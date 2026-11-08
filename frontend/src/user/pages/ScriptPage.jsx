@@ -34,7 +34,7 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
-import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, updateComicPage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
+import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, setPrimaryBookAssetImage, updateBookAsset, updateComicPage, uploadBookAssetImage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 import PrivateComicWorkspace from './PrivateComicWorkspace';
@@ -47,6 +47,7 @@ import { PrivateStudioSteps } from './private-studio/PrivateStudioSteps';
 import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTitle } from './privateCustomizationComic';
 import { ensurePrivateComicTask, preparePrivateComicTaskSettings } from './privateComicSingleBookFlow.js';
 import { comicPageErrorMessage, comicPageGenerationPayload, generateComicPageWithConflict } from './shuihuo/batchFactoryComicMode';
+import { readImageAsDataURL } from './shuihuo/batchFactoryNovelListHelpers';
 import './shuihuo-production.css';
 import './private-customization.css';
 import './private-studio/private-studio-workbench.css';
@@ -1789,6 +1790,68 @@ export function ScriptPage() {
     }
   }
 
+  async function savePrivateComicAsset(asset, fields) {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || !asset?.id) return false;
+    setPrivateComicError('');
+    try {
+      await updateBookAsset(batchId, bookId, asset.id, {
+        name: fields.name,
+        formalName: fields.name,
+        facts: fields.facts || '',
+        relationships: fields.relationships || '',
+        appearance: fields.appearance || fields.prompt,
+        prompt: fields.prompt,
+        imageModelId: fields.imageModelId || '',
+        imageAspectRatio: fields.imageAspectRatio || '',
+        expectedRevision: Number(asset.revision || 0)
+      });
+      await loadPrivateComicProductionData(batchId, bookId);
+      message.success('当前小说资产已保存。');
+      return true;
+    } catch (error) {
+      setPrivateComicError(error?.message || '保存资产失败');
+      return false;
+    }
+  }
+
+  async function uploadPrivateComicAssetImage(asset, file) {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || !asset?.id || !file) return false;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      message.error('仅支持 PNG、JPG、WEBP 图片。');
+      return false;
+    }
+    setPrivateComicError('');
+    try {
+      await uploadBookAssetImage(batchId, bookId, asset.id, await readImageAsDataURL(file));
+      await loadPrivateComicProductionData(batchId, bookId);
+      message.success('图片版本已保存到当前小说资产。');
+      return true;
+    } catch (error) {
+      setPrivateComicError(error?.message || '上传资产图片失败');
+      return false;
+    }
+  }
+
+  async function setPrivateComicPrimaryAssetImage(asset, image) {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || !asset?.id || !image?.id || image.isPrimary) return false;
+    setPrivateComicError('');
+    try {
+      await setPrimaryBookAssetImage(batchId, bookId, asset.id, image.id);
+      await loadPrivateComicProductionData(batchId, bookId);
+      message.success('已切换为当前资产主图。');
+      return true;
+    } catch (error) {
+      setPrivateComicError(error?.message || '切换主图失败');
+      return false;
+    }
+  }
+
   async function runPrivateComicPrompts() {
     const batchId = privateComicTask?.batchId;
     const bookId = privateComicTask?.bookId;
@@ -2426,6 +2489,9 @@ export function ScriptPage() {
           actionKey={privateComicActionKey}
           onExtractAssets={() => void runPrivateComicAssets()}
           onGenerateAssetImage={asset => void runPrivateComicAssetImages(asset?.id || '')}
+          onSaveAsset={savePrivateComicAsset}
+          onUploadAssetImage={uploadPrivateComicAssetImage}
+          onSetPrimaryAssetImage={setPrivateComicPrimaryAssetImage}
           onGenerateMissingAssetImages={() => void runPrivateComicAssetImages()}
           onGeneratePrompts={() => void runPrivateComicPrompts()}
           onGeneratePageImage={page => void runPrivateComicPageImages(page?.videoId || '')}

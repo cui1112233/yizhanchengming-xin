@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Dropdown, Input, Modal, Popconfirm, Progress, Select, Space, Typography, message } from 'antd';
-import { Download, ExternalLink, MoreHorizontal, Pencil, RefreshCw, Settings2, WandSparkles } from 'lucide-react';
+import { Alert, Button, Dropdown, Image, Input, Modal, Popconfirm, Progress, Select, Space, Typography, message } from 'antd';
+import { Download, ExternalLink, ImageIcon, MoreHorizontal, Pencil, RefreshCw, Settings2, WandSparkles } from 'lucide-react';
 
 import { getComicPageImageBlob } from '../../shared/api/batchFactory';
+import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../shared/imageAspectRatios.js';
 import { BatchFactoryComicStylePicker } from './shuihuo/BatchFactoryComicStylePicker';
 import { nextComicOutputVisibleCount, resolveComicImageSources } from './shuihuo/batchFactoryComicStatus.js';
+import { loadBookAssetDisplayURL } from './shuihuo/batchFactoryNovelListHelpers';
+import { PrivateStudioAssetEditor } from './private-studio/PrivateStudioAssetEditor';
 import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
 import { PRIVATE_STUDIO_CONSTRAINT_FIELDS, PrivateStudioConstraintSection, PrivateStudioConstraintsModal } from './private-studio/PrivateStudioConstraintsModal';
 import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
@@ -67,6 +70,32 @@ function taskLabel(task) {
   if (task.status === 'created') return '已创建，准备启动';
   if (task.status === 'idle') return '已就绪，可手动执行或重试';
   return '漫画生成中';
+}
+
+function PrivateComicAssetImage({ imageUrl, alt = '', preview = false }) {
+  const [display, setDisplay] = useState({ url: '', failed: false });
+  useEffect(() => {
+    let active = true;
+    let ownedUrl = '';
+    setDisplay({ url: '', failed: false });
+    loadBookAssetDisplayURL(imageUrl).then(result => {
+      if (!active) {
+        if (result.owned) URL.revokeObjectURL(result.url);
+        return;
+      }
+      if (result.owned) ownedUrl = result.url;
+      setDisplay({ url: result.url, failed: false });
+    }).catch(() => { if (active) setDisplay({ url: '', failed: true }); });
+    return () => {
+      active = false;
+      if (ownedUrl) URL.revokeObjectURL(ownedUrl);
+    };
+  }, [imageUrl]);
+
+  if (!display.url) return <span className="batch-factory-asset-image-state">{display.failed ? '图片加载失败' : '正在读取图片…'}</span>;
+  return preview
+    ? <Image src={display.url} alt={alt} preview={{ mask: '点击放大' }} />
+    : <img src={display.url} alt={alt} />;
 }
 
 function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt }) {
@@ -296,6 +325,9 @@ export function PrivateComicWorkspace({
   actionKey = '',
   onExtractAssets,
   onGenerateAssetImage,
+  onSaveAsset,
+  onUploadAssetImage,
+  onSetPrimaryAssetImage,
   onGenerateMissingAssetImages,
   onGeneratePrompts,
   onGeneratePageImage,
@@ -321,8 +353,45 @@ export function PrivateComicWorkspace({
   const [savingSettings, setSavingSettings] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(null);
   const [assetPreview, setAssetPreview] = useState(null);
+  const [editingAsset, setEditingAsset] = useState(null);
+  const [assetSaving, setAssetSaving] = useState(false);
   const workbenchRef = useRef(null);
   const comic = draft.comic && typeof draft.comic === 'object' ? draft.comic : {};
+
+  async function saveEditingAsset() {
+    if (!text(editingAsset?.name) || !text(editingAsset?.prompt)) {
+      message.warning('请填写资产名称和提示词。');
+      return;
+    }
+    setAssetSaving(true);
+    try {
+      if (await onSaveAsset?.(assetList.find(asset => asset.id === editingAsset.id) || editingAsset, editingAsset)) setEditingAsset(null);
+    } finally {
+      setAssetSaving(false);
+    }
+  }
+
+  async function uploadEditingAssetImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !editingAsset) return;
+    setAssetSaving(true);
+    try {
+      await onUploadAssetImage?.(editingAsset, file);
+    } finally {
+      setAssetSaving(false);
+    }
+  }
+
+  async function makeEditingAssetImagePrimary(image) {
+    if (!editingAsset || !image || image.isPrimary) return;
+    setAssetSaving(true);
+    try {
+      await onSetPrimaryAssetImage?.(editingAsset, image);
+    } finally {
+      setAssetSaving(false);
+    }
+  }
 
   function handleResizeStart(event) {
     if (event.button !== 0 || !workbenchRef.current) return;
@@ -371,6 +440,9 @@ export function PrivateComicWorkspace({
   const assetList = Array.isArray(comicAssets) ? comicAssets : [];
   const pageList = Array.isArray(comicPages) ? comicPages : [];
   const assetImagesFor = asset => Array.isArray(comicAssetImages?.[asset?.id]) ? comicAssetImages[asset.id] : [];
+  const editingAssetImages = editingAsset ? assetImagesFor(editingAsset) : [];
+  const editingAssetPrimaryImage = editingAssetImages.find(image => image?.isPrimary) || editingAssetImages[0] || null;
+  const editingAssetGenerating = action === 'images' && actionKey === editingAsset?.id;
   const assetsForKind = kind => assetList.filter(asset => text(asset?.kind) === kind);
   const assetImageReady = asset => assetImagesFor(asset).length > 0;
   const assetsWithImages = assetList.filter(assetImageReady).length;
@@ -585,11 +657,13 @@ export function PrivateComicWorkspace({
             const visible = items.slice(0, 3);
             return <div className="private-comic-asset-row" key={section.key}>
               <b className="private-comic-asset-row-label">{section.label}<span className="legacy-muted">{items.length}</span></b>
-              {visible.length ? visible.map(asset => <span
+              {visible.length ? visible.map(asset => <button
+                type="button"
                 className="private-comic-asset-name"
                 key={asset.id}
                 title={`${asset.name || '未命名资产'} · ${assetImageReady(asset) ? '资产图已生成' : assetImageFailed(asset) ? '资产图生成失败，可补齐' : '资产图未生成'}`}
-              >{asset.name || '未命名资产'}</span>) : <span className="private-comic-asset-empty">{section.empty}</span>}
+                onClick={() => setEditingAsset({ ...asset })}
+              >{asset.name || '未命名资产'}</button>) : <span className="private-comic-asset-empty">{section.empty}</span>}
               {items.length > 3 ? <Button size="small" type="text" className="entity-section-more" onClick={() => setAssetPreview({ title: section.label, items })}>查看全部</Button> : null}
             </div>;
           })}
@@ -768,21 +842,60 @@ export function PrivateComicWorkspace({
     </PrivateStudioConstraintsModal>
 
     <Modal
-      title={assetPreview ? `${assetPreview.title} · ${assetPreview.items.length}` : ''}
+      title={assetPreview ? `选择${assetPreview.title} · ${assetPreview.items.length}` : ''}
       open={Boolean(assetPreview)}
       onCancel={() => setAssetPreview(null)}
       footer={null}
       width={520}
     >
-      {(assetPreview?.items || []).map(asset => <div className="private-comic-asset-preview-row" key={asset.id}>
+      {(assetPreview?.items || []).map(asset => <button type="button" className="private-comic-asset-preview-row" key={asset.id} onClick={() => {
+        setAssetPreview(null);
+        setEditingAsset({ ...asset });
+      }}>
         <span>{asset.name || '未命名资产'}</span>
         <small className="entity-media-status">
           {assetImageReady(asset)
             ? `资产图已生成${assetImagesFor(asset).length > 1 ? ` · ${assetImagesFor(asset).length} 张` : ''}`
             : assetImageFailed(asset) ? '资产图生成失败，可补齐' : '资产图未生成'}
         </small>
-      </div>)}
+      </button>)}
     </Modal>
+
+    <PrivateStudioAssetEditor
+      open={Boolean(editingAsset)}
+      title={`编辑资产 · ${editingAsset?.name || '未命名资产'}`}
+      onClose={() => setEditingAsset(null)}
+      width={920}
+      basic={<>
+        <div className="batch-factory-asset-editor-config-row">
+          <label className="batch-factory-asset-editor-config-field is-kind"><span>资产分类</span><Input value={assetKindLabel(editingAsset?.kind)} disabled /></label>
+          <label className="batch-factory-asset-editor-config-field is-model"><span>图片模型</span><Select allowClear value={editingAsset?.imageModelId || draft.imageModelId || undefined} placeholder="使用书籍默认" options={modelOptions.image || []} onChange={imageModelId => setEditingAsset(current => ({ ...current, imageModelId: imageModelId || '' }))} /></label>
+          <label className="batch-factory-asset-editor-config-field is-ratio"><span>图片画幅</span><Select allowClear value={editingAsset?.imageAspectRatio || '9:16'} placeholder="默认 9:16" options={IMAGE_ASPECT_RATIO_OPTIONS} onChange={imageAspectRatio => setEditingAsset(current => ({ ...current, imageAspectRatio: imageAspectRatio || '' }))} /></label>
+        </div>
+        <label className="shuihuo-form-label">名称<Input value={editingAsset?.name || ''} onChange={event => setEditingAsset(current => ({ ...current, name: event.target.value }))} /></label>
+      </>}
+      settings={editingAsset?.kind === 'character' ? <section className="batch-factory-asset-editor-character-section">
+        <div className="batch-factory-asset-editor-section-title">人物设定</div>
+        <div className="batch-factory-asset-editor-character-fields">
+          <label className="shuihuo-form-label">人物事实<Input.TextArea rows={3} value={editingAsset?.facts || ''} onChange={event => setEditingAsset(current => ({ ...current, facts: event.target.value }))} placeholder="身份、性别、年龄阶段、别名等原文事实" /></label>
+          <label className="shuihuo-form-label">人物关系<Input.TextArea rows={3} value={editingAsset?.relationships || ''} onChange={event => setEditingAsset(current => ({ ...current, relationships: event.target.value }))} placeholder="与其他人物的关系及原文依据" /></label>
+          <label className="shuihuo-form-label batch-factory-asset-editor-character-appearance">人物外形<Input.TextArea rows={4} value={editingAsset?.appearance || editingAsset?.prompt || ''} onChange={event => setEditingAsset(current => ({ ...current, appearance: event.target.value }))} placeholder="脸型、发型、服装、体态等跨镜头一致性锚点" /></label>
+        </div>
+      </section> : <Typography.Text type="secondary">场景 / 道具暂无独立设定字段，提示词在下方维护。</Typography.Text>}
+      prompts={<label className="shuihuo-form-label">合并资产提示词 / AI 生图提示词<Input.TextArea rows={editingAsset?.kind === 'character' ? 6 : 12} value={editingAsset?.prompt || ''} onChange={event => setEditingAsset(current => ({ ...current, prompt: event.target.value }))} placeholder="输入最终合并后的可视化提示词" /></label>}
+      ruleNote="规则：这个资产有图片时，生成视频走“图片生视频”，不发文字设定；没图片时，按上面的文字走“文字生视频”。"
+      aside={<>
+        <div className="batch-factory-asset-editor-panel-head"><b>主图预览</b><span className="entity-media-status">图片 {editingAssetImages.length} 张</span></div>
+        {editingAssetPrimaryImage ? <div className="batch-factory-asset-editor-main"><PrivateComicAssetImage imageUrl={editingAssetPrimaryImage.url} alt={`${editingAsset?.name || '资产'} 主图`} preview /></div>
+          : <div className="batch-factory-asset-editor-main is-empty"><ImageIcon size={34} aria-hidden="true" /><span>{assetImageFailed(editingAsset) ? '资产图生成失败，可重新生成' : '暂无主图，请上传图片或用 AI 生成'}</span></div>}
+        <div className="batch-factory-asset-editor-panel-actions">
+          <label className="batch-factory-image-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadEditingAssetImage} disabled={assetSaving || editingAssetGenerating} />上传图片版本</label>
+          <Button type="primary" loading={editingAssetGenerating} disabled={assetSaving || editingAssetGenerating || !editingAsset?.id} onClick={() => onGenerateAssetImage?.(editingAsset)}>AI生成</Button>
+        </div>
+        <div className="batch-factory-asset-editor-thumbs">{editingAssetImages.map(image => <button type="button" key={image.id} className={`batch-factory-asset-editor-thumb${image.id === editingAssetPrimaryImage?.id ? ' is-main' : ''}`} title={image.isPrimary ? '当前主图' : '切换为主图'} disabled={assetSaving || editingAssetGenerating} onClick={() => void makeEditingAssetImagePrimary(image)}><PrivateComicAssetImage imageUrl={image.url} alt={`${editingAsset?.name || '资产'} 版本 ${image.revision || ''}`} />{image.isPrimary ? <span className="batch-factory-asset-editor-thumb-tag">主图</span> : null}</button>)}{!editingAssetImages.length ? <span className="batch-factory-asset-editor-thumbs-empty">还没有图片版本</span> : null}</div>
+      </>}
+      footer={<Space><Button onClick={() => setEditingAsset(null)}>取消</Button><Button type="primary" loading={assetSaving} onClick={() => void saveEditingAsset()}>保存</Button></Space>}
+    />
   </section>;
 }
 
