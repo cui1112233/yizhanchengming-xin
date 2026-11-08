@@ -6,12 +6,13 @@ const shell = readFileSync(new URL('./PrivateStudioAssetEditor.jsx', import.meta
 const shellCss = readFileSync(new URL('./private-studio-asset-editor.css', import.meta.url), 'utf8');
 const scriptPage = readFileSync(new URL('../ScriptPage.jsx', import.meta.url), 'utf8');
 const shuihuoPage = readFileSync(new URL('../shuihuo/BatchFactoryNovelList.jsx', import.meta.url), 'utf8');
+const comicPage = readFileSync(new URL('../PrivateComicWorkspace.jsx', import.meta.url), 'utf8');
 const ratios = readFileSync(new URL('../../../shared/imageAspectRatios.js', import.meta.url), 'utf8');
 
 const scriptEditor = scriptPage.slice(scriptPage.indexOf('function EntityEditor('));
 const shuihuoEditor = shuihuoPage.slice(shuihuoPage.indexOf('<PrivateStudioAssetEditor'), shuihuoPage.indexOf('</section>;', shuihuoPage.indexOf('<PrivateStudioAssetEditor')));
 
-test('两个页面共用同一套编辑资产外壳与同一套分区', () => {
+test('剧本、批量工厂和单本漫画共用同一套编辑资产外壳与同一套分区', () => {
   assert.match(shell, /export function PrivateStudioAssetEditor\(/);
   assert.match(shell, /PrivateStudioAssetEditorSection title="基础"/);
   assert.match(shell, /PrivateStudioAssetEditorSection title="设定"/);
@@ -20,8 +21,10 @@ test('两个页面共用同一套编辑资产外壳与同一套分区', () => {
   assert.match(shell, /className="private-studio-asset-editor-footer"/);
   assert.match(scriptPage, /import \{ PrivateStudioAssetEditor \} from '\.\/private-studio\/PrivateStudioAssetEditor';/);
   assert.match(shuihuoPage, /import \{ PrivateStudioAssetEditor \} from '\.\.\/private-studio\/PrivateStudioAssetEditor';/);
+  assert.match(comicPage, /import \{ PrivateStudioAssetEditor \} from '\.\/private-studio\/PrivateStudioAssetEditor';/);
   assert.match(scriptEditor, /<PrivateStudioAssetEditor[\s\S]{0,400}编辑资产 · \$\{entityName\(fields\)/);
   assert.match(shuihuoEditor, /<PrivateStudioAssetEditor[\s\S]{0,400}编辑资产 · \$\{assetName\(editing\)\}/);
+  assert.match(comicPage, /<PrivateStudioAssetEditor/);
 });
 
 test('剧本人物四个字段全部渲染在统一弹窗里，外形按剧本侧命名', () => {

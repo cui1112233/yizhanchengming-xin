@@ -73,3 +73,14 @@ test('comic output cards render the first screen lazily instead of all pages at 
   assert.match(source, /visiblePages\.map/);
   assert.match(source, /shot-output-cards-more/);
 });
+
+test('single-book comic assets open the shared asset editor instead of a passive preview', () => {
+  assert.match(source, /import \{ PrivateStudioAssetEditor \} from '\.\/private-studio\/PrivateStudioAssetEditor';/);
+  assert.match(source, /<button[\s\S]{0,160}className="private-comic-asset-name"/);
+  assert.match(source, /<PrivateStudioAssetEditor/);
+  assert.match(source, /onSaveAsset/);
+  assert.match(source, /onUploadAssetImage/);
+  assert.match(source, /onSetPrimaryAssetImage/);
+  assert.match(source, /onGenerateAssetImage/);
+  assert.doesNotMatch(source, /title=\{assetPreview \? `\$\{assetPreview\.title\} · \$\{assetPreview\.items\.length\}` : ''\}/);
+});
