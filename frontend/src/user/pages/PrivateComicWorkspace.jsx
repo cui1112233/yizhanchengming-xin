@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Dropdown, Image, Input, Modal, Popconfirm, Progress, Select, Space, Typography, message } from 'antd';
+import { Alert, Button, Dropdown, Image, Input, Modal, Popconfirm, Progress, Select, Space, Switch, Tooltip, Typography, message } from 'antd';
 import { Download, ExternalLink, ImageIcon, MoreHorizontal, Pencil, RefreshCw, Settings2, WandSparkles } from 'lucide-react';
 
 import { getComicPageImageBlob } from '../../shared/api/batchFactory';
@@ -9,6 +9,7 @@ import { nextComicOutputVisibleCount, resolveComicImageSources } from './shuihuo
 import { comicEstimatedPageRange } from './shuihuo/batchFactoryContentRange.js';
 import { loadBookAssetDisplayURL } from './shuihuo/batchFactoryNovelListHelpers';
 import { PrivateStudioAssetEditor } from './private-studio/PrivateStudioAssetEditor';
+import { privateComicAssetUseThreeView } from './private-studio/privateComicThreeView.js';
 import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
 import { PRIVATE_STUDIO_CONSTRAINT_FIELDS, PrivateStudioConstraintSection, PrivateStudioConstraintsModal } from './private-studio/PrivateStudioConstraintsModal';
 import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
@@ -356,6 +357,7 @@ export function PrivateComicWorkspace({
   const [assetPreview, setAssetPreview] = useState(null);
   const [editingAsset, setEditingAsset] = useState(null);
   const [assetSaving, setAssetSaving] = useState(false);
+  const [assetImageThreeView, setAssetImageThreeView] = useState(true);
   const workbenchRef = useRef(null);
   const comic = draft.comic && typeof draft.comic === 'object' ? draft.comic : {};
 
@@ -891,8 +893,9 @@ export function PrivateComicWorkspace({
         {editingAssetPrimaryImage ? <div className="batch-factory-asset-editor-main"><PrivateComicAssetImage imageUrl={editingAssetPrimaryImage.url} alt={`${editingAsset?.name || '资产'} 主图`} preview /></div>
           : <div className="batch-factory-asset-editor-main is-empty"><ImageIcon size={34} aria-hidden="true" /><span>{assetImageFailed(editingAsset) ? '资产图生成失败，可重新生成' : '暂无主图，请上传图片或用 AI 生成'}</span></div>}
         <div className="batch-factory-asset-editor-panel-actions">
+          {editingAsset?.kind === 'character' ? <Tooltip title="开启后人物资产图按“正面近照 + 正面/侧面/背面全身”三视图生成，便于分镜保持角色一致。"><span className="batch-factory-asset-editor-three-view"><Switch size="small" checked={assetImageThreeView} onChange={setAssetImageThreeView} disabled={assetSaving || editingAssetGenerating} />人物三视图</span></Tooltip> : null}
           <label className="batch-factory-image-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadEditingAssetImage} disabled={assetSaving || editingAssetGenerating} />上传图片版本</label>
-          <Button type="primary" loading={editingAssetGenerating} disabled={assetSaving || editingAssetGenerating || !editingAsset?.id} onClick={() => onGenerateAssetImage?.(editingAsset)}>AI生成</Button>
+          <Button type="primary" loading={editingAssetGenerating} disabled={assetSaving || editingAssetGenerating || !editingAsset?.id} onClick={() => onGenerateAssetImage?.(editingAsset, privateComicAssetUseThreeView(editingAsset?.kind, assetImageThreeView))}>AI生成</Button>
         </div>
         <div className="batch-factory-asset-editor-thumbs">{editingAssetImages.map(image => <button type="button" key={image.id} className={`batch-factory-asset-editor-thumb${image.id === editingAssetPrimaryImage?.id ? ' is-main' : ''}`} title={image.isPrimary ? '当前主图' : '切换为主图'} disabled={assetSaving || editingAssetGenerating} onClick={() => void makeEditingAssetImagePrimary(image)}><PrivateComicAssetImage imageUrl={image.url} alt={`${editingAsset?.name || '资产'} 版本 ${image.revision || ''}`} />{image.isPrimary ? <span className="batch-factory-asset-editor-thumb-tag">主图</span> : null}</button>)}{!editingAssetImages.length ? <span className="batch-factory-asset-editor-thumbs-empty">还没有图片版本</span> : null}</div>
       </>}

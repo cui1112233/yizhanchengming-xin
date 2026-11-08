@@ -1746,7 +1746,7 @@ export function ScriptPage() {
     }
   }
 
-  async function runPrivateComicAssetImages(assetId = '') {
+  async function runPrivateComicAssetImages(assetId = '', useThreeView = true) {
     const batchId = privateComicTask?.batchId;
     const bookId = privateComicTask?.bookId;
     const ids = assetId ? [assetId] : privateComicAssets
@@ -1763,7 +1763,7 @@ export function ScriptPage() {
         modelId: privateComicDraft.imageModelId || undefined,
         provider: privateComicDraft.imageProvider || undefined,
         imageAspectRatio: '9:16',
-        useThreeView: true
+        useThreeView: Boolean(useThreeView)
       });
       const images = Array.isArray(result?.images) ? result.images : [];
       if (!images.length && result?.taskId) {
@@ -2488,7 +2488,7 @@ export function ScriptPage() {
           action={privateComicAction}
           actionKey={privateComicActionKey}
           onExtractAssets={() => void runPrivateComicAssets()}
-          onGenerateAssetImage={asset => void runPrivateComicAssetImages(asset?.id || '')}
+          onGenerateAssetImage={(asset, useThreeView) => void runPrivateComicAssetImages(asset?.id || '', useThreeView)}
           onSaveAsset={savePrivateComicAsset}
           onUploadAssetImage={uploadPrivateComicAssetImage}
           onSetPrimaryAssetImage={setPrivateComicPrimaryAssetImage}
