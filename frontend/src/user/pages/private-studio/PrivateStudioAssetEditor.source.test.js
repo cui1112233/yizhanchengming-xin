@@ -27,6 +27,12 @@ test('剧本、批量工厂和单本漫画共用同一套编辑资产外壳与�
   assert.match(comicPage, /<PrivateStudioAssetEditor/);
 });
 
+test('统一资产编辑器允许点击遮罩或按 Esc 关闭', () => {
+  assert.match(shell, /onCancel=\{onClose\}/);
+  assert.match(shell, /maskClosable/);
+  assert.match(shell, /keyboard/);
+});
+
 test('剧本人物四个字段全部渲染在统一弹窗里，外形按剧本侧命名', () => {
   assert.match(shell, /key: '名称', label: '名称', section: 'basic', source: '名称'/);
   assert.match(shell, /key: '身份', label: '身份', section: 'settings', source: '身份'/);

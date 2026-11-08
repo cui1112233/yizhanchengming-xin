@@ -59,6 +59,9 @@ export function PrivateStudioAssetEditor({ open, title, onClose, width = 920, fu
     title={null}
     footer={null}
     closable={false}
+    onCancel={onClose}
+    maskClosable
+    keyboard
     width={fullscreen ? '100vw' : width}
     style={fullscreen ? { top: 0, paddingBottom: 0 } : undefined}
     rootClassName="private-studio-asset-editor-modal"
