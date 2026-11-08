@@ -83,29 +83,12 @@ git commit -m "feat: derive private comic generation status"
 **Files:**
 - Modify: `frontend/src/user/pages/PrivateComicWorkspace.jsx`
 - Modify: `frontend/src/user/pages/private-studio/private-studio-workbench.css`
-- Modify: `frontend/src/user/pages/PrivateComicWorkspace.source.test.js`
 
 **Interfaces:**
 - Consumes: `privateComicGenerationStatus(input)` from Task 1.
 - Produces: two `role="status"` cards with stage label, state, count/detail, and conditional retry button.
 
-- [ ] **Step 1: Add failing source-contract assertions**
-
-```js
-assert.match(source, /privateComicGenerationStatus\(/);
-assert.match(source, /private-comic-generation-statuses/);
-assert.match(source, />漫画提示词</);
-assert.match(source, />漫画图片</);
-assert.match(source, /重试未完成项/);
-```
-
-- [ ] **Step 2: Run the source test and verify it fails on the missing status cards**
-
-Run: `node --test src/user/pages/PrivateComicWorkspace.source.test.js`
-
-Expected: FAIL because the status container and retry copy do not exist.
-
-- [ ] **Step 3: Wire the resolver to existing truthful state**
+- [ ] **Step 1: Wire the tested resolver to existing truthful state**
 
 ```jsx
 const generationStatus = privateComicGenerationStatus({
@@ -122,7 +105,7 @@ const generationStatus = privateComicGenerationStatus({
 
 Render the two cards immediately below the toolbar. Prompt retry calls `onGeneratePrompts`; image retry calls `onGenerateAllPageImages`. Disable either retry while `busy || actionBusy`.
 
-- [ ] **Step 4: Add responsive scoped styles**
+- [ ] **Step 2: Add responsive scoped styles**
 
 ```css
 .private-studio-workbench .private-comic-generation-statuses {
@@ -138,16 +121,16 @@ Render the two cards immediately below the toolbar. Prompt retry calls `onGenera
 
 Use distinct but theme-compatible idle, running, complete, and failed tones. Do not rely on color alone; always render the state label and detail text.
 
-- [ ] **Step 5: Run focused tests**
+- [ ] **Step 3: Run focused tests**
 
-Run: `node --test src/user/pages/private-studio/privateComicGenerationStatus.test.js src/user/pages/PrivateComicWorkspace.source.test.js src/user/pages/PrivateStudioWorkbench.layout.test.js`
+Run: `node --test src/user/pages/private-studio/privateComicGenerationStatus.test.js src/user/pages/PrivateStudioWorkbench.layout.test.js`
 
 Expected: all tests PASS with `fail 0`.
 
-- [ ] **Step 6: Commit the UI and styles**
+- [ ] **Step 4: Commit the UI and styles**
 
 ```bash
-git add frontend/src/user/pages/PrivateComicWorkspace.jsx frontend/src/user/pages/private-studio/private-studio-workbench.css frontend/src/user/pages/PrivateComicWorkspace.source.test.js
+git add frontend/src/user/pages/PrivateComicWorkspace.jsx frontend/src/user/pages/private-studio/private-studio-workbench.css
 git commit -m "feat: show private comic generation status"
 ```
 
