@@ -39,6 +39,41 @@ func TestDirectorServiceHydratesLegacyVideoSelectionBeforeGeneration(t *testing.
 	}
 }
 
+func TestRunComicAssetExtractionUsesBackendDefaultForPrivateCustomizationTask(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	data := `[{"id":"batch-comic-assets","module":"batch-factory","name":"漫画资产","kind":"base","version":4,"revision":1,"status":"published","body":"后台漫画资产正文","protocolLock":{"format":"json","slot":"batch.comic-assets"}}]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "单本漫画", Books: []CreateBookInput{{
+		ID: "book-private", Title: "单本漫画", SourceText: "这是一段足够长的单本漫画正文，用来验证旧任务缺少提示词时仍能正常提取资产。", Platform: "private_customization",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode": rawSetting(t, "comic"),
+			"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "scope": "private_customization"}}),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{values: []string{`{"characters":[{"name":"阿月","prompt":"青衣少女"}],"scenes":[],"props":[]}`}}
+	assets, err := (&DirectorService{Store: store, Provider: provider, PresetCatalog: prompt.NewCatalog(path)}).RunComicAssetExtraction(context.Background(), "alice", batch.ID, batch.Books[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 1 || !strings.Contains(provider.calls[0].SystemPrompt, "后台漫画资产正文") {
+		t.Fatalf("private comic asset extraction did not use backend default: calls=%+v", provider.calls)
+	}
+	if len(assets) != 1 || assets[0].Name != "阿月" {
+		t.Fatalf("private comic assets=%+v, want 阿月", assets)
+	}
+}
+
 func (p *queuedDirectorProvider) Complete(_ context.Context, input TextCompletionRequest) (string, error) {
 	p.calls = append(p.calls, input)
 	if len(p.values) == 0 {

@@ -23,6 +23,55 @@ func normalizeLegacyComicBookAsset(asset BookAsset) BookAsset {
 	return asset
 }
 
+func isPrivateCustomizationBook(book Book) bool {
+	if strings.TrimSpace(book.Platform) == "private_customization" {
+		return true
+	}
+	sourceMode, _ := book.SourceMetadata["sourceMode"].(string)
+	return strings.TrimSpace(sourceMode) == "private_customization"
+}
+
+func (s *DirectorService) hydratePrivateComicAssetPreset(book Book, snapshot DirectorSnapshot) (DirectorSnapshot, error) {
+	if s == nil || s.PresetCatalog == nil || !isPrivateCustomizationBook(book) {
+		return snapshot, nil
+	}
+	config := map[string]any{}
+	if raw := snapshot.Effective["aiPromptConfig"]; len(raw) > 0 {
+		if err := json.Unmarshal(raw, &config); err != nil || config == nil {
+			return snapshot, fmt.Errorf("%w: AI 提示词配置格式不正确", ErrInvalid)
+		}
+	}
+	comic, _ := config["comic"].(map[string]any)
+	if comic == nil {
+		comic = map[string]any{}
+		config["comic"] = comic
+	}
+	assets, _ := comic["assets"].(map[string]any)
+	if assets == nil {
+		assets = map[string]any{}
+		comic["assets"] = assets
+	}
+	preset, found, err := s.PresetCatalog.PublishedBody("batch-factory", "batch-comic-assets")
+	if err != nil {
+		return snapshot, fmt.Errorf("%w: 读取漫画资产提示词失败", ErrUnavailable)
+	}
+	if !found || strings.TrimSpace(preset.Body) == "" {
+		return snapshot, NewConfigRequiredError("系统默认漫画资产提示词不存在或未发布")
+	}
+	assets["presetId"] = preset.ID
+	assets["presetName"] = preset.Name
+	assets["presetSlot"] = preset.Slot
+	assets["presetVersion"] = preset.Version
+	assets["body"] = preset.Body
+	assets["constraintCategory"] = preset.ConstraintCategory
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return snapshot, fmt.Errorf("%w: 保存漫画资产提示词配置失败", ErrInvalid)
+	}
+	snapshot.Effective["aiPromptConfig"] = encoded
+	return snapshot, nil
+}
+
 // BuildComicAssetExtractionContract turns the selected backend-owned comic
 // asset preset into the one text-model call that establishes comic continuity.
 func BuildComicAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptContract, error) {
@@ -80,6 +129,10 @@ func (s *DirectorService) RunComicAssetExtraction(ctx context.Context, owner, ba
 		return nil, err
 	}
 	snapshot, err := snapshotForAssetExtraction(batch, book)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err = s.hydratePrivateComicAssetPreset(book, snapshot)
 	if err != nil {
 		return nil, err
 	}
