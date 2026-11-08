@@ -112,7 +112,7 @@ func TestRunHealthcheckRequiresHTTP200(t *testing.T) {
 	}
 }
 
-func TestConfigureDatabasePoolReusesBurstConnections(t *testing.T) {
+func TestConfigureDatabasePoolSupportsBurstAndCapsIdleConnections(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatal(err)
@@ -148,8 +148,9 @@ func TestConfigureDatabasePoolReusesBurstConnections(t *testing.T) {
 	if stats.MaxOpenConnections != 24 {
 		t.Fatalf("max open connections = %d, want 24", stats.MaxOpenConnections)
 	}
-	if stats.Idle < workers {
-		t.Fatalf("idle connections = %d, want at least %d reusable burst connections", stats.Idle, workers)
+	const maxIdle = 4
+	if stats.Idle != maxIdle {
+		t.Fatalf("idle connections = %d, want %d after the burst", stats.Idle, maxIdle)
 	}
 }
 
