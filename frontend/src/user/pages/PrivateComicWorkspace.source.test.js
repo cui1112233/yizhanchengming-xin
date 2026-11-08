@@ -40,6 +40,12 @@ test('comic constraints are persisted to the server task with a readback check',
   assert.match(source, /okText=\{task\?\.batchId \? '保存到任务' : '完成'\}/);
 });
 
+test('private comic workspace shows a live page estimate before generation', () => {
+  assert.match(source, /import \{ comicEstimatedPageRange \} from '\.\/shuihuo\/batchFactoryContentRange\.js';/);
+  assert.match(source, /const pageEstimate = comicEstimatedPageRange\(sourceLength\);/);
+  assert.match(source, /已读取 \$\{sourceLength\} 字 · 预计约 \$\{pageEstimate\.min\}～\$\{pageEstimate\.max\} 张/);
+});
+
 test('asset images are an optional enhancement and never block the next required step', () => {
   assert.match(source, /key: 'assetImages', label: '资产图（可选）', optional: true/);
   assert.match(source, /find\(step => !step\.done && !step\.optional\)/);

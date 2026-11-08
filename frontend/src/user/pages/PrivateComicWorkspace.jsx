@@ -6,6 +6,7 @@ import { getComicPageImageBlob } from '../../shared/api/batchFactory';
 import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../shared/imageAspectRatios.js';
 import { BatchFactoryComicStylePicker } from './shuihuo/BatchFactoryComicStylePicker';
 import { nextComicOutputVisibleCount, resolveComicImageSources } from './shuihuo/batchFactoryComicStatus.js';
+import { comicEstimatedPageRange } from './shuihuo/batchFactoryContentRange.js';
 import { loadBookAssetDisplayURL } from './shuihuo/batchFactoryNovelListHelpers';
 import { PrivateStudioAssetEditor } from './private-studio/PrivateStudioAssetEditor';
 import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
@@ -493,6 +494,7 @@ export function PrivateComicWorkspace({
     ? '请先开始生成漫画创建任务'
     : !assetList.length ? '需先提取资产' : actionBusy ? '当前有其他操作进行中' : '';
   const sourceLength = Array.from(text(draft.sourceText)).length;
+  const pageEstimate = comicEstimatedPageRange(sourceLength);
   const draftSaveLabel = draftSaveState.status === 'saving'
     ? '保存中…'
     : draftSaveState.status === 'saved'
@@ -609,7 +611,7 @@ export function PrivateComicWorkspace({
           </div>
         </div>
         <div className="private-studio-count-row">
-          <span>{sourceLength ? `已读取 ${sourceLength} 字（至少 ${privateComicMinSourceLength} 字）` : '尚未读取'}</span>
+          <span>{sourceLength ? `已读取 ${sourceLength} 字 · 预计约 ${pageEstimate.min}～${pageEstimate.max} 张` : '尚未读取'}</span>
           <span>自动保存</span>
         </div>
         {draftSaveState.status === 'failed' ? (
