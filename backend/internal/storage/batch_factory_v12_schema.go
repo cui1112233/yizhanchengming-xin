@@ -148,6 +148,68 @@ func V12AutomationPresetStatements() []string {
 	}
 }
 
+// V12ProductionMediaStatements adds the durable hand-off ledger between the
+// local production cache and TOS. A local file is never cleanup-eligible until
+// remote_verified_at is populated after byte-size and checksum verification.
+func V12ProductionMediaStatements() []string {
+	return []string{
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_media_objects (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  media_kind VARCHAR(32) NOT NULL,
+  media_type VARCHAR(96) NOT NULL DEFAULT 'application/octet-stream',
+  local_storage_ref VARCHAR(512) NOT NULL,
+  object_key VARCHAR(768) NOT NULL,
+  byte_size BIGINT NULL,
+  sha256 CHAR(64) NULL,
+  state VARCHAR(32) NOT NULL DEFAULT 'pending',
+  attempt_count INT NOT NULL DEFAULT 0,
+  retention_days INT NOT NULL DEFAULT 7,
+  last_error VARCHAR(512) NULL,
+  remote_verified_at DATETIME(6) NULL,
+  purge_after DATETIME(6) NULL,
+  local_deleted_at DATETIME(6) NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_bfv12_media_owner_ref (owner_username, local_storage_ref),
+  UNIQUE KEY uq_bfv12_media_object_key (object_key),
+  KEY idx_bfv12_media_upload (state, updated_at, id),
+  KEY idx_bfv12_media_purge (state, purge_after, id),
+  KEY idx_bfv12_media_owner_kind (owner_username, media_kind, created_at)
+) ENGINE=InnoDB`,
+	}
+}
+
+// V12ImageGenerationCacheStatements stores only successful artifact references
+// and short-lived generation leases. It never stores credentials or full
+// prompts; the SHA-256 fingerprint is calculated before persistence.
+func V12ImageGenerationCacheStatements() []string {
+	return []string{
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_image_generation_cache (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  fingerprint CHAR(64) NOT NULL,
+  model_id VARCHAR(191) NOT NULL,
+  state VARCHAR(24) NOT NULL,
+  storage_ref VARCHAR(512) NULL,
+  media_type VARCHAR(96) NULL,
+  lease_until DATETIME(6) NULL,
+  queue_ms BIGINT NOT NULL DEFAULT 0,
+  header_ms BIGINT NOT NULL DEFAULT 0,
+  body_ms BIGINT NOT NULL DEFAULT 0,
+  download_ms BIGINT NOT NULL DEFAULT 0,
+  save_ms BIGINT NOT NULL DEFAULT 0,
+  total_ms BIGINT NOT NULL DEFAULT 0,
+  last_error VARCHAR(512) NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_bfv12_image_cache_fingerprint (owner_username, fingerprint),
+  KEY idx_bfv12_image_cache_lease (state, lease_until, updated_at),
+  KEY idx_bfv12_image_cache_storage_ref (storage_ref)
+) ENGINE=InnoDB`,
+	}
+}
+
 func V12Migrations() []Migration {
 	// 1200001-1200003 belong to Novel Fetch Workshop in the shared migration
 	// ledger. V12 must have its own unused number or a Batch Factory startup
@@ -158,8 +220,10 @@ func V12Migrations() []Migration {
 		{Version: 1200103, SQL: V12H3ProductionTraceStatements(), CallbackChecksum: "batch-factory-v12-h3-production-trace-v1"},
 		{Version: 1200104, SQL: []string{`ALTER TABLE batch_factory_v12_audio_measurements ADD COLUMN measurement_json JSON NULL`}, CallbackChecksum: "batch-factory-v12-line-audio-v1"},
 		{Version: 1200105, SQL: V12CanonicalTableRenameStatements(), CallbackChecksum: "batch-factory-v12-canonical-tables-v1", Adopt: adoptV12CanonicalTableRename},
-		{Version: 1200106, SQL: V12SlotDigestStatements(), CallbackChecksum: "batch-factory-v12-slot-digest-v1"},
-		{Version: 1200107, SQL: V12AutomationPresetStatements(), CallbackChecksum: "batch-factory-v12-automation-presets-v1"},
+		{Version: 1200106, SQL: V12ProductionMediaStatements(), CallbackChecksum: "batch-factory-v12-production-media-v1"},
+		{Version: 1200107, SQL: V12ImageGenerationCacheStatements(), CallbackChecksum: "batch-factory-v12-image-generation-cache-v1"},
+		{Version: 1200108, SQL: V12SlotDigestStatements(), CallbackChecksum: "batch-factory-v12-slot-digest-v1"},
+		{Version: 1200109, SQL: V12AutomationPresetStatements(), CallbackChecksum: "batch-factory-v12-automation-presets-v1"},
 	}
 }
 

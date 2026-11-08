@@ -732,6 +732,9 @@ func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookI
 		if shouldReplaceGeneratedBookTitle(book.Title, book.BookID, input.SourceTitle) {
 			book.Title = strings.TrimSpace(input.SourceTitle)
 		}
+		if sourceBookID := strings.TrimSpace(input.SourceBookID); sourceBookID != "" {
+			book.BookID = sourceBookID
+		}
 		if book.SourceMetadata == nil {
 			book.SourceMetadata = map[string]any{}
 		}
@@ -754,6 +757,17 @@ func (s *MemoryStore) GetBatch(_ context.Context, owner, id string) (Batch, erro
 		return Batch{}, ErrNotFound
 	}
 	return hydrateMemoryBatchSettingsState(v.Value, s.patches, s.hooks, s.directors, s.bookAssets, s.comicSourceSegments), nil
+}
+
+// BatchOwner 与 MySQLStore 保持相同语义：只查归属，不校验调用方账号。
+func (s *MemoryStore) BatchOwner(_ context.Context, id string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.batches[id]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return v.Owner, nil
 }
 
 func (s *MemoryStore) DeleteBook(_ context.Context, owner, batchID, bookID string) error {

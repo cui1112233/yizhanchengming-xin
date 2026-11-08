@@ -55,3 +55,21 @@ test('clearing pasted comic text asks for confirmation first', () => {
   assert.match(source, /该操作不可撤销。/);
   assert.match(source, /onConfirm=\{\(\) => patchDraft\(\{ sourceText: '' \}\)\}/);
 });
+
+test('comic page cards load the thumbnail first and fetch the original only on demand', () => {
+  assert.match(source, /const sources = resolveComicImageSources\(primary\)/);
+  assert.match(source, /const load = target => getComicPageImageBlob\(target\)/);
+  assert.match(source, /load\(sources\.thumbnail\)/);
+  assert.match(source, /async function ensureOriginal\(\)/);
+  assert.match(source, /async function openViewer\(\)/);
+  assert.match(source, /点击查看原图/);
+  assert.match(source, /原图读取失败，请稍后重试/);
+});
+
+test('comic output cards render the first screen lazily instead of all pages at once', () => {
+  assert.match(source, /nextComicOutputVisibleCount/);
+  assert.match(source, /new IntersectionObserver/);
+  assert.match(source, /const visiblePages = pageList\.slice\(0, visibleCount\)/);
+  assert.match(source, /visiblePages\.map/);
+  assert.match(source, /shot-output-cards-more/);
+});

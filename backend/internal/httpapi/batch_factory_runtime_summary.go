@@ -82,7 +82,7 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 				stageSummary["lastFailed"] = summary.LastFailed
 			}
 			if hasComicPages && len(book.Videos) > 0 {
-				pages, pagesErr := comicStore.ListComicPages(r.Context(), owner, batch.ID, book.ID)
+				pages, pagesErr := listComicPagesForView(r.Context(), comicStore, owner, batch.ID, book.ID, true)
 				if pagesErr == nil {
 					readiness := buildComicReadiness(book.Videos, pages, comicPageGenerationLimit)
 					stageSummary["comicImageReadyCount"] = readiness.PrimaryReadyCount

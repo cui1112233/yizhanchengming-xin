@@ -9,6 +9,7 @@ import {
   comicStyleCoverFlowStyle,
   comicStyleIndexFromDrag,
   comicStyleRelativeOffset,
+  comicStyleShouldLoadPreview,
   comicStyleSelection,
   comicStyleWheelDirection,
   normalizeComicReference,
@@ -27,6 +28,18 @@ function fileAsDataURL(file) {
 // 封面原图失败是常见情况（资源被清理/签名过期）。记住失败源，避免同一张图
 // 反复请求、反复闪烁，也避免把每个失败都当成一次用户可见错误。
 const failedPreviewSources = new Set();
+const previewBlobRequests = new Map();
+
+function loadPreviewBlob(src) {
+  const key = String(src || '');
+  if (!previewBlobRequests.has(key)) {
+    previewBlobRequests.set(key, getComicReferencePreviewBlob(key).catch(error => {
+      previewBlobRequests.delete(key);
+      throw error;
+    }));
+  }
+  return previewBlobRequests.get(key);
+}
 
 function AuthenticatedPreview({ src, alt }) {
   const [displayURL, setDisplayURL] = useState('');
@@ -45,7 +58,7 @@ function AuthenticatedPreview({ src, alt }) {
       setDisplayURL(src);
       return undefined;
     }
-    getComicReferencePreviewBlob(src).then(blob => {
+    loadPreviewBlob(src).then(blob => {
       if (!alive) return;
       objectURL = URL.createObjectURL(blob);
       setDisplayURL(objectURL);
@@ -185,9 +198,10 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
         {styles.map((preset, index) => {
           const selected = selectedId === preset.id;
           const offset = comicStyleRelativeOffset(index, activeIndex, styles.length);
+          const loadPreview = comicStyleShouldLoadPreview(index, activeIndex, styles.length);
           return <article className={`batch-factory-comic-style-card${selected ? ' is-selected' : ''}`} style={comicStyleCoverFlowStyle(offset)} key={preset.id}>
             <button type="button" role="radio" aria-checked={selected} disabled={disabled} onClick={() => { if (!dragged.current) selectIndex(index); }}>
-              <span className="batch-factory-comic-style-image"><AuthenticatedPreview src={preset.previewUrl} alt={`${preset.name}预览`} /></span>
+              <span className="batch-factory-comic-style-image">{loadPreview ? <AuthenticatedPreview src={preset.previewUrl} alt={`${preset.name}预览`} /> : <span className="batch-factory-comic-preview-loading"><ImagePlus size={22} /></span>}</span>
               <span className="batch-factory-comic-style-copy"><b>{preset.name}</b><small>{preset.category || '漫画画风'}</small></span>
             </button>
             {selected ? <span className="batch-factory-comic-style-selected"><Check size={13} />已选择</span> : null}

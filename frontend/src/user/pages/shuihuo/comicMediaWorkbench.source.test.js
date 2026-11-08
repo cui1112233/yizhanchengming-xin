@@ -70,3 +70,7 @@ test('comic collection card downloads its ordered primary images as a ZIP', () =
   assert.match(panel, /下载图片/);
   assert.match(panel, /downloadCollectionImages\(collection\)/);
 });
+
+test('comic collection grid requests the server thumbnail before the original', () => {
+  assert.match(panel, /collection\.items[\s\S]*thumbnailUrl=\{item\.thumbnailUrl\}[\s\S]*lazy/);
+});

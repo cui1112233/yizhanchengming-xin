@@ -298,13 +298,18 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		writeJSON(w, http.StatusOK, map[string]any{"batch": batch})
 	})
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}", func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
+		identity, ok := BridgeIdentityFromContext(r.Context())
+		if !ok || identity.Username == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
+		owner := identity.Username
 		batch, err := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
 		if err != nil {
+			if errors.Is(err, batchfactoryv11.ErrNotFound) {
+				writeBatchAccessError(w, r, store, identity)
+				return
+			}
 			writeStoreError(w, err)
 			return
 		}
@@ -581,8 +586,57 @@ func settingsHandler(store batchfactoryv11.Store, catalog *prompt.Catalog, kind 
 			writeStoreError(w, err)
 			return
 		}
+		// settings_patches 同样可以写入页提示词；写入成功后必须让修复版缓存
+		// 立即失效，避免旧的自动改写版继续压住数据库版本。
+		if comicSettingsPatchTouchesPrompt(input.Patch) {
+			switch kind {
+			case batchfactoryv11.ScopeVideo:
+				invalidateShuihuoRepairedPrompt(ref.BatchID, ref.BookID, ref.VideoID)
+			case batchfactoryv11.ScopeBook:
+				invalidateShuihuoRepairedPrompt(ref.BatchID, ref.BookID, "")
+			default:
+				invalidateShuihuoRepairedPrompt(ref.BatchID, "", "")
+			}
+		}
 		writeJSON(w, http.StatusOK, result)
 	}
+}
+
+// batchOwnerLookup 是批次详情的可选存储能力，用来在不扩大 Store 接口的
+// 前提下区分“批次不存在”和“批次属于其他账号”。
+type batchOwnerLookup interface {
+	BatchOwner(context.Context, string) (string, error)
+}
+
+// writeBatchAccessError 把按 owner 过滤后的 ErrNotFound 拆成可读结果：
+//   - 批次存在但归属其他账号：403 + batch_forbidden；
+//   - 批次确实不存在：404 + batch_not_found。
+//
+// 归属账号名只对系统 owner 展示，普通账号只拿到通用文案，避免账号枚举。
+func writeBatchAccessError(w http.ResponseWriter, r *http.Request, store any, identity BridgeIdentity) {
+	lookup, ok := store.(batchOwnerLookup)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "批次不存在或已被删除", "code": "batch_not_found"})
+		return
+	}
+	actualOwner, err := lookup.BatchOwner(r.Context(), r.PathValue("batchId"))
+	if err != nil && !errors.Is(err, batchfactoryv11.ErrNotFound) {
+		writeStoreError(w, err)
+		return
+	}
+	if err == nil && actualOwner != "" && !strings.EqualFold(actualOwner, identity.Username) {
+		payload := map[string]string{
+			"error": "该批次属于其他账号，请用对应账号登录查看",
+			"code":  "batch_forbidden",
+		}
+		if identity.IsOwner {
+			payload["error"] = fmt.Sprintf("该批次属于账号 %s，请用该账号登录查看", actualOwner)
+			payload["owner"] = actualOwner
+		}
+		writeJSON(w, http.StatusForbidden, payload)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, map[string]string{"error": "批次不存在或已被删除", "code": "batch_not_found"})
 }
 
 func bridgeOwner(r *http.Request) (string, bool) {

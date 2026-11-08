@@ -94,6 +94,7 @@ func preflightComicSettingsPatch(t *testing.T, comicBody string, assetsBody stri
 		"productionMode":       mode,
 		"textModelId":          json.RawMessage(`"text-1"`),
 		"imageModelId":         json.RawMessage(`"image-1"`),
+		"assetImagesEnabled":   json.RawMessage("true"),
 		"comicPublishSettings": publish,
 		"aiPromptConfig":       raw,
 	}
@@ -238,7 +239,7 @@ func TestAutomationPreflightReportsSingleBookOverride(t *testing.T) {
 	batch = savePreflightBatchSettings(t, store, batch, preflightComicSettingsPatch(t, "整本漫画页规则", "提取漫画资产"))
 	book := batch.Books[0]
 	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: batch.ID, BookID: book.ID}, batchfactoryv11.SettingsUpdate{
-		Patch:            batchfactoryv11.SettingsPatch{"comicPublishSettings": json.RawMessage(`{}`)},
+		Patch:            batchfactoryv11.SettingsPatch{"comicPublishSettings": json.RawMessage(`{"organizationId":"","producerAdminName":""}`)},
 		ExpectedRevision: book.Revision,
 	}); err != nil {
 		t.Fatal(err)

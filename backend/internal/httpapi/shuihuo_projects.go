@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/imagegenerationcache"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
@@ -54,7 +56,9 @@ func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
 
 var shuihuoProductionConfigs sync.Map
 
-// 出图并发默认 2：需要适配上游限流时可在统一配置里调整（优先）或用环境变量兜底。
+// 恢复 11/03 已验证版本的并发边界：单本默认 2 路、最多 4 路。
+// ggwk 网关的长响应对并发连接敏感，擅自放大到 4/8 路会增加断流和
+// PROTOCOL_ERROR，实际反而更慢。统一配置和环境变量仍可在安全范围内调整。
 const shuihuoImageConcurrencyEnv = "QIANTIE_SHUHUO_IMAGE_CONCURRENCY"
 const shuihuoImageConcurrencyDefault = 2
 const shuihuoImageConcurrencyMax = 4
@@ -311,6 +315,62 @@ func shuihuoEffectiveSettingsFromContext(ctx context.Context) map[string]any {
 		return settings
 	}
 	return nil
+}
+
+type shuihuoImageGenerationCacheContextKey struct{}
+type shuihuoImageGenerationCacheBypassContextKey struct{}
+
+func withShuihuoImageGenerationCache(ctx context.Context, cache imagegenerationcache.Repository) context.Context {
+	if ctx == nil || cache == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoImageGenerationCacheContextKey{}, cache)
+}
+
+func shuihuoImageGenerationCacheFromContext(ctx context.Context) imagegenerationcache.Repository {
+	if ctx == nil {
+		return nil
+	}
+	cache, _ := ctx.Value(shuihuoImageGenerationCacheContextKey{}).(imagegenerationcache.Repository)
+	return cache
+}
+
+func withShuihuoImageGenerationCacheBypass(ctx context.Context) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoImageGenerationCacheBypassContextKey{}, true)
+}
+
+func shuihuoImageGenerationCacheBypassed(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	bypassed, _ := ctx.Value(shuihuoImageGenerationCacheBypassContextKey{}).(bool)
+	return bypassed
+}
+
+type shuihuoImageFingerprintInput struct {
+	Owner            string   `json:"owner"`
+	Endpoint         string   `json:"endpoint"`
+	ModelID          string   `json:"modelId"`
+	Prompt           string   `json:"prompt"`
+	AspectRatio      string   `json:"aspectRatio"`
+	References       []string `json:"references"`
+	WatermarkEnabled bool     `json:"watermarkEnabled"`
+	WatermarkText    string   `json:"watermarkText"`
+}
+
+func shuihuoImageGenerationFingerprint(input shuihuoImageFingerprintInput) string {
+	input.Owner = strings.TrimSpace(input.Owner)
+	input.Endpoint = strings.TrimRight(strings.ToLower(strings.TrimSpace(input.Endpoint)), "/")
+	input.ModelID = strings.TrimSpace(input.ModelID)
+	input.Prompt = strings.TrimSpace(input.Prompt)
+	input.AspectRatio = strings.TrimSpace(input.AspectRatio)
+	input.WatermarkText = strings.TrimSpace(input.WatermarkText)
+	encoded, _ := json.Marshal(input)
+	sum := sha256.Sum256(encoded)
+	return fmt.Sprintf("%x", sum[:])
 }
 
 // withShuihuoImageConcurrency 把当前书生效的出图并发写进上下文，由真正的
@@ -3351,15 +3411,28 @@ func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batch
 		// 把「第几次外层重试」带进上下文，供出图请求的结构化日志对账使用。
 		attemptCtx := withShuihuoImageOuterAttempt(ctx, attempt)
 		mediaType, storageRef, source, err := generateShuihuoImageArtifact(attemptCtx, store, files, presetCatalog, owner, target, imagePrompt, referenceImageURLs, localExecutors)
-		if err == nil || !retryableShuihuoAssetImageError(err) || attempt == maxAttempts {
+		if err == nil {
+			return mediaType, storageRef, source, nil
+		}
+		retryable := retryableShuihuoAssetImageError(err)
+		var billed *shuihuoImageBilledReadFailure
+		if errors.As(err, &billed) {
+			// HTTP 200 表示供应商已经接单并可能计费。正文没有完整取回时
+			// 只记录失败，绝不自动再发一张，避免重复生成和重复扣费。
+			retryable = false
+		}
+		if !retryable || attempt == maxAttempts {
 			return mediaType, storageRef, source, err
 		}
 		lastErr = err
 		delay := shuihuoImageProviderRetryDelay(attempt)
 		var chatErr shuihuoImageChatChannelError
-		if errors.As(err, &chatErr) {
+		switch {
+		case errors.As(err, &billed):
+			log.Printf("shuihuo image body stalled but billed; retrying once attempt=%d/%d after=%s kind=%s model=%s", attempt+1, maxAttempts, delay, billed.kind, target.ModelID)
+		case errors.As(err, &chatErr):
 			log.Printf("shuihuo image provider returned a chat reply instead of image data; retrying attempt=%d/%d after=%s status=%d body=%q model=%s", attempt+1, maxAttempts, delay, chatErr.StatusCode, chatErr.BodySummary, target.ModelID)
-		} else {
+		default:
 			log.Printf("shuihuo image provider connection interrupted; retrying attempt=%d/%d after=%s model=%s: %v", attempt+1, maxAttempts, delay, target.ModelID, err)
 		}
 		select {
@@ -3503,7 +3576,7 @@ func shuihuoComicProductionMode(settings batchfactoryv11.SettingsPatch) bool {
 	return false
 }
 
-func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, presetCatalog *prompt.Catalog, owner string, target shuihuoAssetImageTarget, imagePrompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (string, string, string, error) {
+func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, presetCatalog *prompt.Catalog, owner string, target shuihuoAssetImageTarget, imagePrompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (mediaType, storageRef, source string, returnErr error) {
 	if files == nil {
 		return "", "", "", fmt.Errorf("%w: image storage is unavailable", batchfactoryv11.ErrUnavailable)
 	}
@@ -3513,6 +3586,47 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 	imagePrompt = sanitizeShuihuoImagePrompt(imagePrompt)
 	if imagePrompt != originalImagePrompt {
 		reportShuihuoImageEvent(ctx, "comic_images", "图片提示词已自动去敏：已替换可能触发内容审核的敏感词")
+	}
+	cache := shuihuoImageGenerationCacheFromContext(ctx)
+	fingerprint := ""
+	cacheClaimed := false
+	if cache != nil && !shuihuoImageGenerationCacheBypassed(ctx) {
+		settings := shuihuoEffectiveSettingsFromContext(ctx)
+		watermarkEnabled, _ := settings["watermarkEnabled"].(bool)
+		watermarkText, _ := settings["watermarkText"].(string)
+		endpoint := modelString(target.CatalogModel, "endpoint")
+		if endpoint == "" {
+			endpoint = modelString(target.CatalogModel, "baseUrl")
+		}
+		fingerprint = shuihuoImageGenerationFingerprint(shuihuoImageFingerprintInput{Owner: owner, Endpoint: endpoint, ModelID: target.ModelID, Prompt: imagePrompt, AspectRatio: target.AspectRatio, References: referenceImageURLs, WatermarkEnabled: watermarkEnabled, WatermarkText: watermarkText})
+		entry, outcome, claimErr := cache.Claim(ctx, owner, fingerprint, target.ModelID, 10*time.Minute)
+		if claimErr != nil {
+			log.Printf("shuihuo image cache unavailable owner=%s model=%s: %v", owner, target.ModelID, claimErr)
+		} else if outcome == imagegenerationcache.ClaimReady {
+			file, openErr := files.Open(entry.StorageRef)
+			if openErr == nil {
+				_ = file.Close()
+				return entry.MediaType, entry.StorageRef, "provider", nil
+			}
+			_ = cache.MarkFailed(ctx, owner, fingerprint, openErr)
+		} else if outcome == imagegenerationcache.ClaimBusy {
+			return "", "", "", fmt.Errorf("%w: 相同图片正在生成，请稍后刷新", batchfactoryv11.ErrConflict)
+		} else if outcome == imagegenerationcache.ClaimAcquired {
+			cacheClaimed = true
+		}
+	}
+	if cacheClaimed {
+		defer func() {
+			if returnErr == nil && storageRef != "" {
+				if err := cache.MarkReady(context.Background(), owner, fingerprint, storageRef, mediaType, imagegenerationcache.Timing{}); err != nil {
+					log.Printf("shuihuo image cache mark ready failed owner=%s model=%s: %v", owner, target.ModelID, err)
+				}
+				return
+			}
+			if err := cache.MarkFailed(context.Background(), owner, fingerprint, returnErr); err != nil {
+				log.Printf("shuihuo image cache mark failed owner=%s model=%s: %v", owner, target.ModelID, err)
+			}
+		}()
 	}
 	if target.Provider == batchfactoryv11.VideoProviderDoubaoLocal {
 		if baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("QIANTIE_DOUBAO_RELAY_BASE_URL")), "/"); baseURL != "" {
@@ -3549,6 +3663,10 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 	if credential == "" {
 		return "", "", "", fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
 	}
+	resolvedReferences, err := resolveComicReferenceImageData(ctx, store, files, presetCatalog, owner, referenceImageURLs)
+	if err != nil {
+		return "", "", "", err
+	}
 	// 第一次用常规降敏提示词；如果仍被内容审核拒绝，再用更保守的降级提示词
 	// 重新生成一次。跳过一张图之前至少给用户两次机会，避免整本缺页。
 	attemptPrompts := []string{imagePrompt}
@@ -3571,8 +3689,8 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 			}
 			reportShuihuoImageEvent(ctx, "comic_images", message)
 		}
-		mediaType, storageRef, attemptErr := requestShuihuoProviderImage(ctx, files, target, model, endpoint, credential, attemptPrompt, referenceImageURLs)
-		if errors.Is(attemptErr, errShuihuoImageReferenceUnusable) && len(referenceImageURLs) > 0 {
+		mediaType, storageRef, attemptErr := requestShuihuoProviderImage(ctx, files, target, model, endpoint, credential, attemptPrompt, resolvedReferences)
+		if errors.Is(attemptErr, errShuihuoImageReferenceUnusable) && len(resolvedReferences) > 0 {
 			// 网关读不到参考图（/edits 端点常见）时不能让整本书失败：
 			// 去掉参考图，用同一段提示词走纯文生图补一张。
 			log.Printf("shuihuo image provider cannot read references; retrying without references model=%s", target.ModelID)
@@ -3597,15 +3715,15 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 
 // newShuihuoProviderImageRequest 构造一次图片生成请求：支持编辑的模型走
 // /images/edits 携带参考图，其余走 /images/generations。
-// withResponseFormat 控制是否要求网关直接返回 base64；第三方网关默认常只回
-// 一个 CDN URL，迫使我们再下载一次，而该 CDN 极易在 200 后读超时。
-func newShuihuoProviderImageRequest(ctx context.Context, endpoint, modelID, prompt, aspectRatio string, referenceImageURLs []string, model map[string]any, withResponseFormat bool) (*http.Request, error) {
+// responseFormat 必须明确指定 url 或 b64_json。空字符串仅用于兼容明确拒绝
+// response_format 参数的旧网关，不能再把“未填写”误当成 URL 模式。
+func newShuihuoProviderImageRequest(ctx context.Context, endpoint, modelID, prompt, aspectRatio string, referenceImageURLs []string, model map[string]any, responseFormat string) (*http.Request, error) {
 	if len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, modelID) {
-		return newShuihuoImageEditRequest(ctx, endpoint, modelID, prompt, shuihuoImageSizeForModel(modelID, aspectRatio), referenceImageURLs)
+		return newShuihuoImageEditRequestWithResponseFormat(ctx, endpoint, modelID, prompt, shuihuoImageSizeForModel(modelID, aspectRatio), referenceImageURLs, responseFormat)
 	}
 	payload := map[string]any{"model": modelID, "prompt": prompt, "n": 1, "size": shuihuoImageSizeForModel(modelID, aspectRatio)}
-	if withResponseFormat {
-		payload["response_format"] = "b64_json"
+	if strings.TrimSpace(responseFormat) != "" {
+		payload["response_format"] = responseFormat
 	}
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
@@ -3634,70 +3752,125 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 	size := shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)
 	useEdits := len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID)
 	outerAttempt := shuihuoImageOuterAttemptFromContext(ctx)
+	// 恢复 11/03 已验证链路：普通生图不传 response_format，由网关返回
+	// 紧凑 URL；只有 CDN 下载失败才在下一轮改要 base64。带参考图的编辑
+	// 请求仍直接取 base64，避免编辑结果再依赖 CDN。
+	// 旧网关若明确拒绝该字段，下面仍会自动去掉 response_format 做兼容。
+	responseFormat := ""
+	if useEdits {
+		responseFormat = "b64_json"
+	}
 	for attempt := 0; attempt < 3; attempt++ {
 		attemptStart := time.Now()
-		// 默认走 URL 模式：小响应在网关上更不容易被截断。只有 URL 下载失败时才
-		// 改用 base64 重发一次，绕开不稳定的 CDN；若网关不接受 response_format，
-		// 再去掉该字段退回 URL 模式。
-		withResponseFormat := attempt == 1
-		req, err := newShuihuoProviderImageRequest(ctx, endpoint, target.ModelID, imagePrompt, target.AspectRatio, referenceImageURLs, model, withResponseFormat)
+		var headerElapsed, bodyElapsed, downloadElapsed, saveElapsed time.Duration
+		// 所有图片请求直接使用 base64，避免已生成图片卡在第三方 CDN。
+		// 只有网关明确拒绝 response_format 时才去掉该字段。
+		req, err := newShuihuoProviderImageRequest(ctx, endpoint, target.ModelID, imagePrompt, target.AspectRatio, referenceImageURLs, model, responseFormat)
 		if err != nil {
 			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, errorKind: "other", model: target.ModelID, detail: err.Error()})
 			return "", "", err
 		}
-		log.Printf("shuihuo image request provider=%s model=%s endpoint=%s refs=%d size=%s b64=%t edits=%t", target.Provider, target.ModelID, endpoint, len(referenceImageURLs), size, withResponseFormat, useEdits)
+		log.Printf("shuihuo image request provider=%s model=%s endpoint=%s refs=%d size=%s response_format=%s edits=%t", target.Provider, target.ModelID, endpoint, len(referenceImageURLs), size, responseFormat, useEdits)
 		req.Header.Set("Authorization", "Bearer "+credential)
+		configuredConcurrency := shuihuoImageConcurrencyFromContext(ctx)
+		parsedEndpoint, _ := url.Parse(strings.TrimSpace(endpoint))
+		adaptiveHost := strings.ToLower(strings.TrimSpace(parsedEndpoint.Host))
+		adaptiveLimit := shuihuoAdaptiveImageLimiter.limit(adaptiveHost, configuredConcurrency)
+		slotCtx := context.WithValue(ctx, shuihuoImageConcurrencyContextKey{}, adaptiveLimit)
+		if taskSemaphore := shuihuoImageSemaphoreFromContext(slotCtx); taskSemaphore != nil {
+			taskSemaphore.setLimit(adaptiveLimit)
+		}
 		queueStart := time.Now()
-		releaseImageSlot, err := acquireShuihuoGPTImageGenerationSlot(ctx, target.ModelID)
+		releaseImageSlot, err := acquireShuihuoGPTImageGenerationSlot(slotCtx, target.ModelID)
 		queued := time.Since(queueStart)
 		if err != nil {
 			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, queued: queued, errorKind: shuihuoImageAttemptKindOfError(err, 0), model: target.ModelID, detail: err.Error()})
 			return "", "", fmt.Errorf("%w: 等待图片模型请求失败: %v", batchfactoryv11.ErrUpstream, err)
 		}
+		headerStart := time.Now()
 		response, err := shuihuoImageGenerationHTTPClient(endpoint).Do(req)
+		headerElapsed = time.Since(headerStart)
 		if err != nil {
 			releaseImageSlot()
-			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, queued: queued, errorKind: shuihuoImageAttemptKindOfError(err, 0), model: target.ModelID, detail: err.Error()})
+			errorKind := shuihuoImageAttemptKindOfError(err, 0)
+			shuihuoAdaptiveImageLimiter.report(adaptiveHost, configuredConcurrency, errorKind)
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, queued: queued, header: headerElapsed, errorKind: errorKind, model: target.ModelID, detail: err.Error()})
 			return "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
 		}
-		bodyMode := "url"
-		bodyTimeout := shuihuoImageBodyReadTimeoutURL
-		if withResponseFormat {
-			bodyMode = "base64"
-			bodyTimeout = shuihuoImageBodyReadTimeoutBase64
-		}
-		raw, readErr := readShuihuoImageResponseBody(response, bodyMode, bodyTimeout)
-		response.Body.Close()
-		// Serialize only the provider generation call; a slow CDN download must not
-		// block the next GPT image request.
+		// 响应头已返回，说明上游出图完成并已计费；正文传输可能长达 150s，
+		// 不应继续占用出图槽位，否则会拖低整体并发。
 		releaseImageSlot()
-		if readErr != nil {
+		// 上游有响应就是真实进展：刷新停滞看门狗，避免慢图正文传输被判 stalled。
+		reportComicGenerationHeartbeat(ctx)
+		bodyMode := "url"
+		bodyStall := shuihuoImageBodyStallTimeoutURL
+		bodyTotal := shuihuoImageBodyTotalTimeoutURL
+		if responseFormat == "b64_json" {
+			bodyMode = "base64"
+			bodyStall = shuihuoImageBodyStallTimeoutBase64
+			bodyTotal = shuihuoImageBodyTotalTimeoutBase64
+		}
+		bodyStart := time.Now()
+		raw, readErr := readShuihuoImageResponseBody(response, bodyMode, bodyStall, bodyTotal)
+		bodyElapsed = time.Since(bodyStart)
+		response.Body.Close()
+		var result struct {
+			Data []struct {
+				B64JSON string `json:"b64_json"`
+				URL     string `json:"url"`
+			} `json:"data"`
+		}
+		resultParsed := json.Unmarshal(raw, &result) == nil && len(result.Data) > 0 && (strings.TrimSpace(result.Data[0].B64JSON) != "" || strings.TrimSpace(result.Data[0].URL) != "")
+		if readErr != nil && !(response.StatusCode >= 200 && response.StatusCode < 300 && resultParsed) {
 			// 上游很可能已经出图，只是响应体在传输中断（网关截断/连接重置）。
 			// 必须把读错误带进错误文本，否则重试判定匹配不到，已生成的图会被丢弃。
 			log.Printf("shuihuo image response body read failed provider=%s model=%s status=%d refs=%d: %v", target.Provider, target.ModelID, response.StatusCode, len(referenceImageURLs), readErr)
 			wrapped := fmt.Errorf("%w: image provider response body read failed status=%d refs=%d: %v", batchfactoryv11.ErrUpstream, response.StatusCode, len(referenceImageURLs), readErr)
 			errorKind := shuihuoImageAttemptKindOfError(readErr, response.StatusCode)
+			bodyKind := ""
+			var stalled *shuihuoImageBodyStallError
+			var slow *shuihuoImageBodySlowError
+			switch {
+			case errors.As(readErr, &stalled):
+				bodyKind = shuihuoImageBodyFailureStalled
+			case errors.As(readErr, &slow):
+				bodyKind = shuihuoImageBodyFailureSlow
+			}
 			if errorKind == "other" {
 				errorKind = "body_read_failed"
 			}
-			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, errorKind: errorKind, model: target.ModelID, detail: wrapped.Error()})
+			shuihuoAdaptiveImageLimiter.report(adaptiveHost, configuredConcurrency, errorKind)
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, header: headerElapsed, body: bodyElapsed, errorKind: errorKind, model: target.ModelID, detail: wrapped.Error()})
 			if response.StatusCode == http.StatusOK && shuihuoImageDedupeBilledRetry() {
-				// 200 说明对面已经按成功计费，重发同一页会重复扣费，交给上层决定。
-				return "", "", &shuihuoImageBilledReadFailure{message: wrapped.Error()}
+				// 200 说明对面已经按成功计费。断流（BODY_STALLED）允许在页级/日预算内
+				// 重发一次；只是慢（BODY_SLOW）不重发，避免重复扣费。
+				return "", "", &shuihuoImageBilledReadFailure{message: wrapped.Error(), kind: bodyKind}
 			}
 			return "", "", wrapped
 		}
+		if readErr != nil {
+			// 一些 HTTP/1.1 网关会把完整 JSON 发完后直接 RST 连接，没有发送
+			// 正常的 chunk 结束标记。只要 JSON 已完整解析且包含图片，就直接
+			// 使用已收到的结果；绝不因为连接尾部异常再次提交已计费的生图请求。
+			log.Printf("shuihuo image response completed before connection reset provider=%s model=%s status=%d refs=%d bytes=%d err=%v", target.Provider, target.ModelID, response.StatusCode, len(referenceImageURLs), len(raw), readErr)
+		}
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
 			log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
-			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, errorKind: shuihuoImageAttemptKindOfStatus(response.StatusCode), model: target.ModelID, detail: shuihuoImageProviderErrorDetail(raw)})
-			if withResponseFormat && !useEdits && shuihuoImageResponseRejectsResponseFormat(raw) {
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, header: headerElapsed, body: bodyElapsed, errorKind: shuihuoImageAttemptKindOfStatus(response.StatusCode), model: target.ModelID, detail: shuihuoImageProviderErrorDetail(raw)})
+			if responseFormat != "" && shuihuoImageResponseRejectsResponseFormat(raw) {
 				log.Printf("shuihuo image gateway rejected response_format; retrying without it model=%s", target.ModelID)
+				responseFormat = ""
 				continue
 			}
 			// 先把“生图请求被当成聊天请求”识别成可重试的通道错误，避免被下面
 			// 的内容审核关键词（“无法完成”“重新发送”）误判成永久拒绝。
 			if shuihuoImageProviderChatChannelResponse(response.StatusCode, raw) {
 				return "", "", shuihuoImageChatChannelError{StatusCode: response.StatusCode, BodySummary: shuihuoImageChatChannelBodySummary(raw)}
+			}
+			// 对话式软拒绝优先于硬审核：它不是标准 JSON 错误，需要单独归类，
+			// 但仍走提示词改写链路（“请上传原图”类问题由改写/换通道兜底）。
+			if shuihuoImageResponseSoftRefusal(response.StatusCode, raw) {
+				return "", "", newShuihuoImageSoftRefusalError(shuihuoImageProviderErrorDetail(raw))
 			}
 			if shuihuoImageResponseContentRejected(response.StatusCode, raw) {
 				return "", "", fmt.Errorf("%w: %s", errShuihuoImageContentPolicy, shuihuoImageProviderErrorDetail(raw))
@@ -3712,35 +3885,39 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 			}
 			return "", "", fmt.Errorf("%w: image provider returned HTTP %d%s", batchfactoryv11.ErrUpstream, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
 		}
-		var result struct {
-			Data []struct {
-				B64JSON string `json:"b64_json"`
-				URL     string `json:"url"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
+		if !resultParsed {
+			// 200 也可能是对话式软拒绝（正文是自然语言而不是图像 JSON）。
+			if shuihuoImageResponseSoftRefusalText(raw) {
+				return "", "", newShuihuoImageSoftRefusalError(shuihuoImageProviderErrorDetail(raw))
+			}
 			return "", "", fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
 		}
+		downloadStart := time.Now()
 		mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, shuihuoImageDownloadHTTPClient(), result.Data[0].B64JSON, result.Data[0].URL, credential, endpoint)
+		downloadElapsed = time.Since(downloadStart)
 		if err != nil {
 			// 图已经生成，只是 CDN 下载不下来：改用 base64 重发一次，跳开 CDN。
-			if errors.Is(err, errShuihuoImageDownloadUnusable) && attempt == 0 {
+			if errors.Is(err, errShuihuoImageDownloadUnusable) && responseFormat != "b64_json" && attempt < 2 {
 				log.Printf("shuihuo image download unavailable; retrying with base64 model=%s", target.ModelID)
+				responseFormat = "b64_json"
 				continue
 			}
 			return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
 		}
 		// 统一配置启用水印时，在保存前叠加白底方框文字。
+		saveStart := time.Now()
 		imageBytes, mediaType = applyShuihuoImageWatermark(ctx, imageBytes, mediaType)
 		artifactID, err := localexecutor.NewArtifactID()
 		if err != nil {
 			return "", "", err
 		}
 		saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
+		saveElapsed = time.Since(saveStart)
 		if err != nil {
 			return "", "", err
 		}
-		logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, errorKind: "ok", model: target.ModelID})
+		shuihuoAdaptiveImageLimiter.report(adaptiveHost, configuredConcurrency, "ok")
+		logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, header: headerElapsed, body: bodyElapsed, download: downloadElapsed, save: saveElapsed, errorKind: "ok", model: target.ModelID})
 		return mediaType, saved.StorageRef, nil
 	}
 	logImageAttempt(shuihuoImageAttemptLog{attempt: outerAttempt, inner: 3, errorKind: "other", model: target.ModelID, detail: "image provider rejected response_format"})
@@ -3762,16 +3939,28 @@ func applyShuihuoImageWatermark(ctx context.Context, imageBytes []byte, mediaTyp
 	return watermark.Apply(imageBytes, mediaType, watermark.Options{Enabled: true, Text: strings.TrimSpace(text)})
 }
 
-// shuihuoImageResponseHeaderTimeout 是 header 阶段的硬上限。此前为 0（无限），
-// 网关扣住响应头时只能等到整请求 900s；60s 足够覆盖正常排队，又能尽早暴露卡死。
-// shuihuoImageBodyReadTimeoutURL/Base64 是 body 阶段的分层上限：URL 模式只有
-// 一个几百字节的 JSON，45s 读不完说明 body 被扣住；b64 模式是大响应，给 120s。
-// 三个值都是变量，测试可临时覆盖。
+// shuihuoImageResponseHeaderTimeout 恢复 11/03 版本行为：header 阶段不单独设限。
+// 20 版加的 60s 会把「响应头 60–120s 才回来」的慢图直接掐掉，这是线上卡死的主因；
+// header 阶段改由 shuihuoImageRequestTimeout 兜底即可，不再叠加一层更短的闸门。
+//
+// shuihuoImageBodyStallTimeout 是「停滞超时」：读取循环里每读到一块字节就重置。
+// 线上供应商会先返回 200，再花一到两分钟准备或分块传输正文，因此窗口取 180s；
+// 旧的 30s 会主动掐掉仍会返回结果的连接，并诱发重复生成。
+// shuihuoImageBodyTotalTimeout 是总上限兜底：持续有数据但极慢时最多读 300s，
+// 防止一个连接无限占用槽位；它只用于兜底，不参与正常判定。
+// 两组值都是变量，测试可临时覆盖。
 var (
-	shuihuoImageResponseHeaderTimeout = 60 * time.Second
-	shuihuoImageBodyReadTimeoutURL    = 45 * time.Second
-	shuihuoImageBodyReadTimeoutBase64 = 120 * time.Second
+	shuihuoImageResponseHeaderTimeout  = time.Duration(0)
+	shuihuoImageBodyStallTimeoutURL    = 180 * time.Second
+	shuihuoImageBodyStallTimeoutBase64 = 180 * time.Second
+	shuihuoImageBodyTotalTimeoutURL    = 300 * time.Second
+	shuihuoImageBodyTotalTimeoutBase64 = 300 * time.Second
 )
+
+// shuihuoImageRequestTimeout 是单次上游图片请求（header + body）的总上限。
+// body 总上限 300s，再给 header/建连留 60s 余量，因此取 360s。
+// HTTP 200 后不再自动重发；普通建连错误仍最多 3 次，但都快速返回。
+const shuihuoImageRequestTimeout = 360 * time.Second
 
 // newShuihuoImageTransport 构造出图请求的 Transport。出图链路按协议变体
 // 各复用一个实例（见下方的包级共享 client）。
@@ -3794,53 +3983,150 @@ func newShuihuoImageTransport(forceHTTP2 bool) *http.Transport {
 // shuihuoLongRunningImageHTTPClient 构造一个新的 HTTP/2 client（测试用构造器；
 // 生产路径走下面的共享实例）。
 func shuihuoLongRunningImageHTTPClient() *http.Client {
-	return &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(true)}
+	return &http.Client{Timeout: shuihuoImageRequestTimeout, Transport: newShuihuoImageTransport(true)}
 }
 
 // 生产路径复用的包级 client。此前每次请求都新建 Transport，等于每次重新
-// TLS 握手、不复用连接，会放大网关的连接级重置与限流暴露面；900s 整体超时
-// 保持不变，中间关卡由 ResponseHeaderTimeout 与 body 分层计时负责。
+// TLS 握手、不复用连接，会放大网关的连接级重置与限流暴露面。整体超时取
+// shuihuoImageRequestTimeout（180s，见上），中间关卡由 body 分层计时负责。
 var (
 	shuihuoImageSharedHTTP2Client = sync.OnceValue(func() *http.Client {
-		return &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(true)}
+		return &http.Client{Timeout: shuihuoImageRequestTimeout, Transport: newShuihuoImageTransport(true)}
 	})
 	shuihuoImageSharedHTTP1Client = sync.OnceValue(func() *http.Client {
-		return &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(false)}
+		return &http.Client{Timeout: shuihuoImageRequestTimeout, Transport: newShuihuoImageTransport(false)}
 	})
 )
 
-// readShuihuoImageResponseBody 在独立计时器下读取响应体：到点即关闭 body，
-// 让后台读协程退出并让半截响应不回到连接池，返回可识别的超时错误。
-func readShuihuoImageResponseBody(response *http.Response, mode string, timeout time.Duration) ([]byte, error) {
-	type readResult struct {
-		payload []byte
-		err     error
+// shuihuoImageBodyStallError 表示连续 stall 时间内没有读到任何新字节，
+// 是真正的断流；它才计入「已计费未取回」并允许预算内重发一次。
+type shuihuoImageBodyStallError struct {
+	stall    time.Duration
+	received int
+	mode     string
+}
+
+func (err *shuihuoImageBodyStallError) Error() string {
+	return fmt.Sprintf("response body stalled after=%s without new bytes received=%d mode=%s", err.stall, err.received, err.mode)
+}
+
+// shuihuoImageBodySlowError 表示直到总上限仍有字节在传，只是整体太慢。
+// 它不按断流处理，也不计入 billed-not-retrieved，避免把「慢」误记成「丢」。
+type shuihuoImageBodySlowError struct {
+	total    time.Duration
+	received int
+	mode     string
+}
+
+func (err *shuihuoImageBodySlowError) Error() string {
+	return fmt.Sprintf("response body slow total=%s received=%d mode=%s", err.total, err.received, err.mode)
+}
+
+// readShuihuoImageResponseBody 按「停滞超时 + 总上限」读取响应体：
+//   - 每成功读到一块字节就重置 stall 计时器；
+//   - 连续 stall 没有新字节 → shuihuoImageBodyStallError；
+//   - 总耗时到 total 仍有数据在传 → shuihuoImageBodySlowError；
+//   - 总耗时到 total 完全没数据 → 也按 slow 兜底（stall 通常先触发）。
+func readShuihuoImageResponseBody(response *http.Response, mode string, stall, total time.Duration) ([]byte, error) {
+	if stall <= 0 {
+		stall = 30 * time.Second
 	}
-	results := make(chan readResult, 1)
+	if total <= 0 {
+		total = 300 * time.Second
+	}
+	type readChunk struct {
+		data []byte
+		err  error
+	}
+	chunks := make(chan readChunk, 1)
+	done := make(chan struct{})
+	var stopOnce sync.Once
+	stop := func() { stopOnce.Do(func() { close(done) }) }
+	defer stop()
+
 	go func() {
-		payload, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
-		results <- readResult{payload: payload, err: err}
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := response.Body.Read(buf)
+			if n > 0 {
+				data := append([]byte(nil), buf[:n]...)
+				select {
+				case chunks <- readChunk{data: data}:
+				case <-done:
+					return
+				}
+			}
+			if err != nil {
+				select {
+				case chunks <- readChunk{err: err}:
+				case <-done:
+				}
+				return
+			}
+		}
 	}()
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-	select {
-	case result := <-results:
-		return result.payload, result.err
-	case <-timer.C:
-		_ = response.Body.Close()
-		return nil, fmt.Errorf("response body read timeout after=%s mode=%s", timeout, mode)
+
+	stallTimer := time.NewTimer(stall)
+	defer stallTimer.Stop()
+	totalTimer := time.NewTimer(total)
+	defer totalTimer.Stop()
+	resetStall := func() {
+		if !stallTimer.Stop() {
+			select {
+			case <-stallTimer.C:
+			default:
+			}
+		}
+		stallTimer.Reset(stall)
+	}
+
+	var payload bytes.Buffer
+	for {
+		select {
+		case chunk := <-chunks:
+			if len(chunk.data) > 0 {
+				payload.Write(chunk.data)
+				if payload.Len() > 16<<20 {
+					_ = response.Body.Close()
+					return payload.Bytes(), fmt.Errorf("response body exceeds limit received=%d mode=%s", payload.Len(), mode)
+				}
+				resetStall()
+			}
+			if chunk.err != nil {
+				if errors.Is(chunk.err, io.EOF) {
+					return payload.Bytes(), nil
+				}
+				return payload.Bytes(), chunk.err
+			}
+		case <-stallTimer.C:
+			_ = response.Body.Close()
+			return payload.Bytes(), &shuihuoImageBodyStallError{stall: stall, received: payload.Len(), mode: mode}
+		case <-totalTimer.C:
+			_ = response.Body.Close()
+			return payload.Bytes(), &shuihuoImageBodySlowError{total: total, received: payload.Len(), mode: mode}
+		}
 	}
 }
 
 // shuihuoImageBilledReadFailure 表示上游已按「请求成功」计费（HTTP 200 已返回），
-// 但响应体在传输中断。它对上层仍是一条可恢复错误，但默认不再自动重发同一页：
-// 对面按成功计费 ¥0.03/次，重发会重复扣费。可用
-// QIANTIE_IMAGE_DEDUPE_BILLED_RETRY=0 关闭去重，退回旧的自动重试行为。
+// 但响应体没有完整取回。kind 区分两种完全不同的原因：
+//   - BODY_STALLED：连续 stall 时间没有新字节，是真断流；已计费，不自动重发。
+//   - BODY_SLOW：一直有数据但到总上限仍未读完；不重发，也不计入
+//     billed-not-retrieved，避免把「慢」误记成「丢」。
 type shuihuoImageBilledReadFailure struct {
 	message string
+	kind    string
+	retried bool
 }
 
+const (
+	shuihuoImageBodyFailureStalled = "BODY_STALLED"
+	shuihuoImageBodyFailureSlow    = "BODY_SLOW"
+)
+
 func (err *shuihuoImageBilledReadFailure) Error() string { return err.message }
+
+func (err *shuihuoImageBilledReadFailure) Kind() string { return err.kind }
 
 // Unwrap 保留 ErrUpstream 语义，上层的错误分类不受影响。
 func (err *shuihuoImageBilledReadFailure) Unwrap() error { return batchfactoryv11.ErrUpstream }
@@ -3882,15 +4168,20 @@ type shuihuoImageAttemptLog struct {
 	inner     int
 	status    int
 	queued    time.Duration
+	header    time.Duration
+	body      time.Duration
+	download  time.Duration
+	save      time.Duration
 	errorKind string
 	model     string
 	detail    string
 }
 
 func logImageAttempt(entry shuihuoImageAttemptLog) {
-	log.Printf("shuihuo image attempt elapsed_ms=%d attempt=%d inner_attempt=%d http_status=%d queued_ms=%d error_kind=%s model=%s detail=%q",
+	log.Printf("shuihuo image attempt elapsed_ms=%d attempt=%d inner_attempt=%d http_status=%d queued_ms=%d header_ms=%d body_ms=%d download_ms=%d save_ms=%d error_kind=%s model=%s detail=%q",
 		entry.elapsed.Milliseconds(), entry.attempt, entry.inner, entry.status,
-		entry.queued.Milliseconds(), entry.errorKind, entry.model, entry.detail)
+		entry.queued.Milliseconds(), entry.header.Milliseconds(), entry.body.Milliseconds(),
+		entry.download.Milliseconds(), entry.save.Milliseconds(), entry.errorKind, entry.model, entry.detail)
 }
 
 func shuihuoImageAttemptKindOfError(err error, status int) string {
@@ -3911,6 +4202,10 @@ func shuihuoImageAttemptKindOfError(err error, status int) string {
 			return "unexpected_eof"
 		case strings.Contains(message, "tls handshake timeout"):
 			return "tls_timeout"
+		case strings.Contains(message, "body stalled"):
+			return "body_stalled"
+		case strings.Contains(message, "body slow"):
+			return "body_slow"
 		case strings.Contains(message, "response body read failed"),
 			strings.Contains(message, "body read timeout"):
 			return "body_read_failed"
@@ -3945,10 +4240,23 @@ func shuihuoImageGenerationHTTPClient(endpoint string) *http.Client {
 	if shuihuoImageGenerationLegacyHTTP1Host(host) {
 		return shuihuoImageSharedHTTP1Client()
 	}
+	if shuihuoImageGenerationIsolatedHTTP2Host(host) {
+		// This gateway only speaks HTTP/2, but one broken long response used to
+		// poison every concurrent stream on the shared connection. Give each
+		// paid generation its own HTTP/2 connection so failures stay isolated.
+		transport := newShuihuoImageTransport(true)
+		transport.DisableKeepAlives = true
+		return &http.Client{Timeout: shuihuoImageRequestTimeout, Transport: transport}
+	}
 	return shuihuoImageSharedHTTP2Client()
 }
 
 var shuihuoImageGenerationLegacyHTTP1Hosts = map[string]struct{}{}
+
+var shuihuoImageGenerationIsolatedHTTP2Hosts = map[string]struct{}{
+	"ggwk1.online":     {},
+	"www.ggwk1.online": {},
+}
 
 func shuihuoImageGenerationLegacyHTTP1Host(host string) bool {
 	if host == "" {
@@ -3959,6 +4267,11 @@ func shuihuoImageGenerationLegacyHTTP1Host(host string) bool {
 		return false
 	}
 	_, ok := shuihuoImageGenerationLegacyHTTP1Hosts[host]
+	return ok
+}
+
+func shuihuoImageGenerationIsolatedHTTP2Host(host string) bool {
+	_, ok := shuihuoImageGenerationIsolatedHTTP2Hosts[host]
 	return ok
 }
 
@@ -3974,6 +4287,58 @@ func shuihuoImageDownloadHTTPClient() *http.Client {
 // errShuihuoImageContentPolicy 表示图片模型按内容审核拒收了提示词。
 // 调用方必须跳过这张图并继续其它图片，不能把它当成可重试的临时故障。
 var errShuihuoImageContentPolicy = fmt.Errorf("image prompt rejected by content policy")
+
+// errShuihuoImageContentSoftRefusal 表示上游没有返回标准 JSON 错误，而是用
+// 对话式软拒绝（“当前无法生成图片”“请上传需要编辑的原图”）。它与硬审核
+// 拒绝共用改写链路，但必须单独归类，便于区分"改写提示词"还是"换通道"。
+var errShuihuoImageContentSoftRefusal = fmt.Errorf("image provider content soft refusal")
+
+// shuihuoImageSoftRefusalError 同时满足两个 sentinel：
+//   - errors.Is(err, errShuihuoImageContentPolicy) == true：仍走提示词改写链路；
+//   - errors.Is(err, errShuihuoImageContentSoftRefusal) == true：归类为软拒绝。
+type shuihuoImageSoftRefusalError struct {
+	message string
+}
+
+func (e *shuihuoImageSoftRefusalError) Error() string { return e.message }
+
+func (e *shuihuoImageSoftRefusalError) Unwrap() error { return errShuihuoImageContentPolicy }
+
+func (e *shuihuoImageSoftRefusalError) Is(target error) bool {
+	return target == errShuihuoImageContentSoftRefusal
+}
+
+func newShuihuoImageSoftRefusalError(message string) error {
+	return &shuihuoImageSoftRefusalError{message: fmt.Sprintf("%s: %s", errShuihuoImageContentSoftRefusal, message)}
+}
+
+// shuihuoImageResponseSoftRefusal 识别对话式软拒绝。部分网关不返回标准
+// JSON 错误，而是让模型回一句自然语言；这类响应不能混进 http_4xx 重试。
+func shuihuoImageResponseSoftRefusal(statusCode int, raw []byte) bool {
+	if statusCode != http.StatusBadRequest && statusCode != http.StatusForbidden &&
+		statusCode != http.StatusUnprocessableEntity && statusCode != http.StatusOK {
+		return false
+	}
+	return shuihuoImageResponseSoftRefusalText(raw)
+}
+
+func shuihuoImageResponseSoftRefusalText(raw []byte) bool {
+	detail := strings.ToLower(strings.TrimSpace(string(raw)))
+	if detail == "" {
+		return false
+	}
+	for _, keyword := range []string{
+		"请上传需要编辑的原图", "上传需要编辑的原图", "上传原图",
+		"当前无法生成图片", "目前无法生成图片", "暂时无法生成图片", "无法生成图片",
+		"未能成功生成图片", "未能完成", "无法完成", "重新发送",
+		"unable to generate", "could not generate", "please resend", "upload the original image",
+	} {
+		if strings.Contains(detail, keyword) {
+			return true
+		}
+	}
+	return false
+}
 
 // errShuihuoImageReferenceUnusable 表示上游网关读不到我们上传的参考图
 // （常见于 /edits 端点只接受公网图片或字段格式不兼容）。这不是内容审核
@@ -4282,12 +4647,7 @@ func shuihuoImageResponseContentRejected(statusCode int, raw []byte) bool {
 		return false
 	}
 	detail := strings.ToLower(string(raw))
-	for _, keyword := range []string{"违规", "违反", "内容政策", "content policy", "content_policy", "moderation", "safety", "unsafe", "blocked",
-		// 部分网关不会返回标准审核文案，而是让模型回一句“目前未能成功生成图片，
-		// 请重新发送一次生成请求”。这只是软拒绝，同样需要走降级提示词重试。
-		// 不同网关的措辞不统一（“未能完成”“重新发送一次生成指令”也算），
-		// 所以匹配范围放宽到“重新发送/未能完成/无法完成”。
-		"未能成功生成图片", "未能完成", "无法完成", "重新发送", "unable to generate", "could not generate", "please resend"} {
+	for _, keyword := range []string{"违规", "违反", "内容政策", "content policy", "content_policy", "moderation", "safety", "unsafe", "blocked"} {
 		if strings.Contains(detail, keyword) {
 			return true
 		}
@@ -4382,6 +4742,10 @@ func shuihuoImageProviderErrorDetail(raw []byte) string {
 }
 
 func newShuihuoImageEditRequest(ctx context.Context, generationEndpoint, modelID, prompt, size string, references []string) (*http.Request, error) {
+	return newShuihuoImageEditRequestWithResponseFormat(ctx, generationEndpoint, modelID, prompt, size, references, "b64_json")
+}
+
+func newShuihuoImageEditRequestWithResponseFormat(ctx context.Context, generationEndpoint, modelID, prompt, size string, references []string, responseFormat string) (*http.Request, error) {
 	editEndpoint := strings.TrimSuffix(generationEndpoint, "/generations") + "/edits"
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -4389,7 +4753,9 @@ func newShuihuoImageEditRequest(ctx context.Context, generationEndpoint, modelID
 	_ = writer.WriteField("prompt", prompt)
 	_ = writer.WriteField("n", "1")
 	_ = writer.WriteField("size", size)
-	_ = writer.WriteField("response_format", "b64_json")
+	if strings.TrimSpace(responseFormat) != "" {
+		_ = writer.WriteField("response_format", responseFormat)
+	}
 	client := &http.Client{Timeout: 60 * time.Second}
 	for index, reference := range references {
 		payload, mediaType, err := readShuihuoReferenceImage(ctx, client, reference)

@@ -85,3 +85,15 @@ func TestComicPageGenerationTaskOnlyBecomesStaleAfterSafetyWindow(t *testing.T) 
 		t.Fatal("an old generation lease must be recoverable")
 	}
 }
+
+func TestRecentDurableComicGenerationLeaseSurvivesProcessRestart(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+	page := batchfactoryv11.ComicPage{Status: "generating", UpdatedAt: now.Add(-time.Minute)}
+	if comicPageGenerationLeaseRecoverable(page, true, now) {
+		t.Fatal("a new process-local gate must not reclaim a recent remote generation")
+	}
+	page.UpdatedAt = now.Add(-comicPageGenerationStaleAfter - time.Second)
+	if !comicPageGenerationLeaseRecoverable(page, true, now) {
+		t.Fatal("a durable generation lease may be recovered after the safety window")
+	}
+}

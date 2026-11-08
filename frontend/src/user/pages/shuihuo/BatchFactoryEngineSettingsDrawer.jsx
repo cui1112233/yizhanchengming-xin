@@ -1,6 +1,6 @@
 import { Alert, Button, Input, InputNumber, Modal, Popover, Segmented, Select, Space, Switch, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { listAvailableModels } from '../../../shared/api/modelCatalog';
+import { getAvailableModelCatalog, peekAvailableModelCatalog } from '../../../shared/api/modelCatalog';
 import { getConfig } from '../../../shared/api/config';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
 import { apiErrorMessage } from '../../../shared/apiErrors';
@@ -49,8 +49,9 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [environment, setEnvironment] = useState(null);
-  const [models, setModels] = useState([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
+  const cachedModels = peekAvailableModelCatalog();
+  const [models, setModels] = useState(() => cachedModels?.models || []);
+  const [modelsLoading, setModelsLoading] = useState(() => !cachedModels);
   const [modelsError, setModelsError] = useState('');
   const [syncing, setSyncing] = useState('');
   const [account, setAccount] = useState(null);
@@ -75,17 +76,16 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   useEffect(() => {
     if (!open) return undefined;
     let active = true;
-    setModelsLoading(true);
+    const cached = peekAvailableModelCatalog();
+    if (cached) setModels(cached.models);
+    setModelsLoading(!cached);
     setModelsError('');
-    Promise.all([
-      listAvailableModels('image'),
-      listAvailableModels('text'),
-      listAvailableModels('video')
-    ]).then(([imageModels, textModels, videoModels]) => {
-      if (active) setModels([...imageModels, ...textModels, ...videoModels]);
+    getAvailableModelCatalog().then(result => {
+      if (!active) return;
+      setModels(result.models);
+      if (result.failedKinds.length) setModelsError(`部分模型目录暂不可用：${result.failedKinds.join('、')}`);
     }).catch(error => {
       if (active) {
-        setModels([]);
         setModelsError(error?.message || '未能读取个人中心已启用模型');
       }
     }).finally(() => { if (active) setModelsLoading(false); });

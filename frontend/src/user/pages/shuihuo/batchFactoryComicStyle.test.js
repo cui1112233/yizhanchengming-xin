@@ -59,6 +59,14 @@ test('cover flow hides distant cards so they cannot block the visible controls',
   assert.equal(comicStyleCoverFlowStyle(5).opacity, 0);
 });
 
+test('cover flow downloads only the previews visible around the active card', () => {
+  assert.equal(typeof comicStyleModule.comicStyleShouldLoadPreview, 'function');
+  assert.equal(comicStyleModule.comicStyleShouldLoadPreview(0, 0, 20), true);
+  assert.equal(comicStyleModule.comicStyleShouldLoadPreview(3, 0, 20), true);
+  assert.equal(comicStyleModule.comicStyleShouldLoadPreview(4, 0, 20), false);
+  assert.equal(comicStyleModule.comicStyleShouldLoadPreview(19, 0, 20), true);
+});
+
 test('comic style selection stores metadata without treating its preview as an AI reference', () => {
   const selected = comicStyleSelection({
     id: 'batch-comic-style-01',

@@ -24,6 +24,12 @@ param(
   [switch]$DryRun,
   [switch]$Force,
   [string]$BuildId = '',
+  # 用户可见更新说明按 releaseId 索引（internal/releasenotes/notes/<releaseId>.json）。
+  # 必须在构建前确定：默认取打包时刻（CST）的 qiantie-YYYYMMDDHHmm。
+  [string]$ReleaseId = '',
+  # 本地前置验证：候选二进制先在本地独立端口启动并验收，任一失败即中止发布。
+  [int]$LocalVerifyPort = 4011,
+  [int]$LocalVerifyTimeoutSeconds = 25,
 
   # 远端连接参数沿用 scripts/deploy-go-embedded.ps1 的默认值。
   [string]$TargetHost = '',
@@ -591,6 +597,159 @@ function Invoke-RemoteRollback {
   Write-Host "回滚完成：$BackupDirectory（/health=$health）" -ForegroundColor Yellow
 }
 
+function Invoke-LocalPreflight {
+  # 21 版起的硬门禁：发线上之前，先用本轮构建产物在本地独立端口起一个实例，
+  # 验证“本地看到的”就是候选版本。任一项不通过就抛错中止，绝不上传。
+  param(
+    [string]$ReleaseId,
+    [string]$ArchiveDir,
+    [string]$WindowsBinary,
+    [string]$FrontendEntry,
+    [string]$ShortSha,
+    [int]$Port,
+    [int]$TimeoutSeconds
+  )
+
+  $base = "http://127.0.0.1:$Port"
+  $manifestPath = Join-Path $ArchiveDir 'local-preflight-runtime-manifest.json'
+  Write-JsonNoBom -Path $manifestPath -Content ([ordered]@{
+    buildId = $BuildId
+    releaseId = $ReleaseId
+    gitSha = $ShortSha
+    gitShort = $ShortSha
+    frontendEntry = $FrontendEntry
+    binaryPath = (Get-RelativePath $WindowsBinary)
+    builtAt = (Get-Date).ToUniversalTime().ToString('o')
+  })
+
+  $checks = @()
+  $failed = @()
+  $instancePid = 0
+  $launchOutput = ''
+  $launcher = Join-Path $PSScriptRoot 'start-local-go.ps1'
+
+  try {
+    # 用 Start-Process + 文件重定向启动候选实例，再用 Process.WaitForExit 等
+    # 启动器自身退出。直接管道（或 *>）捕获输出会一直读到 EOF，而被拉起的
+    # 候选进程继承了写端，门禁会卡死在“已后台启动”之后。
+    $launchLog = Join-Path $ArchiveDir 'local-preflight-launch.log'
+    $launchErrLog = Join-Path $ArchiveDir 'local-preflight-launch.err.log'
+    $launcherProcess = Start-Process -FilePath 'powershell.exe' -PassThru -WindowStyle Hidden `
+      -RedirectStandardOutput $launchLog -RedirectStandardError $launchErrLog `
+      -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $launcher,
+        '-SkipBuild', '-NoBuildCheck', '-Detached',
+        '-ListenAddr', "127.0.0.1:$Port",
+        '-BinaryPath', $WindowsBinary, '-ManifestPath', $manifestPath
+      )
+    [void]$launcherProcess.WaitForExit(30000)
+    $launchOutput = [string](Get-Content -LiteralPath $launchLog -Raw -ErrorAction SilentlyContinue) +
+      [string](Get-Content -LiteralPath $launchErrLog -Raw -ErrorAction SilentlyContinue)
+    $pidMatch = [regex]::Match($launchOutput, 'pid=(\d+)')
+    if ($pidMatch.Success) {
+      $instancePid = [int]$pidMatch.Groups[1].Value
+    } else {
+      $failed += "本地实例启动失败：$($launchOutput.Trim())"
+    }
+
+    if ($failed.Count -eq 0) {
+      $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+      $ready = $false
+      while (-not $ready -and (Get-Date) -lt $deadline) {
+        try {
+          $probe = Invoke-WebRequest -Uri "$base/health" -TimeoutSec 3 -UseBasicParsing
+          if ([int]$probe.StatusCode -eq 200) { $ready = $true; break }
+        } catch {
+          Start-Sleep -Milliseconds 500
+        }
+      }
+      if (-not $ready) { $failed += "/health 在 $TimeoutSeconds 秒内未就绪（$base）" }
+    }
+
+    if ($failed.Count -eq 0) {
+      $homeStatus = 'n/a'
+      try { $homeStatus = [string](Invoke-WebRequest -Uri "$base/" -TimeoutSec 10 -UseBasicParsing).StatusCode } catch { $homeStatus = $_.Exception.Message }
+      $homePass = ($homeStatus -eq '200')
+      $checks += [pscustomobject]@{ name = '首页 /'; expected = '200'; actual = $homeStatus; pass = $homePass }
+      if (-not $homePass) { $failed += "首页 / = $homeStatus" }
+
+      $healthStatus = 'n/a'
+      try { $healthStatus = [string](Invoke-WebRequest -Uri "$base/health" -TimeoutSec 10 -UseBasicParsing).StatusCode } catch { $healthStatus = $_.Exception.Message }
+      $healthPass = ($healthStatus -eq '200')
+      $checks += [pscustomobject]@{ name = '/health'; expected = '200'; actual = $healthStatus; pass = $healthPass }
+      if (-not $healthPass) { $failed += "/health = $healthStatus" }
+
+      $updatesReleaseId = ''
+      $updatesStatus = 'n/a'
+      try {
+        $updates = Invoke-RestMethod -Uri "$base/api/product-updates/latest" -TimeoutSec 10
+        $updatesReleaseId = [string]$updates.releaseId
+        $updatesStatus = '200'
+      } catch {
+        $updatesStatus = $_.Exception.Message
+      }
+      $updatesPass = ($updatesStatus -eq '200' -and $updatesReleaseId -eq $ReleaseId)
+      $checks += [pscustomobject]@{ name = '/api/product-updates/latest releaseId'; expected = $ReleaseId; actual = "$updatesStatus/$updatesReleaseId"; pass = $updatesPass }
+      if (-not $updatesPass) { $failed += "/api/product-updates/latest releaseId=$updatesReleaseId（期望 $ReleaseId）" }
+
+      $runtimeEntry = ''
+      $runtimeSha = ''
+      try {
+        $runtime = Invoke-RestMethod -Uri "$base/api/runtime-build-info" -TimeoutSec 10
+        $runtimeEntry = [string]$runtime.frontend_entry
+        $runtimeSha = [string]$runtime.runtime_manifest_sha
+      } catch {
+        $runtimeEntry = $_.Exception.Message
+      }
+      $entryPass = ($runtimeEntry -eq $FrontendEntry)
+      $checks += [pscustomobject]@{ name = '/api/runtime-build-info frontend_entry'; expected = $FrontendEntry; actual = $runtimeEntry; pass = $entryPass }
+      if (-not $entryPass) { $failed += "frontend_entry=$runtimeEntry（期望 $FrontendEntry）" }
+
+      $indexHtml = ''
+      try {
+        $indexHtml = (Invoke-WebRequest -Uri "$base/" -TimeoutSec 10 -UseBasicParsing).Content
+      } catch {
+        $indexHtml = ''
+      }
+      $indexPass = ($indexHtml -match [regex]::Escape($FrontendEntry))
+      $checks += [pscustomobject]@{ name = '首页 index.html 入口 chunk'; expected = $FrontendEntry; actual = $(if ($indexPass) { $FrontendEntry } else { '未命中' }); pass = $indexPass }
+      if (-not $indexPass) { $failed += "首页未引用候选入口 $FrontendEntry" }
+    }
+  } finally {
+    if ($instancePid -gt 0) {
+      try {
+        $proc = Get-Process -Id $instancePid -ErrorAction Stop
+        if ($proc.Path -and ([System.IO.Path]::GetFullPath($proc.Path) -eq [System.IO.Path]::GetFullPath($WindowsBinary))) {
+          Stop-Process -Id $instancePid -Force
+        }
+      } catch {
+        # 进程已退出或路径不匹配：不误杀其它进程。
+      }
+    }
+  }
+
+  $report = [ordered]@{
+    releaseId = $ReleaseId
+    port = $Port
+    binary = (Get-RelativePath $WindowsBinary)
+    binarySha256 = (Get-FileSha256 $WindowsBinary)
+    runtimeManifestSha = $runtimeSha
+    startedAt = (Get-Date).ToUniversalTime().ToString('o')
+    checks = $checks
+    failed = $failed
+    pass = ($failed.Count -eq 0)
+  }
+  Write-JsonNoBom -Path (Join-Path $ArchiveDir 'local-preflight.json') -Content $report
+  $checks | Format-Table -AutoSize | Out-String | Write-Host
+
+  if ($failed.Count -gt 0) {
+    Write-Host '本地前置验证未通过，已中止：不会上传线上。' -ForegroundColor Red
+    throw "本地前置验证未通过：$($failed -join '; ')"
+  }
+  Write-Host "本地前置验证通过：releaseId=$ReleaseId, entry=$FrontendEntry" -ForegroundColor Green
+  return $report
+}
+
 # ---------------------------------------------------------------------------
 # 只读模式：列出远端回滚点
 # ---------------------------------------------------------------------------
@@ -630,7 +789,7 @@ if ($Deploy -and [string]::IsNullOrWhiteSpace($TargetHost)) {
   throw '启用 -Deploy 时必须提供 -TargetHost。'
 }
 
-Write-Section '1/7 前置检查'
+Write-Section '1/8 前置检查'
 $headSha = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($headSha)) { throw '无法读取 Git HEAD。' }
 $shortSha = $headSha.Substring(0, 8)
@@ -647,6 +806,19 @@ if ([string]::IsNullOrWhiteSpace($BuildId)) {
 } elseif ($BuildId -notmatch '^\d{8}-\d{2}-[0-9a-fA-F]{8}$') {
   throw "BuildId 格式非法：$BuildId（应为 20261104-01-6db3b5ad）"
 }
+
+# releaseId 必须先于构建确定：更新说明按 releaseId 编进二进制。
+if ([string]::IsNullOrWhiteSpace($ReleaseId)) {
+  $ReleaseId = 'qiantie-' + (Get-Date -Format 'yyyyMMddHHmm')
+}
+if ($ReleaseId -notmatch '^qiantie-\d{12}$') {
+  throw "ReleaseId 格式非法：$ReleaseId（应为 qiantie-202611060214）"
+}
+$releaseNotesPath = Join-Path $backendDir "internal/releasenotes/notes/$ReleaseId.json"
+if (-not (Test-Path -LiteralPath $releaseNotesPath)) {
+  throw "缺少本次更新说明：$releaseNotesPath。notes/<releaseId>.json 缺失即视为发布失败（硬门禁）。"
+}
+Write-Host "releaseId：$ReleaseId（说明文件：$(Get-RelativePath $releaseNotesPath)）"
 
 $archiveDir = Join-Path $archivesRoot $BuildId
 $releaseDir = Join-Path $releaseRoot $BuildId
@@ -674,12 +846,12 @@ if (Test-Path -LiteralPath $releaseDir) { Remove-Item -LiteralPath $releaseDir -
 New-Item -ItemType Directory -Force $archiveDir | Out-Null
 New-Item -ItemType Directory -Force $releaseDir | Out-Null
 
-Write-Section '2/7 工作区存档'
+Write-Section '2/8 工作区存档'
 Write-ArchiveSnapshot -ArchiveDir $archiveDir
 Write-Host "存档目录：$archiveDir"
 Write-Host "已排除敏感文件 $($excludedSensitive.Count) 个（api-config.json / upload-target.json / 含 cookie、token、password、secret、.env）"
 
-Write-Section '3/7 构建（npm -> embed 同步 -> Go 二进制）'
+Write-Section '3/8 构建（npm -> embed 同步 -> Go 二进制）'
 $buildTimer = Measure-Command {
   if ($useSnapshotDist) {
     Write-Host "已跳过前端构建，使用产物快照：$useSnapshotDist"
@@ -733,7 +905,7 @@ $windowsSha = Get-FileSha256 $windowsBinary
 $linuxSha = Get-FileSha256 $linuxBinary
 $builtAt = (Get-Date).ToUniversalTime().ToString('o')
 
-Write-Section '4/7 发布数据白名单打包'
+Write-Section '4/8 发布数据白名单打包'
 $package = New-DataPackage -ReleaseDir $releaseDir -ArchiveDir $archiveDir -ExcludedSensitiveFiles $excludedSensitive
 $package.entries | Format-Table kind, path, bytes -AutoSize | Out-String | Write-Host
 Write-Host "数据包：$($package.zipPath)（$($package.bytes) bytes，sha256=$($package.sha256)）"
@@ -742,7 +914,7 @@ if ($package.missing.Count -gt 0) {
   Write-Host "缺少被引用的预览图 $($package.missing.Count) 个：$($package.missing -join ', ')" -ForegroundColor Yellow
 }
 
-Write-Section '5/7 环境变量校验（只查是否设置，不打印明文）'
+Write-Section '5/8 环境变量校验（只查是否设置，不打印明文）'
 $envState = Get-EnvState -Names $RequiredEnvVars -File $EnvFile
 Write-Host "已设置：$($envState.present.Count) 项；缺失：$($envState.missing.Count) 项"
 if ($envState.missing.Count -gt 0) {
@@ -766,7 +938,18 @@ if ($null -eq $expectedCapabilities) {
   Write-Host "本地 capabilities available 数：$expectedCapabilities"
 }
 
+Write-Section '6/8 本地前置验证（硬门禁：不通过不上线）'
+$localPreflight = Invoke-LocalPreflight `
+  -ReleaseId $ReleaseId `
+  -ArchiveDir $archiveDir `
+  -WindowsBinary $windowsBinary `
+  -FrontendEntry $frontendEntry `
+  -ShortSha $shortSha `
+  -Port $LocalVerifyPort `
+  -TimeoutSeconds $LocalVerifyTimeoutSeconds
+
 $runtimeManifest = [ordered]@{
+  releaseId = $ReleaseId
   buildId = $BuildId
   gitSha = $headSha
   gitShort = $shortSha
@@ -781,6 +964,7 @@ Write-JsonNoBom -Path (Join-Path $archiveDir 'runtime-manifest.json') -Content $
 
 $buildInfo = [ordered]@{
   buildId = $BuildId
+  releaseId = $ReleaseId
   builtAt = $builtAt
   gitSha = $headSha
   gitShort = $shortSha
@@ -798,12 +982,16 @@ $buildInfo = [ordered]@{
   dataPackage = [ordered]@{ path = (Get-RelativePath $package.zipPath); bytes = $package.bytes; sha256 = $package.sha256; fileCount = $package.entries.Count }
   envRequired = $RequiredEnvVars
   envMissing = $envState.missing
+  # 本地前置验证结果：21 版起的硬门禁，未通过时脚本已在上一步中止。
+  localPreflight = $localPreflight
   deployTarget = ($(if ($Deploy) { "$TargetUser@$TargetHost" } else { 'local-only' }))
 }
 Write-JsonNoBom -Path (Join-Path $archiveDir 'build-info.json') -Content $buildInfo
 # 兼容既有习惯的纯文本摘要。
 $buildInfoText = @(
   "buildId=$BuildId",
+  "releaseId=$ReleaseId",
+  "localPreflightPass=$([bool]$localPreflight.pass)",
   "builtAt=$builtAt",
   "gitSha=$headSha",
   "worktreeDirty=$($statusLines.Count -gt 0)",
@@ -868,10 +1056,12 @@ Write-Utf8NoBom -Path (Join-Path $archiveDir 'ROLLBACK.md') -Content $rollbackDo
 
 $currentRelease = [ordered]@{
   buildId = $BuildId
+  releaseId = $ReleaseId
   archiveDir = (Get-RelativePath $archiveDir)
   releaseDir = (Get-RelativePath $releaseDir)
   gitSha = $headSha
   frontendEntry = $frontendEntry
+  localPreflightPass = [bool]$localPreflight.pass
   localBinarySha256 = $windowsSha
   linuxBinarySha256 = $linuxSha
   dataPackageSha256 = $package.sha256
@@ -902,7 +1092,7 @@ if ($UpdateLocalBinary) {
 }
 
 if ($Deploy) {
-  Write-Section '6/7 上传与远程校验'
+  Write-Section '7/8 上传与远程校验'
   $context = [pscustomobject]@{
     BuildId = $BuildId
     ArchiveDir = $archiveDir
@@ -915,12 +1105,12 @@ if ($Deploy) {
   }
   Invoke-RemoteDeploy -Context $context
 } else {
-  Write-Section '6/7 未上传（local-only）'
+  Write-Section '7/8 未上传（local-only）'
   Write-Host '已生成本地存档与发布包。上传请显式加 -Deploy -TargetHost 与 -RemoteDataDir。'
 }
 
 if (-not $KeepOldReleases -and (Test-Path -LiteralPath $releaseRoot)) {
-  Write-Section '7/7 清理旧构建目录（保留最近 3 个）'
+  Write-Section '8/8 清理旧构建目录（保留最近 3 个）'
   Get-ChildItem -LiteralPath $releaseRoot -Directory |
     Where-Object { $_.FullName -ne $releaseDir } |
     Sort-Object LastWriteTime -Descending |

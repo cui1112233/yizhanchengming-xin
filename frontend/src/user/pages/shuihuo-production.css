@@ -3087,6 +3087,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-engine-modal-final .batch-factory-engine-drawer{display:grid;gap:12px}.batch-factory-engine-modal-final .batch-factory-engine-card{display:grid;gap:11px;margin:0;padding:14px;border:1px solid var(--sh-line);border-radius:10px;background:var(--sh-panel);box-shadow:none}.batch-factory-engine-modal-final .batch-factory-engine-card>header{display:grid;gap:3px;padding-bottom:9px;border-bottom:1px solid var(--sh-line)}.batch-factory-engine-modal-final .batch-factory-engine-card>header b{color:var(--sh-text);font-size:14px;font-weight:800}.batch-factory-engine-modal-final .batch-factory-engine-card>header small{color:var(--sh-muted);font-size:11px;line-height:1.5}.batch-factory-engine-modal-final .batch-factory-engine-card-body{display:grid;gap:12px}
 .batch-factory-engine-modal-final .batch-factory-engine-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.batch-factory-engine-modal-final .batch-factory-engine-field{display:grid;grid-template-columns:112px minmax(0,1fr);gap:10px;align-items:center;min-width:0}.batch-factory-engine-modal-final .batch-factory-engine-field>span{display:grid;gap:3px;min-width:0}.batch-factory-engine-modal-final .batch-factory-engine-field>span b{color:var(--sh-text);font-size:12px;font-weight:700}.batch-factory-engine-modal-final .batch-factory-engine-field small,.batch-factory-engine-modal-final .batch-factory-engine-note{color:var(--sh-muted);font-size:11px;line-height:1.45}.batch-factory-engine-modal-final .batch-factory-engine-field .ant-select,.batch-factory-engine-modal-final .batch-factory-engine-field .ant-input{width:100%}.batch-factory-engine-modal-final .ant-select-selector,.batch-factory-engine-modal-final .ant-input{min-height:35px!important;color:var(--sh-text)!important;border-color:var(--sh-line)!important;border-radius:8px!important;background:var(--sh-panel-strong)!important;font-size:13px}.batch-factory-engine-modal-final .ant-select-selection-item{color:var(--sh-text)!important}.batch-factory-engine-modal-final .ant-select-selection-placeholder{color:var(--sh-muted)!important}
 .batch-factory-engine-modal-final .ant-segmented{width:max-content;max-width:100%;padding:3px;border:1px solid var(--sh-line);border-radius:8px;background:var(--sh-panel-strong)}.batch-factory-engine-modal-final .ant-segmented-item{min-width:54px;min-height:29px;color:var(--sh-muted);border-radius:6px;font-size:12px;font-weight:700}.batch-factory-engine-modal-final .ant-segmented-item-selected{color:var(--sh-bg);background:var(--sh-accent);box-shadow:0 2px 8px color-mix(in srgb,var(--sh-accent) 20%,transparent)}[data-theme='light'] .batch-factory-engine-modal-final .ant-segmented-item-selected{color:#fff}
+.batch-factory-unified-settings-modal .ant-segmented-item-selected{position:relative;z-index:1;color:#06231d!important;background:var(--sh-accent)!important;border:1px solid color-mix(in srgb,var(--sh-accent) 70%,#fff)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--sh-accent) 22%,transparent),0 4px 12px color-mix(in srgb,var(--sh-accent) 34%,transparent)!important;font-weight:900}.batch-factory-unified-settings-modal .ant-segmented-item-selected .ant-segmented-item-label::before{content:'✓';margin-right:5px;font-size:11px;font-weight:900}[data-theme='light'] .batch-factory-unified-settings-modal .ant-segmented-item-selected{color:#fff!important}
+.batch-factory-unified-settings-modal .batch-factory-copy-source-segmented { min-width:240px; }
+.batch-factory-unified-settings-modal .batch-factory-copy-source-segmented .ant-segmented-item { min-width:76px !important; }
+.batch-factory-engine-field > .batch-factory-field-title-inline { display:inline-flex; align-items:center; justify-content:flex-start; gap:6px; width:auto; }
 .batch-factory-engine-behavior-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.batch-factory-engine-modal-final .batch-factory-audio-option{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--sh-line);border-radius:9px;background:var(--sh-panel-strong)}.batch-factory-engine-modal-final .batch-factory-audio-option b{color:var(--sh-text);font-size:12px}.batch-factory-engine-modal-final .batch-factory-audio-option small{display:block;margin-top:4px;color:var(--sh-muted);font-size:11px;line-height:1.45}.batch-factory-engine-audio-duration{max-width:430px}
 .batch-factory-vms-connection-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:13px 14px;border:1px solid color-mix(in srgb,var(--sh-accent) 35%,var(--sh-line));border-radius:10px;background:color-mix(in srgb,var(--sh-accent) 5%,var(--sh-panel-strong))}.batch-factory-vms-main{display:grid;grid-template-columns:40px minmax(0,1fr);gap:11px;align-items:center;min-width:0}.batch-factory-vms-icon{width:40px;height:40px;display:grid;place-items:center;color:var(--sh-accent);border:1px solid color-mix(in srgb,var(--sh-accent) 30%,var(--sh-line));border-radius:10px;background:color-mix(in srgb,var(--sh-accent) 9%,var(--sh-panel));font-size:17px}.batch-factory-vms-copy{display:grid;gap:4px;min-width:0}.batch-factory-vms-title-row{display:flex;align-items:center;gap:8px}.batch-factory-vms-title-row b{font-size:13px}.batch-factory-vms-meta{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px}.batch-factory-vms-meta span{flex:0 0 54px;color:var(--sh-muted)}.batch-factory-vms-meta strong,.batch-factory-vms-meta a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-text)}.batch-factory-vms-meta a{color:var(--sh-accent)}.batch-factory-vms-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .batch-factory-publish-two-column{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}.batch-factory-publish-sync-row{display:flex;gap:7px;flex-wrap:wrap}.batch-factory-publish-ai-note{display:grid;gap:3px;padding:10px 11px;border:1px solid var(--sh-line);border-radius:8px;background:var(--sh-panel-strong)}.batch-factory-publish-ai-note b{font-size:12px}.batch-factory-publish-ai-note span{color:var(--sh-muted);font-size:11px;line-height:1.45}.batch-factory-publish-rule-list{display:grid;gap:7px}.batch-factory-publish-rule-list>section{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--sh-line);border-radius:8px;background:var(--sh-panel-strong)}.batch-factory-publish-rule-list b{font-size:12px}.batch-factory-publish-rule-list small{display:block;margin-top:3px;color:var(--sh-muted);font-size:11px}
@@ -3426,6 +3430,8 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-giant-items { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
 .batch-factory-giant-item { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.04); }
 .batch-factory-giant-item.is-error { background: rgba(255, 77, 79, 0.12); color: #ff7875; }
+.batch-factory-giant-item.is-duplicate { border: 1px solid rgba(250, 173, 20, 0.58); background: rgba(250, 173, 20, 0.16); color: #ffd666; }
+.batch-factory-giant-duplicate-tag { flex: none; margin-inline-end: 0; border-color: rgba(250, 173, 20, 0.68); background: rgba(250, 173, 20, 0.2); color: #ffd666; font-weight: 700; }
 .batch-factory-giant-item-index { flex: none; opacity: 0.6; }
 .batch-factory-giant-item-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-factory-giant-item-title.is-error { color: #ff7875; }
@@ -4847,6 +4853,41 @@ body.shuihuo-reference-shell
   border-top: 1px solid var(--sh-line, #1d2b40);
 }
 .batch-factory-book-row-error-strip .batch-factory-error-notice { width: 100%; }
+
+/* 窄书籍卡片里，Ant Alert 默认把 action 放在正文右边，会把中文正文挤成
+   一字一行。敏感内容确认属于完整操作区：正文占第一行，按钮单独占下一行。 */
+.batch-factory-sensitive-review.ant-alert {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 10px;
+}
+.batch-factory-sensitive-review .ant-alert-icon {
+  flex: 0 0 auto;
+  margin-inline-end: 0;
+}
+.batch-factory-sensitive-review .ant-alert-content {
+  flex: 1 1 calc(100% - 28px);
+  min-width: 0;
+}
+.batch-factory-sensitive-review .ant-alert-message,
+.batch-factory-sensitive-review .ant-alert-description {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.batch-factory-sensitive-review .ant-alert-action {
+  flex: 0 0 100%;
+  width: 100%;
+  margin-inline-start: 0;
+  padding-inline-start: 28px;
+}
+.batch-factory-sensitive-review .ant-alert-action .ant-space {
+  display: flex;
+  width: 100%;
+}
+.batch-factory-sensitive-review .ant-alert-action .ant-btn {
+  white-space: nowrap;
+}
 
 /* 持久失败记录压成一条 28px 细线：左侧 3px 状态色，折叠态只有一句话 + “详情”。
    展开后才显示原始 code/message/request_id、复制与重试，避免再占满整行。 */

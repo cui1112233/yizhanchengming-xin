@@ -14,6 +14,10 @@ export function apiErrorCode(error) {
 }
 
 export function apiErrorMessage(error, fallback = '') {
+  // 统一请求层超时：与业务失败区分开，提示用户可以直接重试。
+  if (error?.code === 'timeout' || error?.name === 'TimeoutError') {
+    return '请求超时：服务端没有在限定时间内返回，请点击重试。';
+  }
   const code = apiErrorCode(error);
   const friendly = (code && ERROR_MESSAGES[code])
     || String(error?.message || '').trim()

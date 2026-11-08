@@ -40,6 +40,18 @@ export function createGiantMaterialQueue(input) {
   }));
 }
 
+export function duplicateGiantMaterialBookIndexes(entries = []) {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const [index, entry] of entries.entries()) {
+    const platformBookId = text(entry?.platformBookId || entry?.bookId);
+    if (!platformBookId) continue;
+    if (seen.has(platformBookId)) duplicates.add(index);
+    else seen.add(platformBookId);
+  }
+  return duplicates;
+}
+
 export function createGiantMaterialPlatformBookClaims() {
   const ownerByBookID = new Map();
   return {

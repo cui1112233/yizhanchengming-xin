@@ -73,6 +73,7 @@ var v12V11AliasPatterns = []string{
 	"POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/upload",
 	"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/primary",
 	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/content",
+	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/thumbnail",
 	"POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/videos/{videoId}/upload",
 	"POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/merge/upload",
 	"DELETE /api/batch-factory/v12/batches/{batchId}/books/{bookId}/videos/{videoId}/tasks/{taskId}",

@@ -12,7 +12,16 @@ data/
 /_local-archive-*/
 /release/
 
+# Local recovery copies, visual checks, editor notes, and generated release
+# evidence stay on disk but must not turn into source changes.
+/.backups/
+/.trae/
+/_shots/
+/screenshots/
+/docs/releases/
+
 # Local review/runtime output and throwaway verification artifacts.
+/.analysis/
 /.local-review/
 /.local-*.json
 /.local-*.log

@@ -67,3 +67,14 @@ func TestLocalArtifactPurgerLeavesInvalidReferenceRetryable(t *testing.T) {
 		t.Fatalf("summary=%+v deleted=%v retries=%v", summary, repo.deleted, repo.retries)
 	}
 }
+
+func TestLocalArtifactRetentionDefaultsToSevenDays(t *testing.T) {
+	if got := normalizeLocalMergedArtifactRetentionDays(0); got != 7 {
+		t.Fatalf("invalid retention normalized to %d days, want 7", got)
+	}
+	for _, days := range []int{3, 7, 14, 30} {
+		if got := normalizeLocalMergedArtifactRetentionDays(days); got != days {
+			t.Fatalf("valid retention %d normalized to %d", days, got)
+		}
+	}
+}

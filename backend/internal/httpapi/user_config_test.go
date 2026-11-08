@@ -88,6 +88,9 @@ func TestUserConfigSeedsImportedWorkshopCatalog(t *testing.T) {
 	if !ok || pet["id"] != "little-companion" {
 		t.Fatalf("default pet = %#v, want Little Companion", settings["pet"])
 	}
+	if settings["productionRetentionDays"] != 7 {
+		t.Fatalf("default production retention = %#v, want 7 days", settings["productionRetentionDays"])
+	}
 }
 
 func TestUserConfigKeepsSavedPetChoice(t *testing.T) {

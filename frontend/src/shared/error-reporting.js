@@ -47,11 +47,14 @@ export function reportClientError({ kind = 'error', message, stack, source, meth
 
   try {
     const token = localStorage.getItem('auth_token') || '';
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 10000);
     void fetch('/api/client-errors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: payload,
-      keepalive: true
+      keepalive: true,
+      signal: controller.signal
     }).catch(() => {});
   } catch (_) {
     // Reporting cannot be allowed to create a second browser failure.

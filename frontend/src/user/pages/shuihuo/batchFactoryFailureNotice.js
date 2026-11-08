@@ -8,6 +8,11 @@ export const AUTOMATION_STAGE_LABELS = Object.freeze({
   fetch_original: '获取原文'
 });
 
+// 首屏请求尚未返回书目时，不能把下一次返回的历史失败当成刚发生的新失败。
+export function automationFailureNotificationsReady(automationStatus) {
+  return Array.isArray(automationStatus?.books);
+}
+
 /**
  * Collect newly failed books in one pass. The caller passes the persisted
  * `notified` map so the same failure signature never produces a second toast.
@@ -20,7 +25,7 @@ export function collectNewAutomationFailures({ books, automationStatus, batchId,
     const entry = resolveEntry(automationStatus, batchId, book.id);
     const failed = entry && String(entry.status || '').toLowerCase() === 'failed';
     const errorText = String(entry?.error || '').trim();
-    if (!failed || !errorText) {
+    if (!failed || !errorText || entry?.stale) {
       if (notified) delete notified[book.id];
       return;
     }

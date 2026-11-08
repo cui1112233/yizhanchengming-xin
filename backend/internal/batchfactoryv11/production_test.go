@@ -14,6 +14,20 @@ type recordingProductionAdapter struct {
 	prompts []FinalPrompt
 }
 
+type sequenceProductionAdapter struct {
+	refs  []ProviderTaskRef
+	calls int
+}
+
+func (a *sequenceProductionAdapter) Submit(_ context.Context, _ FrozenVideoModel, _ FinalPrompt) (ProviderTaskRef, error) {
+	if a.calls >= len(a.refs) {
+		return ProviderTaskRef{}, errors.New("unexpected production submission")
+	}
+	ref := a.refs[a.calls]
+	a.calls++
+	return ref, nil
+}
+
 func (a *recordingProductionAdapter) Submit(_ context.Context, _ FrozenVideoModel, prompt FinalPrompt) (ProviderTaskRef, error) {
 	a.calls++
 	a.prompts = append(a.prompts, prompt)
@@ -85,6 +99,39 @@ func TestRepeatedProductionRequestReturnsSameDurableJob(t *testing.T) {
 	}
 	if adapter.calls != 1 {
 		t.Fatalf("duplicate request submitted %d provider tasks", adapter.calls)
+	}
+}
+
+func TestMissingProductionRetriesOnlyFailedVideoWithProviderReceipt(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	provider := &queuedDirectorProvider{values: []string{twoDirectorVideosJSON(t)}}
+	if _, err := (&DirectorService{Store: store, Provider: provider}).RunDirector(context.Background(), "alice", batch.ID, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+	adapter := &sequenceProductionAdapter{refs: []ProviderTaskRef{
+		{State: ProductionSucceeded, ProviderTaskID: "provider-ok", MediaURL: "https://media.example/ok.mp4"},
+		{State: ProductionFailed, ProviderTaskID: "provider-failed", ErrorMessage: "provider rejected"},
+		{State: ProductionSucceeded, ProviderTaskID: "provider-retry", MediaURL: "https://media.example/retry.mp4"},
+	}}
+	service := &ProductionService{Store: store, Compiler: &PromptCompilerService{Store: store}, Adapter: adapter, Enabled: true, Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15}}
+	first, err := service.SubmitBookProduction(context.Background(), "alice", batch.ID, book.ID, "first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Tasks) != 2 || first.Tasks[0].Status != ProductionSucceeded || first.Tasks[1].Status != ProductionFailed {
+		t.Fatalf("first production=%+v", first.Tasks)
+	}
+	retry, err := service.SubmitBookProduction(context.Background(), "alice", batch.ID, book.ID, "retry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(retry.Tasks) != 1 || retry.Tasks[0].VideoID != first.Tasks[1].VideoID || retry.Tasks[0].Status != ProductionSucceeded {
+		t.Fatalf("retry must contain only the failed video: first=%+v retry=%+v", first.Tasks, retry.Tasks)
+	}
+	if adapter.calls != 3 {
+		t.Fatalf("provider submissions=%d, want two initial plus one failed-video retry", adapter.calls)
 	}
 }
 
@@ -551,40 +598,5 @@ func TestRetriedVideoUsesTheBookEngineInsteadOfTheStoredProvider(t *testing.T) {
 	if registry.requested[0] != VideoProviderYFAISeedance {
 		t.Fatalf("retry submitted through %q, want the book engine %q (stored provider was %q)",
 			registry.requested[0], VideoProviderYFAISeedance, VideoProviderAutoDLH3)
-	}
-}
-
-// 槽位级保留之后，未变化槽位沿用旧 video 身份，它的成功任务挂在旧修订的
-// job 上。投递去重按当前 active 槽位过滤而不是按修订号过滤：保留槽位的历史
-// 成功任务必须继续阻止重复投递，只有真正轮换的槽位才会重新生成。
-func TestProductionBlocksSucceededTasksFromPreviousRevisionForKeptSlots(t *testing.T) {
-	ctx := context.Background()
-	store, batch, book := seedOpeningBook(t, false, 2, []DirectorVideo{
-		{DurationSec: 10, FinalPrompt: "保留分镜"},
-		{DurationSec: 10, FinalPrompt: "新分镜"},
-	})
-	keptVideo := book.Videos[0]
-	rotatedVideo := book.Videos[1]
-	if _, err := store.CreateProductionJob(ctx, ProductionJob{
-		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "old-revision-job",
-		DirectorRevisionID: "director-old-revision",
-		Tasks: []ProductionTask{{
-			VideoID: keptVideo.ID, Status: ProductionSucceeded, Attempt: 1,
-			FinalPromptHash: "old-hash", CompiledPrompt: "old", MediaURL: "https://media.example/kept.mp4",
-		}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	adapter := &recordingProductionAdapter{ref: ProviderTaskRef{State: ProductionSucceeded}}
-	service := &ProductionService{Store: store, Compiler: &PromptCompilerService{Store: store}, Adapter: adapter, Enabled: true, Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15}}
-	job, err := service.SubmitBookProduction(ctx, "alice", batch.ID, book.ID, "request-retention")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(job.Tasks) != 1 || job.Tasks[0].VideoID != rotatedVideo.ID {
-		t.Fatalf("tasks=%+v, want only the rotated slot to be submitted", job.Tasks)
-	}
-	if adapter.calls != 1 {
-		t.Fatalf("adapter calls=%d, want 1: the kept slot's old-revision success must keep blocking", adapter.calls)
 	}
 }

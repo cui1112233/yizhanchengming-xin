@@ -110,7 +110,14 @@ export function SettingsPage() {
   useEffect(() => {
     let alive = true;
     Promise.all(['windows', 'macos'].map(async platform => {
-      const response = await fetch(`/downloads/giant-material-executor/releases/${platform}/latest.json`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      let response;
+      try {
+        response = await fetch(`/downloads/giant-material-executor/releases/${platform}/latest.json`, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       const data = response.ok ? await response.json() : null;
       return [platform, data?.version ? String(data.version) : null];
     }))
@@ -213,7 +220,7 @@ export function SettingsPage() {
         if (!alive) return;
         form.setFieldsValue({
           storageRoot: config.storageRoot || '',
-          productionRetentionDays: [3, 7, 14, 30].includes(Number(config.productionRetentionDays)) ? Number(config.productionRetentionDays) : 3,
+          productionRetentionDays: [3, 7, 14, 30].includes(Number(config.productionRetentionDays)) ? Number(config.productionRetentionDays) : 7,
           petId: getPetDefinition(config.pet).id,
           soundEnabled: config.notifications?.soundEnabled !== false,
           soundVolume: Number.isFinite(config.notifications?.soundVolume) ? config.notifications.soundVolume : 60,
@@ -244,7 +251,7 @@ export function SettingsPage() {
         const result = await form.validateFields(['storageRoot', 'productionRetentionDays']);
         values = {
           storageRoot: result.storageRoot || '',
-          productionRetentionDays: [3, 7, 14, 30].includes(Number(result.productionRetentionDays)) ? Number(result.productionRetentionDays) : 3
+          productionRetentionDays: [3, 7, 14, 30].includes(Number(result.productionRetentionDays)) ? Number(result.productionRetentionDays) : 7
         };
       }
     } catch (error) {
@@ -320,7 +327,7 @@ export function SettingsPage() {
         form={form}
         layout="vertical"
         disabled={loading}
-        initialValues={{ storageRoot: '', productionRetentionDays: 3, petId: DEFAULT_PET_ID, soundEnabled: true, soundVolume: 60, petVisible: true }}
+        initialValues={{ storageRoot: '', productionRetentionDays: 7, petId: DEFAULT_PET_ID, soundEnabled: true, soundVolume: 60, petVisible: true }}
       >
         <div className="settings-top-grid">
         <section className="settings-section settings-model-section" aria-labelledby="settings-model-title">
@@ -368,10 +375,10 @@ export function SettingsPage() {
           <Form.Item label="服务器归档路径" name="storageRoot" extra="必须是服务器可访问的绝对路径；留空表示关闭服务器归档。">
             <Input placeholder="例如 /data/qiantie-archive" />
           </Form.Item>
-          <Form.Item label="制作文件保留时长" name="productionRetentionDays" extra="只清理已完成且已删除作品的本地合并视频，不影响头像、人物/场景/道具参考图、用户上传素材、项目配置和账号数据。">
+          <Form.Item label="制作文件保留时长" name="productionRetentionDays" extra="制作时先保存在服务器；上传 TOS 并校验成功后，本地副本按所选时长清理。未上传或校验失败的文件绝不删除。">
             <Select options={[3, 7, 14, 30].map(days => ({ value: days, label: `${days} 天` }))} />
           </Form.Item>
-          <Typography.Paragraph type="secondary">已删除作品的本地合并视频会按当前账号的保留期进入回收队列；当前公网尚未启用 TOS 清理，已提交到 121 的内容不受影响。</Typography.Paragraph>
+          <Typography.Paragraph type="secondary">默认保留 7 天；磁盘达到 75% 时会优先清理已在 TOS 校验成功的最旧本地副本，降到 65% 后停止。头像、账号、项目配置和 TOS 正式文件不受影响。</Typography.Paragraph>
           <div className="settings-section-footer settings-storage-actions">
             <Button type="primary" icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => saveSection('storage')} loading={savingSection === 'storage'}>保存存储设置</Button>
             <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={handleRestore} loading={restoring}>恢复</Button>

@@ -16,6 +16,10 @@ export function batchFactoryShouldPrepareAudio(settings = {}) {
     && settings.audioPlanningEnabled === true;
 }
 
+export function batchFactoryShouldLoadPublishEnvironment({ open, activeTab, productionMode } = {}) {
+  return open === true && activeTab === 'publish' && batchFactoryProductionMode(productionMode) === 'video';
+}
+
 export function batchFactoryShouldRecompileVideoPrompts(settings = {}) {
   return batchFactoryProductionMode(settings.productionMode) === 'video';
 }

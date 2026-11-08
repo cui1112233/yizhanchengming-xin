@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"image"
 	_ "image/jpeg"
 	"image/png"
@@ -12,6 +13,20 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 )
+
+type directComicImageLookupStore struct {
+	batchfactoryv11.ComicPageStore
+	image       batchfactoryv11.ComicPageImage
+	lookupCalls int
+}
+
+func (s *directComicImageLookupStore) GetComicPageImage(_ context.Context, owner, batchID, bookID, pageID, imageID string) (batchfactoryv11.ComicPageImage, error) {
+	s.lookupCalls++
+	if owner != "alice" || batchID != "batch-1" || bookID != "book-1" || pageID != "page-1" || imageID != "image-1" {
+		return batchfactoryv11.ComicPageImage{}, batchfactoryv11.ErrNotFound
+	}
+	return s.image, nil
+}
 
 func writeTestComicPNG(t *testing.T, path string, width, height int) {
 	t.Helper()
@@ -113,5 +128,19 @@ func TestComicThumbnailCacheKeyChangesWithOriginal(t *testing.T) {
 	secondKey := comicThumbnailCacheKey(record, secondInfo)
 	if firstKey == secondKey {
 		t.Fatalf("cache key must change when original bytes change")
+	}
+}
+
+func TestFindComicPageImageUsesDirectLookupWithoutHydratingWholeBook(t *testing.T) {
+	store := &directComicImageLookupStore{image: batchfactoryv11.ComicPageImage{ID: "image-1", ComicPageID: "page-1", StorageRef: "artifact.png"}}
+	image, err := findComicPageImage(context.Background(), store, "alice", "batch-1", "book-1", "page-1", "image-1")
+	if err != nil {
+		t.Fatalf("find image: %v", err)
+	}
+	if store.lookupCalls != 1 {
+		t.Fatalf("direct lookup calls=%d, want 1", store.lookupCalls)
+	}
+	if image.ID != "image-1" || image.StorageRef != "artifact.png" {
+		t.Fatalf("image=%+v", image)
 	}
 }

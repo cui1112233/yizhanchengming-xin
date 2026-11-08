@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/giantmaterialresolver"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
@@ -352,7 +353,7 @@ func TestComicAutomationStopsAfterWholeBookCollectionWithoutAudioOrVideo(t *test
 	}})
 	mode, _ := json.Marshal("comic")
 	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
-		Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`)}, ExpectedRevision: batch.Revision,
+		Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`), "assetImagesEnabled": json.RawMessage("true")}, ExpectedRevision: batch.Revision,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +417,7 @@ func TestComicAutomationHonorsBookConcurrency(t *testing.T) {
 	}
 	comicConfig, _ := json.Marshal(map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"id": "batch-comic-assets", "body": "提取漫画人物、场景和道具"}, "imageDerivation": map[string]any{"body": "整理成可直接出图的提示词"}}})
 	mode, _ := json.Marshal("comic")
-	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`)}, ExpectedRevision: batch.Revision}); err != nil {
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`), "assetImagesEnabled": json.RawMessage("true")}, ExpectedRevision: batch.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	batch, _ = store.GetBatch(ctx, "alice", batch.ID)
@@ -548,7 +549,7 @@ func TestComicPreparationActionRepairsOnlyMissingPagePrompts(t *testing.T) {
 }
 
 func TestComicPreparationActionRecoversAmbiguousComicAssetIdentity(t *testing.T) {
-	effective := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`)}
+	effective := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`), "assetImagesEnabled": json.RawMessage("true")}
 	book := batchfactoryv11.Book{
 		AssetRecords: []batchfactoryv11.BookAsset{{ID: "asset-1", Kind: "character", Name: "我", Source: "comic", Prompt: "人物"}},
 		Videos:       []batchfactoryv11.Video{{ID: "page-1", ComicPrompt: "第一页", ComicImagePrompt: "第一页图片", ComicSourceSegment: &batchfactoryv11.ComicSourceSegment{SourceText: "第一段"}}},
@@ -559,7 +560,7 @@ func TestComicPreparationActionRecoversAmbiguousComicAssetIdentity(t *testing.T)
 }
 
 func TestComicPreparationActionDoesNotTreatVideoAssetsAsComicAssets(t *testing.T) {
-	effective := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`)}
+	effective := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`), "assetImagesEnabled": json.RawMessage("true")}
 	book := batchfactoryv11.Book{
 		AssetRecords: []batchfactoryv11.BookAsset{{ID: "video-asset", Source: "director", Prompt: "视频人物"}},
 		Videos: []batchfactoryv11.Video{
@@ -1071,66 +1072,6 @@ func TestSelectedAutomationBooks_WithUnknownBook_RejectsCrossBatchDispatch(t *te
 	}
 }
 
-// 批次钉版升级：预设发布新版本后，用户确认的升级动作用新配置覆盖预设管理的
-// 键，批次其余自定义键保留，并重钉 automationPresetSnapshot 版本。
-func TestUpgradePresetAppliesNewRevisionAndPinsBatch(t *testing.T) {
-	ctx := context.Background()
-	store := batchfactoryv11.NewMemoryStore()
-	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
-	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "升级批次", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本"}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
-		Patch: batchfactoryv11.SettingsPatch{
-			"videoModelId":             json.RawMessage(`"model-old"`),
-			"customNote":               json.RawMessage(`"保留我"`),
-			"automationPresetSnapshot": json.RawMessage(`{"id":"preset-1","name":"升级预设","version":1}`),
-		},
-		ExpectedRevision: batch.Revision,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	presetStore, err := NewFileAutomationPresetStore(filepath.Join(t.TempDir(), "presets.json"), func() time.Time { return now })
-	if err != nil {
-		t.Fatal(err)
-	}
-	preset, err := presetStore.Create("alice", "升级预设", map[string]any{"videoModelId": "model-a", "concurrency": float64(2)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := presetStore.Update("alice", preset.ID, 1, "升级预设", map[string]any{"videoModelId": "model-b", "concurrency": float64(4)}); err != nil {
-		t.Fatal(err)
-	}
-	coordinator := NewBatchAutomationCoordinator(store, presetStore, &batchfactoryv11.BookStageService{Store: store}, nil, nil, nil, nil, nil, func() time.Time { return now })
-
-	result, err := coordinator.UpgradeAutomationPreset(ctx, "alice", batch.ID, map[string]any{"presetId": preset.ID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result["upgraded"] != true {
-		t.Fatalf("result=%#v, want upgraded", result)
-	}
-	updated, err := store.GetBatch(ctx, "alice", batch.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var model, note string
-	var snapshot struct {
-		ID      string `json:"id"`
-		Version int    `json:"version"`
-	}
-	if err := json.Unmarshal(updated.SettingsState.Patch["videoModelId"], &model); err != nil || model != "model-b" {
-		t.Fatalf("videoModelId=%q err=%v, want the new preset revision value", model, err)
-	}
-	if err := json.Unmarshal(updated.SettingsState.Patch["customNote"], &note); err != nil || note != "保留我" {
-		t.Fatalf("customNote=%q err=%v, batch-only keys must survive the upgrade", note, err)
-	}
-	if err := json.Unmarshal(updated.SettingsState.Patch["automationPresetSnapshot"], &snapshot); err != nil || snapshot.ID != preset.ID || snapshot.Version != 2 {
-		t.Fatalf("snapshot=%+v err=%v, want the batch pinned to revision 2", snapshot, err)
-	}
-}
-
 func TestApplyPresetKeepsRequestedComicProductionMode(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
@@ -1247,7 +1188,7 @@ func TestResetRetryableAutomationBooksRestartsOnlyFailedEntries(t *testing.T) {
 		t.Fatalf("completed entry was touched: %#v", done)
 	}
 	bad, _ := books["bad"].(map[string]any)
-	if bad["status"] != "running" || bad["stage"] != "assets" || bad["error"] != "" || bad["updatedAt"] != now || bad["retryRequested"] != true {
+	if bad["status"] != "running" || bad["stage"] != "video" || bad["resumeStage"] != "video" || bad["error"] != "" || bad["updatedAt"] != now || bad["retryRequested"] != true {
 		t.Fatalf("selected failed entry not reset: %#v", bad)
 	}
 	hold, _ := books["hold"].(map[string]any)
@@ -1289,7 +1230,7 @@ func TestResetRetryableAutomationBooksWithoutFilterRestartsAllFailures(t *testin
 		}
 	}
 	stopped, _ := books["stopped"].(map[string]any)
-	if stopped["stage"] != "assets" || stopped["error"] != "" || stopped["updatedAt"] != now {
+	if stopped["stage"] != "assets" || stopped["resumeStage"] != "assets" || stopped["error"] != "" || stopped["updatedAt"] != now {
 		t.Fatalf("stopped entry was not reset for retry: %#v", stopped)
 	}
 }
@@ -1311,7 +1252,8 @@ func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 		wantSkipLog     bool
 		wantMissingText bool
 	}{
-		{name: "default keeps the assets stage", setting: nil, wantCalls: 2},
+		{name: "default skips the assets stage", setting: nil, wantCalls: 1, wantSkipLog: true, wantMissingText: true},
+		{name: "explicit true keeps the assets stage", setting: json.RawMessage("true"), wantCalls: 2},
 		{name: "explicit false skips the assets stage", setting: json.RawMessage("false"), wantCalls: 1, wantSkipLog: true, wantMissingText: true},
 		{name: "disabled keeps existing assets", setting: json.RawMessage("false"), precreateBook: true, wantCalls: 1, wantSkipLog: true},
 	}
@@ -1383,8 +1325,16 @@ func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tc.setting == nil && len(latest.Books[0].AssetRecords) == 0 {
-				t.Fatalf("default switch must still generate assets: %+v", latest.Books[0])
+			if tc.wantCalls == 1 {
+				for _, asset := range latest.Books[0].AssetRecords {
+					images, err := store.ListBookAssetImages(ctx, "alice", batch.ID, book.ID, asset.ID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(images) != 0 {
+						t.Fatalf("asset %s got images while the switch was off: %+v", asset.ID, images)
+					}
+				}
 			}
 			if tc.precreateBook {
 				found := false
@@ -1454,15 +1404,35 @@ func TestComicAutomationWithAssetImagesDisabledStillRunsTheComicStages(t *testin
 
 	coordinator.run(ctx, 0, "alice", batch.ID, "job-comic-assets-off", job, batch)
 
-	// 关闭资产图片：不重新提炼资产，也不出图；漫画仍按正文分页并生成页提示词。
-	if !generated || provider.calls != 2 {
-		t.Fatalf("generated=%v AI calls=%d entry=%#v, want comic preparation and generation to keep running", generated, provider.calls, entry)
+	// 关闭资产图片只是不生成参考图；人物、场景、道具提示词仍须正常提取，
+	// 并继续用于后续漫画分页和每页提示词生成。
+	if !generated || provider.calls != 3 {
+		t.Fatalf("generated=%v AI calls=%d entry=%#v, want asset extraction plus comic preparation and generation", generated, provider.calls, entry)
 	}
 	if entry["status"] != "completed" || entry["stage"] != "ready_for_upload" || automationStringValue(entry["error"], "") != "" {
 		t.Fatalf("entry=%#v, want a completed comic run without failures", entry)
 	}
-	if !strings.Contains(fmt.Sprint(entry["logs"]), "无已存资产描述，已跳过合并") {
-		t.Fatalf("logs=%v, want the asset-text skip explanation", entry["logs"])
+	if strings.Contains(fmt.Sprint(entry["logs"]), "无已存资产描述，已跳过合并") {
+		t.Fatalf("logs=%v, asset descriptions must not be skipped when only asset images are disabled", entry["logs"])
+	}
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(latest.Books[0].AssetRecords) == 0 {
+		t.Fatalf("asset prompts were not extracted: %+v", latest.Books[0])
+	}
+	for _, asset := range latest.Books[0].AssetRecords {
+		if strings.TrimSpace(asset.Prompt) == "" {
+			t.Fatalf("asset %s has no prompt: %+v", asset.ID, asset)
+		}
+		images, listErr := store.ListBookAssetImages(ctx, "alice", batch.ID, book.ID, asset.ID)
+		if listErr != nil {
+			t.Fatal(listErr)
+		}
+		if len(images) != 0 {
+			t.Fatalf("asset %s got reference images while the switch was off: %+v", asset.ID, images)
+		}
 	}
 }
 
@@ -1660,6 +1630,115 @@ func TestEnsureAutomationSourceLegacyEmptyBookStillFetches(t *testing.T) {
 	}
 	if requests != 1 {
 		t.Fatalf("upstream requests=%d, want 1 for legacy source recovery", requests)
+	}
+}
+
+func TestEnsureAutomationSourceClearsStaleReadFailureWhenSourceAlreadyExists(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		Title: "已成功读取但残留旧错误", BookID: "good-id", Platform: "常读", SourceText: "已经保存的可用正文",
+		SourceMetadata: map[string]any{
+			"gender": "女频", "style": "现代通用", "originalReadStrategy": "direct_first",
+			"originalReadStage": "failed", "originalReadError": "旧书号读取失败", "contentPending": true,
+		},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	coordinator := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	updated, fetchErr := coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, batch.Books[0])
+
+	if fetchErr != nil {
+		t.Fatalf("ensureAutomationSource() error = %v", fetchErr)
+	}
+	if updated.SourceMetadata["originalReadStage"] != "direct" || updated.SourceMetadata["originalReadError"] != "" || updated.SourceMetadata["contentPending"] != false {
+		t.Fatalf("stale read failure was not cleared: %#v", updated.SourceMetadata)
+	}
+}
+
+func TestEnsureAutomationSourceNormalizesDisplayPlatformBefore121Fetch(t *testing.T) {
+	tests := []struct {
+		name         string
+		platform     string
+		wantPlatform string
+	}{
+		{name: "常读", platform: "常读", wantPlatform: "2"},
+		{name: "七猫", platform: "七猫", wantPlatform: "3"},
+		{name: "黑岩代码", platform: "HY", wantPlatform: "1"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			memoryStore := batchfactoryv11.NewMemoryStore()
+			batch, err := memoryStore.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+				Title: "待自动获取", BookID: "7597251937846774846", Platform: tc.platform,
+			}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.URL.Query().Get("platform"); got != tc.wantPlatform {
+					t.Errorf("platform query = %q, want numeric platform ID %q", got, tc.wantPlatform)
+				}
+				if got := r.URL.Query().Get("bookid"); got != "7597251937846774846" {
+					t.Errorf("bookid query = %q", got)
+				}
+				_, _ = w.Write([]byte(`{"code":200,"data":"平台编号正确时返回的正文","bookinfo":{}}`))
+			}))
+			defer server.Close()
+			coordinator := NewBatchAutomationCoordinator(memoryStore, nil, nil, nil, nil, nil, nil, nil, nil)
+			coordinator.SetSourceFetcher(&novelfetchworkshop.UpstreamFetcher{Client: server.Client(), Endpoint: server.URL})
+
+			updated, fetchErr := coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, batch.Books[0])
+
+			if fetchErr != nil {
+				t.Fatalf("ensureAutomationSource() error = %v", fetchErr)
+			}
+			if updated.SourceText != "平台编号正确时返回的正文" {
+				t.Fatalf("source = %q", updated.SourceText)
+			}
+		})
+	}
+}
+
+func TestEnsureAutomationSourceFallsBackToReadableGiantMaterialCandidate(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		Title: "同名常读书", BookID: "bad-candidate", Platform: "常读",
+		SourceMetadata: map[string]any{
+			"sourceMode": "giant_material", "giantMaterialId": "material-1", "platformCode": "CD", "platformId": "2",
+			"originalReadStrategy": "direct_first", "originalReadStage": "failed", "originalReadError": "旧候选不可读", "contentPending": true,
+		},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("bookid") == "good-candidate" {
+			_, _ = w.Write([]byte(`{"code":200,"msg":"成功","data":"自动化候选正文"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"code":400,"msg":"获取书籍信息失败"}`))
+	}))
+	defer upstream.Close()
+	coordinator := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, nil)
+	coordinator.SetSourceFetcher(&novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL})
+	coordinator.SetGiantMaterialResolver(fakeGiantMaterialResolver{material: giantmaterialresolver.Material{Books: []giantmaterialresolver.Book{
+		{PlatformBookID: "bad-candidate", PlatformName: "常读", PlatformCode: "CD", PlatformID: "2", Title: "同名常读书"},
+		{PlatformBookID: "good-candidate", PlatformName: "常读", PlatformCode: "CD", PlatformID: "2", Title: "同名常读书"},
+	}}})
+
+	updated, fetchErr := coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, batch.Books[0])
+
+	if fetchErr != nil {
+		t.Fatalf("ensureAutomationSource() error = %v", fetchErr)
+	}
+	if updated.BookID != "good-candidate" || updated.SourceText != "自动化候选正文" {
+		t.Fatalf("fallback was not persisted: %#v", updated)
+	}
+	if updated.SourceMetadata["originalReadStage"] != "direct" || updated.SourceMetadata["originalReadError"] != "" || updated.SourceMetadata["contentPending"] != false {
+		t.Fatalf("successful automation fallback did not clear stale failure: %#v", updated.SourceMetadata)
 	}
 }
 
@@ -2346,7 +2425,7 @@ func TestDispatchDueJobsReclaimsZombieRunningJobWithoutActiveBooks(t *testing.T)
 	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
 		"job-zombie": {
 			"id": "job-zombie", "owner": "alice", "batchId": "batch-1",
-			"state": "running", "updatedAt": now.Add(-20 * time.Minute),
+			"state": "running", "updatedAt": now.Add(-(automationZombieRunningIdleTimeout + time.Minute)),
 			"counts": automationCounts(2, 1, 1, 0),
 			"books": map[string]any{
 				"book-1": map[string]any{"bookId": "book-1", "status": "failed", "stage": "comic_images"},
@@ -2411,8 +2490,9 @@ func TestDispatchDueJobsReclaimsZombieRunningJobWithoutActiveBooks(t *testing.T)
 	}
 }
 
-// 还有书在 running 时不能回收，即使是同一个长时间没更新的 job。
-func TestDispatchDueJobsKeepsRunningJobWithActiveBook(t *testing.T) {
+// 长时间没有任何状态写入的 running job 必须回收，即使还有书挂着 running：
+// 书级停滞由停滞看门狗负责跳过，僵尸回收不能因为一本书在跑就永远失效。
+func TestDispatchDueJobsReclaimsRunningJobWithActiveBook(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "automation.json")
 	now := time.Date(2026, 11, 5, 10, 30, 0, 0, time.UTC)
@@ -2437,8 +2517,20 @@ func TestDispatchDueJobsKeepsRunningJobWithActiveBook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if automationStringValue(got.Jobs["job-active"]["state"], "") != "running" {
-		t.Fatalf("有 running 书时不得回收: %#v", got.Jobs["job-active"]["state"])
+	job := got.Jobs["job-active"]
+	if automationStringValue(job["state"], "") != "failed" {
+		t.Fatalf("长时间无进展的 job 必须回收: %#v", job["state"])
+	}
+	books, _ := job["books"].(map[string]any)
+	book, _ := books["book-1"].(map[string]any)
+	if automationStringValue(book["status"], "") != "failed" {
+		t.Fatalf("被回收的 running 书必须落 failed: %#v", book)
+	}
+	if automationStringValue(book["message"], "") != automationZombieRunningMessage {
+		t.Fatalf("被回收的书必须留下可读状态: %#v", book)
+	}
+	if automationStringValue(book["stage"], "") != "video" {
+		t.Fatalf("回收不得丢失阶段信息: %#v", book)
 	}
 }
 

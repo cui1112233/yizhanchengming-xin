@@ -38,10 +38,11 @@ func TestRepairComicAssetPromptUsesRewriteSanitizesAndCaches(t *testing.T) {
 	if calls != 1 || repaired == original || strings.Contains(repaired, "持刀") {
 		t.Fatalf("repaired=%q calls=%d", repaired, calls)
 	}
-	shuihuoRepairedPrompts.Store(key, repaired)
-	cached, ok := shuihuoRepairedPrompts.Load(key)
-	if !ok || cached.(string) != repaired {
-		t.Fatalf("cached repaired prompt=%v ok=%t", cached, ok)
+	baseRevision := comicPromptRevision("资产原始提示词")
+	storeShuihuoRepairedPrompt(key, shuihuoRepairedPrompt{Prompt: repaired, PromptRevision: baseRevision, PageRevision: 0})
+	cached, ok := loadShuihuoRepairedPrompt(key, baseRevision)
+	if !ok || cached.Prompt != repaired {
+		t.Fatalf("cached repaired prompt=%+v ok=%t", cached, ok)
 	}
 	_ = repairComicImagePrompt
 }
@@ -194,8 +195,8 @@ func TestComicPageAssetLookupUsesStructuredVisibleBindings(t *testing.T) {
 	}
 }
 
-func TestComicPageGenerationRecoversAnExistingGenerationTask(t *testing.T) {
-	now := time.Unix(1700000000, 0)
+func TestComicPageGenerationRejectsARecentDurableGenerationTask(t *testing.T) {
+	now := time.Now().UTC()
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
 		Title: "漫画批次",
@@ -225,15 +226,15 @@ func TestComicPageGenerationRecoversAnExistingGenerationTask(t *testing.T) {
 		"comicPrompt": "完整漫画页",
 		"imagePrompt": "完整出图描述",
 	})
-	if strings.Contains(response.Body.String(), "当前漫画页已有生成任务") {
-		t.Fatalf("orphaned generation task was not recovered: status=%d body=%s", response.Code, response.Body.String())
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "当前漫画页已有生成任务") {
+		t.Fatalf("recent durable task must stay protected: status=%d body=%s", response.Code, response.Body.String())
 	}
 	pages, err := store.ListComicPages(context.Background(), "alice", batch.ID, book.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(pages) != 1 || pages[0].Status != "generation_failed" {
-		t.Fatalf("recovered page=%+v, want generation_failed", pages)
+	if len(pages) != 1 || pages[0].Status != "generating" {
+		t.Fatalf("protected page=%+v, want generating", pages)
 	}
 }
 
@@ -1010,8 +1011,8 @@ func TestComicPagePutIsPatchNotFullRow(t *testing.T) {
 
 	// Creating a page through the same PUT still applies defaults.
 	batch, err = store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
-		Title:  "第二批次",
-		Books:  []batchfactoryv11.CreateBookInput{{Title: "第二本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "分镜一"}}}},
+		Title: "第二批次",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第二本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "分镜一"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1126,5 +1127,235 @@ func TestComicPageFinalImagePromptSkipsEmptySourceWithoutError(t *testing.T) {
 		if appended || got != contract.Prompt {
 			t.Fatal("空 current_page 时不得追加约束块")
 		}
+	}
+}
+
+// TestComicPageManualPromptEditInvalidatesRepairedPromptAndGenerationUsesNewPrompt
+// 复现 21 版必修 bug：人工改提示词后，内存里的旧修复版必须立即失效，
+// 生成必须使用数据库里的新提示词。
+func TestComicPageManualPromptEditInvalidatesRepairedPromptAndGenerationUsesNewPrompt(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	var providerPrompt string
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Prompt string `json:"prompt"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode provider request: %v", err)
+			return
+		}
+		providerPrompt = request.Prompt
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="}]}`))
+	}))
+	defer provider.Close()
+
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "第九页"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, video := batch.Books[0], batch.Books[0].Videos[0]
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{
+		"productionMode":   comicTestRaw(t, "comic"),
+		"imageAspectRatio": comicTestRaw(t, "1:1"),
+		"imageModelId":     comicTestRaw(t, "comic-image"),
+		"imageProvider":    comicTestRaw(t, "personal_api"),
+		"aiPromptConfig": comicTestRaw(t, map[string]any{"comic": map[string]any{
+			"enabled": true,
+			"style":   map[string]any{"presetId": "batch-comic-style-14", "body": "水墨漫画画风"},
+		}}),
+	}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(ctx, "alice", map[string]any{"modelCatalog": []any{
+		map[string]any{"id": "comic-image", "kind": "image", "enabled": true, "provider": "personal_api", "modelId": "comic-provider-v1", "baseUrl": provider.URL, "credential": "test-secret"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, batchfactoryv11.UpsertComicPageInput{
+		ComicPrompt: "旧分镜：复视室对峙",
+		ImagePrompt: "旧画面：复视室里两人对坐，气氛紧绷",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{
+		BridgeSecret:    "secret",
+		Now:             func() time.Time { return now },
+		Slice:           1,
+		Store:           store,
+		LocalArtifacts:  localartifact.NewStore(t.TempDir(), 1<<20),
+		NovelFetchStore: catalog,
+	})
+	key := comicPageRepairKey(batch.ID, book.ID, video.ID)
+	storeShuihuoRepairedPrompt(key, shuihuoRepairedPrompt{Prompt: "旧修复版：复视室对峙，旧气泡「最后没钱治病，抱憾绝望离世」", PromptRevision: comicPromptRevision("旧画面"), PageRevision: 1})
+	defer shuihuoRepairedPrompts.Delete(key)
+
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + book.ID + "/comic-pages/" + video.ID
+	edited := signedJSONRequest(t, api, now, "alice", http.MethodPut, path, map[string]any{
+		"comicPrompt": "第九页：空走廊，散落假金条与药袋，远处模糊背影",
+		"imagePrompt": "空走廊，地面散落假金条与药袋，走廊尽头一个模糊背影，冷色调",
+	})
+	if edited.Code != http.StatusOK {
+		t.Fatalf("manual edit status=%d body=%s", edited.Code, edited.Body.String())
+	}
+	if _, ok := shuihuoRepairedPrompts.Load(key); ok {
+		t.Fatal("人工修改提示词后修复版缓存必须立即失效")
+	}
+
+	generated := signedJSONRequest(t, api, now, "alice", http.MethodPost, path+"/generate", map[string]any{})
+	if generated.Code != http.StatusCreated {
+		t.Fatalf("generate status=%d body=%s", generated.Code, generated.Body.String())
+	}
+	if !strings.Contains(providerPrompt, "空走廊") || !strings.Contains(providerPrompt, "假金条") {
+		t.Fatalf("生成必须使用数据库里的新提示词: %s", providerPrompt)
+	}
+	if strings.Contains(providerPrompt, "复视室对峙") {
+		t.Fatalf("生成不得再复用旧修复版提示词: %s", providerPrompt)
+	}
+}
+
+// TestRepairedPromptDroppedWhenDatabasePromptRevisionChanged 证明缓存版本
+// 落后于数据库时会被丢弃，而不是继续压住数据库提示词。
+func TestRepairedPromptDroppedWhenDatabasePromptRevisionChanged(t *testing.T) {
+	key := comicPageRepairKey("batch-rev", "book-rev", "video-rev")
+	defer shuihuoRepairedPrompts.Delete(key)
+	storeShuihuoRepairedPrompt(key, shuihuoRepairedPrompt{Prompt: "旧修复版提示词正文", PromptRevision: comicPromptRevision("旧提示词"), PageRevision: 7})
+
+	if _, ok := loadShuihuoRepairedPrompt(key, comicPromptRevision("旧提示词")); !ok {
+		t.Fatal("版本一致时应命中缓存")
+	}
+	if _, ok := loadShuihuoRepairedPrompt(key, comicPromptRevision("人工改写后的提示词")); ok {
+		t.Fatal("数据库提示词版本变化后必须丢弃缓存")
+	}
+	if _, ok := shuihuoRepairedPrompts.Load(key); ok {
+		t.Fatal("版本不符时应删除缓存条目")
+	}
+}
+
+// TestRepairedPromptExpiresAfterInjectedTTL 用注入时钟验证 TTL 兜底，
+// 不 sleep。
+func TestRepairedPromptExpiresAfterInjectedTTL(t *testing.T) {
+	originalNow := shuihuoRepairedPromptNow
+	defer func() { shuihuoRepairedPromptNow = originalNow }()
+	current := time.Date(2026, 11, 6, 3, 42, 0, 0, time.UTC)
+	shuihuoRepairedPromptNow = func() time.Time { return current }
+
+	key := comicPageRepairKey("batch-ttl", "book-ttl", "video-ttl")
+	defer shuihuoRepairedPrompts.Delete(key)
+	revision := comicPromptRevision("同一份数据库提示词")
+	storeShuihuoRepairedPrompt(key, shuihuoRepairedPrompt{Prompt: "修复版提示词正文", PromptRevision: revision, PageRevision: 3})
+
+	current = current.Add(shuihuoRepairedPromptTTL - time.Second)
+	if _, ok := loadShuihuoRepairedPrompt(key, revision); !ok {
+		t.Fatal("TTL 内应继续复用修复版")
+	}
+	current = current.Add(2 * time.Second)
+	if _, ok := loadShuihuoRepairedPrompt(key, revision); ok {
+		t.Fatal("TTL 到期后必须丢弃缓存并重新改写")
+	}
+}
+
+// TestManualPromptOverrideNeverFallsBackToRepairedPrompt 证明人工覆盖后
+// 该页不再回落到自动改写版本，且失效入口能按页/按书精确清理。
+func TestManualPromptOverrideNeverFallsBackToRepairedPrompt(t *testing.T) {
+	const batchID, bookID = "batch-scope", "book-scope"
+	pageA, pageB := "video-a", "video-b"
+	keyA := comicPageRepairKey(batchID, bookID, pageA)
+	keyB := comicPageRepairKey(batchID, bookID, pageB)
+	assetKey := comicAssetRepairKey(batchID, bookID, "asset-a")
+	for _, key := range []string{keyA, keyB, assetKey} {
+		storeShuihuoRepairedPrompt(key, shuihuoRepairedPrompt{Prompt: "自动修复版正文", PromptRevision: comicPromptRevision("旧提示词"), PageRevision: 1})
+	}
+	defer func() {
+		for _, key := range []string{keyA, keyB, assetKey} {
+			shuihuoRepairedPrompts.Delete(key)
+		}
+	}()
+
+	invalidateShuihuoRepairedPrompt(batchID, bookID, pageA)
+	if _, ok := loadShuihuoRepairedPrompt(keyA, comicPromptRevision("人工覆盖后的提示词")); ok {
+		t.Fatal("人工覆盖后该页不得再回落自动改写版本")
+	}
+	if _, ok := shuihuoRepairedPrompts.Load(keyA); ok {
+		t.Fatal("人工覆盖后该页缓存必须删除")
+	}
+	if _, ok := shuihuoRepairedPrompts.Load(keyB); !ok {
+		t.Fatal("页级失效不得误删兄弟页缓存")
+	}
+	invalidateShuihuoRepairedPrompt(batchID, bookID, "")
+	if _, ok := shuihuoRepairedPrompts.Load(keyB); ok {
+		t.Fatal("书级失效必须清理本书所有页缓存")
+	}
+	if _, ok := shuihuoRepairedPrompts.Load(assetKey); ok {
+		t.Fatal("书级失效必须清理本书资产修复缓存")
+	}
+}
+
+// TestComicPromptRepairCoversVisualFieldsAndRecordsLedger 证明自动修复能
+// 改写画面描述，并把修复次数、字段与前后摘要写进页级账本。
+func TestComicPromptRepairCoversVisualFieldsAndRecordsLedger(t *testing.T) {
+	before := "复视室里两人对峙，「最后没钱治病，抱憾绝望离世」，气氛紧绷"
+	after := "空走廊，散落假金条与药袋，远处一个模糊背影，「最后没钱治病，抱憾绝望离世」"
+	fields := comicPromptRepairFields(before, after)
+	if len(fields) != 1 || fields[0] != "画面描述" {
+		t.Fatalf("只改画面时必须标记画面描述: %v", fields)
+	}
+	both := comicPromptRepairFields(before, "空走廊，远处模糊背影，「这一次我先走」")
+	if len(both) != 2 || both[0] != "台词" || both[1] != "画面描述" {
+		t.Fatalf("台词与画面同时改写时都必须标记: %v", both)
+	}
+
+	entry := map[string]any{}
+	now := time.Date(2026, 11, 6, 3, 42, 0, 0, time.UTC)
+	recordComicPromptRepair(entry, comicPromptRepair{
+		VideoID: "video-09", Label: "第 9 页", Fields: fields, Before: before, After: after, At: now,
+		Attempts: 1, LastRefusalRaw: "上游原文：content policy violation",
+	}, now)
+	recordComicPromptRepair(entry, comicPromptRepair{
+		VideoID: "video-09", Label: "第 9 页", Fields: fields, Before: after, After: after + "，冷色调", At: now.Add(time.Minute),
+		Attempts: 2, LastRefusalRaw: "上游原文：content policy violation (round 2)",
+	}, now.Add(time.Minute))
+	ledger, _ := entry["nodes"].(map[string]any)
+	comicNode, _ := ledger["comic_images"].(map[string]any)
+	pageLedger, _ := comicNode["pageLedger"].(map[string]any)
+	record, _ := pageLedger["video-09"].(map[string]any)
+	if record == nil {
+		t.Fatalf("页级账本缺失: %+v", entry)
+	}
+	if repaired, _ := record["autoRepaired"].(bool); !repaired {
+		t.Fatalf("必须标记该页被自动改写过: %+v", record)
+	}
+	if count, _ := record["repairCount"].(int); count != 2 {
+		t.Fatalf("修复次数=%v, want 2", record["repairCount"])
+	}
+	if attempts, _ := record["repairAttempts"].(int); attempts != 2 {
+		t.Fatalf("自动改写轮次=%v, want 2", record["repairAttempts"])
+	}
+	if refusal, _ := record["lastRefusalRaw"].(string); !strings.Contains(refusal, "round 2") {
+		t.Fatalf("最后拒绝原文=%q", refusal)
+	}
+	if repairedFields, _ := record["repairedFields"].([]string); len(repairedFields) != 1 || repairedFields[0] != "画面描述" {
+		t.Fatalf("修复字段=%v", record["repairedFields"])
+	}
+	for _, key := range []string{"repairBefore", "repairAfter", "repairedAt"} {
+		if text, _ := record[key].(string); strings.TrimSpace(text) == "" {
+			t.Fatalf("账本缺少 %s: %+v", key, record)
+		}
+	}
+	// 整本成功后的清零只重置当前账期，不能抹掉“被自动改写过”的历史。
+	if !resetAutomationPageLedgerNode(entry, "comic_images", now.Add(2*time.Minute)) {
+		t.Fatal("账本应有可重置的当前账期")
+	}
+	if repaired, _ := record["autoRepaired"].(bool); !repaired {
+		t.Fatalf("清零后仍须保留自动改写历史: %+v", record)
+	}
+	if count, _ := record["repairCount"].(int); count != 2 {
+		t.Fatalf("清零后修复次数不得丢失: %v", record["repairCount"])
 	}
 }

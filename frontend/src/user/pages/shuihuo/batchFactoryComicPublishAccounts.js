@@ -3,14 +3,16 @@ const COMIC_PUBLISH_DIRECTORY_CACHE_KEY = 'batch-factory.n8-comic-publish-direct
 // N8 后台当前已同步的启用分类。接口暂时未返回时先保证下拉框可用，
 // 接口返回新目录后会立即替换这组兜底数据。
 export const DEFAULT_AUDIO_CATEGORIES = [
-  { id: 12, name: '古风-爽文（打脸）', status: 'ENABLE' },
-  { id: 11, name: '古风-男悲伤', status: 'ENABLE' },
-  { id: 10, name: '古风-女悲伤', status: 'ENABLE' },
-  { id: 9, name: '女-爽文（打脸）', status: 'ENABLE' },
-  { id: 8, name: '女，悲伤', status: 'ENABLE' }
+  { id: 14, name: '现代悬疑', status: 'ENABLE' },
+  { id: 13, name: '男频都市', status: 'ENABLE' },
+  { id: 12, name: '古风通用', status: 'ENABLE' },
+  { id: 11, name: '古风虐文', status: 'ENABLE' },
+  { id: 10, name: '古风甜文', status: 'ENABLE' },
+  { id: 9, name: '现代通用', status: 'ENABLE' },
+  { id: 8, name: '现代虐文', status: 'ENABLE' }
 ];
 
-export function producerAccountOptions(accounts = [], savedAccount = '', organizationId = '', accountOrganizations = {}) {
+export function producerAccountOptions(accounts = [], savedAccount = '', organizationId = '', accountOrganizations = {}, loading = false) {
   const saved = String(savedAccount || '').trim();
   const org = String(organizationId || '').trim();
   const hasDirectoryMapping = Object.keys(accountOrganizations || {}).length > 0;
@@ -24,7 +26,11 @@ export function producerAccountOptions(accounts = [], savedAccount = '', organiz
   if (saved) {
     seen.add(saved);
     const isInDirectory = accounts.some(item => String(item || '').trim() === saved);
-    values.push({ value: saved, label: isInDirectory ? (belongsToOrganization(saved) ? `${saved}（已保存）` : `${saved}（不属于当前组织）`) : `${saved}（已保存·目录未同步）` });
+    const savedLabel = isInDirectory
+      ? (belongsToOrganization(saved) ? `${saved}（已保存）` : `${saved}（不属于当前组织）`)
+      // 目录还在读取时不能显示成“目录未同步”，否则看起来像账号缺失。
+      : (loading ? `${saved}（已保存·目录读取中…）` : `${saved}（已保存·目录未同步）`);
+    values.push({ value: saved, label: savedLabel });
   }
   for (const item of accounts || []) {
     const value = String(item || '').trim();
@@ -51,14 +57,13 @@ export function readComicPublishDirectoryCache() {
   }
 }
 
-export function chooseN8Audio(audios = [], savedID = '') {
+export function chooseN8Audio(audios = [], savedID = '', random = Math.random) {
   const enabled = (audios || []).filter(item => String(item?.status || 'ENABLE').toUpperCase() === 'ENABLE');
   const saved = enabled.find(item => String(item?.id) === String(savedID));
   if (saved) return saved;
-  return enabled.sort((a, b) => {
-    const updated = new Date(b?.updatedAt || b?.updated_at || 0) - new Date(a?.updatedAt || a?.updated_at || 0);
-    return updated || Number(b?.id || 0) - Number(a?.id || 0);
-  })[0] || null;
+  if (!enabled.length) return null;
+  const index = Math.min(enabled.length - 1, Math.max(0, Math.floor(Number(random()) * enabled.length)));
+  return enabled[index] || null;
 }
 
 export function writeComicPublishDirectoryCache(directory) {

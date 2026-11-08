@@ -1,5 +1,10 @@
 import { apiRequest } from './client.js';
 
+const AVAILABLE_MODEL_KINDS = Object.freeze(['text', 'image', 'video']);
+const AVAILABLE_MODEL_TIMEOUT_MS = 8000;
+let availableModelCatalogResult = null;
+let availableModelCatalogPromise = null;
+
 const MODEL_KIND_LABELS = Object.freeze({
   text: '文本',
   video: '视频',
@@ -49,8 +54,42 @@ function kindPath(path, kind) {
 
 export async function listAvailableModels(kind, request = apiRequest) {
   const validKind = assertModelKind(kind);
-  const result = await request(`/api/models?kind=${encodeURIComponent(validKind)}`);
+  const result = await request(`/api/models?kind=${encodeURIComponent(validKind)}`, {
+    timeoutMs: AVAILABLE_MODEL_TIMEOUT_MS,
+    suppressGlobalError: true
+  });
   return Array.isArray(result?.models) ? result.models : [];
+}
+
+// Account models are one shared directory. Batch Factory video, comic, create,
+// unified and single-book forms must consume this same snapshot instead of
+// starting their own three-request chains every time a modal opens.
+export function peekAvailableModelCatalog() {
+  return availableModelCatalogResult;
+}
+
+export function invalidateAvailableModelCatalog() {
+  availableModelCatalogResult = null;
+  availableModelCatalogPromise = null;
+}
+
+export function getAvailableModelCatalog({ force = false, loadKind = listAvailableModels } = {}) {
+  if (force) invalidateAvailableModelCatalog();
+  if (availableModelCatalogResult) return Promise.resolve(availableModelCatalogResult);
+  if (availableModelCatalogPromise) return availableModelCatalogPromise;
+  availableModelCatalogPromise = Promise.allSettled(AVAILABLE_MODEL_KINDS.map(kind => loadKind(kind)))
+    .then(results => {
+      const models = [];
+      const failedKinds = [];
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') models.push(...(Array.isArray(result.value) ? result.value : []));
+        else failedKinds.push(AVAILABLE_MODEL_KINDS[index]);
+      });
+      availableModelCatalogResult = Object.freeze({ models, failedKinds });
+      return availableModelCatalogResult;
+    })
+    .finally(() => { availableModelCatalogPromise = null; });
+  return availableModelCatalogPromise;
 }
 
 export async function refreshAvailableModels(kind, request = apiRequest) {
@@ -78,8 +117,10 @@ export async function getManagedModelQuotas() {
   return Array.isArray(result?.quotas) ? result.quotas : [];
 }
 
-export function createManagedModel(model) {
-  return apiRequest('/api/config/models', { method: 'POST', body: JSON.stringify(model) });
+export async function createManagedModel(model) {
+  const result = await apiRequest('/api/config/models', { method: 'POST', body: JSON.stringify(model) });
+  invalidateAvailableModelCatalog();
+  return result;
 }
 
 export function testManagedTextModel(model, existingModelId = '') {
@@ -98,12 +139,16 @@ export function testManagedAudioModel(model, existingModelId = '') {
   });
 }
 
-export function updateManagedModel(modelId, patch) {
-  return apiRequest(`/api/config/models/${encodeURIComponent(modelId)}`, { method: 'PATCH', body: JSON.stringify(patch) });
+export async function updateManagedModel(modelId, patch) {
+  const result = await apiRequest(`/api/config/models/${encodeURIComponent(modelId)}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  invalidateAvailableModelCatalog();
+  return result;
 }
 
-export function deleteManagedModel(modelId) {
-  return apiRequest(`/api/config/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
+export async function deleteManagedModel(modelId) {
+  const result = await apiRequest(`/api/config/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
+  invalidateAvailableModelCatalog();
+  return result;
 }
 
 export function refreshLocalDoubaoPairingStatus() {

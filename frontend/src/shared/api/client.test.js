@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { apiRequest, getToken, isSessionAuthFailure, setToken } from './client.js';
+import { API_TIMEOUT_CODE, DEFAULT_API_TIMEOUT_MS, isApiTimeoutError, apiRequest, getToken, isSessionAuthFailure, setToken } from './client.js';
 
 function responseWithHeader(value) {
   return {
@@ -40,6 +40,54 @@ test('reads and clears the Go application session token from local storage', () 
     assert.equal(getToken(), '');
   } finally {
     globalThis.localStorage = previousStorage;
+  }
+});
+
+test('apiRequest defaults to a bounded timeout so a hung request can never stay pending', async () => {
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  globalThis.localStorage = { getItem() { return ''; } };
+  globalThis.fetch = (_path, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+  });
+  try {
+    assert.equal(DEFAULT_API_TIMEOUT_MS, 60000);
+    await assert.rejects(
+      apiRequest('/api/hangs-forever', { timeoutMs: 20, silent: true, suppressGlobalError: true }),
+      error => {
+        assert.equal(error.code, API_TIMEOUT_CODE);
+        assert.equal(error.name, 'TimeoutError');
+        assert.equal(error.timeoutMs, 20);
+        assert.equal(error.source, '/api/hangs-forever');
+        assert.equal(isApiTimeoutError(error), true);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.localStorage = previousStorage;
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test('apiRequest keeps caller cancellation separate from timeout errors', async () => {
+  const previousStorage = globalThis.localStorage;
+  const previousFetch = globalThis.fetch;
+  globalThis.localStorage = { getItem() { return ''; } };
+  globalThis.fetch = (_path, init) => new Promise((_resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+  });
+  const controller = new AbortController();
+  try {
+    const pending = apiRequest('/api/cancelled', { signal: controller.signal, timeoutMs: 0, silent: true, suppressGlobalError: true });
+    controller.abort();
+    await assert.rejects(pending, error => {
+      assert.equal(isApiTimeoutError(error), false);
+      assert.equal(error.name, 'AbortError');
+      return true;
+    });
+  } finally {
+    globalThis.localStorage = previousStorage;
+    globalThis.fetch = previousFetch;
   }
 });
 

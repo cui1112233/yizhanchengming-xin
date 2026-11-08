@@ -102,8 +102,12 @@ func ResolveSettings(layers ...SettingsPatch) SettingsPatch {
 	out := SettingsPatch{}
 	for _, layer := range layers {
 		for key, value := range layer {
-			if key == "aiPromptConfig" {
+			switch key {
+			case "aiPromptConfig":
 				out[key] = mergeAIPromptConfig(out[key], value)
+				continue
+			case "publishSettings", "comicPublishSettings":
+				out[key] = mergeJSONObject(out[key], value)
 				continue
 			}
 			out[key] = append([]byte(nil), value...)
@@ -125,13 +129,13 @@ func EffectiveProductionMode(batchPatch, bookPatch SettingsPatch) string {
 }
 
 // AssetImagesEnabled reports whether automation should generate asset
-// reference images. Defaults to true so existing batches keep their current
-// behavior; an explicit false in the batch or book patch turns the assets stage
-// off without blocking the storyboard, video or comic stages. When enabled,
-// downstream prompts use the reference images and must not repeat the stored
-// asset descriptions as text.
+// reference images. Defaults to false: batches and books that never wrote the
+// key keep the assets stage off without blocking the storyboard, video or comic
+// stages. Only an explicit true in the batch or book patch turns generation on;
+// when enabled, downstream prompts use the reference images and must not repeat
+// the stored asset descriptions as text.
 func AssetImagesEnabled(patch SettingsPatch) bool {
-	return rawBool(patch, "assetImagesEnabled", true)
+	return rawBool(patch, "assetImagesEnabled", false)
 }
 
 // AssetTextFallbackEnabled reports whether downstream prompts should merge the

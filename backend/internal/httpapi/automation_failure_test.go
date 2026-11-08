@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,7 +28,9 @@ func TestClassifyFailureTable(t *testing.T) {
 		{"network reset", errors.New("read tcp: wsarecv: connection reset by peer"), "comic_images", automationCodeNetwork, automationFailureTransient, true, false, automationPageRetryMaxAttempts},
 		{"provider timeout", errors.New("context deadline exceeded"), "comic_images", automationCodeProviderTimeout, automationFailureTransient, true, false, automationRetryEscalationThreshold},
 		{"infrastructure", errors.New("Error 1038: Out of sort memory"), "comic_images", automationCodeInfrastructure, automationFailureTransient, true, false, automationPageRetryMaxAttempts},
-		{"content policy", errShuihuoImageContentPolicy, "comic_images", automationCodeContentPolicy, automationFailureManual, false, true, 1},
+		// 内容审核拒绝必须走自动改写（最多 comicPromptRepairMaxRounds 轮），
+		// 耗尽后由 errComicPromptRepairExhausted 转 needs_manual。
+		{"content policy", errShuihuoImageContentPolicy, "comic_images", automationCodeContentPolicy, automationFailureTransient, true, false, comicPromptRepairMaxRounds},
 		{"insufficient balance", errors.New("余额不足，请充值"), "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
 		{"page not found", batchfactoryv11.ErrNotFound, "comic_images", automationCodePageNotFound, automationFailureDeterministic, false, false, 1},
 		{"page in flight", errors.New("该页正在生成，请勿重复提交"), "comic_images", automationCodePageInFlight, automationFailureTransient, false, false, 0},
@@ -48,6 +51,116 @@ func TestClassifyFailureTable(t *testing.T) {
 				t.Fatalf("maxAttempts=%d, want %d", got.MaxAttempts, tc.wantMaxAttempts)
 			}
 		})
+	}
+}
+
+// 停滞与慢速必须分开记账：BODY_STALLED 计入已计费未取回并可记重发次数，
+// BODY_SLOW 只记慢，不进入补偿统计。
+func TestBilledReadFailureKindRecordedSeparately(t *testing.T) {
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	stalled := &shuihuoImageBilledReadFailure{message: "响应体停滞", kind: shuihuoImageBodyFailureStalled, retried: true}
+	slow := &shuihuoImageBilledReadFailure{message: "响应体过慢", kind: shuihuoImageBodyFailureSlow}
+
+	entry := map[string]any{}
+	recordAutomationPageLedger(entry, &comicPageWorkError{Failures: []comicPageFailure{
+		{VideoID: "p-stalled", Label: "停滞页", Err: fmt.Errorf("页图生成失败: %w", stalled)},
+		{VideoID: "p-slow", Label: "慢速页", Err: fmt.Errorf("页图生成失败: %w", slow)},
+	}}, "comic_images", now)
+
+	ledger := automationFailureLedger(entry, "comic_images")
+	stalledRecord, _ := ledger["p-stalled"].(map[string]any)
+	if stalledRecord == nil {
+		t.Fatalf("页级账本缺少 p-stalled: %+v", entry["nodes"])
+	}
+	if stalledRecord["lastErrorCode"] != automationCodeImageBodyStalled {
+		t.Fatalf("stalled code=%v, want %s", stalledRecord["lastErrorCode"], automationCodeImageBodyStalled)
+	}
+	if !automationBoolValue(stalledRecord["billedNotRetrieved"]) {
+		t.Fatalf("BODY_STALLED 必须计入已计费未取回: %+v", stalledRecord)
+	}
+	if got := automationNumberValue(stalledRecord["billedRetryCount"], 0); got != 1 {
+		t.Fatalf("billedRetryCount=%d, want 1", got)
+	}
+
+	slowRecord, _ := ledger["p-slow"].(map[string]any)
+	if slowRecord == nil {
+		t.Fatalf("页级账本缺少 p-slow: %+v", entry["nodes"])
+	}
+	if slowRecord["lastErrorCode"] != automationCodeImageBodySlow {
+		t.Fatalf("slow code=%v, want %s", slowRecord["lastErrorCode"], automationCodeImageBodySlow)
+	}
+	if automationBoolValue(slowRecord["billedNotRetrieved"]) {
+		t.Fatalf("BODY_SLOW 不得计入已计费未取回: %+v", slowRecord)
+	}
+	if !automationBoolValue(slowRecord["bodySlow"]) {
+		t.Fatalf("BODY_SLOW 必须记录 bodySlow 标记: %+v", slowRecord)
+	}
+	if got := automationNumberValue(entry["billedNotRetrievedCount"], -1); got != 1 {
+		t.Fatalf("billedNotRetrievedCount=%d, want 1", got)
+	}
+	// 200 已计费后不再原地重发：停滞与慢速都一样（停滞的唯一一次重发
+	// 发生在出图请求内部，由页级/日预算约束）。
+	if retryableComicAutomationError(fmt.Errorf("页图生成失败: %w", stalled)) {
+		t.Fatal("BODY_STALLED 不得在自动化层原地重发")
+	}
+	if retryableComicAutomationError(fmt.Errorf("页图生成失败: %w", slow)) {
+		t.Fatal("BODY_SLOW 不得在自动化层原地重发")
+	}
+}
+
+// 已计费但图没取回：必须记进页级账本（稳定错误码 + 已计费标记），
+// 计数可读，且不得在原地重发（避免同一张图重复扣费）。
+func TestBilledReadFailureRecordedInPageLedger(t *testing.T) {
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	billed := &shuihuoImageBilledReadFailure{message: "200 后读取响应体失败"}
+	pageErr := &comicPageWorkError{Failures: []comicPageFailure{
+		{VideoID: "p3", Label: "漫画页 03", Code: automationCodePageShortage, Err: fmt.Errorf("页图生成失败: %w", billed)},
+	}}
+	entry := map[string]any{}
+	recordAutomationPageLedger(entry, pageErr, "comic_images", now)
+
+	record, _ := automationFailureLedger(entry, "comic_images")["p3"].(map[string]any)
+	if record == nil {
+		t.Fatalf("页级账本缺少 p3: %+v", entry["nodes"])
+	}
+	if record["lastErrorCode"] != automationCodeBilledNotRetrieved {
+		t.Fatalf("code=%v, want %s", record["lastErrorCode"], automationCodeBilledNotRetrieved)
+	}
+	if !automationBoolValue(record["billedNotRetrieved"]) {
+		t.Fatalf("缺少已计费未取回标记: %+v", record)
+	}
+	if got := automationNumberValue(entry["billedNotRetrievedCount"], -1); got != 1 {
+		t.Fatalf("billedNotRetrievedCount=%d, want 1", got)
+	}
+	if retryableComicAutomationError(pageErr) {
+		t.Fatal("已计费未取回不得在原地重发，必须交给下一轮回补")
+	}
+
+	// 图成功取回后，账本与计数都应清零。
+	if !resetAutomationPageLedgerNode(entry, "comic_images", now.Add(time.Minute)) {
+		t.Fatal("成功取回后应能重置页级账本")
+	}
+	if got, ok := entry["billedNotRetrievedCount"].(int); !ok || got != 0 {
+		t.Fatalf("重置后 billedNotRetrievedCount=%v, want 0", entry["billedNotRetrievedCount"])
+	}
+}
+
+// 补缺提示词部分成功：只按页记账并继续出图；一页都没补上时才整本失败。
+func TestComicPromptRecoveryPartialOnly(t *testing.T) {
+	partial := &batchfactoryv11.ComicPromptPartialError{Result: batchfactoryv11.ComicPromptExtractionResult{
+		Updated: []batchfactoryv11.Video{{ID: "v1"}},
+		Failed: []batchfactoryv11.ComicPromptExtractionFailure{
+			{VideoID: "v2", Label: "漫画页 02", Code: automationCodePromptFailed, Message: "期望 1 页，实际 0 页"},
+		},
+	}}
+	if !comicPromptRecoveryIsPartial(partial, len(partial.Result.Updated)) {
+		t.Fatal("部分成功且有补上的页时不得整本失败")
+	}
+	if comicPromptRecoveryIsPartial(partial, 0) {
+		t.Fatal("一页都没补上时必须保持整本失败")
+	}
+	if comicPromptRecoveryIsPartial(errors.New("boom"), 1) {
+		t.Fatal("非部分成功错误不得被当作部分成功")
 	}
 }
 
@@ -86,15 +199,17 @@ func TestTransientFailureSkipsThenRetriesAtThird(t *testing.T) {
 }
 
 // 确定性失败第 1 次即定论，不消耗 3 次预算、不重复调上游。
+// 注意：内容审核拒绝已改为可自动改写，不再是确定性失败；这里用余额不足。
 func TestDeterministicFailureSkipsBudget(t *testing.T) {
 	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
-	disposition := classifyAutomationFailure(errShuihuoImageContentPolicy, "comic_images")
+	balanceErr := errors.New("余额不足，请充值")
+	disposition := classifyAutomationFailure(balanceErr, "comic_images")
 	if disposition.CountsTowardRetryBudget {
 		t.Fatal("确定性失败不得计入重试预算")
 	}
 	ledger := map[string]any{}
 	entry := applyAutomationPageFailure(ledger, "video-1", "漫画页 01", "comic_images",
-		disposition.Code, errShuihuoImageContentPolicy.Error(), disposition, automationPageImageUnitCost, now)
+		disposition.Code, balanceErr.Error(), disposition, automationPageImageUnitCost, now)
 	if entry["state"] != "needs_manual" {
 		t.Fatalf("state=%v, want needs_manual", entry["state"])
 	}
@@ -106,12 +221,29 @@ func TestDeterministicFailureSkipsBudget(t *testing.T) {
 	}
 	// 即使再次记录，也不应升级成 3 次预算后的重试。
 	again := applyAutomationPageFailure(ledger, "video-1", "漫画页 01", "comic_images",
-		disposition.Code, errShuihuoImageContentPolicy.Error(), disposition, automationPageImageUnitCost, now)
+		disposition.Code, balanceErr.Error(), disposition, automationPageImageUnitCost, now)
 	if again["state"] != "needs_manual" {
 		t.Fatalf("deterministic re-record state=%v, want needs_manual", again["state"])
 	}
 	if again["countsTowardRetryBudget"] != false {
 		t.Fatalf("countsTowardRetryBudget=%v, want false", again["countsTowardRetryBudget"])
+	}
+}
+
+// 内容审核拒绝第一轮必须进入自动重试，而不是直接 needs_manual。
+func TestContentPolicyEntersAutoRepairRetry(t *testing.T) {
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	disposition := classifyAutomationFailure(errShuihuoImageContentPolicy, "comic_images")
+	entry := applyAutomationPageFailure(map[string]any{}, "video-1", "漫画页 01", "comic_images",
+		disposition.Code, errShuihuoImageContentPolicy.Error(), disposition, automationPageImageUnitCost, now)
+	if entry["state"] != "retrying" {
+		t.Fatalf("state=%v, want retrying (auto repair)", entry["state"])
+	}
+	if queued, _ := entry["retryQueued"].(bool); !queued {
+		t.Fatal("内容审核拒绝必须进入自动改写队列")
+	}
+	if manual, _ := entry["needsManual"].(bool); manual {
+		t.Fatal("内容审核拒绝第一轮不得转人工")
 	}
 }
 
@@ -245,6 +377,44 @@ func TestNoSilentStall(t *testing.T) {
 	}
 }
 
+// 书内停滞兜底：先跳过这本书安排续跑，达到升级阈值后转人工，
+// 并留下阶段、最后进展时间、被跳过多久等可读状态。
+func TestMarkAutomationBookStalledSkipsThenNeedsManual(t *testing.T) {
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	last := now.Add(-automationStallTimeout)
+	entry := map[string]any{"status": "running", "stage": "comic_images", "updatedAt": last}
+	if !markAutomationBookStalled(entry, "comic_images", last, now) {
+		t.Fatal("超过阈值必须标记停滞")
+	}
+	if entry["status"] != "failed" || !automationBoolValue(entry["retryRequested"]) {
+		t.Fatalf("首次停滞必须跳过并安排续跑: %#v", entry)
+	}
+	if _, ok := entry["retryAt"]; !ok {
+		t.Fatalf("首次停滞必须写 retryAt: %#v", entry)
+	}
+	if automationStringValue(entry["stalledStage"], "") != "comic_images" {
+		t.Fatalf("stalledStage=%#v", entry["stalledStage"])
+	}
+	if automationStringValue(entry["lastProgressAt"], "") != last.UTC().Format(time.RFC3339) {
+		t.Fatalf("lastProgressAt=%#v, want %s", entry["lastProgressAt"], last.UTC().Format(time.RFC3339))
+	}
+	if automationStringValue(entry["stalledFor"], "") != automationStallTimeout.String() {
+		t.Fatalf("stalledFor=%#v, want %s", entry["stalledFor"], automationStallTimeout)
+	}
+
+	manual := map[string]any{
+		"status": "running", "stage": "video",
+		"stallSkipCount": automationRetryEscalationThreshold - 1,
+	}
+	markAutomationBookStalled(manual, "video", last, now)
+	if !automationBoolValue(manual["needsManual"]) || manual["status"] != "failed" {
+		t.Fatalf("达到升级阈值必须转人工: %#v", manual)
+	}
+	if _, ok := manual["retryRequested"]; ok {
+		t.Fatalf("转人工后不得继续自动续跑: %#v", manual)
+	}
+}
+
 // reaper 必须自治：即使 dispatcher 门禁把调度挡住，僵尸 running 也要被回收。
 func TestReapZombieJobsIgnoresDispatchNextCheck(t *testing.T) {
 	dir := t.TempDir()
@@ -253,7 +423,7 @@ func TestReapZombieJobsIgnoresDispatchNextCheck(t *testing.T) {
 	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
 		"job-zombie": {
 			"id": "job-zombie", "owner": "alice", "batchId": "batch-1",
-			"state": "running", "updatedAt": now.Add(-20 * time.Minute),
+			"state": "running", "updatedAt": now.Add(-(automationZombieRunningIdleTimeout + time.Minute)),
 			"counts": automationCounts(1, 1, 0, 0),
 			"books": map[string]any{
 				"book-1": map[string]any{"bookId": "book-1", "status": "failed", "stage": "comic_images"},

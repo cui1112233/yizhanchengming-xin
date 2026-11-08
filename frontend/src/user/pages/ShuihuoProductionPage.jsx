@@ -9,6 +9,7 @@ import { AssetsView } from './shuihuo/AssetsView';
 import { confirmSegmentation, createProject, deleteProject, getProductionHealth, getProject, listModels, listProjects, paragraphSegmentation, replaceProjectSource, smartSegmentation } from '../../shared/api/shuihuoProduction';
 import { appendNovelFetchIntake, classifyFetchedBatchMetadata, createBatchFromIntake, createManualIntake, deleteBatchFactoryProject, getBatch, getIntake, listBatchSummaries, startBatchAutomation } from '../../shared/api/batchFactory';
 import { BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, novelFetchIntakeBooks, pendingNovelFetchIntakeId } from './shuihuo/batchFactoryNovelFetchHandoff';
+import { batchAccessNotice, forgetActiveBatch, isStaleBatchAccessError } from './shuihuo/batchFactoryBatchAccessNotice';
 import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus';
 import { batchExecutorKinds } from './shuihuo/batchFactoryLocalExecutor';
 import { createV88AntTheme } from '../../shared/styles/theme';
@@ -16,6 +17,13 @@ import './shuihuo-production.css';
 import './shuihuo-production-v88.css';
 
 const modelNames = { text: '文本模型', image: '图片模型', video: '视频模型', audio: '配音模型' };
+
+// 批次访问失败只弹一条可关闭提示；请求侧已用 suppressGlobalError 关掉全局错误条。
+function notifyBatchAccessFailure(error) {
+  const notice = batchAccessNotice(error);
+  message.error({ ...notice, onClick: () => message.destroy(notice.key) });
+}
+
 function readinessItems(health, executorKinds = [], executorOnline = false) {
   const enabled = new Set(health?.enabledModelKinds || []);
   const executorKindSet = new Set(executorKinds);
@@ -113,15 +121,19 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     if (!requestedBatchId || pendingNovelFetchIntakeId(window.location.search)) return undefined;
     const requestId = projectRequestRef.current + 1;
     projectRequestRef.current = requestId;
-    getBatch(requestedBatchId).then(result => {
+    getBatch(requestedBatchId, { suppressGlobalError: true }).then(result => {
       if (!mountedRef.current || requestId !== projectRequestRef.current) return;
       const batch = batchFactoryBatchFromResponse(result);
       localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
       setActiveBatchProject(batch);
       setView('batch-novels');
     }).catch(error => {
-      if (mountedRef.current && requestId === projectRequestRef.current) {
-        message.error(error.message || '读取批量工程失败');
+      if (!mountedRef.current || requestId !== projectRequestRef.current) return;
+      notifyBatchAccessFailure(error);
+      if (isStaleBatchAccessError(error)) {
+        forgetActiveBatch(requestedBatchId);
+        // 去掉 URL 上失效的 batchId，刷新后不再重复请求同一个无权限/不存在的批次。
+        window.history.replaceState({}, '', '/shuihuo-production');
       }
     });
     return () => {
@@ -139,12 +151,17 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     projectRequestRef.current = requestId;
     try {
       if (isBatchFactoryV11Project(project)) {
-        const batch = batchFactoryBatchFromResponse(await getBatch(project.batchId));
-        if (!mountedRef.current || requestId !== projectRequestRef.current) return;
-        localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
-        window.history.replaceState({}, '', `/batch-factory?batchId=${encodeURIComponent(batch.id)}`);
-        setActiveBatchProject(batch);
-        setView('batch-novels');
+        try {
+          const batch = batchFactoryBatchFromResponse(await getBatch(project.batchId, { suppressGlobalError: true }));
+          if (!mountedRef.current || requestId !== projectRequestRef.current) return;
+          localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
+          window.history.replaceState({}, '', `/batch-factory?batchId=${encodeURIComponent(batch.id)}`);
+          setActiveBatchProject(batch);
+          setView('batch-novels');
+        } catch (error) {
+          notifyBatchAccessFailure(error);
+          if (isStaleBatchAccessError(error)) forgetActiveBatch(project.batchId);
+        }
         return;
       }
       const next = await getProject(project.id);

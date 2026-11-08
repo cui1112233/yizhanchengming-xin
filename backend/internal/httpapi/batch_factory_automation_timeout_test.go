@@ -128,6 +128,27 @@ func TestAutomationRetryResumesFromFailedStage(t *testing.T) {
 	}
 }
 
+func TestAutomationResumeRunsOnlyTheFailedStageAndWhatFollows(t *testing.T) {
+	tests := []struct {
+		resume string
+		stage  string
+		want   bool
+	}{
+		{resume: "", stage: "assets", want: true},
+		{resume: "director", stage: "assets", want: false},
+		{resume: "director", stage: "director", want: true},
+		{resume: "video", stage: "assets", want: false},
+		{resume: "video", stage: "director", want: false},
+		{resume: "video", stage: "opening", want: false},
+		{resume: "video", stage: "video", want: true},
+	}
+	for _, tc := range tests {
+		if got := automationResumeShouldRunStage(tc.resume, tc.stage); got != tc.want {
+			t.Fatalf("resume=%q stage=%q got=%t want=%t", tc.resume, tc.stage, got, tc.want)
+		}
+	}
+}
+
 func TestProductionInFlightDoesNotFailTheBookOrConsumeRetryBudget(t *testing.T) {
 	now := time.Now().UTC()
 	entry := map[string]any{"status": "failed", "stage": "video", "batchRetryCount": 1, "error": "视频生成超时或已停止"}

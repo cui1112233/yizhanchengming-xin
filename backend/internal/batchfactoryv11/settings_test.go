@@ -19,9 +19,9 @@ func TestSparsePatchPreservesFalseEmptyZero(t *testing.T) {
 	}
 }
 
-func TestAssetImagesEnabledDefaultsToTrueAndHonorsExplicitFalse(t *testing.T) {
-	if !AssetImagesEnabled(SettingsPatch{}) {
-		t.Fatal("asset image generation must default to enabled for existing batches")
+func TestAssetImagesEnabledDefaultsToFalseAndHonorsExplicitTrue(t *testing.T) {
+	if AssetImagesEnabled(SettingsPatch{}) {
+		t.Fatal("asset image generation must default to disabled when the key is absent")
 	}
 	if AssetImagesEnabled(SettingsPatch{"assetImagesEnabled": raw(false)}) {
 		t.Fatal("explicit false must skip the asset stage")
@@ -33,14 +33,14 @@ func TestAssetImagesEnabledDefaultsToTrueAndHonorsExplicitFalse(t *testing.T) {
 	if !AssetImagesEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{"assetImagesEnabled": raw(true)})) {
 		t.Fatal("book override must win over the batch value")
 	}
-	if AssetImagesEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{})) {
-		t.Fatal("batch false must apply when the book inherits")
+	if !AssetImagesEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(true)}, SettingsPatch{})) {
+		t.Fatal("batch true must apply when the book inherits")
 	}
 }
 
 func TestAssetTextFallbackEnabledMirrorsAssetImagesSwitch(t *testing.T) {
-	if AssetTextFallbackEnabled(SettingsPatch{}) {
-		t.Fatal("asset text fallback must stay off when asset images default to enabled")
+	if !AssetTextFallbackEnabled(SettingsPatch{}) {
+		t.Fatal("asset text fallback must be on when asset images default to disabled")
 	}
 	if !AssetTextFallbackEnabled(SettingsPatch{"assetImagesEnabled": raw(false)}) {
 		t.Fatal("explicit false must enable the text fallback path")
@@ -49,8 +49,8 @@ func TestAssetTextFallbackEnabledMirrorsAssetImagesSwitch(t *testing.T) {
 		t.Fatal("explicit true must keep the image-first path")
 	}
 	// 单书覆盖批次：关闭时走文字回退，单书显式打开时走图片优先。
-	if !AssetTextFallbackEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{})) {
-		t.Fatal("batch false must apply when the book inherits")
+	if AssetTextFallbackEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(true)}, SettingsPatch{})) {
+		t.Fatal("batch true must apply when the book inherits")
 	}
 	if AssetTextFallbackEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{"assetImagesEnabled": raw(true)})) {
 		t.Fatal("book override must win over the batch value")

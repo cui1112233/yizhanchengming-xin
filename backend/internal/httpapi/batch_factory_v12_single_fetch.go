@@ -9,13 +9,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 // 批量工厂自己的敏感词处理配置：批次级设置为主，单书设置按现有继承体系覆盖。
-// 旧批次没有这三个字段时按默认值读取（关闭 AI 修复、继承全局模型、失败保留原文待确认）。
+// 旧批次没有这三个字段时按默认值读取（关闭 AI 修复、继承全局模型、失败自动打码并继续）。
 // 显式写入 sensitiveAIEnabled=true 的老批次仍保持开启，默认值只作用于未设置的情况。
 type batchSensitiveConfig struct {
 	Enabled   bool
@@ -284,7 +285,7 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 	}
 	if outcome.ReviewRequired {
 		metadata["sensitiveStatus"] = "review_required"
-		metadata["sensitiveReviewMessage"] = fmt.Sprintf("有 %d 处敏感词未处理，已保留原文，需人工确认", outcome.ReviewCount)
+		metadata["sensitiveReviewMessage"] = fmt.Sprintf("有 %d 处敏感词未能替换，已自动打码，不阻断自动化", outcome.ReviewCount)
 	}
 	metadata["originalStatus"] = "done"
 	metadata["queueStage"] = "classification"
@@ -595,7 +596,7 @@ func registerV12PublishClassificationRoute(mux *http.ServeMux, store batchfactor
 	})
 }
 
-func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store, workshopStore novelfetchworkshop.Store, fetcher *novelfetchworkshop.UpstreamFetcher, classification batchFetchClassification) {
+func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store, workshopStore novelfetchworkshop.Store, fetcher *novelfetchworkshop.UpstreamFetcher, giantResolver GiantMaterialResolver, classification batchFetchClassification) {
 	if mux == nil || store == nil || fetcher == nil {
 		return
 	}
@@ -661,24 +662,35 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 			return
 		}
 		attempts := 0
+		resolvedBookID := bookID
+		fallbackFrom := ""
 		var result novelfetchworkshop.FetchAndProcessResult
 		if retryProcessing {
 			result = batchFetchResultFromStoredRaw(*book, maxTxt)
 		} else {
 			var fetchErr error
-			result, fetchErr, attempts = fetchBatchSourceWithRetry(r.Context(), fetcher, bookID, platform, maxTxt)
+			result, resolvedBookID, fallbackFrom, fetchErr, attempts = fetchBatchSourceWithGiantCandidate(r.Context(), fetcher, giantResolver, *book, bookID, platform, maxTxt)
 			if fetchErr != nil {
 				persistBatchFetchFailure(r.Context(), store, owner, batch.ID, *book, fetchErr, attempts)
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": fetchErr.Error()})
 				return
 			}
+			bookID = resolvedBookID
 		}
 		result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification, resolveBatchSensitiveConfig(batch.SettingsState.Patch, book.SettingsState.Patch))
+		if fallbackFrom != "" {
+			metadata["platformBookId"] = resolvedBookID
+			metadata["resolvedPlatformBookId"] = resolvedBookID
+			metadata["platformCandidateFallbackFrom"] = fallbackFrom
+		}
+		if !retryProcessing {
+			markBatchDirectReadSuccess(metadata)
+		}
 		productionText := result.ProcessedText
 		if processErr != nil {
 			productionText = ""
 		}
-		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceTitle: book.Title, SourceMetadata: metadata, ExpectedRevision: book.Revision})
+		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceBookID: bookID, SourceTitle: book.Title, SourceMetadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -692,6 +704,85 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "done", "book": updated, "rawData": result.OriginalRaw, "length": result.ProcessedChars, "originalLength": result.OriginalRawChars, "maxTxt": result.MaxTxt, "platform": parsePlatformNumber(platform), "bookinfo": result.BookInfo, "sourceMetadata": metadata})
 	})
+}
+
+// fetchBatchSourceWithGiantCandidate handles Qingyu materials that point at
+// multiple same-title works. The first work is not always readable by 121.
+// We only try same-title, same-platform siblings after the selected ID gets the
+// deterministic "book info missing" response, so unrelated books never cross.
+func fetchBatchSourceWithGiantCandidate(ctx context.Context, fetcher *novelfetchworkshop.UpstreamFetcher, resolver GiantMaterialResolver, book batchfactoryv11.Book, bookID, platform string, maxTxt int) (novelfetchworkshop.FetchAndProcessResult, string, string, error, int) {
+	result, err, attempts := fetchBatchSourceWithRetry(ctx, fetcher, bookID, platform, maxTxt)
+	if err == nil {
+		return result, bookID, "", nil, attempts
+	}
+	giantMaterialID := firstMetadataString(book.SourceMetadata, "giantMaterialId", "qingyuMaterialId")
+	if resolver == nil || giantMaterialID == "" || !strings.Contains(err.Error(), "获取书籍信息失败") {
+		return result, bookID, "", err, attempts
+	}
+	material, resolveErr := resolver.Resolve(ctx, giantMaterialID)
+	if resolveErr != nil {
+		return result, bookID, "", err, attempts
+	}
+	platformCode := firstMetadataString(book.SourceMetadata, "platformCode")
+	titleKey := giantCandidateTitleKey(book.Title)
+	// Qingyu sometimes groups a numbered sequence such as "5风误归期…" with
+	// the readable base work "风误归期…". Try the unnumbered base first, then
+	// numbered siblings, avoiding several known-bad paid calls before the useful ID.
+	for pass := 0; pass < 2; pass++ {
+		for _, candidate := range material.Books {
+			candidateID := strings.TrimSpace(candidate.PlatformBookID)
+			if candidateID == "" || candidateID == bookID || giantCandidateTitleKey(candidate.Title) != titleKey {
+				continue
+			}
+			if (pass == 0) == giantCandidateHasSequencePrefix(candidate.Title) {
+				continue
+			}
+			if candidate.PlatformID != "" && strings.TrimSpace(candidate.PlatformID) != platform {
+				continue
+			}
+			if platformCode != "" && candidate.PlatformCode != "" && !strings.EqualFold(strings.TrimSpace(candidate.PlatformCode), platformCode) {
+				continue
+			}
+			candidateResult, candidateErr, candidateAttempts := fetchBatchSourceWithRetry(ctx, fetcher, candidateID, platform, maxTxt)
+			attempts += candidateAttempts
+			if candidateErr == nil {
+				return candidateResult, candidateID, bookID, nil, attempts
+			}
+			if !strings.Contains(candidateErr.Error(), "获取书籍信息失败") {
+				return candidateResult, candidateID, bookID, candidateErr, attempts
+			}
+		}
+	}
+	return result, bookID, "", err, attempts
+}
+
+func giantCandidateHasSequencePrefix(raw string) bool {
+	value := strings.TrimSpace(raw)
+	return value != "" && value[0] >= '0' && value[0] <= '9'
+}
+
+func giantCandidateTitleKey(raw string) string {
+	value := strings.TrimSpace(raw)
+	for len(value) > 0 && value[0] >= '0' && value[0] <= '9' {
+		value = value[1:]
+	}
+	value = strings.TrimSpace(value)
+	var normalized strings.Builder
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			normalized.WriteRune(unicode.ToLower(r))
+		}
+	}
+	return normalized.String()
+}
+
+func markBatchDirectReadSuccess(metadata map[string]any) {
+	if metadata == nil {
+		return
+	}
+	metadata["originalReadStage"] = "direct"
+	metadata["originalReadError"] = ""
+	metadata["contentPending"] = false
 }
 
 func parsePlatformNumber(value string) any {
@@ -725,6 +816,8 @@ func normalizeSingleFetchPlatformAlias(value string) string {
 		return "4"
 	case "番茄付费", "番茄付费书城":
 		return "2"
+	case "常读", "常读付费", "常读付费书城":
+		return "2"
 	case "番茄免费", "番茄免费书城":
 		return "7"
 	case "七猫", "七猫付费", "七猫付费书城":
@@ -739,7 +832,7 @@ func normalizeSingleFetchPlatformAlias(value string) string {
 		return "29"
 	case "掌文", "掌文付费", "掌文付费书城":
 		return "31"
-	case "黑岩", "黑岩付费", "黑岩付费书城":
+	case "hy", "黑岩", "黑岩付费", "黑岩付费书城":
 		return "1"
 	default:
 		return strings.TrimSpace(value)

@@ -3,6 +3,8 @@ package httpapi
 import (
 	"errors"
 	"fmt"
+	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,22 +27,29 @@ const (
 	// 两次）。达到上限后转 needs_manual，不再自动调用上游。
 	automationPageRetryMaxAttempts = 5
 	// automationStallTimeout 超过该时长没有任何进展心跳，按停滞处理。
-	automationStallTimeout = 10 * time.Minute
+	// 20 版的 10min 会掐掉「慢图重试」：单次上游请求上限 180s，外层最多 3 次，
+	// 单页最长约 9min，再加队列/退避就会越过 10min。取 20min，给单页最坏重试
+	// 预算留约 2 倍余量；只要任意页有状态推进、有图落库或上游返回响应，心跳
+	// 就会被刷新（见 reportComicGenerationHeartbeat）。
+	automationStallTimeout = 20 * time.Minute
 	// automationPageImageUnitCost 单页出图成本估算（¥/次），用于费用记账。
 	automationPageImageUnitCost = 0.03
 )
 
 // 稳定错误码。前端和账本只依赖这些码，不依赖错误文案。
 const (
-	automationCodeUnknown            = "UNKNOWN"
-	automationCodeTransient          = "TRANSIENT_UPSTREAM"
-	automationCodeRateLimited        = "RATE_LIMITED"
-	automationCodeNetwork            = "NETWORK_ERROR"
-	automationCodeProviderTimeout    = "PROVIDER_TIMEOUT"
-	automationCodePageInFlight       = "PAGE_IN_FLIGHT"
-	automationCodeInfrastructure     = "INFRASTRUCTURE"
-	automationCodeAuthQuota          = "AUTH_OR_QUOTA"
-	automationCodeContentPolicy      = "CONTENT_POLICY_REJECTED"
+	automationCodeUnknown         = "UNKNOWN"
+	automationCodeTransient       = "TRANSIENT_UPSTREAM"
+	automationCodeRateLimited     = "RATE_LIMITED"
+	automationCodeNetwork         = "NETWORK_ERROR"
+	automationCodeProviderTimeout = "PROVIDER_TIMEOUT"
+	automationCodePageInFlight    = "PAGE_IN_FLIGHT"
+	automationCodeInfrastructure  = "INFRASTRUCTURE"
+	automationCodeAuthQuota       = "AUTH_OR_QUOTA"
+	automationCodeContentPolicy   = "CONTENT_POLICY_REJECTED"
+	// automationCodeContentSoftRefusal 是对话式软拒绝，必须与标准 4xx 分开，
+	// 前端据它判断“再改写一次”还是“换通道”。
+	automationCodeContentSoftRefusal = "CONTENT_SOFT_REFUSAL"
 	automationCodeSensitiveReview    = "SENSITIVE_REVIEW_PENDING"
 	automationCodePublishUnconfirmed = "PUBLISH_UNCONFIRMED"
 	automationCodePageNotFound       = "PAGE_NOT_FOUND"
@@ -49,6 +58,13 @@ const (
 	automationCodePageRejected       = "PAGE_REJECTED_UPSTREAM"
 	automationCodePageShortage       = "PAGE_SHORTAGE"
 	automationCodeDeterministic      = "DETERMINISTIC_FAILURE"
+	// automationCodeBilledNotRetrieved 表示上游已按 HTTP 200 计费，但响应体
+	// 读取失败、图没有取回。默认不重发（避免重复扣费），但必须可观测、可回补。
+	automationCodeBilledNotRetrieved = "IMAGE_BILLED_NOT_RETRIEVED"
+	// BODY_STALLED：连续停滞没有新字节，真断流；已计费，不自动重发。
+	// BODY_SLOW：一直有数据但到总上限仍未读完，只记录慢，不算已计费未取回。
+	automationCodeImageBodyStalled = "BODY_STALLED"
+	automationCodeImageBodySlow    = "BODY_SLOW"
 )
 
 type automationFailureDisposition struct {
@@ -108,13 +124,29 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 	msg := strings.ToLower(err.Error())
 
 	switch {
-	case errors.Is(err, errShuihuoImageContentPolicy) || strings.Contains(msg, "content policy") ||
-		strings.Contains(msg, "内容审核"):
+	case errors.Is(err, errComicPromptRepairExhausted):
+		// 自动改写轮次用尽：只把这一页转人工，不再调用上游。
 		return automationFailureDisposition{
 			Code: automationCodeContentPolicy, Class: automationFailureManual,
 			MaxAttempts: 1, BudgetKey: budget,
 		}
-	case errors.Is(err, errSensitiveReviewPending), strings.Contains(msg, "敏感词未处理"):
+	case errors.Is(err, errShuihuoImageContentSoftRefusal):
+		// 对话式软拒绝：先走提示词改写，和硬审核共用轮次预算，但错误码独立。
+		return automationFailureDisposition{
+			Code: automationCodeContentSoftRefusal, Class: automationFailureTransient,
+			CountsTowardRetryBudget: true, MinAttemptsBeforeRetry: 1,
+			MaxAttempts: comicPromptRepairMaxRounds, BudgetKey: budget,
+		}
+	case errors.Is(err, errShuihuoImageContentPolicy) || strings.Contains(msg, "content policy") ||
+		strings.Contains(msg, "内容审核"):
+		// 硬审核拒绝：每轮改写一次提示词。达到 comicPromptRepairMaxRounds
+		// 后由 generatePage 返回 exhausted，页级账本转 needs_manual。
+		return automationFailureDisposition{
+			Code: automationCodeContentPolicy, Class: automationFailureTransient,
+			CountsTowardRetryBudget: true, MinAttemptsBeforeRetry: 1,
+			MaxAttempts: comicPromptRepairMaxRounds, BudgetKey: budget,
+		}
+	case strings.Contains(msg, "敏感词未处理"):
 		return automationFailureDisposition{
 			Code: automationCodeSensitiveReview, Class: automationFailureManual,
 			MaxAttempts: 1, AbortBook: true, BudgetKey: budget,
@@ -262,6 +294,51 @@ func applyAutomationPageFailure(
 	return entry
 }
 
+// comicBilledReadFailure 判断错误链里是否存在「已计费但图没取回」的失败。
+// 页级聚合错误只暴露首个失败作为 Unwrap，因此还要展开全部失败明细。
+// 这里不区分 BODY_STALLED / BODY_SLOW：两者都是 HTTP 200 已计费，都不允许
+// 在自动化层或出图请求内部原地重发。BODY_SLOW 的区别只体现在账本统计上。
+func comicBilledReadFailure(err error) bool {
+	var billed *shuihuoImageBilledReadFailure
+	if errors.As(err, &billed) {
+		return true
+	}
+	var pageErr *comicPageWorkError
+	if errors.As(err, &pageErr) {
+		for _, failure := range pageErr.Failures {
+			if errors.As(failure.Err, &billed) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// refreshAutomationBilledOutstanding 重算当前仍未取回的已计费图数量，写进
+// entry 供前端/日志直接读取。成功取回后账本记录会被重置，数量随之下降。
+func refreshAutomationBilledOutstanding(entry map[string]any) int {
+	if entry == nil {
+		return 0
+	}
+	count := 0
+	nodes, _ := entry["nodes"].(map[string]any)
+	for _, rawNode := range nodes {
+		nodeEntry, _ := rawNode.(map[string]any)
+		if nodeEntry == nil {
+			continue
+		}
+		ledger, _ := nodeEntry["pageLedger"].(map[string]any)
+		for _, rawRecord := range ledger {
+			record, _ := rawRecord.(map[string]any)
+			if record != nil && automationBoolValue(record["billedNotRetrieved"]) {
+				count++
+			}
+		}
+	}
+	entry["billedNotRetrievedCount"] = count
+	return count
+}
+
 // resetAutomationPageLedgerRecord 在目标成功后清零「当前账期」，但保留
 // 累计尝试次数/花费与最后一次已解决错误，审计仍可回答“为什么曾经跳过”。
 func resetAutomationPageLedgerRecord(record map[string]any, now time.Time) bool {
@@ -301,6 +378,9 @@ func resetAutomationPageLedgerRecord(record map[string]any, now time.Time) bool 
 	record["retryQueued"] = false
 	record["needsManual"] = false
 	record["countsTowardRetryBudget"] = false
+	// 图已成功取回，「已计费未取回」状态结束。
+	delete(record, "billedNotRetrieved")
+	delete(record, "billedAt")
 	delete(record, "lastError")
 	delete(record, "lastErrorCode")
 	delete(record, "lastErrorAt")
@@ -335,6 +415,9 @@ func resetAutomationPageLedgerNode(entry map[string]any, node string, now time.T
 		if resetAutomationPageLedgerRecord(nodeEntry, now) {
 			changed = true
 		}
+	}
+	if changed {
+		refreshAutomationBilledOutstanding(entry)
 	}
 	return changed
 }
@@ -395,8 +478,41 @@ func recordAutomationPageLedger(entry map[string]any, err error, stage string, n
 	if errors.As(err, &pageErr) {
 		for _, failure := range pageErr.Failures {
 			itemDisposition := classifyAutomationFailure(failure.Err, stage)
+			code := itemDisposition.Code
+			var billedErr *shuihuoImageBilledReadFailure
+			billed := errors.As(failure.Err, &billedErr)
+			billedStalled := billed && billedErr.kind == shuihuoImageBodyFailureStalled
+			billedSlow := billed && billedErr.kind == shuihuoImageBodyFailureSlow
+			switch {
+			case billedStalled:
+				// 真断流：已计费但图没取回，单独记账并计入补偿统计。
+				code = automationCodeImageBodyStalled
+			case billedSlow:
+				// 一直在传但到总上限仍未读完：是「慢」不是「丢」，不标记 billed。
+				code = automationCodeImageBodySlow
+			case billed:
+				code = automationCodeBilledNotRetrieved
+			}
 			recordOne(ledger, failure.VideoID, failure.Label, stage, itemDisposition,
-				itemDisposition.Code, failure.Message(), automationPageImageUnitCost)
+				code, failure.Message(), automationPageImageUnitCost)
+			if record, _ := ledger[failure.VideoID].(map[string]any); record != nil {
+				// BODY_SLOW 是「在传但慢」，不算已计费未取回；其余 200 后读失败
+				// （BODY_STALLED 或截断/连接重置等）都必须记入补偿统计。
+				if billed && !billedSlow {
+					record["billedNotRetrieved"] = true
+					record["billedAt"] = now.UTC().Format(time.RFC3339)
+					if billedErr.retried {
+						record["billedRetryCount"] = automationNumberValue(record["billedRetryCount"], 0) + 1
+						record["billedRetriedAt"] = now.UTC().Format(time.RFC3339)
+					}
+					log.Printf("automation: image billed but body not retrieved page=%s label=%s stage=%s kind=%s retried=%v", failure.VideoID, failure.Label, stage, billedErr.kind, billedErr.retried)
+				}
+				if billedSlow {
+					record["bodySlow"] = true
+					record["bodySlowAt"] = now.UTC().Format(time.RFC3339)
+					log.Printf("automation: image body slow (not counted as billed loss) page=%s label=%s stage=%s", failure.VideoID, failure.Label, stage)
+				}
+			}
 		}
 	}
 	var promptErr *batchfactoryv11.ComicPromptPartialError
@@ -424,12 +540,141 @@ func recordAutomationPageLedger(entry map[string]any, err error, stage string, n
 			"at":           now.UTC().Format(time.RFC3339),
 		}
 	}
+	refreshAutomationBilledOutstanding(entry)
 	return outcome
+}
+
+// recordComicAssetShortfall 把缺失的资产参考图写进 comic_asset_images 账本。
+// 资产图缺失不阻断整本，但必须可读、可回补，并与页图共用同一账本口径。
+func recordComicAssetShortfall(entry map[string]any, shortfall comicAssetShortfall, now time.Time) {
+	if entry == nil || len(shortfall.MissingAssetIDs) == 0 {
+		return
+	}
+	disposition := automationFailureDisposition{
+		Code: automationCodePageShortage, Class: automationFailureTransient,
+		CountsTowardRetryBudget: true, MinAttemptsBeforeRetry: automationRetryEscalationThreshold,
+		MaxAttempts: automationPageRetryMaxAttempts, BaseBackoff: 10 * time.Second,
+		MaxBackoff: 5 * time.Minute, BudgetKey: "assets",
+	}
+	code := disposition.Code
+	if shortfall.Billed {
+		code = automationCodeBilledNotRetrieved
+	}
+	message := "资产参考图未写回"
+	if shortfall.Err != nil {
+		message = shortfall.Err.Error()
+	}
+	ledger := automationFailureLedger(entry, "comic_asset_images")
+	for _, assetID := range shortfall.MissingAssetIDs {
+		record := applyAutomationPageFailure(ledger, assetID, assetID, "comic_asset_images",
+			code, message, disposition, 0, now)
+		if shortfall.Billed {
+			record["billedNotRetrieved"] = true
+			record["billedAt"] = now.UTC().Format(time.RFC3339)
+		}
+	}
+	entry["assetShortfallCount"] = len(shortfall.MissingAssetIDs)
+	entry["assetShortfallAt"] = now.UTC().Format(time.RFC3339)
+	refreshAutomationBilledOutstanding(entry)
+	log.Printf("automation: comic asset images missing count=%d critical=%d/%d billed=%v",
+		len(shortfall.MissingAssetIDs), shortfall.CriticalMissing, shortfall.CriticalTotal, shortfall.Billed)
+}
+
+// recordComicPromptRepair 把“这一页被自动改写过”写进 comic_images 页级账本。
+// 与失败账本共用 pageLedger：成功清零只重置当前账期，不会抹掉修复历史。
+func recordComicPromptRepair(entry map[string]any, repair comicPromptRepair, now time.Time) {
+	if entry == nil || strings.TrimSpace(repair.VideoID) == "" {
+		return
+	}
+	ledger := automationFailureLedger(entry, "comic_images")
+	record, _ := ledger[repair.VideoID].(map[string]any)
+	if record == nil {
+		record = map[string]any{"videoId": repair.VideoID, "label": repair.Label}
+		ledger[repair.VideoID] = record
+	}
+	record["autoRepaired"] = true
+	attempts := automationNumberValue(record["repairAttempts"], 0)
+	if repair.Attempts > attempts {
+		attempts = repair.Attempts
+	} else {
+		attempts++
+	}
+	record["repairAttempts"] = attempts
+	record["repairCount"] = attempts
+	record["repairedFields"] = append([]string{}, repair.Fields...)
+	record["repairBefore"] = comicPromptSummary(repair.Before)
+	record["repairAfter"] = comicPromptSummary(repair.After)
+	if repair.LastRefusalRaw != "" {
+		record["lastRefusalRaw"] = repair.LastRefusalRaw
+	}
+	record["repairedAt"] = now.UTC().Format(time.RFC3339)
+	log.Printf("automation: comic prompt auto repaired page=%s attempts=%d fields=%v", repair.VideoID, attempts, repair.Fields)
+}
+
+// comicPromptSummary 限制账本里的提示词长度，保留开头便于人工对照。
+func comicPromptSummary(value string) string {
+	value = strings.TrimSpace(value)
+	runes := []rune(value)
+	const limit = 160
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit]) + fmt.Sprintf("…（已截断，原长 %d 字）", len(runes))
 }
 
 func isComicPageShortageError(err error) bool {
 	var shortage *comicPageShortageError
 	return errors.As(err, &shortage)
+}
+
+// automationNeedsManualPages 从所有书页级账本汇总“需人工页清单”，
+// 供批次状态直接展示：哪本书、哪一页、什么原因、改过几次、最后拒绝原文。
+func automationNeedsManualPages(books map[string]any) []map[string]any {
+	list := make([]map[string]any, 0)
+	for bookID, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		nodes, _ := entry["nodes"].(map[string]any)
+		for nodeName, nodeRaw := range nodes {
+			node, _ := nodeRaw.(map[string]any)
+			if node == nil {
+				continue
+			}
+			pageLedger, _ := node["pageLedger"].(map[string]any)
+			for videoID, pageRaw := range pageLedger {
+				page, _ := pageRaw.(map[string]any)
+				if page == nil {
+					continue
+				}
+				if needsManual, _ := page["needsManual"].(bool); !needsManual {
+					continue
+				}
+				item := map[string]any{
+					"bookId":         bookID,
+					"bookTitle":      automationStringValue(entry["title"], ""),
+					"node":           nodeName,
+					"videoId":        videoID,
+					"label":          automationStringValue(page["label"], ""),
+					"code":           automationStringValue(page["code"], ""),
+					"message":        automationStringValue(page["message"], ""),
+					"repairAttempts": automationNumberValue(page["repairAttempts"], 0),
+					"lastRefusalRaw": automationStringValue(page["lastRefusalRaw"], ""),
+				}
+				if fields, ok := page["repairedFields"].([]string); ok {
+					item["repairedFields"] = append([]string{}, fields...)
+				}
+				list = append(list, item)
+			}
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		left := automationStringValue(list[i]["bookId"], "") + "|" + automationStringValue(list[i]["videoId"], "")
+		right := automationStringValue(list[j]["bookId"], "") + "|" + automationStringValue(list[j]["videoId"], "")
+		return left < right
+	})
+	return list
 }
 
 // automationProgressStalled 判断节点是否静默停滞。超过阈值必须落终态，
@@ -439,6 +684,52 @@ func automationProgressStalled(lastProgressAt, now time.Time) bool {
 		return false
 	}
 	return now.Sub(lastProgressAt) >= automationStallTimeout
+}
+
+// errAutomationBookStalled 是书内停滞看门狗取消执行时携带的原因。它让所有
+// 阶段错误路径统一走「跳过这本书」而不是按上游错误重试。
+var errAutomationBookStalled = errors.New("书籍长时间没有进展")
+
+// automationStallWatchInterval 是停滞看门狗检查进展的间隔。判定阈值仍是
+// automationStallTimeout，这里只控制检查频率。
+const automationStallWatchInterval = 30 * time.Second
+
+// markAutomationBookStalled 把书内停滞落成可读状态：阶段、最后进展时间、
+// 被跳过多久。前两次安排续跑让其它书继续，达到升级阈值后转人工处理。
+func markAutomationBookStalled(entry map[string]any, stage string, lastProgress, now time.Time) bool {
+	if entry == nil {
+		return false
+	}
+	if stage == "" {
+		stage = automationStringValue(entry["stage"], "unknown")
+	}
+	skippedFor := now.Sub(lastProgress).Round(time.Second)
+	count := automationNumberValue(entry["stallSkipCount"], 0) + 1
+	entry["stallSkipCount"] = count
+	entry["stalledStage"] = stage
+	entry["lastProgressAt"] = lastProgress.UTC().Format(time.RFC3339)
+	entry["stalledAt"] = now.UTC().Format(time.RFC3339)
+	entry["stalledFor"] = skippedFor.String()
+	entry["stage"], entry["error"], entry["updatedAt"] = stage, errAutomationBookStalled.Error(), now
+
+	message := fmt.Sprintf("%s 阶段 %s 没有进展，已跳过这本书让其它书继续", stage, skippedFor)
+	if count < automationRetryEscalationThreshold {
+		backoff := automationContinuationBackoff(count)
+		entry["status"] = "failed"
+		entry["message"] = fmt.Sprintf("%s；%d 秒后继续（第 %d/%d 次）",
+			message, int(backoff.Seconds()), count, automationRetryEscalationThreshold)
+		entry["retryRequested"] = true
+		entry["retryAt"] = now.Add(backoff)
+		appendAutomationBookLog(entry, now, "stalled", automationStringValue(entry["message"], ""))
+		return true
+	}
+	entry["status"] = "failed"
+	entry["message"] = fmt.Sprintf("%s；连续 %d 次停滞，需人工处理", message, count)
+	entry["needsManual"] = true
+	delete(entry, "retryRequested")
+	delete(entry, "retryAt")
+	appendAutomationBookLog(entry, now, "stalled", automationStringValue(entry["message"], ""))
+	return true
 }
 
 // automationContinuationBackoff 为未达升级阈值的续跑安排退避。前两次失败

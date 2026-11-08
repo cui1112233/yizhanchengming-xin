@@ -102,7 +102,7 @@ func TestRunComicBootstrapRequiresComicAssetsFromTheAssetStage(t *testing.T) {
 		"assets":  map[string]any{"body": "提取漫画资产"},
 	}}
 	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
-		Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": rawSetting(t, config)}, ExpectedRevision: batch.Revision,
+		Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": rawSetting(t, config), "assetImagesEnabled": rawSetting(t, true)}, ExpectedRevision: batch.Revision,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -768,8 +768,9 @@ func TestBuildComicPromptContractWithAssetImagesEnabledCarriesOnlyAssetIdentity(
 	}
 	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页\n角色：{roles_str}"}})
 	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-identity", Label: "漫画页 01", VideoPrompt: "沈晚看向陆夫人。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
-		"productionMode": rawSetting(t, "comic"),
-		"aiPromptConfig": settings,
+		"productionMode":     rawSetting(t, "comic"),
+		"aiPromptConfig":     settings,
+		"assetImagesEnabled": rawSetting(t, true),
 	}})
 	if err != nil {
 		t.Fatal(err)

@@ -6,7 +6,10 @@ param(
   [switch]$UseReviewMysql,
   [switch]$EnableBatchProduction,
   [switch]$EnableLocalMerge,
-  [switch]$SkipBuild
+  [switch]$SkipBuild,
+  [switch]$Detached,
+  [string]$BinaryPath = '',
+  [string]$ManifestPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -167,5 +170,5 @@ if (-not (Test-Path -LiteralPath $ffmpegPath)) {
 $env:Path = $ffmpegDir + [IO.Path]::PathSeparator + $env:Path
 Write-Output ('Using FFmpeg {0}' -f $ffmpegPath)
 
-& (Join-Path $PSScriptRoot 'start-local-go.ps1') -ListenAddr $ListenAddr -SkipBuild:$SkipBuild
+& (Join-Path $PSScriptRoot 'start-local-go.ps1') -ListenAddr $ListenAddr -SkipBuild:$SkipBuild -Detached:$Detached -BinaryPath $BinaryPath -ManifestPath $ManifestPath
 exit $LASTEXITCODE

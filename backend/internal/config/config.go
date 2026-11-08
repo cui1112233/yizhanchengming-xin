@@ -26,6 +26,12 @@ type Config struct {
 	AgentAssetTOSAccessKey        string
 	AgentAssetTOSSecretKey        string
 	AgentAssetLocalDir            string
+	ProductionMediaTOSEndpoint    string
+	ProductionMediaTOSRegion      string
+	ProductionMediaTOSBucket      string
+	ProductionMediaTOSAccessKey   string
+	ProductionMediaTOSSecretKey   string
+	ProductionMediaTOSPrefix      string
 	Slice                         int
 	DirectorEndpoint              string
 	DirectorAPIKey                string
@@ -112,6 +118,27 @@ func FromEnv() (Config, error) {
 	cfg.AgentAssetTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_BUCKET"))
 	cfg.AgentAssetTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_ACCESS_KEY"))
 	cfg.AgentAssetTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_SECRET_KEY"))
+	cfg.ProductionMediaTOSEndpoint = strings.TrimSpace(os.Getenv("QIANTIE_PRODUCTION_MEDIA_TOS_ENDPOINT"))
+	cfg.ProductionMediaTOSRegion = strings.TrimSpace(os.Getenv("QIANTIE_PRODUCTION_MEDIA_TOS_REGION"))
+	cfg.ProductionMediaTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_PRODUCTION_MEDIA_TOS_BUCKET"))
+	cfg.ProductionMediaTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_PRODUCTION_MEDIA_TOS_ACCESS_KEY"))
+	cfg.ProductionMediaTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_PRODUCTION_MEDIA_TOS_SECRET_KEY"))
+	cfg.ProductionMediaTOSPrefix = strings.Trim(strings.TrimSpace(os.Getenv("QIANTIE_PRODUCTION_MEDIA_TOS_PREFIX")), "/")
+	if cfg.ProductionMediaTOSEndpoint == "" {
+		cfg.ProductionMediaTOSEndpoint = strings.TrimSpace(os.Getenv("QIANTIE_REFERENCE_ASSET_TOS_ENDPOINT"))
+	}
+	if cfg.ProductionMediaTOSRegion == "" {
+		cfg.ProductionMediaTOSRegion = strings.TrimSpace(os.Getenv("QIANTIE_REFERENCE_ASSET_TOS_REGION"))
+	}
+	if cfg.ProductionMediaTOSBucket == "" {
+		cfg.ProductionMediaTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_REFERENCE_ASSET_TOS_BUCKET"))
+	}
+	if cfg.ProductionMediaTOSAccessKey == "" {
+		cfg.ProductionMediaTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_REFERENCE_ASSET_TOS_ACCESS_KEY"))
+	}
+	if cfg.ProductionMediaTOSSecretKey == "" {
+		cfg.ProductionMediaTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_REFERENCE_ASSET_TOS_SECRET_KEY"))
+	}
 	// Agent Canvas must always have a durable local target for generated media.
 	// Without this fallback, a valid local executor is rejected before it receives
 	// work whenever a launcher omits QIANTIE_AGENT_ASSET_LOCAL_DIR.
@@ -145,6 +172,39 @@ func FromEnv() (Config, error) {
 	}
 	if cfg.AgentAssetTOSSecretKey == "" {
 		cfg.AgentAssetTOSSecretKey = cfg.NovelFetchTOSSecretKey
+	}
+	if cfg.ProductionMediaTOSEndpoint == "" {
+		cfg.ProductionMediaTOSEndpoint = cfg.AgentAssetTOSEndpoint
+	}
+	if cfg.ProductionMediaTOSRegion == "" {
+		cfg.ProductionMediaTOSRegion = cfg.AgentAssetTOSRegion
+	}
+	if cfg.ProductionMediaTOSBucket == "" {
+		cfg.ProductionMediaTOSBucket = cfg.AgentAssetTOSBucket
+	}
+	if cfg.ProductionMediaTOSAccessKey == "" {
+		cfg.ProductionMediaTOSAccessKey = cfg.AgentAssetTOSAccessKey
+	}
+	if cfg.ProductionMediaTOSSecretKey == "" {
+		cfg.ProductionMediaTOSSecretKey = cfg.AgentAssetTOSSecretKey
+	}
+	if cfg.ProductionMediaTOSPrefix == "" {
+		cfg.ProductionMediaTOSPrefix = "production-media"
+	}
+	if cfg.MergeTOSEndpoint == "" {
+		cfg.MergeTOSEndpoint = cfg.ProductionMediaTOSEndpoint
+	}
+	if cfg.MergeTOSRegion == "" {
+		cfg.MergeTOSRegion = cfg.ProductionMediaTOSRegion
+	}
+	if cfg.MergeTOSBucket == "" {
+		cfg.MergeTOSBucket = cfg.ProductionMediaTOSBucket
+	}
+	if cfg.MergeTOSAccessKey == "" {
+		cfg.MergeTOSAccessKey = cfg.ProductionMediaTOSAccessKey
+	}
+	if cfg.MergeTOSSecretKey == "" {
+		cfg.MergeTOSSecretKey = cfg.ProductionMediaTOSSecretKey
 	}
 	if cfg.MySQLDSN == "" {
 		return Config{}, fmt.Errorf("QIANTIE_MYSQL_DSN is required")

@@ -5,7 +5,8 @@ import test from 'node:test';
 // Resolve the browser's extensionless client import for the native Node runner.
 const source = readFileSync(new URL('./modelCatalog.js', import.meta.url), 'utf8')
   .replace(/from '\.\/client(?:\.js)?'/, `from '${new URL('./client.js', import.meta.url).href}'`);
-const { isModelKind, modelKindLabel, modelSelectOptions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const modelCatalogModule = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const { isModelKind, modelKindLabel, modelSelectOptions } = modelCatalogModule;
 
 test('uses backend displayName for typed model choices', () => {
   assert.deepEqual(modelSelectOptions([
@@ -29,4 +30,24 @@ test('uses the available label fallback and skips entries without a usable ID', 
 test('treats audio as a supported managed model kind', () => {
   assert.equal(isModelKind('audio'), true);
   assert.equal(modelKindLabel('audio'), '音频');
+});
+
+test('one shared catalog keeps successful model kinds and is reused by every dropdown', async () => {
+  assert.equal(typeof modelCatalogModule.getAvailableModelCatalog, 'function');
+  assert.equal(typeof modelCatalogModule.invalidateAvailableModelCatalog, 'function');
+  modelCatalogModule.invalidateAvailableModelCatalog();
+  const calls = [];
+  const first = await modelCatalogModule.getAvailableModelCatalog({ loadKind: async kind => {
+    calls.push(kind);
+    if (kind === 'video') throw new Error('video temporarily unavailable');
+    return [{ id: `${kind}-configured`, kind, enabled: true }];
+  } });
+  assert.deepEqual(first.models.map(model => model.id), ['text-configured', 'image-configured']);
+  assert.deepEqual(first.failedKinds, ['video']);
+
+  const second = await modelCatalogModule.getAvailableModelCatalog({ loadKind: async () => {
+    throw new Error('the shared result should have been reused');
+  } });
+  assert.strictEqual(second, first);
+  assert.deepEqual(calls, ['text', 'image', 'video']);
 });

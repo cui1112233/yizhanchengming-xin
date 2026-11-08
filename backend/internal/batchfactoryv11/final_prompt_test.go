@@ -14,10 +14,11 @@ func seedCompiledVideo(t *testing.T) (*MemoryStore, Batch, Book, Video) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
 		Patch: SettingsPatch{
-			"qualityEnabled":  rawSetting(t, true),
-			"quality":         rawSetting(t, "高质量商业成片"),
-			"negativeEnabled": rawSetting(t, true),
-			"negative":        rawSetting(t, "不要水印和畸形手指"),
+			"assetImagesEnabled": rawSetting(t, true),
+			"qualityEnabled":     rawSetting(t, true),
+			"quality":            rawSetting(t, "高质量商业成片"),
+			"negativeEnabled":    rawSetting(t, true),
+			"negative":           rawSetting(t, "不要水印和畸形手指"),
 		},
 		ExpectedRevision: batch.Revision,
 	}); err != nil {
@@ -1310,6 +1311,12 @@ func TestFinalPromptOpeningVariantFollowsAssetTextSwitch(t *testing.T) {
 	}
 	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
 	book = batch.Books[0]
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, true)}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
 
 	enabled, err := (&PromptCompilerService{Store: store}).CompileForOpeningVariant(context.Background(), "alice", batch.ID, book.ID, video.ID, 1, -1)
 	if err != nil {

@@ -1,11 +1,13 @@
 {
-    "buildId":  "20261104-10-6db3b5ad",
-    "archiveDir":  "docs/releases/20261104-10-6db3b5ad",
-    "releaseDir":  ".release/v88/20261104-10-6db3b5ad",
-    "gitSha":  "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
-    "frontendEntry":  "/assets/user-BNWHWnad.js",
-    "localBinarySha256":  "193bcf0f4770835530ce720e6191ca0f1f0ed7233c7e45061bacf5bd13969f0e",
-    "linuxBinarySha256":  "5b76f27dee1938eb7ed3ea3232788547f2bef96c514fcaac085e62c83a92b6cb",
-    "dataPackageSha256":  "a9904dddd176cca251c62f0c44d941327efad23cbb70ebee5f57b05bbe28b42f",
-    "writtenAt":  "2026-11-04T15:30:17.9620517Z"
+  "buildId": "20261108-04-a85a5b5c",
+  "releaseId": "qiantie-202611081555",
+  "archiveDir": "docs/releases/20261108-04-a85a5b5c",
+  "releaseDir": ".release/v88/20261108-04-a85a5b5c",
+  "gitSha": "a85a5b5c23f73c39e64233bcce55c1a5c8b5bc47",
+  "frontendEntry": "/assets/user-Ba8K3-qB.js",
+  "localPreflightPass": true,
+  "localBinarySha256": "c0262f382ad32575992a3dde8fc934aec9c19f647a4f740db3369b51c44bbe8c",
+  "linuxBinarySha256": "bd70ebb6ae96c37208d286638a14e79a4c9a8db079ef900b174cc7a06ba89e23",
+  "dataPackageSha256": "4da381ee77fbb0b995b9f72e2655f0b4102ab3197f7febfcaf96f88ead12e4fb",
+  "writtenAt": "2026-11-08T07:59:28.0449078Z"
 }

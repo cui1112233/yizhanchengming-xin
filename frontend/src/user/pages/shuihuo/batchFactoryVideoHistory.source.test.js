@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { batchFactoryNovelCopyText } from './batchFactoryRuntimeLogic.js';
+import { batchFactoryRuntimePollDelay, comicRowResultPollDelay, finishComicPageGeneration } from './batchFactoryPerformance.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8');
@@ -44,10 +45,29 @@ test('the copy-all-books icon lives in the novel header and never triggers row c
 });
 
 test('runtime summary polls every 8 seconds and pauses while the page is hidden', () => {
-  assert.match(source, /const POLL_MS = 8000/);
+  assert.equal(batchFactoryRuntimePollDelay('running', 0), 8000);
   assert.match(source, /document\.hidden/);
   assert.match(source, /visibilitychange/);
   assert.match(source, /clearTimeout/);
+});
+
+test('an unfinished comic image is checked every second', () => {
+  assert.equal(comicRowResultPollDelay([{ generationState: 'generating', images: [] }]), 1000);
+  assert.equal(comicRowResultPollDelay([{ generationState: 'generating', images: [{ isPrimary: true }] }]), 0);
+});
+
+test('revealing a finished comic image does not wait for the full batch refresh', async () => {
+  let releaseRefresh;
+  const refreshBlocked = new Promise(resolve => { releaseRefresh = resolve; });
+  const events = [];
+  const result = await finishComicPageGeneration({
+    waitForResult: async () => ({ id: 'page-1' }),
+    revealResult: page => events.push(`visible:${page.id}`),
+    refreshBatch: async () => { events.push('refresh-started'); await refreshBlocked; },
+  });
+  assert.deepEqual(result, { id: 'page-1' });
+  assert.deepEqual(events, ['visible:page-1', 'refresh-started']);
+  releaseRefresh();
 });
 
 test('videoHistory carries playable media fields as a fallback source of versions', () => {

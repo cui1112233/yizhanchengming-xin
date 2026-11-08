@@ -36,6 +36,7 @@ type BatchAutomationCoordinator struct {
 	external              *external.Service
 	ttsStore              novelfetchworkshop.Store
 	fetcher               *novelfetchworkshop.UpstreamFetcher
+	giantMaterialResolver GiantMaterialResolver
 	classification        batchFetchClassification
 	audioProbe            batchfactoryv11.H3AudioDurationProbe
 	localFiles            *localartifact.Store
@@ -290,19 +291,9 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 				if entry == nil || !automationBoolValue(entry["retryRequested"]) || !automationRetryDue(entry, now) {
 					continue
 				}
-				if automationStringValue(entry["retryReason"], "") == "content_policy" {
-					stage := automationStringValue(entry["stage"], "")
-					if stage == "" {
-						stage = "comic_images"
-					}
-					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", stage, "到达重试时间，正在重新生成被内容审核拒绝的内容", now
-					delete(entry, "retryReason")
-				} else {
-					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "assets", "超时后自动重试中", now
+				if reopenAutomationRetryBook(entry, now) {
+					retryDue = true
 				}
-				delete(entry, "retryAt")
-				delete(entry, "retryRequested")
-				retryDue = true
 			}
 			if retryDue {
 				// Older runtimes could mark the whole job complete while a book
@@ -427,18 +418,68 @@ func automationNextDispatchAt(state automationStateFile, now time.Time) time.Tim
 	return next
 }
 
+// automationRetryDue 必须同时接受内存中的 time.Time 与落库后的字符串。
+// 只用字符串解析会让刚写入 30 秒续跑的 retryAt 在进程内永远判不出“已到点”，
+// 表现为到点后既不重跑也不报错。
 func automationRetryDue(entry map[string]any, now time.Time) bool {
-	value := strings.TrimSpace(automationStringValue(entry["retryAt"], ""))
-	if value == "" {
-		return false
-	}
-	when, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil {
-		when, err = time.Parse(time.RFC3339, value)
-	}
-	return err == nil && !now.Before(when)
+	when := automationStoredJobTime(entry["retryAt"])
+	return !when.IsZero() && !now.Before(when)
 }
 
+// automationBookRunVersionField 标记一本书当前由哪一轮 run 权威持有。
+// 调度器重新打开书时递增，旧 run 的迟到写入因此自动失效。
+const automationBookRunVersionField = "runVersion"
+
+// reopenAutomationRetryBook 是书级自动重跑的唯一权威入口。
+// 返回值表示是否真正重新打开。needs_manual 的书只清理重试标记，不重新激活。
+func reopenAutomationRetryBook(entry map[string]any, now time.Time) bool {
+	if entry == nil {
+		return false
+	}
+	if automationBoolValue(entry["needsManual"]) {
+		delete(entry, "retryRequested")
+		delete(entry, "retryAt")
+		entry["status"], entry["updatedAt"] = "failed", now
+		entry["message"] = "需要人工处理，已停止自动重试"
+		return false
+	}
+	stage := automationStringValue(entry["stage"], "")
+	if automationStringValue(entry["retryReason"], "") == "content_policy" {
+		if stage == "" {
+			stage = "comic_images"
+		}
+		entry["message"] = "到达重试时间，正在重新生成被内容审核拒绝的内容"
+		delete(entry, "retryReason")
+	} else {
+		if stage == "" {
+			stage = "assets"
+		}
+		entry["message"] = "到达重试时间，继续未完成的页/节点"
+	}
+	entry["status"], entry["stage"], entry["updatedAt"] = "running", stage, now
+	delete(entry, "retryAt")
+	delete(entry, "retryRequested")
+	entry[automationBookRunVersionField] = automationNumberValue(entry[automationBookRunVersionField], 0) + 1
+	return true
+}
+
+// automationPendingBookRetry 判断 job 内是否还有已排期的书级续跑。
+// retryAt 在内存中是 time.Time、落库后才是字符串，必须走统一解析入口，
+// 否则 run 收尾会把「已有续跑计划」的 job 提前写成 failed。
+func automationPendingBookRetry(books map[string]any) bool {
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		if automationBoolValue(entry["retryRequested"]) && !automationStoredJobTime(entry["retryAt"]).IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
+// automationHasDueRetry 判断 job 内是否有已到点的书级续跑。
 func automationHasDueRetry(job map[string]any, now time.Time) bool {
 	books, _ := job["books"].(map[string]any)
 	for _, raw := range books {
@@ -489,29 +530,19 @@ func shouldScheduleAutomationTimeoutRetry(stage string) bool {
 const automationBatchRetryRounds = 2
 
 // automationZombieRunningIdleTimeout 是回收“僵尸 running”job 的空闲阈值。
-// 回收必须同时满足三个条件：job 仍标记 running、超过该时长没有任何更新、
-// 且没有任何 running/queued 书。真正等待供应商的慢作业会持续刷新 updatedAt，
-// 因此不会被误杀；阈值调到 10 分钟也是为了避免把刚接管的轮次当成僵尸。
-const automationZombieRunningIdleTimeout = 10 * time.Minute
+// 回收只依赖「job 仍标记 running + 超过该时长没有任何状态写入」，不再要求
+// 必须先没有任何 running 书：书级停滞由独立的停滞看门狗处理，僵尸回收
+// 负责兜住整个执行轮次已经消失、但书还挂着 running 的情况。
+// 比书级停滞阈值多留 2 分钟，让看门狗先落「跳过这本书」的可读状态。
+const automationZombieRunningIdleTimeout = automationStallTimeout + 2*time.Minute
 
-const automationZombieRunningMessage = "执行轮次已失效（无在途书）"
+const automationZombieRunningMessage = "执行轮次已失效（长时间无进展）"
 
 // automationZombieRunningReclaimable 判断 job 是否是执行轮次中断后残留的
-// “running” 假状态：书已全部终态，且长时间没有任何状态写入。
+// “running” 假状态：只要长时间没有任何状态写入即可回收，不再看书的在途状态。
 func automationZombieRunningReclaimable(job map[string]any, now time.Time) bool {
 	if job == nil || automationStringValue(job["state"], "") != "running" {
 		return false
-	}
-	books, _ := job["books"].(map[string]any)
-	for _, raw := range books {
-		entry, _ := raw.(map[string]any)
-		if entry == nil {
-			continue
-		}
-		switch automationStringValue(entry["status"], "") {
-		case "running", "queued":
-			return false
-		}
 	}
 	last := automationStoredJobTime(job["updatedAt"])
 	return !last.IsZero() && now.Sub(last) >= automationZombieRunningIdleTimeout
@@ -524,10 +555,27 @@ func reclaimAutomationZombieRunningJob(job map[string]any, jobID string, now tim
 		return false
 	}
 	books, _ := job["books"].(map[string]any)
+	// 执行轮次已经消失：还挂着 running/queued 的书不能再留在“进行中”，
+	// 否则前端永远显示在跑，调度器也无法判断这本书需要重试。
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "running", "queued":
+			entry["status"] = "failed"
+			entry["stage"] = automationStringValue(entry["stage"], "unknown")
+			entry["message"] = automationZombieRunningMessage
+			entry["error"] = "执行轮次已失效：超过 10 分钟没有任何进展"
+			entry["updatedAt"] = now
+		}
+	}
 	job["state"] = "failed"
 	job["lastError"] = automationZombieRunningMessage
 	job["completedAt"], job["updatedAt"] = now, now
 	job["counts"] = automationCountsFromBooks(books)
+	job["needsManualPages"] = automationNeedsManualPages(books)
 	clearAutomationRetryMarks(job)
 	appendAutomationJobLog(job, now, automationZombieRunningMessage)
 	log.Printf("automation: reclaim zombie running job %s owner=%s batch=%s", jobID,
@@ -579,6 +627,19 @@ func automationRetryResumeStage(stage string) string {
 	default:
 		return "assets"
 	}
+}
+
+// automationResumeShouldRunStage keeps continuation retries monotonic: a
+// failure at video may continue into merge/upload, but must never call assets,
+// director or opening again. An empty resume point is a normal first run.
+func automationResumeShouldRunStage(resumeStage, stage string) bool {
+	ranks := map[string]int{"assets": 1, "director": 2, "opening": 3, "video": 4}
+	resumeRank := ranks[strings.TrimSpace(resumeStage)]
+	stageRank := ranks[strings.TrimSpace(stage)]
+	if resumeRank == 0 || stageRank == 0 {
+		return true
+	}
+	return stageRank >= resumeRank
 }
 
 // deterministicAutomationFailure 识别同一请求重试也不会成功的上游错误：
@@ -719,6 +780,12 @@ func (c *BatchAutomationCoordinator) SetLocalFiles(files *localartifact.Store) {
 func (c *BatchAutomationCoordinator) SetSourceFetcher(fetcher *novelfetchworkshop.UpstreamFetcher) {
 	if c != nil {
 		c.fetcher = fetcher
+	}
+}
+
+func (c *BatchAutomationCoordinator) SetGiantMaterialResolver(resolver GiantMaterialResolver) {
+	if c != nil {
+		c.giantMaterialResolver = resolver
 	}
 }
 
@@ -911,6 +978,10 @@ func (c *BatchAutomationCoordinator) migrateLegacyLocked(state automationStateFi
 func (c *BatchAutomationCoordinator) setJob(owner, batchID, jobID string, job map[string]any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.setJobLocked(owner, batchID, jobID, job)
+}
+
+func (c *BatchAutomationCoordinator) setJobLocked(owner, batchID, jobID string, job map[string]any) error {
 	// 终态任务不再保留自动重试标记：否则残留的 retryRequested/retryAt 会让
 	// DispatchDueJobs 把一个已经结束的 job 重新派发成 running。
 	if state := automationStringValue(job["state"], ""); state == "stopped" || state == "failed" {
@@ -984,6 +1055,61 @@ func (c *BatchAutomationCoordinator) setJob(owner, batchID, jobID string, job ma
 		return nil
 	}
 	return writeAutomationJSONAtomic(indexPath, map[string]any{"version": 1, "jobs": entries})
+}
+
+// persistAutomationBookEntry 是 worker 写书的唯一入口。它在一个 c.mu 临界区内
+// 完成「读最新状态 → 校验 runVersion → 合并 → 落库」，避免旧 run 的迟到写入
+// 把调度器刚写入的 running 覆盖回 failed（最后写入者胜）。
+func (c *BatchAutomationCoordinator) persistAutomationBookEntry(owner, batchID, jobID, bookID string, target, entry map[string]any, entryVersion int, fallbackJob map[string]any) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	state, err := c.loadLocked()
+	if err != nil {
+		return false, err
+	}
+	job := state.Jobs[jobID]
+	if job == nil {
+		// 没有持久化状态（内存 run / 测试）时，退回本轮 job 自身的 map。
+		job = fallbackJob
+	}
+	if job == nil {
+		return false, nil
+	}
+	books, _ := job["books"].(map[string]any)
+	if books == nil {
+		return false, nil
+	}
+	latest, _ := books[bookID].(map[string]any)
+	if latest != nil && automationNumberValue(latest[automationBookRunVersionField], 0) > entryVersion {
+		// 该书的权威状态已被调度器或新一轮 run 接管，旧 worker 不得写回。
+		return false, nil
+	}
+	if latest == nil {
+		latest = target
+	}
+	if latest == nil {
+		return false, nil
+	}
+	// 原地合并，保持既有 map 引用（状态读取方与测试都持有旧引用）。
+	clear(latest)
+	for key, value := range entry {
+		latest[key] = value
+	}
+	if target != nil {
+		clear(target)
+		for key, value := range entry {
+			target[key] = value
+		}
+	}
+	books[bookID] = latest
+	job["counts"] = automationCountsFromBooks(books)
+	// 批次级“需人工页清单”：跨书汇总，供列表/详情直接展示。
+	job["needsManualPages"] = automationNeedsManualPages(books)
+	job["updatedAt"] = c.now()
+	if err := c.setJobLocked(owner, batchID, jobID, job); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // RecoverInterruptedJobs converts persisted runs without a live goroutine into
@@ -1542,122 +1668,11 @@ func (c *BatchAutomationCoordinator) applyPreset(ctx context.Context, owner stri
 	return c.store.GetBatch(ctx, owner, batch.ID)
 }
 
-// upgradePreset 把批次显式升级到预设的某个版本（默认当前 HEAD）。与启动时
-// 的 applyPreset「批次已有键优先、预设只补缺口」不同，升级是用户的明确
-// 确认动作：预设管理的键以新版本配置为准，批次其余自定义键保留。升级后
-// 写入新的 automationPresetSnapshot 钉版；配置真正变化的槽位会在下一次
-// Director 修订时按槽位 digest 被精确重置，未变化槽位连同已生成视频保留。
-func (c *BatchAutomationCoordinator) upgradePreset(ctx context.Context, owner string, batch batchfactoryv11.Batch, preset *AutomationPreset, requestedProductionMode string) (batchfactoryv11.Batch, error) {
-	current := map[string]any{}
-	for key, raw := range batch.SettingsState.Patch {
-		var value any
-		if json.Unmarshal(raw, &value) == nil {
-			current[key] = value
-		}
-	}
-	config := preset.Config
-	if len(config) == 0 {
-		return batchfactoryv11.Batch{}, fmt.Errorf("自动化预设没有可用配置")
-	}
-	merged := map[string]any{}
-	for key, value := range current {
-		merged[key] = value
-	}
-	for key, value := range config {
-		merged[key] = value
-	}
-	for _, key := range []string{"aiPromptConfig", "publishSettings"} {
-		left, _ := current[key].(map[string]any)
-		right, _ := config[key].(map[string]any)
-		if left != nil || right != nil {
-			nested := map[string]any{}
-			for k, v := range left {
-				nested[k] = v
-			}
-			for k, v := range right {
-				nested[k] = v
-			}
-			merged[key] = nested
-		}
-	}
-	if mode := strings.TrimSpace(requestedProductionMode); mode == "comic" || mode == "video" {
-		merged["productionMode"] = mode
-	}
-	if c.promptCatalog != nil {
-		if value, ok := merged["aiPromptConfig"]; ok && value != nil {
-			raw, marshalErr := json.Marshal(value)
-			if marshalErr != nil {
-				return batchfactoryv11.Batch{}, marshalErr
-			}
-			hydrated, hydrateErr := hydrateBatchFactoryPromptConfig(c.promptCatalog, raw)
-			if hydrateErr != nil {
-				return batchfactoryv11.Batch{}, hydrateErr
-			}
-			merged["aiPromptConfig"] = hydrated
-		}
-	}
-	merged["automationPresetSnapshot"] = map[string]any{
-		"id":        preset.ID,
-		"name":      preset.Name,
-		"version":   preset.Version,
-		"appliedAt": c.now().UTC().Format(time.RFC3339),
-	}
-	patch := batchfactoryv11.SettingsPatch{}
-	for key, value := range merged {
-		raw, err := json.Marshal(value)
-		if err != nil {
-			return batchfactoryv11.Batch{}, err
-		}
-		patch[key] = raw
-	}
-	if _, err := c.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: patch, ExpectedRevision: batch.Revision}); err != nil {
-		return batchfactoryv11.Batch{}, err
-	}
-	return c.store.GetBatch(ctx, owner, batch.ID)
-}
-
-// UpgradeAutomationPreset 是「批次页确认升级预设」的 HTTP 入口：批次钉住的
-// automationPresetSnapshot 落后于预设 HEAD 时，用户确认后调用，返回升级
-// 后的批次与新的钉版信息。
-func (c *BatchAutomationCoordinator) UpgradeAutomationPreset(ctx context.Context, owner, batchID string, input map[string]any) (map[string]any, error) {
-	if c.presets == nil {
-		return nil, fmt.Errorf("%w: 自动化预设服务未配置", batchfactoryv11.ErrUnavailable)
-	}
-	batch, err := c.store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return nil, err
-	}
-	presetID := automationStringValue(input["presetId"], "")
-	if presetID == "" {
-		// 未显式指定时沿用批次当前钉住的预设。
-		if raw, ok := batch.SettingsState.Patch["automationPresetSnapshot"]; ok {
-			var snapshot struct {
-				ID string `json:"id"`
-			}
-			if json.Unmarshal(raw, &snapshot) == nil {
-				presetID = strings.TrimSpace(snapshot.ID)
-			}
-		}
-	}
-	if presetID == "" {
-		return nil, fmt.Errorf("%w: 批次没有钉住任何自动化预设，无法升级", batchfactoryv11.ErrInvalid)
-	}
-	preset, err := c.presets.Get(owner, presetID)
-	if err != nil || preset == nil {
-		return nil, fmt.Errorf("自动化预设不存在或不属于当前账号")
-	}
-	updated, err := c.upgradePreset(ctx, owner, batch, preset, automationStringValue(input["productionMode"], ""))
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"batch":    updated,
-		"preset":   map[string]any{"id": preset.ID, "name": preset.Name, "version": preset.Version},
-		"upgraded": true,
-	}, nil
-}
-
 func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
+	// Worker 只能修改自己的深拷贝，不能直接修改 c.automationState 里的共享 map。
+	// 否则 Retry/状态接口在整理公开响应时会与 worker 并发读写同一张 map，
+	// Go 会以 "concurrent map read and map write" 直接终止整个进程。
+	runJob := cloneAutomationMap(job)
 	baseCtx := context.WithValue(context.Background(), bridgeIdentityKey{}, BridgeIdentity{Username: owner})
 	automationCtx, cancel := context.WithCancel(baseCtx)
 	c.controlMu.Lock()
@@ -1674,7 +1689,7 @@ func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job
 	epoch := c.runEpochs[jobID]
 	c.runCancels[jobID] = cancel
 	c.controlMu.Unlock()
-	go func() {
+	go func(job map[string]any) {
 		// 单个自动化任务的 goroutine panic 不允许带走整个进程：落成 failed，
 		// 保留 panic 文本，便于用户看到并重试。
 		defer func() {
@@ -1688,7 +1703,7 @@ func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job
 			}
 		}()
 		c.run(automationCtx, epoch, owner, batchID, jobID, job, batch)
-	}()
+	}(runJob)
 }
 
 func (c *BatchAutomationCoordinator) isCurrentRun(jobID string, epoch int64) bool {
@@ -1772,13 +1787,7 @@ func (c *BatchAutomationCoordinator) latestComicCollection(ctx context.Context, 
 	return collections[len(collections)-1], nil
 }
 
-// errSensitiveReviewPending 表示正文里仍有未处理的敏感命中，必须人工确认后才能上传。
-var errSensitiveReviewPending = errors.New("有敏感词未处理，已保留原文，需人工确认后上传")
-
 func (c *BatchAutomationCoordinator) publishVideo(ctx context.Context, owner, batchID, bookID string) error {
-	if count, pending := c.sensitiveReviewPending(ctx, owner, batchID, bookID); pending {
-		return fmt.Errorf("%w（%d 处）", errSensitiveReviewPending, count)
-	}
 	if c.publish121 != nil {
 		_, err := c.publish121.Submit(ctx, owner, batchID, bookID, map[string]any{})
 		return err
@@ -1797,31 +1806,8 @@ func (c *BatchAutomationCoordinator) publishVideo(ctx context.Context, owner, ba
 	return err
 }
 
-// sensitiveReviewPending 读取最新书状态，判断正文里是否还有未处理的敏感命中。
-// 返回命中数量与是否需要人工确认；读取失败按“不阻断”处理，避免误伤正常批次。
-func (c *BatchAutomationCoordinator) sensitiveReviewPending(ctx context.Context, owner, batchID, bookID string) (int, bool) {
-	if c == nil || c.store == nil {
-		return 0, false
-	}
-	batch, err := c.store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return 0, false
-	}
-	for _, book := range batch.Books {
-		if book.ID != bookID {
-			continue
-		}
-		value := book.SourceMetadata["sensitiveReviewRequired"]
-		if automationBoolValue(value) || strings.EqualFold(strings.TrimSpace(fmt.Sprint(value)), "true") {
-			return automationNumberValue(book.SourceMetadata["sensitiveReviewCount"], 0), true
-		}
-		return 0, false
-	}
-	return 0, false
-}
-
 func comicBootstrapReady(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) bool {
-	if (batchfactoryv11.AssetImagesEnabled(effective) && !comicAssetsReady(book)) || len(book.Videos) == 0 {
+	if !comicAssetsReady(book) || len(book.Videos) == 0 {
 		return false
 	}
 	for _, page := range book.Videos {
@@ -1850,9 +1836,8 @@ const (
 )
 
 func selectComicPreparationAction(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) comicPreparationAction {
-	// 关闭资产图片时不重新提炼资产：已有的就用，没有的走正文继续。
-	requireAssets := batchfactoryv11.AssetImagesEnabled(effective)
-	if (requireAssets && (!comicAssetsReady(book) || batchfactoryv11.ComicAssetIdentityIssue(book) != "")) || len(book.Videos) == 0 {
+	// 漫画资产文字始终需要准备；资产图片开关只控制后续是否生成参考图。
+	if !comicAssetsReady(book) || batchfactoryv11.ComicAssetIdentityIssue(book) != "" || len(book.Videos) == 0 {
 		return comicPreparationBootstrap
 	}
 	for _, page := range book.Videos {
@@ -1998,6 +1983,17 @@ func retryableComicAutomationError(err error) bool {
 	if err == nil {
 		return false
 	}
+	// 部分页成功不是整本可重试错误：调用方必须按页记账并安排带退避的续跑，
+	// 不能在这里原地重复调用上游。
+	var pagePartial *comicPagePartialError
+	if errors.As(err, &pagePartial) {
+		return false
+	}
+	// 已计费但响应体读取失败：默认不重发，避免同一张图重复扣费；由下一轮
+	// 续跑在缺失页/缺失资产上重取。
+	if comicBilledReadFailure(err) {
+		return false
+	}
 	// A page can still have a provider task from the previous attempt. This is
 	// a temporary coordination state, not a configuration error; wait and let
 	// the idempotent book generator continue from the missing page.
@@ -2111,6 +2107,17 @@ func comicMissingPageError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "个漫画页缺少主图")
 }
 
+// comicPromptRecoveryIsPartial 判定补缺提示词是否算「部分成功」：只有至少
+// 补上一页、且失败明细可逐页记账时，才允许跳过缺失页继续出图；一页都没
+// 补上时仍按整本失败处理。
+func comicPromptRecoveryIsPartial(err error, updated int) bool {
+	if err == nil || updated <= 0 {
+		return false
+	}
+	var promptPartial *batchfactoryv11.ComicPromptPartialError
+	return errors.As(err, &promptPartial)
+}
+
 // comicMissingAssetError 表示漫画资产图阶段结束后仍有资产没有主图。审核拒绝
 // 的资产图会被跳过而不是中断整本，所以这里同样按“等待退避重试”处理，避免
 // 一次软拒绝就把整本书打成永久失败。
@@ -2140,6 +2147,34 @@ func (c *BatchAutomationCoordinator) scheduleComicContentPolicyRetry(entry map[s
 	entry["retryReason"] = "content_policy"
 	entry["retryAt"] = now.Add(comicContentPolicyRetryDelay)
 	appendAutomationBookLog(entry, now, stage, message)
+	persist()
+	return true
+}
+
+// automationAssetBackfillMaxAttempts 是资产参考图缺失时的最大回补轮次。
+// 超过之后不再延迟发布：带着已有资产继续后续阶段，账本保留缺失明细。
+const automationAssetBackfillMaxAttempts = 2
+
+// scheduleComicAssetBackfill 在页图已完成、但资产参考图仍缺失时安排一次
+// 回补轮。下一轮只会重新生成缺失的资产图，已完成的页不会重跑。
+func (c *BatchAutomationCoordinator) scheduleComicAssetBackfill(entry map[string]any, persist func(), missing int) bool {
+	if entry == nil || persist == nil || missing <= 0 {
+		return false
+	}
+	attempt := automationNumberValue(entry["assetBackfillCount"], 0)
+	if attempt >= automationAssetBackfillMaxAttempts {
+		return false
+	}
+	attempt++
+	entry["assetBackfillCount"] = attempt
+	backoff := automationContinuationBackoff(attempt)
+	message := fmt.Sprintf("漫画页已完成，仍有 %d 个资产参考图缺失，%d 秒后回补（%d/%d）",
+		missing, int(backoff.Seconds()), attempt, automationAssetBackfillMaxAttempts)
+	entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", "comic_asset_images", "", c.now()
+	entry["message"] = message
+	entry["retryRequested"] = true
+	entry["retryAt"] = c.now().Add(backoff)
+	appendAutomationBookLog(entry, c.now(), "comic_asset_images", message)
 	persist()
 	return true
 }
@@ -2252,10 +2287,22 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 		}
 		return updated, nil
 	}
-	if isDirectFirstSourceBlocked(book) {
+	if isDirectFirstSourceBlocked(book) && len(productionLines(book)) == 0 && firstMetadataString(book.SourceMetadata, "giantMaterialId", "qingyuMaterialId") == "" {
 		return book, fmt.Errorf("书城原文获取失败，等待人工处理：%s", reasonOrDefault(strings.TrimSpace(stringValue(book.SourceMetadata["originalReadError"])), "请手动重试直取或确认后使用 OCR"))
 	}
 	if len(productionLines(book)) > 0 {
+		// A previous candidate can fail first and a sibling can later succeed.
+		// Source text is the authority: once it exists, remove the obsolete intake
+		// failure so later automation runs and the UI do not keep reporting it.
+		if isDirectFirstSourceBlocked(book) {
+			metadata := copyAnyMap(book.SourceMetadata)
+			markBatchDirectReadSuccess(metadata)
+			updated, err := c.updateAutomationBookMetadata(ctx, owner, batchID, book, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata})
+			if err != nil {
+				return book, fmt.Errorf("清理旧正文读取失败状态失败：%w", err)
+			}
+			book = updated
+		}
 		// Classification is a metadata-enrichment step, not a production gate.
 		// Any usable gender/style pair continues; an incomplete pair is
 		// finalized into a default pair instead of stopping automation.
@@ -2280,7 +2327,10 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if c == nil || c.fetcher == nil || c.store == nil {
 		return book, fmt.Errorf("正文尚未获取，且自动获取服务未配置")
 	}
-	platform := strings.TrimSpace(book.Platform)
+	// 列表里保存的是给人看的书城名称（如“常读”“七猫”），121 正文接口
+	// 只接受数字平台 ID。单本手动获取早已走统一解析，自动化也必须复用同一
+	// 条链路，不能把展示名称直接传给上游。
+	platform := resolveSingleFetchPlatform("", book)
 	if platform == "" {
 		return book, fmt.Errorf("正文尚未获取，且缺少书城平台")
 	}
@@ -2312,7 +2362,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if captureCharacters > 100000 {
 		captureCharacters = 100000
 	}
-	fetched, err, attempts := fetchBatchSourceWithRetry(ctx, c.fetcher, bookID, platform, captureCharacters)
+	fetched, resolvedBookID, fallbackFrom, err, attempts := fetchBatchSourceWithGiantCandidate(ctx, c.fetcher, c.giantMaterialResolver, book, bookID, platform, captureCharacters)
 	if err != nil {
 		persistBatchFetchFailure(ctx, c.store, owner, batchID, book, err, attempts)
 		return book, fmt.Errorf("自动获取正文失败：%w", err)
@@ -2320,18 +2370,24 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if len(strings.TrimSpace(fetched.ProcessedText)) == 0 {
 		return book, fmt.Errorf("自动获取正文失败：上游未返回可用正文")
 	}
-	fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, bookID, fetched, c.classification, c.batchSensitiveConfigFor(ctx, owner, batchID, book))
+	fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, resolvedBookID, fetched, c.classification, c.batchSensitiveConfigFor(ctx, owner, batchID, book))
+	if fallbackFrom != "" {
+		metadata["platformBookId"] = resolvedBookID
+		metadata["resolvedPlatformBookId"] = resolvedBookID
+		metadata["platformCandidateFallbackFrom"] = fallbackFrom
+	}
 	for key, value := range book.SourceMetadata {
 		if _, exists := metadata[key]; !exists {
 			metadata[key] = value
 		}
 	}
+	markBatchDirectReadSuccess(metadata)
 	productionText := fetched.ProcessedText
 	if processErr != nil {
 		productionText = ""
 	}
 	updated, err := c.captureAutomationSource(ctx, owner, batchID, book, batchfactoryv11.CaptureBookSourceInput{
-		SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true, SourceTitle: book.Title, SourceMetadata: metadata,
+		SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true, SourceBookID: resolvedBookID, SourceTitle: book.Title, SourceMetadata: metadata,
 	})
 	if err != nil {
 		return book, fmt.Errorf("保存自动获取正文失败：%w", err)
@@ -2620,10 +2676,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	if concurrency > 4 {
 		concurrency = 4
 	}
-	// 每本书各自最多 4 路出图，但整个任务还需要一个总并发上限：实测图片网关
-	// 在并发响应体过多时会直接 RST（HTTP 200 后 wsarecv 被重置）。URL 模式下
-	// 小响应很稳定，这里给到 8 路，资产图与漫画页各占一半，避免资产图阶段把
-	// 漫画页饿住。可用 job 字段覆盖。
+	// 每本书默认 4 路出图（可配置，上限 8），整个任务还需要一个总并发上限：
+	// 实测显示并发共享上游带宽会互相拖慢，12 路时慢图更容易撞总上限。恢复为
+	// 8 路（2 本书 × 4 路）；可用 job 字段 imageGlobalConcurrency 覆盖。
 	imageGlobalConcurrency := automationNumberValue(job["imageGlobalConcurrency"], 8)
 	if imageGlobalConcurrency < 1 {
 		imageGlobalConcurrency = 8
@@ -2668,24 +2723,25 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 			initialEntry = map[string]any{}
 		}
 		entry := cloneAutomationEntry(initialEntry)
+		entryVersion := automationNumberValue(initialEntry[automationBookRunVersionField], 0)
 		jobMu.Unlock()
 		persist := func() {
 			jobMu.Lock()
+			defer jobMu.Unlock()
 			// 本轮 run 一旦被同一 job 的新一轮接管，旧 worker 不得再写书状态与
 			// job 计数，否则会覆盖新 run 的进度。
 			if !c.isCurrentRun(jobID, epoch) {
-				jobMu.Unlock()
 				return
 			}
-			clear(initialEntry)
-			for key, value := range entry {
-				initialEntry[key] = value
+			// 写书只走权威入口：runVersion 不匹配说明调度器已经把这本书
+			// 重新打开，旧 worker 的 failed 终态必须丢弃。
+			written, err := c.persistAutomationBookEntry(owner, batchID, jobID, book.ID, initialEntry, entry, entryVersion, job)
+			if err != nil || !written {
+				return
 			}
-			books[book.ID] = initialEntry
 			job["counts"] = automationCountsFromBooks(books)
+			job["needsManualPages"] = automationNeedsManualPages(books)
 			job["updatedAt"] = c.now()
-			_ = c.setJob(owner, batchID, jobID, job)
-			jobMu.Unlock()
 		}
 		// 并发槽位还没拿到时如实写 queued，前端才会显示“排队中”。
 		// 回补书保留原 stage/retryAt/batchRetryCount，拿到槽位后仍能续跑。
@@ -2715,27 +2771,82 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 				queueCond.Broadcast()
 				queueMu.Unlock()
 			}()
+			// 每本书一个可取消上下文：停滞看门狗只跳过这一本书，其它书的
+			// goroutine 继续跑；取消原因用于区分「停滞」与上游错误。
+			bookCtx, bookCancel := context.WithCancelCause(ctx)
+			defer bookCancel(nil)
+			ctx := bookCtx
+			var entryLogMu sync.Mutex
+			// 看门狗只写原子心跳、不直接写 entry，避免和书本 goroutine 的
+			// 状态写入并发；真正落状态在下面的 defer 里由本书 goroutine 完成。
+			var stallLast atomic.Value
+			var stallStage atomic.Value
+			stallLast.Store(c.now())
+			stallStage.Store("")
+			defer func() {
+				if !errors.Is(context.Cause(ctx), errAutomationBookStalled) {
+					return
+				}
+				last, _ := stallLast.Load().(time.Time)
+				stage, _ := stallStage.Load().(string)
+				entryLogMu.Lock()
+				markAutomationBookStalled(entry, stage, last, c.now())
+				persist()
+				entryLogMu.Unlock()
+			}()
 			// The one-item loop lets every existing stage exit its own book with
 			// continue while the other book workers keep running.
 			for range [1]struct{}{} {
 				// 单本书的执行日志供前端展开查看；并发出图时多个 goroutine 会
 				// 同时上报阶段与去敏、审核拒绝、降级重试事件，因此单独加锁，
 				// 保证日志追加与持久化不并发写同一个 entry。
-				var entryLogMu sync.Mutex
 				var generationLease *comicGenerationLease
+				// 停滞看门狗：书内超过 automationStallTimeout 没有任何进展时，
+				// 取消这本书，把并发槽位让给其它书。
+				stopWatchdog := make(chan struct{})
+				defer close(stopWatchdog)
+				go func() {
+					ticker := time.NewTicker(automationStallWatchInterval)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-stopWatchdog:
+							return
+						case <-ticker.C:
+							last, _ := stallLast.Load().(time.Time)
+							if !automationProgressStalled(last, c.now()) {
+								continue
+							}
+							stallLast.Store(last)
+							bookCancel(errAutomationBookStalled)
+							return
+						}
+					}
+				}()
 				recordComicEvent := func(stage, message string) {
 					// 任何出图/资产进度事件都算心跳：只要还在推进，就不判定超时。
 					if generationLease != nil {
 						generationLease.touch(comicGenerationIdleExtend)
 					}
 					entryLogMu.Lock()
-					entry["stage"], entry["message"], entry["updatedAt"] = stage, message, c.now()
+					now := c.now()
+					entry["stage"], entry["message"], entry["updatedAt"] = stage, message, now
+					entry["lastProgressAt"] = now.UTC().Format(time.RFC3339)
+					stallLast.Store(now)
+					stallStage.Store(stage)
 					delete(entry, "retryAt")
-					appendAutomationBookLog(entry, c.now(), stage, message)
+					appendAutomationBookLog(entry, now, stage, message)
 					persist()
 					entryLogMu.Unlock()
 				}
 				fail := func(stage string, err error, message string) {
+					if errors.Is(context.Cause(ctx), errAutomationBookStalled) {
+						// 看门狗已经写好阶段/最后进展时间/跳过时长，并安排了续跑。
+						// 这里不能再把 context canceled 写成新的失败。
+						return
+					}
 					if ctx.Err() != nil {
 						control, _, _ := c.currentJobControl(owner, batchID, jobID)
 						if control == "paused" || control == "stopped" {
@@ -2869,13 +2980,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					}
 					cancel()
 					if submitErr != nil {
-						if errors.Is(submitErr, errSensitiveReviewPending) {
-							// 未确认的敏感词绝不静默上传：停在待确认，不判整本失败。
-							entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "pending_confirmation", "sensitive_review", "", submitErr.Error()+"，请先在卡片上确认", c.now()
-							appendAutomationBookLog(entry, c.now(), "sensitive_review", submitErr.Error())
-							persist()
-							continue
-						}
 						if errors.Is(submitErr, errPublishUnconfirmed) {
 							entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "upload_confirm", submitErr.Error(), "已上传待确认：回读失败，重试时将优先回读", c.now()
 							appendAutomationBookLog(entry, c.now(), "upload_confirm", "已上传待确认：回读失败，重试时将优先回读")
@@ -2952,8 +3056,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					case comicPreparationBootstrap:
 						identityIssue := batchfactoryv11.ComicAssetIdentityIssue(book)
 						identityRecovery := identityIssue != ""
-						// 关闭资产图片时只复用已存资产描述，不重新提炼。
-						if batchfactoryv11.AssetImagesEnabled(effective) && (!comicAssetsReady(book) || identityRecovery) {
+						// 资产文字始终提取；是否生成资产参考图由后续出图阶段的开关决定。
+						if !comicAssetsReady(book) || identityRecovery {
 							message := "正在提取漫画人物、场景和道具资产"
 							assetMode := batchfactoryv11.StageModeMissing
 							if identityRecovery {
@@ -2992,9 +3096,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 									continue
 								}
 							}
-						}
-						if !batchfactoryv11.AssetImagesEnabled(effective) && !comicAssetsReady(book) {
-							appendAutomationBookLog(entry, c.now(), "comic_assets", "无已存资产描述，已跳过合并")
 						}
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_bootstrap", "正在分析原文、分页并生成每页漫画提示词", c.now()
 						persist()
@@ -3055,13 +3156,22 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							entry["stage"], entry["updatedAt"] = "comic_prompt_recovery", c.now()
 							persist()
 						})
-						_, recoveryErr := c.stages.RunMissingComicPromptExtraction(stageCtx, owner, batchID, book.ID)
+						partialResult, recoveryErr := c.stages.RunMissingComicPromptExtraction(stageCtx, owner, batchID, book.ID)
 						cancel()
 						if recoveryErr != nil {
-							fail("comic_prompt_recovery", recoveryErr, "漫画缺页提示词补齐失败")
-							continue
-						}
-						if resetAutomationPageLedgerNode(entry, "comic_prompt_recovery", c.now()) {
+							// 只有「一页都没补上」才允许整本失败；部分成功时失败页只记账，
+							// 其余页继续进入页图阶段，页图阶段会自然跳过缺提示词的页。
+							if !comicPromptRecoveryIsPartial(recoveryErr, len(partialResult.Updated)) {
+								fail("comic_prompt_recovery", recoveryErr, "漫画缺页提示词补齐失败")
+								continue
+							}
+							recordAutomationPageLedger(entry, recoveryErr, "comic_prompt_recovery", c.now())
+							message := fmt.Sprintf("提示词 %d/%d 页就绪，%d 页缺失已跳过，继续生成其余页",
+								len(partialResult.Updated), len(partialResult.Updated)+len(partialResult.Failed), len(partialResult.Failed))
+							entry["stage"], entry["message"], entry["updatedAt"] = "comic_images", message, c.now()
+							appendAutomationBookLog(entry, c.now(), "comic_prompt_recovery", message)
+							persist()
+						} else if resetAutomationPageLedgerNode(entry, "comic_prompt_recovery", c.now()) {
 							persist()
 						}
 					case comicPreparationReady:
@@ -3087,13 +3197,60 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						generateCtx, cancel := context.WithCancel(attemptCtx)
 						defer cancel()
 						generateCtx = withComicGenerationProgress(generateCtx, recordComicEvent)
+						// 上游返回响应头、图片落库等真实进展只刷新看门狗心跳，
+						// 不追加日志；慢图在重试预算内不会被误判为 stalled。
+						generateCtx = withComicGenerationHeartbeat(generateCtx, func() {
+							if generationLease != nil {
+								generationLease.touch(comicGenerationIdleExtend)
+							}
+							stallLast.Store(c.now())
+						})
 						generateCtx = withShuihuoImageEvent(generateCtx, recordComicEvent)
 						generateCtx = withComicAssetConcurrency(generateCtx, 5)
+						// 资产参考图缺失只记账不回滚：页图阶段继续用已有资产出图，
+						// 成功后再安排一次回补轮。
+						delete(entry, "assetShortfallCount")
+						generateCtx = withComicAssetShortfall(generateCtx, func(shortfall comicAssetShortfall) {
+							entryLogMu.Lock()
+							recordComicAssetShortfall(entry, shortfall, c.now())
+							persist()
+							entryLogMu.Unlock()
+						})
+						// 自动改写画面/台词后写进页级账本，前端可以看到
+						// “这一页被自动改写过”以及改了哪些字段。
+						generateCtx = withComicPromptRepair(generateCtx, func(repair comicPromptRepair) {
+							entryLogMu.Lock()
+							recordComicPromptRepair(entry, repair, c.now())
+							persist()
+							entryLogMu.Unlock()
+						})
 						return c.comicGenerate(generateCtx, owner, batchID, book.ID)
 					}, nil)
 					generationCancel()
 					if generateErr != nil {
 						failureStage, failureDetail := comicGenerationFailureStage(generateErr)
+						// 部分页成功、部分页失败：只记账并安排续跑，不把整本判死。
+						// 下一轮从缺失页继续，已经出好的页不会重跑。
+						var pagePartial *comicPagePartialError
+						if errors.As(generateErr, &pagePartial) {
+							outcome := recordAutomationPageLedger(entry, generateErr, failureStage, c.now())
+							if outcome.NeedsManual || outcome.MaxAttempts >= automationPageRetryMaxAttempts {
+								fail(failureStage, generateErr, fmt.Sprintf(
+									"已生成 %d/%d 页，剩余页连续 %d 次未补齐，需人工处理",
+									pagePartial.Completed, pagePartial.Total, outcome.MaxAttempts))
+								continue
+							}
+							backoff := automationContinuationBackoff(outcome.MaxAttempts)
+							message := fmt.Sprintf("已生成 %d/%d 页，%d 页失败已记账，%d 秒后续跑只补缺失页",
+								pagePartial.Completed, pagePartial.Total, len(pagePartial.Failures), int(backoff.Seconds()))
+							entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", failureStage, generateErr.Error(), c.now()
+							entry["message"] = message
+							entry["retryRequested"] = true
+							entry["retryAt"] = c.now().Add(backoff)
+							appendAutomationBookLog(entry, c.now(), failureStage, message)
+							persist()
+							continue
+						}
 						// 缺页如果只是“仍在生成”或“lease 已过期”，不是内容审核失败：
 						// 不消耗内容审核重试预算，也不使用“两次降级后仍被拒绝”的文案。
 						var shortage *comicPageShortageError
@@ -3126,7 +3283,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					// 整本出图成功说明所有页都已落地：清零当前账期，
 					// 下一轮新故障从第 1 次重新累计。
 					resetAutomationPageLedgerNode(entry, "comic_images", c.now())
-					resetAutomationPageLedgerNode(entry, "comic_asset_images", c.now())
 					confirmCtx, cancelConfirm := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 					confirmedCollection, confirmErr := c.confirmComicCollection(confirmCtx, owner, batchID, book.ID, collection)
 					cancelConfirm()
@@ -3136,6 +3292,22 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					}
 					collection = confirmedCollection
 					entry["comicCollectionId"], entry["comicPageCount"] = collection.ID, len(collection.Items)
+					// 资产参考图缺失不阻断整本：页图已全部完成，先安排回补轮
+					// 把缺失的参考图补回来；回补预算用完就带着已有资产继续发布。
+					shortfallCount := automationNumberValue(entry["assetShortfallCount"], 0)
+					delete(entry, "assetShortfallCount")
+					if shortfallCount > 0 {
+						if c.scheduleComicAssetBackfill(entry, persist, shortfallCount) {
+							continue
+						}
+						message := fmt.Sprintf("有 %d 个资产参考图多次回补仍未写回，用现有资产继续后续阶段", shortfallCount)
+						entry["message"] = message
+						appendAutomationBookLog(entry, c.now(), "comic_asset_images", message)
+						persist()
+					} else {
+						delete(entry, "assetBackfillCount")
+						resetAutomationPageLedgerNode(entry, "comic_asset_images", c.now())
+					}
 					if automationStringValue(job["runMode"], "full_submit") == "full_submit" {
 						if c.automationSubmitDeferred(job) {
 							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "scheduled", "waiting_submit", "漫画合集已提前完成，等待定时提交", c.now()
@@ -3200,7 +3372,11 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 				}
 				production := batchfactoryv11.ProductionJob{}
 				reusedProduction := false
-				forceRegenerate := automationBoolValue(job["forceRegenerate"])
+				resumeStage := automationStringValue(entry["resumeStage"], "")
+				// forceRegenerate authorizes the initial run only. A continuation
+				// retry must preserve completed work even when the original run was
+				// explicitly started as a full regeneration.
+				forceRegenerate := automationBoolValue(job["forceRegenerate"]) && resumeStage == ""
 				// 视频阶段完成口径按 ordinal 统计，允许复用 orphaned 历史成片：
 				// 只要每个分镜都已有 succeeded + mediaUrl，就不再提交新一轮视频任务。
 				if !forceRegenerate && automationStringValue(job["runMode"], "full_submit") != "storyboard_only" {
@@ -3224,7 +3400,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					if forceRegenerate {
 						stageMode = batchfactoryv11.StageModeForce
 					}
-					if batchfactoryv11.AssetImagesEnabled(effective) {
+					if !automationResumeShouldRunStage(resumeStage, "assets") {
+						const skipMessage = "从失败阶段继续，跳过已完成的资产阶段"
+						entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
+						appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
+						persist()
+					} else if batchfactoryv11.AssetImagesEnabled(effective) {
 						if automationAssetsComplete(book, effective) && !forceRegenerate {
 							const skipMessage = "资产已生成，跳过资产提取"
 							entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
@@ -3252,7 +3433,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						}
 						persist()
 					}
-					if forceRegenerate || !automationDirectorComplete(book) {
+					if !automationResumeShouldRunStage(resumeStage, "director") {
+						const skipMessage = "从失败阶段继续，跳过已完成的分镜提示词阶段"
+						entry["stage"], entry["message"], entry["updatedAt"] = "director", skipMessage, c.now()
+						appendAutomationBookLog(entry, c.now(), "director", skipMessage)
+						persist()
+					} else if forceRegenerate || !automationDirectorComplete(book) {
 						entry["stage"], entry["message"] = "director", "正在生成分镜提示词"
 						entry["updatedAt"] = c.now()
 						persist()
@@ -3280,7 +3466,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						persist()
 						continue
 					}
-					if automationOpeningEnabled(batch, book) && (forceRegenerate || !batchfactoryv11.OpeningStageComplete(batch, book)) {
+					if automationResumeShouldRunStage(resumeStage, "opening") && automationOpeningEnabled(batch, book) && (forceRegenerate || !batchfactoryv11.OpeningStageComplete(batch, book)) {
 						entry["stage"], entry["message"], entry["updatedAt"] = "opening", "正在基于分镜提示词生成换开头", c.now()
 						persist()
 						stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
@@ -3301,7 +3487,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						continue
 					}
 					stageCtx, cancel = context.WithTimeout(ctx, videoWaitTimeout)
-					completedProduction, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID, videoRequestID(book.ID, automationNumberValue(entry["batchRetryCount"], 0)), videoWaitIdleTimeout)
+					completedProduction, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID, videoRequestID(book.ID, automationNumberValue(entry["batchRetryCount"], 0)), videoWaitIdleTimeout, func() {
+						// 供应商侧任务状态在推进也算书内进展，避免慢视频被停滞看门狗误杀。
+						stallLast.Store(c.now())
+					})
 					cancel()
 					if waitErr != nil {
 						if errors.Is(waitErr, errProductionInFlight) {
@@ -3376,12 +3565,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						publishErr := c.publishVideo(publishCtx, owner, batchID, book.ID)
 						publishCancel()
 						if publishErr != nil {
-							if errors.Is(publishErr, errSensitiveReviewPending) {
-								entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "pending_confirmation", "sensitive_review", "", publishErr.Error()+"，请先在卡片上确认", c.now()
-								appendAutomationBookLog(entry, c.now(), "sensitive_review", publishErr.Error())
-								persist()
-								continue
-							}
 							if errors.Is(publishErr, errPublishUnconfirmed) {
 								entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "upload_confirm", publishErr.Error(), "已上传待确认：回读失败，重试时将优先回读", c.now()
 								appendAutomationBookLog(entry, c.now(), "upload_confirm", "已上传待确认：回读失败，重试时将优先回读")
@@ -3422,7 +3605,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	// books must remain failed in the aggregate instead of being reported ready.
 	failedCount := 0
 	readyCount := 0
-	autoRetryPending := false
 	for _, raw := range books {
 		entry, _ := raw.(map[string]any)
 		if entry == nil {
@@ -3434,10 +3616,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		case "completed":
 			readyCount++
 		}
-		if automationBoolValue(entry["retryRequested"]) && strings.TrimSpace(automationStringValue(entry["retryAt"], "")) != "" {
-			autoRetryPending = true
-		}
 	}
+	autoRetryPending := automationPendingBookRetry(books)
 	// counts.total 必须按 job 跟踪的全部书计算：重试只调度未成功的书，
 	// batch.Books 已收窄为本次要跑的子集，用 len(batch.Books) 会让总数变少。
 	totalBooks := len(books)
@@ -3616,17 +3796,17 @@ func (c *BatchAutomationCoordinator) currentJobControl(owner, batchID, jobID str
 	return automationStringValue(job["state"], ""), job, nil
 }
 
-func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, batchID, bookID, requestID string, idleTimeout time.Duration) (batchfactoryv11.ProductionJob, error) {
+func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, batchID, bookID, requestID string, idleTimeout time.Duration, onProgress ...func()) (batchfactoryv11.ProductionJob, error) {
 	if c.stages == nil || c.stages.Production == nil {
 		return batchfactoryv11.ProductionJob{}, fmt.Errorf("视频生产服务未配置")
 	}
 	return waitProductionStatus(ctx, func(ctx context.Context) (batchfactoryv11.BatchStatus, error) {
 		return c.stages.Production.GetBatchStatus(ctx, owner, batchID)
-	}, bookID, requestID, idleTimeout)
+	}, bookID, requestID, idleTimeout, onProgress...)
 }
 
 // waitProductionStatus 是视频等待的核心循环。fetch 由调用方注入，便于测试。
-func waitProductionStatus(ctx context.Context, fetch func(context.Context) (batchfactoryv11.BatchStatus, error), bookID, requestID string, idleTimeout time.Duration) (batchfactoryv11.ProductionJob, error) {
+func waitProductionStatus(ctx context.Context, fetch func(context.Context) (batchfactoryv11.BatchStatus, error), bookID, requestID string, idleTimeout time.Duration, onProgress ...func()) (batchfactoryv11.ProductionJob, error) {
 	if idleTimeout <= 0 {
 		idleTimeout = videoWaitIdleTimeout
 	}
@@ -3654,6 +3834,11 @@ func waitProductionStatus(ctx context.Context, fetch func(context.Context) (batc
 			}
 			if signature := productionProgressSignature(current); signature != progress {
 				progress = signature
+				for _, report := range onProgress {
+					if report != nil {
+						report()
+					}
+				}
 				if !idle.Stop() {
 					select {
 					case <-idle.C:
@@ -4095,6 +4280,10 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		c.mu.Unlock()
 		return nil, err
 	}
+	// 必须在启动后台 worker 之前、且仍持有状态锁时生成公开响应。
+	// worker 启动后会持续更新书/节点/页账本；这时再遍历 target 会触发
+	// concurrent map read and map write，并直接杀死整个 Go 进程。
+	response := publicAutomationJob(target)
 	c.mu.Unlock()
 	batch, err := c.store.GetBatch(ctx, owner, batchID)
 	if err != nil {
@@ -4119,7 +4308,7 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		return nil, fmt.Errorf("%w: 没有需要重试的书，已完成或正在执行的书不会重复执行", batchfactoryv11.ErrConflict)
 	}
 	c.launchRun(owner, batchID, automationStringValue(target["id"], ""), target, scoped)
-	return publicAutomationJob(target), nil
+	return response, nil
 }
 
 // pickAutomationControlJob returns the active job (running/paused/
@@ -4164,11 +4353,13 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 		}
 		status := automationStringValue(entry["status"], "")
 		if status == "failed" || status == "blocked" || status == "paused" || status == "stopped" {
-			stage, message := "assets", "重新执行失败阶段"
-			if automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+			failedStage := automationStringValue(entry["stage"], "")
+			stage, message := automationRetryResumeStage(failedStage), "从失败阶段继续执行"
+			if failedStage == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
 				stage, message = "comic_publish", "重新发布已生成漫画合集"
 			}
 			entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", stage, message, "", now
+			entry["resumeStage"] = stage
 			entry["retryRequested"] = true
 			// 人工重试视为重新授权一轮自动重试预算；否则 3/3 用尽后的重试
 			// 会被 scheduleComicContentPolicyRetry 直接判死，按钮等于失效。
@@ -4178,8 +4369,6 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 			// 人工重试同样重置“批次末尾回补”的预算与等待标记。
 			delete(entry, "batchRetryCount")
 			delete(entry, "batchRetryPending")
-			// 人工重试是重新从 assets 开始，不能沿用上一轮回补的续跑点。
-			delete(entry, "resumeStage")
 		}
 	}
 }
@@ -4250,23 +4439,6 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 			return
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"automation": result})
-	})))
-	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/upgrade-preset", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		var input map[string]any
-		if !decodeJSON(w, r, &input) {
-			return
-		}
-		result, err := coordinator.UpgradeAutomationPreset(r.Context(), owner, r.PathValue("batchId"), input)
-		if err != nil {
-			writeStoreError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, result)
 	})))
 	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/books/{bookId}/audio-plan", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)

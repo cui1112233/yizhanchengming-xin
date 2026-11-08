@@ -321,6 +321,85 @@ func TestFromEnvUsesNovelFetchTOSForAgentAssetsWhenUnset(t *testing.T) {
 	}
 }
 
+func TestFromEnvReadsProductionMediaTOSConfig(t *testing.T) {
+	keepUnstagedSlice(t)
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_ENDPOINT", "https://media-tos.example.com")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_REGION", "cn-media")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_BUCKET", "media-bucket")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_ACCESS_KEY", "media-access")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_SECRET_KEY", "media-secret")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_PREFIX", "formal-media")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ProductionMediaTOSEndpoint != "https://media-tos.example.com" || cfg.ProductionMediaTOSRegion != "cn-media" || cfg.ProductionMediaTOSBucket != "media-bucket" || cfg.ProductionMediaTOSAccessKey != "media-access" || cfg.ProductionMediaTOSSecretKey != "media-secret" || cfg.ProductionMediaTOSPrefix != "formal-media" {
+		t.Fatalf("production media TOS config=%#v", cfg)
+	}
+}
+
+func TestFromEnvUsesAgentAssetTOSForProductionMediaWhenUnset(t *testing.T) {
+	keepUnstagedSlice(t)
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_ENDPOINT", "https://shared-tos.example.com")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_REGION", "cn-shared")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_BUCKET", "shared-bucket")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_ACCESS_KEY", "shared-access")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_SECRET_KEY", "shared-secret")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ProductionMediaTOSEndpoint != "https://shared-tos.example.com" || cfg.ProductionMediaTOSBucket != "shared-bucket" || cfg.ProductionMediaTOSPrefix != "production-media" {
+		t.Fatalf("production media did not reuse shared TOS config: %#v", cfg)
+	}
+}
+
+func TestFromEnvUsesProductionMediaTOSForMergeOutputWhenUnset(t *testing.T) {
+	keepUnstagedSlice(t)
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_ENDPOINT", "https://media-tos.example.com")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_REGION", "cn-media")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_BUCKET", "media-bucket")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_ACCESS_KEY", "media-access")
+	t.Setenv("QIANTIE_PRODUCTION_MEDIA_TOS_SECRET_KEY", "media-secret")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_ENDPOINT", "")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_BUCKET", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MergeTOSEndpoint != "https://media-tos.example.com" || cfg.MergeTOSBucket != "media-bucket" || cfg.MergeTOSAccessKey != "media-access" {
+		t.Fatalf("merge output did not reuse production media TOS config: %#v", cfg)
+	}
+}
+
+func TestFromEnvUsesExistingReferenceAssetTOSForProductionMedia(t *testing.T) {
+	keepUnstagedSlice(t)
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_REFERENCE_ASSET_TOS_ENDPOINT", "https://reference-tos.example.com")
+	t.Setenv("QIANTIE_REFERENCE_ASSET_TOS_REGION", "cn-reference")
+	t.Setenv("QIANTIE_REFERENCE_ASSET_TOS_BUCKET", "reference-bucket")
+	t.Setenv("QIANTIE_REFERENCE_ASSET_TOS_ACCESS_KEY", "reference-access")
+	t.Setenv("QIANTIE_REFERENCE_ASSET_TOS_SECRET_KEY", "reference-secret")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ProductionMediaTOSEndpoint != "https://reference-tos.example.com" || cfg.ProductionMediaTOSBucket != "reference-bucket" || cfg.ProductionMediaTOSPrefix != "production-media" {
+		t.Fatalf("production media did not reuse existing reference TOS: %#v", cfg)
+	}
+}
+
 func TestFromEnvRejectsInvalidNovelFetchUpstreamTimeout(t *testing.T) {
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")

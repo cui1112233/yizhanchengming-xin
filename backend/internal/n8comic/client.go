@@ -65,6 +65,26 @@ type PublishRequest struct {
 	UploadedImageIDs []int64
 }
 
+// UploadImagesRequest 是分片上传的入参。分片只负责把图片送入 N8 并拿回
+// image_id，不创建合集；合集由 CreateCarousel 用全部 image_id 一次创建。
+type UploadImagesRequest struct {
+	ProducerAdminName string
+	Images            []ImageInput
+	// UploadedImageIDs 与 Images 等长，大于 0 的位置表示该页已有图片 ID，
+	// 本轮跳过重传。用于同一分片重复提交时的幂等。
+	UploadedImageIDs []int64
+}
+
+// CreateCarouselRequest 复用 N8 的合集创建能力，不包含图片上传。
+type CreateCarouselRequest struct {
+	ProducerAdminName string
+	Name              string
+	ImageIDs          []int64
+	WorkIDs           []int64
+	AudioCategoryID   int64
+	AudioID           int64
+}
+
 type PublishResult struct {
 	CarouselID int64   `json:"carouselId"`
 	ImageIDs   []int64 `json:"imageIds"`
@@ -152,31 +172,94 @@ func (c *Client) Publish(ctx context.Context, input PublishRequest) (PublishResu
 	// N8 文档要求：多张图先全部申请并上传，再统一查询 image/read。
 	// 如果上传一张就立刻查询，TOS 回调还没完成时会把后续流程卡在
 	// IMAGE_NOT_READY，导致合集发布看起来一直失败。
-	imageIDs, uploadErr := c.uploadImages(ctx, input.ProducerAdminName, input.Images, input.UploadedImageIDs)
+	imageIDs, uploadErr := c.UploadImages(ctx, UploadImagesRequest{ProducerAdminName: input.ProducerAdminName, Images: input.Images, UploadedImageIDs: input.UploadedImageIDs})
 	if uploadErr != nil {
 		// 返回部分成功的 imageIDs：调用方可以把已上传的页持久化，下一次只
 		// 重试缺图和建合集，避免整本书 35 张图全部重传。
 		return PublishResult{ImageIDs: imageIDs}, uploadErr
 	}
+	carouselID, err := c.CreateCarousel(ctx, CreateCarouselRequest{
+		ProducerAdminName: input.ProducerAdminName,
+		Name:              input.Name,
+		ImageIDs:          imageIDs,
+		WorkIDs:           workIDs,
+		AudioCategoryID:   input.AudioCategoryID,
+		AudioID:           input.AudioID,
+	})
+	if err != nil {
+		return PublishResult{ImageIDs: imageIDs}, err
+	}
+	return PublishResult{CarouselID: carouselID, ImageIDs: imageIDs}, nil
+}
+
+// UploadImages 只执行图片上传与入库查询，返回与 Images 下标一致的 image_id。
+// 上传失败时仍返回已成功的位置，0 表示该页未拿到 ID。
+func (c *Client) UploadImages(ctx context.Context, input UploadImagesRequest) ([]int64, error) {
+	if !c.Configured() {
+		return nil, fmt.Errorf("N8 漫画发布接口未配置")
+	}
+	producer := strings.TrimSpace(input.ProducerAdminName)
+	if producer == "" || len([]rune(producer)) > 64 {
+		return nil, fmt.Errorf("制作者账号不能为空且不能超过 64 个字符")
+	}
+	if len(input.Images) < 1 || len(input.Images) > 35 {
+		return nil, fmt.Errorf("漫画合集必须包含 2 到 35 张图片")
+	}
+	if len(input.UploadedImageIDs) > 0 && len(input.UploadedImageIDs) != len(input.Images) {
+		return nil, fmt.Errorf("已上传图片记录与当前漫画页数不一致，不能复用")
+	}
+	return c.uploadImages(ctx, producer, input.Images, input.UploadedImageIDs)
+}
+
+// CreateCarousel 用已经上传完成的 image_id 创建漫画合集，返回合集 ID。
+func (c *Client) CreateCarousel(ctx context.Context, input CreateCarouselRequest) (int64, error) {
+	if !c.Configured() {
+		return 0, fmt.Errorf("N8 漫画发布接口未配置")
+	}
+	producer := strings.TrimSpace(input.ProducerAdminName)
+	name := strings.TrimSpace(input.Name)
+	if producer == "" || len([]rune(producer)) > 64 {
+		return 0, fmt.Errorf("制作者账号不能为空且不能超过 64 个字符")
+	}
+	if name == "" || len([]rune(name)) > 64 {
+		return 0, fmt.Errorf("漫画合集名称不能为空且不能超过 64 个字符")
+	}
+	imageIDs, err := uniquePositiveIDs(input.ImageIDs, "合集图片")
+	if err != nil {
+		return 0, err
+	}
+	if len(imageIDs) < 2 || len(imageIDs) > 35 {
+		return 0, fmt.Errorf("漫画合集必须包含 2 到 35 张图片")
+	}
+	workIDs, err := uniquePositiveIDs(input.WorkIDs, "关联作品")
+	if err != nil {
+		return 0, err
+	}
+	if len(workIDs) == 0 {
+		return 0, fmt.Errorf("至少选择一个关联作品")
+	}
+	if input.AudioCategoryID <= 0 || input.AudioID <= 0 {
+		return 0, fmt.Errorf("音频分类 ID 和指定音频 ID 必须大于 0")
+	}
 
 	payload := map[string]any{
-		"producer_admin_name": input.ProducerAdminName,
-		"name":                input.Name,
+		"producer_admin_name": producer,
+		"name":                name,
 		"image_ids":           imageIDs,
 		"work_ids":            workIDs,
+		"audio_category_id":   input.AudioCategoryID,
+		"audio_id":            input.AudioID,
 	}
-	payload["audio_category_id"] = input.AudioCategoryID
-	payload["audio_id"] = input.AudioID
 	var created struct {
 		CarouselID int64 `json:"carousel_id"`
 	}
 	if err := c.post(ctx, createPath, payload, &created); err != nil {
-		return PublishResult{ImageIDs: imageIDs}, err
+		return 0, err
 	}
 	if created.CarouselID <= 0 {
-		return PublishResult{ImageIDs: imageIDs}, fmt.Errorf("N8 创建漫画合集成功但未返回合集 ID")
+		return 0, fmt.Errorf("N8 创建漫画合集成功但未返回合集 ID")
 	}
-	return PublishResult{CarouselID: created.CarouselID, ImageIDs: imageIDs}, nil
+	return created.CarouselID, nil
 }
 
 type pendingImage struct {

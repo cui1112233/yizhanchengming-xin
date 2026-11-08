@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"mime"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
@@ -18,6 +21,7 @@ func registerBookAssetRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const imageCollection = collection + "/{assetId}/images"
 	const imageUpload = imageCollection + "/upload"
 	const imageContent = imageCollection + "/{imageId}/content"
+	const imageThumbnail = imageCollection + "/{imageId}/thumbnail"
 	mux.HandleFunc("GET "+collection, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -182,11 +186,78 @@ func registerBookAssetRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			defer file.Close()
 			w.Header().Set("Content-Type", image.MediaType)
 			w.Header().Set("X-Content-Type-Options", "nosniff")
+			// Each image ID is an immutable version. Allow the signed-in browser
+			// to keep its own copy so revisiting a batch does not download the
+			// same multi-megabyte asset again. `private` prevents shared caches
+			// from mixing images between accounts.
+			if info, statErr := file.Stat(); statErr == nil {
+				w.Header().Set("ETag", fmt.Sprintf("\"%x-%x\"", info.Size(), info.ModTime().UTC().UnixNano()))
+			}
+			w.Header().Set("Cache-Control", "private, max-age=604800, immutable")
 			http.ServeContent(w, r, image.ID, image.CreatedAt, file)
 			return
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "image not found"})
 	})
+	mux.HandleFunc("GET "+imageThumbnail, handleBookAssetThumbnail(store, files))
+}
+
+func handleBookAssetThumbnail(store batchfactoryv11.Store, files *localartifact.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if files == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "asset image storage is unavailable"})
+			return
+		}
+		images, err := store.ListBookAssetImages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("assetId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, image := range images {
+			if image.ID != r.PathValue("imageId") {
+				continue
+			}
+			if image.StorageRef == "" {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "image bytes are not stored locally"})
+				return
+			}
+			original, err := files.Open(image.StorageRef)
+			if err != nil {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "image file not found"})
+				return
+			}
+			defer original.Close()
+			info, err := original.Stat()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "image file is not readable"})
+				return
+			}
+			key := imageThumbnailCacheKey(image.StorageRef, image.MediaType, info)
+			path, err := ensureImageThumbnail(files, original, key)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "thumbnail generation failed"})
+				return
+			}
+			thumbnail, err := os.Open(path)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "thumbnail is not readable"})
+				return
+			}
+			defer thumbnail.Close()
+			w.Header().Set("Content-Type", "image/jpeg")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Cache-Control", "private, max-age=604800, immutable")
+			w.Header().Set("ETag", `"`+key[:32]+`"`)
+			http.ServeContent(w, r, key[:32]+".jpg", time.Time{}, thumbnail)
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "image not found"})
+	}
 }
 
 func decodeImageDataURL(value string) (string, []byte, error) {
@@ -207,7 +278,9 @@ func decodeImageDataURL(value string) (string, []byte, error) {
 
 func bookAssetImageResponse(image batchfactoryv11.BookAssetImage, batchID, bookID, assetID string) batchfactoryv11.BookAssetImage {
 	if image.StorageRef != "" {
-		image.URL = "/api/batch-factory/v12/batches/" + batchID + "/books/" + bookID + "/assets/" + assetID + "/images/" + image.ID + "/content"
+		base := "/api/batch-factory/v12/batches/" + batchID + "/books/" + bookID + "/assets/" + assetID + "/images/" + image.ID
+		image.URL = base + "/content"
+		image.ThumbnailURL = base + "/thumbnail"
 	}
 	return image
 }

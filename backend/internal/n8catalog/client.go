@@ -47,6 +47,33 @@ type Audio struct {
 	UpdatedAt      string  `json:"updated_at"`
 }
 
+func (a *Audio) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		ID             int64           `json:"id"`
+		Name           string          `json:"name"`
+		OrganizationID int64           `json:"organization_id"`
+		CategoryIDs    json.RawMessage `json:"category_ids"`
+		Status         string          `json:"status"`
+		UpdatedAt      string          `json:"updated_at"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	*a = Audio{ID: wire.ID, Name: wire.Name, OrganizationID: wire.OrganizationID, Status: wire.Status, UpdatedAt: wire.UpdatedAt}
+	if len(wire.CategoryIDs) == 0 || string(wire.CategoryIDs) == "null" {
+		return nil
+	}
+	if wire.CategoryIDs[0] == '[' {
+		return json.Unmarshal(wire.CategoryIDs, &a.CategoryIDs)
+	}
+	var categoryID int64
+	if err := json.Unmarshal(wire.CategoryIDs, &categoryID); err != nil {
+		return err
+	}
+	a.CategoryIDs = []int64{categoryID}
+	return nil
+}
+
 type ProducerAccount struct {
 	Name            string
 	OrganizationIDs []string

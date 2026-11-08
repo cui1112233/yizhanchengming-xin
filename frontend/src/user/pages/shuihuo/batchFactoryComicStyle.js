@@ -98,3 +98,7 @@ export function comicStyleCoverFlowStyle(offset) {
     zIndex: 20 - distance
   };
 }
+
+export function comicStyleShouldLoadPreview(index, activeIndex, count, radius = 3) {
+  return Math.abs(comicStyleRelativeOffset(index, activeIndex, count)) <= radius;
+}

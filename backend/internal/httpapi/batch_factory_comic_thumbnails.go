@@ -43,17 +43,21 @@ var comicThumbnailBudget = make(chan struct{}, 4)
 
 // comicThumbnailCacheKey 把原图身份和原图本身的版本一起纳入缓存键：
 // storage_ref 在重新生成时会换新，文件大小/修改时间再兜底一次原地覆盖。
-func comicThumbnailCacheKey(record batchfactoryv11.ComicPageImage, info os.FileInfo) string {
-	sum := sha256.Sum256([]byte(record.StorageRef + "|" + record.MediaType + "|" +
+func imageThumbnailCacheKey(storageRef, mediaType string, info os.FileInfo) string {
+	sum := sha256.Sum256([]byte(storageRef + "|" + mediaType + "|" +
 		strconv.FormatInt(info.Size(), 10) + "|" +
 		strconv.FormatInt(info.ModTime().UnixNano(), 10) + "|" +
 		strconv.Itoa(comicThumbnailLongEdge) + "|" + strconv.Itoa(comicThumbnailQuality)))
 	return hex.EncodeToString(sum[:])
 }
 
+func comicThumbnailCacheKey(record batchfactoryv11.ComicPageImage, info os.FileInfo) string {
+	return imageThumbnailCacheKey(record.StorageRef, record.MediaType, info)
+}
+
 // ensureComicThumbnail 按需生成并落盘缓存；命中缓存时不重复缩放。
 // 返回的路径只含十六进制字符，可直接用于 ServeContent。
-func ensureComicThumbnail(files *localartifact.Store, record batchfactoryv11.ComicPageImage, original *os.File, key string) (string, error) {
+func ensureImageThumbnail(files *localartifact.Store, original *os.File, key string) (string, error) {
 	dir := filepath.Join(files.Root(), comicThumbnailDirName)
 	path := filepath.Join(dir, key[:32]+".jpg")
 	if _, err := os.Stat(path); err == nil {
@@ -138,8 +142,17 @@ func ensureComicThumbnail(files *localartifact.Store, record batchfactoryv11.Com
 	return path, nil
 }
 
+func ensureComicThumbnail(files *localartifact.Store, _ batchfactoryv11.ComicPageImage, original *os.File, key string) (string, error) {
+	return ensureImageThumbnail(files, original, key)
+}
+
 // findComicPageImage 按页/图 ID 定位一条图片记录。缩略图和原图共用同一套归属校验。
 func findComicPageImage(ctx context.Context, comicStore batchfactoryv11.ComicPageStore, owner, batchID, bookID, pageID, imageID string) (batchfactoryv11.ComicPageImage, error) {
+	if direct, ok := comicStore.(interface {
+		GetComicPageImage(context.Context, string, string, string, string, string) (batchfactoryv11.ComicPageImage, error)
+	}); ok {
+		return direct.GetComicPageImage(ctx, owner, batchID, bookID, pageID, imageID)
+	}
 	pages, err := comicStore.ListComicPages(ctx, owner, batchID, bookID)
 	if err != nil {
 		return batchfactoryv11.ComicPageImage{}, err

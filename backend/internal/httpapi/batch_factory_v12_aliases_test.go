@@ -21,6 +21,7 @@ var frozenV12V11AliasPatterns = []string{
 	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets",
 	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images",
 	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/content",
+	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/thumbnail",
 	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/director-prompt-candidate",
 	"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/stages",
 	"GET /api/batch-factory/v12/batches/{batchId}/merge-cover/{artifactId}",

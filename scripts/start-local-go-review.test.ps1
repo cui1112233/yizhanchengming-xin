@@ -31,6 +31,9 @@ if (-not $script.Contains('[switch]$UseReviewMysql')) { throw 'review database m
 if (-not $script.Contains('Defaulting local runtime to the persisted YCM MySQL data store.')) { throw 'local runtime must default to the persisted YCM MySQL data store' }
 if (-not $script.Contains('[switch]$EnableBatchProduction')) { throw 'missing explicit batch production switch' }
 if (-not $script.Contains('[switch]$EnableLocalMerge')) { throw 'missing explicit local merge switch' }
+if (-not $script.Contains('[string]$BinaryPath')) { throw 'review launcher must accept a candidate binary path' }
+if (-not $script.Contains('[string]$ManifestPath')) { throw 'review launcher must accept a candidate runtime manifest path' }
+if (-not $script.Contains('-BinaryPath $BinaryPath -ManifestPath $ManifestPath')) { throw 'review launcher must forward candidate paths to the base launcher' }
 if (-not $script.Contains("QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED = '1'")) { throw 'missing production enablement contract' }
 if (-not $script.Contains("QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED = '1'")) { throw 'missing merge enablement contract' }
 if (-not $script.Contains("QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED = '1'")) { throw 'missing local merge enablement contract' }

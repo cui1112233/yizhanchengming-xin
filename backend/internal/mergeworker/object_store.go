@@ -2,9 +2,12 @@ package mergeworker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -27,6 +30,7 @@ type TOSObjectStore struct {
 	PublicBaseURL string
 	PutFile       PutFileFunc
 	OpenFile      func(context.Context, string) (io.ReadCloser, error)
+	HeadFile      func(context.Context, string) (int64, string, error)
 }
 
 var safeTaskID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -62,6 +66,19 @@ func (s *TOSObjectStore) PutUploadedMP4(ctx context.Context, uploadID, filePath 
 	if err := s.PutFile(ctx, strings.TrimSpace(s.Bucket), key, filePath, "video/mp4"); err != nil {
 		return "", fmt.Errorf("upload video failed: %w", err)
 	}
+	if s.HeadFile != nil {
+		localSize, localSHA, err := fileSizeAndSHA256(filePath)
+		if err != nil {
+			return "", fmt.Errorf("verify local uploaded video: %w", err)
+		}
+		remoteSize, remoteSHA, err := s.HeadFile(ctx, key)
+		if err != nil {
+			return "", fmt.Errorf("verify uploaded video: %w", err)
+		}
+		if remoteSize != localSize || !strings.EqualFold(remoteSHA, localSHA) {
+			return "", fmt.Errorf("verify uploaded video: size or checksum mismatch")
+		}
+	}
 	base.Path = strings.TrimSuffix(base.Path, "/") + "/" + path.Clean(key)
 	base.RawQuery = ""
 	base.Fragment = ""
@@ -79,7 +96,19 @@ func (s *TOSObjectStore) PutMerged(ctx context.Context, taskID, filePath string)
 	if err := s.PutFile(ctx, strings.TrimSpace(s.Bucket), key, filePath, "video/mp4"); err != nil {
 		return "", fmt.Errorf("upload merged video failed: %w", err)
 	}
-	if s.OpenFile != nil {
+	if s.HeadFile != nil {
+		localSize, localSHA, err := fileSizeAndSHA256(filePath)
+		if err != nil {
+			return "", fmt.Errorf("verify local merged video: %w", err)
+		}
+		remoteSize, remoteSHA, err := s.HeadFile(ctx, key)
+		if err != nil {
+			return "", fmt.Errorf("verify uploaded merged video: %w", err)
+		}
+		if remoteSize != localSize || !strings.EqualFold(remoteSHA, localSHA) {
+			return "", fmt.Errorf("verify uploaded merged video: size or checksum mismatch")
+		}
+	} else if s.OpenFile != nil {
 		reader, err := s.OpenFile(ctx, key)
 		if err != nil {
 			return "", fmt.Errorf("verify uploaded merged video: %w", err)
@@ -99,6 +128,20 @@ func (s *TOSObjectStore) PutMerged(ctx context.Context, taskID, filePath string)
 	base.RawQuery = ""
 	base.Fragment = ""
 	return base.String(), nil
+}
+
+func fileSizeAndSHA256(filePath string) (int64, string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0, "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	size, err := io.Copy(hash, file)
+	if err != nil {
+		return 0, "", err
+	}
+	return size, hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func (s *TOSObjectStore) Open(ctx context.Context, taskID string) (io.ReadCloser, error) {

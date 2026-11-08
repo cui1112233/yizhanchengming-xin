@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { LONG_RUNNING_API_TIMEOUT_MS, apiRequest } from './client';
 
 const base = '/api/shuihuo-production';
 
@@ -30,7 +30,7 @@ export function createAsset(projectId, payload) { return apiRequest(`${base}/pro
 export function uploadAssetImage(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/assets/image`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function downloadAssetImage(assetId) { return apiRequest(`${base}/assets/${assetId}/image`, { responseType: 'blob' }); }
 export function replaceAssetImage(assetId, payload) { return apiRequest(`${base}/assets/${assetId}/image`, { method: 'PUT', body: JSON.stringify(payload) }); }
-export function generateAssetImages(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/assets/generate`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function generateAssetImages(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/assets/generate`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS }); }
 export function listAssetImages(assetId) { return apiRequest(`${base}/assets/${assetId}/images`); }
 export function setPrimaryAssetImage(assetImageId) { return apiRequest(`${base}/asset-images/${assetImageId}/primary`, { method: 'PUT' }); }
 export function downloadGeneratedAssetImage(assetImageId) { return apiRequest(`${base}/asset-images/${assetImageId}/download`, { responseType: 'blob' }); }
@@ -40,11 +40,11 @@ export function listShuihuoPresetSlots() { return apiRequest(`${base}/preset-slo
 export function fixedSegmentation(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/segmentation/fixed`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function paragraphSegmentation(projectId, payload = {}) { return apiRequest(`${base}/projects/${projectId}/segmentation/paragraphs`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function importSegmentation(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/segmentation/import`, { method: 'POST', body: JSON.stringify(payload) }); }
-export function smartSegmentation(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/segmentation/smart`, { method: 'POST', body: JSON.stringify(payload) }); }
-export function analyzeAssets(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/analysis/assets`, { method: 'POST', body: JSON.stringify(payload) }); }
-export function analyzeAssetsAndBindings(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/analysis/assets-and-bindings`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function smartSegmentation(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/segmentation/smart`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS }); }
+export function analyzeAssets(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/analysis/assets`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS }); }
+export function analyzeAssetsAndBindings(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/analysis/assets-and-bindings`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS }); }
 export function applyAssetCandidates(projectId, candidates) { return apiRequest(`${base}/projects/${projectId}/assets/candidates/apply`, { method: 'POST', body: JSON.stringify({ candidates }) }); }
-export function generatePromptCandidates(projectId, kind, payload) { return apiRequest(`${base}/projects/${projectId}/prompt-candidates/${kind}`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function generatePromptCandidates(projectId, kind, payload) { return apiRequest(`${base}/projects/${projectId}/prompt-candidates/${kind}`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS }); }
 export function applyPromptCandidates(projectId, kind, candidates) { return apiRequest(`${base}/projects/${projectId}/prompt-candidates/${kind}/apply`, { method: 'PUT', body: JSON.stringify({ candidates }) }); }
 export function confirmSegmentation(projectId, candidates) { return apiRequest(`${base}/projects/${projectId}/segmentation/confirm`, { method: 'POST', body: JSON.stringify({ candidates }) }); }
 export function createSegment(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/segments`, { method: 'POST', body: JSON.stringify(payload) }); }
@@ -70,9 +70,9 @@ export async function exportProject(projectId) {
 }
 export function listModels() { return apiRequest(`${base}/models`); }
 export function listTasks(projectId) { return apiRequest(`${base}/projects/${projectId}/tasks`); }
-export function createTask(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/tasks`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function createTask(projectId, payload) { return apiRequest(`${base}/projects/${projectId}/tasks`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS }); }
 export function createBatchTasks(projectId, payload) {
-  return apiRequest(`${base}/projects/${projectId}/tasks/batch`, { method: 'POST', body: JSON.stringify(payload) });
+  return apiRequest(`${base}/projects/${projectId}/tasks/batch`, { method: 'POST', body: JSON.stringify(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 export function cancelTask(taskId) { return apiRequest(`${base}/tasks/${taskId}/cancel`, { method: 'PUT' }); }
 export function retryTask(taskId) { return apiRequest(`${base}/tasks/${taskId}/retry`, { method: 'POST' }); }
@@ -93,6 +93,6 @@ export function deleteAdminModel(modelId) {
   return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
 }
 export function testAdminModel(modelId) {
-  return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}/test`, { method: 'POST', suppressGlobalError: true });
+  return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}/test`, { method: 'POST', suppressGlobalError: true, timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 export function createBatchFactoryProject(payload) { return apiRequest('/api/batch-factory/projects', { method: 'POST', body: JSON.stringify(payload) }); }

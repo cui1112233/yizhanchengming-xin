@@ -16,11 +16,13 @@ import (
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/ffmpegbin"
 	"qiantie/backend/internal/giantmaterialexecutor"
+	"qiantie/backend/internal/imagegenerationcache"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
+	"qiantie/backend/internal/releasenotes"
 	"qiantie/backend/internal/runtimeaudit"
 	"qiantie/backend/internal/videomanagementconnector"
 )
@@ -97,10 +99,12 @@ type RouterOptions struct {
 	GiantMaterialExecutor     *giantmaterialexecutor.Service
 	GiantMaterialResolver     GiantMaterialResolver
 	LocalArtifacts            *localartifact.Store
+	ImageGenerationCache      imagegenerationcache.Repository
 	LocalExecutorDownloadsDir string
 	MergeOutput               mergeworker.ObjectStore
 	VideoManagementConnector  videomanagementconnector.Service
 	N8ComicPublisher          *BatchFactoryN8ComicPublisher
+	ComicDirectRecordPath     string
 }
 
 func NewRouter(options RouterOptions) http.Handler {
@@ -129,7 +133,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, automationStages, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
 		options.AutomationCoordinator.SetSourceFetcher(options.NovelFetchFetcher)
-		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: options.NovelFetchStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+		options.AutomationCoordinator.SetGiantMaterialResolver(options.GiantMaterialResolver)
+		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: options.NovelFetchStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, imageCache: options.ImageGenerationCache, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
 			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
 			if provider == nil {
 				return "", batchfactoryv11.ErrUnavailable
@@ -139,6 +144,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetComicBookGenerator(comicGenerator.generateBook)
 	}
 	if options.AutomationCoordinator != nil {
+		options.AutomationCoordinator.SetGiantMaterialResolver(options.GiantMaterialResolver)
 		options.AutomationCoordinator.SetAutomationStateStore(options.AutomationStateStore)
 		if options.AutomationStatusReader != nil {
 			options.AutomationStatusReader.SetStateStore(options.AutomationStateStore)
@@ -195,15 +201,16 @@ func NewRouter(options RouterOptions) http.Handler {
 			}
 			return provider.Complete(ctx, request)
 		})
-		registerComicPageRoutes(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore, options.PresetCatalog, options.AuthStore, options.MemberProfileStore, options.Director, comicGenerationGate)
+		registerComicPageRoutes(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore, options.PresetCatalog, options.AuthStore, options.MemberProfileStore, options.Director, comicGenerationGate, options.ImageGenerationCache)
 	}
+	registerComicDirectRoutes(v12, options.N8ComicPublisher, options.ComicDirectRecordPath, options.Now)
 	registerN8ComicPublishRoutes(v12, options.N8ComicPublisher)
 	if options.NovelFetchFetcher != nil {
 		registerV12FetchOriginalsRoute(v12, options.Store, options.NovelFetchStore, options.NovelFetchFetcher, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
 		})
-		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchStore, options.NovelFetchFetcher, batchFetchClassification{
+		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchStore, options.NovelFetchFetcher, options.GiantMaterialResolver, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
 		})
@@ -319,6 +326,9 @@ func NewRouter(options RouterOptions) http.Handler {
 			"media_engine":         ffmpegbin.Current(),
 		})
 	})
+	// Release notes ship inside this binary and are matched against the release
+	// manifest, so a stale or mismatched release cannot show the wrong payload.
+	registerProductUpdateRoute(root, options.RuntimeManifestPath, releasenotes.Default())
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 	novelScope := novelFetchAccountScopeResolver(options.AuthStore, options.MemberProfileStore)
 	novelCompatAuth := auth

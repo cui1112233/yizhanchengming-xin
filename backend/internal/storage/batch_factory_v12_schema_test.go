@@ -52,10 +52,10 @@ func TestV12H3KernelSchemaPersistsTimelineCompilationAndProductionTrace(t *testi
 
 func TestV12MigrationsRegisterH3KernelAfterUpgradeAudit(t *testing.T) {
 	migrations := V12Migrations()
-	if len(migrations) != 7 {
-		t.Fatalf("V12 migration count=%d, want 7: %+v", len(migrations), migrations)
+	if len(migrations) != 9 {
+		t.Fatalf("V12 migration count=%d, want 9: %+v", len(migrations), migrations)
 	}
-	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 || migrations[5].Version != 1200106 || migrations[6].Version != 1200107 {
+	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 || migrations[5].Version != 1200106 || migrations[6].Version != 1200107 || migrations[7].Version != 1200108 || migrations[8].Version != 1200109 {
 		t.Fatalf("V12 migration order=%+v", migrations)
 	}
 }
@@ -65,6 +65,46 @@ func TestV12SlotDigestMigrationAddsPerSlotHash(t *testing.T) {
 	for _, required := range []string{"batch_factory_v12_director_video_links", "slot_digest", "char(64)"} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("missing %q in slot digest migration:\n%s", required, joined)
+		}
+	}
+}
+
+func TestV12ImageGenerationCacheSchemaPreventsDuplicatePaidRequests(t *testing.T) {
+	joined := strings.ToLower(strings.Join(V12ImageGenerationCacheStatements(), "\n"))
+	for _, required := range []string{
+		"batch_factory_v12_image_generation_cache",
+		"owner_username",
+		"fingerprint",
+		"storage_ref",
+		"lease_until",
+		"queue_ms",
+		"header_ms",
+		"body_ms",
+		"download_ms",
+		"save_ms",
+		"total_ms",
+		"unique key uq_bfv12_image_cache_fingerprint",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("missing %q in image generation cache schema:\n%s", required, joined)
+		}
+	}
+}
+
+func TestV12ProductionMediaSchemaProtectsVerifiedRemoteCopies(t *testing.T) {
+	joined := strings.ToLower(strings.Join(V12ProductionMediaStatements(), "\n"))
+	for _, required := range []string{
+		"batch_factory_v12_media_objects",
+		"owner_username",
+		"local_storage_ref",
+		"object_key",
+		"sha256",
+		"remote_verified_at",
+		"purge_after",
+		"unique key",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("missing %q in production media schema:\n%s", required, joined)
 		}
 	}
 }

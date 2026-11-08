@@ -6,6 +6,7 @@ import { BOOK_CONFIG_REGIONS } from './batchFactoryBookConfigRegions';
 import { buildBatchFactoryH3Constraints } from './batchFactoryH3Constraints';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, batchFactorySourceText, comicAnalysisCharactersForBook } from './batchFactoryContentRange';
 import { readStoryboardPromptEditableText } from './storyboardPromptEditor';
+import { bookPlatformName as presentBookPlatformName, sensitiveReviewPresentation as presentSensitiveReviewPresentation } from './batchFactoryBookPresentation.js';
 
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
 const COMIC_PAGE_RESULT_POLL_INTERVAL = 2000;
@@ -140,12 +141,11 @@ export function value(metadata, key) {
 }
 
 export function bookPlatformName(book, platformNames = {}) {
-  const metadata = book?.sourceMetadata || {};
-  const platformCode = String(metadata.platformCode || '').trim().toUpperCase();
-  if (platformCode === 'YG') return '点众付费';
-  const platform = String(book?.platform || '').trim().toUpperCase();
-  if (platform === 'YG' || platform === '阳光') return '点众付费';
-  return String(metadata.platformName || metadata.platformLabel || platformNames[String(book?.platform || '')] || '').trim() || '未命名书城';
+  return presentBookPlatformName(book, platformNames);
+}
+
+export function sensitiveReviewPresentation(metadata = {}, productionMode = 'video') {
+  return presentSensitiveReviewPresentation(metadata, productionMode);
 }
 
 export function sensitiveProcessingDetail(book = {}) {
@@ -213,7 +213,7 @@ export async function waitForComicPageResult(batchId, bookId, videoId, options =
       throw stopped;
     }
     try {
-      const response = await listComicPages(batchId, bookId, { silent: true, suppressGlobalError: true });
+      const response = await listComicPages(batchId, bookId, { view: 'lite', silent: true, suppressGlobalError: true });
       const pages = resultData(response, 'pages') || [];
       const page = pages.find(item => item?.videoId === videoId);
       const primaryImage = page?.images?.find(image => image?.isPrimary) || page?.images?.[0];
@@ -1043,6 +1043,17 @@ export function batchFactoryRatioText(width, height, fallbackRatio = 9 / 16) {
 export function batchFactoryStableMediaLabel(prefix, id) {
   const compact = String(id || '').replace(/[^a-z0-9]/gi, '').slice(-6).toUpperCase();
   return compact ? `${prefix}-${compact}` : prefix;
+}
+
+export function batchFactoryAssetRecordsRefreshKey(book) {
+  return (Array.isArray(book?.assetRecords) ? book.assetRecords : [])
+    .map(asset => [
+      String(asset?.id || ''),
+      Number(asset?.revision || 0),
+      String(asset?.updatedAt || asset?.updated_at || '')
+    ].join(':'))
+    .sort()
+    .join('|');
 }
 
 export function localStartTime() {

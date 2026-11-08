@@ -52,7 +52,7 @@ test('batchId query opens that exact batch and cannot be overwritten by an older
   const page = fs.readFileSync(pagePath, 'utf8');
 
   assert.match(page, /new URLSearchParams\(window\.location\.search\)\.get\('batchId'\)/);
-  assert.match(page, /getBatch\(requestedBatchId\)/);
+  assert.match(page, /getBatch\(requestedBatchId, \{ suppressGlobalError: true \}\)/);
   assert.match(page, /requestId !== projectRequestRef\.current/);
   assert.match(page, /setActiveBatchProject\(batch\);\s*setView\('batch-novels'\)/s);
 });

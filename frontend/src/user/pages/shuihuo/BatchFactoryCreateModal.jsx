@@ -7,7 +7,7 @@ import { batchFactoryPlatformOptions } from './batchFactoryPlatformOptions';
 import { buildManualBatchSubmission, manualBookIDsFromInput, manualFetchedSourceText, removePlatformGroup, replacePlatformGroup, totalGroupBookCount, upsertPlatformGroup } from './batchFactoryManualFetch';
 import { automationPresetSnapshot, formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
 import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
-import { parseGiantMaterialIds } from './batchFactoryGiantMaterialQueue.js';
+import { duplicateGiantMaterialBookIndexes, parseGiantMaterialIds } from './batchFactoryGiantMaterialQueue.js';
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
 import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryComicPublishSettingsForm, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
@@ -125,6 +125,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const isGiantMaterial = platformId === GIANT_MATERIAL_PLATFORM_OPTION.value;
   const isComicProduction = initialBatchSettings.productionMode === 'comic';
   const inputBookIds = useMemo(() => manualBookIDsFromInput(inputText), [inputText]);
+  const giantDuplicateIndexes = useMemo(() => duplicateGiantMaterialBookIndexes(giantItems.map(item => (
+    item.status === 'resolved' ? selectGiantMaterialBook(item.material, item.selectedBookKey) : null
+  ))), [giantItems]);
 
   function reset() {
     giantControllerRef.current?.abort();
@@ -741,18 +744,25 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     /> : null}
 
     {isGiantMaterial && giantItems.length ? <div className="batch-factory-giant-items">
-      {giantItems.map((item, index) => <div key={`${item.id}-${index}`} className={item.status === 'error' ? 'batch-factory-giant-item is-error' : 'batch-factory-giant-item'}>
-        <span className="batch-factory-giant-item-index">{index + 1}</span>
-        {item.status === 'error'
-          ? <span className="batch-factory-giant-item-title is-error">{giantItemErrorText(item.error)}（{item.id}）</span>
-          : item.status === 'resolved'
-            ? <>
-              <span className="batch-factory-giant-item-title">{item.material?.materialTitle || item.material?.title || item.id}</span>
-              <span className="batch-factory-giant-item-meta">Book ID {(selectGiantMaterialBook(item.material, item.selectedBookKey)?.platformBookId) || '—'}</span>
-              {item.books.length > 1 ? <Select size="small" style={{ minWidth: 180 }} value={item.selectedBookKey || undefined} onChange={value => setGiantItems(current => current.map(row => row.id === item.id ? { ...row, selectedBookKey: value } : row))} options={item.books.map(book => ({ value: giantMaterialBookKey(book), label: `${book.title} · ${book.platformBookId}` }))} /> : null}
-            </>
-            : <span className="batch-factory-giant-item-title">{giantError ? `等待重新解析 ${item.id}` : `正在解析 ${item.id}…`}</span>}
-      </div>)}
+      {giantItems.map((item, index) => {
+        const isDuplicate = giantDuplicateIndexes.has(index);
+        const rowClassName = item.status === 'error'
+          ? 'batch-factory-giant-item is-error'
+          : `batch-factory-giant-item${isDuplicate ? ' is-duplicate' : ''}`;
+        return <div key={`${item.id}-${index}`} className={rowClassName}>
+          <span className="batch-factory-giant-item-index">{index + 1}</span>
+          {item.status === 'error'
+            ? <span className="batch-factory-giant-item-title is-error">{giantItemErrorText(item.error)}（{item.id}）</span>
+            : item.status === 'resolved'
+              ? <>
+                <span className="batch-factory-giant-item-title">{item.material?.materialTitle || item.material?.title || item.id}</span>
+                <span className="batch-factory-giant-item-meta">Book ID {(selectGiantMaterialBook(item.material, item.selectedBookKey)?.platformBookId) || '—'}</span>
+                {isDuplicate ? <Tag className="batch-factory-giant-duplicate-tag">重复，将跳过</Tag> : null}
+                {item.books.length > 1 ? <Select size="small" style={{ minWidth: 180 }} value={item.selectedBookKey || undefined} onChange={value => setGiantItems(current => current.map(row => row.id === item.id ? { ...row, selectedBookKey: value } : row))} options={item.books.map(book => ({ value: giantMaterialBookKey(book), label: `${book.title} · ${book.platformBookId}` }))} /> : null}
+              </>
+              : <span className="batch-factory-giant-item-title">{giantError ? `等待重新解析 ${item.id}` : `正在解析 ${item.id}…`}</span>}
+        </div>;
+      })}
     </div> : null}
 
     <div className="batch-factory-create-toolbar">

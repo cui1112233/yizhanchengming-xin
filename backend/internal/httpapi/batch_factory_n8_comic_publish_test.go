@@ -29,6 +29,32 @@ func (f failingProducerDirectory) ListProducerAccounts(context.Context) ([]strin
 	return nil, f.err
 }
 
+type countingProducerAccountDirectory struct{ calls int }
+
+func (f *countingProducerAccountDirectory) Configured() bool { return true }
+func (f *countingProducerAccountDirectory) ListProducerAccounts(context.Context) ([]string, error) {
+	return nil, errors.New("不应再次读取账号目录")
+}
+func (f *countingProducerAccountDirectory) ListProducerAccountDirectory(context.Context) ([]n8catalog.ProducerAccount, error) {
+	f.calls++
+	return []n8catalog.ProducerAccount{{Name: "账号甲", OrganizationIDs: []string{"1"}}, {Name: "账号乙", OrganizationIDs: []string{"2"}}}, nil
+}
+
+func TestComicPublishDirectorySyncReadsProducerDirectoryOnlyOnce(t *testing.T) {
+	directory := &countingProducerAccountDirectory{}
+	publisher := &BatchFactoryN8ComicPublisher{ProducerDirectory: directory}
+	accounts, source, warning, organizations := publisher.producerDirectorySnapshot(context.Background())
+	if directory.calls != 1 {
+		t.Fatalf("producer directory calls=%d, want 1", directory.calls)
+	}
+	if !reflect.DeepEqual(accounts, []string{"账号甲", "账号乙"}) || source != "n8" || warning != "" {
+		t.Fatalf("accounts=%v source=%s warning=%s", accounts, source, warning)
+	}
+	if !reflect.DeepEqual(organizations, map[string][]string{"账号甲": {"1"}, "账号乙": {"2"}}) {
+		t.Fatalf("organizations=%v", organizations)
+	}
+}
+
 func TestProducerDirectoryFailureLogsOnlySafeCategory(t *testing.T) {
 	var output bytes.Buffer
 	previous := log.Writer()
@@ -51,6 +77,26 @@ type fakeN8ComicClient struct {
 	configured bool
 	request    n8comic.PublishRequest
 	calls      int
+}
+
+func TestParseN8ComicPublishSettingsAcceptsEmptyOptionalNumericFields(t *testing.T) {
+	settings := batchfactoryv11.SettingsPatch{
+		"comicPublishSettings": json.RawMessage(`{
+			"producerAdminName":"崔家铭2",
+			"organizationId":"1",
+			"audioCategoryId":null,
+			"audioCategorySelectionMode":"auto",
+			"specifiedAudioId":""
+		}`),
+	}
+
+	config, err := parseN8ComicPublishSettings(settings)
+	if err != nil {
+		t.Fatalf("parse settings error=%v", err)
+	}
+	if config.AudioCategoryID != 0 || config.SpecifiedAudioID != 0 {
+		t.Fatalf("numeric defaults category=%d specified=%d, want zero", config.AudioCategoryID, config.SpecifiedAudioID)
+	}
 }
 
 func (f *fakeN8ComicClient) Configured() bool { return f.configured }

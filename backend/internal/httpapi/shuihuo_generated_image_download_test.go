@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,26 +17,32 @@ import (
 	"qiantie/backend/internal/localartifact"
 )
 
-func TestProviderImageRequestFallsBackToBase64WhenDownloadFails(t *testing.T) {
-	var (
-		mu     sync.Mutex
-		bodies []string
-	)
+func TestProviderImageGenerationRequestUsesURLAndDownloadsResult(t *testing.T) {
 	const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="
+	pngBytes, err := base64.StdEncoding.DecodeString(tinyPNG)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var (
+		mu        sync.Mutex
+		bodies    []string
+		serverURL string
+	)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/result.png" {
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(pngBytes)
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		mu.Lock()
 		bodies = append(bodies, string(body))
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		if strings.Contains(string(body), "response_format") {
-			_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + tinyPNG + `"}]}`))
-			return
-		}
-		// 默认返回一个无法下载的 CDN 地址，触发 base64 兜底。
-		_, _ = w.Write([]byte(`{"data":[{"url":"http://127.0.0.1:1/unavailable.png"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"url":"` + serverURL + `/result.png"}]}`))
 	}))
 	defer server.Close()
+	serverURL = server.URL
 
 	files := localartifact.NewStore(t.TempDir(), 1<<20)
 	target := shuihuoAssetImageTarget{
@@ -53,14 +60,134 @@ func TestProviderImageRequestFallsBackToBase64WhenDownloadFails(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(bodies) != 2 {
-		t.Fatalf("requests=%d, want URL request then base64 fallback", len(bodies))
+	if len(bodies) != 1 {
+		t.Fatalf("requests=%d, want one image generation request", len(bodies))
 	}
-	if strings.Contains(bodies[0], "response_format") {
-		t.Fatalf("first request must use URL mode: %s", bodies[0])
+	if strings.Contains(bodies[0], `"response_format"`) {
+		t.Fatalf("initial generation request must preserve the working gateway default: %s", bodies[0])
 	}
-	if !strings.Contains(bodies[1], `"response_format":"b64_json"`) {
-		t.Fatalf("fallback request must ask for base64: %s", bodies[1])
+}
+
+func TestProviderImageEditRequestUsesBase64Directly(t *testing.T) {
+	reference := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte{0x89, 0x50, 0x4e, 0x47})
+	req, err := newShuihuoImageEditRequest(context.Background(), "https://images.example/v1/images/generations", "gpt-image-2", "test prompt", "1024x1536", []string{reference})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `name="response_format"`) || !strings.Contains(string(body), "b64_json") {
+		t.Fatalf("edit request must directly ask for base64 so a generated image does not depend on a second CDN download: %s", body)
+	}
+
+	base64Req, err := newShuihuoImageEditRequestWithResponseFormat(context.Background(), "https://images.example/v1/images/generations", "gpt-image-2", "test prompt", "1024x1536", []string{reference}, "b64_json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base64Body, err := io.ReadAll(base64Req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(base64Body), `name="response_format"`) || !strings.Contains(string(base64Body), "b64_json") {
+		t.Fatalf("fallback edit request must ask for base64: %s", base64Body)
+	}
+}
+
+func TestProviderImageEditRequestFallsBackWhenGatewayRejectsResponseFormat(t *testing.T) {
+	const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="
+	var (
+		mu      sync.Mutex
+		formats []string
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		format := r.FormValue("response_format")
+		mu.Lock()
+		formats = append(formats, format)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if format != "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"unknown parameter: response_format"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + tinyPNG + `"}]}`))
+	}))
+	defer server.Close()
+
+	target := shuihuoAssetImageTarget{
+		Provider:    "personal_api",
+		ModelID:     "gpt-image-2",
+		AspectRatio: "1:1",
+		CatalogModel: map[string]any{
+			"supportsImageEdits": true,
+		},
+	}
+	reference := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte{0x89, 0x50, 0x4e, 0x47})
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	if _, _, err := requestShuihuoProviderImage(context.Background(), files, target, target.CatalogModel, server.URL+"/v1/images/generations", "test-secret", "test prompt", []string{reference}); err != nil {
+		t.Fatalf("compatibility fallback failed: %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(formats) != 2 || formats[0] != "b64_json" || formats[1] != "" {
+		t.Fatalf("response formats=%v, want [b64_json <omitted>]", formats)
+	}
+}
+
+func TestProviderImageUsesCompleteJSONBeforeResetWithoutResubmitting(t *testing.T) {
+	const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="
+	png, err := base64.StdEncoding.DecodeString(tinyPNG)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/images/generations":
+			conn, rw, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			body := []byte(`{"data":[{"url":"` + serverURL + `/result.png"}]}`)
+			_, _ = rw.WriteString("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n")
+			_, _ = rw.WriteString(fmt.Sprintf("%x\r\n", len(body)))
+			_, _ = rw.Write(body)
+			_, _ = rw.WriteString("\r\n")
+			_ = rw.Flush()
+			_ = conn.Close()
+		case "/result.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(png)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	target := shuihuoAssetImageTarget{
+		Provider:    "personal_api",
+		ModelID:     "gpt-image-2",
+		AspectRatio: "1:1",
+		CatalogModel: map[string]any{
+			"endpoint":   server.URL + "/v1/images/generations",
+			"credential": "test-secret",
+		},
+	}
+	mediaType, storageRef, err := requestShuihuoProviderImage(context.Background(), files, target, target.CatalogModel, server.URL+"/v1/images/generations", "test-secret", "test prompt", nil)
+	if err != nil {
+		t.Fatalf("complete JSON received before reset must be used: %v", err)
+	}
+	if mediaType != "image/png" || storageRef == "" {
+		t.Fatalf("mediaType=%q storageRef=%q", mediaType, storageRef)
 	}
 }
 
@@ -186,7 +313,6 @@ func TestShuihuoLongRunningImageHTTPClientNegotiatesHTTP2(t *testing.T) {
 func TestShuihuoImageGenerationHTTPClientSelectsProtocolByEndpoint(t *testing.T) {
 	for _, endpoint := range []string{
 		"https://api.vveai.com/v1/images/generations",
-		"https://www.ggwk1.online/v1/images/generations",
 		"https://nvewvip.preview.tencent-zeabur.cn/v1/images/generations",
 		"https://abc.preview.tencent-zeabur.cn/v1/images/generations",
 		"https://images.example.test/v1/images/generations",
@@ -198,6 +324,20 @@ func TestShuihuoImageGenerationHTTPClientSelectsProtocolByEndpoint(t *testing.T)
 		// 并排除显式 HTTP/1.1 变体。
 		if !transport.ForceAttemptHTTP2 || client == shuihuoImageSharedHTTP1Client() {
 			t.Fatalf("endpoint %s must use the HTTP/2-capable transport", endpoint)
+		}
+	}
+}
+
+func TestShuihuoImageGenerationHTTPClientIsolatesGGWKHTTP2Connections(t *testing.T) {
+	first := shuihuoImageGenerationHTTPClient("https://www.ggwk1.online/v1/images/generations")
+	second := shuihuoImageGenerationHTTPClient("https://www.ggwk1.online/v1/images/generations")
+	if first == second || first.Transport == second.Transport {
+		t.Fatal("ggwk image requests must not share an HTTP/2 connection")
+	}
+	for _, client := range []*http.Client{first, second} {
+		transport := client.Transport.(*http.Transport)
+		if !transport.ForceAttemptHTTP2 || !transport.DisableKeepAlives {
+			t.Fatal("ggwk image requests must use one isolated HTTP/2 connection")
 		}
 	}
 }

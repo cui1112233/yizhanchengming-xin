@@ -3,10 +3,22 @@ import test from 'node:test';
 import {
   createGiantMaterialPlatformBookClaims,
   createGiantMaterialQueue,
+  duplicateGiantMaterialBookIndexes,
   parseGiantMaterialIds,
   queueSummary,
   runSequentialGiantMaterialQueue
 } from './batchFactoryGiantMaterialQueue.js';
+
+test('marks only later rows with the same resolved Book ID as duplicates', () => {
+  const duplicates = duplicateGiantMaterialBookIndexes([
+    { platformBookId: '7703405385419328574', title: '同名书' },
+    { platformBookId: '7703405385419328574', title: '同名书' },
+    { platformBookId: 'other', title: '同名书' },
+    { platformBookId: '', title: '同名书' }
+  ]);
+
+  assert.deepEqual([...duplicates], [1]);
+});
 
 test('claims a resolved platform book only once per submission regardless of title', () => {
   const claims = createGiantMaterialPlatformBookClaims();

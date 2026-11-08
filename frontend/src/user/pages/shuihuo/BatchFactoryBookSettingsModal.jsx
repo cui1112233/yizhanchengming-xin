@@ -1,6 +1,6 @@
 import { Alert, Button, Divider, Input, InputNumber, Modal, Popconfirm, Popover, Segmented, Select, Space, Switch, Tabs, Typography, message} from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { listAvailableModels, modelSelectOptions } from '../../../shared/api/modelCatalog';
+import { getAvailableModelCatalog, modelSelectOptions, peekAvailableModelCatalog } from '../../../shared/api/modelCatalog';
 import { get121OrganizationOptions, getBatch, listSystemPresetCatalog, saveBookOverride } from '../../../shared/api/batchFactory';
 import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
@@ -45,6 +45,7 @@ const DEFAULT_ENABLED_CONSTRAINT_CATEGORIES = ['prefix', 'quality', 'restriction
 const DEFAULT_VIDEO_PROMPT = { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
 const SMART_UNIFIED_PRESET_ID = 'script-constraint-prefix-smart-unified';
+
 const TTS_VOICE_OPTIONS = [
   { label: '晓晓（女声·温柔）', value: 'zh-CN-XiaoxiaoNeural' },
   { label: '晓辰（女声·知性）', value: 'zh-CN-XiaochenNeural' },
@@ -111,14 +112,13 @@ function isConstraintPreset(item, category) {
   return item?.constraintCategory === category || (category === 'prefix' && item?.id === SMART_UNIFIED_PRESET_ID);
 }
 function presetLabel(preset) { return String(preset?.name || preset?.presetName || preset?.label || preset?.id || '').trim(); }
-function optionFor(preset) { return { value: preset.id, label: <span className="batch-factory-preset-option"><span>{presetLabel(preset)}</span><small>v{preset.version || 1}</small></span> }; }
-// Preserve the frozen display name for an existing override if its published
-// catalog entry is unavailable during a refresh.
+function optionFor(preset) { return { value: preset.id, disabled: Boolean(preset.disabled), label: <span className="batch-factory-preset-option"><span>{presetLabel(preset)}</span><small>v{preset.version || 1}</small></span> }; }
+// 系统预设请求失败时，用配置里保存的名称回显当前选择，保持可读、可保存。
 function optionsWithCurrent(records, value, fallbackName = '系统预设词') {
   const list = Array.isArray(records) ? records : [];
   const id = String(value?.presetId || '').trim();
   return id && !list.some(item => item.id === id)
-    ? [{ id, name: '预设已失效', version: value?.presetVersion || 1, disabled: true }, ...list]
+    ? [{ id, name: String(value?.presetName || '').trim() || fallbackName, version: value?.presetVersion || 1, disabled: true }, ...list]
     : list;
 }
 
@@ -327,7 +327,7 @@ function ConstraintLayers({ value, records, personalPrompts, loading, saving, ed
   const rules = normalizeConstraintRules(value);
   return <div className="batch-factory-constraint-layers">
     <div className="batch-factory-constraint-layer"><Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}><div><b>基础设定（人物 / 场景）</b><HelpTip title="基础设定（人物 / 场景）">开启后，当前书每个分镜自动带入已提取的人物与场景设定；关闭后不显示资产提示词。</HelpTip></div><Switch checked={rules.baseSetup.enabled} onChange={enabled => onChange({ ...rules, baseSetup: { enabled } })} /></Space></div>
-    {EDITABLE_CONSTRAINT_LAYERS.map(([category, label]) => <ConstraintCategoryEditor key={category} category={category} label={label} value={rules[category]} systemOptions={records.filter(item => item.constraintCategory === category)} personalPrompts={personalPrompts[category] || []} loading={loading} saving={saving === category} editingPromptId={editingPromptId === category} onChange={patch => onChange({ ...rules, [category]: { ...rules[category], ...patch } })} onSelectSystem={presetId => onSelectSystem(category, presetId)} onSelectPersonal={promptId => onSelectPersonal(category, promptId)} onSaveDraft={() => onSaveDraft(category)} onSaveNamed={() => onSaveNamed(category)} onEditPersonal={prompt => onEditPersonal(category, prompt)} onDeletePersonal={promptId => onDeletePersonal(category, promptId)} />)}
+    {EDITABLE_CONSTRAINT_LAYERS.map(([category, label]) => <ConstraintCategoryEditor key={category} category={category} label={label} value={rules[category]} systemOptions={optionsWithCurrent(records.filter(item => item.constraintCategory === category), rules[category])} personalPrompts={personalPrompts[category] || []} loading={loading} saving={saving === category} editingPromptId={editingPromptId === category} onChange={patch => onChange({ ...rules, [category]: { ...rules[category], ...patch } })} onSelectSystem={presetId => onSelectSystem(category, presetId)} onSelectPersonal={promptId => onSelectPersonal(category, promptId)} onSaveDraft={() => onSaveDraft(category)} onSaveNamed={() => onSaveNamed(category)} onEditPersonal={prompt => onEditPersonal(category, prompt)} onDeletePersonal={promptId => onDeletePersonal(category, promptId)} />)}
   </div>;
 }
 
@@ -340,7 +340,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const region = REGION_LABELS[activeRegion] ? activeRegion : 'engine';
   const inherited = useMemo(() => ({ ...batchPatch, aiPromptConfig: mergePromptConfig(batchPatch.aiPromptConfig, {}), publishSettings: mergePublishSettings(batchPatch.publishSettings, {}), comicPublishSettings: mergePublishSettings(batchPatch.comicPublishSettings, {}) }), [batch?.id, batch?.settingsState?.revision]);
   const [form, setForm] = useState(() => effectiveValues(batchPatch, bookPatch));
-  const [models, setModels] = useState([]);
+  const cachedModels = peekAvailableModelCatalog();
+  const [models, setModels] = useState(() => cachedModels?.models || []);
+  const [modelsLoading, setModelsLoading] = useState(() => !cachedModels);
   const [organizations, setOrganizations] = useState([]);
   const [catalog, setCatalog] = useState({ script: [], batch: [] });
   const [loading, setLoading] = useState(false);
@@ -349,6 +351,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const [audioBlob, setAudioBlob] = useState(null);
   const [accountTts, setAccountTts] = useState(DEFAULT_TTS);
   const [loadError, setLoadError] = useState('');
+  const [modelsError, setModelsError] = useState('');
   const [personalPrompts, setPersonalPrompts] = useState({});
   const [savingPersonalCategory, setSavingPersonalCategory] = useState('');
   const [editingPersonalPrompt, setEditingPersonalPrompt] = useState({ category: '', id: '', name: '' });
@@ -361,13 +364,27 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   useEffect(() => {
     if (!open) return undefined;
     let active = true;
+    const cached = peekAvailableModelCatalog();
+    if (cached) setModels(cached.models);
+    setModelsLoading(!cached);
+    setModelsError('');
+    getAvailableModelCatalog().then(result => {
+      if (!active) return;
+      setModels(result.models);
+      if (result.failedKinds.length) setModelsError(`部分模型目录暂不可用：${result.failedKinds.join('、')}`);
+    }).catch(error => {
+      if (active) setModelsError(error?.message || '读取个人中心模型失败');
+    }).finally(() => { if (active) setModelsLoading(false); });
+    return () => { active = false; };
+  }, [open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
     setLoading(true); setLoadError('');
     Promise.all([
-      listAvailableModels('text'), listAvailableModels('image'), listAvailableModels('video'),
       listSystemPresetCatalog('script'), listSystemPresetCatalog('batch-factory'), getConfig().catch(() => ({ tts: DEFAULT_TTS })), get121OrganizationOptions().catch(() => ({ organizations: [] }))
-    ]).then(([text, image, video, scriptResult, batchResult, config, organizationResult]) => {
+    ]).then(([scriptResult, batchResult, config, organizationResult]) => {
       if (!active) return;
-      setModels([...text, ...image, ...video]);
       setCatalog({ script: Array.isArray(scriptResult?.catalog) ? scriptResult.catalog : [], batch: Array.isArray(batchResult?.catalog) ? batchResult.catalog : [] });
       setAccountTts({ ...DEFAULT_TTS, ...(config?.tts || {}) });
       setOrganizations(Array.isArray(organizationResult?.organizations) ? organizationResult.organizations : []);
@@ -484,7 +501,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
     return (ai.comic?.constraints || []).find(item => item.constraintCategory === category)?.presetId || undefined;
   }
   function comicConstraintOptions(category) {
-    return catalog.script.filter(item => item.kind === 'addon' && item.constraintCategory === category).map(optionFor);
+    const saved = (ai.comic?.constraints || []).find(item => item.constraintCategory === category) || {};
+    return optionsWithCurrent(catalog.script.filter(item => item.kind === 'addon' && item.constraintCategory === category), saved).map(optionFor);
   }
   function updateComicConstraint(category, presetId) {
     const comic = ai.comic || {};
@@ -660,7 +678,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
           <Alert type="info" showIcon message={<span>当前书独立模型配置 <HelpTip title="当前书独立模型配置">这里只保存当前小说与批量默认值不同的参数。</HelpTip></span>} />
           {visibility.video ? <ConfigCard title="核心视频引擎" description="视频生成、分镜时长和画幅。"><div className="batch-factory-engine-grid">
             <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider ? normalizeModelProvider(form.videoProvider, 'personal_api', effectiveVideoModelId) : ''} inherited={effectiveVideoProvider} options={videoProviderOptions} loading={false} explicit={Object.hasOwn(bookPatch, 'videoProvider')} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId || inherited.videoModelId, expandFanKeModels: true }))} />
-            <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={videoModelOptions} loading={effectiveVideoProvider === 'doubao_local_executor' ? false : loading} explicit={Object.hasOwn(bookPatch, 'videoModelId')} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), effectiveVideoProvider) } : {}) })} />
+            <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={videoModelOptions} loading={effectiveVideoProvider === 'doubao_local_executor' ? false : modelsLoading} explicit={Object.hasOwn(bookPatch, 'videoModelId')} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), effectiveVideoProvider) } : {}) })} />
             <InheritedStoryboardDurationField value={form.storyboardDurationLimit} inherited={inherited.storyboardDurationLimit} explicit={Object.hasOwn(bookPatch, 'storyboardDurationLimit')} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} />
             <InheritedField label="视频画幅" field="videoAspectRatio" value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} inherited={inherited.videoAspectRatio || (inherited.aspectRatio === '16:9' ? '16:9' : '9:16')} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} loading={false} explicit={Object.hasOwn(bookPatch, 'videoAspectRatio')} onChange={videoAspectRatio => patch({ videoAspectRatio })} />
             <InheritedField label="视频分辨率" field="videoResolution" value={form.videoResolution || '720p'} inherited={inherited.videoResolution || '720p'} options={[{ value: '480p', label: '480p' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} loading={false} explicit={Object.hasOwn(bookPatch, 'videoResolution')} onChange={videoResolution => patch({ videoResolution })} />
@@ -695,15 +713,15 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 
           <ConfigCard title="辅助生成" description="图片与文本模型用于资产、AI 推理和画面生成。"><div className="batch-factory-engine-grid">
             <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} explicit={Object.hasOwn(bookPatch, 'imageProvider')} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
-            <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : loading} explicit={Object.hasOwn(bookPatch, 'imageModelId')} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
-            <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={loading} explicit={Object.hasOwn(bookPatch, 'textModelId')} onChange={textModelId => patch({ textModelId })} />
+            <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : modelsLoading} explicit={Object.hasOwn(bookPatch, 'imageModelId')} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
+            <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={modelsLoading} explicit={Object.hasOwn(bookPatch, 'textModelId')} onChange={textModelId => patch({ textModelId })} />
             <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIO_OPTIONS} loading={false} explicit={Object.hasOwn(bookPatch, 'imageAspectRatio')} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
-            <InheritedSwitchField label="生成资产图片" value={form.assetImagesEnabled} inherited={inherited.assetImagesEnabled !== false} explicit={Object.hasOwn(bookPatch, 'assetImagesEnabled')} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} />
+            <InheritedSwitchField label="生成资产图片" value={form.assetImagesEnabled} inherited={inherited.assetImagesEnabled === true} explicit={Object.hasOwn(bookPatch, 'assetImagesEnabled')} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} />
           </div></ConfigCard>
-          <ConfigCard title="敏感词处理" description="AI 修复默认关闭；只有显式开启后才会调用。关闭时只走规则/打码并标记待确认，不影响后续阶段。">
+          <ConfigCard title="敏感词处理" description="AI 修复默认关闭；关闭时只走规则处理，无法替换的词会自动打码，自动化继续执行。">
             <InheritedSwitchField label="AI 修复" value={form.sensitiveAIEnabled} inherited={inherited.sensitiveAIEnabled === true} explicit={Object.hasOwn(bookPatch, 'sensitiveAIEnabled')} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} />
-            <InheritedMultiField label="修复模型" value={form.sensitiveAIModels} inherited={inherited.sensitiveAIModels} options={modelOptions.text} loading={loading} explicit={Object.hasOwn(bookPatch, 'sensitiveAIModels')} onChange={sensitiveAIModels => patch({ sensitiveAIModels })} />
-            <label className="batch-factory-engine-field"><span><b>失败时策略</b></span><Segmented block value={form.sensitiveAIOnFailure || inherited.sensitiveAIOnFailure || 'review'} options={[{ value: 'review', label: '保留原文待确认' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
+            <InheritedMultiField label="修复模型" value={form.sensitiveAIModels} inherited={inherited.sensitiveAIModels} options={modelOptions.text} loading={modelsLoading} explicit={Object.hasOwn(bookPatch, 'sensitiveAIModels')} onChange={sensitiveAIModels => patch({ sensitiveAIModels })} />
+            <label className="batch-factory-engine-field"><span><b>失败时策略</b></span><Segmented block value={form.sensitiveAIOnFailure || inherited.sensitiveAIOnFailure || 'review'} options={[{ value: 'review', label: '自动打码并继续' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
           </ConfigCard>
         </div>
       },
@@ -723,8 +741,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
           <ConfigCard title="上传规则" description="只影响当前小说。">
             <div className="batch-factory-engine-field"><span><b>上传视频类型</b><HelpTip title="上传视频类型">当前书发布策略。</HelpTip></span><Segmented value={publish.uploadVideoType || 'merged'} options={[{ value: 'merged', label: '合并成品' }, { value: 'individual', label: '独立 VIDEO' }]} onChange={uploadVideoType => patch({ publishSettings: { ...publish, uploadVideoType } })} /></div>
             <div className="batch-factory-engine-grid">
-              <div className="batch-factory-engine-field"><span><b>素材使用</b><HelpTip title="素材使用">当前书发布策略。</HelpTip></span><Select value={publish.materialReuse === true ? 'reuse' : 'no_reuse'} options={[{ value: 'no_reuse', label: '不复用' }, { value: 'reuse', label: '复用' }]} onChange={value => patch({ publishSettings: { ...publish, materialReuse: value === 'reuse' } })} /></div>
-              <div className="batch-factory-engine-field"><span><b>水平翻转</b><HelpTip title="水平翻转">当前书发布策略。</HelpTip></span><Select value={publish.horizontalFlip === true ? 'flip' : 'no_flip'} options={[{ value: 'no_flip', label: '不翻转' }, { value: 'flip', label: '翻转' }]} onChange={value => patch({ publishSettings: { ...publish, horizontalFlip: value === 'flip' } })} /></div>
+              <div className="batch-factory-engine-field"><span><b>标红复用</b><HelpTip title="标红复用">按行号标红后直接复用已关联的素材，对应视频管理系统的 biaohong_reuse。</HelpTip></span><Select value={publish.biaohongReuse === true ? 'reuse' : 'no_reuse'} options={[{ value: 'no_reuse', label: '不复用' }, { value: 'reuse', label: '复用' }]} onChange={value => patch({ publishSettings: { ...publish, biaohongReuse: value === 'reuse' } })} /></div>
+              <div className="batch-factory-engine-field"><span><b>AI头部素材使用</b><HelpTip title="AI头部素材使用">仅当网站配置档的拼接方式是 AI 前贴时生效，对应视频管理系统的 jieya_ai_head_video_mode。</HelpTip></span><Select value={publish.materialReuse === true ? 'reuse' : 'no_reuse'} options={[{ value: 'no_reuse', label: '不复用' }, { value: 'reuse', label: '复用' }]} onChange={value => patch({ publishSettings: { ...publish, materialReuse: value === 'reuse' } })} /></div>
+              <div className="batch-factory-engine-field"><span><b>水平翻转</b><HelpTip title="水平翻转">仅当网站配置档的拼接方式是 AI 前贴时生效，对应视频管理系统的 jieya_ai_head_horizontal_flip。</HelpTip></span><Select value={publish.horizontalFlip === true ? 'flip' : 'no_flip'} options={[{ value: 'no_flip', label: '不翻转' }, { value: 'flip', label: '翻转' }]} onChange={value => patch({ publishSettings: { ...publish, horizontalFlip: value === 'flip' } })} /></div>
             </div>
             <InheritedSwitchField label="改文后上传" value={form.publishRewriteEnabled} inherited={inherited.publishRewriteEnabled} explicit={Object.hasOwn(bookPatch, 'publishRewriteEnabled')} onChange={publishRewriteEnabled => patch({ publishRewriteEnabled })} />
           </ConfigCard>
@@ -771,6 +790,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 		{frozenAutomationPreset?.id ? <Alert type="info" showIcon message={`继承统一配置：${frozenAutomationPreset.name || frozenAutomationPreset.id} · v${frozenAutomationPreset.version || 1}`} description="当前书未保存覆盖时，始终使用该批次冻结的统一配置。" /> : null}
     <div className="batch-factory-inherit-hint">整页默认继承批次统一配置；改动哪个字段，哪个字段就变成“自定义”，保存后不会跟随批次。</div>
     {loadError ? <Alert type="warning" showIcon message="配置目录读取失败" description={loadError} /> : null}
+    {modelsError ? <Alert type="warning" showIcon message="模型目录读取失败" description={modelsError} /> : null}
     {region !== 'engine' ? <Divider orientation="left">{REGION_LABELS[region]}</Divider> : null}
     {body}
   </Modal><Modal title={editingPersonalPrompt.id ? '编辑我的提示词' : '保存为我的提示词'} open={personalPromptNameModal.open} onCancel={() => { setPersonalPromptNameModal({ open: false, category: '', name: '' }); setEditingPersonalPrompt({ category: '', id: '', name: '' }); }} onOk={() => savePersonalConstraint(personalPromptNameModal.category, personalPromptNameModal.name.trim())} okText="保存" confirmLoading={savingPersonalCategory === personalPromptNameModal.category}><Input autoFocus value={personalPromptNameModal.name} placeholder="提示词名称" onChange={event => setPersonalPromptNameModal(current => ({ ...current, name: event.target.value }))} /></Modal></>;

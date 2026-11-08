@@ -28,7 +28,7 @@ var defaultUserConfig = func() map[string]any {
 		"modelCatalog":            []any{},
 		"modelCatalogVersion":     1,
 		"storageRoot":             "",
-		"productionRetentionDays": 3,
+		"productionRetentionDays": 7,
 		"image": map[string]any{
 			"mode": "openai_compatible", "provider": "openai_compatible", "displayName": "", "baseUrl": "", "model": "",
 		},

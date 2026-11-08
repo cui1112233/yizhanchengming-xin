@@ -9,12 +9,12 @@ const app = fs.readFileSync(path.join(here, 'App.jsx'), 'utf8');
 const preload = fs.readFileSync(path.join(here, 'workbenchPreload.js'), 'utf8');
 
 test('keeps Batch Factory on the single cover-library route', () => {
-  assert.match(app, /const ShuihuoProductionPage = lazy\(\(\) => import\('\.\/pages\/ShuihuoProductionPage'\)\)/);
+  assert.match(app, /const ShuihuoProductionPage = lazy\(\(\) => import\('\.\/pages\/BatchFactoryPageV30'\)\)/);
   assert.match(app, /'\/batch-factory': ShuihuoProductionPage/);
   assert.match(app, /function CanonicalBatchFactoryRedirect\(\)/);
   assert.match(app, /'\/shuihuo-production': CanonicalBatchFactoryRedirect/);
   assert.match(app, /'\/shuihuo-production\/creative': CanonicalBatchFactoryRedirect/);
   assert.doesNotMatch(app, /BatchFactoryWorkbenchPage/);
-  assert.match(preload, /'\/batch-factory': \(\) => import\('\.\/pages\/ShuihuoProductionPage'\)/);
+  assert.match(preload, /'\/batch-factory': \(\) => import\('\.\/pages\/BatchFactoryPageV30'\)/);
   assert.doesNotMatch(preload, /BatchFactoryWorkbenchPage/);
 });

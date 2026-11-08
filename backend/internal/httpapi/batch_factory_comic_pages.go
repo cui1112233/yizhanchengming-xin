@@ -21,6 +21,7 @@ import (
 
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/imagegenerationcache"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -34,6 +35,7 @@ type comicPageGenerator struct {
 	catalogStore   novelfetchworkshop.Store
 	presetCatalog  *prompt.Catalog
 	generationGate *comicPageGenerationGate
+	imageCache     imagegenerationcache.Repository
 	// rewritePrompt 接统一文本模型，用于内容审核拒绝后重写该页提示词。
 	// 未配置时为 nil，退回本地暴力合规改写。
 	rewritePrompt func(context.Context, string, novelfetchworkshop.RewriteRequest) (string, error)
@@ -92,6 +94,131 @@ func (e *comicPageWorkError) videoIDs() map[string]struct{} {
 		ids[failure.VideoID] = struct{}{}
 	}
 	return ids
+}
+
+// comicPagePartialError 表示本轮已有多页成功、只剩部分页失败。它保留
+// comicPageWorkError 的逐页失败明细供调用方写页级账本，但语义不是"整本失败"：
+// 调用方必须安排续跑，下一轮只补缺失页。
+type comicPagePartialError struct {
+	*comicPageWorkError
+	Completed int
+	Total     int
+}
+
+func (e *comicPagePartialError) Error() string {
+	if e == nil {
+		return ""
+	}
+	total := e.Total
+	failed := 0
+	first := ""
+	if e.comicPageWorkError != nil {
+		failed = len(e.Failures)
+		if failed > 0 {
+			first = fmt.Sprintf("（首个：%s: %v）", e.Failures[0].Label, e.Failures[0].Err)
+		}
+	}
+	if total <= 0 {
+		total = e.Completed + failed
+	}
+	return fmt.Sprintf("已生成 %d/%d 页，%d 页失败%s", e.Completed, total, failed, first)
+}
+
+func (e *comicPagePartialError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.comicPageWorkError
+}
+
+// comicPageGenerationError 把本轮页级失败聚合成调用方可见的错误：
+// 一页都没成功时保持整本失败语义；已有成功页时降级为可续跑的部分失败。
+func comicPageGenerationError(failures []comicPageFailure, completed, total int) error {
+	if len(failures) == 0 {
+		return nil
+	}
+	sort.SliceStable(failures, func(i, j int) bool { return failures[i].VideoID < failures[j].VideoID })
+	workErr := &comicPageWorkError{Failures: failures}
+	if completed > 0 {
+		return &comicPagePartialError{comicPageWorkError: workErr, Completed: completed, Total: total}
+	}
+	return workErr
+}
+
+// comicAssetShortfall 记录本轮资产参考图的缺失明细。资产图只是页图参考，
+// 缺一张不阻断整本；调用方据此记账，并在后续轮次优先回补。
+type comicAssetShortfall struct {
+	MissingAssetIDs []string
+	CriticalTotal   int
+	CriticalMissing int
+	Billed          bool
+	Err             error
+}
+
+type comicAssetShortfallFunc func(comicAssetShortfall)
+
+type comicAssetShortfallContextKey struct{}
+
+func withComicAssetShortfall(ctx context.Context, report comicAssetShortfallFunc) context.Context {
+	if report == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, comicAssetShortfallContextKey{}, report)
+}
+
+func reportComicAssetShortfall(ctx context.Context, shortfall comicAssetShortfall) {
+	if ctx == nil {
+		return
+	}
+	report, _ := ctx.Value(comicAssetShortfallContextKey{}).(comicAssetShortfallFunc)
+	if report != nil {
+		report(shortfall)
+	}
+}
+
+type comicGenerationHeartbeatFunc func()
+
+type comicGenerationHeartbeatContextKey struct{}
+
+func withComicGenerationHeartbeat(ctx context.Context, beat comicGenerationHeartbeatFunc) context.Context {
+	if beat == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, comicGenerationHeartbeatContextKey{}, beat)
+}
+
+// reportComicGenerationHeartbeat 只刷新停滞看门狗的心跳，不追加阶段日志。
+// 「上游已返回响应头」「图片已落库」这类真实进展都应调用它，避免慢图在
+// 重试预算内被判定为 stalled。
+func reportComicGenerationHeartbeat(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+	if beat, ok := ctx.Value(comicGenerationHeartbeatContextKey{}).(comicGenerationHeartbeatFunc); ok && beat != nil {
+		beat()
+	}
+}
+
+// comicCriticalAssetCoverage 统计关键资产（漫画角色/场景）总数与缺失数。
+// 它们的参考图决定页图里的“谁/在哪”，只有全部缺失才阻断整本。
+func comicCriticalAssetCoverage(assets []batchfactoryv11.BookAsset, missing []string) (total, missingCount int) {
+	missingSet := make(map[string]struct{}, len(missing))
+	for _, id := range missing {
+		missingSet[id] = struct{}{}
+	}
+	for _, asset := range assets {
+		if strings.TrimSpace(asset.Source) != "comic" {
+			continue
+		}
+		switch strings.TrimSpace(asset.Kind) {
+		case "character", "scene":
+			total++
+			if _, ok := missingSet[asset.ID]; ok {
+				missingCount++
+			}
+		}
+	}
+	return total, missingCount
 }
 
 // runComicPageWork 快速失败 + 跳过继续：任一页失败只记账，不阻塞兄弟页，
@@ -378,6 +505,42 @@ func comicReferenceImageResponses(settings batchfactoryv11.SettingsPatch, book b
 	return result
 }
 
+// shuihuoRepairedPrompt 是审核被拒后由文本模型重写过的提示词。
+// 缓存必须带版本与时间：人工修正提示词后，旧改写版绝不能再压住数据库版本。
+type shuihuoRepairedPrompt struct {
+	Prompt string
+	// PromptRevision 是生成该修复版时数据库提示词（编译前原文）的内容摘要。
+	// 页面行的 Revision 会因申领租约、状态写回而自增，不能直接当作提示词
+	// 版本；用内容摘要才既能感知人工修改，又不会让每次重试都失效。
+	PromptRevision string
+	// PageRevision 只作诊断：记录写入缓存时观测到的页行版本。
+	PageRevision int64
+	// RepairCount 是该页已经自动改写的轮次。跨自动化续跑累计，达到上限后
+	// 不再调用上游，直接转 needs_manual。
+	RepairCount int
+	// LastRefusalRaw 是最近一次上游拒绝原文（按字节截断，见
+	// comicPromptRefusalSummary），写进页级账本供人工排查。
+	LastRefusalRaw string
+	LastFields     []string
+	StoredAt       time.Time
+}
+
+// shuihuoRepairedPromptTTL 是修复版缓存的最长存活时间。整本重试通常发生在
+// 同一天内，12 小时足够复用；超过后强制重新改写一次，才能跟上审核策略或
+// 文本模型升级，避免旧改写版长期生效。
+const shuihuoRepairedPromptTTL = 12 * time.Hour
+
+// shuihuoRepairedPromptNow 可注入，测试用假时钟验证 TTL，不 sleep。
+var shuihuoRepairedPromptNow = func() time.Time { return time.Now().UTC() }
+
+// comicPromptRepairMaxRounds 是单页自动改写的轮次上限。选 3 的依据：
+// 一轮改对白/文案、一轮改画面构图、一轮改场景与镜头，覆盖线上被拒的
+// 主要形态；再往上继续改写边际收益很低，而且每轮都要真实出图计费。
+const comicPromptRepairMaxRounds = 3
+
+// errComicPromptRepairExhausted 表示该页自动改写轮次用尽，必须转人工。
+var errComicPromptRepairExhausted = errors.New("comic prompt repair exhausted")
+
 // shuihuoRepairedPrompts 缓存审核被拒后由文本模型重写过的提示词。
 // 进程内缓存即可：后续整本自动重试直接复用修复版，不再拿原提示词撞审核。
 var shuihuoRepairedPrompts sync.Map
@@ -390,20 +553,213 @@ func comicAssetRepairKey(batchID, bookID, assetID string) string {
 	return batchID + "|" + bookID + "|" + assetID
 }
 
-const comicPromptRepairSystemPrompt = "你是漫画图片提示词的合规改写器。上游图片模型审核严格，包含武器、刀具、伤害动作、血液、伤口、昏迷、殴打等描写的提示词会被拒绝。你负责在保留资产身份、画风、三视图和参考图约束的前提下，把提示词改写为可以稳定通过审核的版本。"
+// comicPromptRevision 用数据库提示词内容派生版本号。提示词一旦被人工或
+// 自动流程改写，版本就会变化，旧修复版随之失效。
+func comicPromptRevision(prompt string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(prompt)))
+	return fmt.Sprintf("%x", sum[:16])
+}
+
+// loadShuihuoRepairedPrompt 只返回仍然有效的修复版：版本必须与当前数据库
+// 提示词一致，且未超过 TTL；否则立即删除并视为未命中。
+func loadShuihuoRepairedPrompt(key, promptRevision string) (shuihuoRepairedPrompt, bool) {
+	value, ok := shuihuoRepairedPrompts.Load(key)
+	if !ok {
+		return shuihuoRepairedPrompt{}, false
+	}
+	cached, ok := value.(shuihuoRepairedPrompt)
+	if !ok || strings.TrimSpace(cached.Prompt) == "" {
+		shuihuoRepairedPrompts.Delete(key)
+		return shuihuoRepairedPrompt{}, false
+	}
+	if !cached.StoredAt.IsZero() && shuihuoRepairedPromptNow().Sub(cached.StoredAt) >= shuihuoRepairedPromptTTL {
+		shuihuoRepairedPrompts.Delete(key)
+		return shuihuoRepairedPrompt{}, false
+	}
+	if promptRevision != "" && cached.PromptRevision != promptRevision {
+		shuihuoRepairedPrompts.Delete(key)
+		return shuihuoRepairedPrompt{}, false
+	}
+	return cached, true
+}
+
+func storeShuihuoRepairedPrompt(key string, cached shuihuoRepairedPrompt) {
+	cached.StoredAt = shuihuoRepairedPromptNow()
+	shuihuoRepairedPrompts.Store(key, cached)
+}
+
+// invalidateShuihuoRepairedPrompt 是提示词写入后唯一的失效入口。任何人工
+// 写入（页级 PUT、reference-images、settings_patches 补丁）都必须调用它，
+// 不允许在业务代码里直接 Delete 缓存。
+// 只给 batchID 时按批次清理，给到 bookID 时按书清理，三者齐全时精确清理该页。
+func invalidateShuihuoRepairedPrompt(batchID, bookID, videoID string) bool {
+	batchID = strings.TrimSpace(batchID)
+	if batchID == "" {
+		return false
+	}
+	bookID = strings.TrimSpace(bookID)
+	videoID = strings.TrimSpace(videoID)
+	if bookID != "" && videoID != "" {
+		key := comicPageRepairKey(batchID, bookID, videoID)
+		if _, loaded := shuihuoRepairedPrompts.LoadAndDelete(key); loaded {
+			log.Printf("comic prompt repair cache invalidated batch=%s book=%s video=%s", batchID, bookID, videoID)
+			return true
+		}
+		return false
+	}
+	prefix := batchID + "|"
+	if bookID != "" {
+		prefix = batchID + "|" + bookID + "|"
+	}
+	invalidated := 0
+	shuihuoRepairedPrompts.Range(func(key, _ any) bool {
+		if text, ok := key.(string); ok && strings.HasPrefix(text, prefix) {
+			shuihuoRepairedPrompts.Delete(text)
+			invalidated++
+		}
+		return true
+	})
+	if invalidated > 0 {
+		log.Printf("comic prompt repair cache invalidated batch=%s book=%s entries=%d", batchID, bookID, invalidated)
+	}
+	return invalidated > 0
+}
+
+// comicSettingsPatchTouchesPrompt 判断 settings_patches 是否写入了页提示词。
+// 只有改动提示词的补丁才需要让修复版缓存失效。
+func comicSettingsPatchTouchesPrompt(patch batchfactoryv11.SettingsPatch) bool {
+	for _, key := range []string{"comicPrompt", "comicImagePrompt"} {
+		if _, ok := patch[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// comicPromptRepair 记录一次自动改写：哪一页、改了哪些字段、改写前后摘要，
+// 由自动化链路写进 pageLedger，前端据此显示“这一页被自动改写过”。
+type comicPromptRepair struct {
+	VideoID string
+	Label   string
+	Fields  []string
+	Before  string
+	After   string
+	// Attempts 是该页累计自动改写轮次（从 1 开始）。
+	Attempts int
+	// LastRefusalRaw 是触发本次改写的上游拒绝原文摘要。
+	LastRefusalRaw string
+	At             time.Time
+}
+
+type comicPromptRepairFunc func(comicPromptRepair)
+
+type comicPromptRepairContextKey struct{}
+
+func withComicPromptRepair(ctx context.Context, report comicPromptRepairFunc) context.Context {
+	if report == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, comicPromptRepairContextKey{}, report)
+}
+
+func reportComicPromptRepair(ctx context.Context, repair comicPromptRepair) {
+	if ctx == nil {
+		return
+	}
+	report, _ := ctx.Value(comicPromptRepairContextKey{}).(comicPromptRepairFunc)
+	if report != nil {
+		report(repair)
+	}
+}
+
+// comicPromptRefusalSummary 截断上游拒绝原文后写进页级账本。规则：
+// 直接按字节截前 500 字节（上游多半是英文 JSON），再追加原长度；500 字节
+// 足够看清拒绝类型和关键句，又不会把整段网关 HTML 塞进 job_json。
+func comicPromptRefusalSummary(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 500 {
+		return value
+	}
+	return value[:500] + fmt.Sprintf("…（已截断，原长 %d 字节）", len(value))
+}
+
+// comicPromptRepairFields 比较修复前后的提示词，指出自动修复改了哪些字段。
+// 引号/「」内是台词，其余是画面描述（构图、主体动作、场景细节）。
+func comicPromptRepairFields(before, after string) []string {
+	if strings.TrimSpace(before) == strings.TrimSpace(after) {
+		return nil
+	}
+	fields := make([]string, 0, 2)
+	if comicPromptDialogue(before) != comicPromptDialogue(after) {
+		fields = append(fields, "台词")
+	}
+	if comicPromptVisual(before) != comicPromptVisual(after) {
+		fields = append(fields, "画面描述")
+	}
+	if len(fields) == 0 {
+		return []string{"提示词"}
+	}
+	return fields
+}
+
+func comicPromptDialogue(value string) string {
+	var builder strings.Builder
+	depth := 0
+	for _, r := range value {
+		switch r {
+		case '「', '『', '“', '‘':
+			depth++
+			builder.WriteRune(r)
+			continue
+		case '」', '』', '”', '’':
+			if depth > 0 {
+				depth--
+			}
+			builder.WriteRune(r)
+			continue
+		}
+		if depth > 0 {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String()
+}
+
+func comicPromptVisual(value string) string {
+	var builder strings.Builder
+	depth := 0
+	for _, r := range value {
+		switch r {
+		case '「', '『', '“', '‘':
+			depth++
+			continue
+		case '」', '』', '”', '’':
+			if depth > 0 {
+				depth--
+			}
+			continue
+		}
+		if depth == 0 {
+			builder.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(builder.String()), "")
+}
+
+const comicPromptRepairSystemPrompt = "你是漫画图片提示词的合规改写器。上游图片模型审核严格，包含武器、刀具、伤害动作、血液、伤口、昏迷、殴打等描写的提示词会被拒绝。你负责在保留人物身份、画风、分格与台词原文的前提下，改写被拒绝的画面描述（构图、主体动作、视线、景别、场景细节），把冲突场面替换成可以稳定通过审核的版本。"
 
 func repairComicImagePrompt(ctx context.Context, owner, imagePrompt, rejection string, rewrite func(context.Context, string, novelfetchworkshop.RewriteRequest) (string, error), asset bool) string {
 	fallback := sanitizeShuihuoImagePromptViolence(imagePrompt)
 	if rewrite == nil {
 		return fallback
 	}
-	constraints := "保留画风描述、分格数量与阅读顺序、人物身份和台词原文"
+	constraints := "保留画风描述、分格数量与阅读顺序、人物身份和台词原文；必须同时改写被拒绝的画面描述（构图、主体动作、视线、景别与场景细节），不得只改台词或文案"
 	if asset {
 		constraints = "保留资产身份、画风、正面/侧面/背面三视图、构图和所有参考图约束"
 	}
 	request := novelfetchworkshop.RewriteRequest{
 		SystemPrompt: comicPromptRepairSystemPrompt,
-		UserPrompt:   fmt.Sprintf("请重写下面的漫画图片提示词。硬性要求：\n1. %s；\n2. 删除武器、刀具、利刃、伤害动作、血液、伤口、昏迷、殴打、掐颈等描写；\n3. 冲突和伤害改用表情、姿态、后退躲避、被扶住、物品掉落等安全表达；\n4. 不新增人物，不改变资产身份和整体画风；\n5. 只输出改写后的完整提示词正文，不要解释，不要加代码块。\n\n上游拒绝原因：%s\n\n【原提示词】\n%s", constraints, strings.TrimSpace(rejection), imagePrompt),
+		UserPrompt:   fmt.Sprintf("请重写下面的漫画图片提示词。硬性要求：\n1. %s；\n2. 删除武器、刀具、利刃、伤害动作、血液、伤口、昏迷、殴打、掐颈等描写；\n3. 冲突和伤害必须改写成安全的画面替代：调整构图、主体姿态、视线、景别或场景细节（如空镜、远景背影、后退躲避、被扶住、物品掉落），必要时更换场景，但不得增删剧情事实；\n4. 不新增人物，不改变资产身份和整体画风；\n5. 只输出改写后的完整提示词正文，不要解释，不要加代码块。\n\n上游拒绝原因：%s\n\n【原提示词】\n%s", constraints, strings.TrimSpace(rejection), imagePrompt),
 		Temperature:  0.3, MaxTokens: 2600,
 	}
 	repaired, err := rewrite(ctx, owner, request)
@@ -420,6 +776,39 @@ func repairComicImagePrompt(ctx context.Context, owner, imagePrompt, rejection s
 
 func (g comicPageGenerator) repairComicPageImagePrompt(ctx context.Context, owner, imagePrompt, rejection string) string {
 	return repairComicImagePrompt(ctx, owner, imagePrompt, rejection, g.rewritePrompt, false)
+}
+
+// persistRepairedComicPrompt 把自动改写结果同时写回页级提示词与 video 级
+// settings_patches，保证两者一致；进程重启或后续续跑仍使用同一份提示词。
+// 写回失败时保留旧提示词，调用方继续用本轮修复版生成，下一轮再尝试写回。
+func (g comicPageGenerator) persistRepairedComicPrompt(ctx context.Context, comicStore batchfactoryv11.ComicPageStore, owner string, batch batchfactoryv11.Batch, book batchfactoryv11.Book, page batchfactoryv11.Video, current batchfactoryv11.ComicPage, input batchfactoryv11.UpsertComicPageInput, effective batchfactoryv11.SettingsPatch, repaired string, referenceURLs []string) (batchfactoryv11.ComicPage, string, error) {
+	repairedRaw := strings.TrimSpace(batchfactoryv11.StripCompiledComicImagePrompt(effective, batchfactoryv11.ComicImagePurposePage, repaired))
+	if repairedRaw == "" {
+		return current, "", fmt.Errorf("repaired prompt is empty after stripping")
+	}
+	writeInput := input
+	writeInput.ImagePrompt = repairedRaw
+	writeInput.Status = current.Status
+	writeInput.ExpectedRevision = current.Revision
+	if contract, err := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposePage, "", comicPagePromptContent(input.ComicPrompt, repairedRaw), nil, referenceURLs); err == nil {
+		writeInput.SnapshotHash = contract.SnapshotHash
+	}
+	updated, err := comicStore.UpsertComicPage(ctx, owner, batch.ID, book.ID, page.ID, writeInput)
+	if err != nil {
+		return current, "", err
+	}
+	comicPromptRaw, _ := json.Marshal(input.ComicPrompt)
+	imagePromptRaw, _ := json.Marshal(repairedRaw)
+	if _, err := g.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{
+		Kind: batchfactoryv11.ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: page.ID,
+	}, batchfactoryv11.SettingsUpdate{
+		Patch:            batchfactoryv11.SettingsPatch{"comicPrompt": comicPromptRaw, "comicImagePrompt": imagePromptRaw},
+		ExpectedRevision: page.SettingsState.Revision,
+	}); err != nil {
+		// 页级提示词仍是权威来源；settings 写回失败只影响页面外的展示一致性。
+		log.Printf("comic page repaired prompt settings writeback failed batch=%s book=%s video=%s err=%v", batch.ID, book.ID, page.ID, err)
+	}
+	return updated, repairedRaw, nil
 }
 
 func comicPagePromptContent(comicPrompt, imagePrompt string) string {
@@ -440,11 +829,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if !ok || g.files == nil || g.catalogStore == nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: 漫画图片生成服务尚未配置", batchfactoryv11.ErrUnavailable)
 	}
-	// The in-memory gate belongs to this Go service instance. If we acquire it
-	// successfully, there is no active local worker for this page, so a
-	// durable "generating" record left by an earlier attempt is recoverable
-	// immediately. Waiting only on UpdatedAt would make automatic retries hit
-	// the same orphaned lease repeatedly for up to fifteen minutes.
+	// The in-memory gate belongs to this Go service instance.
 	ownsLocalGenerationGate := false
 	if g.generationGate != nil {
 		release, acquired := g.generationGate.tryAcquire(strings.Join([]string{owner, batchID, bookID, videoID}, "/"))
@@ -510,14 +895,12 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			}
 			storedPage, hasStoredPage = page, true
 			if comicPageGenerationTaskExists(page) {
-				if !ownsLocalGenerationGate && !comicPageGenerationTaskIsStale(page, time.Now().UTC()) {
+				if !comicPageGenerationLeaseRecoverable(page, ownsLocalGenerationGate, time.Now().UTC()) {
 					return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: 当前漫画页已有生成任务，请等待完成后再重新生成", batchfactoryv11.ErrConflict)
 				}
-				// A previous request can leave the durable page lease at
-				// "generating" after a service restart or a lost browser
-				// connection. Reopen that page as failed before continuing; this
-				// keeps the next automatic retry idempotent and prevents a single
-				// orphaned page from blocking the whole book forever.
+				// The durable lease survives a service restart. Recover it only
+				// after the safety window; acquiring this process-local gate does
+				// not prove the remote provider stopped working.
 				recovered, recoverErr := comicStore.UpsertComicPage(ctx, owner, batchID, bookID, videoID, batchfactoryv11.UpsertComicPageInput{
 					ComicPrompt: page.ComicPrompt, ImagePrompt: page.ImagePrompt, ReferenceImageURLs: page.ReferenceImageURLs,
 					ModelID: page.ModelID, AspectRatio: page.AspectRatio, Status: "generation_failed", SnapshotHash: page.SnapshotHash,
@@ -612,11 +995,20 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	generationCtx = withShuihuoEffectiveSettings(generationCtx, comicSettingsToMap(effective))
 	generationPrompt := contract.Prompt
 	repairKey := comicPageRepairKey(batchID, bookID, videoID)
-	if cached, ok := shuihuoRepairedPrompts.Load(repairKey); ok {
-		if repaired, textOK := cached.(string); textOK && strings.TrimSpace(repaired) != "" {
-			generationPrompt = repaired
-			log.Printf("comic page reuse repaired prompt batch=%s book=%s video=%s", batchID, bookID, videoID)
-		}
+	// 修复版缓存用“数据库原始提示词”派生版本：人工改写会改变版本并让缓存
+	// 失效；我们自己写回的修复版会带着新版本写入，跨轮次才能继续累计。
+	promptRevision := comicPromptRevision(comicPagePromptContent(input.ComicPrompt, input.ImagePrompt))
+	repairedCache, hasRepairedCache := loadShuihuoRepairedPrompt(repairKey, promptRevision)
+	if hasRepairedCache {
+		generationPrompt = repairedCache.Prompt
+		log.Printf("comic page reuse repaired prompt batch=%s book=%s video=%s rounds=%d", batchID, bookID, videoID, repairedCache.RepairCount)
+	}
+	// 轮次用尽后不再调用上游，直接把这一页转 needs_manual，避免继续计费。
+	if hasRepairedCache && repairedCache.RepairCount >= comicPromptRepairMaxRounds {
+		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
+			"%w: %s 已自动改写 %d 轮仍被内容审核拒绝（最后拒绝：%s）",
+			errComicPromptRepairExhausted, selectedPage.Label, repairedCache.RepairCount,
+			comicPromptRefusalSummary(repairedCache.LastRefusalRaw))
 	}
 	// CM·文字插画版：把本页 current_page 原文逐字拼进最终出图 prompt，不依赖
 	// 文本模型转述。其它预设原样放行。
@@ -639,20 +1031,61 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	mediaType, storageRef, source, err := generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, generationPrompt, contract.ReferenceImageURLs, g.localExecutors)
 	if errors.Is(err, errShuihuoImageContentPolicy) {
 		// 两次降级仍被审核拒绝后，不要拿原提示词反复重试，而是先用文本模型
-		// 把整页提示词改写成合规版本，再生成一次。修复结果会缓存，后续整本
-		// 自动重试直接复用，避免“无限重试但每次都被拒”的无效循环。
+		// 把整页提示词改写成合规版本（允许改构图/主体/场景），再生成一次。
+		// 修复结果写回页级提示词与 video settings，并缓存轮次；续跑时累计，
+		// 达到 comicPromptRepairMaxRounds 后转人工。
+		refusal := comicPromptRefusalSummary(err.Error())
+		roundsUsed := 0
+		if hasRepairedCache {
+			roundsUsed = repairedCache.RepairCount
+		}
+		if roundsUsed >= comicPromptRepairMaxRounds {
+			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
+				"%w: %s 已自动改写 %d 轮仍被内容审核拒绝（最后拒绝：%s）",
+				errComicPromptRepairExhausted, selectedPage.Label, roundsUsed, refusal)
+		}
 		if progress := comicGenerationProgressFromContext(ctx); progress != nil {
-			progress("comic_images", fmt.Sprintf("%s 被内容审核拒绝，正在自动改写该页提示词为合规版本", selectedPage.Label))
+			progress("comic_images", fmt.Sprintf("%s 被内容审核拒绝，正在第 %d/%d 轮自动改写提示词（含画面构图）", selectedPage.Label, roundsUsed+1, comicPromptRepairMaxRounds))
 		}
 		repaired := g.repairComicPageImagePrompt(generationCtx, owner, generationPrompt, err.Error())
 		repaired, _ = comicPageFinalImagePrompt(repaired, effective, *selectedPage)
-		if repaired != "" && repaired != generationPrompt {
-			shuihuoRepairedPrompts.Store(repairKey, repaired)
-			if progress := comicGenerationProgressFromContext(ctx); progress != nil {
-				progress("comic_images", fmt.Sprintf("%s 提示词已改写为合规版本，正在重新生成", selectedPage.Label))
-			}
-			mediaType, storageRef, source, err = generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, repaired, contract.ReferenceImageURLs, g.localExecutors)
+		if repaired == "" || repaired == generationPrompt {
+			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
+				"%w: %s 第 %d 轮改写未产生变化（最后拒绝：%s）",
+				errComicPromptRepairExhausted, selectedPage.Label, roundsUsed+1, refusal)
 		}
+		fields := comicPromptRepairFields(generationPrompt, repaired)
+		updatedRevision := promptRevision
+		if updatedPage, repairedRaw, writeErr := g.persistRepairedComicPrompt(generationCtx, comicStore, owner, batch, *selectedBook, *selectedPage, createdPage, input, effective, repaired, contract.ReferenceImageURLs); writeErr != nil {
+			log.Printf("comic page repaired prompt writeback failed batch=%s book=%s video=%s err=%v", batchID, bookID, videoID, writeErr)
+		} else {
+			createdPage = updatedPage
+			input.ImagePrompt = repairedRaw
+			updatedRevision = comicPromptRevision(comicPagePromptContent(input.ComicPrompt, repairedRaw))
+		}
+		storeShuihuoRepairedPrompt(repairKey, shuihuoRepairedPrompt{
+			Prompt:         repaired,
+			PromptRevision: updatedRevision,
+			PageRevision:   createdPage.Revision,
+			RepairCount:    roundsUsed + 1,
+			LastRefusalRaw: refusal,
+			LastFields:     fields,
+		})
+		// 页级账本记录：哪一页被自动改写、改了哪些字段、前后摘要与拒绝原文。
+		reportComicPromptRepair(ctx, comicPromptRepair{
+			VideoID:        videoID,
+			Label:          selectedPage.Label,
+			Fields:         fields,
+			Before:         generationPrompt,
+			After:          repaired,
+			Attempts:       roundsUsed + 1,
+			LastRefusalRaw: refusal,
+			At:             shuihuoRepairedPromptNow(),
+		})
+		if progress := comicGenerationProgressFromContext(ctx); progress != nil {
+			progress("comic_images", fmt.Sprintf("%s 提示词已改写为合规版本（第 %d 轮），正在重新生成", selectedPage.Label, roundsUsed+1))
+		}
+		mediaType, storageRef, source, err = generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, repaired, contract.ReferenceImageURLs, g.localExecutors)
 	}
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
@@ -750,6 +1183,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	detachedCtx, cancel := comicBookGenerationContext(ctx)
 	defer cancel()
 	ctx = detachedCtx
+	ctx = withShuihuoImageGenerationCache(ctx, g.imageCache)
 	comicStore, ok := g.store.(batchfactoryv11.ComicPageStore)
 	if !ok {
 		return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: 漫画合集存储尚未配置", batchfactoryv11.ErrUnavailable)
@@ -796,15 +1230,30 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		}
 		assetBatch := batch
 		assetBatch.Books = []batchfactoryv11.Book{*book}
-		if _, err := generateShuihuoAssetImagesWithRepair(ctx, g.store, g.files, owner, assetBatch, missingAssetIDs, modelID, "16:9", provider, g.localExecutors, g.presetCatalog, g.rewritePrompt, g.catalogStore); err != nil {
-			return batchfactoryv11.ComicCollection{}, fmt.Errorf("漫画资产图生成失败: %w", err)
-		}
+		_, assetErr := generateShuihuoAssetImagesWithRepair(ctx, g.store, g.files, owner, assetBatch, missingAssetIDs, modelID, "16:9", provider, g.localExecutors, g.presetCatalog, g.rewritePrompt, g.catalogStore)
 		remainingAssetIDs, verifyErr := missingComicAssetImageIDs(ctx, g.store, owner, batchID, *book)
 		if verifyErr != nil {
 			return batchfactoryv11.ComicCollection{}, verifyErr
 		}
 		if len(remainingAssetIDs) > 0 {
-			return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: 漫画资产图未全部写回（剩余 %d 个资产）", batchfactoryv11.ErrConflict, len(remainingAssetIDs))
+			criticalTotal, criticalMissing := comicCriticalAssetCoverage(book.AssetRecords, remainingAssetIDs)
+			// 关键资产（角色/场景）参考图全缺时继续出图只会产出错角色/错场景，
+			// 必须阻断；其余缺图降级为「用已有资产继续 + 记账回补」，
+			// 不再因为一张参考图把整本书判死。
+			if criticalTotal > 0 && criticalMissing >= criticalTotal {
+				return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: 漫画资产图未全部写回（关键资产 %d 个全部缺失）", batchfactoryv11.ErrConflict, criticalTotal)
+			}
+			reportComicAssetShortfall(ctx, comicAssetShortfall{
+				MissingAssetIDs: append([]string(nil), remainingAssetIDs...),
+				CriticalTotal:   criticalTotal,
+				CriticalMissing: criticalMissing,
+				Billed:          comicBilledReadFailure(assetErr),
+				Err:             assetErr,
+			})
+			if report := comicGenerationProgressFromContext(ctx); report != nil {
+				report("comic_asset_images", fmt.Sprintf("有 %d 个资产参考图缺失（关键资产可用 %d/%d），先用现有资产继续出图，缺失项稍后回补",
+					len(remainingAssetIDs), criticalTotal-criticalMissing, criticalTotal))
+			}
 		}
 	}
 	existingPages, err := comicStore.ListComicPages(ctx, owner, batchID, bookID)
@@ -976,10 +1425,10 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		}
 	}
 	// 本轮有真实页级失败：返回聚合错误让调用方写 pageLedger，而不是把它
-	// 伪装成“缺图成功”或只保留第一条错误。
-	if len(failures) > 0 {
-		sort.SliceStable(failures, func(i, j int) bool { return failures[i].VideoID < failures[j].VideoID })
-		return batchfactoryv11.ComicCollection{}, &comicPageWorkError{Failures: failures}
+	// 伪装成“缺图成功”或只保留第一条错误。已有成功页时只降级为可续跑的
+	// 部分失败，不因为一页把整本判死。
+	if err := comicPageGenerationError(failures, completedPages, totalPages); err != nil {
+		return batchfactoryv11.ComicCollection{}, err
 	}
 	if progress != nil {
 		progress("comic_images", fmt.Sprintf("图片已全部生成（%d/%d），正在整理漫画合集", completedPages, totalPages))
@@ -1180,7 +1629,7 @@ func comicPromptPreviewDeveloper(ctx context.Context, owner string, accounts aut
 	return toString(authAccountPayload(account, profiles)["role"]) == "dev"
 }
 
-func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate) {
+func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate, imageCache imagegenerationcache.Repository) {
 	registerComicSourceSegmentRoutes(mux, store, director)
 	comicStore, ok := store.(batchfactoryv11.ComicPageStore)
 	if mux == nil || !ok {
@@ -1193,7 +1642,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
 	const collectionDownload = collections + "/{collectionId}/download"
-	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, presetCatalog: presetCatalog, generationGate: generationGate}
+	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache}
 
 	mux.HandleFunc("GET "+pages, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -1201,14 +1650,14 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		result, err := comicStore.ListComicPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		// view=lite 供列表行缩略图与状态渲染使用；提示词正文单本约 300KB，
+		// 列表行完全不用，只有编辑弹窗需要全量视图。
+		liteView := r.URL.Query().Get("view") == "lite"
+		result, err := listComicPagesForView(r.Context(), comicStore, owner, r.PathValue("batchId"), r.PathValue("bookId"), liteView)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		// view=lite 供列表行缩略图与状态渲染使用；提示词正文单本约 300KB，
-		// 列表行完全不用，只有编辑弹窗需要全量视图。
-		liteView := r.URL.Query().Get("view") == "lite"
 		if indexStore, ok := store.(batchfactoryv11.ComicSourceIndexStore); ok {
 			// Only the requested book's source text and segment digests are needed
 			// for the stale check. Loading the full batch here made every book row
@@ -1248,15 +1697,12 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		archive, filename, err := buildComicPromptZip(r.Context(), store, comicStore, files, presetCatalog, owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		plan, err := planComicPromptZip(r.Context(), store, comicStore, files, presetCatalog, owner, r.PathValue("batchId"), r.PathValue("bookId"))
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/zip")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"comic-prompts.zip\"; filename*=UTF-8''"+url.QueryEscape(filename))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(archive)
+		serveComicZip(w, files, plan, "comic-prompts.zip")
 	})
 	mux.HandleFunc("PUT "+page, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -1299,6 +1745,11 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		if err != nil {
 			writeStoreError(w, err)
 			return
+		}
+		// 人工改了页提示词就必须让修复版缓存立即失效，否则旧的自动改写版
+		// 会继续压住数据库里的新提示词。
+		if input.ComicPrompt != nil || input.ImagePrompt != nil {
+			invalidateShuihuoRepairedPrompt(r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"page": comicPageResponse(created)})
 	})
@@ -1427,6 +1878,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 				ModelID: comicSettingString(effective, "imageModelId", ""), AspectRatio: batchfactoryv11.EffectiveImageAspectRatio(effective),
 			})
 			if err == nil {
+				invalidateShuihuoRepairedPrompt(batch.ID, targetBook.ID, targetVideo.ID)
 				updated, err = comicStore.SetComicPageReferenceImages(r.Context(), owner, batch.ID, targetBook.ID, targetVideo.ID, input.ReferenceImageURLs)
 			}
 		}
@@ -1479,6 +1931,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 				writeStoreError(w, err)
 				return
 			}
+			invalidateShuihuoRepairedPrompt(batch.ID, book.ID, video.ID)
 		}
 		updated, err := comicStore.ApplyComicPageReferenceImages(r.Context(), owner, batch.ID, book.ID, r.PathValue("videoId"))
 		if err != nil {
@@ -1514,6 +1967,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			// written back to the comic page.
 			generationCtx, cancel := comicPageGenerationContext(context.Background())
 			defer cancel()
+			generationCtx = withShuihuoImageGenerationCacheBypass(withShuihuoImageGenerationCache(generationCtx, imageCache))
 			createdPage, createdImage, err := generator.generatePage(generationCtx, owner, batchID, bookID, videoID, input)
 			resultCh <- generationResult{page: createdPage, image: createdImage, err: err}
 			if err != nil {
@@ -1645,6 +2099,14 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 				defer file.Close()
 				w.Header().Set("Content-Type", candidate.MediaType)
 				w.Header().Set("X-Content-Type-Options", "nosniff")
+				// 页图只在登录态下可见：只允许浏览器私有缓存，不引入共享缓存。
+				// 7 天与缩略图一致；同 ref 原地重新生成会改变 size/mtime，ETag 随之失效。
+				if info, statErr := file.Stat(); statErr == nil {
+					w.Header().Set("ETag", fmt.Sprintf("\"%x-%x\"", info.Size(), info.ModTime().UTC().UnixNano()))
+				}
+				w.Header().Set("Cache-Control", "private, max-age=604800")
+				// ServeContent 继续负责 Accept-Ranges、Content-Length、Range→206
+				// 与 If-None-Match/If-Modified-Since→304。
 				http.ServeContent(w, r, candidate.ID, candidate.CreatedAt, file)
 				return
 			}
@@ -1714,7 +2176,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		archive, filename, err := buildComicCollectionImageZip(r.Context(), store, comicStore, files, owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("collectionId"))
+		plan, err := planComicCollectionImageZip(r.Context(), store, comicStore, files, owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("collectionId"))
 		if err != nil {
 			if errors.Is(err, batchfactoryv11.ErrNotFound) && strings.Contains(err.Error(), "第 ") {
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
@@ -1723,10 +2185,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/zip")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"comic-collection.zip\"; filename*=UTF-8''"+url.QueryEscape(filename))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(archive)
+		serveComicZip(w, files, plan, "comic-collection.zip")
 	})
 	mux.HandleFunc("GET "+collections, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -1746,13 +2205,15 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	})
 }
 
-func buildComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, owner, batchID, bookID, collectionID string) ([]byte, string, error) {
+// planComicCollectionImageZip 先解析合集并逐页校验主图文件可打开，再返回
+// 流式打包计划。缺图仍返回「第 N 页…」的可读错误，绝不会写半截 ZIP。
+func planComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, owner, batchID, bookID, collectionID string) (comicZipPlan, error) {
 	if files == nil {
-		return nil, "", fmt.Errorf("%w: 漫画图片存储不可用", batchfactoryv11.ErrUnavailable)
+		return comicZipPlan{}, fmt.Errorf("%w: 漫画图片存储不可用", batchfactoryv11.ErrUnavailable)
 	}
 	batch, err := store.GetBatch(ctx, owner, batchID)
 	if err != nil {
-		return nil, "", err
+		return comicZipPlan{}, err
 	}
 	var title string
 	for _, book := range batch.Books {
@@ -1762,11 +2223,11 @@ func buildComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Sto
 		}
 	}
 	if strings.TrimSpace(title) == "" {
-		return nil, "", batchfactoryv11.ErrNotFound
+		return comicZipPlan{}, batchfactoryv11.ErrNotFound
 	}
 	collections, err := comicStore.ListComicCollections(ctx, owner, batchID, bookID)
 	if err != nil {
-		return nil, "", err
+		return comicZipPlan{}, err
 	}
 	var collection *batchfactoryv11.ComicCollection
 	for index := range collections {
@@ -1776,42 +2237,32 @@ func buildComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Sto
 		}
 	}
 	if collection == nil {
-		return nil, "", batchfactoryv11.ErrNotFound
+		return comicZipPlan{}, batchfactoryv11.ErrNotFound
 	}
 	if len(collection.Items) == 0 {
-		return nil, "", fmt.Errorf("%w: 漫画合集没有可下载的图片", batchfactoryv11.ErrConflict)
+		return comicZipPlan{}, fmt.Errorf("%w: 漫画合集没有可下载的图片", batchfactoryv11.ErrConflict)
 	}
 
-	archive := bytes.Buffer{}
-	writer := zip.NewWriter(&archive)
+	entries := make([]comicZipEntry, 0, len(collection.Items))
 	for _, item := range collection.Items {
 		pageNumber := item.Ordinal
 		if pageNumber < 1 {
 			pageNumber = 1
 		}
 		if strings.TrimSpace(item.StorageRef) == "" {
-			_ = writer.Close()
-			return nil, "", fmt.Errorf("%w: 第 %d 页主图不可下载", batchfactoryv11.ErrNotFound, pageNumber)
+			return comicZipPlan{}, fmt.Errorf("%w: 第 %d 页主图不可下载", batchfactoryv11.ErrNotFound, pageNumber)
 		}
 		file, openErr := files.Open(item.StorageRef)
 		if openErr != nil {
-			_ = writer.Close()
-			return nil, "", fmt.Errorf("%w: 第 %d 页主图文件不存在", batchfactoryv11.ErrNotFound, pageNumber)
-		}
-		entry, createErr := writer.Create(fmt.Sprintf("%s-%03d%s", comicDownloadFileStem(title), pageNumber, comicDownloadImageExtension(item.MediaType, item.StorageRef)))
-		if createErr == nil {
-			_, createErr = io.Copy(entry, file)
+			return comicZipPlan{}, fmt.Errorf("%w: 第 %d 页主图文件不存在", batchfactoryv11.ErrNotFound, pageNumber)
 		}
 		_ = file.Close()
-		if createErr != nil {
-			_ = writer.Close()
-			return nil, "", createErr
-		}
+		entries = append(entries, comicZipEntry{
+			name:       fmt.Sprintf("%s-%03d%s", comicDownloadFileStem(title), pageNumber, comicDownloadImageExtension(item.MediaType, item.StorageRef)),
+			storageRef: item.StorageRef,
+		})
 	}
-	if err := writer.Close(); err != nil {
-		return nil, "", err
-	}
-	return archive.Bytes(), comicDownloadFileStem(title) + ".zip", nil
+	return comicZipPlan{filename: comicDownloadFileStem(title) + ".zip", entries: entries}, nil
 }
 
 func comicDownloadFileStem(title string) string {
@@ -2002,10 +2453,25 @@ func comicPageImageResponse(image batchfactoryv11.ComicPageImage) batchfactoryv1
 	return image
 }
 
-func buildComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, presetCatalog *prompt.Catalog, owner, batchID, bookID string) ([]byte, string, error) {
+// comicZipEntry 是一条待写入 ZIP 的图片条目。plan 阶段只校验文件可打开，
+// 真正的字节复制留到响应体流式写出，避免整包驻留内存。
+type comicZipEntry struct {
+	name       string
+	storageRef string
+}
+
+type comicZipPlan struct {
+	filename string
+	markdown string
+	entries  []comicZipEntry
+}
+
+// planComicPromptZip 只做数据库读取、提示词拼装和条目收集，不生成 ZIP 字节。
+// 单本漫画 35 页原图约 150MB，必须让压缩发生在响应流里而不是内存里。
+func planComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, presetCatalog *prompt.Catalog, owner, batchID, bookID string) (comicZipPlan, error) {
 	batch, err := store.GetBatch(ctx, owner, batchID)
 	if err != nil {
-		return nil, "", err
+		return comicZipPlan{}, err
 	}
 	var book *batchfactoryv11.Book
 	for index := range batch.Books {
@@ -2015,11 +2481,11 @@ func buildComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comic
 		}
 	}
 	if book == nil {
-		return nil, "", batchfactoryv11.ErrNotFound
+		return comicZipPlan{}, batchfactoryv11.ErrNotFound
 	}
 	pages, err := comicStore.ListComicPages(ctx, owner, batchID, bookID)
 	if err != nil {
-		return nil, "", err
+		return comicZipPlan{}, err
 	}
 	pagesByVideo := make(map[string]batchfactoryv11.ComicPage, len(pages))
 	for _, page := range pages {
@@ -2028,11 +2494,9 @@ func buildComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comic
 	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	effective, err = resolvePublishedComicStyleReference(effective, presetCatalog)
 	if err != nil {
-		return nil, "", err
+		return comicZipPlan{}, err
 	}
 
-	var archive bytes.Buffer
-	zipWriter := zip.NewWriter(&archive)
 	var promptMarkdown strings.Builder
 	fmt.Fprintf(&promptMarkdown, "# %s｜最终完整出图提示词\n\n", book.Title)
 	for index, video := range book.Videos {
@@ -2071,48 +2535,41 @@ func buildComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comic
 		promptMarkdown.WriteString(compiled)
 		promptMarkdown.WriteString("\n\n")
 	}
-	if err := writeComicZipText(zipWriter, "最终完整出图提示词.md", promptMarkdown.String()); err != nil {
-		return nil, "", err
+
+	entries := make([]comicZipEntry, 0, len(pages))
+	appendEntry := func(name, storageRef string) {
+		if files == nil || strings.TrimSpace(storageRef) == "" {
+			return
+		}
+		// 只校验可打开；读不到的图片沿用原有“跳过”语义，不让整包失败。
+		file, openErr := files.Open(storageRef)
+		if openErr != nil {
+			return
+		}
+		_ = file.Close()
+		entries = append(entries, comicZipEntry{name: name, storageRef: storageRef})
 	}
 
 	// 复用同一个打包接口，把已生成的漫画页主图一并放入压缩包；没有图片时
 	// 仍然只导出提示词与资产图片，保持原有调用方的行为。
 	for pageIndex, page := range pages {
-		if files == nil {
-			break
-		}
 		for imageIndex, image := range page.Images {
-			storageRef := strings.TrimSpace(image.StorageRef)
-			if storageRef == "" {
-				continue
-			}
-			file, openErr := files.Open(storageRef)
-			if openErr != nil {
-				continue
-			}
-			extension := filepath.Ext(storageRef)
+			extension := filepath.Ext(image.StorageRef)
 			if extension == "" {
 				extension = comicZipImageExtension(image.MediaType)
 			}
-			entry, createErr := zipWriter.Create(fmt.Sprintf("漫画页/第%02d页_%02d%s", pageIndex+1, imageIndex+1, extension))
-			if createErr == nil {
-				_, createErr = io.Copy(entry, file)
-			}
-			_ = file.Close()
-			if createErr != nil {
-				return nil, "", createErr
-			}
+			appendEntry(fmt.Sprintf("漫画页/第%02d页_%02d%s", pageIndex+1, imageIndex+1, extension), image.StorageRef)
 		}
 	}
 
 	assets, err := store.ListBookAssets(ctx, owner, batchID, bookID)
 	if err != nil {
-		return nil, "", err
+		return comicZipPlan{}, err
 	}
 	for assetIndex, asset := range assets {
 		images, listErr := store.ListBookAssetImages(ctx, owner, batchID, bookID, asset.ID)
 		if listErr != nil {
-			return nil, "", listErr
+			return comicZipPlan{}, listErr
 		}
 		kind := comicZipAssetKindLabel(asset.Kind)
 		assetName := safeComicZipPart(asset.Name)
@@ -2120,39 +2577,62 @@ func buildComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comic
 			assetName = fmt.Sprintf("资产_%03d", assetIndex+1)
 		}
 		for imageIndex, image := range images {
-			storageRef := strings.TrimSpace(image.StorageRef)
-			if storageRef == "" {
-				continue
-			}
-			if files == nil {
-				continue
-			}
-			file, openErr := files.Open(storageRef)
-			if openErr != nil {
-				continue
-			}
-			extension := filepath.Ext(storageRef)
+			extension := filepath.Ext(image.StorageRef)
 			if extension == "" {
 				extension = comicZipImageExtension(image.MediaType)
 			}
-			entry, createErr := zipWriter.Create(fmt.Sprintf("资产图片/%s/%s_%02d%s", kind, assetName, imageIndex+1, extension))
-			if createErr == nil {
-				_, createErr = io.Copy(entry, file)
-			}
-			_ = file.Close()
-			if createErr != nil {
-				return nil, "", createErr
-			}
+			appendEntry(fmt.Sprintf("资产图片/%s/%s_%02d%s", kind, assetName, imageIndex+1, extension), image.StorageRef)
 		}
 	}
-	if err := zipWriter.Close(); err != nil {
-		return nil, "", err
-	}
+
 	filename := safeComicZipPart(book.Title)
 	if filename == "" {
 		filename = "漫画提示词"
 	}
-	return archive.Bytes(), filename + "_最终提示词_资产图片.zip", nil
+	return comicZipPlan{filename: filename + "_最终提示词_资产图片.zip", markdown: promptMarkdown.String(), entries: entries}, nil
+}
+
+// writeComicZipStream 边压边写：zip.NewWriter 直接落到响应 writer，条目按
+// 顺序 io.Copy，内存占用只跟单个读缓冲有关。
+func writeComicZipStream(w io.Writer, files *localartifact.Store, plan comicZipPlan) error {
+	writer := zip.NewWriter(w)
+	if plan.markdown != "" {
+		if err := writeComicZipText(writer, "最终完整出图提示词.md", plan.markdown); err != nil {
+			_ = writer.Close()
+			return err
+		}
+	}
+	for _, entry := range plan.entries {
+		file, openErr := files.Open(entry.storageRef)
+		if openErr != nil {
+			_ = writer.Close()
+			return openErr
+		}
+		target, createErr := writer.Create(entry.name)
+		if createErr == nil {
+			_, createErr = io.Copy(target, file)
+		}
+		_ = file.Close()
+		if createErr != nil {
+			_ = writer.Close()
+			return createErr
+		}
+	}
+	return writer.Close()
+}
+
+// serveComicZip 在写出任何 ZIP 字节前先发响应头；plan 阶段已经拦掉了可读
+// 错误（缺图、权限、不存在），所以这里出现 I/O 错误只可能是流中断。此时
+// 状态码已经发出，主动断开连接让客户端明确看到下载失败，而不是收到一个
+// 看似成功但内容截断的 ZIP。
+func serveComicZip(w http.ResponseWriter, files *localartifact.Store, plan comicZipPlan, asciiName string) {
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+asciiName+"\"; filename*=UTF-8''"+url.QueryEscape(plan.filename))
+	w.WriteHeader(http.StatusOK)
+	if err := writeComicZipStream(w, files, plan); err != nil {
+		log.Printf("stream comic zip %s: %v", plan.filename, err)
+		panic(http.ErrAbortHandler)
+	}
 }
 
 func comicZipAssetKindLabel(kind string) string {
@@ -2229,7 +2709,10 @@ func comicPageResponsesLite(pages []batchfactoryv11.ComicPage, lite bool) []batc
 func comicCollectionResponse(collection batchfactoryv11.ComicCollection) batchfactoryv11.ComicCollection {
 	for index := range collection.Items {
 		item := &collection.Items[index]
-		item.URL = "/api/batch-factory/v12/batches/" + collection.BatchID + "/books/" + collection.BookID + "/comic-pages/" + item.ComicPageID + "/images/" + item.ImageID + "/content"
+		base := "/api/batch-factory/v12/batches/" + collection.BatchID + "/books/" + collection.BookID + "/comic-pages/" + item.ComicPageID + "/images/" + item.ImageID
+		item.URL = base + "/content"
+		// 合集九宫格同样先取缩略图；点开大图/下载仍走 URL 原图。
+		item.ThumbnailURL = base + "/thumbnail"
 	}
 	return collection
 }

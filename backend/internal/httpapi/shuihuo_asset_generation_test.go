@@ -350,6 +350,36 @@ func TestGenerateShuihuoImageArtifactPassesReferencesToPersonalAPI(t *testing.T)
 	}
 }
 
+func TestGenerateShuihuoImageArtifactResolvesLocalStyleReferenceForPersonalAPI(t *testing.T) {
+	ctx := context.Background()
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/images/edits" {
+			t.Errorf("path=%s, want /v1/images/edits", r.URL.Path)
+		}
+		if err := r.ParseMultipartForm(8 << 20); err != nil {
+			t.Errorf("parse multipart: %v", err)
+		}
+		if len(r.MultipartForm.File["image[]"]) != 1 {
+			t.Errorf("reference files=%d, want 1", len(r.MultipartForm.File["image[]"]))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="}]}`))
+	}))
+	defer provider.Close()
+
+	target := shuihuoAssetImageTarget{
+		Provider:     "personal_api",
+		ModelID:      "provider-image",
+		AspectRatio:  "9:16",
+		CatalogModel: map[string]any{"endpoint": provider.URL + "/v1/images/generations", "credential": "test-secret"},
+	}
+	_, _, _, err := generateShuihuoImageArtifact(ctx, nil, files, nil, "alice", target, "漫画页提示词", []string{"/api/local-executor/v1/batch-comic-style-previews/batch-comic-style-16"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateShuihuoImageArtifactDownloadsAuthorizedProviderURL(t *testing.T) {
 	ctx := context.Background()
 	files := localartifact.NewStore(t.TempDir(), 1<<20)
@@ -745,8 +775,14 @@ func TestGenerateShuihuoAssetImagesDispatchesMixedProvidersPerAsset(t *testing.T
 
 func TestShuihuoImageResponseContentRejectedRecognizesProviderSoftRefusal(t *testing.T) {
 	softRefusal := []byte(`{"error":{"message":"目前未能成功生成图片。请重新发送一次生成请求，我会按要求制作 1536×1024 横版画面。(request id: 2026110117491859091069118142872)"}}`)
-	if !shuihuoImageResponseContentRejected(400, softRefusal) {
-		t.Fatal("provider soft refusal must go through the degraded-prompt retry path")
+	if !shuihuoImageResponseSoftRefusal(400, softRefusal) {
+		t.Fatal("provider soft refusal must be classified as CONTENT_SOFT_REFUSAL")
+	}
+	if shuihuoImageResponseContentRejected(400, softRefusal) {
+		t.Fatal("soft refusal must be separate from hard content policy")
+	}
+	if !shuihuoImageResponseContentRejected(400, []byte(`{"error":{"message":"prompt violates content policy"}}`)) {
+		t.Fatal("hard content policy rejection must still be recognized")
 	}
 	if shuihuoImageResponseContentRejected(400, []byte(`{"error":{"message":"balance pre-deduction insufficient"}}`)) {
 		t.Fatal("account balance errors must stay permanent failures")

@@ -1,7 +1,11 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"image"
+	"image/png"
 	"net/http"
 	"testing"
 	"time"
@@ -80,28 +84,55 @@ func TestBookAssetImageUploadStoresBytesAndServesOwnedVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store, LocalArtifacts: localartifact.NewStore(t.TempDir(), 1024)})
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store, LocalArtifacts: localartifact.NewStore(t.TempDir(), 1<<30)})
 	path := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + book.ID + "/assets/" + asset.ID + "/images"
-	dataURL := "data:image/png;base64,iVBORw0KGgoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	canvas := image.NewRGBA(image.Rect(0, 0, 900, 1200))
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, canvas); err != nil {
+		t.Fatal(err)
+	}
+	dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(encoded.Bytes())
 
 	uploaded := signedJSONRequest(t, api, now, "alice", http.MethodPost, path+"/upload", map[string]any{"dataUrl": dataURL})
 	if uploaded.Code != http.StatusCreated {
 		t.Fatalf("upload status=%d body=%s", uploaded.Code, uploaded.Body.String())
 	}
-	image := decodeBody[struct {
+	uploadedImage := decodeBody[struct {
 		Image struct {
-			ID     string `json:"id"`
-			URL    string `json:"url"`
-			Source string `json:"source"`
+			ID           string `json:"id"`
+			URL          string `json:"url"`
+			ThumbnailURL string `json:"thumbnailUrl"`
+			Source       string `json:"source"`
 		} `json:"image"`
 	}](t, uploaded).Image
-	if image.ID == "" || image.URL == "" || image.Source != "upload" {
-		t.Fatalf("image=%+v", image)
+	if uploadedImage.ID == "" || uploadedImage.URL == "" || uploadedImage.ThumbnailURL == "" || uploadedImage.Source != "upload" {
+		t.Fatalf("image=%+v", uploadedImage)
 	}
 
-	content := signedJSONRequest(t, api, now, "alice", http.MethodGet, image.URL, nil)
+	thumbnail := signedJSONRequest(t, api, now, "alice", http.MethodGet, uploadedImage.ThumbnailURL, nil)
+	if thumbnail.Code != http.StatusOK || thumbnail.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("thumbnail status=%d type=%q body=%s", thumbnail.Code, thumbnail.Header().Get("Content-Type"), thumbnail.Body.String())
+	}
+	if got := thumbnail.Header().Get("Cache-Control"); got != "private, max-age=604800, immutable" {
+		t.Fatalf("thumbnail Cache-Control=%q", got)
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(thumbnail.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("decode thumbnail: %v", err)
+	}
+	if config.Width != 315 || config.Height != 420 {
+		t.Fatalf("thumbnail size=%dx%d, want 315x420", config.Width, config.Height)
+	}
+
+	content := signedJSONRequest(t, api, now, "alice", http.MethodGet, uploadedImage.URL, nil)
 	if content.Code != http.StatusOK || content.Header().Get("Content-Type") != "image/png" || content.Body.Len() == 0 {
 		t.Fatalf("content status=%d type=%q bytes=%d", content.Code, content.Header().Get("Content-Type"), content.Body.Len())
+	}
+	if got := content.Header().Get("Cache-Control"); got != "private, max-age=604800, immutable" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
+	if got := content.Header().Get("ETag"); got == "" {
+		t.Fatal("asset image content is missing ETag")
 	}
 }
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   batchFactoryProductionMode,
   batchFactoryProductionModeVisibility,
+  batchFactoryShouldLoadPublishEnvironment,
   batchFactoryShouldPrepareAudio,
   batchFactoryShouldRecompileVideoPrompts
 } from './batchFactoryProductionMode.js';
@@ -14,6 +15,13 @@ test('defaults historical settings to video mode', () => {
     video: true,
     comic: false
   });
+});
+
+test('video publishing environment is checked only while its tab is visible', () => {
+  assert.equal(batchFactoryShouldLoadPublishEnvironment({ open: true, activeTab: 'models', productionMode: 'video' }), false);
+  assert.equal(batchFactoryShouldLoadPublishEnvironment({ open: true, activeTab: 'publish', productionMode: 'comic' }), false);
+  assert.equal(batchFactoryShouldLoadPublishEnvironment({ open: true, activeTab: 'publish', productionMode: 'video' }), true);
+  assert.equal(batchFactoryShouldLoadPublishEnvironment({ open: false, activeTab: 'publish', productionMode: 'video' }), false);
 });
 
 test('comic mode exposes comic settings and hides video settings', () => {

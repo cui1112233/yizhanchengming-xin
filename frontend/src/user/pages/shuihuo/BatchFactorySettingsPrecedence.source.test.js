@@ -53,19 +53,20 @@ test('unified configuration covers engine, model, media, opening and publish fie
   }
 });
 
-test('the asset image switch defaults to on, is pushed batch-wide and only badges single-book deviations', () => {
-  // 统一配置弹窗里的开关：默认开（只有显式 false 才关闭），文案说明跳过资产不影响后续流程。
+test('the asset image switch defaults to off, is pushed batch-wide and only badges single-book deviations', () => {
+  // 统一配置弹窗里的开关：默认关（只有显式 true 才开启），文案说明跳过资产不影响后续流程。
   assert.match(unifiedModal, /<b>生成资产图片<\/b>/);
-  assert.match(unifiedModal, /checked=\{value\.assetImagesEnabled !== false\}/);
-  assert.match(unifiedModal, /关闭后跳过自动化的资产生成阶段/);
+  assert.match(unifiedModal, /checked=\{value\.assetImagesEnabled === true\}/);
+  assert.match(unifiedModal, /默认关闭/);
+  assert.match(unifiedModal, /关闭时跳过资产生成阶段/);
   assert.match(unifiedModal, /不影响分镜、视频与漫画流程/);
   assert.match(unifiedModal, /已有资产图片仍会照常使用/);
   // 保存统一配置时纳入写透集合，逐本下发，单书可覆盖。
   const keys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
   assert.match(keys, /'assetImagesEnabled'/, 'assetImagesEnabled must be part of UNIFIED_CONFIGURATION_KEYS');
   assert.match(bookModal, /ENGINE_MODEL_OVERRIDE_FIELDS = \[[\s\S]*?'assetImagesEnabled'[\s\S]*?\];/);
-  // 单书沿用统一 FieldSource 规则：只有偏离批次并显式保存时才出现“自定义”。
-  assert.match(bookModal, /<InheritedSwitchField label="生成资产图片"[\s\S]{0,220}explicit=\{Object\.hasOwn\(bookPatch, 'assetImagesEnabled'\)\}/);
+  // 单书沿用统一 FieldSource 规则：批次未写该键时按关闭继承，只有偏离批次并显式保存时才出现“自定义”。
+  assert.match(bookModal, /<InheritedSwitchField label="生成资产图片"[\s\S]{0,220}inherited=\{inherited\.assetImagesEnabled === true\}[\s\S]{0,220}explicit=\{Object\.hasOwn\(bookPatch, 'assetImagesEnabled'\)\}/);
 });
 
 test('the batch AI repair switch defaults to off and only an explicit true turns it on', () => {
@@ -151,7 +152,7 @@ test('the config-region badge follows the same precedence as runtime', () => {
   assert.match(novelList, /bookConfigRegionStatus\(book, region\.key, batch\?\.settingsState\?\.patch \|\| \{\}\)/);
 });
 
-test('the automation failure notice lives outside the editable-content cell and does not reuse the sensitive-review class', () => {
+test('the automation failure notice lives outside the editable-content cell and the removed sensitive-review card stays hidden', () => {
   const contentCell = novelList.match(/className="shuihuo-workbench-cell batch-factory-book-content"[\s\S]*?batch-factory-book-content-actions/)?.[0] || '';
   assert.ok(contentCell.length > 0, 'content cell not found');
   assert.doesNotMatch(contentCell, /BatchFactoryErrorNotice/);
@@ -161,7 +162,7 @@ test('the automation failure notice lives outside the editable-content cell and 
   const strip = novelList.match(/<div className="batch-factory-book-row-error-strip">[\s\S]*?<\/div>/)?.[0] || '';
   assert.match(strip, /<BatchFactoryErrorNotice/);
   const sensitiveCount = (novelList.match(/batch-factory-sensitive-review/g) || []).length;
-  assert.equal(sensitiveCount, 1, 'only the real sensitive-word alert may use batch-factory-sensitive-review');
+  assert.equal(sensitiveCount, 0, 'the sensitive-word review card must stay removed');
 });
 
 test('unified settings save closes the dialog before audio measurement and prompt recompilation', () => {

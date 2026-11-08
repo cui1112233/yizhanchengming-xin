@@ -1,4 +1,4 @@
-import { apiRequest } from './client.js';
+import { LONG_RUNNING_API_TIMEOUT_MS, apiRequest } from './client.js';
 
 const AGENT_ASSET_CONTENT_PATTERN = /^\/api\/agent\/tasks\/[^/?#]+\/assets\/[^/?#]+\/content$/;
 const BATCH_FACTORY_PROJECTION_MEDIA_PATTERN = /^\/api\/agent\/tasks\/[^/?#]+\/batch-factory\/nodes\/[^/?#]+\/media$/;
@@ -404,6 +404,7 @@ export function askAgent({ taskId, prompt, context, skillIds = [], suppressGloba
   return apiRequest('/api/agent/chat', {
     method: 'POST',
     body: JSON.stringify({ taskId, prompt, context: prepareAgentContext(context), skillIds }),
-    suppressGlobalError
+    suppressGlobalError,
+    timeoutMs: LONG_RUNNING_API_TIMEOUT_MS
   });
 }

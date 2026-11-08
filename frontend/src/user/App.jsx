@@ -12,7 +12,7 @@ const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
 const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ default: module.AgentPageV2 })));
-const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
+const ShuihuoProductionPage = lazy(() => import('./pages/BatchFactoryPageV30'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));

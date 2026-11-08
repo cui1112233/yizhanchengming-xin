@@ -120,6 +120,26 @@ func TestResolveUsesTrailingBookCityTagWhenProviderCodeIsUnknown(t *testing.T) {
 	}
 }
 
+func TestResolveNormalizesHYWithoutTrailingBookCityTag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"code":"SUCCESS","data":{"list":[{"id":"10122320","video_url":"https://material.hnqingyuwen.top/a.mp4","works":[{"cp_work_id":"2116117507845951489","cp_type":"HY","name":"旧梦辞秋赴归途"}]}]}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(&http.Client{Transport: rewriteTransport{target: server.URL}}, "https://n8.hnqingyuwen.top/select", "server-token")
+	material, err := client.Resolve(context.Background(), "7703457376615170058")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(material.Books) != 1 {
+		t.Fatalf("books=%+v", material.Books)
+	}
+	book := material.Books[0]
+	if book.PlatformCode != "HY" || book.PlatformName != "黑岩" || book.PlatformID != "1" || book.Title != "旧梦辞秋赴归途" {
+		t.Fatalf("book=%+v", book)
+	}
+}
+
 type rewriteTransport struct{ target string }
 
 func (t rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {

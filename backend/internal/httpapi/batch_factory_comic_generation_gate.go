@@ -39,6 +39,14 @@ func comicPageGenerationTaskIsStale(page batchfactoryv11.ComicPage, now time.Tim
 	return !now.Before(page.UpdatedAt.Add(comicPageGenerationStaleAfter))
 }
 
+// comicPageGenerationLeaseRecoverable deliberately ignores whether this
+// process acquired its local gate. After a restart that gate is empty while a
+// paid provider request may still be running, so only the durable safety
+// window may authorize another submission.
+func comicPageGenerationLeaseRecoverable(page batchfactoryv11.ComicPage, _ bool, now time.Time) bool {
+	return comicPageGenerationTaskIsStale(page, now)
+}
+
 func (g *comicPageGenerationGate) tryAcquire(key string) (func(), bool) {
 	if g == nil {
 		return nil, false

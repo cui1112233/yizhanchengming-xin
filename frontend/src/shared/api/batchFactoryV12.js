@@ -1,4 +1,4 @@
-import { apiRequest } from './client.js';
+import { LONG_RUNNING_API_TIMEOUT_MS, apiRequest } from './client.js';
 
 // The module name remains for import compatibility while the production
 // workbench has moved to the V12 public contract.
@@ -34,7 +34,7 @@ function query(params = {}) {
 async function productionRetentionDays() {
   const config = await apiRequest('/api/config');
   const days = Number(config?.productionRetentionDays);
-  return [3, 7, 14, 30].includes(days) ? days : 3;
+  return [3, 7, 14, 30].includes(days) ? days : 7;
 }
 
 function localExecutorArtifactRequestPath(value) {
@@ -242,7 +242,7 @@ export function getCapabilities() {
 // book-scoped image endpoints below, but Vite still statically imports this
 // page and must retain its public API contract.
 export function generateConfiguredImage(payload = {}) {
-  return apiRequest(bf11Path('image-generation'), { method: 'POST', body: body(payload) });
+  return apiRequest(bf11Path('image-generation'), { method: 'POST', body: body(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function createNovelFetchIntake(payload) {
@@ -254,7 +254,7 @@ export function createManualIntake(payload) {
 }
 
 export function createPrivateComicTask(payload = {}) {
-  return apiRequest(bf11Path('private-comic/tasks'), { method: 'POST', body: body(payload) });
+  return apiRequest(bf11Path('private-comic/tasks'), { method: 'POST', body: body(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function getIntake(intakeId) {
@@ -306,7 +306,8 @@ export function fetchDirectOriginals(payload) {
   return apiRequest(`${bf11Path('fetch-originals')}?${params.toString()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(normalized)
+    body: JSON.stringify(normalized),
+    timeoutMs: LONG_RUNNING_API_TIMEOUT_MS
   });
 }
 
@@ -316,7 +317,8 @@ export function fetchBookOriginal(batchId, bookId, options = {}) {
     body: body({
       ...(Number(options.maxTxt) > 0 ? { maxTxt: Number(options.maxTxt) } : {}),
       ...(String(options.platform || '').trim() ? { platform: String(options.platform).trim() } : {})
-    })
+    }),
+    timeoutMs: LONG_RUNNING_API_TIMEOUT_MS
   });
 }
 
@@ -430,7 +432,7 @@ export function setPrimaryBookAssetImage(batchId, bookId, assetId, imageId) {
 // authenticated Node gateway resolves the account credential, calls the model,
 // and persists each returned image as a version owned by this book asset.
 export function generateBookAssetImages(batchId, bookId, payload) {
-  return apiRequest(`${bookAssetsPath(batchId, bookId)}/images/generate`, { method: 'POST', body: body(payload) });
+  return apiRequest(`${bookAssetsPath(batchId, bookId)}/images/generate`, { method: 'POST', body: body(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function getBookAssetImageGenerationTask(batchId, bookId, taskId) {
@@ -464,7 +466,8 @@ export function createPrompt(payload) {
 // System preset metadata is safe for the browser. The protected body is
 // resolved only in the Node-to-Go bridge when a Batch Factory setting is saved.
 export function listSystemPresetCatalog(module) {
-  return apiRequest(`/api/presets?module=${encodeURIComponent(String(module || ''))}`);
+  const catalogNonce = Date.now();
+  return apiRequest(`/api/presets?module=${encodeURIComponent(String(module || ''))}&_=${catalogNonce}`, { cache: 'no-store' });
 }
 
 export function listBatchFactorySystemPresets() {
@@ -490,11 +493,11 @@ export function saveDraft(payload) {
 }
 
 export function rewriteWorkingFront(batchId, bookId, content, payload = {}) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/working-front/viral`), { method: 'POST', body: body({ ...payload, content: String(content || '') }) });
+  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/working-front/viral`), { method: 'POST', body: body({ ...payload, content: String(content || '') }), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function runHook(batchId, bookId, payload = {}) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/hook`), { method: 'POST', body: body(payload) });
+  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/hook`), { method: 'POST', body: body(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function approveHook(batchId, bookId, hookId) {
@@ -502,11 +505,11 @@ export function approveHook(batchId, bookId, hookId) {
 }
 
 export function runDirector(batchId, bookId) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/director`), { method: 'POST', body: body({}) });
+  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/director`), { method: 'POST', body: body({}), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function uploadComicGlobalReference(batchId, dataUrl) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/comic-reference/upload`), { method: 'POST', body: body({ dataUrl }) });
+  return apiRequest(bf11Path(`batches/${id(batchId)}/comic-reference/upload`), { method: 'POST', body: body({ dataUrl }), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 function comicPagesPath(batchId, bookId, suffix = '') {
@@ -524,7 +527,8 @@ export function listComicPages(batchId, bookId, options = {}) {
   // 漫画页编辑弹窗需要完整提示词，保持默认全量。
   const { view, ...requestOptions } = options;
   const path = comicPagesPath(batchId, bookId);
-  return apiRequest(view ? `${path}?view=${encodeURIComponent(view)}` : path, requestOptions);
+  // 生图成功后必须立即读到新候选图；浏览器旧 GET 缓存会让用户误以为图片没回来。
+  return apiRequest(view ? `${path}?view=${encodeURIComponent(view)}` : path, { ...requestOptions, cache: 'no-store' });
 }
 
 function comicSourceSegmentsPath(batchId, bookId, suffix = '') {
@@ -537,7 +541,7 @@ export function getComicSourceSegments(batchId, bookId, options = {}) {
 }
 
 export function segmentComicSource(batchId, bookId) {
-  return apiRequest(comicSourceSegmentsPath(batchId, bookId, 'segment'), { method: 'POST', body: body({}) });
+  return apiRequest(comicSourceSegmentsPath(batchId, bookId, 'segment'), { method: 'POST', body: body({}), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function splitComicSourceSegment(batchId, bookId, videoId, payload) {
@@ -547,7 +551,7 @@ export function splitComicSourceSegment(batchId, bookId, videoId, payload) {
 export function generateComicPage(batchId, bookId, videoId, payload) {
   // 409 是“该页已有在途生成”，由调用方合并成一条提示并启动轮询；
   // 这里不再触发全局顶栏错误，避免同一个失败被全局拦截器和页面各弹一次。
-  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/generate`), { method: 'POST', body: body(payload), suppressGlobalError: true });
+  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/generate`), { method: 'POST', body: body(payload), suppressGlobalError: true, timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function updateComicPage(batchId, bookId, videoId, payload) {
@@ -555,11 +559,11 @@ export function updateComicPage(batchId, bookId, videoId, payload) {
 }
 
 export function generateComicBook(batchId, bookId) {
-  return apiRequest(comicCollectionsPath(batchId, bookId, 'generate'), { method: 'POST', body: body({}) });
+  return apiRequest(comicCollectionsPath(batchId, bookId, 'generate'), { method: 'POST', body: body({}), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function getComicPagePromptPreview(batchId, bookId, videoId, payload = {}) {
-  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/prompt-preview`), { method: 'POST', body: body(payload) });
+  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/prompt-preview`), { method: 'POST', body: body(payload), timeoutMs: LONG_RUNNING_API_TIMEOUT_MS });
 }
 
 export function downloadComicPromptZip(batchId, bookId) {
@@ -783,10 +787,6 @@ export function deleteAutomationPreset(presetId) {
 
 export function saveBatchAutomationPreset(batchId, name) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/automation-presets`), { method: 'POST', body: body({ name }) });
-}
-
-export function upgradeBatchAutomationPreset(batchId, payload = {}) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/automation/upgrade-preset`), { method: 'POST', body: body(payload) });
 }
 
 export function startBatchAutomation(batchId, payload = {}) {

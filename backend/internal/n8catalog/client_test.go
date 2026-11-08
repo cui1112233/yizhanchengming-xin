@@ -39,6 +39,23 @@ func TestClientListsEnabledAudioByOrganizationAndStatus(t *testing.T) {
 	}
 }
 
+func TestClientListsAudioWhenN8ReturnsScalarCategoryID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "data": map[string]any{"list": []map[string]any{
+			{"id": 33, "name": "泡沫.MP3", "organization_id": 1, "category_ids": 8, "status": "ENABLE"},
+		}}})
+	}))
+	defer server.Close()
+
+	items, err := NewClient(server.Client(), server.URL+"/center-api", "token").ListAudio(context.Background(), "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || !reflect.DeepEqual(items[0].CategoryIDs, []int64{8}) {
+		t.Fatalf("items=%+v", items)
+	}
+}
+
 func TestDirectoryFailureHasSafeDiagnostic(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

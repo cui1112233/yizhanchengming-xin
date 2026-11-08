@@ -120,6 +120,14 @@ test('offers giant material intake through the resident executor', () => {
   assert.doesNotMatch(source, /waitForGiantMaterialJob/);
 });
 
+test('highlights later giant material rows that resolve to a duplicate Book ID', () => {
+  assert.match(source, /duplicateGiantMaterialBookIndexes/);
+  assert.match(source, /is-duplicate/);
+  assert.match(source, /重复，将跳过/);
+  assert.match(stylesheet, /batch-factory-giant-item\.is-duplicate/);
+  assert.match(stylesheet, /batch-factory-giant-duplicate-tag/);
+});
+
 test('giant immediate execution opens the same automation-plan dialog as other book cities', () => {
   const toolbarStart = source.search(/\{isGiantMaterial\r?\n        \? <>/);
   const toolbarEnd = source.indexOf('\n      <Button onClick={() => openAutomationDialog(\'scheduled\')}>开始定时</Button>', toolbarStart);

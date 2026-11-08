@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
 
 import { inferBatchN8AudioCategory, inferBookN8AudioCategory } from './batchFactoryAudioCategory.js';
+
+const unifiedSettingsSource = fs.readFileSync(new URL('./BatchFactoryUnifiedSettingsModal.jsx', import.meta.url), 'utf8');
 
 const categories = [
   { id: 14, name: '现代悬疑', status: 'ENABLE' },
@@ -43,4 +46,17 @@ test('keeps batch inference compatible without treating mixed books as one categ
   ], categories);
   assert.equal(result.reason, 'mixed');
   assert.equal(result.category, null);
+});
+
+test('comic publish defaults to per-book automatic audio instead of one batch category', () => {
+  assert.match(unifiedSettingsSource, /发布时按每本书的男女频和风格自动匹配并随机选择音频/);
+  assert.match(unifiedSettingsSource, /value=\{comicPublishSettings\.audioCategorySelectionMode === 'manual' \? 'manual' : 'auto'\}/);
+  assert.doesNotMatch(unifiedSettingsSource, /inferBatchN8AudioCategory/);
+  assert.doesNotMatch(unifiedSettingsSource, /批次书籍分类不一致，需手动选择音频分类/);
+});
+
+test('manual category and audio changes explicitly lock manual mode', () => {
+  const manualAssignments = unifiedSettingsSource.match(/audioCategorySelectionMode: 'manual'/g) || [];
+  assert.ok(manualAssignments.length >= 3, `manual assignments=${manualAssignments.length}`);
+  assert.match(unifiedSettingsSource, /specifiedAudioId: selected\?\.id \|\| '', specifiedAudioName: selected\?\.name \|\| '', audioCategorySelectionMode: 'manual'/);
 });

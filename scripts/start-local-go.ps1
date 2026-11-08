@@ -4,7 +4,14 @@
   [switch]$SkipBuild,
   # 版本纪律：要求本次启动的二进制必须对应 docs/releases 下已存档的构建。
   [switch]$RequireArchivedRelease,
-  [string]$ListenAddr = $(if ($env:QIANTIE_GO_LISTEN_ADDR) { $env:QIANTIE_GO_LISTEN_ADDR } else { ':4001' })
+  # 后台常驻启动：用 Start-Process 独立进程 + 文件日志，避免父 PowerShell 退出后把服务带走。
+  [switch]$Detached,
+  [string]$ListenAddr = $(if ($env:QIANTIE_GO_LISTEN_ADDR) { $env:QIANTIE_GO_LISTEN_ADDR } else { ':4001' }),
+  # 发布前置验证用：直接运行指定二进制和清单，不覆盖 backend/qiantie-local.exe。
+  [string]$BinaryPath = '',
+  [string]$ManifestPath = '',
+  # 发布前置验证用：跳过“是否需要重建”的源码/资源时间戳推断，避免误重建候选二进制。
+  [switch]$NoBuildCheck
 )
 
 $ErrorActionPreference = 'Stop'
@@ -105,14 +112,24 @@ if ($CheckOnly) {
   exit $LASTEXITCODE
 }
 
-$binaryPath = Join-Path $repo 'backend/qiantie-local.exe'
+$binaryPath = if ([string]::IsNullOrWhiteSpace($BinaryPath)) {
+  Join-Path $repo 'backend/qiantie-local.exe'
+} else {
+  [System.IO.Path]::GetFullPath($BinaryPath)
+}
 $goSourceRoot = Join-Path $repo 'backend'
 $frontendRoot = Join-Path $repo 'frontend'
 $frontendDist = Join-Path $repo 'frontend/dist'
 $goDist = Join-Path $repo 'backend/web/dist'
-$runtimeManifestPath = Join-Path $repo '.local-review/runtime-manifest.json'
+$runtimeManifestPath = if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+  Join-Path $repo '.local-review/runtime-manifest.json'
+} else {
+  [System.IO.Path]::GetFullPath($ManifestPath)
+}
 $expectedBuildSHA = (& git -C $repo rev-parse --short HEAD).Trim()
 $needsBuild = -not (Test-Path $binaryPath)
+$frontendBuildRequired = $false
+if (-not $NoBuildCheck) {
 $frontendBuildRequired = Test-FrontendBuildRequired `
   -SourceRoot (Join-Path $frontendRoot 'src') `
   -DistIndexPath (Join-Path $frontendDist 'index.html') `
@@ -165,6 +182,7 @@ if (-not $needsBuild) {
     Select-Object -First 1
   $needsBuild = $latestAsset -and $latestAsset.LastWriteTimeUtc -gt $binaryTime
 }
+}  # end of -NoBuildCheck guard
 if ($SkipBuild) {
   if (-not (Test-Path -LiteralPath $binaryPath)) {
     throw "SkipBuild 已指定，但本地二进制不存在：$binaryPath；请先运行 scripts/build-go-local.ps1。"
@@ -195,7 +213,9 @@ if (Test-Path -LiteralPath $currentReleasePath) {
     throw "backend/current-release.json 的 buildId 非法：$releaseBuildId"
   }
   $releaseArchive = Join-Path $repo (Join-Path 'docs/releases' $releaseBuildId)
-  if (-not (Test-Path -LiteralPath (Join-Path $releaseArchive 'build-info.json'))) {
+  # 日常本地启动只要求 current-release.json 可解析；存档完整性仅在
+  # -RequireArchivedRelease 的正式验证场景强制校验，避免本地被未归档构建挡住。
+  if ($RequireArchivedRelease -and -not (Test-Path -LiteralPath (Join-Path $releaseArchive 'build-info.json'))) {
     throw "backend/current-release.json 指向的存档不存在或不完整：$releaseArchive"
   }
   if ($RequireArchivedRelease) {
@@ -276,6 +296,22 @@ try {
     $env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED, `
     $env:QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED, `
     $ListenAddr)
+  if ($Detached) {
+    # 直接以前台方式调用 .exe 时，Go 写 stderr 会在这个脚本的
+    # $ErrorActionPreference='Stop' 下变成终止性错误，父 PowerShell 一退出
+    # 服务也跟着消失。后台启动改用独立进程，日志固定落到 .local-review/logs。
+    $logDir = Join-Path $repo '.local-review/logs'
+    New-Item -ItemType Directory -Force $logDir | Out-Null
+    $portLabel = (($ListenAddr -replace '^\s*:', '').Trim() -replace '[^0-9A-Za-z._-]', '-')
+    if ([string]::IsNullOrWhiteSpace($portLabel)) { $portLabel = '4001' }
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $stdoutLog = Join-Path $logDir ("qiantie-$portLabel-$stamp.out.log")
+    $stderrLog = Join-Path $logDir ("qiantie-$portLabel-$stamp.err.log")
+    $proc = Start-Process -FilePath $binaryPath -WorkingDirectory (Join-Path $repo 'backend') `
+      -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Hidden -PassThru
+    Write-Output ("已后台启动 pid={0} stdout={1} stderr={2}" -f $proc.Id, $stdoutLog, $stderrLog)
+    exit 0
+  }
   & .\qiantie-local.exe
   exit $LASTEXITCODE
 } finally {

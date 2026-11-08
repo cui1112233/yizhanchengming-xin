@@ -14,7 +14,7 @@ import (
 
 var localMergedArtifactID = regexp.MustCompile(`^merge_[A-Za-z0-9_-]{3,96}$`)
 
-const DefaultLocalMergedArtifactRetentionDays = 3
+const DefaultLocalMergedArtifactRetentionDays = 7
 
 func normalizeLocalMergedArtifactRetentionDays(value int) int {
 	switch value {

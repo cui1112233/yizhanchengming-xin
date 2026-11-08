@@ -61,7 +61,7 @@ func TestSliceOneCapabilitiesUnlockRequiredSurfaceOnly(t *testing.T) {
 }
 
 func TestDeleteRetentionDaysAcceptsOnlyConfiguredWindows(t *testing.T) {
-	for raw, want := range map[string]int{"3": 3, "7": 7, "14": 14, "30": 30, "": 3, "99": 3, "x": 3} {
+	for raw, want := range map[string]int{"3": 3, "7": 7, "14": 14, "30": 30, "": 7, "99": 7, "x": 7} {
 		req := httptest.NewRequest(http.MethodDelete, "/api/batch-factory/v11/batches/batch-1?retentionDays="+raw, nil)
 		if got := deleteRetentionDays(req); got != want {
 			t.Fatalf("retentionDays %q = %d, want %d", raw, got, want)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,6 +20,23 @@ func TestMergeObjectKeyIsDeterministicAndSafe(t *testing.T) {
 	}
 	if _, err := MergeObjectKey("../bad"); err == nil {
 		t.Fatal("expected unsafe task id rejection")
+	}
+}
+
+func TestTOSObjectStoreRejectsMergedVideoWhenHeadVerificationDiffers(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "merged.mp4")
+	if err := os.WriteFile(file, []byte("merged-video"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := &TOSObjectStore{
+		Bucket:  "bucket-a",
+		PutFile: func(context.Context, string, string, string, string) error { return nil },
+		HeadFile: func(context.Context, string) (int64, string, error) {
+			return int64(len("merged-video")), strings.Repeat("0", 64), nil
+		},
+	}
+	if _, err := store.PutMerged(context.Background(), "merge-task-123", file); err == nil {
+		t.Fatal("expected remote checksum mismatch")
 	}
 }
 

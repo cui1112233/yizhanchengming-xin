@@ -88,8 +88,30 @@ func parseN8ComicPublishSettings(settings batchfactoryv11.SettingsPatch) (n8Comi
 	if !ok {
 		return n8ComicPublishSettings{}, fmt.Errorf("请先在统一配置中填写漫画发布设置")
 	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return n8ComicPublishSettings{}, fmt.Errorf("漫画发布设置格式无效")
+	}
+	for _, key := range []string{"audioCategoryId", "audioId", "specifiedAudioId"} {
+		value, exists := payload[key]
+		if !exists || value == nil || strings.TrimSpace(fmt.Sprint(value)) == "" {
+			payload[key] = int64(0)
+			continue
+		}
+		if text, isText := value.(string); isText {
+			parsed, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+			if err != nil {
+				return n8ComicPublishSettings{}, fmt.Errorf("漫画发布设置格式无效")
+			}
+			payload[key] = parsed
+		}
+	}
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return n8ComicPublishSettings{}, fmt.Errorf("漫画发布设置格式无效")
+	}
 	var config n8ComicPublishSettings
-	if err := json.Unmarshal(raw, &config); err != nil {
+	if err := json.Unmarshal(normalized, &config); err != nil {
 		return n8ComicPublishSettings{}, fmt.Errorf("漫画发布设置格式无效")
 	}
 	return config, nil
@@ -301,6 +323,12 @@ type n8ProducerAccountsCache struct {
 	source string
 }
 
+type n8ProducerDirectorySnapshot struct {
+	names         []string
+	source        string
+	organizations map[string][]string
+}
+
 func (p *BatchFactoryN8ComicPublisher) cachedDirectory(key string) (any, bool) {
 	p.directoryCacheMu.Lock()
 	defer p.directoryCacheMu.Unlock()
@@ -353,18 +381,14 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 			organizationsWarning   string
 		)
 		var directoryWG sync.WaitGroup
-		directoryWG.Add(4)
+		directoryWG.Add(3)
 		go func() {
 			defer directoryWG.Done()
-			accountNames, source, warning = publisher.producerAccounts(r.Context())
+			accountNames, source, warning, producerOrganizations = publisher.producerDirectorySnapshot(r.Context())
 		}()
 		go func() {
 			defer directoryWG.Done()
 			organizationItems, organizationsWarning = publisher.organizationsWithWarning(r.Context())
-		}()
-		go func() {
-			defer directoryWG.Done()
-			producerOrganizations = publisher.producerOrganizations(r.Context())
 		}()
 		go func() {
 			defer directoryWG.Done()
@@ -610,6 +634,81 @@ func (p *BatchFactoryN8ComicPublisher) producerOrganizations(ctx context.Context
 		result[name] = append([]string(nil), entry.OrganizationIDs...)
 	}
 	p.storeDirectory("producerOrganizations", result)
+	return result
+}
+
+// producerDirectorySnapshot 一次翻页同时得到账号名和账号所属组织。
+// N8 的 ListProducerAccounts 本身也是通过 ListProducerAccountDirectory 翻页；
+// 分开调用会把同一份慢目录完整读取两遍。
+func (p *BatchFactoryN8ComicPublisher) producerDirectorySnapshot(ctx context.Context) ([]string, string, string, map[string][]string) {
+	if cached, ok := p.cachedDirectory("producerDirectorySnapshot"); ok {
+		entry := cached.(n8ProducerDirectorySnapshot)
+		return append([]string(nil), entry.names...), entry.source, "", cloneProducerOrganizations(entry.organizations)
+	}
+	fallback := uniqueProducerAccounts(p.ProducerAccounts)
+	emptyOrganizations := map[string][]string{}
+	if p.ProducerDirectory == nil || !p.ProducerDirectory.Configured() {
+		return fallback, "cache", "", emptyOrganizations
+	}
+	if directory, ok := p.ProducerDirectory.(N8ComicProducerAccountDirectory); ok {
+		entries, err := directory.ListProducerAccountDirectory(ctx)
+		if err == nil && len(entries) > 0 {
+			names := make([]string, 0, len(entries))
+			organizations := make(map[string][]string, len(entries))
+			for _, entry := range entries {
+				name := strings.TrimSpace(entry.Name)
+				if name == "" {
+					continue
+				}
+				names = append(names, name)
+				if len(entry.OrganizationIDs) > 0 {
+					organizations[name] = append([]string(nil), entry.OrganizationIDs...)
+				}
+			}
+			names = uniqueProducerAccounts(names)
+			snapshot := n8ProducerDirectorySnapshot{names: names, source: "n8", organizations: organizations}
+			p.storeDirectory("producerDirectorySnapshot", snapshot)
+			return names, "n8", "", organizations
+		}
+		return producerDirectoryFallback(fallback, err)
+	}
+	accounts, err := p.ProducerDirectory.ListProducerAccounts(ctx)
+	if err == nil && len(accounts) > 0 {
+		names := uniqueProducerAccounts(accounts)
+		snapshot := n8ProducerDirectorySnapshot{names: names, source: "n8", organizations: emptyOrganizations}
+		p.storeDirectory("producerDirectorySnapshot", snapshot)
+		return names, "n8", "", emptyOrganizations
+	}
+	return producerDirectoryFallback(fallback, err)
+}
+
+func producerDirectoryFallback(fallback []string, err error) ([]string, string, string, map[string][]string) {
+	if err != nil {
+		var failure *n8catalog.DirectoryError
+		if errors.As(err, &failure) {
+			log.Printf("N8 producer directory failed: kind=%s status=%d", failure.Kind, failure.Status)
+		} else {
+			log.Print("N8 producer directory failed: kind=unknown")
+		}
+	}
+	if len(fallback) > 0 {
+		warning := "N8 制作者目录实时同步暂不可用，当前使用最近同步的账号。"
+		if detail := n8DirectoryFailureDetail(err); detail != "" {
+			warning = "N8 制作者目录实时同步暂不可用（" + detail + "），当前使用最近同步的账号。"
+		}
+		return fallback, "cache", warning, map[string][]string{}
+	}
+	if err != nil {
+		return nil, "unavailable", n8DirectoryWarning("制作者目录", err), map[string][]string{}
+	}
+	return nil, "unavailable", "N8 没有返回启用中的制作者账号。", map[string][]string{}
+}
+
+func cloneProducerOrganizations(source map[string][]string) map[string][]string {
+	result := make(map[string][]string, len(source))
+	for name, organizations := range source {
+		result[name] = append([]string(nil), organizations...)
+	}
 	return result
 }
 

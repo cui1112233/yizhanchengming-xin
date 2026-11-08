@@ -2,8 +2,11 @@ package mergeworker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -56,11 +59,33 @@ func NewTOSObjectStore(config TOSConfig) (*TOSObjectStore, error) {
 		Bucket:        config.Bucket,
 		PublicBaseURL: config.PublicBaseURL,
 		PutFile: func(ctx context.Context, bucket, key, filePath, _ string) error {
-			_, err := client.PutObjectFromFile(ctx, &tos.PutObjectFromFileInput{
-				PutObjectBasicInput: tos.PutObjectBasicInput{Bucket: bucket, Key: key},
+			file, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+			hash := sha256.New()
+			size, err := io.Copy(hash, file)
+			closeErr := file.Close()
+			if err != nil {
+				return err
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+			digest := hex.EncodeToString(hash.Sum(nil))
+			_, err = client.PutObjectFromFile(ctx, &tos.PutObjectFromFileInput{
+				PutObjectBasicInput: tos.PutObjectBasicInput{Bucket: bucket, Key: key, ContentLength: size, ContentType: "video/mp4", Meta: map[string]string{"qiantie-sha256": digest}},
 				FilePath:            filePath,
 			})
 			return err
+		},
+		HeadFile: func(ctx context.Context, key string) (int64, string, error) {
+			result, err := client.HeadObjectV2(ctx, &tos.HeadObjectV2Input{Bucket: config.Bucket, Key: key})
+			if err != nil {
+				return 0, "", err
+			}
+			digest, _ := result.Meta.Get("qiantie-sha256")
+			return result.ContentLength, digest, nil
 		},
 		OpenFile: func(ctx context.Context, key string) (io.ReadCloser, error) {
 			result, err := client.GetObjectV2(ctx, &tos.GetObjectV2Input{Bucket: config.Bucket, Key: key})

@@ -20,5 +20,14 @@ test('keeps the saved audio when it remains among matching candidates', () => {
     { id: 1, name: '已保存音频', status: 'ENABLE', updatedAt: '2026-11-01T10:00:00Z' }
   ];
   assert.equal(chooseN8Audio(audios, 1)?.name, '已保存音频');
-  assert.equal(chooseN8Audio(audios)?.name, '较新音频');
+});
+
+test('randomly chooses only from enabled matching audios when nothing was saved', () => {
+  const audios = [
+    { id: 1, name: '第一首', status: 'ENABLE' },
+    { id: 2, name: '已停用', status: 'DISABLE' },
+    { id: 3, name: '最后一首', status: 'ENABLE' }
+  ];
+  assert.equal(chooseN8Audio(audios, '', () => 0.99)?.name, '最后一首');
+  assert.equal(chooseN8Audio(audios, '', () => 0)?.name, '第一首');
 });

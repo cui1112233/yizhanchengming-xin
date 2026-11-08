@@ -13,11 +13,17 @@ import {
 import { BatchFactoryNovelList } from './shuihuo/BatchFactoryNovelList';
 import { BatchFactoryCreateModal } from './shuihuo/BatchFactoryCreateModal';
 import { batchFactoryBatchFromResponse } from './shuihuo/batchFactoryProjects';
+import { getAvailableModelCatalog } from '../../shared/api/modelCatalog';
 import {
   BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY,
   novelFetchIntakeBooks,
   pendingNovelFetchIntakeId
 } from './shuihuo/batchFactoryNovelFetchHandoff';
+import {
+  batchAccessNotice,
+  forgetActiveBatch,
+  isStaleBatchAccessError
+} from './shuihuo/batchFactoryBatchAccessNotice';
 import './shuihuo-production.css';
 import './BatchFactoryWorkbenchPage.css';
 
@@ -36,6 +42,12 @@ function asBatch(result) {
 
 function bookCount(batch) {
   return Array.isArray(batch?.books) ? batch.books.length : Number(batch?.bookCount || 0);
+}
+
+// 批次访问失败只弹一条可关闭提示；请求侧已用 suppressGlobalError 关掉全局错误条。
+function notifyBatchAccessFailure(error) {
+  const notice = batchAccessNotice(error);
+  message.error({ ...notice, onClick: () => message.destroy(notice.key) });
 }
 
 export default function BatchFactoryWorkbenchPage() {
@@ -95,15 +107,21 @@ export default function BatchFactoryWorkbenchPage() {
 
   const openBatch = useCallback(async batchId => {
     try {
-      const batch = asBatch(await getBatch(batchId));
+      const batch = asBatch(await getBatch(batchId, { suppressGlobalError: true }));
       localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
       if (mountedRef.current) setActiveBatch(batch);
     } catch (requestError) {
-      message.error(requestError?.message || '读取批量工程失败');
+      notifyBatchAccessFailure(requestError);
+      // 归属不匹配/已删除是确定性结果，清掉本地活跃 id 后不再每次打开都重复 404。
+      if (isStaleBatchAccessError(requestError)) forgetActiveBatch(batchId);
     }
   }, []);
 
   useEffect(() => { refreshBatches({ quiet: true }); }, [refreshBatches]);
+
+  // Warm the one account-level model directory while the workbench opens, so
+  // every later video/comic dropdown can render from the same ready snapshot.
+  useEffect(() => { void getAvailableModelCatalog(); }, []);
 
   useEffect(() => {
     if (activeBatch) return undefined;
@@ -129,14 +147,20 @@ export default function BatchFactoryWorkbenchPage() {
   useEffect(() => {
     if (!pendingBatchId || pendingHandoffRef.current) return undefined;
     let cancelled = false;
-    getBatch(pendingBatchId).then(result => {
+    getBatch(pendingBatchId, { suppressGlobalError: true }).then(result => {
       if (cancelled) return;
       const batch = asBatch(result);
       localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
       setActiveBatch(batch);
       window.history.replaceState({}, '', '/batch-factory');
     }).catch(requestError => {
-      if (!cancelled) message.error(requestError?.message || '读取批量工程失败');
+      if (cancelled) return;
+      notifyBatchAccessFailure(requestError);
+      if (isStaleBatchAccessError(requestError)) {
+        forgetActiveBatch(pendingBatchId);
+        // 去掉 URL 上失效的 batchId，避免刷新后再次请求同一个不存在/无权限的批次。
+        window.history.replaceState({}, '', '/batch-factory');
+      }
     });
     return () => { cancelled = true; };
   }, [pendingBatchId]);

@@ -26,3 +26,14 @@ export function resolveComicImageSources(image) {
   const thumbnail = String(image?.thumbnailUrl || '') || original;
   return { thumbnail, original };
 }
+
+// 漫画输出卡首屏只挂 4 张。35 页原图一次性挂载会同时发起 35 个 3MB 级请求，
+// 滚动到尾部哨兵后再按批追加，交互（点击看原图、下载本页）保持不变。
+export const COMIC_OUTPUT_FIRST_SCREEN = 4;
+
+export function nextComicOutputVisibleCount(current, total) {
+  const maximum = Math.max(0, Number(total) || 0);
+  if (maximum === 0) return 0;
+  const visible = Math.max(0, Number(current) || 0);
+  return Math.min(maximum, visible + COMIC_OUTPUT_FIRST_SCREEN);
+}

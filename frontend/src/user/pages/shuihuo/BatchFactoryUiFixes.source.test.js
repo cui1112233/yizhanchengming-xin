@@ -82,6 +82,12 @@ test('失败提示两段式：新失败只弹 4.5 秒 toast，持久记录压成
   assert.doesNotMatch(list, /batch-factory-sensitive-review[\s\S]{0,80}?lineMode/);
 });
 
+test('敏感内容提示在窄书籍卡片中保持正文可读，操作按钮另起一行', () => {
+  assert.match(css, /\.batch-factory-sensitive-review\.ant-alert\s*\{[^}]*flex-wrap:\s*wrap/s);
+  assert.match(css, /\.batch-factory-sensitive-review \.ant-alert-content\s*\{[^}]*min-width:\s*0/s);
+  assert.match(css, /\.batch-factory-sensitive-review \.ant-alert-action\s*\{[^}]*flex:\s*0 0 100%;[^}]*width:\s*100%/s);
+});
+
 test('换开头变体：按 VIDEO 版本区分文案，并带前置条件的生成按钮', () => {
   assert.match(list, /'换开头变体尚未生成'/);
   assert.match(list, /其他版本已有 \$\{otherVersionOpeningCount\} 条/);

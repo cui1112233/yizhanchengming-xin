@@ -299,15 +299,16 @@ type UpdateBookAssetInput struct {
 }
 
 type BookAssetImage struct {
-	ID         string    `json:"id"`
-	AssetID    string    `json:"assetId"`
-	URL        string    `json:"url"`
-	StorageRef string    `json:"-"`
-	MediaType  string    `json:"mediaType"`
-	Source     string    `json:"source"`
-	IsPrimary  bool      `json:"isPrimary"`
-	Revision   int64     `json:"revision"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID           string    `json:"id"`
+	AssetID      string    `json:"assetId"`
+	URL          string    `json:"url"`
+	ThumbnailURL string    `json:"thumbnailUrl,omitempty"`
+	StorageRef   string    `json:"-"`
+	MediaType    string    `json:"mediaType"`
+	Source       string    `json:"source"`
+	IsPrimary    bool      `json:"isPrimary"`
+	Revision     int64     `json:"revision"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type CreateBookAssetImageInput struct {
@@ -370,19 +371,19 @@ type PatchComicPageInput struct {
 }
 
 type ComicPageImage struct {
-	ID          string    `json:"id"`
-	BatchID     string    `json:"-"`
-	BookID      string    `json:"-"`
-	ComicPageID string    `json:"comicPageId"`
-	URL         string    `json:"url,omitempty"`
+	ID          string `json:"id"`
+	BatchID     string `json:"-"`
+	BookID      string `json:"-"`
+	ComicPageID string `json:"comicPageId"`
+	URL         string `json:"url,omitempty"`
 	// ThumbnailURL 只给列表行/缩略图格用；详情和下载仍走 URL 的原图。
-	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
-	StorageRef   string `json:"-"`
-	MediaType   string    `json:"mediaType"`
-	Source      string    `json:"source"`
-	IsPrimary   bool      `json:"isPrimary"`
-	Revision    int64     `json:"revision"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ThumbnailURL string    `json:"thumbnailUrl,omitempty"`
+	StorageRef   string    `json:"-"`
+	MediaType    string    `json:"mediaType"`
+	Source       string    `json:"source"`
+	IsPrimary    bool      `json:"isPrimary"`
+	Revision     int64     `json:"revision"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type CreateComicPageImageInput struct {
@@ -393,13 +394,15 @@ type CreateComicPageImageInput struct {
 }
 
 type ComicCollectionItem struct {
-	Ordinal     int    `json:"ordinal"`
-	VideoID     string `json:"videoId"`
-	ComicPageID string `json:"comicPageId"`
-	ImageID     string `json:"imageId"`
-	URL         string `json:"url,omitempty"`
-	StorageRef  string `json:"-"`
-	MediaType   string `json:"mediaType"`
+	Ordinal int    `json:"ordinal"`
+	VideoID string `json:"videoId"`
+	// ComicPageID/ImageID 供响应层拼缩略图地址，不对外暴露。
+	ComicPageID  string `json:"comicPageId"`
+	ImageID      string `json:"imageId"`
+	URL          string `json:"url,omitempty"`
+	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
+	StorageRef   string `json:"-"`
+	MediaType    string `json:"mediaType"`
 }
 
 type ComicCollection struct {
@@ -546,6 +549,7 @@ type CaptureBookSourceInput struct {
 	SourceText       string         `json:"sourceText"`
 	RawSourceText    string         `json:"rawSourceText,omitempty"`
 	ReplaceSource    bool           `json:"replaceSource,omitempty"`
+	SourceBookID     string         `json:"sourceBookId,omitempty"`
 	SourceTitle      string         `json:"sourceTitle,omitempty"`
 	SourceMetadata   map[string]any `json:"sourceMetadata,omitempty"`
 	ExpectedRevision int64          `json:"expectedRevision"`

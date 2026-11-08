@@ -134,6 +134,11 @@ func TestNormalizeStageExecutionErrorMarksTextProviderTransportFailureRetryable(
 
 func TestBookStageAssetMalformedModelOutputIsRetryable(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, true)}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	service := &BookStageService{
 		Store:    store,
 		Director: &DirectorService{Store: store, Provider: &queuedDirectorProvider{values: []string{"不是 JSON"}}},
@@ -455,6 +460,41 @@ func TestBookStageVideoReportsImmediateProviderFailure(t *testing.T) {
 	}
 }
 
+func TestRetryLastFailedVideoWithoutExplicitIDTargetsLatestFailedVideo(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	provider := &queuedDirectorProvider{values: []string{twoDirectorVideosJSON(t)}}
+	if _, err := (&DirectorService{Store: store, Provider: provider}).RunDirector(context.Background(), "alice", batch.ID, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+	adapter := &sequenceProductionAdapter{refs: []ProviderTaskRef{
+		{State: ProductionSucceeded, ProviderTaskID: "provider-ok", MediaURL: "https://media.example/ok.mp4"},
+		{State: ProductionFailed, ProviderTaskID: "provider-failed", ErrorMessage: "provider rejected"},
+		{State: ProductionSucceeded, ProviderTaskID: "provider-retry", MediaURL: "https://media.example/retry.mp4"},
+	}}
+	production := &ProductionService{Store: store, Compiler: &PromptCompilerService{Store: store}, Adapter: adapter, Enabled: true, Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15}}
+	stages := &BookStageService{Store: store, Production: production}
+	if _, err := stages.Run(context.Background(), "alice", batch.ID, book.ID, BookStageVideo, StageModeMissing, "first-stage", ""); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("first stage err=%v, want failed provider task", err)
+	}
+	summary, err := stages.RetryLastFailed(context.Background(), "alice", batch.ID, book.ID, "retry-stage", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.LastFailed != nil {
+		t.Fatalf("retry left unresolved failure: %+v", summary.LastFailed)
+	}
+	status, err := production.GetBatchStatus(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest := status.Jobs[len(status.Jobs)-1]
+	if len(latest.Tasks) != 1 || latest.Tasks[0].VideoID != book.Videos[1].ID || adapter.calls != 3 {
+		t.Fatalf("retry must submit only failed VIDEO02: latest=%+v calls=%d", latest.Tasks, adapter.calls)
+	}
+}
+
 func seedOpeningStageBook(t *testing.T, sdResponse string) (*MemoryStore, Batch, Book, *BookStageService) {
 	t.Helper()
 	store := NewMemoryStore()
@@ -594,9 +634,10 @@ func TestBookStageUsesSelectedTextModelProvider(t *testing.T) {
 	}})
 	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
 		Patch: SettingsPatch{
-			"productionMode": rawSetting(t, "comic"),
-			"aiPromptConfig": comicConfig,
-			"textModelId":    rawSetting(t, "model-selected"),
+			"productionMode":     rawSetting(t, "comic"),
+			"aiPromptConfig":     comicConfig,
+			"textModelId":        rawSetting(t, "model-selected"),
+			"assetImagesEnabled": rawSetting(t, true),
 		},
 		ExpectedRevision: batch.Revision,
 	}); err != nil {
@@ -647,9 +688,10 @@ func TestBookStageFailsExplicitlyWhenSelectedTextModelIsUnavailable(t *testing.T
 	}})
 	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
 		Patch: SettingsPatch{
-			"productionMode": rawSetting(t, "comic"),
-			"aiPromptConfig": comicConfig,
-			"textModelId":    rawSetting(t, "model-missing"),
+			"productionMode":     rawSetting(t, "comic"),
+			"aiPromptConfig":     comicConfig,
+			"textModelId":        rawSetting(t, "model-missing"),
+			"assetImagesEnabled": rawSetting(t, true),
 		},
 		ExpectedRevision: batch.Revision,
 	}); err != nil {

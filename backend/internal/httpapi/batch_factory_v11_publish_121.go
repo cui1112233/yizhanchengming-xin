@@ -305,12 +305,18 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 		}
 		book.Revision++
 	}
-	headVideoJSON, err := marshalPublishedVideoHeads(heads)
-	if err != nil {
-		return nil, err
+	// 只有选择了 AI 前贴（jieya_ai_head=3）时才提交头部视频与其复用开关；
+	// 其它拼接方式下这两个字段没有意义，提交过去反而会被视频管理系统忽略或误判。
+	if fields["jieya_ai_head"] == "3" {
+		headVideoJSON, err := marshalPublishedVideoHeads(heads)
+		if err != nil {
+			return nil, err
+		}
+		fields["jieya_ai_head_video"] = headVideoJSON
+		if _, ok := fields["jieya_ai_head_video_mode"]; !ok {
+			fields["jieya_ai_head_video_mode"] = "0"
+		}
 	}
-	fields["jieya_ai_head_video"] = headVideoJSON
-	fields["jieya_ai_head_video_mode"] = "0"
 	if _, ok := fields["jieya_ai_head_horizontal_flip"]; !ok {
 		fields["jieya_ai_head_horizontal_flip"] = "0"
 	}
@@ -447,6 +453,15 @@ func buildPublishFields(batch batchfactoryv11.Batch, book batchfactoryv11.Book, 
 	if value, ok := publish["materialReuse"]; ok {
 		if enabled, valid := publishBoolValue(value); valid {
 			if enabled {
+				advanced["jieya_ai_head_video_mode"] = "1"
+			} else {
+				advanced["jieya_ai_head_video_mode"] = "0"
+			}
+		}
+	}
+	if value, ok := publish["biaohongReuse"]; ok {
+		if enabled, valid := publishBoolValue(value); valid {
+			if enabled {
 				advanced["biaohong_reuse"] = "1"
 			} else {
 				advanced["biaohong_reuse"] = ""
@@ -461,6 +476,12 @@ func buildPublishFields(batch batchfactoryv11.Batch, book batchfactoryv11.Book, 
 				advanced["jieya_ai_head_horizontal_flip"] = "0"
 			}
 		}
+	}
+	// AI 头部视频及其复用开关只在拼接方式为 AI 前贴（jieya_ai_head=3）时有效，
+	// 其它方案即使方案里带了这两个键也不提交，避免被视频管理系统误读。
+	if advanced["jieya_ai_head"] != "3" {
+		delete(advanced, "jieya_ai_head_video")
+		delete(advanced, "jieya_ai_head_video_mode")
 	}
 	organization := publishOrganization(input, settings)
 	if organization == "" {
@@ -528,6 +549,8 @@ var publishAdvancedAliases = map[string]string{
 	"gunping_speed":                 "gunping_speed",
 	"jieyaAiHeadHorizontalFlip":     "jieya_ai_head_horizontal_flip",
 	"jieya_ai_head_horizontal_flip": "jieya_ai_head_horizontal_flip",
+	"aiHeadVideoMode":               "jieya_ai_head_video_mode",
+	"jieya_ai_head_video_mode":      "jieya_ai_head_video_mode",
 }
 
 func applyPublishAdvanced(target map[string]string, source map[string]any) {

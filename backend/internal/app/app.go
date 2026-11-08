@@ -20,12 +20,14 @@ import (
 	"qiantie/backend/internal/giantmaterialexecutor"
 	"qiantie/backend/internal/giantmaterialresolver"
 	"qiantie/backend/internal/httpapi"
+	"qiantie/backend/internal/imagegenerationcache"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/n8catalog"
 	"qiantie/backend/internal/n8comic"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/productionmedia"
 	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/storage"
 	"qiantie/backend/internal/videomanagementconnector"
@@ -347,6 +349,49 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	giantMaterialResolver := selectGiantMaterialResolver(cfg)
 	artifactStore := localartifact.NewStore(cfg.LocalExecutorArtifactDir, cfg.LocalExecutorArtifactMaxBytes)
+	imageGenerationCache := imagegenerationcache.NewMySQLRepository(db)
+	userConfigStore := httpapi.NewUserConfigStore(cfg.ScriptHistoryDir)
+	productionMediaEnabled := strings.TrimSpace(cfg.ProductionMediaTOSEndpoint) != "" || strings.TrimSpace(cfg.ProductionMediaTOSBucket) != ""
+	if productionMediaEnabled {
+		if err := os.MkdirAll(artifactStore.Root(), 0o750); err != nil {
+			return nil, fmt.Errorf("prepare production media cache: %w", err)
+		}
+		remote, mediaErr := productionmedia.NewTOSStore(productionmedia.TOSConfig{
+			Endpoint: cfg.ProductionMediaTOSEndpoint, Region: cfg.ProductionMediaTOSRegion,
+			Bucket: cfg.ProductionMediaTOSBucket, AccessKey: cfg.ProductionMediaTOSAccessKey, SecretKey: cfg.ProductionMediaTOSSecretKey,
+		})
+		if mediaErr != nil {
+			return nil, mediaErr
+		}
+		repository := productionmedia.NewMySQLRepository(db)
+		resolver := &productionmedia.Resolver{Repository: repository, Local: artifactStore, Remote: remote}
+		artifactStore.SetMissingRestorer(resolver)
+		usage := func() (float64, error) { return productionmedia.DiskUsagePercent(artifactStore.Root()) }
+		artifactStore.SetWriteGuard(productionmedia.NewDiskWriteGuard(usage))
+		retentionDays := func(owner string) int {
+			settings, err := userConfigStore.GetConfig(context.Background(), owner)
+			if err != nil {
+				return 7
+			}
+			switch value := settings["productionRetentionDays"].(type) {
+			case int:
+				return productionmedia.NormalizeRetentionDays(value)
+			case float64:
+				return productionmedia.NormalizeRetentionDays(int(value))
+			default:
+				return 7
+			}
+		}
+		scanner := productionmedia.Scanner{DB: db, Repository: repository, Local: artifactStore, Prefix: cfg.ProductionMediaTOSPrefix, RetentionDays: retentionDays}
+		migrator := productionmedia.Migrator{Repository: repository, Local: artifactStore, Remote: remote, MaxPerRun: 50}
+		cleanup := productionmedia.CleanupSupervisor{Purger: productionmedia.Purger{Repository: repository, Local: artifactStore, MaxPerRun: 100}, Usage: usage}
+		scanner.Start(time.Minute)
+		migrator.Start(time.Minute)
+		// Retention still controls normal deletion. The short supervisor cadence
+		// only makes the pressure path react before a busy production host fills;
+		// it can delete exclusively TOS-verified local copies.
+		cleanup.Start(time.Minute)
+	}
 	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
 	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。
 	automationPresetStore, err := httpapi.NewMySQLAutomationPresetStore(db, cfg.AutomationPresetPath, time.Now)
@@ -358,7 +403,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	// deadline. Cleanup also recovers files queued by an earlier Slice 5 run, so
 	// it must not depend on whether video production or merging is enabled now.
 	// This worker deliberately has no TOS authority.
-	if shouldStartLocalArtifactPurger(cfg) {
+	if shouldStartLocalArtifactPurger(cfg) && !productionMediaEnabled {
 		batchfactoryv11.LocalArtifactPurger{Repository: store, Artifacts: artifactStore}.Start(time.Hour)
 	}
 	// Keep a read-only production service available for status queries even
@@ -457,11 +502,23 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	n8ComicClient := n8comic.NewClient(n8comic.Config{BaseURL: cfg.N8ComicBaseURL, APIKey: cfg.N8ComicOpenAPIKey})
 	n8ProducerDirectory := n8catalog.NewClient(nil, cfg.N8AdminBaseURL, cfg.QingyuN8AdminToken)
 	n8ComicWorks := n8catalog.NewWorksClientWithPath(nil, cfg.N8ComicBaseURL, cfg.QingyuN8AdminToken, os.Getenv("QIANTIE_N8_WORKS_PATH"))
-	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), AutomationStateStore: httpapi.NewMySQLAutomationStateStore(db), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, TextProviderResolver: textProviderForModel, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts, WorkTitleMapPath: os.Getenv("QIANTIE_N8_WORK_TITLE_MAP_PATH")}}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, ImageGenerationCache: imageGenerationCache, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), AutomationStateStore: httpapi.NewMySQLAutomationStateStore(db), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: userConfigStore, TextProvider: effectiveTextProvider, TextProviderResolver: textProviderForModel, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts, WorkTitleMapPath: os.Getenv("QIANTIE_N8_WORK_TITLE_MAP_PATH")}, ComicDirectRecordPath: comicDirectRecordPath(cfg)}), nil
 }
 
 func shouldStartLocalArtifactPurger(cfg config.Config) bool {
 	return strings.TrimSpace(cfg.LocalExecutorArtifactDir) != ""
+}
+
+// comicDirectRecordPath 把合集直传的幂等记录放到和其他运行数据同一目录，
+// 避免进程工作目录变化导致记录漂移。
+func comicDirectRecordPath(cfg config.Config) string {
+	if value := strings.TrimSpace(os.Getenv("QIANTIE_COMIC_DIRECT_RECORD_PATH")); value != "" {
+		return value
+	}
+	if dir := strings.TrimSpace(cfg.ScriptHistoryDir); dir != "" {
+		return filepath.Join(filepath.Dir(dir), "comic-direct-collections.json")
+	}
+	return ""
 }
 
 func videoManagementTargetBaseURL() string {

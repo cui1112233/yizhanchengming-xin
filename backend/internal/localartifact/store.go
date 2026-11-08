@@ -1,6 +1,7 @@
 package localartifact
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -10,14 +11,17 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 var (
-	ErrInvalidMP4    = errors.New("invalid mp4 artifact")
-	ErrInvalidImage  = errors.New("invalid image artifact")
-	ErrTooLarge      = errors.New("artifact exceeds size limit")
-	ErrInvalidID     = errors.New("invalid artifact id")
-	ErrAlreadyExists = errors.New("artifact already exists")
+	ErrInvalidMP4      = errors.New("invalid mp4 artifact")
+	ErrInvalidImage    = errors.New("invalid image artifact")
+	ErrTooLarge        = errors.New("artifact exceeds size limit")
+	ErrInvalidID       = errors.New("invalid artifact id")
+	ErrAlreadyExists   = errors.New("artifact already exists")
+	ErrRemoteIntegrity = errors.New("restored artifact failed integrity verification")
+	ErrDiskPressure    = errors.New("server disk pressure blocks new media writes")
 )
 
 var safeArtifactID = regexp.MustCompile(`^[A-Za-z0-9_-]{3,96}$`)
@@ -31,8 +35,15 @@ type Artifact struct {
 }
 
 type Store struct {
-	root     string
-	maxBytes int64
+	root            string
+	maxBytes        int64
+	mu              sync.RWMutex
+	missingRestorer MissingRestorer
+	writeGuard      func() error
+}
+
+type MissingRestorer interface {
+	RestoreStorageRef(context.Context, string) error
 }
 
 func NewStore(root string, maxBytes int64) *Store {
@@ -50,9 +61,43 @@ func (s *Store) Root() string {
 	return s.root
 }
 
+func (s *Store) SetMissingRestorer(restorer MissingRestorer) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.missingRestorer = restorer
+	s.mu.Unlock()
+}
+
+func (s *Store) SetWriteGuard(guard func() error) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.writeGuard = guard
+	s.mu.Unlock()
+}
+
+func (s *Store) checkWriteAllowed() error {
+	if s == nil {
+		return ErrInvalidID
+	}
+	s.mu.RLock()
+	guard := s.writeGuard
+	s.mu.RUnlock()
+	if guard != nil {
+		return guard()
+	}
+	return nil
+}
+
 func (s *Store) SaveMP4(id string, src io.Reader) (artifact Artifact, err error) {
 	if s == nil || !safeArtifactID.MatchString(id) || src == nil {
 		return Artifact{}, ErrInvalidID
+	}
+	if err := s.checkWriteAllowed(); err != nil {
+		return Artifact{}, err
 	}
 	if err := os.MkdirAll(s.root, 0o750); err != nil {
 		return Artifact{}, err
@@ -133,6 +178,9 @@ func (s *Store) SaveImage(id, mediaType string, src io.Reader) (artifact Artifac
 	if s == nil || !safeArtifactID.MatchString(id) || src == nil {
 		return Artifact{}, ErrInvalidID
 	}
+	if err := s.checkWriteAllowed(); err != nil {
+		return Artifact{}, err
+	}
 	if err := os.MkdirAll(s.root, 0o750); err != nil {
 		return Artifact{}, err
 	}
@@ -204,6 +252,9 @@ func (s *Store) SaveImage(id, mediaType string, src io.Reader) (artifact Artifac
 func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artifact Artifact, err error) {
 	if s == nil || !safeArtifactID.MatchString(id) || src == nil {
 		return Artifact{}, ErrInvalidID
+	}
+	if err := s.checkWriteAllowed(); err != nil {
+		return Artifact{}, err
 	}
 	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
 	extension = strings.ToLower(strings.TrimSpace(extension))
@@ -302,13 +353,90 @@ func (s *Store) Open(storageRef string) (*os.File, error) {
 	if s == nil || filepath.Base(storageRef) != storageRef {
 		return nil, ErrInvalidID
 	}
+	file, err := os.Open(filepath.Join(s.root, storageRef))
+	if err == nil || !os.IsNotExist(err) {
+		return file, err
+	}
+	s.mu.RLock()
+	restorer := s.missingRestorer
+	s.mu.RUnlock()
+	if restorer == nil {
+		return nil, err
+	}
+	if restoreErr := restorer.RestoreStorageRef(context.Background(), storageRef); restoreErr != nil {
+		if errors.Is(restoreErr, os.ErrNotExist) {
+			return nil, os.ErrNotExist
+		}
+		return nil, restoreErr
+	}
 	return os.Open(filepath.Join(s.root, storageRef))
+}
+
+// Restore atomically rehydrates an exact logical reference from durable
+// storage. The final path becomes visible only after byte-size and SHA256
+// verification succeed.
+func (s *Store) Restore(storageRef string, source io.Reader, expectedSize int64, expectedSHA256 string) (err error) {
+	if s == nil || filepath.Base(storageRef) != storageRef || source == nil || expectedSize < 0 || expectedSize > s.maxBytes || !regexp.MustCompile(`^[a-fA-F0-9]{64}$`).MatchString(expectedSHA256) {
+		return ErrInvalidID
+	}
+	if err := os.MkdirAll(s.root, 0o750); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(s.root, ".restore-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
+		}
+	}()
+	hash := sha256.New()
+	written, err := io.Copy(io.MultiWriter(tmp, hash), io.LimitReader(source, expectedSize+1))
+	if err != nil {
+		return err
+	}
+	if written != expectedSize || !strings.EqualFold(hex.EncodeToString(hash.Sum(nil)), expectedSHA256) {
+		return ErrRemoteIntegrity
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, filepath.Join(s.root, storageRef)); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // Path returns a verified, root-confined artifact path for an uploader. It
 // never accepts traversal or a missing object, so callers cannot upload an
 // arbitrary server file by crafting a storage reference.
 func (s *Store) Path(storageRef string) (string, error) {
+	path, err := s.LocalPath(storageRef)
+	if err == nil || !os.IsNotExist(err) {
+		return path, err
+	}
+	file, openErr := s.Open(storageRef)
+	if openErr != nil {
+		return "", openErr
+	}
+	if closeErr := file.Close(); closeErr != nil {
+		return "", closeErr
+	}
+	return filepath.Join(s.root, storageRef), nil
+}
+
+// LocalPath checks only the server cache. Background discovery uses this
+// method so a cleaned TOS-backed object is not downloaded merely because a
+// periodic scanner looked at it.
+func (s *Store) LocalPath(storageRef string) (string, error) {
 	if s == nil || filepath.Base(storageRef) != storageRef {
 		return "", ErrInvalidID
 	}

@@ -213,10 +213,44 @@ func comicPageFromUpsertInput(pageID string, revision int64, createdAt, updatedA
 }
 
 func (s *MySQLStore) ListComicPages(ctx context.Context, owner, batchID, bookID string) ([]ComicPage, error) {
+	return s.listComicPages(ctx, owner, batchID, bookID, false)
+}
+
+// ListComicPagesLite is the list-screen read path. It deliberately skips the
+// large prompt/reference columns; callers that open an editor still use
+// ListComicPages and receive the complete page payload.
+func (s *MySQLStore) ListComicPagesLite(ctx context.Context, owner, batchID, bookID string) ([]ComicPage, error) {
+	return s.listComicPages(ctx, owner, batchID, bookID, true)
+}
+
+// GetComicPageImage is the thumbnail/content hot path. Looking up one image
+// must not hydrate every page prompt and every candidate image in the book.
+func (s *MySQLStore) GetComicPageImage(ctx context.Context, owner, batchID, bookID, pageID, imageID string) (ComicPageImage, error) {
+	var image ComicPageImage
+	err := s.db.QueryRowContext(ctx, `SELECT i.id,COALESCE(i.url,''),COALESCE(i.storage_ref,''),i.media_type,i.source,i.is_primary,i.revision,i.created_at,i.comic_page_id
+		FROM batch_factory_v12_comic_page_images i
+		JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id AND p.owner_username=i.owner_username
+		WHERE i.id=? AND i.owner_username=? AND i.comic_page_id=? AND p.batch_id=? AND p.book_id=?`, imageID, owner, pageID, batchID, bookID).
+		Scan(&image.ID, &image.URL, &image.StorageRef, &image.MediaType, &image.Source, &image.IsPrimary, &image.Revision, &image.CreatedAt, &image.ComicPageID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ComicPageImage{}, ErrNotFound
+	}
+	if err != nil {
+		return ComicPageImage{}, err
+	}
+	image.BatchID, image.BookID = batchID, bookID
+	return image, nil
+}
+
+func (s *MySQLStore) listComicPages(ctx context.Context, owner, batchID, bookID string, lite bool) ([]ComicPage, error) {
 	if err := ensureBookOwnership(ctx, s.db, owner, batchID, bookID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT p.id,p.video_id,p.comic_prompt,p.image_prompt,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.snapshot_hash,''),COALESCE(p.reference_image_urls,JSON_ARRAY()),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, owner, batchID, bookID)
+	query := `SELECT p.id,p.video_id,p.comic_prompt,p.image_prompt,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.snapshot_hash,''),COALESCE(p.reference_image_urls,JSON_ARRAY()),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`
+	if lite {
+		query = `SELECT p.id,p.video_id,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.snapshot_hash,''),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`
+	}
+	rows, err := s.db.QueryContext(ctx, query, owner, batchID, bookID)
 	if err != nil {
 		return nil, err
 	}
@@ -225,11 +259,17 @@ func (s *MySQLStore) ListComicPages(ctx context.Context, owner, batchID, bookID 
 	for rows.Next() {
 		var page ComicPage
 		page.BatchID, page.BookID = batchID, bookID
-		var referencesJSON []byte
-		if err := rows.Scan(&page.ID, &page.VideoID, &page.ComicPrompt, &page.ImagePrompt, &page.ModelID, &page.AspectRatio, &page.Status, &page.SnapshotHash, &referencesJSON, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
-			return nil, err
+		if lite {
+			if err := rows.Scan(&page.ID, &page.VideoID, &page.ModelID, &page.AspectRatio, &page.Status, &page.SnapshotHash, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
+				return nil, err
+			}
+		} else {
+			var referencesJSON []byte
+			if err := rows.Scan(&page.ID, &page.VideoID, &page.ComicPrompt, &page.ImagePrompt, &page.ModelID, &page.AspectRatio, &page.Status, &page.SnapshotHash, &referencesJSON, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
+				return nil, err
+			}
+			_ = json.Unmarshal(referencesJSON, &page.ReferenceImageURLs)
 		}
-		_ = json.Unmarshal(referencesJSON, &page.ReferenceImageURLs)
 		pages = append(pages, page)
 	}
 	if err := rows.Err(); err != nil {

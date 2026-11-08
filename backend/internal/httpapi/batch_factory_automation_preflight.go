@@ -426,7 +426,7 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 // extended=true 时额外检查提示词预设、正文冻结与模型可用性，供执行前展示。
 func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.Context, owner string, batch batchfactoryv11.Batch, book batchfactoryv11.Book, runMode string, extended bool) []automationPreflightIssue {
 	issues := []automationPreflightIssue{}
-	if isDirectFirstSourceBlocked(book) {
+	if isDirectFirstSourceBlocked(book) && len(productionLines(book)) == 0 && firstMetadataString(book.SourceMetadata, "giantMaterialId", "qingyuMaterialId") == "" {
 		title := strings.TrimSpace(book.Title)
 		if title == "" {
 			title = "未命名作品"

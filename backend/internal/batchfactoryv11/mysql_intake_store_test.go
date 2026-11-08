@@ -383,13 +383,14 @@ func TestMySQLCaptureBookSourceBindsJSONAsText(t *testing.T) {
 		WithArgs("book-1").
 		WillReturnRows(sqlmock.NewRows([]string{"source_text", "title", "source_book_id", "source_metadata_json"}).AddRow("", "小说 1", "1", []byte(`{}`)))
 	mock.ExpectExec("UPDATE batch_factory_v12_book_records").
-		WithArgs("小说 1", "正文", "正文", jsonTextArg{}, "book-1").
+		WithArgs("小说 1", "2", "正文", "正文", jsonTextArg{}, "book-1").
 		WillReturnError(errors.New("stop after source write"))
 	mock.ExpectRollback()
 
 	store := NewMySQLStore(db)
 	_, err = store.CaptureBookSource(context.Background(), "alice", "batch-1", "book-1", CaptureBookSourceInput{
 		SourceText:       "正文",
+		SourceBookID:     "2",
 		SourceMetadata:   map[string]any{"originalReadVia": "bookstore"},
 		ExpectedRevision: 1,
 	})

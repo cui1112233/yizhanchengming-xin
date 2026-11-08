@@ -3,6 +3,7 @@ import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLi
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
+import { ProductUpdateModal } from '../components/ProductUpdateModal';
 import { getCurrentAccount, getCurrentUsername, login, loginWithPasskey, logout } from '../api/auth';
 import { getToken } from '../api/client';
 import { getConfig } from '../api/config';
@@ -423,6 +424,7 @@ export function UserLayout({ children }) {
         <div className="home-shell">
           {isValidElement(children) ? cloneElement(children, { theme, isLoggedIn, onOpenLogin: openLoginDialog }) : content}
           {loginOverlay}
+          <ProductUpdateModal enabled={isLoggedIn} />
         </div>
       </ConfigProvider>
     );
@@ -433,6 +435,7 @@ export function UserLayout({ children }) {
       <ConfigProvider theme={createAntTheme(theme)}>
         <AccountCenterLayout account={account} username={username} avatar={displayAvatar} pathname={pathname} onReturn={returnToWorkbench} onLogout={handleLogout}>{pageContent}</AccountCenterLayout>
         {loginOverlay}
+        <ProductUpdateModal enabled={isLoggedIn} />
       </ConfigProvider>
     );
   }
@@ -525,6 +528,7 @@ export function UserLayout({ children }) {
         {isLoggedIn && pathname !== '/' && petVisible ? <CmPenguinCompanion username={username} accountSessionKey={accountSessionKey} /> : null}
       </Fragment>
       {loginOverlay}
+      <ProductUpdateModal enabled={isLoggedIn} />
       </div>
     </ConfigProvider>
   );

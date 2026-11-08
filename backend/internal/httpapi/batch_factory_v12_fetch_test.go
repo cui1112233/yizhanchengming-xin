@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/giantmaterialresolver"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -233,6 +233,107 @@ func TestV12SingleFetchMapsLegacyYGAliasAndCapturesFetchedSource(t *testing.T) {
 	}
 	if updated.Books[0].SourceText != "这是测试正文" || updated.Books[0].TxtText != "这是测试正文" {
 		t.Fatalf("fetched source was not captured: %#v", updated.Books[0])
+	}
+}
+
+func TestV12SingleFetchFallsBackToReadableGiantMaterialCandidate(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		Title: "嫌我寿礼寒酸，摔完倒欠四千万", BookID: "7701285074985176088", Platform: "常读",
+		SourceMetadata: map[string]any{
+			"sourceMode": "giant_material", "giantMaterialId": "7701560812326846473", "platformCode": "CD", "platformId": "2",
+			"originalReadStrategy": "direct_first", "originalReadStage": "failed", "originalReadError": "旧书号读取失败", "contentPending": true,
+		},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("bookid") {
+		case "7701285074985176088":
+			_, _ = w.Write([]byte(`{"code":400,"msg":"获取书籍信息失败","data":""}`))
+		case "7701321609914616857":
+			_, _ = w.Write([]byte(`{"code":200,"msg":"获取章节内容成功","data":"候选作品的正文","bookinfo":{"book_id":"7701321609914616857","book_name":"嫌我寿礼寒酸，摔完倒欠四千万"}}`))
+		default:
+			t.Fatalf("unexpected candidate bookid=%q", r.URL.Query().Get("bookid"))
+		}
+	}))
+	defer upstream.Close()
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{
+		BridgeSecret: "secret", Now: func() time.Time { return now }, Store: store,
+		NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL},
+		GiantMaterialResolver: fakeGiantMaterialResolver{material: giantmaterialresolver.Material{
+			GiantMaterialID: "7701560812326846473",
+			Books: []giantmaterialresolver.Book{
+				{PlatformBookID: "7701285074985176088", PlatformName: "常读", PlatformCode: "CD", PlatformID: "2", Title: "嫌我寿礼寒酸，摔完倒欠四千万"},
+				{PlatformBookID: "7701321609914616857", PlatformName: "常读", PlatformCode: "CD", PlatformID: "2", Title: "嫌我寿礼寒酸，摔完倒欠四千万"},
+			},
+		}},
+	})
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + batch.Books[0].ID + "/fetch-original"
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	updated, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Books[0].BookID != "7701321609914616857" || updated.Books[0].SourceText != "候选作品的正文" {
+		t.Fatalf("candidate fallback was not persisted: %#v", updated.Books[0])
+	}
+	if updated.Books[0].SourceMetadata["platformCandidateFallbackFrom"] != "7701285074985176088" {
+		t.Fatalf("fallback audit metadata missing: %#v", updated.Books[0].SourceMetadata)
+	}
+	if updated.Books[0].SourceMetadata["originalReadStage"] != "direct" || updated.Books[0].SourceMetadata["originalReadError"] != "" || updated.Books[0].SourceMetadata["contentPending"] != false {
+		t.Fatalf("successful fallback did not clear stale read failure: %#v", updated.Books[0].SourceMetadata)
+	}
+}
+
+func TestV12SingleFetchFallsBackAcrossQingyuSequenceTitleVariants(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		Title: "5风误归期，爱则别离", BookID: "737389", Platform: "七猫",
+		SourceMetadata: map[string]any{"sourceMode": "giant_material", "giantMaterialId": "7701983523235512346", "platformCode": "QM", "platformId": "3"},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("bookid") {
+		case "737389":
+			_, _ = w.Write([]byte(`{"code":400,"msg":"获取书籍信息失败","data":""}`))
+		case "737234":
+			_, _ = w.Write([]byte(`{"code":200,"msg":"获取章节内容成功","data":"可读的七猫正文","bookinfo":{"book_id":"737234","book_name":"风误归期，爱则别离"}}`))
+		default:
+			t.Fatalf("should prefer the unnumbered sibling before other doomed sequence books, got bookid=%q", r.URL.Query().Get("bookid"))
+		}
+	}))
+	defer upstream.Close()
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{
+		BridgeSecret: "secret", Now: func() time.Time { return now }, Store: store,
+		NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL},
+		GiantMaterialResolver: fakeGiantMaterialResolver{material: giantmaterialresolver.Material{Books: []giantmaterialresolver.Book{
+			{PlatformBookID: "737389", PlatformCode: "QM", PlatformID: "3", Title: "5风误归期，爱则别离"},
+			{PlatformBookID: "737390", PlatformCode: "QM", PlatformID: "3", Title: "6风误归期，爱则别离"},
+			{PlatformBookID: "737234", PlatformCode: "QM", PlatformID: "3", Title: "风误归期,爱则别离"},
+		}}},
+	})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/books/"+batch.Books[0].ID+"/fetch-original", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	updated, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Books[0].BookID != "737234" || updated.Books[0].SourceText != "可读的七猫正文" {
+		t.Fatalf("sequence-title fallback was not persisted: %#v", updated.Books[0])
 	}
 }
 
@@ -567,7 +668,7 @@ func TestProcessBatchConfiguredTextDefaultsToNoAIWithoutBlocking(t *testing.T) {
 	}
 }
 
-func TestPublishVideoBlocksUnconfirmedSensitiveReview(t *testing.T) {
+func TestPublishVideoDoesNotBlockAfterSensitiveWordsAreMasked(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "测试小说", BookID: "book-1", Platform: "15"}}})
 	if err != nil {
@@ -581,10 +682,7 @@ func TestPublishVideoBlocksUnconfirmedSensitiveReview(t *testing.T) {
 	}
 	coordinator := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, func() time.Time { return time.Unix(1700000000, 0) })
 	err = coordinator.publishVideo(context.Background(), "alice", batch.ID, book.ID)
-	if !errors.Is(err, errSensitiveReviewPending) {
-		t.Fatalf("unconfirmed sensitive review must block upload, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "2 处") {
-		t.Fatalf("block message did not carry the unprocessed count: %v", err)
+	if err == nil || strings.Contains(err.Error(), "敏感词") || !strings.Contains(err.Error(), "视频管理系统上传服务未配置") {
+		t.Fatalf("video publish did not continue past sensitive review: %v", err)
 	}
 }

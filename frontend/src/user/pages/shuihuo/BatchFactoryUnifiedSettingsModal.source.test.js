@@ -50,9 +50,8 @@ test('shows simple comic publication defaults instead of video publication contr
 	assert.match(source, /audioCategoryName/);
 	assert.match(source, /启用中的音频分类/);
 	assert.match(source, /音频分类 ID（必填）/);
-	assert.match(source, /inferBatchN8AudioCategory/);
 	assert.match(source, /audioCategorySelectionMode/);
-	assert.match(source, /已根据批次 AI 分类自动匹配/);
+	assert.match(source, /发布时按每本书的男女频和风格自动匹配并随机选择音频/);
 	assert.doesNotMatch(source, /没有配套音频时可以不填/);
   assert.match(source, /按书名自动匹配/);
   assert.match(source, /productionMode === 'comic'\s*\? <BatchFactoryComicPublishSettingsForm/);
@@ -94,27 +93,15 @@ test('does not discard an open unified-configuration draft when the batch refres
   assert.match(resetEffect, /\[open, batch\?\.id\]/);
 });
 
-test('unified configuration makes an unavailable model directory actionable instead of rendering empty selectors', () => {
-  assert.match(source, /const \[modelsError, setModelsError\] = useState\(''\)/);
-  assert.match(source, /setModelsError\(error\?\.message \|\| '未能读取个人中心已启用模型'\)/);
-  assert.match(source, /message="模型目录暂不可用"/);
-  assert.match(source, /前往个人中心配置模型/);
-});
-
 test('unified configuration loads every typed model without passing Array map indexes as request functions', () => {
   assert.match(source, /listAvailableModels\('text'\)/);
   assert.match(source, /listAvailableModels\('image'\)/);
   assert.match(source, /listAvailableModels\('video'\)/);
   assert.doesNotMatch(source, /\.map\(listAvailableModels\)/);
-});
-
-test('clears the model spinner and shows an actionable error when the directory request never settles', () => {
-  // fetch 没有超时；任一请求挂死会卡住 Promise.all，必须由本地定时器清加载态。
-  assert.match(source, /const MODELS_LOAD_TIMEOUT_MS = 15000;/);
-  assert.match(source, /const timeoutId = setTimeout\(\(\) => \{[\s\S]*?setModelsError\('读取模型超时，请点击“重试读取模型”'\);[\s\S]*?setModelsLoading\(false\);[\s\S]*?\}, MODELS_LOAD_TIMEOUT_MS\);/);
-  assert.match(source, /\.finally\(\(\) => \{\s*clearTimeout\(timeoutId\);[\s\S]*?setModelsLoading\(false\);[\s\S]*?\}\);/);
-  assert.match(source, /return \(\) => \{ alive = false; clearTimeout\(timeoutId\); \};/);
-  assert.match(source, /if \(!alive \|\| timedOut\) return;/);
+  assert.match(source, /const \[modelsLoading, setModelsLoading\] = useState\(false\)/);
+  assert.match(source, /const \[modelsError, setModelsError\] = useState\(''\)/);
+  assert.doesNotMatch(source, /listAvailableModels\('image'\)\.catch\(\(\) => \[\]\)/);
+  assert.match(source, /模型目录暂不可用/);
 });
 
 test('automation preset manager changes the unified draft only after confirmation', () => {
@@ -236,7 +223,7 @@ test('places opening variants under AI reasoning asset settings with a compact h
   const assetStart = source.indexOf('<section className="batch-factory-engine-card"><header><b>资产设置</b>');
   const assetEnd = source.indexOf('<section className="batch-factory-engine-card"><header><b>约束设置</b>');
   const modelStart = source.indexOf('<section className="batch-factory-engine-card"><header><b>模型配置</b>');
-  const modelEnd = source.indexOf('{modelsError ?');
+  const modelEnd = source.indexOf("{sections.includes('sensitive')");
   assert.match(source.slice(assetStart, assetEnd), /换开头/);
   assert.match(source.slice(assetStart, assetEnd), /batch-factory-help-button/);
   assert.doesNotMatch(source.slice(modelStart, modelEnd), /换开头/);
@@ -296,6 +283,16 @@ test('keeps model dropdowns outside the label that owns the help-tip button', ()
 
 test('keeps the automation gear beside the unified configuration label', () => {
   assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
+});
+
+test('makes selected segmented options unmistakable in the unified settings modal', () => {
+  assert.match(source, /className="batch-factory-unified-settings-modal"/);
+  const selectedRule = stylesheet.match(/\.batch-factory-unified-settings-modal \.ant-segmented-item-selected\{[^}]+\}/)?.[0] || '';
+  assert.match(selectedRule, /color:[^;]+!important/);
+  assert.match(selectedRule, /background:var\(--sh-accent\)!important/);
+  assert.match(selectedRule, /border:[^;]+!important/);
+  assert.match(selectedRule, /box-shadow:[^;]+!important/);
+  assert.match(stylesheet, /\.batch-factory-unified-settings-modal \.ant-segmented-item-selected \.ant-segmented-item-label::before\{content:'✓'/);
 });
 
 test('uses a website profile organization as the unified organization default', () => {

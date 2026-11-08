@@ -4,6 +4,7 @@ import { Download, ExternalLink, MoreHorizontal, Pencil, RefreshCw, Settings2, W
 
 import { getComicPageImageBlob } from '../../shared/api/batchFactory';
 import { BatchFactoryComicStylePicker } from './shuihuo/BatchFactoryComicStylePicker';
+import { nextComicOutputVisibleCount, resolveComicImageSources } from './shuihuo/batchFactoryComicStatus.js';
 import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
 import { PRIVATE_STUDIO_CONSTRAINT_FIELDS, PrivateStudioConstraintSection, PrivateStudioConstraintsModal } from './private-studio/PrivateStudioConstraintsModal';
 import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
@@ -71,8 +72,13 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ comicPrompt: '', imagePrompt: '' });
   const [display, setDisplay] = useState({ url: '', failed: false });
+  const [original, setOriginal] = useState({ url: '', loading: false, failed: false });
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const originalURLRef = useRef('');
   const images = Array.isArray(page?.images) ? page.images : [];
   const primary = images.find(image => image?.isPrimary) || images[0] || null;
+  // 卡片只取 420px 缩略图；原图留到点击放大或下载本页时才拉取。
+  const sources = resolveComicImageSources(primary);
   const generating = action === 'pages' && actionKey === page?.videoId;
   const saving = action === 'save' && actionKey === page?.videoId;
   const busyElsewhere = Boolean(action) && !generating && !saving;
@@ -99,19 +105,69 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
 
   useEffect(() => {
     let active = true;
-    let ownedUrl = '';
+    const owned = [];
     setDisplay({ url: '', failed: false });
-    if (!primary?.url) return () => {};
-    getComicPageImageBlob(primary.url).then(blob => {
+    if (!sources.thumbnail) return () => {};
+    const load = target => getComicPageImageBlob(target).then(blob => {
       if (!active) return;
-      ownedUrl = URL.createObjectURL(blob);
-      setDisplay({ url: ownedUrl, failed: false });
-    }).catch(() => { if (active) setDisplay({ url: '', failed: true }); });
+      const url = URL.createObjectURL(blob);
+      owned.push(url);
+      setDisplay({ url, failed: false });
+    });
+    load(sources.thumbnail).catch(() => {
+      if (!active) return;
+      // 缩略图生成失败时自动回落原图，不让卡片停在占位文案。
+      if (sources.original && sources.original !== sources.thumbnail) {
+        load(sources.original).catch(() => { if (active) setDisplay({ url: '', failed: true }); });
+        return;
+      }
+      setDisplay({ url: '', failed: true });
+    });
     return () => {
       active = false;
-      if (ownedUrl) URL.revokeObjectURL(ownedUrl);
+      owned.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [primary?.url]);
+  }, [sources.thumbnail, sources.original]);
+
+  useEffect(() => () => {
+    if (originalURLRef.current) URL.revokeObjectURL(originalURLRef.current);
+  }, []);
+
+  async function ensureOriginal() {
+    if (originalURLRef.current) return originalURLRef.current;
+    if (!sources.original) return '';
+    setOriginal(current => ({ ...current, loading: true, failed: false }));
+    try {
+      const blob = await getComicPageImageBlob(sources.original);
+      const url = URL.createObjectURL(blob);
+      originalURLRef.current = url;
+      setOriginal({ url, loading: false, failed: false });
+      return url;
+    } catch {
+      setOriginal({ url: '', loading: false, failed: true });
+      return '';
+    }
+  }
+
+  async function openViewer() {
+    if (!sources.original) return;
+    setViewerOpen(true);
+    await ensureOriginal();
+  }
+
+  async function downloadPage() {
+    const url = await ensureOriginal();
+    if (!url) {
+      message.error('原图读取失败，请稍后重试');
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `漫画${comicPageNumber(index + 1)}.png`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }
 
   function beginEdit() {
     setDraft({ comicPrompt: text(page?.comicPrompt), imagePrompt: text(page?.imagePrompt) });
@@ -138,7 +194,7 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
           title={!taskReady ? '请先开始生成漫画创建任务' : !hasPrompt ? '该页缺少提示词' : busyElsewhere ? '当前有其他操作进行中' : ''}
           onClick={() => onGeneratePage?.(page)}
         >{images.length ? '重新生成图' : '生成图'}</Button>
-        {display.url ? <Button size="small" icon={<Download size={15} aria-hidden="true" />} href={display.url} download={`漫画${comicPageNumber(index + 1)}.png`}>下载本页</Button> : null}
+        {sources.original ? <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={original.loading} onClick={() => void downloadPage()}>下载本页</Button> : null}
       </Space>
     </div>
     {editing ? <div className="private-comic-page-editor">
@@ -157,7 +213,7 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
       {!canSave ? <small className="entity-media-status">保存需要漫画提示词与图片提示词都不为空。</small> : null}
     </div> : <pre className="shot-output-card-content">{`漫画提示词\n${text(page?.comicPrompt) || '暂无'}\n\n图片提示词\n${text(page?.imagePrompt) || '暂无'}`}</pre>}
     <div className="private-comic-page-image">
-      {display.url ? <img src={display.url} alt={`漫画第${index + 1}页`} /> : <div className="private-comic-page-placeholder">
+      {display.url ? <img src={display.url} alt={`漫画第${index + 1}页`} title="点击查看原图" style={{ cursor: 'zoom-in' }} onClick={() => void openViewer()} /> : <div className="private-comic-page-placeholder">
         <span className="entity-media-status">{display.failed ? '图片加载失败' : images.length ? '正在读取图片…' : '本页还没有生成图片'}</span>
         {!images.length ? <Button
           size="small"
@@ -169,12 +225,41 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
         >生成图</Button> : null}
       </div>}
     </div>
+    <Modal open={viewerOpen} footer={null} centered width="90vw" destroyOnClose onCancel={() => setViewerOpen(false)} title={`漫画${comicPageNumber(index + 1)} · 原图`}>
+      {original.url ? <img src={original.url} alt={`漫画第${index + 1}页原图`} style={{ width: '100%', height: 'auto' }} /> : <div className="entity-media-status">{original.failed ? '原图加载失败' : '正在读取原图…'}</div>}
+    </Modal>
   </div>;
 }
 
 function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt, onDownloadAll }) {
   const pageList = Array.isArray(pages) ? pages : [];
   const imagedPages = pageList.filter(page => (Array.isArray(page?.images) ? page.images : []).length > 0).length;
+  // 首屏只挂 COMIC_OUTPUT_FIRST_SCREEN 张卡片，滚到尾部哨兵再按批追加；
+  // 35 页一次性挂载会同时发起 35 个缩略图请求并解码，仍然会卡。
+  const [visibleCount, setVisibleCount] = useState(() => nextComicOutputVisibleCount(0, pageList.length));
+  const sentinelRef = useRef(null);
+
+  useEffect(() => {
+    setVisibleCount(nextComicOutputVisibleCount(0, pageList.length));
+  }, [pageList.length]);
+
+  useEffect(() => {
+    if (visibleCount >= pageList.length) return undefined;
+    const node = sentinelRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setVisibleCount(pageList.length);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setVisibleCount(current => nextComicOutputVisibleCount(current, pageList.length));
+      }
+    }, { rootMargin: '320px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [visibleCount, pageList.length]);
+
+  const visiblePages = pageList.slice(0, visibleCount);
   return <div className="shot-output-cards">
     <div className="shot-output-toolbar">
       <span>共 {pageList.length} 页 · 已出图 {imagedPages} 页</span>
@@ -182,7 +267,7 @@ function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage,
         <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={action === 'download'} disabled={!pageList.length || (action && action !== 'download')} onClick={onDownloadAll}>下载全部</Button>
       </Space>
     </div>
-    {pageList.map((page, index) => <ComicPageCard
+    {visiblePages.map((page, index) => <ComicPageCard
       key={page?.videoId || page?.id || index}
       page={page}
       index={index}
@@ -192,6 +277,7 @@ function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage,
       onGeneratePage={onGeneratePage}
       onSavePagePrompt={onSavePagePrompt}
     />)}
+    {visibleCount < pageList.length ? <div ref={sentinelRef} className="shot-output-cards-more" aria-hidden="true" /> : null}
   </div>;
 }
 

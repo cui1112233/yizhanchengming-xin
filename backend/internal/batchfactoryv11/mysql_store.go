@@ -419,6 +419,10 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	if shouldReplaceGeneratedBookTitle(nextTitle, sourceBookID.String, input.SourceTitle) {
 		nextTitle = strings.TrimSpace(input.SourceTitle)
 	}
+	nextSourceBookID := sourceBookID.String
+	if candidate := strings.TrimSpace(input.SourceBookID); candidate != "" {
+		nextSourceBookID = candidate
+	}
 	nextSourceText := source.String
 	if validSourceText || input.ReplaceSource {
 		nextSourceText = sourceText
@@ -427,7 +431,7 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 		rawSourceText = nextSourceText
 	}
 	// See UpdateBookMetadata: this column is JSON, not a binary blob.
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_text=?,txt_text=?,source_metadata_json=? WHERE book_id=?`, nextTitle, nextSourceText, rawSourceText, string(encodedMetadata), bookID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_book_id=?,source_text=?,txt_text=?,source_metadata_json=? WHERE book_id=?`, nextTitle, nullableString(nextSourceBookID), nextSourceText, rawSourceText, string(encodedMetadata), bookID); err != nil {
 		return Book{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
@@ -764,6 +768,20 @@ func projectCoverArtifactID(batchID, outputURL string) string {
 
 func (s *MySQLStore) GetBatch(ctx context.Context, owner, id string) (Batch, error) {
 	return loadBatch(ctx, s.db, owner, id)
+}
+
+// BatchOwner 只按批次 id 读取归属账号，不做 owner 过滤。
+// 详情接口用它把“批次属于其他账号”从裸 404 里区分出来，返回可读的 403。
+func (s *MySQLStore) BatchOwner(ctx context.Context, id string) (string, error) {
+	var owner string
+	err := s.db.QueryRowContext(ctx, `SELECT b.owner_username FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.id=?`, id).Scan(&owner)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return owner, nil
 }
 
 // GetBatchRuntimeIndex returns only the identity data needed by the live

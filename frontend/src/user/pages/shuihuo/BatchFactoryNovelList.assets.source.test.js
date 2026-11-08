@@ -16,6 +16,12 @@ test('asset popup uses durable book-asset APIs instead of draft prompts', () => 
 	assert.match(source, /source: productionMode === 'comic' \? 'comic' : 'manual'/);
 });
 
+test('asset popup reloads when background extraction changes the same book assets', () => {
+  assert.match(source, /export function batchFactoryAssetRecordsRefreshKey\(book\)/);
+  assert.match(source, /const assetRecordsRefreshKey = batchFactoryAssetRecordsRefreshKey\(book\);/);
+  assert.match(source, /\[batchId, book\?\.id, assetRecordsRefreshKey\]/);
+});
+
 test('asset popup uploads real image bytes and manages durable image versions', () => {
   assert.match(source, /uploadBookAssetImage/);
   assert.match(source, /listBookAssetImages/);

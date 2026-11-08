@@ -272,6 +272,37 @@ func idleAutomationCounts() map[string]any {
 	return map[string]any{"total": 0, "ready": 0, "running": 0, "pending": 0, "failed": 0, "blocked": 0}
 }
 
+// automationBookAutoContinue 告诉前端“系统会不会自己继续”，并说明缺什么。
+// 状态接口不能再让 stopped/needs_manual 表现为“什么都没有”。
+func automationBookAutoContinue(book map[string]any) map[string]any {
+	status := strings.TrimSpace(toString(book["status"]))
+	switch status {
+	case "queued":
+		return map[string]any{"willContinue": true, "reason": "已排队，等待并发槽位"}
+	case "running":
+		return map[string]any{"willContinue": true, "reason": "系统正在自动执行"}
+	case "paused":
+		return map[string]any{"willContinue": false, "reason": "已暂停，需手动继续"}
+	case "stopped":
+		return map[string]any{"willContinue": false, "reason": "已停止，需手动继续"}
+	case "needs_manual":
+		pages := automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book})
+		reason := "需人工处理"
+		if len(pages) > 0 {
+			reason = "需人工处理 " + toString(pages[0]["label"]) + "：" + toString(pages[0]["code"])
+		}
+		return map[string]any{"willContinue": false, "reason": reason}
+	case "failed":
+		if automationBoolValue(book["retryRequested"]) {
+			return map[string]any{"willContinue": true, "reason": "已安排自动续跑"}
+		}
+		return map[string]any{"willContinue": false, "reason": "已失败，等待重试"}
+	case "completed":
+		return map[string]any{"willContinue": false, "reason": "已完成"}
+	}
+	return map[string]any{"willContinue": false, "reason": "状态未知，需人工确认"}
+}
+
 // publicAutomationBookLogs 只返回最近 limit 条日志，避免状态接口随任务时长膨胀。
 func publicAutomationBookLogs(raw any, limit int) []any {
 	logs := make([]any, 0, 8)
@@ -312,6 +343,13 @@ func publicAutomationJob(job map[string]any) map[string]any {
 	if result["counts"] == nil {
 		result["counts"] = idleAutomationCounts()
 	}
+	// 批次级“需人工页清单”：全批次跑完后，前端不必逐本点开就能看到
+	// 哪一页需要人工、原因、已自动改写几次、最后拒绝原文。
+	if rawBooks, ok := job["books"].(map[string]any); ok {
+		result["needsManualPages"] = automationNeedsManualPages(rawBooks)
+	} else {
+		result["needsManualPages"] = []map[string]any{}
+	}
 	books := []any{}
 	if raw, ok := job["books"].(map[string]any); ok {
 		for _, value := range raw {
@@ -333,6 +371,8 @@ func publicAutomationJob(job map[string]any) map[string]any {
 				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": retryAt,
 				"retryRequested": book["retryRequested"], "logs": publicAutomationBookLogs(book["logs"], 50),
 				"batchRetryPending": book["batchRetryPending"], "batchRetryCount": book["batchRetryCount"],
+				"needsManualPages": automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book}),
+				"autoContinue":     automationBookAutoContinue(book),
 			})
 		}
 	}

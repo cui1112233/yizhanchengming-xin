@@ -1,6 +1,6 @@
 const preloaders = {
   '/novel-fetch': () => import('./pages/NovelFetchPage'),
-  '/batch-factory': () => import('./pages/ShuihuoProductionPage')
+  '/batch-factory': () => import('./pages/BatchFactoryPageV30')
 };
 
 export function preloadRoute(href) {

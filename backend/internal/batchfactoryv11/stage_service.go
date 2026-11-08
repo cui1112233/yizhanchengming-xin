@@ -285,9 +285,9 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	}
 	effectiveSettings := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	effectiveMode := normalizeProductionMode(effectiveSettings)
-	if stage == BookStageAssets && !AssetImagesEnabled(effectiveSettings) {
-		// 关闭资产图片：不跑视频/漫画资产提取，直接沿用书里已存描述，
-		// 严禁为了凑齐资产而重新调用文本模型。
+	if stage == BookStageAssets && effectiveMode != "comic" && !AssetImagesEnabled(effectiveSettings) {
+		// 视频模式沿用原有行为。漫画模式必须始终提取人物、场景和道具的
+		// 文字提示词；资产图片开关只在后续出图阶段生效。
 		return s.Summary(ctx, owner, batchID, bookID)
 	}
 	if mode == StageModeMissing && effectiveMode == "comic" {
@@ -502,6 +502,13 @@ func (s *BookStageService) RetryLastFailed(ctx context.Context, owner, batchID, 
 	}
 	if strings.TrimSpace(videoID) == "" && summary.LastFailed.Stage == BookStageVideo {
 		videoID = summary.LastFailed.InputRevision
+	}
+	if summary.LastFailed.Stage == BookStageVideo && strings.TrimSpace(videoID) == "" {
+		failedTask, found := s.latestFailedProductionTask(ctx, owner, batchID, bookID, "")
+		if !found || strings.TrimSpace(failedTask.VideoID) == "" {
+			return BookStageSummary{}, fmt.Errorf("%w: 找不到明确的失败视频，已停止整本重新生成", ErrConflict)
+		}
+		videoID = failedTask.VideoID
 	}
 	frozenCompilationID := ""
 	strip := false

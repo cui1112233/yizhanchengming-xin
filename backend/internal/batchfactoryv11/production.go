@@ -447,47 +447,42 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 	resubmittedVideos := map[string]bool{}
 	supersededTasks := make([]supersededProductionTask, 0)
 	now := time.Now().UTC()
-	// 槽位级保留之后，未变化槽位的 video 身份跨修订保持不变，它的成功任务
-	// 挂在旧修订的 job 上。去重因此按「当前 active 槽位」过滤而不是按修订号
-	// 过滤：保留槽位的历史成功任务继续阻止重复投递，被轮换槽位的旧任务因为
-	// video 已不在 active 集合中而自然失效。
-	activeVideoIDs := map[string]bool{}
-	for _, video := range book.Videos {
-		activeVideoIDs[video.ID] = true
-	}
 	// Pass 1: the marker is durable evidence that this video already consumed
 	// its single no-receipt re-submission, even when the marker sits on a task
 	// from an older job.
 	for _, prior := range priorJobs {
-		if prior.BookID != bookID {
+		if prior.BookID != bookID || prior.DirectorRevisionID != book.DirectorRevision.ID {
 			continue
 		}
 		for _, task := range prior.Tasks {
-			if !activeVideoIDs[task.VideoID] {
-				continue
-			}
 			if task.ErrorMessage == SupersededWithoutReceiptMarker {
 				resubmittedVideos[task.VideoID] = true
 			}
 		}
 	}
 	for _, prior := range priorJobs {
-		if prior.BookID != bookID {
+		if prior.BookID != bookID || prior.DirectorRevisionID != book.DirectorRevision.ID {
 			continue
 		}
 		for _, task := range prior.Tasks {
-			if !activeVideoIDs[task.VideoID] {
-				continue
-			}
 			if options.Force {
 				continue
 			}
 			key := fmt.Sprintf("%s#v%d", task.VideoID, task.OpeningVariantIndex)
-			if task.Status == ProductionSucceeded || strings.TrimSpace(task.ProviderTaskID) != "" {
+			if task.Status == ProductionSucceeded {
 				blockedVideos[key] = true
 				continue
 			}
 			if task.Status != ProductionQueued && task.Status != ProductionRunning {
+				// Failed/cancelled tasks are unfinished work. Missing mode must
+				// resubmit only those VIDEO identities while preserving every
+				// successful sibling from the same Director revision.
+				continue
+			}
+			if strings.TrimSpace(task.ProviderTaskID) != "" {
+				// The provider already accepted this task. Poll/read it back; a
+				// second submission here could create a duplicate paid video.
+				blockedVideos[key] = true
 				continue
 			}
 			// A queued/running task without a provider id means submission was

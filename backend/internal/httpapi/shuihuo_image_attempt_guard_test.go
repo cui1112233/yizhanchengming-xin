@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 )
 
@@ -40,6 +42,10 @@ func TestLogImageAttemptFieldOrderIsStable(t *testing.T) {
 		inner:     3,
 		status:    200,
 		queued:    250 * time.Millisecond,
+		header:    600 * time.Millisecond,
+		body:      300 * time.Millisecond,
+		download:  200 * time.Millisecond,
+		save:      100 * time.Millisecond,
 		errorKind: "body_read_failed",
 		model:     "gpt-image-2",
 		detail:    "boom",
@@ -62,6 +68,10 @@ func TestLogImageAttemptFieldOrderIsStable(t *testing.T) {
 		"inner_attempt=3",
 		"http_status=200",
 		"queued_ms=250",
+		"header_ms=600",
+		"body_ms=300",
+		"download_ms=200",
+		"save_ms=100",
 		"error_kind=body_read_failed",
 		"model=gpt-image-2",
 		`detail="boom"`,
@@ -82,14 +92,16 @@ func TestLogImageAttemptFieldOrderIsStable(t *testing.T) {
 func TestShuihuoImageAttemptErrorKindClassification(t *testing.T) {
 	cases := map[string]string{
 		"context deadline exceeded (Client.Timeout exceeded while awaiting headers)": "client_timeout",
-		"context deadline exceeded":                     "ctx_deadline",
-		"context canceled":                             "ctx_canceled",
+		"context deadline exceeded": "ctx_deadline",
+		"context canceled":          "ctx_canceled",
 		"read tcp 1.2.3.4:1->5.6.7.8:443: connection reset by peer": "reset",
-		"wsarecv: An existing connection was forcibly closed":      "reset",
-		"unexpected EOF":                               "unexpected_eof",
-		"net/http: TLS handshake timeout":              "tls_timeout",
-		"image provider response body read failed":     "body_read_failed",
-		"something else":                               "other",
+		"wsarecv: An existing connection was forcibly closed":       "reset",
+		"unexpected EOF":                           "unexpected_eof",
+		"net/http: TLS handshake timeout":          "tls_timeout",
+		"image provider response body read failed": "body_read_failed",
+		"response body stalled after=30s without new bytes received=12 mode=url": "body_stalled",
+		"response body slow total=5m0s received=1024 mode=url":                   "body_slow",
+		"something else": "other",
 	}
 	for message, want := range cases {
 		if got := shuihuoImageAttemptKindOfError(errors.New(message), 0); got != want {
@@ -107,11 +119,11 @@ func TestShuihuoImageAttemptErrorKindClassification(t *testing.T) {
 	}
 }
 
-// 第 2 项：发了头却不回 body 时，body 分层计时必须在阈值内失败，而不是等到 900s。
-func TestRequestBodyReadTimesOutWithoutWaitingClientTimeout(t *testing.T) {
-	previous := shuihuoImageBodyReadTimeoutURL
-	shuihuoImageBodyReadTimeoutURL = 200 * time.Millisecond
-	t.Cleanup(func() { shuihuoImageBodyReadTimeoutURL = previous })
+// 第 2 项：发了头却不回 body 时，停滞计时必须在阈值内失败，而不是等到整请求超时。
+func TestRequestBodyStallsWithoutWaitingClientTimeout(t *testing.T) {
+	previous := shuihuoImageBodyStallTimeoutURL
+	shuihuoImageBodyStallTimeoutURL = 200 * time.Millisecond
+	t.Cleanup(func() { shuihuoImageBodyStallTimeoutURL = previous })
 
 	release := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -129,24 +141,90 @@ func TestRequestBodyReadTimesOutWithoutWaitingClientTimeout(t *testing.T) {
 	_, _, err := requestShuihuoProviderImage(context.Background(), nil, target, target.CatalogModel, endpoint, "test-secret", "test prompt", nil)
 	elapsed := time.Since(started)
 	if err == nil {
-		t.Fatal("expected a body read timeout error")
+		t.Fatal("expected a body stalled error")
 	}
 	if !strings.Contains(err.Error(), "response body read failed") {
 		t.Fatalf("error must keep the existing body-read string: %v", err)
 	}
-	if !strings.Contains(err.Error(), "body read timeout after=200ms mode=url") {
-		t.Fatalf("error must report the layered timeout: %v", err)
+	if !strings.Contains(err.Error(), "response body stalled after=200ms without new bytes received=0 mode=url") {
+		t.Fatalf("error must report the stalled timeout: %v", err)
 	}
 	if elapsed > 10*time.Second {
-		t.Fatalf("body timeout took %s, want within the layered limit", elapsed)
+		t.Fatalf("body stall took %s, want within the layered limit", elapsed)
 	}
 	var billed *shuihuoImageBilledReadFailure
 	if !errors.As(err, &billed) {
-		t.Fatalf("status=200 read failure must be billed (no resend): %v", err)
+		t.Fatalf("status=200 stalled read must be billed: %v", err)
+	}
+	if billed.kind != shuihuoImageBodyFailureStalled {
+		t.Fatalf("billed kind=%q, want BODY_STALLED", billed.kind)
 	}
 }
 
-// 第 2 项：连响应头都不回时，ResponseHeaderTimeout 必须早于 900s 生效。
+// 19 版：正文分块到达、总耗时超过旧闸门但始终有进展时必须判成功。
+func TestRequestBodyArrivingLateWithinTimeoutSucceeds(t *testing.T) {
+	body := []byte(`{"created":1,"data":[]}`)
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		<-release
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+	timer := time.AfterFunc(300*time.Millisecond, func() { close(release) })
+	defer timer.Stop()
+
+	response, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer response.Body.Close()
+	started := time.Now()
+	raw, err := readShuihuoImageResponseBody(response, "url", 900*time.Millisecond, 3*time.Second)
+	elapsed := time.Since(started)
+	if err != nil {
+		t.Fatalf("body arriving inside the window must succeed: %v", err)
+	}
+	if !bytes.Equal(raw, body) {
+		t.Fatalf("unexpected body: %q", raw)
+	}
+	if elapsed < 250*time.Millisecond {
+		t.Fatalf("body read returned in %s, expected to wait for the delayed body", elapsed)
+	}
+}
+
+// URL 与 base64 两档的停滞阈值、总上限都必须对齐，避免出现两套口径。
+func TestImageBodyTimeoutAligned(t *testing.T) {
+	if shuihuoImageBodyStallTimeoutURL != shuihuoImageBodyStallTimeoutBase64 {
+		t.Fatalf("body stall timeouts must be aligned: url=%s base64=%s",
+			shuihuoImageBodyStallTimeoutURL, shuihuoImageBodyStallTimeoutBase64)
+	}
+	if shuihuoImageBodyTotalTimeoutURL != shuihuoImageBodyTotalTimeoutBase64 {
+		t.Fatalf("body total timeouts must be aligned: url=%s base64=%s",
+			shuihuoImageBodyTotalTimeoutURL, shuihuoImageBodyTotalTimeoutBase64)
+	}
+}
+
+// 线上供应商会先返回 200，再用一到两分钟准备/传输图片正文；默认停滞窗口
+// 必须覆盖这段真实等待，不能在 30 秒时主动掐断一个仍会返回结果的请求。
+func TestImageRequestDefaultsAllowSlowProviderBody(t *testing.T) {
+	if shuihuoImageResponseHeaderTimeout != 0 {
+		t.Fatalf("response header timeout=%s, want 0 (old version behavior)", shuihuoImageResponseHeaderTimeout)
+	}
+	if shuihuoImageRequestTimeout != 360*time.Second {
+		t.Fatalf("request timeout=%s, want 360s", shuihuoImageRequestTimeout)
+	}
+	if shuihuoImageBodyStallTimeoutURL != 180*time.Second || shuihuoImageBodyStallTimeoutBase64 != 180*time.Second {
+		t.Fatalf("body stall timeouts=%s/%s, want 180s/180s", shuihuoImageBodyStallTimeoutURL, shuihuoImageBodyStallTimeoutBase64)
+	}
+	if shuihuoImageBodyTotalTimeoutURL != 300*time.Second || shuihuoImageBodyTotalTimeoutBase64 != 300*time.Second {
+		t.Fatalf("body total timeouts=%s/%s, want 300s/300s", shuihuoImageBodyTotalTimeoutURL, shuihuoImageBodyTotalTimeoutBase64)
+	}
+}
+
+// 连响应头都不回时，注入的 ResponseHeaderTimeout 必须早于整请求超时生效。
 func TestResponseHeaderTimeoutFailsFast(t *testing.T) {
 	previous := shuihuoImageResponseHeaderTimeout
 	shuihuoImageResponseHeaderTimeout = 200 * time.Millisecond
@@ -159,7 +237,7 @@ func TestResponseHeaderTimeoutFailsFast(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Cleanup(func() { close(release) })
 
-	client := &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(true)}
+	client := &http.Client{Timeout: shuihuoImageRequestTimeout, Transport: newShuihuoImageTransport(true)}
 	started := time.Now()
 	response, err := client.Post(server.URL, "application/json", strings.NewReader("{}"))
 	if response != nil {
@@ -207,8 +285,11 @@ func TestImageGenerationClientIsSharedPerProtocol(t *testing.T) {
 		t.Fatal("shared client must reuse the same Transport")
 	}
 	transport := first.Transport.(*http.Transport)
-	if transport.ResponseHeaderTimeout != 60*time.Second {
-		t.Fatalf("response header timeout=%s, want 60s", transport.ResponseHeaderTimeout)
+	if transport.ResponseHeaderTimeout != 0 {
+		t.Fatalf("response header timeout=%s, want 0 (old version behavior)", transport.ResponseHeaderTimeout)
+	}
+	if first.Timeout != shuihuoImageRequestTimeout {
+		t.Fatalf("client timeout=%s, want %s", first.Timeout, shuihuoImageRequestTimeout)
 	}
 	if transport.MaxIdleConnsPerHost <= 0 || transport.IdleConnTimeout <= 0 {
 		t.Fatalf("idle pool not configured: perHost=%d idle=%s", transport.MaxIdleConnsPerHost, transport.IdleConnTimeout)
@@ -269,5 +350,196 @@ func TestBilledReadFailureIsNotRetried(t *testing.T) {
 	}
 	if got := requests.Load(); got != 3 {
 		t.Fatalf("provider requests=%d, want 3 retries when dedupe disabled", got)
+	}
+}
+
+// pacedBodyReader 按固定间隔返回数据块，模拟「慢速但一直有数据」的正文。
+// 间隔取毫秒级，测试不依赖真实的 30s/300s 阈值。
+type pacedBodyReader struct {
+	chunks   [][]byte
+	index    int
+	interval time.Duration
+}
+
+func (r *pacedBodyReader) Read(p []byte) (int, error) {
+	if r.index > 0 && r.interval > 0 {
+		time.Sleep(r.interval)
+	}
+	if r.index >= len(r.chunks) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.chunks[r.index])
+	r.index++
+	return n, nil
+}
+
+// blockedBodyReader 先返回一块数据，随后永久阻塞，模拟上游 200 后断流。
+type blockedBodyReader struct {
+	first   []byte
+	sent    bool
+	release chan struct{}
+}
+
+func (r *blockedBodyReader) Read(p []byte) (int, error) {
+	if !r.sent {
+		r.sent = true
+		return copy(p, r.first), nil
+	}
+	<-r.release
+	return 0, io.EOF
+}
+
+// endlessBodyReader 持续返回数据块，用于触发总上限兜底。
+type endlessBodyReader struct {
+	chunk    []byte
+	interval time.Duration
+	release  chan struct{}
+}
+
+func (r *endlessBodyReader) Read(p []byte) (int, error) {
+	if r.interval > 0 {
+		time.Sleep(r.interval)
+	}
+	select {
+	case <-r.release:
+		return 0, io.EOF
+	default:
+		return copy(p, r.chunk), nil
+	}
+}
+
+// ① 慢速但持续有数据：每块都会重置停滞计时，必须成功，即使总耗时远超停滞阈值。
+func TestBodyStallReaderSucceedsWithContinuousChunks(t *testing.T) {
+	chunks := make([][]byte, 8)
+	for index := range chunks {
+		chunks[index] = []byte("01234567")
+	}
+	reader := &pacedBodyReader{chunks: chunks, interval: 20 * time.Millisecond}
+	response := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(reader)}
+
+	started := time.Now()
+	raw, err := readShuihuoImageResponseBody(response, "url", 120*time.Millisecond, 5*time.Second)
+	elapsed := time.Since(started)
+	if err != nil {
+		t.Fatalf("continuous slow chunks must succeed, got %v", err)
+	}
+	if len(raw) != 8*len(chunks[0]) {
+		t.Fatalf("received=%d bytes, want %d", len(raw), 8*len(chunks[0]))
+	}
+	// 总耗时已超过停滞阈值，但因为没有「连续停滞」所以不应失败。
+	if elapsed < 100*time.Millisecond {
+		t.Fatalf("elapsed=%s, test did not exercise the slow path", elapsed)
+	}
+}
+
+// ② 连续无数据超过停滞阈值：失败并归类 BODY_STALLED，且已计费类型可被识别。
+func TestBodyStallFailsAndClassifiesBodyStalled(t *testing.T) {
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(&blockedBodyReader{first: []byte("partial"), release: release}),
+	}
+
+	started := time.Now()
+	raw, err := readShuihuoImageResponseBody(response, "url", 60*time.Millisecond, 5*time.Second)
+	elapsed := time.Since(started)
+	var stalled *shuihuoImageBodyStallError
+	if !errors.As(err, &stalled) {
+		t.Fatalf("want shuihuoImageBodyStallError, got %v", err)
+	}
+	if string(raw) != "partial" {
+		t.Fatalf("partial bytes=%q, want %q", raw, "partial")
+	}
+	if stalled.received != len("partial") || stalled.stall != 60*time.Millisecond || stalled.mode != "url" {
+		t.Fatalf("stalled detail=%+v", stalled)
+	}
+	if elapsed > 5*time.Second {
+		t.Fatalf("stall detection took %s", elapsed)
+	}
+	if kind := shuihuoImageAttemptKindOfError(err, http.StatusOK); kind != "body_stalled" {
+		t.Fatalf("attempt kind=%q, want body_stalled", kind)
+	}
+	billed := &shuihuoImageBilledReadFailure{message: err.Error(), kind: shuihuoImageBodyFailureStalled}
+	if billed.Kind() != shuihuoImageBodyFailureStalled {
+		t.Fatalf("billed kind=%q", billed.Kind())
+	}
+	if !errors.Is(billed, batchfactoryv11.ErrUpstream) {
+		t.Fatal("billed failure must keep ErrUpstream semantics")
+	}
+}
+
+// ③ 总上限兜底：一直有数据但到总上限仍未读完，归类 BODY_SLOW，而不是 BODY_STALLED。
+func TestBodyTotalCapFailsAsBodySlow(t *testing.T) {
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(&endlessBodyReader{
+			chunk:    bytes.Repeat([]byte("x"), 4*1024),
+			interval: 10 * time.Millisecond,
+			release:  release,
+		}),
+	}
+
+	_, err := readShuihuoImageResponseBody(response, "url", 2*time.Second, 80*time.Millisecond)
+	var slow *shuihuoImageBodySlowError
+	if !errors.As(err, &slow) {
+		t.Fatalf("want shuihuoImageBodySlowError, got %v", err)
+	}
+	if slow.received <= 0 {
+		t.Fatalf("slow received=%d, want data before the total cap", slow.received)
+	}
+	if slow.total != 80*time.Millisecond || slow.mode != "url" {
+		t.Fatalf("slow detail=%+v", slow)
+	}
+	if kind := shuihuoImageAttemptKindOfError(err, http.StatusOK); kind != "body_slow" {
+		t.Fatalf("attempt kind=%q, want body_slow", kind)
+	}
+	var stalled *shuihuoImageBodyStallError
+	if errors.As(err, &stalled) {
+		t.Fatal("total cap must not be classified as BODY_STALLED")
+	}
+}
+
+// HTTP 200 表示供应商已经接单并可能计费。即使正文最终断流，也不能自动
+// 再发一张；应保留失败记录，交给用户明确决定是否付费重试。
+func TestBilledStalledResponseIsNotAutomaticallyResent(t *testing.T) {
+	previousStall := shuihuoImageBodyStallTimeoutURL
+	shuihuoImageBodyStallTimeoutURL = 100 * time.Millisecond
+	t.Cleanup(func() { shuihuoImageBodyStallTimeoutURL = previousStall })
+	t.Setenv("QIANTIE_IMAGE_RETRY_BASE_DELAY_MS", "0")
+	t.Setenv("QIANTIE_IMAGE_PROVIDER_MAX_ATTEMPTS", "3")
+
+	var requests atomic.Int32
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		<-release
+	}))
+	t.Cleanup(func() {
+		close(release)
+		server.Close()
+	})
+
+	endpoint := server.URL + "/v1/images/generations"
+	target := testShuihuoImageTarget(endpoint)
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	_, _, _, err := generateShuihuoAssetImageArtifactWithRetry(context.Background(), nil, files, nil, "alice", target, "test prompt", nil, nil)
+	var billed *shuihuoImageBilledReadFailure
+	if !errors.As(err, &billed) {
+		t.Fatalf("want billed stalled failure, got %v", err)
+	}
+	if billed.kind != shuihuoImageBodyFailureStalled {
+		t.Fatalf("billed kind=%q, want BODY_STALLED", billed.kind)
+	}
+	if billed.retried {
+		t.Fatal("billed response must not be automatically resent")
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("provider requests=%d, want exactly 1 billed request", got)
 	}
 }
