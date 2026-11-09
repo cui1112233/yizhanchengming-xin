@@ -54,6 +54,31 @@ func TestClassifyFailureTable(t *testing.T) {
 	}
 }
 
+func TestRecordAutomationPageLedgerKeepsInFlightRetryable(t *testing.T) {
+	now := time.Date(2026, 11, 9, 11, 0, 0, 0, time.UTC)
+	entry := map[string]any{}
+	err := &comicPagePartialError{
+		comicPageWorkError: &comicPageWorkError{Failures: []comicPageFailure{{
+			VideoID: "video-1",
+			Label:   "漫画页 01",
+			Err:     fmt.Errorf("%w: 当前漫画页正在生成，请等待本次结果完成后再重试", batchfactoryv11.ErrConflict),
+		}}},
+		Completed: 34,
+		Total:     35,
+	}
+	outcome := recordAutomationPageLedger(entry, err, "comic_images", now)
+	if outcome.NeedsManual {
+		t.Fatal("PAGE_IN_FLIGHT must remain eligible for automatic continuation")
+	}
+	record, _ := automationFailureLedger(entry, "comic_images")["video-1"].(map[string]any)
+	if record == nil || record["lastErrorCode"] != automationCodePageInFlight {
+		t.Fatalf("record=%#v, want PAGE_IN_FLIGHT ledger entry", record)
+	}
+	if record["state"] != "skipped" || automationBoolValue(record["needsManual"]) {
+		t.Fatalf("record=%#v, want repairable skipped state", record)
+	}
+}
+
 // 停滞与慢速必须分开记账：BODY_STALLED 计入已计费未取回并可记重发次数，
 // BODY_SLOW 只记慢，不进入补偿统计。
 func TestBilledReadFailureKindRecordedSeparately(t *testing.T) {

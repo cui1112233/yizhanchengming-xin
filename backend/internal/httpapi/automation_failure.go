@@ -169,7 +169,7 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 	case comicPageGenerationInFlightError(err), strings.Contains(msg, "正在生成"),
 		strings.Contains(msg, "已有生成任务"):
 		return automationFailureDisposition{
-			Code: automationCodePageInFlight, Class: automationFailureTransient,
+			Code: automationCodePageInFlight, Class: automationFailureTransient, Repairable: true,
 			MaxAttempts: 0, MinAttemptsBeforeRetry: 0, BudgetKey: budget,
 		}
 	case strings.Contains(msg, "error 1038"), strings.Contains(msg, "out of sort memory"),
