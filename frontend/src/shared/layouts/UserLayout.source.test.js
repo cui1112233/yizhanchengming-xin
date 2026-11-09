@@ -54,12 +54,19 @@ test('routes account-center pages through the dedicated layout while the avatar 
   assert.doesNotMatch(source, /accountCenterOpen/);
 });
 
-test('keeps theme and logout controls compact inside the collapsed sidebar', () => {
+test('keeps the shared multi-theme picker and logout controls compact inside the collapsed sidebar', () => {
   assert.match(source, /className="legacy-sidebar-logout"/);
   assert.match(source, /<LogOut/);
-  assert.match(source, /className="legacy-theme-switch"/);
-  assert.match(source, /legacy-theme-switch__track/);
-  assert.match(stylesheet, /\.legacy-theme-switch__track\s*\{/s);
+  assert.match(source, /<ThemePicker value=\{theme\} onChange=\{changeTheme\} compact \/>/);
+  assert.match(source, /const nextThemeId = persistCachedTheme\(themeId\)/);
+  assert.match(source, /updateMemberProfile\(\{ themeId: nextThemeId \}\)/);
+  assert.match(source, /主题已在本机切换，但未同步到账号/);
   assert.match(stylesheet, /\.legacy-sidebar\.collapsed \.legacy-sidebar-user\s*\{[^}]*flex-direction:\s*column;/s);
   assert.match(stylesheet, /\.legacy-sidebar\.collapsed \.legacy-sidebar-user \.legacy-sidebar-logout-label\s*\{[^}]*display:\s*none;/s);
+});
+
+test('logged-in account theme overrides cache and system mode resolves before rendering', () => {
+  assert.match(source, /selectThemePreference\(\{ loggedIn: true, accountThemeId: account\.themeId, cachedThemeId: theme \}\)/);
+  assert.match(source, /resolveThemeId\(theme, systemMode\)/);
+  assert.match(source, /document\.documentElement\.dataset\.theme = resolvedTheme/);
 });

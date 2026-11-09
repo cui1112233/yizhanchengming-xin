@@ -11,7 +11,8 @@ const canvas = fs.readFileSync(path.join(here, '..', 'components', 'AgentCanvas.
 
 test('Agent 工作区接入 V88 主题与连接线外的青绿主色', () => {
   assert.match(source, /import \{ Button, ConfigProvider,[^}]*\} from 'antd'/);
-  assert.match(source, /createV88AntTheme\('dark'\)/);
+  assert.match(source, /createV88AntTheme\(theme\)/);
+  assert.match(source, /useMemo\(\(\) => createV88AntTheme\(theme\), \[theme\]\)/);
   assert.match(source, /<ConfigProvider theme=\{antTheme\}>/);
   assert.match(css, /\.agent-page\.utility-workbench[\s\S]*?--agent-accent:\s*var\(--v88-color-primary\)/);
   assert.match(css, /--agent-accent-hover:\s*var\(--v88-color-primary-hover\)/);

@@ -1,9 +1,12 @@
-import { Button, ConfigProvider, Result, Spin } from 'antd';
+import { Button, ConfigProvider, Result, Spin, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
+import { ThemePicker } from '../components/ThemePicker';
 import { getCurrentAccount, logout } from '../api/auth';
-import { createAntTheme } from '../styles/theme';
+import { updateMemberProfile } from '../api/member';
+import { createAntTheme, resolveThemeId } from '../styles/theme';
+import { loadCachedTheme, persistCachedTheme, selectThemePreference } from '../styles/theme-preference.js';
 
 const navItems = [
   { href: '/admin', icon: '▦', label: '概览' },
@@ -15,10 +18,12 @@ const navItems = [
   { href: '/admin/error-logs', icon: '!', label: '错误日志' }
 ];
 
-const THEME_STORAGE_KEY = 'yizhan-theme';
-
 function initialTheme() {
-  return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
+  return loadCachedTheme();
+}
+
+function initialSystemMode() {
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
 function pageTitle(pathname) {
@@ -29,11 +34,16 @@ export function AdminLayout({ children }) {
   const [account, setAccount] = useState(null);
   const [accessState, setAccessState] = useState('checking');
   const [theme, setTheme] = useState(initialTheme);
+  const [systemMode, setSystemMode] = useState(initialSystemMode);
   const pathname = window.location.pathname;
+  const resolvedTheme = resolveThemeId(theme, systemMode);
 
   useEffect(() => {
     getCurrentAccount().then(nextAccount => {
       setAccount(nextAccount);
+      const accountTheme = selectThemePreference({ loggedIn: true, accountThemeId: nextAccount.themeId, cachedThemeId: theme });
+      setTheme(accountTheme);
+      persistCachedTheme(accountTheme);
       if (nextAccount?.role === 'dev') {
         setAccessState('allowed');
         return;
@@ -47,9 +57,16 @@ export function AdminLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-color-scheme: light)');
+    if (!query) return undefined;
+    const receive = event => setSystemMode(event.matches ? 'light' : 'dark');
+    query.addEventListener?.('change', receive);
+    return () => query.removeEventListener?.('change', receive);
+  }, []);
 
   useEffect(() => {
     document.body.classList.add('admin-theme-active');
@@ -61,20 +78,27 @@ export function AdminLayout({ children }) {
     window.location.assign('/');
   }
 
-  function toggleTheme() {
-    setTheme(current => current === 'dark' ? 'light' : 'dark');
+  async function changeTheme(themeId) {
+    const nextThemeId = persistCachedTheme(themeId);
+    setTheme(nextThemeId);
+    try {
+      const result = await updateMemberProfile({ themeId: nextThemeId });
+      setAccount(current => current ? { ...current, themeId: result.member?.themeId || nextThemeId } : current);
+    } catch {
+      message.warning('主题已在本机切换，但未同步到账号');
+    }
   }
 
   if (accessState === 'checking') {
-    return <ConfigProvider theme={createAntTheme(theme)}><div className="admin-access-screen"><Spin size="large" tip="正在验证开发者权限" /></div></ConfigProvider>;
+    return <ConfigProvider theme={createAntTheme(theme, systemMode)}><div className="admin-access-screen"><Spin size="large" tip="正在验证开发者权限" /></div></ConfigProvider>;
   }
 
   if (accessState !== 'allowed') {
-    return <ConfigProvider theme={createAntTheme(theme)}><div className="admin-access-screen"><Result status="403" title="仅 DEV 可访问管理后台" subTitle="账号与组员授权请在个人中心完成。" /></div></ConfigProvider>;
+    return <ConfigProvider theme={createAntTheme(theme, systemMode)}><div className="admin-access-screen"><Result status="403" title="仅 DEV 可访问管理后台" subTitle="账号与组员授权请在个人中心完成。" /></div></ConfigProvider>;
   }
 
   return (
-    <ConfigProvider theme={createAntTheme(theme)}>
+    <ConfigProvider theme={createAntTheme(theme, systemMode)}>
       <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-brand"><BrandLogo className="admin-brand-logo" /><span>管理后台</span></div>
@@ -85,16 +109,7 @@ export function AdminLayout({ children }) {
         <div className="admin-sidebar-footer">
           <Link href="/profile" reload className="admin-return-link">← 返回个人中心</Link>
           <div className="admin-user-summary"><span>{account?.username || '正在验证身份'}</span>{account?.isOwner ? <small>主管理员</small> : <small>管理员</small>}</div>
-          <Button
-            size="small"
-            className="admin-theme-toggle"
-            type="button"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}
-            aria-label={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}
-          >
-            {theme === 'dark' ? '☀ 浅色主题' : '☾ 深色主题'}
-          </Button>
+          <ThemePicker value={theme} onChange={changeTheme} />
           <Button size="small" onClick={handleLogout}>退出登录</Button>
         </div>
       </aside>

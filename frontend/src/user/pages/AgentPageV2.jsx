@@ -59,7 +59,7 @@ function ConversationAssetPreview({ asset }) {
   return <FileText size={15} aria-hidden="true" />;
 }
 
-export function AgentPageV2({ theme }) {
+export function AgentPageV2({ theme = 'dark' }) {
   const [tasks, setTasks] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
@@ -1133,7 +1133,7 @@ export function AgentPageV2({ theme }) {
     }
   }
 
-  const antTheme = useMemo(() => createV88AntTheme('dark'), []);
+  const antTheme = useMemo(() => createV88AntTheme(theme), [theme]);
 
   return (
     <ConfigProvider theme={antTheme}>

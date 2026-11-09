@@ -1,17 +1,20 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Settings2 } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
 import { ProductUpdateModal } from '../components/ProductUpdateModal';
+import { ThemePicker } from '../components/ThemePicker';
 import { getCurrentAccount, getCurrentUsername, login, loginWithPasskey, logout } from '../api/auth';
 import { getToken } from '../api/client';
 import { getConfig } from '../api/config';
+import { updateMemberProfile } from '../api/member';
 import { avatarDisplay } from '../avatars';
 import { CmPenguinCompanion } from '../pet/CmPenguinCompanion';
 import { dispatchPetContext } from '../pet/stacky';
 import { GLOBAL_STATUS_EVENT, GLOBAL_TASK_NOTIFICATION_EVENT, normalizeGlobalTaskNotification } from '../notifications/globalTaskCenter.js';
-import { createAntTheme } from '../styles/theme';
+import { createAntTheme, resolveThemeId } from '../styles/theme';
+import { loadCachedTheme, persistCachedTheme, selectThemePreference } from '../styles/theme-preference.js';
 import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAccess.js';
 import { AccountCenterLayout } from './AccountCenterLayout';
 import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
@@ -32,12 +35,15 @@ const navItems = [
   { href: '/tts', icon: AudioLines, label: '配音' }
 ];
 
-const THEME_STORAGE_KEY = 'yizhan-theme';
 const ACCOUNT_CENTER_RETURN_PATH_KEY = 'qiantie:account-center-return-path';
 const ACCOUNT_CENTER_ENTRY_KEY = 'qiantie:account-center-entry-active';
 
 function initialTheme() {
-  return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
+  return loadCachedTheme();
+}
+
+function initialSystemMode() {
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
 function pageTitle(pathname) {
@@ -72,6 +78,7 @@ export function UserLayout({ children }) {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => shouldAutoCollapseAgentNavigation(window.location.pathname));
   const [theme, setTheme] = useState(initialTheme);
+  const [systemMode, setSystemMode] = useState(initialSystemMode);
   const [petVisible, setPetVisible] = useState(true);
   const [globalStatus, setGlobalStatus] = useState({ text: '', tone: 'idle', expiresAt: 0 });
   const [avatar, setAvatar] = useState(null);
@@ -90,18 +97,33 @@ export function UserLayout({ children }) {
   // 悬浮助手需要用它区分账号会话；它不能再作为主页面容器的 React key。
   const accountSessionKey = username || 'anonymous';
   const visibleNavItems = navItems;
+  const resolvedTheme = resolveThemeId(theme, systemMode);
   const content = isValidElement(children)
     ? cloneElement(
       children,
-      { theme },
-      isValidElement(children.props.children) ? cloneElement(children.props.children, { theme }) : children.props.children
+      { theme: resolvedTheme, themePreference: theme, onThemeChange: changeTheme },
+      isValidElement(children.props.children) ? cloneElement(children.props.children, { theme: resolvedTheme, themePreference: theme, onThemeChange: changeTheme }) : children.props.children
     )
     : children;
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-color-scheme: light)');
+    if (!query) return undefined;
+    const receive = event => setSystemMode(event.matches ? 'light' : 'dark');
+    query.addEventListener?.('change', receive);
+    return () => query.removeEventListener?.('change', receive);
+  }, []);
+
+  useEffect(() => {
+    if (!account || !isLoggedIn) return;
+    const accountTheme = selectThemePreference({ loggedIn: true, accountThemeId: account.themeId, cachedThemeId: theme });
+    setTheme(accountTheme);
+    persistCachedTheme(accountTheme);
+  }, [account?.themeId, isLoggedIn]);
 
   useEffect(() => {
     if (shouldAutoCollapseAgentNavigation(pathname)) setSidebarCollapsed(true);
@@ -382,8 +404,16 @@ export function UserLayout({ children }) {
     setSidebarCollapsed(collapsed => !collapsed);
   }
 
-  function toggleTheme() {
-    setTheme(current => current === 'dark' ? 'light' : 'dark');
+  async function changeTheme(themeId) {
+    const nextThemeId = persistCachedTheme(themeId);
+    setTheme(nextThemeId);
+    if (!isLoggedIn) return;
+    try {
+      const result = await updateMemberProfile({ themeId: nextThemeId });
+      setAccount(current => current ? { ...current, themeId: result.member?.themeId || nextThemeId } : current);
+    } catch (error) {
+      message.warning('主题已在本机切换，但未同步到账号');
+    }
   }
 
   const showLoginCard = !isLoggedIn && (isHome || loginDialogOpen);
@@ -420,7 +450,7 @@ export function UserLayout({ children }) {
 
   if (isHome) {
     return (
-      <ConfigProvider theme={createAntTheme(theme)}>
+      <ConfigProvider theme={createAntTheme(theme, systemMode)}>
         <div className="home-shell">
           {isValidElement(children) ? cloneElement(children, { theme, isLoggedIn, onOpenLogin: openLoginDialog }) : content}
           {loginOverlay}
@@ -432,7 +462,7 @@ export function UserLayout({ children }) {
 
   if (isAccountCenterRoute) {
     return (
-      <ConfigProvider theme={createAntTheme(theme)}>
+      <ConfigProvider theme={createAntTheme(theme, systemMode)}>
         <AccountCenterLayout account={account} username={username} avatar={displayAvatar} pathname={pathname} onReturn={returnToWorkbench} onLogout={handleLogout}>{pageContent}</AccountCenterLayout>
         {loginOverlay}
         <ProductUpdateModal enabled={isLoggedIn} />
@@ -441,7 +471,7 @@ export function UserLayout({ children }) {
   }
 
   return (
-    <ConfigProvider theme={createAntTheme(theme)}>
+    <ConfigProvider theme={createAntTheme(theme, systemMode)}>
       <div className="legacy-shell">
       <aside className={`legacy-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="legacy-brand">
@@ -456,7 +486,7 @@ export function UserLayout({ children }) {
           </button>
           <Link href="/" className="legacy-brand-link">
             <Suspense fallback={<BrandLogo className="legacy-brand-logo" />}>
-              <SuperOpcLiquidMetalLogo theme={theme} scale={1} className="legacy-brand-logo" />
+              <SuperOpcLiquidMetalLogo theme={resolvedTheme} scale={1} className="legacy-brand-logo" />
             </Suspense>
             <span className="legacy-brand-title shine">一战晟铭</span>
           </Link>
@@ -474,19 +504,7 @@ export function UserLayout({ children }) {
           })}
         </nav>
         <div className="legacy-sidebar-tools">
-          <label className="legacy-theme-switch" title={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}>
-            <input
-              type="checkbox"
-              checked={theme === 'dark'}
-              aria-label={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}
-              onChange={toggleTheme}
-            />
-            <span className="legacy-theme-switch__track" aria-hidden="true">
-              <span className="legacy-theme-switch__clouds" />
-              <span className="legacy-theme-switch__stars" />
-              <span className="legacy-theme-switch__thumb"><Sun className="legacy-theme-switch__sun" size={17} strokeWidth={1.8} /><Moon className="legacy-theme-switch__moon" size={16} strokeWidth={1.8} /></span>
-            </span>
-          </label>
+          <ThemePicker value={theme} onChange={changeTheme} compact />
           <Link href="/settings" className="legacy-sidebar-tool" title="设置">
             <span className="legacy-nav-icon"><Settings2 size={18} strokeWidth={1.8} aria-hidden="true" /></span>
             <span className="legacy-nav-label">设置</span>

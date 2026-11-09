@@ -108,6 +108,23 @@ func textPatch(value any, fallback string, max int) (string, error) {
 	return text, nil
 }
 
+var memberThemeIDs = map[string]struct{}{
+	"system": {}, "dark": {}, "light": {}, "graywhite": {}, "mint": {}, "snow": {},
+	"vanilla": {}, "sakura": {}, "pureblack": {}, "purple": {}, "willow": {}, "ivory": {}, "lotus": {},
+}
+
+func memberThemePatch(value any) (string, error) {
+	themeID, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("主题格式不正确")
+	}
+	themeID = strings.TrimSpace(themeID)
+	if _, ok := memberThemeIDs[themeID]; !ok {
+		return "", fmt.Errorf("不支持的主题")
+	}
+	return themeID, nil
+}
+
 func (s *MemberProfileStore) update(username string, input map[string]any, accounts auth.Store) (map[string]any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -136,6 +153,13 @@ func (s *MemberProfileStore) update(username string, input map[string]any, accou
 			return nil, err
 		}
 		profile["displayName"] = next
+	}
+	if value, exists := input["themeId"]; exists {
+		next, err := memberThemePatch(value)
+		if err != nil {
+			return nil, err
+		}
+		profile["themeId"] = next
 	}
 	if _, exists := input["bio"]; exists || input["phone"] != nil || input["email"] != nil || input["teamTitle"] != nil {
 		details := s.readArray("member-profile-details.json")
@@ -196,8 +220,8 @@ func (s *MemberProfileStore) member(ctxUsername string, accounts auth.Store) map
 	} else if value, ok := profile["role"].(string); ok && (value == "dev" || value == "manager") {
 		role = value
 	}
-	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": false, "bio": nil, "phone": nil, "email": nil, "teamTitle": nil}
-	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit", "apiEnabled", "apiScopes"} {
+	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": false, "bio": nil, "phone": nil, "email": nil, "teamTitle": nil, "themeId": "system"}
+	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit", "apiEnabled", "apiScopes", "themeId"} {
 		if value, ok := profile[key]; ok {
 			member[key] = value
 		}

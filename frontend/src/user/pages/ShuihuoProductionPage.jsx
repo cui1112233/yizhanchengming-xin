@@ -30,7 +30,7 @@ function readinessItems(health, executorKinds = [], executorOnline = false) {
   return [['数据库', health?.database], ['Redis', health?.redis], ['存储', health?.storage], ...Object.entries(modelNames).map(([kind, name]) => [name, executorKindSet.has(kind) ? { ready: executorOnline, executor: true, reason: executorOnline ? '一战晟铭执行器在线' : '一战晟铭执行器离线' } : { ready: enabled.has(kind), reason: enabled.has(kind) ? '' : `缺少已启用的${name}` }])];
 }
 
-export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
+export function ShuihuoProductionPage({ openBatchOnLoad = false, theme = 'dark' }) {
   const [projects, setProjects] = useState([]);
   const [activeProject, setActiveProject] = useState(null);
   const [activeBatchProject, setActiveBatchProject] = useState(null);
@@ -347,7 +347,7 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     try { setActiveProject(await getProject(activeProject.project.id)); } catch (error) { message.error(error.message || '刷新项目失败'); }
   }
 
-  const antTheme = useMemo(() => createV88AntTheme('dark'), []);
+  const antTheme = useMemo(() => createV88AntTheme(theme), [theme]);
 
   return <ConfigProvider theme={antTheme}><div className={`shuihuo-production ${view === 'studio' || view === 'batch-novels' ? 'is-workbench' : ''}`}>
     {view !== 'projects' && health ? <div className="shuihuo-readiness-strip" role="status" aria-live="polite"><strong className="shuihuo-readiness-title">运行依赖</strong>{readinessItems(health, activeBatchExecutorKinds, localExecutorStatus.online).map(([name, dependency]) => <span className={`${dependency?.ready ? 'ready' : 'missing'}${dependency?.executor ? ' is-local-executor' : ''}`} key={name} title={dependency?.reason || `${name}已配置`}>{dependency?.executor ? <><i aria-hidden="true" />{name}：一战晟铭执行器{dependency.ready ? '在线' : '离线'}</> : <>{name}：{dependency?.ready ? '已配置' : '未配置'}{dependency?.ready || !dependency?.reason ? '' : `（${dependency.reason}）`}</>}</span>)}</div> : null}

@@ -27,6 +27,7 @@ func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[
 	role := "member"
 	displayName := account.Username
 	var avatarURL any
+	themeID := "system"
 	if account.IsOwner {
 		role = "dev"
 	}
@@ -49,9 +50,14 @@ func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[
 				displayName = value
 			}
 			avatarURL = memberAvatarURL(profile)
+			if value, ok := profile["themeId"].(string); ok {
+				if _, supported := memberThemeIDs[value]; supported {
+					themeID = value
+				}
+			}
 		}
 	}
-	return map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "role": role, "displayName": displayName, "avatarUrl": avatarURL, "effectivePermissions": []string{}}
+	return map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "role": role, "displayName": displayName, "avatarUrl": avatarURL, "themeId": themeID, "effectivePermissions": []string{}}
 }
 
 func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {

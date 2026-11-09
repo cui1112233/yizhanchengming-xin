@@ -15,6 +15,7 @@ import {
 import { PET_COMPANION_SETTINGS_EVENT, readCompanionSpeechState, writeCompanionSpeechState } from '../../shared/pet/companionSpeech';
 import { DEFAULT_PET_ID, dispatchPetSelection, getPetDefinition, getPetOptions, previewPetSelection } from '../../shared/pet/petCatalog';
 import { LittleCompanionSprite } from '../../shared/pet/LittleCompanionSprite';
+import { ThemePicker } from '../../shared/components/ThemePicker';
 
 const petOptions = getPetOptions();
 
@@ -32,7 +33,7 @@ function executorStatusText(group) {
   return '状态读取中…';
 }
 
-export function SettingsPage() {
+export function SettingsPage({ themePreference = 'system', onThemeChange }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [savingSection, setSavingSection] = useState(null);
@@ -329,6 +330,13 @@ export function SettingsPage() {
         disabled={loading}
         initialValues={{ storageRoot: '', productionRetentionDays: 7, petId: DEFAULT_PET_ID, soundEnabled: true, soundVolume: 60, petVisible: true }}
       >
+        <section className="settings-section settings-theme-section" aria-labelledby="settings-theme-title">
+          <div>
+            <h2 id="settings-theme-title">外观主题</h2>
+            <p>选择后立即切换。登录账号会自动同步到其他设备。</p>
+          </div>
+          <ThemePicker value={themePreference} onChange={onThemeChange} variant="grid" />
+        </section>
         <div className="settings-top-grid">
         <section className="settings-section settings-model-section" aria-labelledby="settings-model-title">
           <div>

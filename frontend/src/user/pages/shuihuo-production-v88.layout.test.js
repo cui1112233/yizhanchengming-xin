@@ -12,7 +12,8 @@ const studio = fs.readFileSync(path.join(here, 'shuihuo', 'StudioView.jsx'), 'ut
 
 test('水货生产接入 V88 主题，且项目库容器使用页面间距令牌', () => {
   assert.match(source, /import \{ ConfigProvider, Modal, Spin, message \} from 'antd'/);
-  assert.match(source, /createV88AntTheme\('dark'\)/);
+  assert.match(source, /theme = 'dark'/);
+  assert.match(source, /createV88AntTheme\(theme\)/);
   assert.match(source, /<ConfigProvider theme=\{antTheme\}>/);
   assert.match(css, /\.shuihuo-project-library\s*\{[^}]*width:\s*100%[^}]*padding:\s*var\(--v88-space-page\)/s);
   assert.match(css, /\.shuihuo-project-library\s*\{[^}]*min-width:\s*0/s);

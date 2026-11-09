@@ -11,7 +11,8 @@ const css = fs.readFileSync(path.join(here, 'home-v88.css'), 'utf8');
 test('首页接入 V88 主题，antd 按钮不再单独引入', () => {
   assert.match(source, /import \{ ConfigProvider \} from 'antd'/);
   assert.doesNotMatch(source, /import \{ Button \} from 'antd'/);
-  assert.match(source, /<ConfigProvider theme=\{createV88AntTheme\('dark'\)\}>/);
+  assert.match(source, /export function HomePage\(\{ isLoggedIn, onOpenLogin, theme = 'dark' \}\)/);
+  assert.match(source, /<ConfigProvider theme=\{createV88AntTheme\(theme\)\}>/);
   assert.match(source, /<V88Button variant="secondary"[\s\S]{0,240}?>打开设置<\/V88Button>/);
 });
 

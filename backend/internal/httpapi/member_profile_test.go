@@ -42,6 +42,32 @@ func TestMemberProfileIncludesDetailsAndOwnerTeamShape(t *testing.T) {
 	}
 }
 
+func TestMemberProfileThemePreferenceDefaultsPersistsAndValidates(t *testing.T) {
+	dir := t.TempDir()
+	store := NewMemberProfileStore(dir)
+	accounts := &authTestStore{account: auth.Account{Username: "alice", IsOwner: true, Active: true, CreatedAt: time.Unix(100, 0)}}
+
+	if got := store.member("alice", accounts)["themeId"]; got != "system" {
+		t.Fatalf("default themeId=%v, want system", got)
+	}
+	updated, err := store.update("alice", map[string]any{"themeId": "mint"}, accounts)
+	if err != nil {
+		t.Fatalf("update theme: %v", err)
+	}
+	if got := updated["themeId"]; got != "mint" {
+		t.Fatalf("updated themeId=%v, want mint", got)
+	}
+	if got := store.member("alice", accounts)["themeId"]; got != "mint" {
+		t.Fatalf("persisted themeId=%v, want mint", got)
+	}
+	if _, err := store.update("alice", map[string]any{"themeId": "unknown-theme"}, accounts); err == nil {
+		t.Fatal("unsupported themeId should be rejected")
+	}
+	if got := store.member("alice", accounts)["themeId"]; got != "mint" {
+		t.Fatalf("rejected update changed themeId=%v, want mint", got)
+	}
+}
+
 func TestMemberSecuritySeparatesRememberedSessions(t *testing.T) {
 	now := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
 	accounts := &authTestStore{
@@ -90,7 +116,7 @@ func TestMemberAvatarURLVersionsLegacyRows(t *testing.T) {
 
 func TestAuthAccountPayloadIncludesOwnerAvatar(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "member-profiles.json"), []byte(`[{"username":"owner","avatarUrl":"/user-content/avatars/owner.png?v=abc123","displayName":"站长"}]`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "member-profiles.json"), []byte(`[{"username":"owner","avatarUrl":"/user-content/avatars/owner.png?v=abc123","displayName":"站长","themeId":"mint"}]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	payload := authAccountPayload(auth.Account{Username: "owner", IsOwner: true, Active: true}, NewMemberProfileStore(dir))
@@ -102,6 +128,9 @@ func TestAuthAccountPayloadIncludesOwnerAvatar(t *testing.T) {
 	}
 	if payload["displayName"] != "站长" {
 		t.Fatalf("owner displayName=%v, want profile displayName", payload["displayName"])
+	}
+	if payload["themeId"] != "mint" {
+		t.Fatalf("owner themeId=%v, want profile theme", payload["themeId"])
 	}
 }
 

@@ -19,7 +19,8 @@ test('小说获取容器铺满并使用 V88 页面间距', () => {
 test('小说获取接入 V88 主题，按钮走 ConfigProvider 令牌', () => {
   assert.match(source, /import \{ V88Button \} from '\.\.\/\.\.\/shared\/components\/V88Button'/);
   assert.match(source, /import \{ V88EmptyState \} from '\.\.\/\.\.\/shared\/components\/V88EmptyState'/);
-  assert.match(source, /createV88AntTheme\('dark'\)/);
+  assert.match(source, /export function NovelFetchPage\(\{ theme = 'dark' \}\)/);
+  assert.match(source, /createV88AntTheme\(theme\)/);
   assert.match(source, /<ConfigProvider theme=\{antTheme\}>/);
   assert.match(css, /\.ant-btn\.v88-btn--primary:not\(:disabled\)/);
   assert.match(css, /\.ant-btn\.v88-btn--danger:not\(:disabled\)/);

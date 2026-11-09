@@ -38,3 +38,9 @@ test('窄屏下载按钮逐行显示，长标题不会撑出设置卡片', () =>
   assert.match(css, /\.settings-executor-action-row-downloads\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(200px,\s*1fr\)\)/);
   assert.match(css, /\.settings-executor-action-row-downloads \.ant-btn\s*\{[^}]*width:\s*100%/);
 });
+
+test('设置页复用统一主题选择器并显示完整色卡', () => {
+  assert.match(source, /import \{ ThemePicker \}/);
+  assert.match(source, /<ThemePicker value=\{themePreference\} onChange=\{onThemeChange\} variant="grid" \/>/);
+  assert.match(source, /外观主题/);
+});

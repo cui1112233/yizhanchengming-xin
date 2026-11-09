@@ -582,7 +582,7 @@ function KnowledgeLibraryManager({
   </div>;
 }
 
-export function NovelFetchPage() {
+export function NovelFetchPage({ theme = 'dark' }) {
   return <LegacyNovelFetchPage />;
 }
 
@@ -592,7 +592,7 @@ export function LegacyNovelFetchPage() {
   const [inputFormat, setInputFormat] = useState('smart');
   const [customColumnOrder, setCustomColumnOrder] = useState(['bookId', 'bookName', 'gender', 'reason']);
   const savedProcessSettings = useMemo(() => readNovelFetchProcessSettings(), []);
-  const antTheme = useMemo(() => createV88AntTheme('dark'), []);
+  const antTheme = useMemo(() => createV88AntTheme(theme), [theme]);
   const [configForm] = Form.useForm();
   const [knowledgeForm] = Form.useForm();
   const [activeTab, setActiveTab] = useState(initialTab);

@@ -26,7 +26,7 @@ const navItems = [
   { href: '/settings', label: '设置' }
 ];
 
-export function HomePage({ isLoggedIn, onOpenLogin }) {
+export function HomePage({ isLoggedIn, onOpenLogin, theme = 'dark' }) {
   function requireLogin(event) {
     if (isLoggedIn) return;
     event.preventDefault();
@@ -42,7 +42,7 @@ export function HomePage({ isLoggedIn, onOpenLogin }) {
   }
 
   return (
-    <ConfigProvider theme={createV88AntTheme('dark')}>
+    <ConfigProvider theme={createV88AntTheme(theme)}>
     <div className="home-page">
       <section className="home-video-hero">
         <video className="home-hero-video" autoPlay muted loop playsInline>
