@@ -27,7 +27,14 @@ test('old canvases receive stable workflow workspace defaults', () => {
       categories: {},
       order: [],
       libraryWidth: 340,
-      sectionHeights: { text: 220, audio: 240, image: 320 }
+      sectionHeights: { text: 220, audio: 240, image: 320 },
+      layout: {
+        director: 31,
+        column: 25,
+        leftRow: 66,
+        rightRow: 55,
+        sectionOrder: ['text', 'audio', 'image', 'video']
+      }
     }
   });
 });
@@ -61,7 +68,14 @@ test('workspace view normalization accepts known values and clamps panel widths'
       categories: {},
       order: [],
       libraryWidth: 340,
-      sectionHeights: { text: 220, audio: 240, image: 320 }
+      sectionHeights: { text: 220, audio: 240, image: 320 },
+      layout: {
+        director: 31,
+        column: 25,
+        leftRow: 66,
+        rightRow: 55,
+        sectionOrder: ['text', 'audio', 'image', 'video']
+      }
     }
   });
 });
