@@ -70,3 +70,8 @@ test('logged-in account theme overrides cache and system mode resolves before re
   assert.match(source, /resolveThemeId\(theme, systemMode\)/);
   assert.match(source, /document\.documentElement\.dataset\.theme = resolvedTheme/);
 });
+
+test('窗口背景不能把固定桌宠变成占据网页宽度的 flex 子项', () => {
+  assert.doesNotMatch(stylesheet, /\.legacy-shell\.has-window-background\s*>\s*\*\s*\{/);
+  assert.match(stylesheet, /\.legacy-shell\.has-window-background\s*>\s*\.legacy-sidebar,\s*\.legacy-shell\.has-window-background\s*>\s*\.legacy-main,\s*\.home-shell\.has-window-background\s*>\s*\.home-page\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;/);
+});

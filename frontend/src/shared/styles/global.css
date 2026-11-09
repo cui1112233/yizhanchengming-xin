@@ -876,8 +876,9 @@ select {
 .home-shell.has-window-background { background-position: center; background-size: cover; }
 .legacy-shell.has-window-background::before,
 .home-shell.has-window-background::before { position: absolute; inset: 0; z-index: 0; content: ''; pointer-events: none; background: color-mix(in srgb, var(--surface-base) 38%, transparent); backdrop-filter: blur(1.5px); }
-.legacy-shell.has-window-background > *,
-.home-shell.has-window-background > * { position: relative; z-index: 1; }
+.legacy-shell.has-window-background > .legacy-sidebar,
+.legacy-shell.has-window-background > .legacy-main,
+.home-shell.has-window-background > .home-page { position: relative; z-index: 1; }
 .legacy-shell.has-window-background .legacy-sidebar { background: color-mix(in srgb, var(--surface-panel) 82%, transparent); }
 .legacy-shell.has-window-background .legacy-main { background: color-mix(in srgb, var(--surface-base) 68%, transparent); }
 
