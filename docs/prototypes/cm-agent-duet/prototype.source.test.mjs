@@ -50,3 +50,17 @@ test('Duet exposes channel production and controlled relay interactions', () => 
     'REVIEW_DUET_TASK', 'REWORK_DUET_TASK', 'TOGGLE_DUET_SCHEDULE'
   ]) assert.match(html, new RegExp(token));
 });
+
+test('prototype has no forbidden product strings or network calls', () => {
+  for (const forbidden of ['洛水', '小洛', '洛Duet']) assert.doesNotMatch(html, new RegExp(forbidden));
+  for (const networkCall of ['fetch(', 'XMLHttpRequest', 'WebSocket(', 'EventSource(']) {
+    assert.doesNotMatch(html, new RegExp(networkCall.replace('(', '\\(')));
+  }
+});
+
+test('prototype includes responsive and accessibility contracts', () => {
+  assert.match(html, /@media\s*\(max-width:\s*1366px\)/);
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /aria-label=/);
+  assert.match(html, /Escape/);
+});

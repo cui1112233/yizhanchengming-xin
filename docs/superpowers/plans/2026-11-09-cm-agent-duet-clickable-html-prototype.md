@@ -402,7 +402,7 @@ git commit -m "feat: add clickable CM Duet workflow"
 - Consumes: 所有前述渲染函数和动作。
 - Produces: 可交付原型、完整测试证据和已勾选计划。
 
-- [ ] **Step 1: 增加品牌、无网络和响应式契约测试**
+- [x] **Step 1: 增加品牌、无网络和响应式契约测试**
 
 ```js
 test('prototype has no forbidden product strings or network calls', () => {
@@ -420,17 +420,17 @@ test('prototype includes responsive and accessibility contracts', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认缺失项失败**
+- [x] **Step 2: 运行测试并确认缺失项失败**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
 Expected: 响应式或 Escape 契约测试 FAIL。
 
-- [ ] **Step 3: 完成窄屏、键盘和弹层行为**
+- [x] **Step 3: 完成窄屏、键盘和弹层行为**
 
 在 1366px 以下压缩侧栏和间距；在 1100px 以下将右侧执行区改为抽屉。为下拉、标签、抽屉和弹窗设置 `aria-label`、焦点样式和 Esc 关闭。危险确认弹窗不允许点击遮罩直接确认。
 
-- [ ] **Step 4: 运行完整源测试和仓库格式检查**
+- [x] **Step 4: 运行完整源测试和仓库格式检查**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
@@ -440,7 +440,7 @@ Run: `git diff --check`
 
 Expected: no output，exit code 0。
 
-- [ ] **Step 5: 启动静态服务器并完成两个视口的浏览器验收**
+- [x] **Step 5: 启动静态服务器并完成两个视口的浏览器验收**
 
 Run: `python -m http.server 4178 --directory docs/prototypes/cm-agent-duet`
 
@@ -454,20 +454,20 @@ Run: `python -m http.server 4178 --directory docs/prototypes/cm-agent-duet`
 - 刷新恢复当前模式、项目、主题和任务；
 - 浏览器网络面板没有原型发起的业务请求。
 
-- [ ] **Step 6: 复核文件和工作树**
+- [x] **Step 6: 复核文件和工作树**
 
 Run: `git status --short`
 
 Expected: 只显示本任务尚未提交的 `index.html`、测试文件和计划勾选更新；不得包含无关文件。
 
-- [ ] **Step 7: 提交最终验收修正**
+- [x] **Step 7: 提交最终验收修正**
 
 ```bash
 git add docs/prototypes/cm-agent-duet/index.html docs/prototypes/cm-agent-duet/prototype.source.test.mjs docs/superpowers/plans/2026-11-09-cm-agent-duet-clickable-html-prototype.md
 git commit -m "test: verify CM Agent and Duet prototype"
 ```
 
-- [ ] **Step 8: 最终交付说明**
+- [x] **Step 8: 最终交付说明**
 
 交付时提供：
 
