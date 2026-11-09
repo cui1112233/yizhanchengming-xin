@@ -259,6 +259,22 @@ test('语义机位会保存景别、焦段、方位角和俯仰角', () => {
   assert.ok(next.directorCamera.position[1] > 2);
 });
 
+test('多机位语义参数只更新当前选中的生产机位', () => {
+  const project = normalizeDirectorProject({
+    cameras: [
+      { id: 'camera-main', name: '主机位', position: [0, 2, 7], target: [0, 1, 0], fov: 42 },
+      { id: 'camera-side', name: '侧机位', position: [6, 2, 0], target: [0, 1, 0], fov: 46 }
+    ],
+    directorCamera: { position: [0, 5, 10], target: [0, 0, 0], fov: 50 }
+  });
+  const next = directorCameraSemantics(project, { shotSize: 'close', focalLength: 85, azimuth: 90, elevation: 10 }, 'camera-side');
+  assert.deepEqual(next.cameras[0], project.cameras[0]);
+  assert.notDeepEqual(next.cameras[1].position, project.cameras[1].position);
+  assert.equal(next.cameras[1].shotSize, 'close');
+  assert.equal(next.cameras[1].focalLength, 85);
+  assert.deepEqual(next.directorCamera, project.directorCamera);
+});
+
 test('导演台分别保存场景描述和分镜视频提示词并收集去重素材', () => {
   const project = normalizeDirectorProject({ scene: { assetId: 'scene-1' }, scenePrompt: '街道', shotPrompt: '镜头推进', objects: [
     { id: 'hero', kind: 'actor', assetId: 'hero-1' }, { id: 'prop', kind: 'prop', assetId: 'scene-1' }

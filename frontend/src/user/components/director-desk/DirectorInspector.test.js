@@ -36,3 +36,10 @@ test('inspector renders scene information and camera controls for their selectio
   assert.match(camera, /机位目标 Z/); assert.match(camera, /机位滚转/); assert.match(camera, /机位 FOV/); assert.match(camera, /设为活动机位/);
   assert.doesNotMatch(camera, /机位旋转 [XYZ]/);
 });
+
+test('camera semantic controls read the selected camera values', () => {
+  const project = { cameras: [{ id: 'camera-main', shotSize: 'wide', focalLength: 35, azimuth: 20, elevation: -5 }] };
+  const markup = renderToStaticMarkup(React.createElement(Inspector, { project, selection: { kind: 'camera', id: 'camera-main' } }));
+  assert.match(markup, /<option value="wide" selected="">大全景<\/option>/);
+  assert.match(markup, /aria-label="焦段 mm"[^>]*value="35"/);
+});

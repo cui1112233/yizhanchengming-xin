@@ -51,8 +51,8 @@ export default function DirectorInspector({ project, images = [], selection, onP
   return <section className="agent-director-inspector" aria-label={`${prefix}检查器`}>
     <h3>{actor ? (images.find(image => image.id === object.assetId)?.name?.trim() || object.assetId) : object.name}</h3>
     {selection.kind === 'camera' ? <fieldset><legend>语义机位</legend><div className="agent-director-inspector__semantic">
-      <label>景别<select aria-label="景别" value={current.shotSize} onChange={event => onSemanticCameraChange?.({ shotSize: event.target.value })}>{[['extremeClose', '大特写'], ['close', '特写'], ['mediumClose', '近景'], ['medium', '中景'], ['full', '全景'], ['wide', '大全景']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      {['focalLength', 'azimuth', 'elevation'].map(key => <NumericField key={key} label={key === 'focalLength' ? '焦段 mm' : key === 'azimuth' ? '方位角' : '俯仰角'} value={current[key]} onCommit={value => { onSemanticCameraChange?.({ [key]: Number(value) }); return Number(value); }} />)}
+      <label>景别<select aria-label="景别" value={object.shotSize || current.shotSize} onChange={event => onSemanticCameraChange?.({ shotSize: event.target.value })}>{[['extremeClose', '大特写'], ['close', '特写'], ['mediumClose', '近景'], ['medium', '中景'], ['full', '全景'], ['wide', '大全景']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      {['focalLength', 'azimuth', 'elevation'].map(key => <NumericField key={key} label={key === 'focalLength' ? '焦段 mm' : key === 'azimuth' ? '方位角' : '俯仰角'} value={object[key] ?? current[key]} onCommit={value => { onSemanticCameraChange?.({ [key]: Number(value) }); return Number(value); }} />)}
     </div></fieldset> : null}
     {fields.map(([name, path]) => <fieldset key={path}><legend>{name}</legend><div className="agent-director-inspector__axes">
       {['X', 'Y', 'Z'].map((axis, index) => field(`${prefix}${name} ${axis}`, `${path}.${index}`, object[path][index]))}

@@ -225,7 +225,7 @@ export default function DirectorDeskApp({ adapter }) {
       setViewMode('camera');
     }}
     onChangeScene={() => setActiveTool('assets')}
-    onSemanticCameraChange={patch => applyProject(directorCameraSemantics(projectRef.current, patch))}
+    onSemanticCameraChange={patch => applyProject(directorCameraSemantics(projectRef.current, patch, selectedObject?.kind === 'camera' ? selectedObject.id : ''))}
   />;
   const bottom = <DirectorBottomDock
     prompt={promptDraft}

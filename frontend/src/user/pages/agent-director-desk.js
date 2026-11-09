@@ -72,7 +72,11 @@ function normalizeCameraObject(camera = {}, index = 0) {
     id: text(input.id || (index === 0 ? 'camera-main' : `camera-${index + 1}`), 200),
     name: text(input.name || (index === 0 ? '主机位' : `机位${index + 1}`), 200),
     ...normalizeCamera(input),
-    rotation: numberList(input.rotation, [0, 0, 0])
+    rotation: numberList(input.rotation, [0, 0, 0]),
+    shotSize: text(input.shotSize, 40) || 'medium',
+    focalLength: clamp(input.focalLength, 14, 200, 50),
+    azimuth: clamp(input.azimuth, -180, 180, 0),
+    elevation: clamp(input.elevation, -89, 89, 0)
   };
 }
 
@@ -159,13 +163,15 @@ export function directorObjectTransform(project, selection, patch = {}) {
 const SHOT_SIZE_DISTANCE = Object.freeze({ extremeClose: 3.2, close: 4.2, mediumClose: 5.4, medium: 7, full: 9, wide: 12 });
 const SHOT_SIZE_FOV = Object.freeze({ extremeClose: 28, close: 34, mediumClose: 38, medium: 42, full: 48, wide: 58 });
 
-export function directorCameraSemantics(project, patch = {}) {
+export function directorCameraSemantics(project, patch = {}, cameraID = '') {
   const current = normalizeDirectorProject(project);
-  const shotSize = text(patch.shotSize || current.shotSize, 40) || 'medium';
-  const focalLength = clamp(patch.focalLength ?? current.focalLength, 14, 200, 50);
-  const azimuth = clamp(patch.azimuth ?? current.azimuth, -180, 180, 0);
-  const elevation = clamp(patch.elevation ?? current.elevation, -89, 89, 0);
-  const target = numberList(patch.target || current.directorCamera.target, [0, 0, 0]);
+  const selectedCamera = current.cameras.find(camera => camera.id === cameraID);
+  const semanticSource = selectedCamera || current;
+  const shotSize = text(patch.shotSize || semanticSource.shotSize, 40) || 'medium';
+  const focalLength = clamp(patch.focalLength ?? semanticSource.focalLength, 14, 200, 50);
+  const azimuth = clamp(patch.azimuth ?? semanticSource.azimuth, -180, 180, 0);
+  const elevation = clamp(patch.elevation ?? semanticSource.elevation, -89, 89, 0);
+  const target = numberList(patch.target || selectedCamera?.target || current.directorCamera.target, [0, 0, 0]);
   const distance = clamp(patch.distance ?? SHOT_SIZE_DISTANCE[shotSize], 1, 100, 7);
   const horizontal = distance * Math.cos(elevation * Math.PI / 180);
   const position = [
@@ -174,6 +180,11 @@ export function directorCameraSemantics(project, patch = {}) {
     target[2] + horizontal * Math.cos(azimuth * Math.PI / 180)
   ];
   const fov = clamp(patch.fov ?? SHOT_SIZE_FOV[shotSize] ?? (50 / focalLength * 42), 20, 90, 42);
+  if (selectedCamera) {
+    return normalizeDirectorProject({ ...current, cameras: current.cameras.map(camera => camera.id === selectedCamera.id
+      ? { ...camera, position, target, fov, shotSize, focalLength, azimuth, elevation }
+      : camera) });
+  }
   return normalizeDirectorProject({ ...current, shotSize, focalLength, azimuth, elevation,
     directorCamera: { ...current.directorCamera, position, target, fov },
     camera: { ...current.camera, position, target, fov } });
