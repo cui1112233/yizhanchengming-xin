@@ -398,10 +398,7 @@
         ['ai-cut', '✂', 'AI-CUT', ''],
         ['tutorial', '◇', '教程', ''],
         ['plugins', '⚡', '插件中心', '4'],
-        ['community', '◎', '社区', ''],
-        ['assets', '□', '我的资产', ''],
-        ['feedback', '✉', '反馈', ''],
-        ['support', '◌', '在线客服', '']
+        ['assets', '□', '我的资产', '']
       ];
     }
     function renderNavButtons(items) {
@@ -417,7 +414,7 @@
       const nav = navForMode();
       const primaryNav = state.mode === 'brand' ? nav.filter(item => ['home','private','novel','production','voice'].includes(item[0])) : nav;
       const aiCutNav = nav.filter(item => item[0] === 'ai-cut');
-      const serviceNav = nav.filter(item => ['tutorial','plugins','community','assets','feedback','support'].includes(item[0]));
+      const serviceNav = nav.filter(item => ['tutorial','plugins','assets'].includes(item[0]));
       return `<aside class="sidebar">
         <div class="mode-switcher ${state.modeMenuOpen ? 'is-open' : ''}">
           <button type="button" class="mode-button" data-action="TOGGLE_MODE_MENU" aria-label="切换工作模式" aria-expanded="${state.modeMenuOpen}">
@@ -429,7 +426,7 @@
         <nav class="side-nav" aria-label="${modeLabel()}导航">
           ${renderNavButtons(primaryNav)}
         </nav>
-        ${state.mode === 'brand' ? `<div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">社区与服务</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
+        ${state.mode === 'brand' ? `<div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">扩展与资源</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
         ${state.mode === 'agent' ? `<div class="sidebar-caption">一战晟铭工作区</div><nav class="side-nav"><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">默认工作区</span></button><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">水浒漫剧</span></button></nav>` : ''}
         </div>
         <div class="sidebar-footer">
@@ -467,7 +464,7 @@
       return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">AI剪辑视频</span><h1>AI-CUT</h1><p>从视频分析到剪映草稿的独立剪辑工作台，不属于Agent代理。</p></div><span class="pill">${state.aiCutStage ? `步骤 ${Math.min(state.aiCutStage, stages.length)} / ${stages.length}` : '等待导入'}</span></div><section class="card"><div class="grid">${stages.map((stage,index) => `<article class="card ${index < state.aiCutStage ? 'is-enabled' : ''}"><div class="task-head"><h3>${index+1}. ${stage[0]}</h3><span class="pill">${index < state.aiCutStage ? '已完成' : index === state.aiCutStage ? '当前' : '等待'}</span></div><p>${stage[1]}</p></article>`).join('')}</div><div class="toolbar">${state.aiCutStage === 0 ? `<button class="primary-button" data-action="START_AI_CUT_DEMO">选择演示视频</button>` : state.aiCutStage < stages.length ? `<button class="primary-button" data-action="NEXT_AI_CUT_STAGE">完成当前步骤并继续</button>` : `<button class="primary-button" data-action="NOTICE" data-message="剪映草稿已生成，可进入现有生产流程">打开剪映草稿</button>`}<button class="secondary-button" data-action="RESET_AI_CUT_DEMO">重新开始</button></div></section></div>`;
     }
     function renderPluginCenter() {
-      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">社区与服务</span><h1>插件中心</h1><p>插件提供工具，Agent技能负责编排调用；安装和启停在这里统一管理。</p></div><span class="pill">已安装 ${state.installedPluginIds.length}</span></div><div class="grid">${plugins.map(plugin => { const installed = state.installedPluginIds.includes(plugin.id); const enabled = state.enabledPluginIds.includes(plugin.id); return `<article class="card"><div class="task-head"><h3>${plugin.name}</h3><span class="pill">${installed ? enabled ? '已启用' : '已停用' : '未安装'}</span></div><p>${plugin.summary}</p><div class="card-actions">${installed ? `<button class="secondary-button" data-action="TOGGLE_PLUGIN" data-id="${plugin.id}">${enabled ? '停用' : '启用'}</button><button class="secondary-button" data-action="NOTICE" data-message="已打开 ${plugin.name} 的演示设置">设置</button>` : `<button class="primary-button" data-action="INSTALL_PLUGIN" data-id="${plugin.id}">安装插件</button>`}</div></article>`; }).join('')}</div><section class="card" style="margin-top:14px"><h3>和Agent技能的关系</h3><p>插件负责连接剪辑、字幕、上传等实际工具；Agent技能负责理解任务、安排步骤，并在获得权限后调用已启用插件。</p></section></div>`;
+      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">扩展与资源</span><h1>插件中心</h1><p>插件提供工具，Agent技能负责编排调用；安装和启停在这里统一管理。</p></div><span class="pill">已安装 ${state.installedPluginIds.length}</span></div><div class="grid">${plugins.map(plugin => { const installed = state.installedPluginIds.includes(plugin.id); const enabled = state.enabledPluginIds.includes(plugin.id); return `<article class="card"><div class="task-head"><h3>${plugin.name}</h3><span class="pill">${installed ? enabled ? '已启用' : '已停用' : '未安装'}</span></div><p>${plugin.summary}</p><div class="card-actions">${installed ? `<button class="secondary-button" data-action="TOGGLE_PLUGIN" data-id="${plugin.id}">${enabled ? '停用' : '启用'}</button><button class="secondary-button" data-action="NOTICE" data-message="已打开 ${plugin.name} 的演示设置">设置</button>` : `<button class="primary-button" data-action="INSTALL_PLUGIN" data-id="${plugin.id}">安装插件</button>`}</div></article>`; }).join('')}</div><section class="card" style="margin-top:14px"><h3>和Agent技能的关系</h3><p>插件负责连接剪辑、字幕、上传等实际工具；Agent技能负责理解任务、安排步骤，并在获得权限后调用已启用插件。</p></section></div>`;
     }
     function renderSkillDetail() {
       const skill = skills.find(item => item.id === state.drawer);
