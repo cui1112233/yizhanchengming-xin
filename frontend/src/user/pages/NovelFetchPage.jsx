@@ -583,10 +583,10 @@ function KnowledgeLibraryManager({
 }
 
 export function NovelFetchPage({ theme = 'dark' }) {
-  return <LegacyNovelFetchPage />;
+  return <LegacyNovelFetchPage theme={theme} />;
 }
 
-export function LegacyNovelFetchPage() {
+export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const [processForm] = Form.useForm();
   const bookIdsValue = Form.useWatch('bookIds', processForm) || '';
   const [inputFormat, setInputFormat] = useState('smart');

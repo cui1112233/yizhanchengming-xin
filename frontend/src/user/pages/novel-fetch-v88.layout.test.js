@@ -20,6 +20,8 @@ test('小说获取接入 V88 主题，按钮走 ConfigProvider 令牌', () => {
   assert.match(source, /import \{ V88Button \} from '\.\.\/\.\.\/shared\/components\/V88Button'/);
   assert.match(source, /import \{ V88EmptyState \} from '\.\.\/\.\.\/shared\/components\/V88EmptyState'/);
   assert.match(source, /export function NovelFetchPage\(\{ theme = 'dark' \}\)/);
+  assert.match(source, /return <LegacyNovelFetchPage theme=\{theme\} \/>/);
+  assert.match(source, /export function LegacyNovelFetchPage\(\{ theme = 'dark' \}\)/);
   assert.match(source, /createV88AntTheme\(theme\)/);
   assert.match(source, /<ConfigProvider theme=\{antTheme\}>/);
   assert.match(css, /\.ant-btn\.v88-btn--primary:not\(:disabled\)/);
