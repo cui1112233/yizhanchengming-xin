@@ -150,6 +150,29 @@ func TestComicAudioSelectionUsesManualAudioWithoutRandomOverride(t *testing.T) {
 	}
 }
 
+func TestComicAudioSelectionUsesCategoryIDWhenSavedNameIsStale(t *testing.T) {
+	store, batch, book := createComicAudioTestBook(t, map[string]any{
+		"style": "古风通用", "gender": "女频", "classifyStatus": "classified",
+	})
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store: store,
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{{ID: 12, Name: "古风通用", Status: "ENABLE"}},
+			audios:     []n8catalog.Audio{{ID: 16, Name: "已保存音频", OrganizationID: 1, CategoryIDs: []int64{12}, Status: "ENABLE"}},
+		},
+	}
+	selection, err := publisher.resolveBookComicAudio(context.Background(), "alice", batch.ID, book.ID, n8ComicPublishSettings{
+		OrganizationID: "1", AudioCategoryID: 12, AudioCategoryName: "古风-爽文（打脸）",
+		SpecifiedAudioID: 16, SpecifiedAudioName: "已保存音频", AudioCategorySelectionMode: "manual",
+	})
+	if err != nil {
+		t.Fatalf("stale category display name must not invalidate enabled category ID: %v", err)
+	}
+	if selection.CategoryID != 12 || selection.CategoryName != "古风通用" || selection.AudioID != 16 {
+		t.Fatalf("selection=%+v, want enabled category 12 and audio 16", selection)
+	}
+}
+
 func TestComicAudioSelectionRerandomizesOnlyWhenSavedAutomaticAudioIsUnavailable(t *testing.T) {
 	store, batch, book := createComicAudioTestBook(t, map[string]any{
 		"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified",

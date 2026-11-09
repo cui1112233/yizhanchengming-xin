@@ -118,7 +118,9 @@ func enabledComicAudioCategory(categories []n8catalog.AudioCategory, id int64, n
 		if id > 0 && category.ID != id {
 			continue
 		}
-		if strings.TrimSpace(name) != "" && strings.TrimSpace(category.Name) != strings.TrimSpace(name) {
+		// 分类 ID 是 N8 的稳定标识；名称只是保存时的展示快照，后台改名后可能过期。
+		// 只有没有 ID 时才按名称查找，避免有效的已保存分类被旧名称误判为不可用。
+		if id <= 0 && strings.TrimSpace(name) != "" && strings.TrimSpace(category.Name) != strings.TrimSpace(name) {
 			continue
 		}
 		matches = append(matches, category)
