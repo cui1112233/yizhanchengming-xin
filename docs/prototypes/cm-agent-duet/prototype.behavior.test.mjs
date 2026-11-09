@@ -39,17 +39,29 @@ function bootPrototype() {
   return context.__prototypeTest;
 }
 
-test('一战晟铭 exposes the benchmarked creation choices instead of the old placeholder menu', () => {
+test('一战晟铭 keeps its own product navigation', () => {
   const prototype = bootPrototype();
   prototype.state.mode = 'brand';
   const labels = prototype.navForMode().map((item) => item[2]);
 
-  for (const expected of ['首页', '小说创作', '角色库', '音色库', '作品', '漫剧解说', '剧本创作', 'momo画布', 'AI-CUT', '教程', '插件中心', '我的资产']) {
-    assert.ok(labels.includes(expected), `missing creation choice: ${expected}`);
+  for (const expected of ['首页', '私人定制', '小说获取', '水货生产', '配音', 'AI-CUT', '教程', '插件中心', '我的资产']) {
+    assert.ok(labels.includes(expected), `missing product choice: ${expected}`);
   }
-  for (const obsolete of ['私人定制', '小说获取', '水货生产', '配音']) {
-    assert.ok(!labels.includes(obsolete), `obsolete placeholder remains: ${obsolete}`);
+  for (const borrowed of ['小说创作', '角色库', '音色库', '作品', '漫剧解说', '剧本创作', 'momo画布']) {
+    assert.ok(!labels.includes(borrowed), `borrowed top-level choice remains: ${borrowed}`);
   }
+});
+
+test('水货生产 contains the 创作漫剧 entry without renaming the product navigation', () => {
+  const prototype = bootPrototype();
+  prototype.state.mode = 'brand';
+  prototype.state.pages.brand = 'production';
+  const page = prototype.renderBrandPage();
+
+  assert.match(page, /水货生产/);
+  assert.match(page, /创作漫剧/);
+  assert.match(page, /CREATE_COMIC_WORK/);
+  assert.doesNotMatch(page, /漫剧解说/);
 });
 
 test('Duet uses project channels and a conversation workspace instead of a flat admin menu', () => {

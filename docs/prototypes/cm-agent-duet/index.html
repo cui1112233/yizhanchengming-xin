@@ -403,13 +403,10 @@
       ];
       return [
         ['home', '⌂', '首页', ''],
-        ['novel-writing', '✎', '小说创作', ''],
-        ['characters', '♙', '角色库', ''],
-        ['voices', '◖', '音色库', ''],
-        ['works', '▣', '作品', ''],
-        ['comic-commentary', '▤', '漫剧解说', ''],
-        ['script-creation', '⌑', '剧本创作', ''],
-        ['momo-canvas', '⠿', 'momo画布', ''],
+        ['private', '◫', '私人定制', ''],
+        ['novel', '▤', '小说获取', ''],
+        ['production', '▰', '水货生产', ''],
+        ['voice', '◖', '配音', ''],
         ['ai-cut', '✂', 'AI-CUT', ''],
         ['tutorial', '◇', '教程', ''],
         ['plugins', '⚡', '插件中心', '4'],
@@ -427,8 +424,7 @@
     }
     function renderSidebar() {
       const nav = navForMode();
-      const primaryNav = state.mode === 'brand' ? nav.filter(item => ['home','novel-writing','characters','voices','works','comic-commentary'].includes(item[0])) : nav;
-      const contentNav = nav.filter(item => ['script-creation','momo-canvas'].includes(item[0]));
+      const primaryNav = state.mode === 'brand' ? nav.filter(item => ['home','private','novel','production','voice'].includes(item[0])) : nav;
       const aiCutNav = nav.filter(item => item[0] === 'ai-cut');
       const serviceNav = nav.filter(item => ['tutorial','plugins','assets'].includes(item[0]));
       const duetSidebar = `<div class="duet-sidebar-block"><div class="duet-project-row"><span>✦</span><strong>任何事</strong></div><div class="duet-project-row"><span>□</span><strong>q</strong><span class="count-badge">20集</span></div><nav class="side-nav" aria-label="Duet频道">${duetChannels.map(channel => `<button type="button" class="nav-button duet-channel-button ${state.activeChannelId === channel.id ? 'is-active' : ''}" data-action="OPEN_DUET_CHANNEL" data-id="${channel.id}"><span class="nav-icon">#</span><span class="nav-label">${channel.name}</span></button>`).join('')}<button type="button" class="nav-button" aria-label="＋ 新频道" data-action="NOTICE" data-message="已打开新频道演示入口"><span class="nav-icon">＋</span><span class="nav-label">新频道</span></button><button type="button" class="nav-button" aria-label="＋ 新项目" data-action="NOTICE" data-message="已打开新项目演示入口"><span class="nav-icon">＋</span><span class="nav-label">新项目</span></button></nav></div>`;
@@ -443,7 +439,7 @@
         ${state.mode === 'duet' ? duetSidebar : `<nav class="side-nav" aria-label="${modeLabel()}导航">
           ${renderNavButtons(primaryNav)}
         </nav>`}
-        ${state.mode === 'brand' ? `<div class="sidebar-caption">内容创作</div><nav class="side-nav">${renderNavButtons(contentNav)}</nav><div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">扩展与资源</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
+        ${state.mode === 'brand' ? `<div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">扩展与资源</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
         ${state.mode === 'agent' ? `<div class="sidebar-caption">一战晟铭工作区</div><nav class="side-nav"><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">默认工作区</span></button><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">水浒漫剧</span></button></nav>` : ''}
         </div>
         <div class="sidebar-footer">
@@ -465,10 +461,14 @@
       const page = state.pages.brand;
       if (page === 'ai-cut') return renderAiCutPage();
       if (page === 'plugins') return renderPluginCenter();
+      if (page === 'production') return renderWaterProductionPage();
       if (page !== 'home') return `<section class="empty-panel"><div><div class="orb">${page === 'production' ? '▰' : '◆'}</div><h1>${navForMode().find(item => item[0] === page)?.[2] || '一战晟铭'}</h1><p>该页面在原型中用于验证工作模式切换和导航恢复。正式业务仍由现有 V88 页面负责。</p><button class="primary-button" data-action="SET_PAGE" data-page="home">返回首页</button></div></section>`;
-      return `<div class="page"><section class="hero"><span class="eyebrow">一战晟铭 · 内容创作工作台</span><h1>从小说、剧本到画布和成片，按创作链路进入</h1><p>左侧功能顺序对齐内容创作工作流；Agent代理和 Duet 仍通过左上角独立切换。</p></section><section class="grid">
-        ${[['小说创作','长短篇原创、仿写、续写与素材导入','novel-writing'],['角色库','统一管理人物设定和形象资产','characters'],['音色库','管理角色音色、台词与试听','voices'],['作品','集中查看全部创作项目与产物','works'],['漫剧解说','创建和管理漫剧解说作品','comic-commentary'],['剧本创作','分集、出图和导演台预演','script-creation'],['momo画布','节点画布与画布助手','momo-canvas'],['AI-CUT','视频拆分、字幕、BGM与剪映草稿','ai-cut']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
+      return `<div class="page"><section class="hero"><span class="eyebrow">一战晟铭 · AI 创作平台</span><h1>保留我们自己的创作入口和生产链路</h1><p>私人定制、小说获取、水货生产和配音仍是一战晟铭的首页功能；Agent代理和 Duet 通过左上角独立切换。</p></section><section class="grid">
+        ${[['私人定制','为单个创作需求建立专属生产方案','private'],['小说获取','获取、整理并进入后续改编链','novel'],['水货生产','批量管理剧本、漫剧、素材与成片','production'],['配音','管理角色音色、台词与音频任务','voice']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
       </section></div>`;
+    }
+    function renderWaterProductionPage() {
+      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">一战晟铭 · 水货生产</span><h1>水货生产</h1><p>沿用一战晟铭自己的批量生产入口，漫剧能力从这里进入。</p></div><button class="secondary-button" data-action="SET_PAGE" data-page="home">返回首页</button></div><section class="grid"><button type="button" class="card card-button" data-action="CREATE_COMIC_WORK"><div class="task-head"><h3>创作漫剧</h3><span class="pill">重点能力</span></div><p>导入小说或剧本，进入分集、资产、分镜、画面和成片生产链。</p></button><article class="card"><h3>批量生产</h3><p>继续承载一战晟铭现有的批量任务和作品进度。</p></article><article class="card"><h3>生产记录</h3><p>统一查看正在运行、等待处理和已经完成的项目。</p></article></section></div>`;
     }
     function renderAiCutPage() {
       const stages = [
@@ -600,6 +600,7 @@
         case 'SET_MODE': return patchState({ mode: payload.mode, modeMenuOpen: false });
         case 'SET_THEME': return patchState({ theme: payload.theme });
         case 'SET_PAGE': return setPage(payload.page);
+        case 'CREATE_COMIC_WORK': return showToast('已进入创作漫剧演示入口');
         case 'START_AI_CUT_DEMO': patchState({ aiCutStage:1 }); return showToast('演示视频已导入，开始镜头分析');
         case 'NEXT_AI_CUT_STAGE': return patchState({ aiCutStage:Math.min(5, state.aiCutStage+1) });
         case 'RESET_AI_CUT_DEMO': return patchState({ aiCutStage:0 });
