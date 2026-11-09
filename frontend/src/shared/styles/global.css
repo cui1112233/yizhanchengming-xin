@@ -859,6 +859,33 @@ select {
 .theme-picker-inline .theme-picker-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .settings-theme-section { grid-column: 1 / -1; }
 
+.window-background-picker { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border-default); }
+.window-background-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.window-background-heading h2 { margin: 0 0 4px; font-size: 16px; color: var(--text-primary); }
+.window-background-heading p { margin: 0; color: var(--text-secondary); }
+.window-background-file { display: none; }
+.window-background-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; }
+.window-background-option { position: relative; min-width: 0; padding: 8px; color: var(--text-primary); text-align: left; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: 12px; cursor: pointer; }
+.window-background-option:hover { border-color: var(--theme-primary); }
+.window-background-option.is-selected { border-color: var(--theme-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 18%, transparent); }
+.window-background-option > svg { position: absolute; right: 12px; bottom: 12px; color: var(--theme-primary); }
+.window-background-preview { display: grid; width: 100%; aspect-ratio: 1.72; place-items: center; overflow: hidden; border-radius: 9px; color: #6f7888; background-color: #eef0f4; background-position: center; background-size: cover; font-weight: 600; }
+.window-background-label { display: block; padding: 8px 22px 2px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.legacy-shell.has-window-background,
+.home-shell.has-window-background { background-position: center; background-size: cover; }
+.legacy-shell.has-window-background::before,
+.home-shell.has-window-background::before { position: absolute; inset: 0; z-index: 0; content: ''; pointer-events: none; background: color-mix(in srgb, var(--surface-base) 38%, transparent); backdrop-filter: blur(1.5px); }
+.legacy-shell.has-window-background > *,
+.home-shell.has-window-background > * { position: relative; z-index: 1; }
+.legacy-shell.has-window-background .legacy-sidebar { background: color-mix(in srgb, var(--surface-panel) 82%, transparent); }
+.legacy-shell.has-window-background .legacy-main { background: color-mix(in srgb, var(--surface-base) 68%, transparent); }
+
+@media (max-width: 640px) {
+  .window-background-heading { align-items: stretch; flex-direction: column; }
+  .window-background-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .legacy-sidebar-tool {
   display: flex;
   align-items: center;

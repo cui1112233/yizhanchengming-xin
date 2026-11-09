@@ -16,6 +16,7 @@ import { PET_COMPANION_SETTINGS_EVENT, readCompanionSpeechState, writeCompanionS
 import { DEFAULT_PET_ID, dispatchPetSelection, getPetDefinition, getPetOptions, previewPetSelection } from '../../shared/pet/petCatalog';
 import { LittleCompanionSprite } from '../../shared/pet/LittleCompanionSprite';
 import { ThemePicker } from '../../shared/components/ThemePicker';
+import { WindowBackgroundPicker } from '../../shared/components/WindowBackgroundPicker';
 
 const petOptions = getPetOptions();
 
@@ -33,7 +34,7 @@ function executorStatusText(group) {
   return '状态读取中…';
 }
 
-export function SettingsPage({ themePreference = 'system', onThemeChange }) {
+export function SettingsPage({ themePreference = 'system', onThemeChange, windowBackgroundId = 'none', windowBackgroundUrl = '', onWindowBackgroundChange, onWindowBackgroundUpload }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [savingSection, setSavingSection] = useState(null);
@@ -336,6 +337,7 @@ export function SettingsPage({ themePreference = 'system', onThemeChange }) {
             <p>选择后立即切换。登录账号会自动同步到其他设备。</p>
           </div>
           <ThemePicker value={themePreference} onChange={onThemeChange} variant="grid" />
+          <WindowBackgroundPicker value={windowBackgroundId} customUrl={windowBackgroundUrl} onChange={onWindowBackgroundChange} onUpload={onWindowBackgroundUpload} />
         </section>
         <div className="settings-top-grid">
         <section className="settings-section settings-model-section" aria-labelledby="settings-model-title">

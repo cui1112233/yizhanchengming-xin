@@ -68,6 +68,56 @@ func TestMemberProfileThemePreferenceDefaultsPersistsAndValidates(t *testing.T) 
 	}
 }
 
+func TestMemberProfileWindowBackgroundPreference(t *testing.T) {
+	store := NewMemberProfileStore(t.TempDir())
+	accounts := &authTestStore{account: auth.Account{Username: "alice", Active: true}}
+	if got := store.member("alice", accounts)["windowBackgroundId"]; got != "none" {
+		t.Fatalf("default windowBackgroundId=%v, want none", got)
+	}
+	updated, err := store.update("alice", map[string]any{"windowBackgroundId": "preset3"}, accounts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := updated["windowBackgroundId"]; got != "preset3" {
+		t.Fatalf("windowBackgroundId=%v, want preset3", got)
+	}
+	if _, err := store.update("alice", map[string]any{"windowBackgroundId": "unknown"}, accounts); err == nil {
+		t.Fatal("unsupported windowBackgroundId should be rejected")
+	}
+}
+
+func TestMemberWindowBackgroundUploadAndServe(t *testing.T) {
+	now := time.Date(2026, 11, 9, 15, 0, 0, 0, time.UTC)
+	accounts := &authTestStore{account: auth.Account{Username: "alice", Active: true}}
+	avatarDir := t.TempDir()
+	mux := http.NewServeMux()
+	RegisterMemberProfileRoutes(mux, BridgeAuth{Secret: "test-secret", Now: func() time.Time { return now }, AuthStore: accounts}, NewMemberProfileStore(t.TempDir()), accounts, avatarDir)
+	imageBytes := []byte("\x89PNG\r\n\x1a\nbackground-bytes")
+	body := `{"backgroundDataUrl":"data:image/png;base64,` + base64.StdEncoding.EncodeToString(imageBytes) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/member/window-background", strings.NewReader(body))
+	SignBridgeRequest(req, "alice", true, now, "test-secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("upload status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload struct {
+		Member map[string]any `json:"member"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	backgroundURL, _ := payload.Member["windowBackgroundUrl"].(string)
+	if !strings.HasPrefix(backgroundURL, "/user-content/backgrounds/alice.png?v=") {
+		t.Fatalf("windowBackgroundUrl=%q", backgroundURL)
+	}
+	readRes := httptest.NewRecorder()
+	mux.ServeHTTP(readRes, httptest.NewRequest(http.MethodGet, backgroundURL, nil))
+	if readRes.Code != http.StatusOK || readRes.Body.String() != string(imageBytes) {
+		t.Fatalf("background fetch status=%d body=%q", readRes.Code, readRes.Body.String())
+	}
+}
+
 func TestMemberSecuritySeparatesRememberedSessions(t *testing.T) {
 	now := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
 	accounts := &authTestStore{

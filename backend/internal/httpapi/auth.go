@@ -28,6 +28,8 @@ func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[
 	displayName := account.Username
 	var avatarURL any
 	themeID := "system"
+	windowBackgroundID := "none"
+	var windowBackgroundURL any
 	if account.IsOwner {
 		role = "dev"
 	}
@@ -55,9 +57,15 @@ func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[
 					themeID = value
 				}
 			}
+			if value, ok := profile["windowBackgroundId"].(string); ok {
+				if _, supported := memberWindowBackgroundIDs[value]; supported {
+					windowBackgroundID = value
+				}
+			}
+			windowBackgroundURL = profile["windowBackgroundUrl"]
 		}
 	}
-	return map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "role": role, "displayName": displayName, "avatarUrl": avatarURL, "themeId": themeID, "effectivePermissions": []string{}}
+	return map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "role": role, "displayName": displayName, "avatarUrl": avatarURL, "themeId": themeID, "windowBackgroundId": windowBackgroundID, "windowBackgroundUrl": windowBackgroundURL, "effectivePermissions": []string{}}
 }
 
 func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {

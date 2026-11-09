@@ -21,7 +21,8 @@
 | `L29-DD-001` | 场景、人物、道具白模 | Director Desk `directorProject` | `partial` | 对象基础已有，完整对象树需验收 | 对象变换测试/浏览器证据 |
 | `L29-DD-002` | 多机位和镜头参数 | Director Desk camera fields | `partial` | 语义机位已有部分实现，多机位/画幅待核 | 状态迁移和机位验收 |
 | `L29-DD-003` | 截图/白模回到创作链 | capture、canvas edge、video sync | `partial` | 截图和直接视频同步已有基础，完整失败链待核 | 上传/保存失败测试 |
-| `L29-TH-001` | 12 个主题切换 | `theme.js`、User/Admin Layout | `partial` | 当前仅深色/浅色 | 主题目录、账号偏好、全页面对比度 |
+| `L29-TH-001` | 多主题切换 | `theme.js`、User/Admin Layout | `implemented` | 已提供 13 个选项并按账号保存 | 全页面对比度持续回归 |
+| `L29-TH-002` | 窗口背景关闭、预设 2～5、自定义上传 | `WindowBackgroundPicker.jsx`、成员背景接口 | `implemented` | 预设使用 V88 自有渐变图，不复制洛水图片文件 | 已登录设置页和跨设备回读 |
 | `L29-PR-001` | Agent/资产/分镜/视频提示词 | 分散在现有服务和前端契约 | `partial` | 尚无首批八个统一 PromptDefinition | Prompt ID/版本/解析测试 |
 
 ## 证据更新格式

@@ -8,13 +8,14 @@ import { ThemePicker } from '../components/ThemePicker';
 import { getCurrentAccount, getCurrentUsername, login, loginWithPasskey, logout } from '../api/auth';
 import { getToken } from '../api/client';
 import { getConfig } from '../api/config';
-import { updateMemberProfile } from '../api/member';
+import { updateMemberProfile, uploadMemberWindowBackground } from '../api/member';
 import { avatarDisplay } from '../avatars';
 import { CmPenguinCompanion } from '../pet/CmPenguinCompanion';
 import { dispatchPetContext } from '../pet/stacky';
 import { GLOBAL_STATUS_EVENT, GLOBAL_TASK_NOTIFICATION_EVENT, normalizeGlobalTaskNotification } from '../notifications/globalTaskCenter.js';
 import { createAntTheme, resolveThemeId } from '../styles/theme';
 import { loadCachedTheme, persistCachedTheme, selectThemePreference } from '../styles/theme-preference.js';
+import { normalizeWindowBackgroundId, windowBackgroundStyle } from '../styles/window-background.js';
 import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAccess.js';
 import { AccountCenterLayout } from './AccountCenterLayout';
 import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
@@ -98,11 +99,14 @@ export function UserLayout({ children }) {
   const accountSessionKey = username || 'anonymous';
   const visibleNavItems = navItems;
   const resolvedTheme = resolveThemeId(theme, systemMode);
+  const windowBackgroundUrl = account?.windowBackgroundUrl || '';
+  const windowBackgroundId = normalizeWindowBackgroundId(account?.windowBackgroundId, windowBackgroundUrl);
+  const shellBackgroundStyle = windowBackgroundStyle(windowBackgroundId, windowBackgroundUrl);
   const content = isValidElement(children)
     ? cloneElement(
       children,
-      { theme: resolvedTheme, themePreference: theme, onThemeChange: changeTheme },
-      isValidElement(children.props.children) ? cloneElement(children.props.children, { theme: resolvedTheme, themePreference: theme, onThemeChange: changeTheme }) : children.props.children
+      { theme: resolvedTheme, themePreference: theme, onThemeChange: changeTheme, windowBackgroundId, windowBackgroundUrl, onWindowBackgroundChange: changeWindowBackground, onWindowBackgroundUpload: uploadWindowBackground },
+      isValidElement(children.props.children) ? cloneElement(children.props.children, { theme: resolvedTheme, themePreference: theme, onThemeChange: changeTheme, windowBackgroundId, windowBackgroundUrl, onWindowBackgroundChange: changeWindowBackground, onWindowBackgroundUpload: uploadWindowBackground }) : children.props.children
     )
     : children;
 
@@ -416,6 +420,20 @@ export function UserLayout({ children }) {
     }
   }
 
+  async function changeWindowBackground(backgroundId) {
+    if (!isLoggedIn) return message.warning('登录后才能保存窗口背景');
+    try {
+      const result = await updateMemberProfile({ windowBackgroundId: backgroundId });
+      setAccount(current => current ? { ...current, ...result.member } : result.member);
+    } catch (error) { message.error(error.message || '窗口背景保存失败'); }
+  }
+
+  async function uploadWindowBackground(backgroundDataUrl) {
+    if (!isLoggedIn) throw new Error('登录后才能上传窗口背景');
+    const result = await uploadMemberWindowBackground(backgroundDataUrl);
+    setAccount(current => current ? { ...current, ...result.member } : result.member);
+  }
+
   const showLoginCard = !isLoggedIn && (isHome || loginDialogOpen);
   const pageContent = routeAccess.canRenderPage ? content : null;
   const loginOverlay = showLoginCard ? (
@@ -451,7 +469,7 @@ export function UserLayout({ children }) {
   if (isHome) {
     return (
       <ConfigProvider theme={createAntTheme(theme, systemMode)}>
-        <div className="home-shell">
+        <div className={`home-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}`} style={shellBackgroundStyle}>
           {isValidElement(children) ? cloneElement(children, { theme, isLoggedIn, onOpenLogin: openLoginDialog }) : content}
           {loginOverlay}
           <ProductUpdateModal enabled={isLoggedIn} />
@@ -472,7 +490,7 @@ export function UserLayout({ children }) {
 
   return (
     <ConfigProvider theme={createAntTheme(theme, systemMode)}>
-      <div className="legacy-shell">
+      <div className={`legacy-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}`} style={shellBackgroundStyle}>
       <aside className={`legacy-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="legacy-brand">
           <button

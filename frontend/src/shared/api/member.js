@@ -25,6 +25,10 @@ export function uploadMemberAvatar(avatarDataUrl) {
   return apiRequest('/api/member/avatar', { method: 'POST', body: JSON.stringify({ avatarDataUrl }) });
 }
 
+export function uploadMemberWindowBackground(backgroundDataUrl) {
+  return apiRequest('/api/member/window-background', { method: 'POST', body: JSON.stringify({ backgroundDataUrl }) });
+}
+
 export function getSecurityOverview() { return apiRequest('/api/member/security'); }
 export function changeOwnPassword(currentPassword, newPassword) { return apiRequest('/api/member/security/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }); }
 export function revokeOtherSessions() { return apiRequest('/api/member/security/sessions/revoke-others', { method: 'POST' }); }

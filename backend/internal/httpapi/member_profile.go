@@ -113,6 +113,22 @@ var memberThemeIDs = map[string]struct{}{
 	"vanilla": {}, "sakura": {}, "pureblack": {}, "purple": {}, "willow": {}, "ivory": {}, "lotus": {},
 }
 
+var memberWindowBackgroundIDs = map[string]struct{}{
+	"none": {}, "default": {}, "preset2": {}, "preset3": {}, "preset4": {}, "preset5": {}, "custom": {},
+}
+
+func memberWindowBackgroundPatch(value any) (string, error) {
+	id, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("窗口背景格式不正确")
+	}
+	id = strings.TrimSpace(id)
+	if _, ok := memberWindowBackgroundIDs[id]; !ok {
+		return "", fmt.Errorf("不支持的窗口背景")
+	}
+	return id, nil
+}
+
 func memberThemePatch(value any) (string, error) {
 	themeID, ok := value.(string)
 	if !ok {
@@ -160,6 +176,16 @@ func (s *MemberProfileStore) update(username string, input map[string]any, accou
 			return nil, err
 		}
 		profile["themeId"] = next
+	}
+	if value, exists := input["windowBackgroundId"]; exists {
+		next, err := memberWindowBackgroundPatch(value)
+		if err != nil {
+			return nil, err
+		}
+		if next == "custom" && strings.TrimSpace(toString(profile["windowBackgroundUrl"])) == "" {
+			return nil, fmt.Errorf("请先上传自定义背景图片")
+		}
+		profile["windowBackgroundId"] = next
 	}
 	if _, exists := input["bio"]; exists || input["phone"] != nil || input["email"] != nil || input["teamTitle"] != nil {
 		details := s.readArray("member-profile-details.json")
@@ -220,8 +246,8 @@ func (s *MemberProfileStore) member(ctxUsername string, accounts auth.Store) map
 	} else if value, ok := profile["role"].(string); ok && (value == "dev" || value == "manager") {
 		role = value
 	}
-	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": false, "bio": nil, "phone": nil, "email": nil, "teamTitle": nil, "themeId": "system"}
-	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit", "apiEnabled", "apiScopes", "themeId"} {
+	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": false, "bio": nil, "phone": nil, "email": nil, "teamTitle": nil, "themeId": "system", "windowBackgroundId": "none", "windowBackgroundUrl": nil}
+	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit", "apiEnabled", "apiScopes", "themeId", "windowBackgroundId", "windowBackgroundUrl"} {
 		if value, ok := profile[key]; ok {
 			member[key] = value
 		}
@@ -362,6 +388,75 @@ func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, a
 	// 浏览器会复用旧缓存（甚至复用旧 404）。用内容摘要作为版本号保证每次都取到新图。
 	sum := sha256.Sum256(decoded)
 	profile["avatarUrl"] = "/user-content/avatars/" + username + "." + ext + "?v=" + hex.EncodeToString(sum[:8])
+	profile["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
+	if err := s.writeArray("member-profiles.json", profiles); err != nil {
+		return nil, err
+	}
+	return s.member(username, accounts), nil
+}
+
+func windowBackgroundDir(avatarDir string) string {
+	dir := strings.TrimSpace(avatarDir)
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(dir), "backgrounds")
+}
+
+func (s *MemberProfileStore) updateWindowBackground(username, dataURL, avatarDir string, accounts auth.Store) (map[string]any, error) {
+	const maxBytes = 10 * 1024 * 1024
+	value := strings.TrimSpace(dataURL)
+	prefix, encoded, ok := strings.Cut(value, ",")
+	if !ok || !strings.HasPrefix(prefix, "data:image/") || !strings.HasSuffix(prefix, ";base64") {
+		return nil, fmt.Errorf("背景图片仅支持 PNG、JPG 或 WebP")
+	}
+	ext := "png"
+	if strings.Contains(prefix, "image/jpeg") {
+		ext = "jpg"
+	} else if strings.Contains(prefix, "image/webp") {
+		ext = "webp"
+	} else if !strings.Contains(prefix, "image/png") {
+		return nil, fmt.Errorf("背景图片仅支持 PNG、JPG 或 WebP")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(decoded) == 0 || len(decoded) > maxBytes {
+		return nil, fmt.Errorf("背景图片大小不能超过 10MB")
+	}
+	dir := windowBackgroundDir(avatarDir)
+	if dir == "" {
+		return nil, fmt.Errorf("背景图片存储未配置")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.member(username, accounts) == nil {
+		return nil, auth.ErrNotFound
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	for _, other := range []string{"png", "jpg", "webp"} {
+		if other != ext {
+			_ = os.Remove(filepath.Join(dir, username+"."+other))
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, username+"."+ext), decoded, 0o600); err != nil {
+		return nil, err
+	}
+	profiles := s.readArray("member-profiles.json")
+	var profile map[string]any
+	for _, row := range profiles {
+		if row["username"] == username {
+			profile = row
+			break
+		}
+	}
+	if profile == nil {
+		profile = map[string]any{"username": username}
+		profiles = append(profiles, profile)
+	}
+	sum := sha256.Sum256(decoded)
+	profile["windowBackgroundUrl"] = "/user-content/backgrounds/" + username + "." + ext + "?v=" + hex.EncodeToString(sum[:8])
+	profile["windowBackgroundId"] = "custom"
 	profile["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
 	if err := s.writeArray("member-profiles.json", profiles); err != nil {
 		return nil, err
@@ -524,6 +619,7 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 		return
 	}
 	registerMemberAvatarContentRoute(root, avatarDir)
+	registerMemberImageContentRoute(root, "/user-content/backgrounds/{file}", windowBackgroundDir(avatarDir))
 	root.Handle("GET /api/member/me", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -606,6 +702,30 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			return
 		}
 		member, err := profiles.updateAvatar(identity.Username, input.AvatarDataURL, avatarDir, accounts)
+		if err != nil {
+			status := http.StatusBadRequest
+			if err == auth.ErrNotFound {
+				status = http.StatusNotFound
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"member": member})
+	})))
+	root.Handle("POST /api/member/window-background", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			BackgroundDataURL string `json:"backgroundDataUrl"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 14<<20)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		member, err := profiles.updateWindowBackground(identity.Username, input.BackgroundDataURL, avatarDir, accounts)
 		if err != nil {
 			status := http.StatusBadRequest
 			if err == auth.ErrNotFound {
@@ -769,14 +889,18 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 // browser receives a 404 for every uploaded avatar and Antd Avatar silently falls
 // back to the initial-letter placeholder while the upload itself reports success.
 func registerMemberAvatarContentRoute(root *http.ServeMux, avatarDir string) {
+	registerMemberImageContentRoute(root, "/user-content/avatars/{file}", avatarDir)
+}
+
+func registerMemberImageContentRoute(root *http.ServeMux, pattern, imageDir string) {
 	if root == nil {
 		return
 	}
-	dir := strings.TrimSpace(avatarDir)
+	dir := strings.TrimSpace(imageDir)
 	if dir == "" {
 		return
 	}
-	root.HandleFunc("GET /user-content/avatars/{file}", func(w http.ResponseWriter, req *http.Request) {
+	root.HandleFunc("GET "+pattern, func(w http.ResponseWriter, req *http.Request) {
 		name := req.PathValue("file")
 		// Only plain file names inside the avatar directory are served. Reject
 		// separators, dot-only names and non-image extensions so the route cannot
