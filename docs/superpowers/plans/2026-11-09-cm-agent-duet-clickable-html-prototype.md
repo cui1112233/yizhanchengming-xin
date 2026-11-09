@@ -79,7 +79,7 @@ window.__CM_PROTOTYPE__ = {
 - Consumes: 无。
 - Produces: `defaultState`、`loadState()`、`saveState()`、`patchState()`、`renderApp()`、`dispatchAction()`、`window.__CM_PROTOTYPE__`，供后续所有任务扩展。
 
-- [ ] **Step 1: 写模式、主题和单文件契约的失败测试**
+- [x] **Step 1: 写模式、主题和单文件契约的失败测试**
 
 ```js
 import test from 'node:test';
@@ -109,13 +109,13 @@ test('prototype includes three approved themes without external assets', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认因 HTML 不存在而失败**
+- [x] **Step 2: 运行测试并确认因 HTML 不存在而失败**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
 Expected: FAIL，错误包含 `ENOENT` 和 `index.html`。
 
-- [ ] **Step 3: 实现页面外壳、统一状态和三模式导航**
+- [x] **Step 3: 实现页面外壳、统一状态和三模式导航**
 
 在 `index.html` 中实现：
 
@@ -143,19 +143,19 @@ document.addEventListener('click', event => {
 
 模式切换必须替换整条侧栏内容；三个模式分别记住 `pages.brand`、`pages.agent` 和 `pages.duet`。主题切换通过 `document.documentElement.dataset.theme` 和 CSS 语义变量驱动。
 
-- [ ] **Step 4: 运行源测试并确认通过**
+- [x] **Step 4: 运行源测试并确认通过**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
 Expected: 3 tests PASS。
 
-- [ ] **Step 5: 浏览器冒烟检查模式、主题和刷新恢复**
+- [x] **Step 5: 浏览器冒烟检查模式、主题和刷新恢复**
 
 Run: `python -m http.server 4178 --directory docs/prototypes/cm-agent-duet`
 
 检查 `http://127.0.0.1:4178/`：依次切换三个模式和三个主题，刷新后仍停留在刷新前模式与主题。
 
-- [ ] **Step 6: 提交外壳**
+- [x] **Step 6: 提交外壳**
 
 ```bash
 git add docs/prototypes/cm-agent-duet/index.html docs/prototypes/cm-agent-duet/prototype.source.test.mjs
@@ -476,4 +476,3 @@ git commit -m "test: verify CM Agent and Duet prototype"
 - 通过的测试命令；
 - 浏览器验收范围；
 - 明确说明这是交互原型，不是已接后端的正式功能。
-

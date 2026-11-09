@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>一战晟铭 · CM 工作台原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070b12;
+      --sidebar: #0d1420;
+      --surface: #101a29;
+      --surface-2: #152235;
+      --surface-3: #1b2a40;
+      --text: #eef4ff;
+      --muted: #8fa0b8;
+      --border: #26364d;
+      --primary: #6e70ff;
+      --primary-2: #48c6ef;
+      --success: #48d7a5;
+      --warning: #f6ba57;
+      --danger: #ff6e7d;
+      --shadow: 0 18px 46px rgb(0 0 0 / 25%);
+      --radius: 14px;
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f4f6fa;
+      --sidebar: #ffffff;
+      --surface: #ffffff;
+      --surface-2: #f7f8fc;
+      --surface-3: #edf1f8;
+      --text: #182235;
+      --muted: #65738a;
+      --border: #dce3ee;
+      --primary: #5367df;
+      --primary-2: #1aa8ca;
+      --shadow: 0 18px 46px rgb(50 68 98 / 13%);
+    }
+    html[data-theme="snow"] {
+      color-scheme: light;
+      --bg: #edf6fb;
+      --sidebar: #e7f2f9;
+      --surface: #f8fcff;
+      --surface-2: #eef7fc;
+      --surface-3: #deeff8;
+      --text: #183044;
+      --muted: #607c91;
+      --border: #c8dde9;
+      --primary: #2587bc;
+      --primary-2: #54b6d1;
+      --shadow: 0 18px 46px rgb(52 102 132 / 14%);
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
+    body {
+      min-height: 100vh;
+      overflow: hidden;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 75% 0%, color-mix(in srgb, var(--primary) 13%, transparent), transparent 34%),
+        var(--bg);
+      font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      font-size: 14px;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--primary-2);
+      outline-offset: 2px;
+    }
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+    .sidebar {
+      position: relative;
+      z-index: 30;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      border-right: 1px solid var(--border);
+      background: color-mix(in srgb, var(--sidebar) 96%, transparent);
+    }
+    .mode-switcher { position: relative; }
+    .mode-button {
+      width: 100%; min-height: 46px; display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); cursor: pointer; text-align: left;
+    }
+    .brand-mark {
+      width: 28px; height: 28px; display: grid; place-items: center; flex: none;
+      border-radius: 9px; color: white; font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      box-shadow: 0 7px 18px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+    .mode-button strong { flex: 1; font-size: 15px; }
+    .mode-button .chevron { color: var(--muted); transition: transform .18s ease; }
+    .mode-switcher.is-open .chevron { transform: rotate(180deg); }
+    .mode-menu {
+      position: absolute; top: 52px; left: 0; right: 0; z-index: 60;
+      padding: 6px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); box-shadow: var(--shadow);
+    }
+    .mode-option {
+      width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px;
+      border: 0; border-radius: 9px; background: transparent; cursor: pointer; text-align: left;
+    }
+    .mode-option:hover, .mode-option.is-active { background: var(--surface-3); }
+    .mode-option span:first-child { width: 22px; text-align: center; }
+    .mode-option b { flex: 1; }
+    .mode-option em { color: var(--success); font-style: normal; }
+    .sidebar-caption { margin: 20px 10px 7px; color: var(--muted); font-size: 12px; letter-spacing: .08em; }
+    .side-nav { display: grid; gap: 5px; margin-top: 14px; overflow-y: auto; }
+    .nav-button {
+      width: 100%; min-height: 42px; display: flex; align-items: center; gap: 11px;
+      padding: 9px 11px; border: 0; border-radius: 10px; background: transparent;
+      cursor: pointer; color: var(--muted); text-align: left;
+    }
+    .nav-button:hover { color: var(--text); background: var(--surface-2); }
+    .nav-button.is-active { color: white; background: linear-gradient(100deg, var(--primary), color-mix(in srgb, var(--primary) 58%, var(--primary-2))); }
+    html[data-theme="light"] .nav-button.is-active, html[data-theme="snow"] .nav-button.is-active { color: white; }
+    .nav-icon { width: 20px; text-align: center; font-size: 16px; }
+    .nav-label { flex: 1; font-weight: 650; }
+    .count-badge { min-width: 24px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); text-align: center; font-size: 12px; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-footer { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .main-shell { min-width: 0; height: 100vh; overflow: auto; }
+    .topbar {
+      position: sticky; top: 0; z-index: 20; min-height: 64px; display: flex; align-items: center;
+      justify-content: space-between; gap: 18px; padding: 12px 24px; border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(16px);
+    }
+    .topbar-title strong { display: block; font-size: 17px; }
+    .topbar-title span { color: var(--muted); font-size: 12px; }
+    .theme-switcher { display: flex; gap: 6px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .theme-button { padding: 6px 9px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; color: var(--muted); }
+    .theme-button.is-active { color: var(--text); background: var(--surface-3); }
+    .page { padding: 24px; }
+    .hero {
+      min-height: 240px; display: grid; align-content: center; padding: 34px;
+      border: 1px solid var(--border); border-radius: 22px; overflow: hidden;
+      background:
+        radial-gradient(circle at 85% 25%, color-mix(in srgb, var(--primary-2) 28%, transparent), transparent 28%),
+        radial-gradient(circle at 60% 100%, color-mix(in srgb, var(--primary) 24%, transparent), transparent 35%),
+        var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .eyebrow { color: var(--primary-2); font-weight: 750; letter-spacing: .06em; }
+    .hero h1 { max-width: 760px; margin: 10px 0 8px; font-size: clamp(32px, 4vw, 56px); line-height: 1.08; }
+    .hero p { max-width: 700px; margin: 0; color: var(--muted); font-size: 16px; line-height: 1.8; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+    .card { padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .card h3 { margin: 0 0 8px; }
+    .card p { margin: 0; color: var(--muted); line-height: 1.7; }
+    .card-button { cursor: pointer; text-align: left; }
+    .card-button:hover { border-color: color-mix(in srgb, var(--primary) 65%, var(--border)); transform: translateY(-1px); }
+    .empty-panel { min-height: 420px; display: grid; place-items: center; padding: 30px; text-align: center; }
+    .empty-panel .orb { width: 74px; height: 74px; display: grid; place-items: center; margin: auto; border-radius: 24px; color: white; font-size: 30px; background: linear-gradient(145deg, var(--primary), var(--primary-2)); }
+    .empty-panel h1 { margin-bottom: 8px; }
+    .empty-panel p { max-width: 560px; color: var(--muted); line-height: 1.8; }
+    .primary-button, .secondary-button {
+      min-height: 38px; padding: 8px 14px; border-radius: 9px; cursor: pointer;
+    }
+    .primary-button { border: 0; color: white; background: linear-gradient(100deg, var(--primary), var(--primary-2)); }
+    .secondary-button { border: 1px solid var(--border); background: var(--surface-2); }
+    #toast-region {
+      position: fixed; right: 20px; bottom: 20px; z-index: 100; max-width: 360px;
+      padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface); box-shadow: var(--shadow); opacity: 0; transform: translateY(10px);
+      pointer-events: none; transition: .2s ease;
+    }
+    #toast-region.is-visible { opacity: 1; transform: translateY(0); }
+    @media (max-width: 1366px) {
+      .app-shell { grid-template-columns: 208px minmax(0, 1fr); }
+      .sidebar { padding: 10px; }
+      .page { padding: 18px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      body { overflow: auto; }
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: sticky; top: 0; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+      .side-nav, .sidebar-footer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .sidebar-caption, .sidebar-spacer { display: none; }
+      .nav-button { justify-content: center; }
+      .nav-label { flex: none; }
+      .main-shell { height: auto; overflow: visible; }
+      .grid { grid-template-columns: 1fr; }
+      .topbar { padding: 10px 14px; }
+      .page { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast-region" role="status" aria-live="polite"></div>
+  <script>
+    const STORAGE_KEY = 'cm-agent-duet-prototype-v1';
+    const modes = [
+      { id: 'brand', label: '一战晟铭', icon: '◆' },
+      { id: 'agent', label: 'Agent代理', icon: '◎' },
+      { id: 'duet', label: 'Duet', icon: '♬' }
+    ];
+    const themes = [
+      { id: 'dark', label: '深夜黑' },
+      { id: 'light', label: '明亮白' },
+      { id: 'snow', label: '雪山蓝' }
+    ];
+    const defaultState = {
+      mode: 'brand',
+      theme: 'dark',
+      pages: { brand: 'home', agent: 'new-session', duet: 'channels' },
+      modeMenuOpen: false,
+      activeProjectId: 'project-water-margin',
+      activeChannelId: 'channel-screenplay',
+      activeWorkspaceView: 'canvas',
+      skillTab: 'skills',
+      enabledSkillIds: ['cm-creative-advisor', 'storyboard-director'],
+      selectedContext: [],
+      permissionMode: 'auto',
+      run: { status: 'idle', step: 0, error: '' },
+      automations: [],
+      duetTasks: [],
+      modal: null,
+      drawer: null
+    };
+    let state = loadState();
+    let toastTimer = 0;
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (!saved || typeof saved !== 'object') return structuredClone(defaultState);
+        return {
+          ...structuredClone(defaultState),
+          ...saved,
+          pages: { ...defaultState.pages, ...(saved.pages || {}) },
+          run: { ...defaultState.run, ...(saved.run || {}) }
+        };
+      } catch {
+        return structuredClone(defaultState);
+      }
+    }
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+    function patchState(patch) {
+      state = { ...state, ...patch };
+      saveState();
+      renderApp();
+    }
+    function resetState() {
+      state = structuredClone(defaultState);
+      saveState();
+      renderApp();
+      showToast('原型状态已重置');
+    }
+    function setPage(page) {
+      patchState({ pages: { ...state.pages, [state.mode]: page } });
+    }
+    function showToast(text) {
+      const region = document.querySelector('#toast-region');
+      if (!region) return;
+      region.textContent = text;
+      region.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => region.classList.remove('is-visible'), 2200);
+    }
+    function modeLabel() {
+      return modes.find(item => item.id === state.mode)?.label || '一战晟铭';
+    }
+    function navForMode() {
+      if (state.mode === 'agent') return [
+        ['new-session', '✦', '新 Agent 会话', ''],
+        ['automations', '⌁', '自动任务', '3'],
+        ['skills', '◇', 'Agent 技能', '52'],
+        ['projects', '▣', '项目', '2']
+      ];
+      if (state.mode === 'duet') return [
+        ['channels', '#', '频道', '3'],
+        ['employees', '♟', '员工', '5'],
+        ['tasks', '✓', '任务', '8'],
+        ['relay', '⇄', '接力看板', '6'],
+        ['schedules', '◷', '定时任务', '2']
+      ];
+      return [
+        ['home', '⌂', '首页', ''],
+        ['private', '◫', '私人定制', ''],
+        ['novel', '▤', '小说获取', ''],
+        ['production', '▰', '水货生产', ''],
+        ['voice', '◖', '配音', '']
+      ];
+    }
+    function renderModeMenu() {
+      if (!state.modeMenuOpen) return '';
+      return `<div class="mode-menu" role="menu" aria-label="工作模式">
+        ${modes.map(item => `<button type="button" role="menuitem" class="mode-option ${item.id === state.mode ? 'is-active' : ''}" data-action="SET_MODE" data-mode="${item.id}"><span>${item.icon}</span><b>${item.label}</b><em>${item.id === state.mode ? '✓' : ''}</em></button>`).join('')}
+      </div>`;
+    }
+    function renderSidebar() {
+      const nav = navForMode();
+      return `<aside class="sidebar">
+        <div class="mode-switcher ${state.modeMenuOpen ? 'is-open' : ''}">
+          <button type="button" class="mode-button" data-action="TOGGLE_MODE_MENU" aria-label="切换工作模式" aria-expanded="${state.modeMenuOpen}">
+            <span class="brand-mark">Y</span><strong>${modeLabel()}</strong><span class="chevron">⌄</span>
+          </button>
+          ${renderModeMenu()}
+        </div>
+        <nav class="side-nav" aria-label="${modeLabel()}导航">
+          ${nav.map(([id, icon, label, count]) => `<button type="button" class="nav-button ${state.pages[state.mode] === id ? 'is-active' : ''}" data-action="SET_PAGE" data-page="${id}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${count ? `<span class="count-badge">${count}</span>` : ''}</button>`).join('')}
+        </nav>
+        ${state.mode === 'agent' ? `<div class="sidebar-caption">项目</div><nav class="side-nav"><button type="button" class="nav-button" data-action="NOTICE" data-message="已切换到默认工作区"><span class="nav-icon">□</span><span class="nav-label">默认工作区</span></button><button type="button" class="nav-button" data-action="NOTICE" data-message="已切换到水浒漫剧"><span class="nav-icon">□</span><span class="nav-label">水浒漫剧</span></button></nav>` : ''}
+        <div class="sidebar-spacer"></div>
+        <div class="sidebar-footer">
+          <button type="button" class="nav-button" data-action="NOTICE" data-message="主题可在页面右上角切换"><span class="nav-icon">◉</span><span class="nav-label">主题</span></button>
+          <button type="button" class="nav-button" data-action="NOTICE" data-message="这是独立原型，不修改正式设置"><span class="nav-icon">⚙</span><span class="nav-label">设置</span></button>
+          <button type="button" class="nav-button" data-action="RESET_STATE"><span class="nav-icon">↺</span><span class="nav-label">重置原型</span></button>
+        </div>
+      </aside>`;
+    }
+    function renderTopbar() {
+      return `<header class="topbar">
+        <div class="topbar-title"><strong>${modeLabel()}</strong><span>CM 交互原型 · 演示数据，不连接真实服务</span></div>
+        <div class="theme-switcher" aria-label="主题选择">
+          ${themes.map(theme => `<button type="button" class="theme-button ${theme.id === state.theme ? 'is-active' : ''}" data-action="SET_THEME" data-theme="${theme.id}">${theme.label}</button>`).join('')}
+        </div>
+      </header>`;
+    }
+    function renderBrandPage() {
+      const page = state.pages.brand;
+      if (page !== 'home') return `<section class="empty-panel"><div><div class="orb">${page === 'production' ? '▰' : '◆'}</div><h1>${navForMode().find(item => item[0] === page)?.[2] || '一战晟铭'}</h1><p>该页面在原型中用于验证工作模式切换和导航恢复。正式业务仍由现有 V88 页面负责。</p><button class="primary-button" data-action="SET_PAGE" data-page="home">返回首页</button></div></section>`;
+      return `<div class="page"><section class="hero"><span class="eyebrow">一战晟铭 · AI 创作平台</span><h1>从灵感到成片，所有生产链在一个工作台完成</h1><p>当前模式保留一战晟铭已有业务入口。点击左上角可以切换到 Agent代理或 Duet，并在返回时恢复当前页面。</p></section><section class="grid">
+        ${[['私人定制','为单个创作需求建立专属生产方案','private'],['小说获取','获取、整理并进入后续改编链','novel'],['水货生产','批量管理剧本、素材、分镜与成片','production'],['配音','管理角色音色、台词与音频任务','voice']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
+      </section></div>`;
+    }
+    function renderAgentFoundation() {
+      const page = state.pages.agent;
+      return `<section class="empty-panel"><div><div class="orb">◎</div><h1>${page === 'skills' ? 'Agent 技能' : page === 'automations' ? '自动任务' : page === 'projects' ? 'Agent 项目' : 'CM Agent 工作区'}</h1><p>Agent代理完整会话、技能、自动任务和项目交互将在后续任务接入这个固定入口。</p><button class="primary-button" data-action="NOTICE" data-message="入口已生效，详细交互正在实现">检查入口</button></div></section>`;
+    }
+    function renderDuetFoundation() {
+      return `<section class="empty-panel"><div><div class="orb">♬</div><h1>CM Duet 制片厂</h1><p>频道、员工 Agent、任务、审核返工和接力看板将在后续任务接入这个独立工作模式。</p><button class="primary-button" data-action="NOTICE" data-message="Duet 工作模式已生效">检查入口</button></div></section>`;
+    }
+    function renderMain() {
+      const content = state.mode === 'brand' ? renderBrandPage() : state.mode === 'agent' ? renderAgentFoundation() : renderDuetFoundation();
+      return `<main class="main-shell">${renderTopbar()}${content}</main>`;
+    }
+    function renderApp() {
+      document.documentElement.dataset.theme = state.theme;
+      document.querySelector('#app').innerHTML = `<div class="app-shell">${renderSidebar()}${renderMain()}</div>`;
+    }
+    function dispatchAction(action, payload = {}) {
+      switch (action) {
+        case 'TOGGLE_MODE_MENU': return patchState({ modeMenuOpen: !state.modeMenuOpen });
+        case 'SET_MODE': return patchState({ mode: payload.mode, modeMenuOpen: false });
+        case 'SET_THEME': return patchState({ theme: payload.theme });
+        case 'SET_PAGE': return setPage(payload.page);
+        case 'RESET_STATE': return resetState();
+        case 'NOTICE': return showToast(payload.message || '操作已完成');
+      }
+    }
+    document.addEventListener('click', event => {
+      const target = event.target.closest('[data-action]');
+      if (target) dispatchAction(target.dataset.action, target.dataset);
+      else if (state.modeMenuOpen) patchState({ modeMenuOpen: false });
+    });
+    window.__CM_PROTOTYPE__ = {
+      getState: () => structuredClone(state),
+      reset: () => resetState(),
+      dispatch: (action, payload) => dispatchAction(action, payload)
+    };
+    renderApp();
+  </script>
+</body>
+</html>
