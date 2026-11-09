@@ -213,6 +213,19 @@
     .canvas-board { position: relative; min-height: 330px; border-radius: 12px; background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 18px 18px; }
     .canvas-node { position: absolute; width: 180px; padding: 12px; border: 1px solid var(--primary); border-radius: 11px; background: var(--surface-2); }
     .list-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px; border-bottom: 1px solid var(--border); }
+    .duet-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 14px; }
+    .channel-card, .task-card, .relay-column { padding: 16px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); }
+    .channel-card.is-active { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+    .channel-head, .task-head, .metric-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .channel-head h3, .task-head h3 { margin: 0; }
+    .employee-avatar { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; color: white; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--primary-2)); }
+    .employee-card { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
+    .employee-card .card-actions { grid-column: 1 / -1; }
+    .relay-columns { display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+    .relay-column { min-height: 280px; }
+    .relay-column > h3 { margin-top: 0; }
+    .relay-column .task-card { margin-top: 10px; background: var(--surface-2); }
+    .task-card p { color: var(--muted); }
     #toast-region {
       position: fixed; right: 20px; bottom: 20px; z-index: 100; max-width: 360px;
       padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
@@ -266,6 +279,18 @@
       { id:'publisher', name:'发布助手', version:'1.0.3', summary:'整理发布文案和封面信息', source:'平台', author:'CM', category:'其他', environment:'denied', inputs:['成片'], outputs:['发布资料'], tools:['外部连接'] },
       { id:'knowledge-reader', name:'知识资料检索', version:'1.3.1', summary:'从项目文件中查找可靠上下文', source:'平台', author:'小Y', category:'其他', environment:'ready', inputs:['问题'], outputs:['引用资料'], tools:['读取项目文件'] }
     ];
+    const duetChannels = [
+      { id:'channel-screenplay', name:'剧本生产线', icon:'✎', purpose:'小说拆解、分集剧本与对白审核', lead:'编剧小Y' },
+      { id:'channel-assets', name:'资产工坊', icon:'◫', purpose:'人物、场景、道具资产统一生产', lead:'美术小Y' },
+      { id:'channel-storyboard', name:'分镜台', icon:'▦', purpose:'故事板、镜头运动与画面连续性', lead:'导演小Y' }
+    ];
+    const duetEmployees = [
+      { id:'writer', name:'编剧小Y', role:'短剧编剧', channel:'剧本生产线', load:'2 个任务' },
+      { id:'artist', name:'美术小Y', role:'资产规划师', channel:'资产工坊', load:'1 个任务' },
+      { id:'director', name:'导演小Y', role:'故事板导演', channel:'分镜台', load:'2 个任务' },
+      { id:'reviewer', name:'审片小Y', role:'质量审核', channel:'跨频道', load:'1 个待审' },
+      { id:'coordinator', name:'制片小Y', role:'接力调度', channel:'跨频道', load:'运行正常' }
+    ];
     const defaultState = {
       mode: 'brand',
       theme: 'dark',
@@ -281,6 +306,8 @@
       run: { status: 'idle', step: 0, error: '' },
       automations: [],
       duetTasks: [],
+      activeDuetTaskId: null,
+      duetScheduleEnabled: true,
       modal: null,
       drawer: null
       , picker: null, skillSearch: '', skillCategory: '全部'
@@ -459,7 +486,48 @@
       return `<div class="overlay" data-action="CLOSE_LAYER"></div><section class="modal" role="dialog" aria-label="${title}"><button class="close-button" data-action="CLOSE_LAYER">×</button><h2>${title}</h2><p class="muted">演示模式只展示入口，不会上传文件、运行安装命令或连接外部服务。</p><button class="primary-button" data-action="CLOSE_LAYER">我知道了</button></section>`;
     }
     function renderDuetFoundation() {
-      return `<section class="empty-panel"><div><div class="orb">♬</div><h1>CM Duet 制片厂</h1><p>频道、员工 Agent、任务、审核返工和接力看板将在后续任务接入这个独立工作模式。</p><button class="primary-button" data-action="NOTICE" data-message="Duet 工作模式已生效">检查入口</button></div></section>`;
+      const page = state.pages.duet;
+      if (page === 'employees') return renderDuetEmployees();
+      if (page === 'tasks') return `<div class="workspace-page">${renderDuetHeader('任务中心','创建、转交、补充、审核和返工都保留在同一条任务记录。')}${renderDuetTaskPanel()}</div>`;
+      if (page === 'relay') return renderRelayBoard();
+      if (page === 'schedules') return renderDuetSchedules();
+      return renderDuetWorkspace();
+    }
+    function renderDuetHeader(title, description) {
+      return `<div class="workspace-header"><div><span class="eyebrow">CM Duet · 多 Agent 协作</span><h1>${title}</h1><p>${description}</p></div><button class="primary-button" data-action="CREATE_DUET_TASK">＋ 创建任务</button></div>`;
+    }
+    function renderDuetWorkspace() {
+      const active = duetChannels.find(item => item.id === state.activeChannelId) || duetChannels[0];
+      return `<div class="workspace-page">${renderDuetHeader('频道制片厂','项目 → 频道 → 员工 Agent → 审核 → 接力，所有进度在这里汇总。')}<div class="duet-layout"><section><div class="grid">${duetChannels.map(channel => `<button class="channel-card card-button ${channel.id===active.id?'is-active':''}" data-action="OPEN_DUET_CHANNEL" data-id="${channel.id}"><div class="channel-head"><h3>${channel.icon} ${channel.name}</h3><span class="pill">${channel.id===active.id?'当前':'进入'}</span></div><p>${channel.purpose}</p><small class="muted">负责人：${channel.lead}</small></button>`).join('')}</div><section class="card" style="margin-top:14px"><h2>${active.name}</h2><p class="muted">${active.purpose}</p><div class="metric-row" style="margin-top:16px"><span>今日任务 <b>${state.duetTasks.filter(t=>t.channelId===active.id).length}</b></span><span>负责人 <b>${active.lead}</b></span><button class="secondary-button" data-action="CREATE_DUET_TASK">布置任务</button></div></section></section><aside>${renderDuetTaskPanel(true)}</aside></div></div>`;
+    }
+    function renderDuetEmployees() {
+      return `<div class="workspace-page">${renderDuetHeader('员工 Agent','每个员工有明确岗位、负责频道和当前工作量。')}<div class="grid">${duetEmployees.map(employee => `<article class="card employee-card"><div class="employee-avatar">${employee.name.slice(0,1)}</div><div><h3>${employee.name}</h3><p>${employee.role} · ${employee.channel}</p><small class="muted">${employee.load}</small></div><div class="card-actions"><button class="secondary-button" data-action="HANDOFF_DUET_TASK" data-employee="${employee.id}">转交给他</button><button class="secondary-button" data-action="NOTICE" data-message="已打开 ${employee.name} 的工作记录">查看记录</button></div></article>`).join('')}</div></div>`;
+    }
+    function renderDuetTaskPanel(compact = false) {
+      const tasks = state.duetTasks;
+      if (!tasks.length) return `<section class="card"><h3>${compact?'当前频道任务':'任务队列'}</h3><p class="muted">还没有演示任务。创建后可模拟转交、补充、审核与返工。</p><button class="primary-button" data-action="CREATE_DUET_TASK">创建《第一集改编》</button></section>`;
+      return `<section class="card"><div class="task-head"><h3>${compact?'当前频道任务':'任务队列'}</h3><span class="pill">${tasks.length} 项</span></div>${tasks.map(task => `<article class="task-card"><div class="task-head"><h3>${task.name}</h3><span class="pill">${duetStatusLabel(task.status)}</span></div><p>${duetChannels.find(c=>c.id===task.channelId)?.name || '跨频道'} · ${duetEmployees.find(e=>e.id===task.employeeId)?.name || '待分配'} · 第 ${task.round+1} 轮</p><div class="card-actions"><button class="secondary-button" data-action="HANDOFF_DUET_TASK" data-id="${task.id}" data-employee="director">转交导演</button><button class="secondary-button" data-action="SUPPLEMENT_DUET_TASK" data-id="${task.id}">补充要求</button>${task.status==='review'?`<button class="primary-button" data-action="APPROVE_DUET_TASK" data-id="${task.id}">审核通过</button><button class="secondary-button" data-action="REWORK_DUET_TASK" data-id="${task.id}">退回返工</button>`:`<button class="primary-button" data-action="REVIEW_DUET_TASK" data-id="${task.id}">提交审核</button>`}</div></article>`).join('')}</section>`;
+    }
+    function duetStatusLabel(status) {
+      return ({queued:'待领取',in_progress:'制作中',review:'待审核',rework:'返工中',done:'已完成'})[status] || status;
+    }
+    function renderRelayBoard() {
+      const columns = [['queued','待领取'],['in_progress','制作中'],['review','待审核'],['done','已完成']];
+      return `<div class="workspace-page">${renderDuetHeader('接力看板','任务只有在审核通过后才进入下一环；退回会保留轮次和补充要求。')}<div class="relay-columns">${columns.map(([status,label]) => `<section class="relay-column"><h3>${label}</h3><span class="muted">${state.duetTasks.filter(t=>t.status===status || (status==='in_progress'&&t.status==='rework')).length} 项</span>${state.duetTasks.filter(t=>t.status===status || (status==='in_progress'&&t.status==='rework')).map(t=>`<article class="task-card"><b>${t.name}</b><p>${duetStatusLabel(t.status)} · 第 ${t.round+1} 轮</p><button class="secondary-button" data-action="REVIEW_DUET_TASK" data-id="${t.id}">推进</button></article>`).join('') || '<p class="muted">暂无任务</p>'}</section>`).join('')}</div></div>`;
+    }
+    function renderDuetSchedules() {
+      return `<div class="workspace-page">${renderDuetHeader('定时任务','按固定时间整理频道进度，不会在原型中连接真实服务。')}<section class="card"><div class="list-row"><div><h3>每日制片晨会</h3><p class="muted">每天 09:00 · 汇总全部频道阻塞</p></div><button class="secondary-button" data-action="TOGGLE_DUET_SCHEDULE">${state.duetScheduleEnabled?'已开启':'已暂停'}</button></div><div class="list-row"><div><h3>待审任务提醒</h3><p class="muted">每 2 小时 · 通知审片小Y</p></div><button class="secondary-button" data-action="RUN_DUET_SCHEDULE">立即运行</button></div></section></div>`;
+    }
+    function createDuetTask(employeeId = 'writer') {
+      const task = { id:`duet-${Date.now()}`, name:'第一集改编与分镜', channelId:state.activeChannelId, employeeId, status:'queued', round:0, supplement:'' };
+      patchState({ duetTasks:[...state.duetTasks, task], activeDuetTaskId:task.id });
+      showToast('任务已创建，等待员工领取');
+    }
+    function updateDuetTask(id, updater) {
+      const targetId = id || state.activeDuetTaskId || state.duetTasks.at(-1)?.id;
+      if (!targetId) return false;
+      patchState({ duetTasks:state.duetTasks.map(task => task.id === targetId ? updater(task) : task), activeDuetTaskId:targetId });
+      return true;
     }
     function renderMain() {
       const content = state.mode === 'brand' ? renderBrandPage() : state.mode === 'agent' ? renderAgentFoundation() : renderDuetFoundation();
@@ -499,6 +567,30 @@
         case 'CREATE_AUTOMATION': return patchState({ automations:[...state.automations,{id:`auto-${Date.now()}`,name:'每晚故事板进度检查',status:'active',schedule:'每天 21:00'}] });
         case 'TOGGLE_AUTOMATION': return showToast('自动任务状态已切换');
         case 'RUN_AUTOMATION': state.pages.agent='new-session'; saveState(); renderApp(); return startRun();
+        case 'OPEN_DUET_CHANNEL': return patchState({ activeChannelId:payload.id });
+        case 'CREATE_DUET_TASK': return createDuetTask();
+        case 'HANDOFF_DUET_TASK': {
+          if (!state.duetTasks.length) return createDuetTask(payload.employee || 'writer');
+          updateDuetTask(payload.id, task => ({...task, employeeId:payload.employee || 'director', status:'in_progress'}));
+          return showToast('任务已转交，接收员工开始制作');
+        }
+        case 'SUPPLEMENT_DUET_TASK':
+          updateDuetTask(payload.id, task => ({...task, supplement:'补充：强化前三秒冲突，并保持人物造型连续。'}));
+          return showToast('补充要求已追加到任务记录');
+        case 'REVIEW_DUET_TASK':
+          updateDuetTask(payload.id, task => ({...task, status:'review'}));
+          return showToast('已提交审片小Y审核');
+        case 'APPROVE_DUET_TASK':
+          updateDuetTask(payload.id, task => ({...task, status:'done'}));
+          return showToast('审核通过，产物已进入项目');
+        case 'REWORK_DUET_TASK': {
+          const task = state.duetTasks.find(item => item.id === payload.id);
+          if (task?.round >= 2) return showToast('已到返工上限，请制片人介入');
+          updateDuetTask(payload.id, item => ({...item, status:'rework', round:item.round+1}));
+          return showToast('已退回返工，原审核意见已保留');
+        }
+        case 'TOGGLE_DUET_SCHEDULE': return patchState({ duetScheduleEnabled:!state.duetScheduleEnabled });
+        case 'RUN_DUET_SCHEDULE': return showToast('演示运行完成：1 个待审任务，0 个阻塞');
         case 'RESET_STATE': return resetState();
         case 'NOTICE': return showToast(payload.message || '操作已完成');
       }

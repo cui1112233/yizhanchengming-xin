@@ -41,3 +41,12 @@ test('agent session, workspace and run state machine are represented', () => {
   ]) assert.match(html, new RegExp(token));
   for (const status of ['idle', 'planning', 'awaiting_approval', 'running', 'succeeded', 'failed', 'cancelled']) assert.match(html, new RegExp(status));
 });
+
+test('Duet exposes channel production and controlled relay interactions', () => {
+  for (const token of [
+    'CM Duet', '剧本生产线', '资产工坊', '分镜台', '员工', '接力看板', '定时任务',
+    'renderDuetWorkspace', 'renderDuetTaskPanel', 'renderRelayBoard', 'renderDuetSchedules',
+    'CREATE_DUET_TASK', 'HANDOFF_DUET_TASK', 'SUPPLEMENT_DUET_TASK',
+    'REVIEW_DUET_TASK', 'REWORK_DUET_TASK', 'TOGGLE_DUET_SCHEDULE'
+  ]) assert.match(html, new RegExp(token));
+});

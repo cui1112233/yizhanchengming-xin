@@ -326,7 +326,7 @@ git commit -m "feat: simulate Agent projects and runs"
 - Consumes: `state.pages.duet`、`state.activeProjectId`、`state.activeChannelId`、`state.duetTasks` 和共享项目/产物 ID。
 - Produces: `renderDuetWorkspace()`、`renderDuetTaskPanel()`、`renderRelayBoard()`、`renderDuetSchedules()` 和动作 `SET_DUET_CHANNEL`、`CREATE_DUET_TASK`、`HANDOFF_DUET_TASK`、`SUPPLEMENT_DUET_TASK`、`REVIEW_DUET_TASK`、`REWORK_DUET_TASK`、`TOGGLE_DUET_SCHEDULE`。
 
-- [ ] **Step 1: 增加 Duet 业务链的失败测试**
+- [x] **Step 1: 增加 Duet 业务链的失败测试**
 
 ```js
 test('Duet exposes channel production and controlled relay interactions', () => {
@@ -339,17 +339,17 @@ test('Duet exposes channel production and controlled relay interactions', () => 
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
 Expected: 新测试 FAIL，缺少 `renderDuetWorkspace`。
 
-- [ ] **Step 3: 实现频道与员工视图**
+- [x] **Step 3: 实现频道与员工视图**
 
 内嵌 CM Duet、编剧、审校、资产和分镜员工。员工只包含演示职责、状态、能力和当前任务，不包含系统提示词。频道和 Agent 项目共用 `project-water-margin`。
 
-- [ ] **Step 4: 实现任务、转交、补充、审核与返工**
+- [x] **Step 4: 实现任务、转交、补充、审核与返工**
 
 Duet 任务结构固定为：
 
@@ -370,11 +370,11 @@ Duet 任务结构固定为：
 
 审核通过推进接力；退回返工增加 `round`；达到 `maxRounds` 后进入等待用户决定，不再自动推进。
 
-- [ ] **Step 5: 实现接力看板和定时任务**
+- [x] **Step 5: 实现接力看板和定时任务**
 
 接力步骤固定演示“写剧本 → 审剧本 → 出资产 → 审资产 → 写分镜 → 审分镜”。每一步可显示待办、执行、通过、返工和失败。定时任务可新建、暂停和恢复，并保存到 `localStorage`。
 
-- [ ] **Step 6: 运行测试并浏览器验收 Duet 链路**
+- [x] **Step 6: 运行测试并浏览器验收 Duet 链路**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
@@ -382,7 +382,7 @@ Expected: all tests PASS。
 
 浏览器：新建任务→转交员工→补充要求→退回返工→审核通过→查看接力下一步→暂停和恢复定时任务。
 
-- [ ] **Step 7: 提交 Duet 主链**
+- [x] **Step 7: 提交 Duet 主链**
 
 ```bash
 git add docs/prototypes/cm-agent-duet/index.html docs/prototypes/cm-agent-duet/prototype.source.test.mjs
