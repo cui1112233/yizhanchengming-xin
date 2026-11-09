@@ -50,6 +50,26 @@ test('Agent proxy hands completed work to the existing Agent workspace', () => {
   assert.doesNotMatch(html, /打开第 1 集故事板/);
 });
 
+test('main workspace exposes a clickable AI-CUT production flow', () => {
+  for (const token of [
+    'AI剪辑视频', 'AI-CUT', 'renderAiCutPage', '导入视频', '智能拆分',
+    '字幕纠错', 'BGM', '剪映草稿', 'START_AI_CUT_DEMO', 'NEXT_AI_CUT_STAGE'
+  ]) assert.match(html, new RegExp(token));
+});
+
+test('plugin center is separate from Agent skills and has managed state', () => {
+  for (const token of [
+    '社区与服务', '插件中心', 'renderPluginCenter', 'enabledPluginIds',
+    'TOGGLE_PLUGIN', 'INSTALL_PLUGIN', '插件提供工具，Agent技能负责编排调用'
+  ]) assert.match(html, new RegExp(token));
+});
+
+test('grouped sidebar uses one scroll surface instead of nested nav scrollbars', () => {
+  assert.match(html, /class="sidebar-content"/);
+  assert.match(html, /\.sidebar-content\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(html, /\.sidebar-content \.side-nav\s*\{[^}]*overflow:\s*visible/s);
+});
+
 test('Duet exposes channel production and controlled relay interactions', () => {
   for (const token of [
     'CM Duet', '剧本生产线', '资产工坊', '分镜台', '员工', '接力看板', '定时任务',

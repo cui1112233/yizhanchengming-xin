@@ -110,6 +110,8 @@
     .mode-option em { color: var(--success); font-style: normal; }
     .sidebar-caption { margin: 20px 10px 7px; color: var(--muted); font-size: 12px; letter-spacing: .08em; }
     .side-nav { display: grid; gap: 5px; margin-top: 14px; overflow-y: auto; }
+    .sidebar-content { flex: 1; min-height: 0; overflow-y: auto; padding-right: 2px; }
+    .sidebar-content .side-nav { overflow: visible; }
     .nav-button {
       width: 100%; min-height: 42px; display: flex; align-items: center; gap: 11px;
       padding: 9px 11px; border: 0; border-radius: 10px; background: transparent;
@@ -297,6 +299,12 @@
       { id:'reviewer', name:'审片小Y', role:'质量审核', channel:'跨频道', load:'1 个待审' },
       { id:'coordinator', name:'制片小Y', role:'接力调度', channel:'跨频道', load:'运行正常' }
     ];
+    const plugins = [
+      { id:'jianying-draft', name:'剪映草稿助手', summary:'读取轨道、合并字幕并生成剪映草稿', installed:true },
+      { id:'subtitle-fix', name:'字幕纠错插件', summary:'识别错别字、口癖和中英字幕问题', installed:true },
+      { id:'video-upscale', name:'视频超分插件', summary:'为成片提供清晰度增强处理', installed:false },
+      { id:'asset-uploader', name:'素材上传助手', summary:'把项目素材整理后发送到指定渠道', installed:false }
+    ];
     const defaultState = {
       mode: 'brand',
       theme: 'dark',
@@ -314,6 +322,9 @@
       duetTasks: [],
       activeDuetTaskId: null,
       duetScheduleEnabled: true,
+      aiCutStage: 0,
+      installedPluginIds: plugins.filter(item => item.installed).map(item => item.id),
+      enabledPluginIds: ['jianying-draft','subtitle-fix'],
       modal: null,
       drawer: null
       , picker: null, skillSearch: '', skillCategory: '全部'
@@ -383,8 +394,18 @@
         ['private', '◫', '私人定制', ''],
         ['novel', '▤', '小说获取', ''],
         ['production', '▰', '水货生产', ''],
-        ['voice', '◖', '配音', '']
+        ['voice', '◖', '配音', ''],
+        ['ai-cut', '✂', 'AI-CUT', ''],
+        ['tutorial', '◇', '教程', ''],
+        ['plugins', '⚡', '插件中心', '4'],
+        ['community', '◎', '社区', ''],
+        ['assets', '□', '我的资产', ''],
+        ['feedback', '✉', '反馈', ''],
+        ['support', '◌', '在线客服', '']
       ];
+    }
+    function renderNavButtons(items) {
+      return items.map(([id, icon, label, count]) => `<button type="button" class="nav-button ${state.pages[state.mode] === id ? 'is-active' : ''}" data-action="SET_PAGE" data-page="${id}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${count ? `<span class="count-badge">${count}</span>` : ''}</button>`).join('');
     }
     function renderModeMenu() {
       if (!state.modeMenuOpen) return '';
@@ -394,6 +415,9 @@
     }
     function renderSidebar() {
       const nav = navForMode();
+      const primaryNav = state.mode === 'brand' ? nav.filter(item => ['home','private','novel','production','voice'].includes(item[0])) : nav;
+      const aiCutNav = nav.filter(item => item[0] === 'ai-cut');
+      const serviceNav = nav.filter(item => ['tutorial','plugins','community','assets','feedback','support'].includes(item[0]));
       return `<aside class="sidebar">
         <div class="mode-switcher ${state.modeMenuOpen ? 'is-open' : ''}">
           <button type="button" class="mode-button" data-action="TOGGLE_MODE_MENU" aria-label="切换工作模式" aria-expanded="${state.modeMenuOpen}">
@@ -401,11 +425,13 @@
           </button>
           ${renderModeMenu()}
         </div>
+        <div class="sidebar-content">
         <nav class="side-nav" aria-label="${modeLabel()}导航">
-          ${nav.map(([id, icon, label, count]) => `<button type="button" class="nav-button ${state.pages[state.mode] === id ? 'is-active' : ''}" data-action="SET_PAGE" data-page="${id}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${count ? `<span class="count-badge">${count}</span>` : ''}</button>`).join('')}
+          ${renderNavButtons(primaryNav)}
         </nav>
+        ${state.mode === 'brand' ? `<div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">社区与服务</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
         ${state.mode === 'agent' ? `<div class="sidebar-caption">一战晟铭工作区</div><nav class="side-nav"><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">默认工作区</span></button><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">水浒漫剧</span></button></nav>` : ''}
-        <div class="sidebar-spacer"></div>
+        </div>
         <div class="sidebar-footer">
           <button type="button" class="nav-button" data-action="NOTICE" data-message="主题可在页面右上角切换"><span class="nav-icon">◉</span><span class="nav-label">主题</span></button>
           <button type="button" class="nav-button" data-action="NOTICE" data-message="这是独立原型，不修改正式设置"><span class="nav-icon">⚙</span><span class="nav-label">设置</span></button>
@@ -423,10 +449,25 @@
     }
     function renderBrandPage() {
       const page = state.pages.brand;
+      if (page === 'ai-cut') return renderAiCutPage();
+      if (page === 'plugins') return renderPluginCenter();
       if (page !== 'home') return `<section class="empty-panel"><div><div class="orb">${page === 'production' ? '▰' : '◆'}</div><h1>${navForMode().find(item => item[0] === page)?.[2] || '一战晟铭'}</h1><p>该页面在原型中用于验证工作模式切换和导航恢复。正式业务仍由现有 V88 页面负责。</p><button class="primary-button" data-action="SET_PAGE" data-page="home">返回首页</button></div></section>`;
       return `<div class="page"><section class="hero"><span class="eyebrow">一战晟铭 · AI 创作平台</span><h1>从灵感到成片，所有生产链在一个工作台完成</h1><p>当前模式保留一战晟铭已有业务入口。点击左上角可以切换到 Agent代理或 Duet，并在返回时恢复当前页面。</p></section><section class="grid">
         ${[['私人定制','为单个创作需求建立专属生产方案','private'],['小说获取','获取、整理并进入后续改编链','novel'],['水货生产','批量管理剧本、素材、分镜与成片','production'],['配音','管理角色音色、台词与音频任务','voice']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
       </section></div>`;
+    }
+    function renderAiCutPage() {
+      const stages = [
+        ['导入视频','读取媒体与基础信息'],
+        ['智能拆分','识别镜头和可用片段'],
+        ['字幕纠错','处理错字、口癖与双语字幕'],
+        ['BGM','匹配节奏并调整音量'],
+        ['剪映草稿','生成可继续编辑的时间线']
+      ];
+      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">AI剪辑视频</span><h1>AI-CUT</h1><p>从视频分析到剪映草稿的独立剪辑工作台，不属于Agent代理。</p></div><span class="pill">${state.aiCutStage ? `步骤 ${Math.min(state.aiCutStage, stages.length)} / ${stages.length}` : '等待导入'}</span></div><section class="card"><div class="grid">${stages.map((stage,index) => `<article class="card ${index < state.aiCutStage ? 'is-enabled' : ''}"><div class="task-head"><h3>${index+1}. ${stage[0]}</h3><span class="pill">${index < state.aiCutStage ? '已完成' : index === state.aiCutStage ? '当前' : '等待'}</span></div><p>${stage[1]}</p></article>`).join('')}</div><div class="toolbar">${state.aiCutStage === 0 ? `<button class="primary-button" data-action="START_AI_CUT_DEMO">选择演示视频</button>` : state.aiCutStage < stages.length ? `<button class="primary-button" data-action="NEXT_AI_CUT_STAGE">完成当前步骤并继续</button>` : `<button class="primary-button" data-action="NOTICE" data-message="剪映草稿已生成，可进入现有生产流程">打开剪映草稿</button>`}<button class="secondary-button" data-action="RESET_AI_CUT_DEMO">重新开始</button></div></section></div>`;
+    }
+    function renderPluginCenter() {
+      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">社区与服务</span><h1>插件中心</h1><p>插件提供工具，Agent技能负责编排调用；安装和启停在这里统一管理。</p></div><span class="pill">已安装 ${state.installedPluginIds.length}</span></div><div class="grid">${plugins.map(plugin => { const installed = state.installedPluginIds.includes(plugin.id); const enabled = state.enabledPluginIds.includes(plugin.id); return `<article class="card"><div class="task-head"><h3>${plugin.name}</h3><span class="pill">${installed ? enabled ? '已启用' : '已停用' : '未安装'}</span></div><p>${plugin.summary}</p><div class="card-actions">${installed ? `<button class="secondary-button" data-action="TOGGLE_PLUGIN" data-id="${plugin.id}">${enabled ? '停用' : '启用'}</button><button class="secondary-button" data-action="NOTICE" data-message="已打开 ${plugin.name} 的演示设置">设置</button>` : `<button class="primary-button" data-action="INSTALL_PLUGIN" data-id="${plugin.id}">安装插件</button>`}</div></article>`; }).join('')}</div><section class="card" style="margin-top:14px"><h3>和Agent技能的关系</h3><p>插件负责连接剪辑、字幕、上传等实际工具；Agent技能负责理解任务、安排步骤，并在获得权限后调用已启用插件。</p></section></div>`;
     }
     function renderSkillDetail() {
       const skill = skills.find(item => item.id === state.drawer);
@@ -549,6 +590,14 @@
         case 'SET_MODE': return patchState({ mode: payload.mode, modeMenuOpen: false });
         case 'SET_THEME': return patchState({ theme: payload.theme });
         case 'SET_PAGE': return setPage(payload.page);
+        case 'START_AI_CUT_DEMO': patchState({ aiCutStage:1 }); return showToast('演示视频已导入，开始镜头分析');
+        case 'NEXT_AI_CUT_STAGE': return patchState({ aiCutStage:Math.min(5, state.aiCutStage+1) });
+        case 'RESET_AI_CUT_DEMO': return patchState({ aiCutStage:0 });
+        case 'INSTALL_PLUGIN': return patchState({ installedPluginIds:[...new Set([...state.installedPluginIds, payload.id])], enabledPluginIds:[...new Set([...state.enabledPluginIds, payload.id])] });
+        case 'TOGGLE_PLUGIN': {
+          const enabled = state.enabledPluginIds.includes(payload.id);
+          return patchState({ enabledPluginIds:enabled ? state.enabledPluginIds.filter(id => id !== payload.id) : [...state.enabledPluginIds, payload.id] });
+        }
         case 'SET_SKILL_TAB': return patchState({ skillTab: payload.value });
         case 'SET_SKILL_CATEGORY': return patchState({ skillCategory: payload.value });
         case 'TOGGLE_SKILL': {
