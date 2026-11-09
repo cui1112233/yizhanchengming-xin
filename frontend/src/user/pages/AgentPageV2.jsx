@@ -59,6 +59,40 @@ function ConversationAssetPreview({ asset }) {
   return <FileText size={15} aria-hidden="true" />;
 }
 
+function AgentAssetWorkspace({ workspaceAssets, loading, error, onAddToCanvas, onAddToConversation }) {
+  return <main className="agent-collection-workspace" aria-label="项目素材">
+    <header><div><strong>项目素材</strong><span>当前项目生成、上传和引用的素材统一显示在这里。</span></div><Tag>{workspaceAssets.length} 项</Tag></header>
+    {loading ? <div className="agent-collection-empty">正在读取项目素材…</div> : null}
+    {error ? <div className="agent-collection-empty is-error">{error}</div> : null}
+    {!loading && !error && !workspaceAssets.length ? <div className="agent-collection-empty">当前项目还没有素材</div> : null}
+    <div className="agent-asset-workspace-grid">
+      {workspaceAssets.map(asset => <article key={asset.id || asset.assetId} className="agent-asset-workspace-card">
+        <div className={`agent-asset-workspace-preview is-${asset.kind || 'file'}`}><ConversationAssetPreview asset={asset} /></div>
+        <div><strong>{asset.name || asset.title || '未命名素材'}</strong><span>{asset.kind || '素材'} · {asset.source || '当前项目'}{asset.version ? ` · v${asset.version}` : ''}</span></div>
+        <footer><Button size="small" onClick={() => onAddToConversation(asset)}>加入对话</Button><Button size="small" type="primary" disabled={!['image', 'video', 'audio'].includes(asset.kind)} onClick={() => onAddToCanvas(asset)}>加入画布</Button></footer>
+      </article>)}
+    </div>
+  </main>;
+}
+
+function AgentTaskWorkspace({ executions, generations }) {
+  const taskEntries = [...executions, ...generations];
+  return <main className="agent-collection-workspace" aria-label="项目任务">
+    <header><div><strong>项目任务</strong><span>画布执行和生成任务使用同一份实时状态，不会另建任务列表。</span></div><Tag>{taskEntries.length} 项</Tag></header>
+    {!taskEntries.length ? <div className="agent-collection-empty">当前项目还没有执行任务</div> : null}
+    <div className="agent-task-workspace-list">
+      {taskEntries.map((entry, index) => {
+        const status = entry.status || entry.state || 'pending';
+        return <article key={`${entry.id || index}-${entry.toolName || entry.kind || 'task'}`}>
+          <span className={`agent-task-workspace-status is-${status}`} />
+          <div><strong>{entry.name || entry.title || entry.toolName || `${entry.kind || '生成'}任务`}</strong><span>{entry.modelId || entry.tool || entry.kind || '项目执行'} · {status}</span></div>
+          <time>{formatTaskTime(entry.updatedAt || entry.createdAt) || '等待更新'}</time>
+        </article>;
+      })}
+    </div>
+  </main>;
+}
+
 export function AgentPageV2({ theme = 'dark' }) {
   const [tasks, setTasks] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState(null);
@@ -1139,7 +1173,7 @@ export function AgentPageV2({ theme = 'dark' }) {
     <ConfigProvider theme={antTheme}>
     <div className={`agent-page utility-workbench agent-workspace-v3${isCanvasWorkspace && !viewState.drawerOpen ? ' agent-task-drawer-collapsed' : ''}`}>
       {isCanvasWorkspace ? <div
-        className={`${viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}${viewState.activeView === 'storyboard' ? ' is-storyboard' : ' is-workflow'}${storyboardDirectorResizing ? ' is-resizing-director' : ''}`}
+        className={`${viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'} is-${viewState.activeView}${storyboardDirectorResizing ? ' is-resizing-director' : ''}`}
         style={viewState.activeView === 'storyboard' ? { '--storyboard-director-split': `${viewState.storyboard.layout.director}%` } : undefined}
       >
         <AgentWorkspaceHeader
@@ -1245,7 +1279,7 @@ export function AgentPageV2({ theme = 'dark' }) {
               setCanvasViewport(nextCanvas.viewport || { x: 0, y: 0, zoom: 1 });
             }}
           />
-        </main> : <AgentStoryboardWorkspace
+        </main> : viewState.activeView === 'storyboard' ? <AgentStoryboardWorkspace
           taskId={activeTaskId}
           nodes={canvas.nodes}
           assets={workspaceAssets}
@@ -1267,7 +1301,13 @@ export function AgentPageV2({ theme = 'dark' }) {
            onAddToWorkflow={addStoryboardAssetToWorkflow}
            onAssetsCreated={handleWorkspaceAssetsCreated}
           onOpenNodeInWorkflow={openNodeInWorkflow}
-        />}
+        /> : viewState.activeView === 'assets' ? <AgentAssetWorkspace
+          workspaceAssets={workspaceAssets}
+          loading={workspaceAssetsLoading}
+          error={workspaceAssetsError}
+          onAddToCanvas={addStoryboardAssetToWorkflow}
+          onAddToConversation={addStoryboardAssetToConversation}
+        /> : <AgentTaskWorkspace executions={executions} generations={generations} />}
 
         <aside className="agent-conversation-panel" aria-label="项目对话">
           {viewState.activeView !== 'storyboard' ? <header className="agent-conversation-header">

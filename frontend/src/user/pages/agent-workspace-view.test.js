@@ -115,14 +115,22 @@ test('workspace patches preserve untouched state and URL view is normalized', ()
     drawerOpen: false
   });
   assert.equal(workspaceViewQuery('storyboard'), 'storyboard');
+  assert.equal(workspaceViewQuery('assets'), 'assets');
+  assert.equal(workspaceViewQuery('tasks'), 'tasks');
   assert.equal(workspaceViewQuery('unknown'), 'workflow');
 });
 
-test('view switching gives workflow the canvas first while storyboard restores Director', () => {
+test('view switching supports four workspaces and only storyboard restores Director', () => {
   const closed = normalizeWorkspaceView({ activeView: 'workflow', drawerOpen: true, conversationOpen: false });
   assert.equal(workspaceViewForActiveView(closed, 'storyboard').conversationOpen, true);
   assert.equal(workspaceViewForActiveView(closed, 'storyboard').activeView, 'storyboard');
   const workflow = workspaceViewForActiveView({ ...closed, conversationOpen: true }, 'workflow');
   assert.equal(workflow.conversationOpen, false);
   assert.equal(workflow.drawerOpen, false);
+  const assets = workspaceViewForActiveView({ ...closed, conversationOpen: true }, 'assets');
+  assert.equal(assets.activeView, 'assets');
+  assert.equal(assets.conversationOpen, false);
+  const tasks = workspaceViewForActiveView({ ...closed, conversationOpen: true }, 'tasks');
+  assert.equal(tasks.activeView, 'tasks');
+  assert.equal(tasks.conversationOpen, false);
 });

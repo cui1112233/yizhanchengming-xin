@@ -22,7 +22,7 @@ function clamp(value, minimum, maximum, fallback) {
 }
 
 export function workspaceViewQuery(value) {
-  return value === 'storyboard' ? 'storyboard' : 'workflow';
+  return ['workflow', 'storyboard', 'assets', 'tasks'].includes(value) ? value : 'workflow';
 }
 
 export function workspaceViewForActiveView(current, activeView) {
