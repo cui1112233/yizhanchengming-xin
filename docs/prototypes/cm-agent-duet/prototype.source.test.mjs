@@ -58,8 +58,8 @@ test('main workspace exposes a clickable AI-CUT production flow', () => {
 
 test('plugin center is separate from Agent skills and has managed state', () => {
   for (const token of [
-    '扩展与资源', '插件中心', 'renderPluginCenter', 'enabledPluginIds',
-    'TOGGLE_PLUGIN', 'INSTALL_PLUGIN', '插件提供工具，Agent技能负责编排调用'
+    '扩展与资源', '插件中心', '插件市场', 'renderPluginCenter', 'enabledPluginIds',
+    'TOGGLE_PLUGIN', 'OPEN_PLUGIN', 'pluginSearch', '搜索插件名称或功能'
   ]) assert.match(html, new RegExp(token));
 });
 

@@ -316,10 +316,35 @@
       { id:'coordinator', name:'制片小Y', role:'接力调度', channel:'跨频道', load:'运行正常' }
     ];
     const plugins = [
-      { id:'jianying-draft', name:'剪映草稿助手', summary:'读取轨道、合并字幕并生成剪映草稿', installed:true },
-      { id:'subtitle-fix', name:'字幕纠错插件', summary:'识别错别字、口癖和中英字幕问题', installed:true },
-      { id:'video-upscale', name:'视频超分插件', summary:'为成片提供清晰度增强处理', installed:false },
-      { id:'asset-uploader', name:'素材上传助手', summary:'把项目素材整理后发送到指定渠道', installed:false }
+      { id:'asset-reference', name:'资产参考', summary:'文生图/多图参考快速出图', isNew:true },
+      { id:'ai-segment', name:'AI-分段', summary:'按主轨道 / 文本轨道 / AI对照剧本分集切割', isNew:true },
+      { id:'ai-subtitle', name:'AI-Subtitle', summary:'对照剧本修正剪映语音识别错别字', isNew:true },
+      { id:'ai-filler', name:'AI-Filler', summary:'对照剧本删掉单独成行的呵、嗯、啊、哼、哈哈、哦哦、呵呵', isNew:true },
+      { id:'ai-bilingual-subtitle', name:'AI-双语字幕', summary:'把剪映字幕译成另一种语言，新建一条位置更高的字幕轨', isNew:true },
+      { id:'ai-cut-plugin', name:'AI-CUT插件版', summary:'AI-CUT草稿插件版', isNew:true },
+      { id:'ai-bgm', name:'AI-BGM', summary:'按剧本和字幕从曲库选乐，写入剪映同一条 BGM 轨', isNew:true },
+      { id:'ai-shot', name:'AI-Shot', summary:'按剧本和字幕从成片里抽宣传高光，只在片段交界下刀', isNew:true },
+      { id:'ai-upscale', name:'AI-Upscale', summary:'批量超分视频。支持火山、云端、Picsart CLI 和本地显卡', isNew:true },
+      { id:'ai-split', name:'AI-Split', summary:'按画面变化切开剪映主轨道上的每个视频', isNew:true },
+      { id:'novel-to-drama', name:'小说转剧', summary:'中长篇·纯对话版' },
+      { id:'ai-rewrite', name:'AI改文', summary:'智能改写文本，优化表达' },
+      { id:'storyboard-master', name:'分镜大师', summary:'智能生成分镜脚本' },
+      { id:'viral-opening', name:'爆款开头', summary:'生成吸引人的开头文案' },
+      { id:'female-gender-swap', name:'女频性转', summary:'女频小说性别转换改写' },
+      { id:'subtitle-alignment', name:'字幕对轴', summary:'字幕时间轴对齐调整' },
+      { id:'text-format', name:'格式化文本', summary:'文本格式整理与规范化' },
+      { id:'character-edit', name:'角色修改', summary:'批量修改角色名称属性' },
+      { id:'long-novel-split', name:'长篇拆书', summary:'长篇小说智能拆分章节' },
+      { id:'voice-clone', name:'声音克隆', summary:'AI克隆个性化音色' },
+      { id:'world-building', name:'世界观', summary:'构建小说世界观设定' },
+      { id:'subtitle-merge', name:'字幕合并', summary:'多条字幕智能合并处理' },
+      { id:'document-merge', name:'文档合并', summary:'按章节规则批量合并TXT' },
+      { id:'book-title', name:'书名生成', summary:'智能生成吸引人的书名' },
+      { id:'cover-generation', name:'封面生成', summary:'AI智能生成精美封面图' },
+      { id:'character-turnaround', name:'角色三视图', summary:'一键生成人物三视图' },
+      { id:'voice-design', name:'音色设计', summary:'AI智能设计角色音色' },
+      { id:'draft-merge', name:'草稿合并', summary:'多选剪映草稿按顺序合成一份' },
+      { id:'jianying-keyframe', name:'剪映关键帧', summary:'为剪映草稿添加关键帧动画' }
     ];
     const defaultState = {
       mode: 'brand',
@@ -339,8 +364,10 @@
       activeDuetTaskId: null,
       duetScheduleEnabled: true,
       aiCutStage: 0,
-      installedPluginIds: plugins.filter(item => item.installed).map(item => item.id),
-      enabledPluginIds: ['jianying-draft','subtitle-fix'],
+      installedPluginIds: plugins.map(item => item.id),
+      enabledPluginIds: [],
+      selectedPluginId: null,
+      pluginSearch: '',
       modal: null,
       drawer: null
       , picker: null, skillSearch: '', skillCategory: '全部'
@@ -409,7 +436,7 @@
         ['voice', '◖', '配音', ''],
         ['ai-cut', '✂', 'AI-CUT', ''],
         ['tutorial', '◇', '教程', ''],
-        ['plugins', '⚡', '插件中心', '4'],
+        ['plugins', '⚡', '插件中心', '29'],
         ['assets', '□', '我的资产', '']
       ];
     }
@@ -481,7 +508,11 @@
       return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">AI剪辑视频</span><h1>AI-CUT</h1><p>从视频分析到剪映草稿的独立剪辑工作台，不属于Agent代理。</p></div><span class="pill">${state.aiCutStage ? `步骤 ${Math.min(state.aiCutStage, stages.length)} / ${stages.length}` : '等待导入'}</span></div><section class="card"><div class="grid">${stages.map((stage,index) => `<article class="card ${index < state.aiCutStage ? 'is-enabled' : ''}"><div class="task-head"><h3>${index+1}. ${stage[0]}</h3><span class="pill">${index < state.aiCutStage ? '已完成' : index === state.aiCutStage ? '当前' : '等待'}</span></div><p>${stage[1]}</p></article>`).join('')}</div><div class="toolbar">${state.aiCutStage === 0 ? `<button class="primary-button" data-action="START_AI_CUT_DEMO">选择演示视频</button>` : state.aiCutStage < stages.length ? `<button class="primary-button" data-action="NEXT_AI_CUT_STAGE">完成当前步骤并继续</button>` : `<button class="primary-button" data-action="NOTICE" data-message="剪映草稿已生成，可进入现有生产流程">打开剪映草稿</button>`}<button class="secondary-button" data-action="RESET_AI_CUT_DEMO">重新开始</button></div></section></div>`;
     }
     function renderPluginCenter() {
-      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">扩展与资源</span><h1>插件中心</h1><p>插件提供工具，Agent技能负责编排调用；安装和启停在这里统一管理。</p></div><span class="pill">已安装 ${state.installedPluginIds.length}</span></div><div class="grid">${plugins.map(plugin => { const installed = state.installedPluginIds.includes(plugin.id); const enabled = state.enabledPluginIds.includes(plugin.id); return `<article class="card"><div class="task-head"><h3>${plugin.name}</h3><span class="pill">${installed ? enabled ? '已启用' : '已停用' : '未安装'}</span></div><p>${plugin.summary}</p><div class="card-actions">${installed ? `<button class="secondary-button" data-action="TOGGLE_PLUGIN" data-id="${plugin.id}">${enabled ? '停用' : '启用'}</button><button class="secondary-button" data-action="NOTICE" data-message="已打开 ${plugin.name} 的演示设置">设置</button>` : `<button class="primary-button" data-action="INSTALL_PLUGIN" data-id="${plugin.id}">安装插件</button>`}</div></article>`; }).join('')}</div><section class="card" style="margin-top:14px"><h3>和Agent技能的关系</h3><p>插件负责连接剪辑、字幕、上传等实际工具；Agent技能负责理解任务、安排步骤，并在获得权限后调用已启用插件。</p></section></div>`;
+      const query = state.pluginSearch.trim().toLowerCase();
+      const visible = plugins.filter(plugin => !query || `${plugin.name} ${plugin.summary}`.toLowerCase().includes(query));
+      const selected = plugins.find(plugin => plugin.id === state.selectedPluginId);
+      const detail = selected ? `<section class="card" style="margin:14px 0"><div class="task-head"><div><span class="eyebrow">本地插件详情</span><h2 style="margin:4px 0">${selected.name}</h2></div><button class="secondary-button" data-action="CLOSE_PLUGIN_DETAIL">关闭</button></div><p>${selected.summary}</p><div class="toolbar"><span class="pill">本地已收录</span><button class="secondary-button" data-action="TOGGLE_PLUGIN" data-id="${selected.id}">${state.enabledPluginIds.includes(selected.id) ? '停用本地演示' : '启用本地演示'}</button></div><p class="muted">当前只保存本地目录与交互说明，不连接真实插件服务。</p></section>` : '';
+      return `<div class="workspace-page"><div class="workspace-header"><div><span class="eyebrow">扩展与资源</span><h1>插件市场</h1><p>丰富的AI辅助工具，提升创作效率。当前共收录 ${plugins.length} 个本地插件入口。</p></div><span class="pill">本地 ${plugins.length}</span></div><div class="toolbar"><input class="search-input" aria-label="搜索插件名称或功能" placeholder="搜索插件名称或功能" value="${state.pluginSearch}" data-input="plugin-search"><span class="muted">找到 ${visible.length} 个</span></div>${detail}<div class="grid">${visible.map(plugin => { const enabled = state.enabledPluginIds.includes(plugin.id); return `<article class="card"><div class="task-head"><h3>${plugin.name}</h3><span class="pill">${plugin.isNew ? 'NEW' : enabled ? '已启用' : '本地'}</span></div><p>${plugin.summary}</p><div class="card-actions"><span class="muted">${enabled ? '本地演示已启用' : '本地已收录'}</span><button class="secondary-button" data-action="OPEN_PLUGIN" data-plugin-id="${plugin.id}">查看详情</button></div></article>`; }).join('')}</div></div>`;
     }
     function renderSkillDetail() {
       const skill = skills.find(item => item.id === state.drawer);
@@ -605,6 +636,8 @@
         case 'NEXT_AI_CUT_STAGE': return patchState({ aiCutStage:Math.min(5, state.aiCutStage+1) });
         case 'RESET_AI_CUT_DEMO': return patchState({ aiCutStage:0 });
         case 'INSTALL_PLUGIN': return patchState({ installedPluginIds:[...new Set([...state.installedPluginIds, payload.id])], enabledPluginIds:[...new Set([...state.enabledPluginIds, payload.id])] });
+        case 'OPEN_PLUGIN': return patchState({ selectedPluginId:payload.pluginId });
+        case 'CLOSE_PLUGIN_DETAIL': return patchState({ selectedPluginId:null });
         case 'TOGGLE_PLUGIN': {
           const enabled = state.enabledPluginIds.includes(payload.id);
           return patchState({ enabledPluginIds:enabled ? state.enabledPluginIds.filter(id => id !== payload.id) : [...state.enabledPluginIds, payload.id] });
@@ -668,6 +701,7 @@
     });
     document.addEventListener('input', event => {
       if (event.target.dataset.input === 'skill-search') { state.skillSearch = event.target.value; saveState(); renderApp(); document.querySelector('[data-input="skill-search"]')?.focus(); }
+      if (event.target.dataset.input === 'plugin-search') { state.pluginSearch = event.target.value; saveState(); renderApp(); document.querySelector('[data-input="plugin-search"]')?.focus(); }
     });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && (state.modal || state.drawer || state.picker || state.modeMenuOpen)) {

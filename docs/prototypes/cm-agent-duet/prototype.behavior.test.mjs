@@ -35,7 +35,7 @@ function bootPrototype() {
     console
   });
   context.window = context;
-  vm.runInContext(`${inlineScript}\n;globalThis.__prototypeTest = { state, navForMode, renderSidebar, renderBrandPage, renderAgentFoundation, renderDuetFoundation };`, context);
+  vm.runInContext(`${inlineScript}\n;globalThis.__prototypeTest = { state, navForMode, renderSidebar, renderBrandPage, renderPluginCenter, renderAgentFoundation, renderDuetFoundation };`, context);
   return context.__prototypeTest;
 }
 
@@ -92,4 +92,29 @@ test('Agent proxy opens on its command composer and keeps the production workspa
   assert.match(workspace, /\/ 技能/);
   assert.match(workspace, /@ 引用/);
   assert.doesNotMatch(workspace, /镜头 1/);
+});
+
+test('插件中心 renders the complete local 29-item catalog', () => {
+  const prototype = bootPrototype();
+  prototype.state.mode = 'brand';
+  prototype.state.pages.brand = 'plugins';
+  const pluginNav = prototype.navForMode().find((item) => item[2] === '插件中心');
+  const page = prototype.renderPluginCenter();
+  const expectedNames = [
+    '资产参考', 'AI-分段', 'AI-Subtitle', 'AI-Filler', 'AI-双语字幕',
+    'AI-CUT插件版', 'AI-BGM', 'AI-Shot', 'AI-Upscale', 'AI-Split',
+    '小说转剧', 'AI改文', '分镜大师', '爆款开头', '女频性转',
+    '字幕对轴', '格式化文本', '角色修改', '长篇拆书', '声音克隆',
+    '世界观', '字幕合并', '文档合并', '书名生成', '封面生成',
+    '角色三视图', '音色设计', '草稿合并', '剪映关键帧'
+  ];
+
+  assert.match(page, /插件市场/);
+  assert.match(page, /搜索插件名称或功能/);
+  assert.equal(pluginNav?.[3], '29');
+  assert.equal([...page.matchAll(/data-plugin-id=/g)].length, 29);
+  for (const name of expectedNames) assert.match(page, new RegExp(name));
+  for (const placeholder of ['剪映草稿助手', '字幕纠错插件', '视频超分插件', '素材上传助手']) {
+    assert.doesNotMatch(page, new RegExp(placeholder));
+  }
 });
