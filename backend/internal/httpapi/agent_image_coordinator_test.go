@@ -104,3 +104,37 @@ func TestAgentImageCoordinatorExplainsMissingResultStore(t *testing.T) {
 		t.Fatalf("error=%q", updated.ErrorMessage)
 	}
 }
+
+func TestAgentImageCoordinatorRecoversStaleRunningTaskAfterRestart(t *testing.T) {
+	createdAt := time.Date(2026, 10, 25, 2, 0, 0, 0, time.UTC)
+	recoveredAt := createdAt.Add(agentImageLease + time.Second)
+	store := newAgentNodeGenerationTestStore(t, createdAt, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
+	task, err := store.CreateGenerationTask(context.Background(), "alice", agentworkspace.CreateGenerationTaskInput{
+		ID: "generation-stale-running", ProjectID: "project-1", NodeID: "image-1", NodeVersion: 1, Kind: "image", Provider: "configured_model", ModelID: "image-primary", Mode: "image_generation",
+		Settings: map[string]any{"prompt": "雨夜街道", "parameters": map[string]any{"ratio": "16:9", "quality": "standard", "resolution": "2K", "count": 1}}, IdempotencyKey: "stale-running-image", Now: createdAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.TransitionGenerationTask(context.Background(), "alice", "project-1", task.ID, agentworkspace.GenerationTaskTransition{State: agentworkspace.GenerationRunning, Now: createdAt.Add(time.Second)}); err != nil {
+		t.Fatal(err)
+	}
+	started := make(chan struct{}, 1)
+	services := AgentNodeGenerationServices{
+		Projects: store, Assets: agentworkspace.NewMemoryAssetStore(), Objects: &recordingAgentNodeObjectStore{}, Now: func() time.Time { return recoveredAt },
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+			started <- struct{}{}
+			return []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"}, http.StatusOK, nil
+		},
+	}
+	coordinator := newAgentImageCoordinator(services)
+	if err := coordinator.pollPendingOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		stored, _ := store.GenerationTask(context.Background(), "alice", "project-1", task.ID)
+		t.Fatalf("stale running image task was not recovered: %+v", stored)
+	}
+}

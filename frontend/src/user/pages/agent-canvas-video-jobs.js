@@ -48,7 +48,7 @@ export function videoResultPreview(job) {
 
 export function videoNodeViewState(job) {
   const state = String(job?.state || 'draft');
-  const label = {
+  const defaultLabel = {
     draft: '准备生成',
     preparing: '正在准备',
     submitting: '正在提交',
@@ -63,8 +63,10 @@ export function videoNodeViewState(job) {
     abandoned: '需处理',
     applied: '已完成'
   }[state] || '准备生成';
+  const failureReason = state === 'failed' ? String(job?.errorMessage || '').trim() : '';
+  const label = failureReason || defaultLabel;
   return {
-    state, label,
+    state, label, message: label,
     polling: runningStates.has(state),
     canGenerate: !job || ['failed', 'canceled', 'abandoned', 'applied'].includes(state),
     canCancel: ['preparing', 'queued', 'running'].includes(state),

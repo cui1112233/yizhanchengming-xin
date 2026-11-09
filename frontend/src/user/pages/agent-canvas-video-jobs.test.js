@@ -68,6 +68,24 @@ test('videoNodeViewState translates provider lifecycle into readable canvas stat
   assert.equal(videoNodeViewState({ state: 'applied' }).label, '已完成');
 });
 
+test('failed video state exposes the persisted provider reason', () => {
+  const state = videoNodeViewState({ state: 'failed', errorMessage: '临时网络错误，请稍后重试' });
+  assert.equal(state.label, '临时网络错误，请稍后重试');
+  assert.equal(state.message, '临时网络错误，请稍后重试');
+  assert.equal(state.canRetry, true);
+});
+
+test('one failed video node does not replace another running node', () => {
+  const merged = videoJobs.mergeLatestVideoJobsByNode({}, [
+    { id: 'video-job-failed', projectId: 'project-1', nodeId: 'video-1', state: 'failed', errorMessage: 'provider failed', updatedAt: '2026-10-21T20:30:00Z' },
+    { id: 'video-job-running', projectId: 'project-1', nodeId: 'video-2', state: 'running', updatedAt: '2026-10-21T20:30:00Z' }
+  ], 'project-1');
+  assert.equal(merged['video-1'].state, 'failed');
+  assert.equal(merged['video-2'].state, 'running');
+  assert.equal(videoNodeViewState(merged['video-1']).canRetry, true);
+  assert.equal(videoNodeViewState(merged['video-2']).polling, true);
+});
+
 test('submitting ranks after preparation and before a queued job at the same timestamp', () => {
   const at = '2026-10-21T20:30:00Z';
   const merged = videoJobs.mergeLatestVideoJobsByNode({
