@@ -1,13 +1,13 @@
 {
-  "buildId": "20261108-04-a85a5b5c",
-  "releaseId": "qiantie-202611090148",
-  "archiveDir": "docs/releases/20261108-04-a85a5b5c",
-  "releaseDir": ".release/v88/20261108-04-a85a5b5c",
-  "gitSha": "a85a5b5c23f73c39e64233bcce55c1a5c8b5bc47",
-  "frontendEntry": "/assets/user-Ba8K3-qB.js",
-  "localPreflightPass": true,
-  "localBinarySha256": "c0262f382ad32575992a3dde8fc934aec9c19f647a4f740db3369b51c44bbe8c",
-  "linuxBinarySha256": "bd70ebb6ae96c37208d286638a14e79a4c9a8db079ef900b174cc7a06ba89e23",
-  "dataPackageSha256": "4da381ee77fbb0b995b9f72e2655f0b4102ab3197f7febfcaf96f88ead12e4fb",
-  "writtenAt": "2026-11-08T07:59:28.0449078Z"
+    "buildId":  "20261109-01-fc09611f",
+    "releaseId":  "qiantie-202611091202",
+    "archiveDir":  "docs/releases/20261109-01-fc09611f",
+    "releaseDir":  ".release/v88/20261109-01-fc09611f",
+    "gitSha":  "fc09611f727280ab2cde981236fe49c873a6797f",
+    "frontendEntry":  "/assets/user-CWLkwP1H.js",
+    "localPreflightPass":  true,
+    "localBinarySha256":  "553741b759413799b518ffe14da233553942c63d2dc0be240bba2a02d65b264c",
+    "linuxBinarySha256":  "c6b792d21371fcb4b313aa2d4db0cdfbbd6ef1aadbe14e4f1d74e866a8dd0752",
+    "dataPackageSha256":  "7d31e30423a882808f17abda6ff1e2354ee8dfb98cde3cfd8d6180bdefd5c701",
+    "writtenAt":  "2026-11-09T04:05:52.9014150Z"
 }
