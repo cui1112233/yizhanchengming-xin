@@ -35,11 +35,19 @@ test('agent skill center and composer contracts are present', () => {
 
 test('agent session, workspace and run state machine are represented', () => {
   for (const token of [
-    'renderAgentSession', 'renderAutomationPage', 'renderProjectWorkspace', 'renderRunTimeline', 'advanceRun',
+    'renderAgentSession', 'renderAutomationPage', 'renderAgentWorkspace', 'renderRunTimeline', 'advanceRun',
     'START_RUN', 'APPROVE_RUN', 'CANCEL_RUN', 'FAIL_RUN', 'RETRY_RUN',
     '画布', '故事板', '素材', '任务', '等待确认', '继续执行', '从失败处重试'
   ]) assert.match(html, new RegExp(token));
   for (const status of ['idle', 'planning', 'awaiting_approval', 'running', 'succeeded', 'failed', 'cancelled']) assert.match(html, new RegExp(status));
+});
+
+test('Agent proxy hands completed work to the existing Agent workspace', () => {
+  for (const token of [
+    'Agent工作区', 'Agent代理负责计划与调度', '一战晟铭原有生产工作台',
+    '发送到Agent工作区', 'SEND_TO_AGENT_WORKSPACE', 'renderAgentWorkspace'
+  ]) assert.match(html, new RegExp(token));
+  assert.doesNotMatch(html, /打开第 1 集故事板/);
 });
 
 test('Duet exposes channel production and controlled relay interactions', () => {
