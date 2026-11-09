@@ -32,3 +32,12 @@ test('agent skill center and composer contracts are present', () => {
   ]) assert.match(html, new RegExp(token));
   for (const label of ['计划模式', '自动审批', '完全运行']) assert.match(html, new RegExp(label));
 });
+
+test('agent session, workspace and run state machine are represented', () => {
+  for (const token of [
+    'renderAgentSession', 'renderAutomationPage', 'renderProjectWorkspace', 'renderRunTimeline', 'advanceRun',
+    'START_RUN', 'APPROVE_RUN', 'CANCEL_RUN', 'FAIL_RUN', 'RETRY_RUN',
+    '画布', '故事板', '素材', '任务', '等待确认', '继续执行', '从失败处重试'
+  ]) assert.match(html, new RegExp(token));
+  for (const status of ['idle', 'planning', 'awaiting_approval', 'running', 'succeeded', 'failed', 'cancelled']) assert.match(html, new RegExp(status));
+});

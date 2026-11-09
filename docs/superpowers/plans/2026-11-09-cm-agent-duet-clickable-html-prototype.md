@@ -246,7 +246,7 @@ git commit -m "feat: add clickable Agent skill center"
 - Consumes: `state.pages.agent`、`state.activeProjectId`、`state.activeWorkspaceView`、`state.run`、`state.automations`、上下文和权限接口。
 - Produces: `renderAgentSession()`、`renderAutomationPage()`、`renderProjectWorkspace()`、`renderRunTimeline()`、`advanceRun()` 和动作 `START_RUN`、`APPROVE_RUN`、`CANCEL_RUN`、`FAIL_RUN`、`RETRY_RUN`、`SET_WORKSPACE_VIEW`、`CREATE_AUTOMATION`、`TOGGLE_AUTOMATION`、`RUN_AUTOMATION`。
 
-- [ ] **Step 1: 增加 Agent 完整链路的失败测试**
+- [x] **Step 1: 增加 Agent 完整链路的失败测试**
 
 ```js
 test('agent session, workspace and run state machine are represented', () => {
@@ -261,13 +261,13 @@ test('agent session, workspace and run state machine are represented', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
 Expected: 新测试 FAIL，缺少 `renderAgentSession`。
 
-- [ ] **Step 3: 实现新会话和可控运行状态机**
+- [x] **Step 3: 实现新会话和可控运行状态机**
 
 实现以下明确行为：
 
@@ -285,11 +285,11 @@ function advanceRun() {
 
 完全运行在短计时器后进入 `succeeded`；自动审批等待点击“继续执行”；计划模式停在计划结果。取消、故障演示和重试必须保留已经完成的步骤。
 
-- [ ] **Step 4: 实现自动任务和项目四视图**
+- [x] **Step 4: 实现自动任务和项目四视图**
 
 自动任务弹窗创建包含名称、工作区、目标、权限、技能、周期和状态的演示记录。项目工作区四个视图共用同一个顶部工具条，工具条始终显示技能、权限、附件、`/` 与 `@`。
 
-- [ ] **Step 5: 实现产物定位**
+- [x] **Step 5: 实现产物定位**
 
 执行成功后产生稳定演示产物：
 
@@ -299,7 +299,7 @@ function advanceRun() {
 
 点击产物调用 `SET_WORKSPACE_VIEW` 并高亮对应镜头、节点或素材卡片。
 
-- [ ] **Step 6: 运行测试并浏览器验收 Agent 主链**
+- [x] **Step 6: 运行测试并浏览器验收 Agent 主链**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
@@ -307,7 +307,7 @@ Expected: all tests PASS。
 
 浏览器依次验收计划模式、自动审批和完全运行；再验收取消、故障演示、重试、自动任务创建和四视图工具条一致性。
 
-- [ ] **Step 7: 提交 Agent 主链**
+- [x] **Step 7: 提交 Agent 主链**
 
 ```bash
 git add docs/prototypes/cm-agent-duet/index.html docs/prototypes/cm-agent-duet/prototype.source.test.mjs

@@ -201,6 +201,18 @@
     .modal { position: fixed; left: 50%; top: 50%; z-index: 72; width: min(560px, 92vw); transform: translate(-50%, -50%); padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
     .close-button { float: right; border: 0; background: transparent; cursor: pointer; font-size: 22px; }
     .detail-list { display: grid; gap: 12px; margin-top: 20px; }
+    .split-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; }
+    .run-timeline { padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .timeline-step { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .timeline-step:last-child { border: 0; }
+    .timeline-dot { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-3); }
+    .timeline-step.is-done .timeline-dot { color: #06150f; background: var(--success); }
+    .timeline-step.is-current .timeline-dot { color: white; background: var(--primary); }
+    .status-banner { margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+    .workspace-stage { min-height: 420px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .canvas-board { position: relative; min-height: 330px; border-radius: 12px; background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 18px 18px; }
+    .canvas-node { position: absolute; width: 180px; padding: 12px; border: 1px solid var(--primary); border-radius: 11px; background: var(--surface-2); }
+    .list-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px; border-bottom: 1px solid var(--border); }
     #toast-region {
       position: fixed; right: 20px; bottom: 20px; z-index: 100; max-width: 360px;
       padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
@@ -275,6 +287,7 @@
     };
     let state = loadState();
     let toastTimer = 0;
+    let runTimer = 0;
 
     function loadState() {
       try {
@@ -405,13 +418,40 @@
     }
     function renderAgentSessionBase() {
       const permissionCopy = { plan:'只生成计划，不执行写入与工具。', auto:'只读步骤自动执行，写入与生成等待确认。', bypass:'按计划连续执行，高风险操作仍需确认。' };
-      return `<div class="workspace-page"><div class="workspace-header"><div><h1>新 Agent 会话</h1><p>选择技能、引用项目资料，再让小Y整理执行计划。</p></div><span class="pill">默认工作区</span></div><div class="permission-row">${[['plan','计划模式'],['auto','自动审批'],['bypass','完全运行']].map(item => `<button class="pill ${state.permissionMode === item[0] ? 'is-active' : ''}" data-action="SET_PERMISSION_MODE" data-value="${item[0]}">${item[1]}</button>`).join('')}</div><p class="muted" style="text-align:center">${permissionCopy[state.permissionMode]}</p><div class="composer">${state.selectedContext.length ? `<div class="chips">${state.selectedContext.map(item => `<span class="chip">${item.kind} · ${item.label}<button aria-label="移除 ${item.label}" data-action="REMOVE_CONTEXT" data-id="${item.id}">×</button></span>`).join('')}</div>` : ''}<textarea aria-label="创作目标" placeholder="输入目标，使用 / 选择技能，使用 @ 引用文件或素材"></textarea>${renderContextPicker('slash')}${renderContextPicker('mention')}<div class="composer-footer"><div class="toolbar"><button class="secondary-button" data-action="OPEN_PICKER" data-value="slash">/ 技能</button><button class="secondary-button" data-action="OPEN_PICKER" data-value="mention">@ 引用</button><button class="secondary-button" data-action="NOTICE" data-message="演示模式不会上传真实文件">＋ 附件</button></div><button class="primary-button" data-action="NOTICE" data-message="运行状态机将在下一任务接入">开始创作</button></div></div></div>`;
+      return `<div class="workspace-page"><div class="workspace-header"><div><h1>新 Agent 会话</h1><p>选择技能、引用项目资料，再让小Y整理执行计划。</p></div><span class="pill">默认工作区</span></div><div class="split-workspace"><section><div class="permission-row">${[['plan','计划模式'],['auto','自动审批'],['bypass','完全运行']].map(item => `<button class="pill ${state.permissionMode === item[0] ? 'is-active' : ''}" data-action="SET_PERMISSION_MODE" data-value="${item[0]}">${item[1]}</button>`).join('')}</div><p class="muted" style="text-align:center">${permissionCopy[state.permissionMode]}</p><div class="composer">${state.selectedContext.length ? `<div class="chips">${state.selectedContext.map(item => `<span class="chip">${item.kind} · ${item.label}<button aria-label="移除 ${item.label}" data-action="REMOVE_CONTEXT" data-id="${item.id}">×</button></span>`).join('')}</div>` : ''}<textarea aria-label="创作目标" placeholder="输入目标，使用 / 选择技能，使用 @ 引用文件或素材">把第一章改编成三集短剧并生成故事板</textarea>${renderContextPicker('slash')}${renderContextPicker('mention')}<div class="composer-footer"><div class="toolbar"><button class="secondary-button" data-action="OPEN_PICKER" data-value="slash">/ 技能</button><button class="secondary-button" data-action="OPEN_PICKER" data-value="mention">@ 引用</button><button class="secondary-button" data-action="NOTICE" data-message="演示模式不会上传真实文件">＋ 附件</button></div>${state.run.status === 'idle' || ['succeeded','failed','cancelled'].includes(state.run.status) ? `<button class="primary-button" data-action="${state.run.status === 'failed' ? 'RETRY_RUN' : 'START_RUN'}">${state.run.status === 'failed' ? '从失败处重试' : '开始创作'}</button>` : `<button class="secondary-button" data-action="CANCEL_RUN">停止生成</button>`}</div></div></section>${renderRunTimeline()}</div></div>`;
+    }
+    function renderAgentSession() { return renderAgentSessionBase(); }
+    function renderRunTimeline() {
+      const steps = ['分析需求','读取项目资料','调用 CM 创作顾问','生成故事板','写入项目产物'];
+      const statusLabel = { idle:'等待开始', planning:'正在规划', awaiting_approval:'等待确认', running:'正在执行', succeeded:'执行成功', failed:'执行失败', cancelled:'已取消' }[state.run.status];
+      return `<aside class="run-timeline"><h3>执行计划</h3><div class="status-banner"><b>${statusLabel}</b>${state.run.error ? `<p style="color:var(--danger)">${state.run.error}</p>` : ''}</div>${steps.map((label,index) => `<div class="timeline-step ${index < state.run.step ? 'is-done' : index === state.run.step ? 'is-current' : ''}"><span class="timeline-dot">${index < state.run.step ? '✓' : index + 1}</span><div><strong>${label}</strong><p class="muted">${index < state.run.step ? '已完成' : index === state.run.step ? statusLabel : '等待执行'}</p></div></div>`).join('')}${state.run.status === 'awaiting_approval' ? `<button class="primary-button" data-action="APPROVE_RUN">继续执行</button><button class="secondary-button" data-action="FAIL_RUN">调整后再执行</button>` : ''}${state.run.status === 'running' ? `<button class="secondary-button" data-action="FAIL_RUN">演示失败</button>` : ''}${state.run.status === 'succeeded' ? `<button class="primary-button" data-action="OPEN_ARTIFACT" data-value="storyboard">打开第 1 集故事板</button>` : ''}</aside>`;
+    }
+    function patchRun(status, step, error='') { patchState({ run:{ status, step, error } }); }
+    function scheduleRunAdvance() { clearTimeout(runTimer); runTimer = setTimeout(advanceRun, 650); }
+    function advanceRun() {
+      if (state.run.status === 'planning') {
+        if (state.permissionMode === 'plan') return patchRun('succeeded', 2);
+        if (state.permissionMode === 'auto') return patchRun('awaiting_approval', 3);
+        patchRun('running', 3); return scheduleRunAdvance();
+      }
+      if (state.run.status === 'running') patchRun('succeeded', 5);
+    }
+    function startRun() { patchRun('planning', 1); scheduleRunAdvance(); }
+    function renderAutomationPage() {
+      const items = state.automations.length ? state.automations : [{id:'auto-daily',name:'每日项目进度简报',status:'active',schedule:'每天 09:00'},{id:'auto-review',name:'故事板自动审校',status:'paused',schedule:'工作日 18:00'},{id:'auto-assets',name:'资产缺失检查',status:'failed',schedule:'每 2 小时'}];
+      return `<div class="workspace-page"><div class="workspace-header"><div><h1>自动任务</h1><p>使用同一套技能、权限和运行记录。</p></div><button class="primary-button" data-action="CREATE_AUTOMATION">＋ 新建自动任务</button></div><section class="card">${items.map(item => `<div class="list-row"><div><strong>${item.name}</strong><p class="muted">${item.schedule} · ${item.status}</p></div><div class="toolbar"><button class="secondary-button" data-action="RUN_AUTOMATION" data-id="${item.id}">立即运行</button><button class="secondary-button" data-action="TOGGLE_AUTOMATION" data-id="${item.id}">${item.status === 'paused' ? '恢复' : '暂停'}</button></div></div>`).join('')}</section></div>`;
+    }
+    function renderProjectWorkspace() {
+      const view = state.activeWorkspaceView;
+      const content = view === 'canvas' ? `<div class="canvas-board"><article class="canvas-node" style="left:8%;top:18%"><b>剧本拆解</b><p>第 1—3 集</p></article><article class="canvas-node" style="left:48%;top:50%"><b>故事板生成</b><p>12 个镜头</p></article></div>` : view === 'storyboard' ? `<div class="grid">${[1,2,3,4,5,6].map(i => `<article class="card"><h3>镜头 ${i}</h3><p>人物、场景、运镜与对白说明</p></article>`).join('')}</div>` : view === 'assets' ? `<div class="grid">${['宋江人物图','聚义厅场景','令牌道具','第1集预览'].map(x => `<article class="card"><h3>${x}</h3><p>项目正式素材 · 可加入对话和画布</p></article>`).join('')}</div>` : `<section class="card">${['生成故事板 · 成功','人物资产提取 · 执行中','视频审校 · 失败'].map(x => `<div class="list-row"><b>${x}</b><button class="secondary-button" data-action="NOTICE" data-message="已打开任务详情">查看</button></div>`).join('')}</section>`;
+      return `<div class="workspace-page"><div class="workspace-header"><div><h1>水浒漫剧</h1><p>同一个项目中的画布、故事板、素材和任务。</p></div><span class="pill">CM 正常</span></div><div class="tabs">${[['canvas','画布'],['storyboard','故事板'],['assets','素材'],['tasks','任务']].map(item => `<button class="tab-button ${view===item[0]?'is-active':''}" data-action="SET_WORKSPACE_VIEW" data-value="${item[0]}">${item[1]}</button>`).join('')}</div><div class="toolbar"><button class="secondary-button" data-action="OPEN_PICKER" data-value="slash">/ 技能</button><button class="secondary-button" data-action="OPEN_PICKER" data-value="mention">@ 引用</button><span class="pill">${state.permissionMode === 'auto' ? '自动审批' : state.permissionMode === 'plan' ? '计划模式' : '完全运行'}</span><button class="secondary-button" data-action="NOTICE" data-message="附件入口可用">＋ 附件</button></div><div class="workspace-stage">${content}</div>${renderContextPicker('slash')}${renderContextPicker('mention')}</div>`;
     }
     function renderAgentFoundation() {
       const page = state.pages.agent;
       if (page === 'skills') return `${renderSkillCenter()}${renderSkillDetail()}${renderModal()}`;
-      if (page === 'new-session') return `${renderAgentSessionBase()}${renderModal()}`;
-      return `<section class="empty-panel"><div><div class="orb">◎</div><h1>${page === 'automations' ? '自动任务' : 'Agent 项目'}</h1><p>该入口将在下一任务接入完整交互。</p><button class="primary-button" data-action="SET_PAGE" data-page="new-session">进入新会话</button></div></section>`;
+      if (page === 'new-session') return `${renderAgentSession()}${renderModal()}`;
+      if (page === 'automations') return renderAutomationPage();
+      return renderProjectWorkspace();
     }
     function renderModal() {
       if (!state.modal) return '';
@@ -449,6 +489,16 @@
         case 'ADD_CONTEXT': return patchState({ selectedContext: state.selectedContext.some(item => item.id === payload.id) ? state.selectedContext : [...state.selectedContext, { id:payload.id, label:payload.label, kind:payload.kind }], picker: null });
         case 'REMOVE_CONTEXT': return patchState({ selectedContext: state.selectedContext.filter(item => item.id !== payload.id) });
         case 'SET_PERMISSION_MODE': return patchState({ permissionMode: payload.value });
+        case 'START_RUN': return startRun();
+        case 'APPROVE_RUN': patchRun('running', 3); return scheduleRunAdvance();
+        case 'CANCEL_RUN': return patchRun('cancelled', state.run.step);
+        case 'FAIL_RUN': return patchRun('failed', Math.max(state.run.step, 3), '故事板结构校验未通过，请调整后从失败处重试。');
+        case 'RETRY_RUN': patchRun('running', Math.max(state.run.step, 3)); return scheduleRunAdvance();
+        case 'SET_WORKSPACE_VIEW': return patchState({ activeWorkspaceView: payload.value });
+        case 'OPEN_ARTIFACT': patchState({ pages:{...state.pages,agent:'projects'}, activeWorkspaceView:payload.value }); return showToast('已定位到第 1 集故事板');
+        case 'CREATE_AUTOMATION': return patchState({ automations:[...state.automations,{id:`auto-${Date.now()}`,name:'每晚故事板进度检查',status:'active',schedule:'每天 21:00'}] });
+        case 'TOGGLE_AUTOMATION': return showToast('自动任务状态已切换');
+        case 'RUN_AUTOMATION': state.pages.agent='new-session'; saveState(); renderApp(); return startRun();
         case 'RESET_STATE': return resetState();
         case 'NOTICE': return showToast(payload.message || '操作已完成');
       }
