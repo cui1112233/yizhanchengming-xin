@@ -194,6 +194,7 @@ export function ScriptPage() {
   const [loadingScriptVideoModels, setLoadingScriptVideoModels] = useState(false);
   const [scriptModels, setScriptModels] = useState({ text: [], image: [] });
   const [scriptModelsLoaded, setScriptModelsLoaded] = useState(false);
+  const [scriptDefaultsLoaded, setScriptDefaultsLoaded] = useState(false);
   const [scriptModelSelection, setScriptModelSelection] = useState({ textModelId: '', imageModelId: '' });
   const [scriptImageProvider, setScriptImageProvider] = useState('personal_api');
   const [scriptImageAspectRatio, setScriptImageAspectRatio] = useState('9:16');
@@ -277,7 +278,7 @@ export function ScriptPage() {
   const [quickDirectorOpen, setQuickDirectorOpen] = useState(false);
   const [customizationWorkspace, setCustomizationWorkspace] = useState('script');
   const [privateComicCatalog, setPrivateComicCatalog] = useState([]);
-  const [privateComicDraft, setPrivateComicDraft] = useState({ title: '', sourceText: '', comic: { enabled: true }, textModelId: '', imageModelId: '', imageProvider: 'personal_api' });
+  const [privateComicDraft, setPrivateComicDraft] = useState({ title: '', sourceText: '', comic: { enabled: true }, textModelId: '', imageModelId: '', imageProvider: '' });
   const [privateComicTask, setPrivateComicTask] = useState(null);
   const [privateComicPendingReference, setPrivateComicPendingReference] = useState('');
   const [privateComicBusy, setPrivateComicBusy] = useState(false);
@@ -374,8 +375,8 @@ export function ScriptPage() {
   const scriptVideoModelOptions = useMemo(() => modelOptionsForProvider(scriptVideoModels, 'video', scriptVideoProvider), [scriptVideoModels, scriptVideoProvider]);
   const privateComicModelOptions = useMemo(() => ({
     text: scriptModels.text.map(model => ({ value: model.id, label: model.displayName || model.id })),
-    image: scriptImageModelOptions
-  }), [scriptModels.text, scriptImageModelOptions]);
+    image: scriptModels.image.map(model => ({ value: model.id, label: model.displayName || model.id }))
+  }), [scriptModels.text, scriptModels.image]);
   function privateComicScopedKey(baseKey) {
     const username = String(draftUsernameRef.current || getCurrentUsername() || 'anonymous').trim().toLowerCase() || 'anonymous';
     return `${baseKey}:${username}`;
@@ -394,6 +395,19 @@ export function ScriptPage() {
       // A malformed local draft should never prevent the page from opening.
     }
   }, []);
+  useEffect(() => {
+    if (!scriptModelsLoaded || !scriptDefaultsLoaded) return;
+    setPrivateComicDraft(current => {
+      const next = {
+        ...current,
+        textModelId: current.textModelId || scriptModelSelection.textModelId,
+        imageModelId: current.imageModelId || scriptModelSelection.imageModelId,
+        imageProvider: current.imageProvider || scriptImageProvider || 'personal_api'
+      };
+      if (next.textModelId === current.textModelId && next.imageModelId === current.imageModelId && next.imageProvider === current.imageProvider) return current;
+      return next;
+    });
+  }, [scriptModelsLoaded, scriptDefaultsLoaded, scriptModelSelection.textModelId, scriptModelSelection.imageModelId, scriptImageProvider]);
   useEffect(() => {
     if (customizationWorkspace !== 'comic' || privateComicCatalog.length) return undefined;
     let active = true;
@@ -960,7 +974,8 @@ export function ScriptPage() {
         setScriptVideoAspectRatio(defaults.videoAspectRatio);
         setScriptVideoResolution(defaults.videoResolution);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) setScriptDefaultsLoaded(true); });
     const handleNotificationsUpdated = event => {
       setSoundEnabled(event.detail?.soundEnabled !== false);
       setSoundVolume(Number.isFinite(event.detail?.soundVolume) ? event.detail.soundVolume : 60);
@@ -973,6 +988,15 @@ export function ScriptPage() {
   }, []);
 
   function openScriptUnifiedConfig() {
+    if (customizationWorkspace === 'comic') {
+      setScriptConfigDraft(normalizeScriptUnifiedConfig({
+        textModelId: privateComicDraft.textModelId || scriptModelSelection.textModelId,
+        imageProvider: privateComicDraft.imageProvider || scriptImageProvider || 'personal_api',
+        imageModelId: privateComicDraft.imageModelId || scriptModelSelection.imageModelId
+      }));
+      setScriptConfigOpen(true);
+      return;
+    }
     setScriptConfigDraft(normalizeScriptUnifiedConfig({
       textModelId: scriptModelSelection.textModelId,
       imageProvider: scriptImageProvider,
@@ -990,6 +1014,17 @@ export function ScriptPage() {
     const next = normalizeScriptUnifiedConfig(scriptConfigDraft);
     setSavingScriptConfig(true);
     try {
+      if (customizationWorkspace === 'comic') {
+        setPrivateComicDraft(current => ({
+          ...current,
+          textModelId: next.textModelId,
+          imageProvider: next.imageProvider || 'personal_api',
+          imageModelId: next.imageModelId
+        }));
+        setScriptConfigOpen(false);
+        message.success('当前漫画模型配置已应用');
+        return;
+      }
       const saved = await saveConfig({ scriptDefaults: next });
       const defaults = normalizeScriptUnifiedConfig(saved.scriptDefaults || next);
       setScriptModelSelection({ textModelId: defaults.textModelId, imageModelId: defaults.imageModelId });
@@ -2756,11 +2791,11 @@ export function ScriptPage() {
         </Typography.Paragraph>
       </Modal>
       <Modal
-        title={customizationWorkspace === 'comic' ? '漫画生成 · 统一配置' : '剧本创作 · 统一配置'}
+        title={customizationWorkspace === 'comic' ? '漫画生成 · 当前配置' : '剧本创作 · 统一配置'}
         open={scriptConfigOpen}
         onCancel={() => setScriptConfigOpen(false)}
         onOk={saveScriptUnifiedConfig}
-        okText="保存为默认配置"
+        okText={customizationWorkspace === 'comic' ? '应用到当前漫画' : '保存为默认配置'}
         confirmLoading={savingScriptConfig}
         destroyOnClose
       >
@@ -2768,13 +2803,15 @@ export function ScriptPage() {
           <Form.Item label="文本模型" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.textModelId || undefined} placeholder="选择文本模型" options={scriptModels.text.map(model => ({ value: model.id, label: model.displayName || model.id }))} onChange={textModelId => setScriptConfigDraft(current => ({ ...current, textModelId }))} /></Form.Item>
           <Form.Item label="图片生成通道" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.imageProvider || 'personal_api'} options={scriptImageProviderOptions} onChange={imageProvider => setScriptConfigDraft(current => ({ ...current, imageProvider, imageModelId: reconcileProviderModel({ models: scriptModels.image, kind: 'image', provider: imageProvider, modelId: current.imageModelId }).modelId }))} /></Form.Item>
           <Form.Item label="图片模型" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.imageModelId || undefined} placeholder="选择当前通道的图片模型" options={modelOptionsForProvider(scriptModels.image, 'image', scriptConfigDraft.imageProvider)} onChange={imageModelId => setScriptConfigDraft(current => ({ ...current, imageModelId }))} /></Form.Item>
+          {customizationWorkspace !== 'comic' ? <>
           <Form.Item label="视频生成通道" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.videoProvider || 'personal_api'} options={scriptVideoProviderOptions} onChange={videoProvider => setScriptConfigDraft(current => ({ ...current, videoProvider, videoModelKey: reconcileProviderModel({ models: scriptVideoModels, kind: 'video', provider: videoProvider, modelId: current.videoModelKey }).modelId }))} /></Form.Item>
           <Form.Item label="视频模型" style={{ marginBottom: 0 }}><Select loading={loadingScriptVideoModels} value={scriptConfigDraft.videoModelKey} options={modelOptionsForProvider(scriptVideoModels, 'video', scriptConfigDraft.videoProvider)} onChange={videoModelKey => setScriptConfigDraft(current => ({ ...current, videoModelKey }))} /></Form.Item>
           <Form.Item label="图片画幅" style={{ marginBottom: 0 }}><Segmented block options={IMAGE_ASPECT_RATIOS} value={scriptConfigDraft.imageAspectRatio} onChange={imageAspectRatio => setScriptConfigDraft(current => ({ ...current, imageAspectRatio }))} /></Form.Item>
           <Form.Item label="视频画幅" style={{ marginBottom: 0 }}><Segmented block options={['16:9', '9:16']} value={scriptConfigDraft.videoAspectRatio} onChange={videoAspectRatio => setScriptConfigDraft(current => ({ ...current, videoAspectRatio }))} /></Form.Item>
           <Form.Item label="视频分辨率" style={{ marginBottom: 0 }}><Segmented block options={['480p', '720p', '1080p']} value={scriptConfigDraft.videoResolution} onChange={videoResolution => setScriptConfigDraft(current => ({ ...current, videoResolution }))} /></Form.Item>
           {scriptConfigDraft.videoModelKey === 'minimax-h3-video' ? <Typography.Text type="secondary">H3 会保持所选横竖画幅；720p 与 1080p 会按 H3 的 768p 档提交。</Typography.Text> : null}
-          <Typography.Text type="secondary">保存后会成为当前账号后续剧本创作的默认值；仍可随时在这里更换。</Typography.Text>
+          </> : null}
+          <Typography.Text type="secondary">{customizationWorkspace === 'comic' ? '仅应用到当前这一本漫画；新作品仍会从账号默认配置开始。' : '保存后会成为当前账号后续剧本创作的默认值；仍可随时在这里更换。'}</Typography.Text>
         </Space>
       </Modal>
       <EntityEditor

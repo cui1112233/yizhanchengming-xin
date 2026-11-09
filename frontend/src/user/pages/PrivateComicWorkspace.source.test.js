@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'PrivateComicWorkspace.jsx'), 'utf8');
+const scriptPageSource = fs.readFileSync(path.join(here, 'ScriptPage.jsx'), 'utf8');
 const pickerSource = fs.readFileSync(path.join(here, 'shuihuo', 'BatchFactoryComicStylePicker.jsx'), 'utf8');
 const constraintsSource = fs.readFileSync(path.join(here, 'private-studio', 'PrivateStudioConstraintsModal.jsx'), 'utf8');
 
@@ -43,6 +44,22 @@ test('private comic workspace shows a live page estimate before generation', () 
   assert.match(source, /import \{ comicEstimatedPageRange \} from '\.\/shuihuo\/batchFactoryContentRange\.js';/);
   assert.match(source, /const pageEstimate = comicEstimatedPageRange\(sourceLength\);/);
   assert.match(source, /已读取 \$\{sourceLength\} 字 · 预计约 \$\{pageEstimate\.min\}～\$\{pageEstimate\.max\} 张/);
+});
+
+test('private comic models have one editor and the toolbar only shows the effective values', () => {
+  assert.match(source, /resolveModelLabel\(modelOptions\.text, draft\.textModelId\)/);
+  assert.match(source, /resolveModelLabel\(modelOptions\.image, draft\.imageModelId\)/);
+  assert.match(source, /private-studio-tool-value/);
+  assert.doesNotMatch(source, /onChange=\{textModelId => patchDraft\(\{ textModelId/);
+  assert.doesNotMatch(source, /onChange=\{imageModelId => patchDraft\(\{ imageModelId/);
+});
+
+test('comic configuration edits the current comic while script configuration keeps account defaults', () => {
+  assert.match(scriptPageSource, /if \(customizationWorkspace === 'comic'\) \{[\s\S]{0,700}textModelId: privateComicDraft\.textModelId \|\| scriptModelSelection\.textModelId/);
+  assert.match(scriptPageSource, /if \(customizationWorkspace === 'comic'\) \{[\s\S]{0,700}setPrivateComicDraft\(current => \(\{[\s\S]{0,300}textModelId: next\.textModelId/);
+  assert.match(scriptPageSource, /if \(!scriptModelsLoaded \|\| !scriptDefaultsLoaded\) return;/);
+  assert.match(scriptPageSource, /okText=\{customizationWorkspace === 'comic' \? '应用到当前漫画' : '保存为默认配置'\}/);
+  assert.match(scriptPageSource, /customizationWorkspace !== 'comic' \? <>[\s\S]{0,1800}视频模型/);
 });
 
 test('asset images are an optional enhancement and never block the next required step', () => {

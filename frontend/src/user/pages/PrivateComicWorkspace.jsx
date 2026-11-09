@@ -76,6 +76,12 @@ function taskLabel(task) {
   return '漫画生成中';
 }
 
+function resolveModelLabel(options, value) {
+  const modelId = text(value);
+  if (!modelId) return '未选择';
+  return text((Array.isArray(options) ? options : []).find(option => text(option?.value) === modelId)?.label) || modelId;
+}
+
 function PrivateComicAssetImage({ imageUrl, alt = '', preview = false }) {
   const [display, setDisplay] = useState({ url: '', failed: false });
   useEffect(() => {
@@ -744,11 +750,11 @@ export function PrivateComicWorkspace({
         <div className="private-studio-toolbar-left">
         <div className="private-studio-tool-pill">
           <span className="private-studio-tool-label">文本模型</span>
-        <Select className="private-studio-tool-select" style={{ width: 140, flex: '0 0 140px' }} allowClear value={draft.textModelId || undefined} options={modelOptions.text || []} placeholder="文本模型" disabled={busy} onChange={textModelId => patchDraft({ textModelId: textModelId || '' })} />
+          <span className="private-studio-tool-value" title={resolveModelLabel(modelOptions.text, draft.textModelId)}>{resolveModelLabel(modelOptions.text, draft.textModelId)}</span>
         </div>
         <div className="private-studio-tool-pill">
           <span className="private-studio-tool-label">图片模型</span>
-        <Select className="private-studio-tool-select" style={{ width: 140, flex: '0 0 140px' }} allowClear value={draft.imageModelId || undefined} options={modelOptions.image || []} placeholder="图片模型" disabled={busy} onChange={imageModelId => patchDraft({ imageModelId: imageModelId || '' })} />
+          <span className="private-studio-tool-value" title={resolveModelLabel(modelOptions.image, draft.imageModelId)}>{resolveModelLabel(modelOptions.image, draft.imageModelId)}</span>
         </div>
         </div>
         <div className="private-studio-toolbar-right">
