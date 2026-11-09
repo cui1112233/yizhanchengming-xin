@@ -174,7 +174,7 @@ git commit -m "feat: add CM workspace prototype shell"
 - Consumes: `state.skillTab`、`state.enabledSkillIds`、`state.selectedContext`、`state.permissionMode`、`dispatchAction()`。
 - Produces: `renderSkillCenter()`、`renderSkillDetail()`、`renderContextPicker(kind)` 和动作 `SET_SKILL_TAB`、`TOGGLE_SKILL`、`TOGGLE_ALL_SKILLS`、`OPEN_SKILL_DETAIL`、`ADD_CONTEXT`、`REMOVE_CONTEXT`、`SET_PERMISSION_MODE`。
 
-- [ ] **Step 1: 增加技能和选择器契约的失败测试**
+- [x] **Step 1: 增加技能和选择器契约的失败测试**
 
 ```js
 test('agent skill center and composer contracts are present', () => {
@@ -187,13 +187,13 @@ test('agent skill center and composer contracts are present', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
 Expected: 新测试 FAIL，缺少 `renderSkillCenter`。
 
-- [ ] **Step 3: 实现技能演示数据与管理页面**
+- [x] **Step 3: 实现技能演示数据与管理页面**
 
 内嵌至少 8 个技能，覆盖平台、个人、项目三种来源和可用、缺配置、无权限三种环境状态。每项结构固定为：
 
@@ -215,11 +215,11 @@ Expected: 新测试 FAIL，缺少 `renderSkillCenter`。
 
 实现 Skills/MCP/Codex 标签、搜索、分类、全部启停、单项启停、详情抽屉、导入弹窗和管理执行器弹窗。导入按钮只展示“演示模式，不会上传文件”。
 
-- [ ] **Step 4: 实现 `/`、`@` 和权限联动**
+- [x] **Step 4: 实现 `/`、`@` 和权限联动**
 
 `renderContextPicker('slash')` 只显示已启用且环境可用的技能，并显示 MCP、自动任务、思考强度；`renderContextPicker('mention')` 显示技能、自动任务、MCP、文件、素材、画布节点和故事板镜头。关闭技能后重新打开 `/`，该技能必须消失。
 
-- [ ] **Step 5: 运行测试并浏览器验收联动**
+- [x] **Step 5: 运行测试并浏览器验收联动**
 
 Run: `node --test docs/prototypes/cm-agent-duet/prototype.source.test.mjs`
 
@@ -227,7 +227,7 @@ Expected: all tests PASS。
 
 浏览器：关闭“CM 创作顾问”→返回新会话→打开 `/`，确认不再显示；重新开启后恢复。切换三档权限，说明文案同步变化。
 
-- [ ] **Step 6: 提交技能中心**
+- [x] **Step 6: 提交技能中心**
 
 ```bash
 git add docs/prototypes/cm-agent-duet/index.html docs/prototypes/cm-agent-duet/prototype.source.test.mjs

@@ -162,6 +162,45 @@
     }
     .primary-button { border: 0; color: white; background: linear-gradient(100deg, var(--primary), var(--primary-2)); }
     .secondary-button { border: 1px solid var(--border); background: var(--surface-2); }
+    .workspace-page { padding: 22px; }
+    .workspace-header, .toolbar, .tabs, .chips, .permission-row, .card-actions { display: flex; align-items: center; gap: 10px; }
+    .workspace-header { justify-content: space-between; margin-bottom: 18px; }
+    .workspace-header h1 { margin: 0 0 4px; font-size: 25px; }
+    .workspace-header p, .muted { margin: 0; color: var(--muted); }
+    .tabs { padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .tab-button, .chip, .pill { padding: 7px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); cursor: pointer; }
+    .tab-button.is-active, .pill.is-active { color: white; border-color: transparent; background: var(--primary); }
+    .toolbar { flex-wrap: wrap; margin: 14px 0; }
+    .search-input, .composer textarea, .field-input, .field-select { color: var(--text); border: 1px solid var(--border); background: var(--surface-2); }
+    .search-input { min-width: 250px; padding: 9px 12px; border-radius: 9px; }
+    .skill-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .skill-card { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); }
+    .skill-card.is-enabled { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); }
+    .skill-head { display: flex; gap: 10px; align-items: flex-start; }
+    .skill-icon { width: 36px; height: 36px; display: grid; place-items: center; flex: none; border-radius: 10px; background: var(--surface-3); color: var(--primary-2); }
+    .skill-head div { flex: 1; }
+    .skill-head strong { display: block; }
+    .skill-head small, .skill-meta { color: var(--muted); }
+    .switch { width: 38px; height: 22px; padding: 2px; border: 0; border-radius: 999px; background: var(--surface-3); cursor: pointer; }
+    .switch::after { content: ''; display: block; width: 18px; height: 18px; border-radius: 50%; background: white; transition: .16s; }
+    .switch.is-on { background: var(--success); }
+    .switch.is-on::after { transform: translateX(16px); }
+    .card-actions { justify-content: space-between; }
+    .composer { position: relative; max-width: 900px; margin: 18px auto; padding: 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .composer textarea { width: 100%; min-height: 120px; resize: vertical; padding: 12px; border-radius: 10px; }
+    .composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+    .chips { flex-wrap: wrap; margin-bottom: 8px; }
+    .chip { cursor: default; }
+    .chip button { margin-left: 6px; border: 0; background: transparent; cursor: pointer; color: var(--muted); }
+    .permission-row { justify-content: center; flex-wrap: wrap; margin: 14px 0; }
+    .picker { position: absolute; left: 14px; bottom: 58px; z-index: 15; width: min(560px, calc(100% - 28px)); max-height: 310px; overflow: auto; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+    .picker button { width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 9px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; text-align: left; }
+    .picker button:hover { background: var(--surface-2); }
+    .overlay { position: fixed; inset: 0; z-index: 70; background: rgb(0 0 0 / 45%); }
+    .drawer { position: fixed; top: 0; right: 0; z-index: 71; width: min(480px, 92vw); height: 100vh; overflow: auto; padding: 22px; border-left: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); }
+    .modal { position: fixed; left: 50%; top: 50%; z-index: 72; width: min(560px, 92vw); transform: translate(-50%, -50%); padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+    .close-button { float: right; border: 0; background: transparent; cursor: pointer; font-size: 22px; }
+    .detail-list { display: grid; gap: 12px; margin-top: 20px; }
     #toast-region {
       position: fixed; right: 20px; bottom: 20px; z-index: 100; max-width: 360px;
       padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
@@ -205,6 +244,16 @@
       { id: 'light', label: '明亮白' },
       { id: 'snow', label: '雪山蓝' }
     ];
+    const skills = [
+      { id:'cm-creative-advisor', name:'CM 创作顾问', version:'1.6.0', summary:'整理创作目标并生成可执行计划', source:'平台', author:'CM', category:'写小说', environment:'ready', inputs:['创作目标','项目资料'], outputs:['创作计划','修改建议'], tools:['读取项目资料'] },
+      { id:'storyboard-director', name:'故事板导演', version:'2.1.0', summary:'把剧本拆成可执行镜头和画面说明', source:'平台', author:'小Y', category:'画布', environment:'ready', inputs:['剧本','人物资产'], outputs:['故事板','镜头计划'], tools:['读取故事板'] },
+      { id:'screenplay-writer', name:'短剧编剧', version:'1.4.2', summary:'生成短剧分集结构、场次和对白', source:'平台', author:'CM', category:'短剧剪辑', environment:'ready', inputs:['故事梗概'], outputs:['分集剧本'], tools:['写入项目文件'] },
+      { id:'novel-writer', name:'写小说', version:'2.1.0', summary:'根据设定和大纲连续创作小说章节', source:'个人', author:'用户', category:'写小说', environment:'ready', inputs:['设定','大纲'], outputs:['章节正文'], tools:['读取项目资料'] },
+      { id:'asset-planner', name:'资产规划师', version:'1.2.0', summary:'提取人物、场景、道具并建立资产清单', source:'平台', author:'CM', category:'画布', environment:'ready', inputs:['剧本'], outputs:['资产清单'], tools:['读取项目素材'] },
+      { id:'video-reviewer', name:'视频审校', version:'1.1.0', summary:'检查镜头连续性和字幕问题', source:'项目', author:'用户', category:'短剧剪辑', environment:'missing', inputs:['视频'], outputs:['问题清单'], tools:['本地执行器'] },
+      { id:'publisher', name:'发布助手', version:'1.0.3', summary:'整理发布文案和封面信息', source:'平台', author:'CM', category:'其他', environment:'denied', inputs:['成片'], outputs:['发布资料'], tools:['外部连接'] },
+      { id:'knowledge-reader', name:'知识资料检索', version:'1.3.1', summary:'从项目文件中查找可靠上下文', source:'平台', author:'小Y', category:'其他', environment:'ready', inputs:['问题'], outputs:['引用资料'], tools:['读取项目文件'] }
+    ];
     const defaultState = {
       mode: 'brand',
       theme: 'dark',
@@ -222,6 +271,7 @@
       duetTasks: [],
       modal: null,
       drawer: null
+      , picker: null, skillSearch: '', skillCategory: '全部'
     };
     let state = loadState();
     let toastTimer = 0;
@@ -332,9 +382,41 @@
         ${[['私人定制','为单个创作需求建立专属生产方案','private'],['小说获取','获取、整理并进入后续改编链','novel'],['水货生产','批量管理剧本、素材、分镜与成片','production'],['配音','管理角色音色、台词与音频任务','voice']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
       </section></div>`;
     }
+    function renderSkillDetail() {
+      const skill = skills.find(item => item.id === state.drawer);
+      if (!skill) return '';
+      return `<div class="overlay" data-action="CLOSE_LAYER"></div><aside class="drawer" aria-label="技能详情"><button class="close-button" data-action="CLOSE_LAYER">×</button><span class="eyebrow">${skill.source}技能 · v${skill.version}</span><h1>${skill.name}</h1><p class="muted">${skill.summary}</p><div class="detail-list"><div class="card"><strong>触发方式</strong><p>在会话中输入 / 并选择该技能，或通过 @ 引用。</p></div><div class="card"><strong>需要输入</strong><p>${skill.inputs.join('、')}</p></div><div class="card"><strong>产生输出</strong><p>${skill.outputs.join('、')}</p></div><div class="card"><strong>需要工具</strong><p>${skill.tools.join('、')}</p></div><div class="card"><strong>说明</strong><p>系统提示词由 Go 后端管理，本原型不展示提示词正文。</p></div></div></aside>`;
+    }
+    function renderSkillCenter() {
+      const categories = ['全部', ...new Set(skills.map(item => item.category))];
+      const visible = skills.filter(item => (state.skillCategory === '全部' || item.category === state.skillCategory) && (!state.skillSearch || `${item.name}${item.summary}`.includes(state.skillSearch)));
+      if (state.skillTab !== 'skills') return `<div class="workspace-page"><div class="workspace-header"><div><h1>Agent 技能</h1><p>${state.skillTab === 'mcp' ? 'MCP 连接与工具状态' : 'Codex 渠道和可用模型'}</p></div></div>${renderSkillTabs()}<div class="grid">${(state.skillTab === 'mcp' ? [['项目文件 MCP','已连接'],['素材服务 MCP','缺少配置'],['浏览器 MCP','无权限'],['导演台 MCP','已连接']] : [['Codex 创作版','可用'],['Codex 审校版','可用'],['本地执行渠道','缺少配置']]).map(item => `<article class="card"><h3>${item[0]}</h3><p>${item[1]} · 演示状态，不会发起真实授权或连接。</p><button class="secondary-button" data-action="NOTICE" data-message="已打开演示详情">查看详情</button></article>`).join('')}</div></div>`;
+      return `<div class="workspace-page"><div class="workspace-header"><div><h1>Agent 技能</h1><p>管理平台、个人和项目技能；启用后可在会话中使用。</p></div><div class="toolbar"><button class="secondary-button" data-action="TOGGLE_ALL_SKILLS">全部开启</button><button class="secondary-button" data-action="OPEN_MODAL" data-value="import">导入 Skill</button><button class="secondary-button" data-action="OPEN_MODAL" data-value="executor">管理执行器</button></div></div>${renderSkillTabs()}<div class="toolbar"><input class="search-input" aria-label="搜索技能" placeholder="搜索技能" value="${state.skillSearch}" data-input="skill-search">${categories.map(category => `<button class="pill ${state.skillCategory === category ? 'is-active' : ''}" data-action="SET_SKILL_CATEGORY" data-value="${category}">${category}</button>`).join('')}</div><div class="skill-grid">${visible.map(skill => { const enabled = state.enabledSkillIds.includes(skill.id); return `<article class="skill-card ${enabled ? 'is-enabled' : ''}"><div class="skill-head"><span class="skill-icon">✦</span><div><strong>${skill.name}</strong><small>v${skill.version} · ${skill.source}</small></div><button class="switch ${enabled ? 'is-on' : ''}" aria-label="${enabled ? '停用' : '启用'} ${skill.name}" data-action="TOGGLE_SKILL" data-id="${skill.id}"></button></div><p>${skill.summary}</p><div class="skill-meta">作者：${skill.author} · ${skill.environment === 'ready' ? '环境可用' : skill.environment === 'missing' ? '缺少执行器' : '无权限'}</div><div class="card-actions"><span class="pill">${skill.category}</span><button class="secondary-button" data-action="OPEN_SKILL_DETAIL" data-id="${skill.id}">查看详情</button></div></article>`; }).join('')}</div></div>`;
+    }
+    function renderSkillTabs() {
+      return `<div class="tabs">${[['skills','Skills 52'],['mcp','MCP 4'],['codex','Codex 7']].map(item => `<button class="tab-button ${state.skillTab === item[0] ? 'is-active' : ''}" data-action="SET_SKILL_TAB" data-value="${item[0]}">${item[1]}</button>`).join('')}</div>`;
+    }
+    function renderContextPicker(kind) {
+      if (state.picker !== kind) return '';
+      const slashItems = skills.filter(item => state.enabledSkillIds.includes(item.id) && item.environment === 'ready').map(item => ({ id:item.id, label:item.name, type:'技能' })).concat([{id:'mcp-files',label:'项目文件 MCP',type:'MCP'},{id:'automation-daily',label:'每日进度简报',type:'自动任务'},{id:'effort-high',label:'深度思考',type:'思考强度'}]);
+      const mentionItems = skills.slice(0,3).map(item => ({id:item.id,label:item.name,type:'技能'})).concat([{id:'file-script',label:'第1集剧本.docx',type:'项目文件'},{id:'asset-hero',label:'宋江人物参考图',type:'项目素材'},{id:'node-script',label:'剧本拆解节点',type:'画布节点'},{id:'shot-01',label:'第1镜',type:'故事板镜头'}]);
+      const items = kind === 'slash' ? slashItems : mentionItems;
+      return `<div class="picker" role="listbox" aria-label="${kind === 'slash' ? '技能选择' : '引用选择'}">${items.map(item => `<button data-action="ADD_CONTEXT" data-id="${item.id}" data-label="${item.label}" data-kind="${item.type}"><span><b>${item.label}</b><br><small>${item.type}</small></span><span>＋</span></button>`).join('')}</div>`;
+    }
+    function renderAgentSessionBase() {
+      const permissionCopy = { plan:'只生成计划，不执行写入与工具。', auto:'只读步骤自动执行，写入与生成等待确认。', bypass:'按计划连续执行，高风险操作仍需确认。' };
+      return `<div class="workspace-page"><div class="workspace-header"><div><h1>新 Agent 会话</h1><p>选择技能、引用项目资料，再让小Y整理执行计划。</p></div><span class="pill">默认工作区</span></div><div class="permission-row">${[['plan','计划模式'],['auto','自动审批'],['bypass','完全运行']].map(item => `<button class="pill ${state.permissionMode === item[0] ? 'is-active' : ''}" data-action="SET_PERMISSION_MODE" data-value="${item[0]}">${item[1]}</button>`).join('')}</div><p class="muted" style="text-align:center">${permissionCopy[state.permissionMode]}</p><div class="composer">${state.selectedContext.length ? `<div class="chips">${state.selectedContext.map(item => `<span class="chip">${item.kind} · ${item.label}<button aria-label="移除 ${item.label}" data-action="REMOVE_CONTEXT" data-id="${item.id}">×</button></span>`).join('')}</div>` : ''}<textarea aria-label="创作目标" placeholder="输入目标，使用 / 选择技能，使用 @ 引用文件或素材"></textarea>${renderContextPicker('slash')}${renderContextPicker('mention')}<div class="composer-footer"><div class="toolbar"><button class="secondary-button" data-action="OPEN_PICKER" data-value="slash">/ 技能</button><button class="secondary-button" data-action="OPEN_PICKER" data-value="mention">@ 引用</button><button class="secondary-button" data-action="NOTICE" data-message="演示模式不会上传真实文件">＋ 附件</button></div><button class="primary-button" data-action="NOTICE" data-message="运行状态机将在下一任务接入">开始创作</button></div></div></div>`;
+    }
     function renderAgentFoundation() {
       const page = state.pages.agent;
-      return `<section class="empty-panel"><div><div class="orb">◎</div><h1>${page === 'skills' ? 'Agent 技能' : page === 'automations' ? '自动任务' : page === 'projects' ? 'Agent 项目' : 'CM Agent 工作区'}</h1><p>Agent代理完整会话、技能、自动任务和项目交互将在后续任务接入这个固定入口。</p><button class="primary-button" data-action="NOTICE" data-message="入口已生效，详细交互正在实现">检查入口</button></div></section>`;
+      if (page === 'skills') return `${renderSkillCenter()}${renderSkillDetail()}${renderModal()}`;
+      if (page === 'new-session') return `${renderAgentSessionBase()}${renderModal()}`;
+      return `<section class="empty-panel"><div><div class="orb">◎</div><h1>${page === 'automations' ? '自动任务' : 'Agent 项目'}</h1><p>该入口将在下一任务接入完整交互。</p><button class="primary-button" data-action="SET_PAGE" data-page="new-session">进入新会话</button></div></section>`;
+    }
+    function renderModal() {
+      if (!state.modal) return '';
+      const title = state.modal === 'import' ? '导入 Skill' : '管理执行器';
+      return `<div class="overlay" data-action="CLOSE_LAYER"></div><section class="modal" role="dialog" aria-label="${title}"><button class="close-button" data-action="CLOSE_LAYER">×</button><h2>${title}</h2><p class="muted">演示模式只展示入口，不会上传文件、运行安装命令或连接外部服务。</p><button class="primary-button" data-action="CLOSE_LAYER">我知道了</button></section>`;
     }
     function renderDuetFoundation() {
       return `<section class="empty-panel"><div><div class="orb">♬</div><h1>CM Duet 制片厂</h1><p>频道、员工 Agent、任务、审核返工和接力看板将在后续任务接入这个独立工作模式。</p><button class="primary-button" data-action="NOTICE" data-message="Duet 工作模式已生效">检查入口</button></div></section>`;
@@ -353,6 +435,20 @@
         case 'SET_MODE': return patchState({ mode: payload.mode, modeMenuOpen: false });
         case 'SET_THEME': return patchState({ theme: payload.theme });
         case 'SET_PAGE': return setPage(payload.page);
+        case 'SET_SKILL_TAB': return patchState({ skillTab: payload.value });
+        case 'SET_SKILL_CATEGORY': return patchState({ skillCategory: payload.value });
+        case 'TOGGLE_SKILL': {
+          const enabled = state.enabledSkillIds.includes(payload.id);
+          return patchState({ enabledSkillIds: enabled ? state.enabledSkillIds.filter(id => id !== payload.id) : [...state.enabledSkillIds, payload.id] });
+        }
+        case 'TOGGLE_ALL_SKILLS': return patchState({ enabledSkillIds: state.enabledSkillIds.length === skills.length ? [] : skills.filter(item => item.environment === 'ready').map(item => item.id) });
+        case 'OPEN_SKILL_DETAIL': return patchState({ drawer: payload.id });
+        case 'OPEN_MODAL': return patchState({ modal: payload.value });
+        case 'CLOSE_LAYER': return patchState({ drawer: null, modal: null, picker: null });
+        case 'OPEN_PICKER': return patchState({ picker: state.picker === payload.value ? null : payload.value });
+        case 'ADD_CONTEXT': return patchState({ selectedContext: state.selectedContext.some(item => item.id === payload.id) ? state.selectedContext : [...state.selectedContext, { id:payload.id, label:payload.label, kind:payload.kind }], picker: null });
+        case 'REMOVE_CONTEXT': return patchState({ selectedContext: state.selectedContext.filter(item => item.id !== payload.id) });
+        case 'SET_PERMISSION_MODE': return patchState({ permissionMode: payload.value });
         case 'RESET_STATE': return resetState();
         case 'NOTICE': return showToast(payload.message || '操作已完成');
       }
@@ -361,6 +457,9 @@
       const target = event.target.closest('[data-action]');
       if (target) dispatchAction(target.dataset.action, target.dataset);
       else if (state.modeMenuOpen) patchState({ modeMenuOpen: false });
+    });
+    document.addEventListener('input', event => {
+      if (event.target.dataset.input === 'skill-search') { state.skillSearch = event.target.value; saveState(); renderApp(); document.querySelector('[data-input="skill-search"]')?.focus(); }
     });
     window.__CM_PROTOTYPE__ = {
       getState: () => structuredClone(state),

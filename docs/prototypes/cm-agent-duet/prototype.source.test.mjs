@@ -23,3 +23,12 @@ test('prototype includes three approved themes without external assets', () => {
   for (const theme of ['dark', 'light', 'snow']) assert.match(html, new RegExp(`data-theme=["']?${theme}|theme:\\s*["']${theme}`));
   assert.doesNotMatch(html, /https?:\/\//);
 });
+
+test('agent skill center and composer contracts are present', () => {
+  for (const token of [
+    'Skills', 'MCP', 'Codex', '搜索技能', '全部开启', '导入 Skill',
+    'renderSkillCenter', 'renderSkillDetail', 'renderContextPicker',
+    'TOGGLE_SKILL', 'ADD_CONTEXT', 'REMOVE_CONTEXT', 'SET_PERMISSION_MODE'
+  ]) assert.match(html, new RegExp(token));
+  for (const label of ['计划模式', '自动审批', '完全运行']) assert.match(html, new RegExp(label));
+});
