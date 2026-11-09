@@ -49,7 +49,7 @@ type BatchAutomationCoordinator struct {
 	publish121            *BatchFactory121Publisher
 	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
 	comicPublish          func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
-	comicPublishPreflight func(context.Context, batchfactoryv11.SettingsPatch) error
+	comicPublishPreflight func(context.Context, string, string, string, batchfactoryv11.SettingsPatch) error
 	mu                    sync.Mutex
 	controlMu             sync.Mutex
 	startMu               sync.Mutex
@@ -809,7 +809,7 @@ func (c *BatchAutomationCoordinator) SetComicPublisher(publisher func(context.Co
 	}
 }
 
-func (c *BatchAutomationCoordinator) SetComicPublishPreflight(preflight func(context.Context, batchfactoryv11.SettingsPatch) error) {
+func (c *BatchAutomationCoordinator) SetComicPublishPreflight(preflight func(context.Context, string, string, string, batchfactoryv11.SettingsPatch) error) {
 	if c != nil {
 		c.comicPublishPreflight = preflight
 	}

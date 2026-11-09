@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -229,6 +230,33 @@ func TestAutomationPreflightBlocksMissingComicPublishProfile(t *testing.T) {
 	blocking := preflightIssueCodes(result.Books[0].Blocking)
 	if !strings.Contains(blocking["comic_publish_profile_missing"], "漫画发布设置未绑定网站或组织") {
 		t.Fatalf("blocking=%#v, want comic publish profile reason", result.Books[0].Blocking)
+	}
+}
+
+func TestAutomationPreflightBlocksInvalidComicAudioDirectory(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch := preflightComicBatch(t, store, 1, 0)
+	batch = savePreflightBatchSettings(t, store, batch, preflightComicSettingsPatch(t, "整本漫画页规则", "提取漫画资产"))
+	coordinator := preflightCoordinator(t, store, preflightReadyStages(store))
+	called := false
+	coordinator.SetComicPublishPreflight(func(_ context.Context, owner, batchID, bookID string, _ batchfactoryv11.SettingsPatch) error {
+		called = true
+		if owner != "alice" || batchID != batch.ID || bookID != batch.Books[0].ID {
+			t.Fatalf("unexpected scope owner=%q batch=%q book=%q", owner, batchID, bookID)
+		}
+		return fmt.Errorf("音频分类“古风-爽文（打脸）”不存在、未启用或名称不唯一")
+	})
+
+	result, err := coordinator.Preflight(context.Background(), "alice", batch.ID, map[string]any{"runMode": "full_submit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called || result.OK || result.Summary.Blocked != 1 {
+		t.Fatalf("called=%v ok=%v summary=%#v", called, result.OK, result.Summary)
+	}
+	blocking := preflightIssueCodes(result.Books[0].Blocking)
+	if !strings.Contains(blocking["comic_publish_directory_invalid"], "古风-爽文（打脸）") {
+		t.Fatalf("blocking=%#v", result.Books[0].Blocking)
 	}
 }
 

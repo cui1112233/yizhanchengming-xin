@@ -159,7 +159,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 		if options.N8ComicPublisher != nil {
 			options.AutomationCoordinator.SetComicPublisher(options.N8ComicPublisher.PublishFromSettings)
-			options.AutomationCoordinator.SetComicPublishPreflight(options.N8ComicPublisher.ValidateSettings)
+			options.AutomationCoordinator.SetComicPublishPreflight(options.N8ComicPublisher.ValidateBookSettings)
 		}
 		log.Printf("[DIAG] AutomationCoordinator reader=%v path=%q", options.AutomationStatusReader != nil, func() string {
 			if options.AutomationStatusReader != nil {

@@ -898,14 +898,16 @@ func TestAutomationBookPreflightReason(t *testing.T) {
 	}
 }
 
-func TestAutomationBookPreflightSkipsComicPublishPreflight(t *testing.T) {
-	// comicPublishPreflight 现在挪到 run() 的 publish 阶段再查；
-	// preflight 只检查出图必需的前置条件，N8 目录挂了不能卡出图。
+func TestAutomationBookPreflightChecksComicPublishDirectory(t *testing.T) {
+	// full_submit 必须在付费出图前验证这本书实际要用的分类和音频。
 	preflightCalled := false
 	coordinator := &BatchAutomationCoordinator{
-		comicPublishPreflight: func(context.Context, batchfactoryv11.SettingsPatch) error {
+		comicPublishPreflight: func(_ context.Context, _, _, bookID string, _ batchfactoryv11.SettingsPatch) error {
 			preflightCalled = true
-			return fmt.Errorf("漫画发布设置不完整：没有可用指定音频")
+			if bookID == "book-1" {
+				return fmt.Errorf("漫画发布设置不完整：没有可用指定音频")
+			}
+			return nil
 		},
 	}
 	batch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
@@ -918,11 +920,11 @@ func TestAutomationBookPreflightSkipsComicPublishPreflight(t *testing.T) {
 		"publishSettings": json.RawMessage(`{"websiteProfileId":"p1"}`),
 	}}}
 	reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "full_submit")
-	if reason != "" {
-		t.Fatalf("reason=%q, want empty: preflight should not call publish preflight", reason)
+	if !strings.Contains(reason, "没有可用指定音频") {
+		t.Fatalf("reason=%q, want comic publish directory error", reason)
 	}
-	if preflightCalled {
-		t.Fatal("comicPublishPreflight must not be called during preflight anymore")
+	if !preflightCalled {
+		t.Fatal("comicPublishPreflight must run before full_submit")
 	}
 
 	// 漫画批次保存的是 comicPublishSettings（组织/音频分类/制作者），

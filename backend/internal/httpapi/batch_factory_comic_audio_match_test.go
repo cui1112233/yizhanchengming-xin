@@ -211,6 +211,45 @@ func TestComicAudioPreflightDoesNotChooseOneCategoryForAutomaticBooks(t *testing
 	}
 }
 
+func TestComicAudioBookPreflightValidatesMappedCategoryWithoutPersisting(t *testing.T) {
+	store, batch, book := createComicAudioTestBook(t, map[string]any{
+		"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified",
+	})
+	randomCalls := 0
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store: store,
+		RandomIndex: func(int) (int, error) {
+			randomCalls++
+			return 0, nil
+		},
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{{ID: 9, Name: "现代通用", Status: "ENABLE"}},
+			audios:     []n8catalog.Audio{{ID: 91, Name: "通用音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE"}},
+		},
+	}
+	settings := batchfactoryv11.SettingsPatch{
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1"}`),
+	}
+	before, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = publisher.ValidateBookSettings(context.Background(), "alice", batch.ID, book.ID, settings)
+	if err == nil || !strings.Contains(err.Error(), "现代悬疑") || !strings.Contains(err.Error(), "不存在、未启用或名称不唯一") {
+		t.Fatalf("error=%v, want missing mapped category", err)
+	}
+	after, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Revision != before.Revision || randomCalls != 0 {
+		t.Fatalf("preflight mutated state: revision %d -> %d, randomCalls=%d", before.Revision, after.Revision, randomCalls)
+	}
+	if _, exists := after.Books[0].SettingsState.Patch["comicAudioSelection"]; exists {
+		t.Fatal("preflight persisted comicAudioSelection")
+	}
+}
+
 func TestComicAudioCategoryRejectsMissingClassification(t *testing.T) {
 	book := batchfactoryv11.Book{SourceMetadata: map[string]any{"style": "未知", "classifyStatus": "classified"}}
 	if _, err := comicAudioCategoryName(book); err == nil {

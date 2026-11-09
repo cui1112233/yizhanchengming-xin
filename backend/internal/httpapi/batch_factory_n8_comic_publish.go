@@ -155,6 +155,64 @@ func (p *BatchFactoryN8ComicPublisher) ValidateSettings(ctx context.Context, set
 	return err
 }
 
+// ValidateBookSettings verifies the exact category and audio that a book would
+// use without choosing a random audio or persisting comicAudioSelection.
+func (p *BatchFactoryN8ComicPublisher) ValidateBookSettings(ctx context.Context, owner, batchID, bookID string, settings batchfactoryv11.SettingsPatch) error {
+	config, err := parseN8ComicPublishSettings(settings)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(config.OrganizationID) == "" {
+		return fmt.Errorf("漫画发布设置不完整：请选择组织")
+	}
+	if p == nil || p.Store == nil {
+		return fmt.Errorf("漫画发布存储尚未配置")
+	}
+	batch, err := p.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return err
+	}
+	book, err := comicAudioBook(batch, bookID)
+	if err != nil {
+		return err
+	}
+	manualAudioID := config.AudioID
+	if manualAudioID <= 0 && strings.EqualFold(strings.TrimSpace(config.AudioCategorySelectionMode), "manual") {
+		manualAudioID = config.SpecifiedAudioID
+	}
+	categoryName := strings.TrimSpace(config.AudioCategoryName)
+	categoryID := config.AudioCategoryID
+	if manualAudioID <= 0 {
+		categoryName, err = comicAudioCategoryName(book)
+		if err != nil {
+			return err
+		}
+		categoryID = 0
+	}
+	categories, warning := p.audioCategoriesWithWarning(ctx)
+	if warning != "" {
+		return n8DirectoryError(errors.New(warning))
+	}
+	category, err := enabledComicAudioCategory(categories, categoryID, categoryName)
+	if err != nil {
+		return err
+	}
+	audios, err := p.audios(ctx, strconv.FormatInt(category.ID, 10), config.OrganizationID)
+	if err != nil {
+		return err
+	}
+	if manualAudioID > 0 {
+		_, err = enabledComicAudio(audios, manualAudioID)
+		return err
+	}
+	for _, audio := range audios {
+		if audio.ID > 0 && strings.EqualFold(strings.TrimSpace(audio.Status), "ENABLE") {
+			return nil
+		}
+	}
+	return fmt.Errorf("当前组织的“%s”分类没有可用音频", category.Name)
+}
+
 func (p *BatchFactoryN8ComicPublisher) resolveComicPublishAudio(ctx context.Context, categoryID, audioID int64, organizationID string) (int64, int64, error) {
 	if categoryID <= 0 {
 		for _, category := range p.audioCategories(ctx) {

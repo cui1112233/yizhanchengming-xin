@@ -478,7 +478,18 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 		})
 	}
 	if runMode == "full_submit" {
-		issues = append(issues, automationBookPublishIssues(productionMode, effective)...)
+		publishIssues := automationBookPublishIssues(productionMode, effective)
+		issues = append(issues, publishIssues...)
+		if productionMode == "comic" && len(publishIssues) == 0 && c.comicPublishPreflight != nil {
+			if err := c.comicPublishPreflight(ctx, owner, batch.ID, book.ID, effective); err != nil {
+				issues = append(issues, automationPreflightIssue{
+					Code:      "comic_publish_directory_invalid",
+					Message:   err.Error(),
+					FixTarget: automationFixPublishSettings,
+					FixLabel:  "发布设置",
+				})
+			}
+		}
 	}
 	if extended && productionMode == "comic" {
 		issues = append(issues, automationComicPromptIssues(effective, book)...)
