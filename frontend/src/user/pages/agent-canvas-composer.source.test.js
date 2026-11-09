@@ -37,8 +37,9 @@ test('附件和素材引用继续走真实校验与移除逻辑', () => {
 });
 
 test('发送状态与故事板专家入口规则不回归', () => {
-  assert.match(source, /loading=\{asking\}/);
-  assert.match(source, /disabled=\{!question\.trim\(\) \|\| taskDetailLoading\}/);
+  assert.match(source, /aria-label=\{asking \? '停止生成' : '发送消息'\}/);
+  assert.match(source, /disabled=\{asking \? false : !question\.trim\(\) \|\| taskDetailLoading\}/);
+  assert.match(source, /onClick=\{asking \? stopQuestion/);
   assert.match(source, /viewState\.activeView !== 'storyboard'/);
   assert.match(source, /problemSearchMode \? <SearchCheck/);
 });

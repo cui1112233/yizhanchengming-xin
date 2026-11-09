@@ -406,11 +406,12 @@ function prepareAgentContext(context) {
   };
 }
 
-export function askAgent({ taskId, prompt, context, skillIds = [], suppressGlobalError = false }) {
-  return apiRequest('/api/agent/chat', {
+export function askAgent({ taskId, prompt, context, skillIds = [], suppressGlobalError = false, signal }, request = apiRequest) {
+  return request('/api/agent/chat', {
     method: 'POST',
     body: JSON.stringify({ taskId, prompt, context: prepareAgentContext(context), skillIds }),
-    suppressGlobalError,
+    signal,
+    suppressGlobalError: suppressGlobalError || Boolean(signal),
     timeoutMs: LONG_RUNNING_API_TIMEOUT_MS
   });
 }

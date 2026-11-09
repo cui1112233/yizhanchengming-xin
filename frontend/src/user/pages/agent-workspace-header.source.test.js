@@ -10,9 +10,9 @@ function read(relativePath) {
   return fs.readFileSync(path.resolve(dirname, relativePath), 'utf8');
 }
 
-test('共享头部提供工作流和故事板视图', () => {
+test('共享头部提供画布和故事板视图', () => {
   const header = read('../components/AgentWorkspaceHeader.jsx');
-  assert.match(header, /工作流/);
+  assert.match(header, /title="画布"/);
   assert.match(header, /故事板/);
   assert.match(header, /onViewChange/);
   assert.doesNotMatch(header, /项目对话/);

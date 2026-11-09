@@ -165,6 +165,6 @@ test('隐藏的连线目标仍然能够接住一次连续的拖线操作', () =>
 test('画布顶部栏使用无状态的原生悬浮说明，避免工具提示反复重排', () => {
   const header = read('../components/AgentWorkspaceHeader.jsx');
   assert.doesNotMatch(header, /Tooltip/);
-  assert.match(header, /title="工作流"/);
+  assert.match(header, /title="画布"/);
   assert.match(header, /title="故事板"/);
 });

@@ -511,6 +511,7 @@
 .agent-page .agent-task-workspace-list article > div { display: grid; gap: 3px; }
 .agent-page .agent-task-workspace-list article span,
 .agent-page .agent-task-workspace-list article time { color: var(--agent-muted); font-size: 11px; }
+.agent-page .agent-task-workspace-list article > footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .agent-page .agent-task-workspace-status { width: 8px; height: 8px; border-radius: 50%; background: var(--text-warning); }
 .agent-page .agent-task-workspace-status:is(.is-done, .is-completed, .is-succeeded) { background: var(--text-success); }
 .agent-page .agent-task-workspace-status:is(.is-failed, .is-cancelled) { background: var(--text-danger); }

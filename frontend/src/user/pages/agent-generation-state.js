@@ -65,6 +65,17 @@ export function generationPresentation(task = {}) {
   };
 }
 
+export function generationTaskActions(task = {}) {
+  const presentation = generationPresentation(task);
+  const legacyVideo = task?.kind === 'video' && !String(task?.mode || '').startsWith('video_');
+  const needsCanvas = legacyVideo || presentation.canConfirm;
+  return {
+    canCancel: presentation.canCancel && !legacyVideo,
+    canRetry: presentation.canRetry && !legacyVideo,
+    openCanvasOnly: needsCanvas
+  };
+}
+
 export function shouldPollGeneration(task) {
   return task?.state === 'queued' || task?.state === 'running';
 }

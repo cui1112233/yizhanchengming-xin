@@ -131,7 +131,7 @@ test('项目对话输入区将能力收为紧凑图标工具条', () => {
   assert.match(pageSource, /aria-label="添加附件"/);
   assert.match(pageSource, /aria-label="选择技能"/);
   assert.match(pageSource, /aria-label="选择专家"/);
-  assert.match(pageSource, /aria-label="发送消息"/);
+  assert.match(pageSource, /aria-label=\{asking \? '停止生成' : '发送消息'\}/);
   assert.match(pageSource, /找问题/);
   assert.match(css, /\.agent-page \.agent-conversation-panel \.agent-composer-tools\s*\{/);
   assert.match(css, /\.agent-page \.agent-conversation-panel \.agent-composer-send\s*\{/);

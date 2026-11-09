@@ -12,6 +12,7 @@ import {
 } from '../../shared/api/agent.js';
 import {
   activeGenerationTaskForNode,
+  generationTaskActions,
   generationPresentation,
   generationSummaryText,
   latestGenerationTaskForNode,
@@ -20,6 +21,14 @@ import {
   shouldAcceptGenerationResponse,
   shouldPollGeneration
 } from './agent-generation-state.js';
+
+test('generationTaskActions exposes recovery controls without bypassing legacy video jobs', () => {
+  assert.deepEqual(generationTaskActions({ state: 'running', kind: 'image' }), { canCancel: true, canRetry: false, openCanvasOnly: false });
+  assert.deepEqual(generationTaskActions({ state: 'failed', kind: 'audio' }), { canCancel: false, canRetry: true, openCanvasOnly: false });
+  assert.deepEqual(generationTaskActions({ state: 'failed', kind: 'video', mode: 'legacy' }), { canCancel: false, canRetry: false, openCanvasOnly: true });
+  assert.deepEqual(generationTaskActions({ state: 'failed', kind: 'video', mode: 'video_image_to_video' }), { canCancel: false, canRetry: true, openCanvasOnly: false });
+  assert.deepEqual(generationTaskActions({ state: 'awaiting_confirmation', kind: 'image' }), { canCancel: false, canRetry: false, openCanvasOnly: true });
+});
 
 test('画布任务汇总不把历史失败当成当前执行状态', () => {
   assert.equal(generationSummaryText({ queued: 2, running: 1, awaitingConfirmation: 3, completed: 8, failed: 21, cancelled: 1 }), '排队 2 · 生成中 1 · 待确认 3');
