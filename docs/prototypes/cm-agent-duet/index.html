@@ -216,6 +216,20 @@
     .canvas-node { position: absolute; width: 180px; padding: 12px; border: 1px solid var(--primary); border-radius: 11px; background: var(--surface-2); }
     .list-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px; border-bottom: 1px solid var(--border); }
     .duet-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 14px; }
+    .duet-sidebar-block { margin-top: 14px; }
+    .duet-project-row { display: flex; align-items: center; gap: 9px; padding: 9px 10px; color: var(--muted); }
+    .duet-project-row strong { flex: 1; color: var(--text); }
+    .duet-channel-button { padding-left: 27px; }
+    .duet-chat { min-height: calc(100vh - 150px); display: flex; flex-direction: column; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .duet-chat-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .duet-chat-stream { flex: 1; display: grid; align-content: start; gap: 14px; padding: 18px 4px; }
+    .duet-message { max-width: 780px; padding: 14px; border-radius: 13px; background: var(--surface-2); }
+    .duet-message h3 { margin: 0 0 8px; }
+    .duet-message p { margin: 0; color: var(--muted); line-height: 1.7; }
+    .duet-team { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .duet-team span { padding: 9px; border: 1px solid var(--border); border-radius: 9px; color: var(--muted); background: var(--surface); }
+    .duet-composer { margin-top: auto; padding: 12px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface-2); }
+    .duet-composer textarea { width: 100%; min-height: 74px; resize: vertical; padding: 10px; color: var(--text); border: 0; background: transparent; }
     .channel-card, .task-card, .relay-column { padding: 16px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); }
     .channel-card.is-active { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
     .channel-head, .task-head, .metric-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -241,6 +255,7 @@
       .page { padding: 18px; }
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .duet-layout { grid-template-columns: minmax(0, 1fr) 330px; }
+      .duet-team { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .split-workspace { grid-template-columns: minmax(0, 1fr) 330px; }
     }
     @media (max-width: 1100px) {
@@ -257,6 +272,7 @@
       .nav-label { flex: none; }
       .main-shell { height: auto; overflow: visible; }
       .grid { grid-template-columns: 1fr; }
+      .duet-team { grid-template-columns: 1fr 1fr; }
       .topbar { padding: 10px 14px; }
       .page { padding: 14px; }
     }
@@ -383,18 +399,17 @@
         ['projects', '▣', 'Agent工作区', '2']
       ];
       if (state.mode === 'duet') return [
-        ['channels', '#', '频道', '3'],
-        ['employees', '♟', '员工', '5'],
-        ['tasks', '✓', '任务', '8'],
-        ['relay', '⇄', '接力看板', '6'],
-        ['schedules', '◷', '定时任务', '2']
+        ['channels', '#', '任何事', '']
       ];
       return [
         ['home', '⌂', '首页', ''],
-        ['private', '◫', '私人定制', ''],
-        ['novel', '▤', '小说获取', ''],
-        ['production', '▰', '水货生产', ''],
-        ['voice', '◖', '配音', ''],
+        ['novel-writing', '✎', '小说创作', ''],
+        ['characters', '♙', '角色库', ''],
+        ['voices', '◖', '音色库', ''],
+        ['works', '▣', '作品', ''],
+        ['comic-commentary', '▤', '漫剧解说', ''],
+        ['script-creation', '⌑', '剧本创作', ''],
+        ['momo-canvas', '⠿', 'momo画布', ''],
         ['ai-cut', '✂', 'AI-CUT', ''],
         ['tutorial', '◇', '教程', ''],
         ['plugins', '⚡', '插件中心', '4'],
@@ -412,9 +427,11 @@
     }
     function renderSidebar() {
       const nav = navForMode();
-      const primaryNav = state.mode === 'brand' ? nav.filter(item => ['home','private','novel','production','voice'].includes(item[0])) : nav;
+      const primaryNav = state.mode === 'brand' ? nav.filter(item => ['home','novel-writing','characters','voices','works','comic-commentary'].includes(item[0])) : nav;
+      const contentNav = nav.filter(item => ['script-creation','momo-canvas'].includes(item[0]));
       const aiCutNav = nav.filter(item => item[0] === 'ai-cut');
       const serviceNav = nav.filter(item => ['tutorial','plugins','assets'].includes(item[0]));
+      const duetSidebar = `<div class="duet-sidebar-block"><div class="duet-project-row"><span>✦</span><strong>任何事</strong></div><div class="duet-project-row"><span>□</span><strong>q</strong><span class="count-badge">20集</span></div><nav class="side-nav" aria-label="Duet频道">${duetChannels.map(channel => `<button type="button" class="nav-button duet-channel-button ${state.activeChannelId === channel.id ? 'is-active' : ''}" data-action="OPEN_DUET_CHANNEL" data-id="${channel.id}"><span class="nav-icon">#</span><span class="nav-label">${channel.name}</span></button>`).join('')}<button type="button" class="nav-button" aria-label="＋ 新频道" data-action="NOTICE" data-message="已打开新频道演示入口"><span class="nav-icon">＋</span><span class="nav-label">新频道</span></button><button type="button" class="nav-button" aria-label="＋ 新项目" data-action="NOTICE" data-message="已打开新项目演示入口"><span class="nav-icon">＋</span><span class="nav-label">新项目</span></button></nav></div>`;
       return `<aside class="sidebar">
         <div class="mode-switcher ${state.modeMenuOpen ? 'is-open' : ''}">
           <button type="button" class="mode-button" data-action="TOGGLE_MODE_MENU" aria-label="切换工作模式" aria-expanded="${state.modeMenuOpen}">
@@ -423,10 +440,10 @@
           ${renderModeMenu()}
         </div>
         <div class="sidebar-content">
-        <nav class="side-nav" aria-label="${modeLabel()}导航">
+        ${state.mode === 'duet' ? duetSidebar : `<nav class="side-nav" aria-label="${modeLabel()}导航">
           ${renderNavButtons(primaryNav)}
-        </nav>
-        ${state.mode === 'brand' ? `<div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">扩展与资源</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
+        </nav>`}
+        ${state.mode === 'brand' ? `<div class="sidebar-caption">内容创作</div><nav class="side-nav">${renderNavButtons(contentNav)}</nav><div class="sidebar-caption">AI剪辑视频</div><nav class="side-nav">${renderNavButtons(aiCutNav)}</nav><div class="sidebar-caption">扩展与资源</div><nav class="side-nav">${renderNavButtons(serviceNav)}</nav>` : ''}
         ${state.mode === 'agent' ? `<div class="sidebar-caption">一战晟铭工作区</div><nav class="side-nav"><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">默认工作区</span></button><button type="button" class="nav-button" data-action="SET_PAGE" data-page="projects"><span class="nav-icon">□</span><span class="nav-label">水浒漫剧</span></button></nav>` : ''}
         </div>
         <div class="sidebar-footer">
@@ -449,8 +466,8 @@
       if (page === 'ai-cut') return renderAiCutPage();
       if (page === 'plugins') return renderPluginCenter();
       if (page !== 'home') return `<section class="empty-panel"><div><div class="orb">${page === 'production' ? '▰' : '◆'}</div><h1>${navForMode().find(item => item[0] === page)?.[2] || '一战晟铭'}</h1><p>该页面在原型中用于验证工作模式切换和导航恢复。正式业务仍由现有 V88 页面负责。</p><button class="primary-button" data-action="SET_PAGE" data-page="home">返回首页</button></div></section>`;
-      return `<div class="page"><section class="hero"><span class="eyebrow">一战晟铭 · AI 创作平台</span><h1>从灵感到成片，所有生产链在一个工作台完成</h1><p>当前模式保留一战晟铭已有业务入口。点击左上角可以切换到 Agent代理或 Duet，并在返回时恢复当前页面。</p></section><section class="grid">
-        ${[['私人定制','为单个创作需求建立专属生产方案','private'],['小说获取','获取、整理并进入后续改编链','novel'],['水货生产','批量管理剧本、素材、分镜与成片','production'],['配音','管理角色音色、台词与音频任务','voice']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
+      return `<div class="page"><section class="hero"><span class="eyebrow">一战晟铭 · 内容创作工作台</span><h1>从小说、剧本到画布和成片，按创作链路进入</h1><p>左侧功能顺序对齐内容创作工作流；Agent代理和 Duet 仍通过左上角独立切换。</p></section><section class="grid">
+        ${[['小说创作','长短篇原创、仿写、续写与素材导入','novel-writing'],['角色库','统一管理人物设定和形象资产','characters'],['音色库','管理角色音色、台词与试听','voices'],['作品','集中查看全部创作项目与产物','works'],['漫剧解说','创建和管理漫剧解说作品','comic-commentary'],['剧本创作','分集、出图和导演台预演','script-creation'],['momo画布','节点画布与画布助手','momo-canvas'],['AI-CUT','视频拆分、字幕、BGM与剪映草稿','ai-cut']].map(item => `<button type="button" class="card card-button" data-action="SET_PAGE" data-page="${item[2]}"><h3>${item[0]}</h3><p>${item[1]}</p></button>`).join('')}
       </section></div>`;
     }
     function renderAiCutPage() {
@@ -530,11 +547,6 @@
       return `<div class="overlay" data-action="CLOSE_LAYER"></div><section class="modal" role="dialog" aria-label="${title}"><button class="close-button" data-action="CLOSE_LAYER">×</button><h2>${title}</h2><p class="muted">演示模式只展示入口，不会上传文件、运行安装命令或连接外部服务。</p><button class="primary-button" data-action="CLOSE_LAYER">我知道了</button></section>`;
     }
     function renderDuetFoundation() {
-      const page = state.pages.duet;
-      if (page === 'employees') return renderDuetEmployees();
-      if (page === 'tasks') return `<div class="workspace-page">${renderDuetHeader('任务中心','创建、转交、补充、审核和返工都保留在同一条任务记录。')}${renderDuetTaskPanel()}</div>`;
-      if (page === 'relay') return renderRelayBoard();
-      if (page === 'schedules') return renderDuetSchedules();
       return renderDuetWorkspace();
     }
     function renderDuetHeader(title, description) {
@@ -542,7 +554,8 @@
     }
     function renderDuetWorkspace() {
       const active = duetChannels.find(item => item.id === state.activeChannelId) || duetChannels[0];
-      return `<div class="workspace-page">${renderDuetHeader('频道制片厂','项目 → 频道 → 员工 Agent → 审核 → 接力，所有进度在这里汇总。')}<div class="duet-layout"><section><div class="grid">${duetChannels.map(channel => `<button class="channel-card card-button ${channel.id===active.id?'is-active':''}" data-action="OPEN_DUET_CHANNEL" data-id="${channel.id}"><div class="channel-head"><h3>${channel.icon} ${channel.name}</h3><span class="pill">${channel.id===active.id?'当前':'进入'}</span></div><p>${channel.purpose}</p><small class="muted">负责人：${channel.lead}</small></button>`).join('')}</div><section class="card" style="margin-top:14px"><h2>${active.name}</h2><p class="muted">${active.purpose}</p><div class="metric-row" style="margin-top:16px"><span>今日任务 <b>${state.duetTasks.filter(t=>t.channelId===active.id).length}</b></span><span>负责人 <b>${active.lead}</b></span><button class="secondary-button" data-action="CREATE_DUET_TASK">布置任务</button></div></section></section><aside>${renderDuetTaskPanel(true)}</aside></div></div>`;
+      const team = duetEmployees.map(employee => `<span><b>${employee.name}</b><br>${employee.role}</span>`).join('');
+      return `<div class="workspace-page"><div class="duet-layout"><section class="duet-chat"><div class="duet-chat-toolbar"><div><span class="eyebrow">✦ ${active.name}</span><h2 style="margin:4px 0 0">任何事</h2></div><div class="toolbar"><button class="secondary-button" data-action="NOTICE" data-message="已打开任务侧栏">任务</button><button class="secondary-button" data-action="NOTICE" data-message="已打开频道设置">设置</button><button class="secondary-button" data-action="NOTICE" data-message="已打开新项目演示入口">新项目</button></div></div><div class="duet-chat-stream"><article class="duet-message"><h3>CM Duet</h3><p>你好，我是CM Duet。我会把小说改编任务拆给对应员工，在剧本、资产和分镜频道里接力执行；只有需要你拍板时才会来找你。</p><div class="duet-team">${team}</div></article><article class="duet-message"><h3>项目 q 已就绪</h3><p>已建立 #剧本生产线、#资产工坊、#分镜台。当前频道负责：${active.purpose}。</p></article></div><div class="duet-composer"><textarea aria-label="Duet消息" placeholder="跟CM Duet说点什么，比如：新开一个项目……"></textarea><div class="composer-footer"><div class="toolbar"><button class="secondary-button" data-action="NOTICE" data-message="文件入口为演示">📎 文件</button><button class="secondary-button" data-action="NOTICE" data-message="已打开员工选择">@ 员工</button><button class="secondary-button" data-action="CREATE_DUET_TASK">＋ 任务</button></div><button class="primary-button" data-action="NOTICE" data-message="演示模式不会发送真实消息">发送</button></div><p class="muted">员工会自动接力；只有需要你拍板时才会来找你</p></div></section><aside>${renderDuetTaskPanel(true)}</aside></div></div>`;
     }
     function renderDuetEmployees() {
       return `<div class="workspace-page">${renderDuetHeader('员工 Agent','每个员工有明确岗位、负责频道和当前工作量。')}<div class="grid">${duetEmployees.map(employee => `<article class="card employee-card"><div class="employee-avatar">${employee.name.slice(0,1)}</div><div><h3>${employee.name}</h3><p>${employee.role} · ${employee.channel}</p><small class="muted">${employee.load}</small></div><div class="card-actions"><button class="secondary-button" data-action="HANDOFF_DUET_TASK" data-employee="${employee.id}">转交给他</button><button class="secondary-button" data-action="NOTICE" data-message="已打开 ${employee.name} 的工作记录">查看记录</button></div></article>`).join('')}</div></div>`;

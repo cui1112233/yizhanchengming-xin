@@ -10,7 +10,6 @@ test('prototype is self-contained and exposes the three approved modes', () => {
   assert.doesNotMatch(html, /<script[^>]+src=/);
   assert.doesNotMatch(html, /<link[^>]+stylesheet/);
   for (const label of ['一战晟铭', 'Agent代理', 'Duet']) assert.match(html, new RegExp(label));
-  assert.doesNotMatch(html, />\s*内容创作\s*</);
 });
 
 test('prototype publishes state inspection and persistence contracts', () => {
