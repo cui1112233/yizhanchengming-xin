@@ -11,12 +11,16 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-const scriptShotColumns = `id, project_id, script_node_id, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, revision, created_at, updated_at`
+const scriptShotColumns = `id, project_id, script_node_id, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, duration_seconds, source_shot_ids_json, revision, created_at, updated_at`
 
 func scanScriptShot(scanner interface{ Scan(...any) error }) (ScriptShot, error) {
 	var shot ScriptShot
-	if err := scanner.Scan(&shot.ID, &shot.ProjectID, &shot.ScriptNodeID, &shot.Sequence, &shot.Scene, &shot.Characters, &shot.Dialogue, &shot.Narration, &shot.ImagePrompt, &shot.VideoPrompt, &shot.TTSText, &shot.Revision, &shot.CreatedAt, &shot.UpdatedAt); err != nil {
+	var sourceShotIDsJSON []byte
+	if err := scanner.Scan(&shot.ID, &shot.ProjectID, &shot.ScriptNodeID, &shot.Sequence, &shot.Scene, &shot.Characters, &shot.Dialogue, &shot.Narration, &shot.ImagePrompt, &shot.VideoPrompt, &shot.TTSText, &shot.DurationSeconds, &sourceShotIDsJSON, &shot.Revision, &shot.CreatedAt, &shot.UpdatedAt); err != nil {
 		return ScriptShot{}, err
+	}
+	if len(sourceShotIDsJSON) > 0 && string(sourceShotIDsJSON) != "null" && json.Unmarshal(sourceShotIDsJSON, &shot.SourceShotIDs) != nil {
+		return ScriptShot{}, ErrScriptShotInvalid
 	}
 	return shot, nil
 }
@@ -60,7 +64,11 @@ func (s *MySQLStore) ReplaceShots(ctx context.Context, owner, projectID, scriptN
 		return err
 	}
 	for _, shot := range normalized {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_script_shots (id, project_id, script_node_id, owner_username, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, shot.ID, shot.ProjectID, shot.ScriptNodeID, owner, shot.Sequence, shot.Scene, shot.Characters, shot.Dialogue, shot.Narration, shot.ImagePrompt, shot.VideoPrompt, shot.TTSText, shot.Revision, shot.CreatedAt, shot.UpdatedAt); err != nil {
+		sourcesJSON, marshalErr := json.Marshal(shot.SourceShotIDs)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_script_shots (id, project_id, script_node_id, owner_username, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, duration_seconds, source_shot_ids_json, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, shot.ID, shot.ProjectID, shot.ScriptNodeID, owner, shot.Sequence, shot.Scene, shot.Characters, shot.Dialogue, shot.Narration, shot.ImagePrompt, shot.VideoPrompt, shot.TTSText, shot.DurationSeconds, sourcesJSON, shot.Revision, shot.CreatedAt, shot.UpdatedAt); err != nil {
 			return err
 		}
 	}
@@ -111,7 +119,11 @@ func (s *MySQLStore) UpdateShot(ctx context.Context, owner string, shot ScriptSh
 		return ScriptShot{}, err
 	}
 	normalized.CreatedAt = createdAt.UTC().Truncate(time.Microsecond)
-	result, err := tx.ExecContext(ctx, `UPDATE agent_script_shots SET sequence = ?, scene = ?, characters = ?, dialogue = ?, narration = ?, image_prompt = ?, video_prompt = ?, tts_text = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? AND revision = ?`, normalized.Sequence, normalized.Scene, normalized.Characters, normalized.Dialogue, normalized.Narration, normalized.ImagePrompt, normalized.VideoPrompt, normalized.TTSText, normalized.UpdatedAt, normalized.ID, normalized.ProjectID, normalized.ScriptNodeID, owner, normalized.Revision)
+	sourcesJSON, err := json.Marshal(normalized.SourceShotIDs)
+	if err != nil {
+		return ScriptShot{}, err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE agent_script_shots SET sequence = ?, scene = ?, characters = ?, dialogue = ?, narration = ?, image_prompt = ?, video_prompt = ?, tts_text = ?, duration_seconds = ?, source_shot_ids_json = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? AND revision = ?`, normalized.Sequence, normalized.Scene, normalized.Characters, normalized.Dialogue, normalized.Narration, normalized.ImagePrompt, normalized.VideoPrompt, normalized.TTSText, normalized.DurationSeconds, sourcesJSON, normalized.UpdatedAt, normalized.ID, normalized.ProjectID, normalized.ScriptNodeID, owner, normalized.Revision)
 	if err != nil {
 		return ScriptShot{}, err
 	}

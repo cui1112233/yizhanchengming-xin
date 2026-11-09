@@ -14,20 +14,22 @@ var (
 )
 
 type ScriptShot struct {
-	ID           string    `json:"id"`
-	ProjectID    string    `json:"projectId"`
-	ScriptNodeID string    `json:"scriptNodeId"`
-	Sequence     int       `json:"sequence"`
-	Scene        string    `json:"scene"`
-	Characters   string    `json:"characters"`
-	Dialogue     string    `json:"dialogue"`
-	Narration    string    `json:"narration"`
-	ImagePrompt  string    `json:"imagePrompt"`
-	VideoPrompt  string    `json:"videoPrompt"`
-	TTSText      string    `json:"ttsText"`
-	Revision     int64     `json:"revision"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID              string    `json:"id"`
+	ProjectID       string    `json:"projectId"`
+	ScriptNodeID    string    `json:"scriptNodeId"`
+	Sequence        int       `json:"sequence"`
+	Scene           string    `json:"scene"`
+	Characters      string    `json:"characters"`
+	Dialogue        string    `json:"dialogue"`
+	Narration       string    `json:"narration"`
+	ImagePrompt     string    `json:"imagePrompt"`
+	VideoPrompt     string    `json:"videoPrompt"`
+	TTSText         string    `json:"ttsText"`
+	DurationSeconds int       `json:"durationSeconds"`
+	SourceShotIDs   []string  `json:"sourceShotIds,omitempty"`
+	Revision        int64     `json:"revision"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
 type ScriptSplit struct {
@@ -84,6 +86,23 @@ func normalizeScriptShot(owner, projectID, scriptNodeID string, shot ScriptShot,
 	shot.ImagePrompt = strings.TrimSpace(shot.ImagePrompt)
 	shot.VideoPrompt = strings.TrimSpace(shot.VideoPrompt)
 	shot.TTSText = strings.TrimSpace(shot.TTSText)
+	if shot.DurationSeconds < 0 {
+		return ScriptShot{}, ErrScriptShotInvalid
+	}
+	seenSources := make(map[string]struct{}, len(shot.SourceShotIDs))
+	sources := make([]string, 0, len(shot.SourceShotIDs))
+	for _, sourceID := range shot.SourceShotIDs {
+		sourceID = strings.TrimSpace(sourceID)
+		if sourceID == "" {
+			continue
+		}
+		if _, exists := seenSources[sourceID]; exists {
+			continue
+		}
+		seenSources[sourceID] = struct{}{}
+		sources = append(sources, sourceID)
+	}
+	shot.SourceShotIDs = sources
 	if owner == "" || projectID == "" || scriptNodeID == "" || shot.ID == "" || shot.ProjectID != projectID || shot.ScriptNodeID != scriptNodeID || shot.Sequence < 1 {
 		return ScriptShot{}, ErrScriptShotInvalid
 	}

@@ -1,7 +1,7 @@
 import { Button, ConfigProvider, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { ArrowRight, ArrowUp, Bot, ChevronDown, ChevronUp, Clock3, FilePenLine, FileText, Film, Image as ImageIcon, MessageCircle, MoreHorizontal, Music, Paperclip, Pin, RotateCcw, SearchCheck, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentGenerationSummary, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
+import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentGenerationSummary, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, mergeAgentScriptShots, renameAgentTask, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
@@ -213,6 +213,11 @@ export function AgentPageV2({ theme = 'dark' }) {
     if (Object.prototype.hasOwnProperty.call(patch || {}, 'activeView')) syncWorkspaceViewUrl(nextViewState.activeView);
   }
 
+  const handleStoryboardStateChange = useCallback(patch => {
+    const nextStoryboard = patchStoryboardState(viewStateRef.current.storyboard, patch);
+    updateWorkspaceView({ storyboard: nextStoryboard });
+  }, []);
+
   function openNodeInWorkflow(nodeId) {
     if (!nodeId) return;
     pendingWorkflowNodeRef.current = nodeId;
@@ -238,6 +243,13 @@ export function AgentPageV2({ theme = 'dark' }) {
     if (!updated?.id) return;
     setStoryboardShots(current => current.map(shot => shot.id === updated.id ? updated : shot));
   }, []);
+
+  const openShotInStoryboard = useCallback(shotId => {
+    shotId = String(shotId || '').trim();
+    if (!shotId) return;
+    updateWorkspaceView({ activeView: 'storyboard', conversationOpen: true });
+    handleStoryboardStateChange({ selectedKey: `shot:${shotId}` });
+  }, [handleStoryboardStateChange, updateWorkspaceView]);
 
   const handleSharedScriptShotsChange = useCallback((scriptNodeId, nextShots) => {
     const normalizedNodeId = String(scriptNodeId || '').trim();
@@ -281,6 +293,23 @@ export function AgentPageV2({ theme = 'dark' }) {
     return result;
   }, []);
 
+  const handleStoryboardMerge = useCallback(async payload => {
+    const requestedTaskId = activeTaskIdRef.current;
+    const requestedQueue = canvasSaveQueueRef.current;
+    if (!requestedTaskId || !requestedQueue) throw new Error('画布保存队列尚未准备完成');
+    await requestedQueue.flushRequired();
+    if (activeTaskIdRef.current !== requestedTaskId || canvasSaveQueueRef.current !== requestedQueue) return { ignored: true };
+    const result = await mergeAgentScriptShots(requestedTaskId, payload);
+    if (activeTaskIdRef.current !== requestedTaskId || canvasSaveQueueRef.current !== requestedQueue) return { ...result, ignored: true };
+    const replacements = Array.isArray(result?.shots) ? result.shots : [];
+    setStoryboardShots(current => [
+      ...current.filter(shot => String(shot?.scriptNodeId || '') !== String(payload?.scriptNodeId || '')),
+      ...replacements
+    ]);
+    if (replacements[0]?.id) handleStoryboardStateChange({ selectedKey: `shot:${replacements[0].id}` });
+    return result;
+  }, [handleStoryboardStateChange]);
+
   const handleGenerationResultActivate = useCallback(async item => {
     const requestedTaskId = activeTaskIdRef.current;
     const requestedQueue = canvasSaveQueueRef.current;
@@ -305,11 +334,6 @@ export function AgentPageV2({ theme = 'dark' }) {
     setCanvasViewport(result.canvas.viewport || { x: 0, y: 0, zoom: 1 });
     setGenerations(current => current.map(task => String(task?.id || '') === String(result?.task?.id || '') ? result.task : task));
     message.success('已设为当前结果');
-  }, []);
-
-  const handleStoryboardStateChange = useCallback(patch => {
-    const nextStoryboard = patchStoryboardState(viewStateRef.current.storyboard, patch);
-    updateWorkspaceView({ storyboard: nextStoryboard });
   }, []);
 
   function startStoryboardDirectorResize(event) {
@@ -1221,6 +1245,7 @@ export function AgentPageV2({ theme = 'dark' }) {
           onTabChange={drawerTab => updateWorkspaceView({ drawerTab })}
           onWidthChange={drawerWidth => updateWorkspaceView({ drawerWidth })}
           onLocateNode={openNodeInWorkflow}
+          onOpenShot={openShotInStoryboard}
           onOpenDirectorDesk={nodeId => canvasRef.current?.openDirectorDesk(nodeId)}
           onActivateGenerationResult={handleGenerationResultActivate}
           onCreateFromAsset={asset => canvasRef.current?.createFromAsset(asset)}
@@ -1304,6 +1329,7 @@ export function AgentPageV2({ theme = 'dark' }) {
           onNodeConfigChange={handleStoryboardNodeConfigChange}
           onShotUpdated={handleStoryboardShotUpdated}
           onCreateShotBatch={handleStoryboardBatchCreate}
+          onMergeShots={handleStoryboardMerge}
            onAddToConversation={addStoryboardAssetToConversation}
            onAddToWorkflow={addStoryboardAssetToWorkflow}
            onAssetsCreated={handleWorkspaceAssetsCreated}

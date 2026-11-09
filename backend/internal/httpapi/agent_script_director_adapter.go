@@ -29,14 +29,15 @@ func adaptDirectorResultToScriptShots(scriptNodeID string, result batchfactoryv1
 			imagePrompt = strings.TrimSpace(strings.Join(nonEmptyDirectorText(video.Scene, video.VideoDesc), "，"))
 		}
 		shots = append(shots, agentworkspace.ScriptShot{
-			ID:          fmt.Sprintf("%s-shot-%d", scriptNodeID, index+1),
-			Sequence:    index + 1,
-			Scene:       strings.TrimSpace(video.Scene),
-			Characters:  strings.Join(nonEmptyDirectorText(video.Characters...), "、"),
-			Narration:   renderAgentDirectorNarration(video),
-			ImagePrompt: imagePrompt,
-			VideoPrompt: videoPrompt,
-			TTSText:     renderAgentDirectorAudio(video),
+			ID:              fmt.Sprintf("%s-shot-%d", scriptNodeID, index+1),
+			Sequence:        index + 1,
+			Scene:           strings.TrimSpace(video.Scene),
+			Characters:      strings.Join(nonEmptyDirectorText(video.Characters...), "、"),
+			Narration:       renderAgentDirectorNarration(video),
+			ImagePrompt:     imagePrompt,
+			VideoPrompt:     videoPrompt,
+			TTSText:         renderAgentDirectorAudio(video),
+			DurationSeconds: video.DurationSec,
 		})
 	}
 	return shots, nil

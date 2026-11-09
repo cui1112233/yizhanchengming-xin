@@ -5,7 +5,7 @@ import { updateAgentScriptShot, uploadAgentAsset } from '../../shared/api/agent'
 import { listAvailableModels } from '../../shared/api/modelCatalog';
 import { buildStoryboardLibrary, findStoryboardSelection, storyboardItemMetaLabel, storyboardSelectionKey } from '../pages/agent-storyboard-model';
 import { groupResultLibrary, locateShotNode } from '../pages/agent-result-lineage';
-import { buildShotBatchPayload } from '../pages/agent-script-shots';
+import { buildShotBatchPayload, newShotBatchRequestID } from '../pages/agent-script-shots';
 import { writeStoryboardAssetDrag } from '../pages/agent-storyboard-conversation-drag';
 import { STORYBOARD_SPLIT_DEFAULTS, storyboardSplitRatioFromPointer } from '../pages/agent-storyboard-split';
 import { filterStoryboardLibrary, moveStoryboardMaterial, normalizeStoryboardState, reorderStoryboardMaterial, storyboardBatchAssets, storyboardBatchCategoryPatch, storyboardCategoryOptions, storyboardItemCategory, storyboardPointerDropTarget, toggleStoryboardBatchSelection } from '../pages/agent-storyboard-state';
@@ -36,7 +36,7 @@ function StoryboardThumbnail({ item, large = false }) {
 
 export function AgentStoryboardWorkspace({
   taskId = '', nodes = [], assets = [], shots = [], generations = [], generationSummary = null, loading = false, error = '', shotsLoading = false, shotsError = '', conversationAssetIds = [], storyboardState = {}, onStoryboardStateChange,
-  onOpenNodeInWorkflow, onSelectionChange, onNodeConfigChange, onShotUpdated, onCreateShotBatch, onAddToConversation, onAddToWorkflow, onAssetsCreated
+  onOpenNodeInWorkflow, onSelectionChange, onNodeConfigChange, onShotUpdated, onCreateShotBatch, onMergeShots, onAddToConversation, onAddToWorkflow, onAssetsCreated
 }) {
   const [query, setQuery] = useState('');
   const [collapsedKinds, setCollapsedKinds] = useState([]);
@@ -63,6 +63,8 @@ export function AgentStoryboardWorkspace({
     audio: { provider: 'personal_api', modelId: '' }
   });
   const [shotBatchBusy, setShotBatchBusy] = useState(false);
+  const [shotMergeTarget, setShotMergeTarget] = useState(15);
+  const [shotMergeBusy, setShotMergeBusy] = useState(false);
   const storyboard = useMemo(() => normalizeStoryboardState(storyboardState), [storyboardState]);
   const assetInputRef = useRef(null);
   const itemDragRef = useRef(null);
@@ -218,7 +220,7 @@ export function AgentStoryboardWorkspace({
     if (!taskId || selected?.source !== 'shot') return;
     const selection = shotBatchModels[shotBatchKind] || {};
     const modelId = selection.modelId;
-    const payload = buildShotBatchPayload({ scriptNodeId: selected.shot.scriptNodeId, selectedIDs: [selected.id], kind: shotBatchKind, provider: selection.provider, modelId });
+    const payload = buildShotBatchPayload({ scriptNodeId: selected.shot.scriptNodeId, selectedIDs: [selected.id], kind: shotBatchKind, provider: selection.provider, modelId, requestId: newShotBatchRequestID() });
     if (!modelId) {
       setShotActionError('请先选择当前类型的模型');
       return;
@@ -235,6 +237,21 @@ export function AgentStoryboardWorkspace({
       setShotActionError(batchError?.message || '提交镜头生成失败');
     } finally {
       setShotBatchBusy(false);
+    }
+  }
+
+  async function mergeSelectedScriptShots() {
+    if (!taskId || selected?.source !== 'shot') return;
+    setShotMergeBusy(true);
+    setShotActionError('');
+    try {
+      const result = await onMergeShots?.({ scriptNodeId: selected.shot.scriptNodeId, targetDurationSeconds: shotMergeTarget });
+      if (result?.ignored) return;
+      message.success(`已按 ${shotMergeTarget} 秒上限合并相邻镜头`);
+    } catch (mergeError) {
+      setShotActionError(mergeError?.message || '合并镜头失败');
+    } finally {
+      setShotMergeBusy(false);
     }
   }
 
@@ -614,6 +631,12 @@ export function AgentStoryboardWorkspace({
               />
               <Button type="primary" icon={<Sparkles size={14} />} loading={shotBatchBusy} onClick={createSelectedShotBatch}>生成当前镜头</Button>
               {shotActionError ? <span className="agent-storyboard-inspector__hint is-error">{shotActionError}</span> : null}
+            </section>
+            <section className="agent-storyboard-shot-batch" aria-label="合并相邻镜头">
+              <strong>合并相邻镜头</strong>
+              <Segmented size="small" value={shotMergeTarget} options={[{ value: 10, label: '10 秒' }, { value: 15, label: '15 秒' }, { value: 30, label: '30 秒' }]} onChange={setShotMergeTarget} />
+              <Button loading={shotMergeBusy} onClick={mergeSelectedScriptShots}>按时长合并</Button>
+              <span className="agent-storyboard-inspector__hint">按顺序合并当前剧本镜头，旧生成结果保留在版本记录中。</span>
             </section>
             <section className="agent-storyboard-shot-versions" aria-label="镜头版本">
               <div className="agent-storyboard-shot-editor__heading"><strong>镜头版本</strong><span>{selectedShotVersions.length}</span></div>

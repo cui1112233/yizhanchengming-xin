@@ -86,6 +86,14 @@ test('batch payload keeps the selected provider for local executor models', () =
   });
 });
 
+test('batch payload carries one stable request ID for safe retries', () => {
+  assert.deepEqual(buildShotBatchPayload({
+    scriptNodeId: 'script-1', selectedIDs: ['shot-1'], kind: 'image', modelId: 'image-1', requestId: 'submit-1'
+  }), {
+    scriptNodeId: 'script-1', shotIds: ['shot-1'], kind: 'image', modelId: 'image-1', requestId: 'submit-1'
+  });
+});
+
 test('both batch image entry points expose channel-aware model selection', () => {
   const workspaceSource = readFileSync(new URL('../components/AgentStoryboardWorkspace.jsx', import.meta.url), 'utf8');
   const pickerSource = readFileSync(new URL('../components/AgentBatchModelPicker.jsx', import.meta.url), 'utf8');

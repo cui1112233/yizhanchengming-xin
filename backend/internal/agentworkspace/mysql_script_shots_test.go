@@ -25,17 +25,17 @@ func TestMySQLScriptShotStoreReplacesListsAndScopesShots(t *testing.T) {
 		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM agent_script_shots WHERE project_id = ? AND script_node_id = ? AND owner_username = ?")).
 		WithArgs("project-1", "script-1", "alice").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO agent_script_shots (id, project_id, script_node_id, owner_username, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")).
-		WithArgs("shot-2", "project-1", "script-1", "alice", 2, "", "", "", "", "", "", "", int64(1), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO agent_script_shots (id, project_id, script_node_id, owner_username, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")).
-		WithArgs("shot-1", "project-1", "script-1", "alice", 1, "", "", "", "", "", "", "", int64(1), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO agent_script_shots (id, project_id, script_node_id, owner_username, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, duration_seconds, source_shot_ids_json, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")).
+		WithArgs("shot-2", "project-1", "script-1", "alice", 2, "", "", "", "", "", "", "", 0, sqlmock.AnyArg(), int64(1), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO agent_script_shots (id, project_id, script_node_id, owner_username, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, duration_seconds, source_shot_ids_json, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")).
+		WithArgs("shot-1", "project-1", "script-1", "alice", 1, "", "", "", "", "", "", "", 0, sqlmock.AnyArg(), int64(1), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
 	if err := store.ReplaceShots(context.Background(), "alice", "project-1", "script-1", []ScriptShot{{ID: "shot-2", Sequence: 2}, {ID: "shot-1", Sequence: 1}}); err != nil {
 		t.Fatal(err)
 	}
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, project_id, script_node_id, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, revision, created_at, updated_at FROM agent_script_shots WHERE owner_username = ? AND project_id = ? AND script_node_id = ? ORDER BY sequence, id")).
-		WithArgs("bob", "project-1", "script-1").WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "script_node_id", "sequence", "scene", "characters", "dialogue", "narration", "image_prompt", "video_prompt", "tts_text", "revision", "created_at", "updated_at"}))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, project_id, script_node_id, sequence, scene, characters, dialogue, narration, image_prompt, video_prompt, tts_text, duration_seconds, source_shot_ids_json, revision, created_at, updated_at FROM agent_script_shots WHERE owner_username = ? AND project_id = ? AND script_node_id = ? ORDER BY sequence, id")).
+		WithArgs("bob", "project-1", "script-1").WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "script_node_id", "sequence", "scene", "characters", "dialogue", "narration", "image_prompt", "video_prompt", "tts_text", "duration_seconds", "source_shot_ids_json", "revision", "created_at", "updated_at"}))
 	shots, err := store.ListShots(context.Background(), "bob", "project-1", "script-1")
 	if err != nil || len(shots) != 0 {
 		t.Fatalf("cross-owner shots=%+v err=%v, want empty", shots, err)
@@ -59,8 +59,8 @@ func TestMySQLScriptShotStoreUpdatesByRevisionAndRecordsLineage(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT created_at FROM agent_script_shots WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? FOR UPDATE")).
 		WithArgs("shot-1", "project-1", "script-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"created_at"}).AddRow(persistedCreatedAt))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE agent_script_shots SET sequence = ?, scene = ?, characters = ?, dialogue = ?, narration = ?, image_prompt = ?, video_prompt = ?, tts_text = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? AND revision = ?")).
-		WithArgs(1, "雨夜小巷", "", "", "", "", "", "", sqlmock.AnyArg(), "shot-1", "project-1", "script-1", "alice", int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE agent_script_shots SET sequence = ?, scene = ?, characters = ?, dialogue = ?, narration = ?, image_prompt = ?, video_prompt = ?, tts_text = ?, duration_seconds = ?, source_shot_ids_json = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? AND revision = ?")).
+		WithArgs(1, "雨夜小巷", "", "", "", "", "", "", 0, sqlmock.AnyArg(), sqlmock.AnyArg(), "shot-1", "project-1", "script-1", "alice", int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	updated, err := store.UpdateShot(context.Background(), "alice", shot)
 	if err != nil || updated.Revision != 4 || !updated.CreatedAt.Equal(persistedCreatedAt) {
@@ -131,8 +131,8 @@ func TestMySQLScriptShotStoreReturnsRevisionConflictWhenUpdateAffectsNoRows(t *t
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT created_at FROM agent_script_shots WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? FOR UPDATE")).
 		WithArgs("shot-1", "project-1", "script-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"created_at"}).AddRow(time.Date(2026, 10, 22, 3, 0, 0, 0, time.UTC)))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE agent_script_shots SET sequence = ?, scene = ?, characters = ?, dialogue = ?, narration = ?, image_prompt = ?, video_prompt = ?, tts_text = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? AND revision = ?")).
-		WithArgs(1, "", "", "", "", "", "", "", sqlmock.AnyArg(), "shot-1", "project-1", "script-1", "alice", int64(3)).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE agent_script_shots SET sequence = ?, scene = ?, characters = ?, dialogue = ?, narration = ?, image_prompt = ?, video_prompt = ?, tts_text = ?, duration_seconds = ?, source_shot_ids_json = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND project_id = ? AND script_node_id = ? AND owner_username = ? AND revision = ?")).
+		WithArgs(1, "", "", "", "", "", "", "", 0, sqlmock.AnyArg(), sqlmock.AnyArg(), "shot-1", "project-1", "script-1", "alice", int64(3)).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectRollback()
 	_, err = store.UpdateShot(context.Background(), "alice", shot)
 	if !errors.Is(err, ErrRevisionConflict) {

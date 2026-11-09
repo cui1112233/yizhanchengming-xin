@@ -3,10 +3,13 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -196,6 +199,12 @@ type batchShotNodesRequest struct {
 	Kind         string   `json:"kind"`
 	Provider     string   `json:"provider"`
 	ModelID      string   `json:"modelId"`
+	RequestID    string   `json:"requestId,omitempty"`
+}
+
+type mergeShotsRequest struct {
+	ScriptNodeID          string `json:"scriptNodeId"`
+	TargetDurationSeconds int    `json:"targetDurationSeconds"`
 }
 
 type skippedShot struct {
@@ -329,7 +338,7 @@ func RegisterAgentScriptShotRoutes(root *http.ServeMux, middleware BridgeAuth, s
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "批量生成参数无效"})
 			return
 		}
-		input.ScriptNodeID, input.Kind, input.Provider, input.ModelID = strings.TrimSpace(input.ScriptNodeID), strings.ToLower(strings.TrimSpace(input.Kind)), strings.ToLower(strings.TrimSpace(input.Provider)), strings.TrimSpace(input.ModelID)
+		input.ScriptNodeID, input.Kind, input.Provider, input.ModelID, input.RequestID = strings.TrimSpace(input.ScriptNodeID), strings.ToLower(strings.TrimSpace(input.Kind)), strings.ToLower(strings.TrimSpace(input.Provider)), strings.TrimSpace(input.ModelID), strings.TrimSpace(input.RequestID)
 		shotIDs, ok := nonEmptyUniqueShotIDs(input.ShotIDs)
 		if !ok || input.ScriptNodeID == "" || input.ModelID == "" || (input.Kind != "image" && input.Kind != "video" && input.Kind != "audio") {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请选择不重复的镜头、生成类型和模型"})
@@ -362,6 +371,52 @@ func RegisterAgentScriptShotRoutes(root *http.ServeMux, middleware BridgeAuth, s
 			return
 		}
 		writeJSON(w, http.StatusOK, response)
+	})
+
+	handle("POST /api/agent/tasks/{id}/shots/merge", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input mergeShotsRequest
+		decoder := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "镜头合并参数无效"})
+			return
+		}
+		input.ScriptNodeID = strings.TrimSpace(input.ScriptNodeID)
+		if input.ScriptNodeID == "" || (input.TargetDurationSeconds != 10 && input.TargetDurationSeconds != 15 && input.TargetDurationSeconds != 30) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请选择 10、15 或 30 秒的合并时长"})
+			return
+		}
+		projectID := strings.TrimSpace(req.PathValue("id"))
+		canvas, err := services.Projects.Canvas(req.Context(), owner, projectID)
+		if err != nil {
+			writeScriptShotError(w, err)
+			return
+		}
+		if node, ok := agentCanvasNodeByID(canvas, input.ScriptNodeID); !ok || node.Type != "script" {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "剧本节点不存在"})
+			return
+		}
+		shots, err := services.Projects.ListShots(req.Context(), owner, projectID, input.ScriptNodeID)
+		if err != nil {
+			writeScriptShotError(w, err)
+			return
+		}
+		merged, inheritedLinks, err := mergeAdjacentScriptShots(req.Context(), services.Projects, owner, projectID, input.ScriptNodeID, shots, input.TargetDurationSeconds)
+		if err != nil {
+			writeScriptShotError(w, err)
+			return
+		}
+		if err := services.Projects.ReplaceShots(req.Context(), owner, projectID, input.ScriptNodeID, merged); err != nil {
+			writeScriptShotError(w, err)
+			return
+		}
+		for _, link := range inheritedLinks {
+			if err := services.Projects.AttachGeneration(req.Context(), owner, link); err != nil {
+				writeScriptShotError(w, err)
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"shots": merged, "targetDurationSeconds": input.TargetDurationSeconds})
 	})
 }
 
@@ -474,6 +529,13 @@ func scriptNodeForRequest(ctx context.Context, store agentworkspace.Store, owner
 }
 
 func createShotBatchNodes(ctx context.Context, services AgentScriptShotServices, owner, projectID string, canvas agentworkspace.Canvas, scriptNode agentworkspace.Node, shots []agentworkspace.ScriptShot, shotIDs []string, input batchShotNodesRequest, model map[string]any) (map[string]any, error) {
+	if input.RequestID != "" {
+		if reused, ok, err := reuseShotBatchNodes(ctx, services.Projects, owner, projectID, canvas, shotIDs, input); err != nil {
+			return nil, err
+		} else if ok {
+			return reused, nil
+		}
+	}
 	shotByID := make(map[string]agentworkspace.ScriptShot, len(shots))
 	for _, shot := range shots {
 		shotByID[shot.ID] = shot
@@ -512,7 +574,7 @@ func createShotBatchNodes(ctx context.Context, services AgentScriptShotServices,
 			taskID = newAgentID("video-job")
 			taskIdempotencyKey = "video:" + idempotencyKey
 		}
-		taskInput := agentworkspace.CreateGenerationTaskInput{ID: taskID, ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version, Kind: input.Kind, Provider: provider, ModelID: input.ModelID, Mode: operation, Settings: map[string]any{"prompt": prompt, "parameters": map[string]any{}, "advanced": map[string]any{}, "source": source, "submissionIdempotencyKey": idempotencyKey}, IdempotencyKey: taskIdempotencyKey, Now: services.Now().UTC()}
+		taskInput := agentworkspace.CreateGenerationTaskInput{ID: taskID, ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version, Kind: input.Kind, Provider: provider, ModelID: input.ModelID, Mode: operation, Settings: map[string]any{"prompt": prompt, "parameters": map[string]any{}, "advanced": map[string]any{}, "source": source, "submissionIdempotencyKey": idempotencyKey, "batchRequestId": input.RequestID}, IdempotencyKey: taskIdempotencyKey, Now: services.Now().UTC()}
 		link := agentworkspace.ShotGenerationLink{ProjectID: projectID, ScriptNodeID: scriptNode.ID, ShotID: shot.ID, NodeID: node.ID, GenerationID: taskID, Attempt: attempt, Active: true}
 		createdCanvas, task, createdLink, err := services.Projects.CreateShotGeneration(ctx, owner, agentworkspace.CreateShotGenerationInput{ExpectedCanvasRevision: canvas.Revision, Node: node, Edge: agentworkspace.Edge{ID: newAgentID("edge"), Source: scriptNode.ID, Target: node.ID, Relation: "shot-generation"}, Task: taskInput, Link: link, Now: services.Now().UTC()})
 		if err != nil {
@@ -529,6 +591,149 @@ func createShotBatchNodes(ctx context.Context, services AgentScriptShotServices,
 		}
 	}
 	return map[string]any{"canvas": agentCanvasForResponse(projectID, canvas), "nodes": nodes, "generationLinks": generationLinks, "skipped": skipped}, nil
+}
+
+func reuseShotBatchNodes(ctx context.Context, store agentworkspace.Store, owner, projectID string, canvas agentworkspace.Canvas, shotIDs []string, input batchShotNodesRequest) (map[string]any, bool, error) {
+	tasks, err := store.ListGenerationTasks(ctx, owner, projectID)
+	if err != nil {
+		return nil, false, err
+	}
+	nodeByID := make(map[string]agentworkspace.Node, len(canvas.Nodes))
+	for _, node := range canvas.Nodes {
+		nodeByID[node.ID] = node
+	}
+	nodes := make([]agentworkspace.Node, 0, len(shotIDs))
+	links := make([]agentworkspace.ShotGenerationLink, 0, len(shotIDs))
+	for _, shotID := range shotIDs {
+		found := false
+		for _, task := range tasks {
+			source, _ := task.Settings["source"].(map[string]any)
+			if strings.TrimSpace(stringValue(task.Settings["batchRequestId"])) != input.RequestID || task.Kind != input.Kind || strings.TrimSpace(stringValue(source["shotId"])) != shotID {
+				continue
+			}
+			node, exists := nodeByID[task.NodeID]
+			if !exists {
+				continue
+			}
+			shotLinks, listErr := store.ListGenerationLinks(ctx, owner, projectID, shotID)
+			if listErr != nil {
+				return nil, false, listErr
+			}
+			for _, link := range shotLinks {
+				if link.NodeID == task.NodeID && link.GenerationID == task.ID {
+					links = append(links, link)
+					break
+				}
+			}
+			nodes = append(nodes, node)
+			found = true
+			break
+		}
+		if !found {
+			return nil, false, nil
+		}
+	}
+	return map[string]any{"canvas": agentCanvasForResponse(projectID, canvas), "nodes": nodes, "generationLinks": links, "skipped": []skippedShot{}, "reused": true}, true, nil
+}
+
+var shotTimelinePattern = regexp.MustCompile(`(?m)(\d{2}):(\d{2})-(\d{2}):(\d{2})`)
+
+func scriptShotDuration(shot agentworkspace.ScriptShot) int {
+	if shot.DurationSeconds > 0 {
+		return shot.DurationSeconds
+	}
+	maximum := 0
+	for _, match := range shotTimelinePattern.FindAllStringSubmatch(shot.VideoPrompt, -1) {
+		minutes, _ := strconv.Atoi(match[3])
+		seconds, _ := strconv.Atoi(match[4])
+		if end := minutes*60 + seconds; end > maximum {
+			maximum = end
+		}
+	}
+	if maximum > 0 {
+		return maximum
+	}
+	return 5
+}
+
+func mergeAdjacentScriptShots(ctx context.Context, store agentworkspace.Store, owner, projectID, scriptNodeID string, shots []agentworkspace.ScriptShot, target int) ([]agentworkspace.ScriptShot, []agentworkspace.ShotGenerationLink, error) {
+	type group struct {
+		shots    []agentworkspace.ScriptShot
+		duration int
+	}
+	groups := make([]group, 0)
+	for _, shot := range shots {
+		duration := scriptShotDuration(shot)
+		if len(groups) == 0 || (groups[len(groups)-1].duration > 0 && groups[len(groups)-1].duration+duration > target) {
+			groups = append(groups, group{})
+		}
+		current := &groups[len(groups)-1]
+		current.shots = append(current.shots, shot)
+		current.duration += duration
+	}
+	merged := make([]agentworkspace.ScriptShot, 0, len(groups))
+	inherited := make([]agentworkspace.ShotGenerationLink, 0)
+	for index, item := range groups {
+		if len(item.shots) == 0 {
+			continue
+		}
+		sourceIDs := make([]string, 0, len(item.shots))
+		for _, source := range item.shots {
+			if len(source.SourceShotIDs) > 0 {
+				sourceIDs = append(sourceIDs, source.SourceShotIDs...)
+			} else {
+				sourceIDs = append(sourceIDs, source.ID)
+			}
+		}
+		id := stableMergedShotID(scriptNodeID, target, sourceIDs)
+		mergedShot := agentworkspace.ScriptShot{ID: id, ProjectID: projectID, ScriptNodeID: scriptNodeID, Sequence: index + 1, Scene: joinShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.Scene }), Characters: joinUniqueShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.Characters }, "、"), Dialogue: joinShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.Dialogue }), Narration: joinShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.Narration }), ImagePrompt: joinShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.ImagePrompt }), VideoPrompt: joinShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.VideoPrompt }), TTSText: joinShotFields(item.shots, func(shot agentworkspace.ScriptShot) string { return shot.TTSText }), DurationSeconds: item.duration, SourceShotIDs: sourceIDs, Revision: 1}
+		merged = append(merged, mergedShot)
+		for _, source := range item.shots {
+			links, err := store.ListGenerationLinks(ctx, owner, projectID, source.ID)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, link := range links {
+				link.ShotID = id
+				inherited = append(inherited, link)
+			}
+		}
+	}
+	return merged, inherited, nil
+}
+
+func stableMergedShotID(scriptNodeID string, target int, sourceIDs []string) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%s", scriptNodeID, target, strings.Join(sourceIDs, "\x00"))))
+	return fmt.Sprintf("shot-merge-%x", sum[:10])
+}
+
+func joinShotFields(shots []agentworkspace.ScriptShot, value func(agentworkspace.ScriptShot) string) string {
+	parts := make([]string, 0, len(shots))
+	for _, shot := range shots {
+		if text := strings.TrimSpace(value(shot)); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func joinUniqueShotFields(shots []agentworkspace.ScriptShot, value func(agentworkspace.ScriptShot) string, separator string) string {
+	seen := map[string]struct{}{}
+	parts := make([]string, 0, len(shots))
+	for _, shot := range shots {
+		for _, part := range strings.FieldsFunc(value(shot), func(r rune) bool { return r == '、' || r == ',' || r == '，' || r == '\n' }) {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if _, exists := seen[part]; exists {
+				continue
+			}
+			seen[part] = struct{}{}
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, separator)
 }
 
 func resolveScriptShotModel(ctx context.Context, services AgentScriptShotServices, owner, modelID, kind, provider string) (map[string]any, error) {

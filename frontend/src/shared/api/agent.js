@@ -141,6 +141,12 @@ export function createAgentShotBatchNodes(taskId, payload, request = apiRequest)
   });
 }
 
+export function mergeAgentScriptShots(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/shots/merge`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
 export function createAgentAudioGeneration(taskId, payload, request = apiRequest) {
   return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/audio-generations`, {
     method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true

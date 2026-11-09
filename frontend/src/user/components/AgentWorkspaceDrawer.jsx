@@ -85,6 +85,7 @@ export function AgentWorkspaceDrawer({
   onTabChange,
   onWidthChange,
   onLocateNode,
+  onOpenShot,
   onOpenDirectorDesk,
   onActivateGenerationResult,
   onCreateFromAsset,
@@ -249,7 +250,7 @@ export function AgentWorkspaceDrawer({
     </div>
     {resultGroups.length ? <div className="agent-workspace-results" aria-label="镜头结果库">
       {resultGroups.map(group => <section className="agent-workspace-results__group" key={group.id}>
-        <header><strong>{group.title}</strong><span>{group.shot?.scene || `${group.items.length} 个版本`}</span></header>
+        <header><strong>{group.title}</strong><span>{group.shot?.scene || `${group.items.length} 个版本`}</span><Button size="small" type="link" onClick={() => onOpenShot?.(group.id)}>在故事板打开</Button></header>
         {group.items.map(item => {
           const generation = generations.find(candidate => String(candidate?.id || '') === item.generationId) || {};
           const node = nodes.find(candidate => String(candidate?.id || '') === item.nodeId) || {};

@@ -38,6 +38,19 @@ test('故事板消费接口镜头并提供来源定位编辑批量生成和版�
   assert.match(workspace, /onCreateShotBatch/);
   assert.match(workspace, /镜头版本/);
   assert.match(workspace, /定位来源/);
+	assert.match(page, /mergeAgentScriptShots/);
+	assert.match(workspace, /合并相邻镜头/);
+	assert.match(workspace, /10 秒/);
+	assert.match(workspace, /15 秒/);
+	assert.match(workspace, /30 秒/);
+});
+
+test('工作流结果库可以反向打开故事板中的来源镜头', () => {
+  const drawer = fs.readFileSync(path.resolve(dirname, '../components/AgentWorkspaceDrawer.jsx'), 'utf8');
+  assert.match(drawer, /onOpenShot/);
+  assert.match(drawer, /在故事板打开/);
+  assert.match(page, /openShotInStoryboard/);
+  assert.match(page, /selectedKey: `shot:\$\{shotId\}`/);
 });
 
 test('工作流和故事板读取同一份镜头集合，不各自维护镜头副本', () => {

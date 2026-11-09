@@ -133,7 +133,7 @@ export function scriptShotsByNode(shots = []) {
   return grouped;
 }
 
-export function buildShotBatchPayload({ scriptNodeId, selectedIDs, kind, provider, modelId }) {
+export function buildShotBatchPayload({ scriptNodeId, selectedIDs, kind, provider, modelId, requestId }) {
   const shotIds = [...new Set((Array.isArray(selectedIDs) ? selectedIDs : []).map(text).filter(Boolean))];
   const payload = {
     scriptNodeId: text(scriptNodeId),
@@ -143,5 +143,12 @@ export function buildShotBatchPayload({ scriptNodeId, selectedIDs, kind, provide
   };
   const normalizedProvider = text(provider);
   if (normalizedProvider) payload.provider = normalizedProvider;
+  const normalizedRequestID = text(requestId);
+  if (normalizedRequestID) payload.requestId = normalizedRequestID;
   return payload;
+}
+
+export function newShotBatchRequestID() {
+  const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `shot-batch-${random}`;
 }

@@ -1,7 +1,7 @@
 import { Button, Checkbox, Input, InputNumber, Segmented } from 'antd';
 import { AudioLines, Image, Scissors, Video } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { buildShotBatchPayload, scriptSplitReady, selectedShotIDs } from '../pages/agent-script-shots';
+import { buildShotBatchPayload, newShotBatchRequestID, scriptSplitReady, selectedShotIDs } from '../pages/agent-script-shots';
 import { reconcileNodeModel } from '../pages/agent-model-capabilities';
 import { AgentBatchModelPicker } from './AgentBatchModelPicker';
 import { AgentBatchFactoryPromptSelector } from './AgentBatchFactoryPromptSelector';
@@ -104,7 +104,7 @@ export default function AgentScriptNodeComposer({
   async function submitBatch() {
     const payload = buildShotBatchPayload({
       scriptNodeId: node.id, selectedIDs, kind: activeBatchKind.kind,
-      provider: activeModel.provider, modelId: activeModel.modelId
+      provider: activeModel.provider, modelId: activeModel.modelId, requestId: newShotBatchRequestID()
     });
     if (!payload.shotIds.length || !payload.modelId) return;
     setBatchError('');

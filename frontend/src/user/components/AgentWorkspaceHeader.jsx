@@ -42,7 +42,7 @@ export function AgentWorkspaceHeader({
           <Pencil className="agent-canvas-project-title__edit" size={12} />
         </button>
         <div className="agent-canvas-view-switch" role="group" aria-label="项目视图">
-          <button type="button" title="画布" aria-label="画布" aria-pressed={activeView === 'workflow'} className={activeView === 'workflow' ? 'is-active' : ''} onClick={() => onViewChange('workflow')}>
+          <button type="button" title="工作流" aria-label="工作流" aria-pressed={activeView === 'workflow'} className={activeView === 'workflow' ? 'is-active' : ''} onClick={() => onViewChange('workflow')}>
             <Workflow size={15} />
           </button>
           <button type="button" title="故事板" aria-label="故事板" aria-pressed={activeView === 'storyboard'} className={activeView === 'storyboard' ? 'is-active' : ''} onClick={() => onViewChange('storyboard')}>

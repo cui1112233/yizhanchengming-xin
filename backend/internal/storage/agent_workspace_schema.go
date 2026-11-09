@@ -357,5 +357,13 @@ WHERE c.canvas_json IS NULL`,
 			},
 			CallbackChecksum: "v88-agent-project-type-v1",
 		},
+		{
+			Version: 8800017,
+			SQL: []string{
+				`ALTER TABLE agent_script_shots ADD COLUMN duration_seconds INT NOT NULL DEFAULT 0 AFTER tts_text`,
+				`ALTER TABLE agent_script_shots ADD COLUMN source_shot_ids_json JSON NULL AFTER duration_seconds`,
+			},
+			CallbackChecksum: "v88-agent-script-shot-merge-v1",
+		},
 	}
 }

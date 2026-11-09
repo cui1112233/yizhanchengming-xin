@@ -35,22 +35,23 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 	}
 }
 
-func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
+func TestAppMigrationsIncludeLatestAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800016 {
-		t.Fatalf("last migration=%v, want 8800016", migrations[len(migrations)-1].Version)
-	}
-	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800016 {
-			t.Fatalf("agent migration must be less than new version %d", migration.Version)
+	found := false
+	for _, migration := range migrations {
+		if migration.Version == 8800017 && migration.CallbackChecksum == "v88-agent-script-shot-merge-v1" {
+			found = true
 		}
+	}
+	if !found {
+		t.Fatal("missing agent script shot merge migration 8800017")
 	}
 }
 
 func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	if len(migrations) != 15 {
-		t.Fatalf("AgentWorkspaceMigrations length=%d, want 15", len(migrations))
+	if len(migrations) != 16 {
+		t.Fatalf("AgentWorkspaceMigrations length=%d, want 16", len(migrations))
 	}
 	if migrations[0].Version != 8800001 || migrations[0].CallbackChecksum != "v88-agent-workspace-foundation-v1" {
 		t.Fatalf("historical migration changed: %+v", migrations[0])
@@ -179,7 +180,7 @@ func TestAgentWorkspaceSchemaIncludesScriptShots(t *testing.T) {
 
 func TestAgentWorkspaceBatchFactoryBindingMigrationIsAppendOnlyAndSafe(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	binding := migrations[len(migrations)-4]
+	binding := migrations[len(migrations)-5]
 	if binding.Version != 8800012 || binding.CallbackChecksum != "v88-agent-batch-factory-bindings-v1" {
 		t.Fatalf("batch factory binding migration=%+v", binding)
 	}
@@ -205,7 +206,7 @@ func TestAgentWorkspaceBatchFactoryBindingMigrationIsAppendOnlyAndSafe(t *testin
 
 func TestAgentWorkspaceGenerationHistoryIndexMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	history := migrations[len(migrations)-3]
+	history := migrations[len(migrations)-4]
 	if history.Version != 8800013 || history.CallbackChecksum != "v88-agent-generation-history-index-v1" {
 		t.Fatalf("generation history index migration=%+v", history)
 	}
@@ -220,7 +221,7 @@ func TestAgentWorkspaceGenerationHistoryIndexMigrationIsAppendOnly(t *testing.T)
 
 func TestAgentWorkspaceMaterialLibraryMigrationIsAppendOnlyAndStoresReferencesOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	library := migrations[len(migrations)-2]
+	library := migrations[len(migrations)-3]
 	if library.Version != 8800014 || library.CallbackChecksum != "v88-agent-material-library-v1" {
 		t.Fatalf("material library migration=%+v", library)
 	}
@@ -244,12 +245,29 @@ func TestAgentWorkspaceMaterialLibraryMigrationIsAppendOnlyAndStoresReferencesOn
 
 func TestAgentWorkspaceProjectTypeMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	typeMigration := migrations[len(migrations)-1]
+	typeMigration := migrations[len(migrations)-2]
 	if typeMigration.Version != 8800015 || typeMigration.CallbackChecksum != "v88-agent-project-type-v1" {
 		t.Fatalf("project type migration=%+v", typeMigration)
 	}
 	schema := strings.ToLower(strings.Join(typeMigration.SQL, "\n"))
 	if !strings.Contains(schema, "add column project_type") || strings.Contains(schema, "drop ") || strings.Contains(schema, "delete ") {
 		t.Fatalf("project type migration must be additive: %v", typeMigration.SQL)
+	}
+}
+
+func TestAgentWorkspaceShotMergeMigrationIsAppendOnly(t *testing.T) {
+	migrations := AgentWorkspaceMigrations()
+	merge := migrations[len(migrations)-1]
+	if merge.Version != 8800017 || merge.CallbackChecksum != "v88-agent-script-shot-merge-v1" {
+		t.Fatalf("shot merge migration=%+v", merge)
+	}
+	schema := strings.ToLower(strings.Join(merge.SQL, "\n"))
+	for _, clause := range []string{"add column duration_seconds", "add column source_shot_ids_json"} {
+		if !strings.Contains(schema, clause) {
+			t.Fatalf("missing %q in %v", clause, merge.SQL)
+		}
+	}
+	if strings.Contains(schema, "drop ") || strings.Contains(schema, "delete ") {
+		t.Fatalf("shot merge migration must be additive: %v", merge.SQL)
 	}
 }

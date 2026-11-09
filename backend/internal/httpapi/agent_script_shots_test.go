@@ -199,6 +199,67 @@ func TestShotBatchCreatesValidNodesAndSkipsMissingShots(t *testing.T) {
 	}
 }
 
+func TestShotBatchRequestIDMakesRetryIdempotent(t *testing.T) {
+	now := time.Date(2026, 11, 9, 11, 0, 0, 0, time.UTC)
+	store, mux, _ := newAgentScriptShotTestAPI(t, now, &fixedAgentNodeTextProvider{})
+	if err := store.ReplaceShots(context.Background(), "alice", "project-1", "script-1", []agentworkspace.ScriptShot{{ID: "shot-1", Sequence: 1, ImagePrompt: "雨夜仓库"}}); err != nil {
+		t.Fatal(err)
+	}
+	payload := map[string]any{"scriptNodeId": "script-1", "shotIds": []string{"shot-1"}, "kind": "image", "modelId": "image-model", "requestId": "storyboard-submit-1"}
+	first := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/shots/batch-nodes", payload)
+	second := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/shots/batch-nodes", payload)
+	if first.Code != http.StatusOK || second.Code != http.StatusOK || !strings.Contains(second.Body.String(), `"reused":true`) {
+		t.Fatalf("first=%d %s second=%d %s", first.Code, first.Body.String(), second.Code, second.Body.String())
+	}
+	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil || len(canvas.Nodes) != 2 {
+		t.Fatalf("canvas=%+v err=%v", canvas, err)
+	}
+	tasks, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	if err != nil || len(tasks) != 1 {
+		t.Fatalf("tasks=%+v err=%v", tasks, err)
+	}
+}
+
+func TestMergeAdjacentShotsKeepsOrderedContentAndGenerationHistory(t *testing.T) {
+	now := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+	store, mux, _ := newAgentScriptShotTestAPI(t, now, &fixedAgentNodeTextProvider{})
+	shots := []agentworkspace.ScriptShot{
+		{ID: "shot-1", Sequence: 1, Scene: "门外", Dialogue: "第一句", ImagePrompt: "远景", VideoPrompt: "00:00-00:04 开门", TTSText: "第一句"},
+		{ID: "shot-2", Sequence: 2, Scene: "门内", Dialogue: "第二句", ImagePrompt: "近景", VideoPrompt: "00:00-00:05 进入", TTSText: "第二句"},
+		{ID: "shot-3", Sequence: 3, Scene: "走廊", Dialogue: "第三句", ImagePrompt: "跟拍", VideoPrompt: "00:00-00:06 前行", TTSText: "第三句"},
+	}
+	if err := store.ReplaceShots(context.Background(), "alice", "project-1", "script-1", shots); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AttachGeneration(context.Background(), "alice", agentworkspace.ShotGenerationLink{ProjectID: "project-1", ScriptNodeID: "script-1", ShotID: "shot-1", NodeID: "image-1", GenerationID: "generation-1", Attempt: 1, Active: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	response := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/shots/merge", map[string]any{"scriptNodeId": "script-1", "targetDurationSeconds": 10})
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"sourceShotIds":["shot-1","shot-2"]`) || !strings.Contains(response.Body.String(), `"durationSeconds":9`) {
+		t.Fatalf("merge=%d %s", response.Code, response.Body.String())
+	}
+	merged, err := store.ListShots(context.Background(), "alice", "project-1", "script-1")
+	if err != nil || len(merged) != 2 || merged[0].Dialogue != "第一句\n第二句" || merged[0].ImagePrompt != "远景\n近景" {
+		t.Fatalf("shots=%+v err=%v", merged, err)
+	}
+	links, err := store.ListGenerationLinks(context.Background(), "alice", "project-1", merged[0].ID)
+	if err != nil || len(links) != 1 || links[0].GenerationID != "generation-1" {
+		t.Fatalf("links=%+v err=%v", links, err)
+	}
+	repeated := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/shots/merge", map[string]any{"scriptNodeId": "script-1", "targetDurationSeconds": 10})
+	repeatedShots, repeatErr := store.ListShots(context.Background(), "alice", "project-1", "script-1")
+	if repeated.Code != http.StatusOK || repeatErr != nil || len(repeatedShots) != 2 || repeatedShots[0].ID != merged[0].ID {
+		t.Fatalf("repeated=%d %s shots=%+v err=%v", repeated.Code, repeated.Body.String(), repeatedShots, repeatErr)
+	}
+
+	invalid := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/shots/merge", map[string]any{"scriptNodeId": "script-1", "targetDurationSeconds": 12})
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid=%d %s", invalid.Code, invalid.Body.String())
+	}
+}
+
 func TestShotPatchUsesCurrentRevisionAndProjectScope(t *testing.T) {
 	now := time.Date(2026, 10, 22, 11, 30, 0, 0, time.UTC)
 	store, mux, _ := newAgentScriptShotTestAPI(t, now, &fixedAgentNodeTextProvider{})
