@@ -22,7 +22,7 @@ import { STORYBOARD_SPLIT_DEFAULTS, storyboardSplitRatio, storyboardSplitRatioFr
 import { patchStoryboardState } from './agent-storyboard-state';
 import { createNodeAt } from './agent-canvas-context-menu';
 import { appendUniqueAssetID, classifyComposerAttachment } from './agent-composer-attachments';
-import { findNodeMentionCandidates, insertNodeMention } from './agent-node-mentions';
+import { findAgentMentionCandidates, insertAgentMention } from './agent-node-mentions';
 import { normalizeWorkspaceView, workspaceViewForActiveView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
 import { batchFactoryGroupLabel, refreshBatchFactoryBookCanvas, syncBookThenLoadCanvas } from './agent-canvas-batch-factory';
 import { agentProjectCapabilities, agentProjectTypeLabel, agentProjectTypeOptions, normalizeAgentProjectType } from './agent-project-type';
@@ -870,15 +870,22 @@ export function AgentPageV2({ theme = 'dark' }) {
     const assetsByID = new Map(workspaceAssets.map(asset => [String(asset?.id || asset?.assetId || '').trim(), asset]));
     return selectedAssetContext.map(asset => ({ ...asset, url: String(assetsByID.get(asset.id)?.url || '') }));
   }, [selectedAssetContext, workspaceAssets]);
-  const nodeMentionCandidates = useMemo(() => findNodeMentionCandidates(canvas.nodes, question), [canvas.nodes, question]);
-  function selectNodeMention(node) {
-    setSelectedCanvasNodes(current => current.includes(node.id) ? current : [...current, node.id]);
-    setQuestion(current => insertNodeMention(current, node));
+  const mentionCandidates = useMemo(
+    () => findAgentMentionCandidates({ nodes: canvas.nodes, assets: workspaceAssets }, question),
+    [canvas.nodes, question, workspaceAssets]
+  );
+  function selectMention(candidate) {
+    if (candidate.mentionSource === 'asset') {
+      setSelectedConversationAssetIds(current => appendUniqueAssetID(current, candidate.referenceId));
+    } else {
+      setSelectedCanvasNodes(current => current.includes(candidate.referenceId) ? current : [...current, candidate.referenceId]);
+    }
+    setQuestion(current => insertAgentMention(current, candidate));
     questionInputRef.current?.focus();
   }
-  const nodeMentionPicker = nodeMentionCandidates.length ? <div className="agent-node-mention-picker" role="listbox" aria-label="引用画布节点">
-    {nodeMentionCandidates.map(node => <button type="button" role="option" key={node.id} onMouseDown={event => event.preventDefault()} onClick={() => selectNodeMention(node)}>
-      <span>{node.type === 'image' ? '图片' : node.type === 'video' ? '视频' : node.type === 'audio' ? '音频' : '文本'}</span><strong>{node.title || node.data?.title}</strong><small>{node.summary || node.data?.summary || node.status || node.data?.status || '画布节点'}</small>
+  const mentionPicker = mentionCandidates.length ? <div className="agent-node-mention-picker" role="listbox" aria-label="引用节点或素材">
+    {mentionCandidates.map(candidate => <button type="button" role="option" key={`${candidate.mentionSource}:${candidate.referenceId}`} onMouseDown={event => event.preventDefault()} onClick={() => selectMention(candidate)}>
+      <span>{candidate.mentionSource === 'asset' ? '素材' : '节点'}</span><strong>{candidate.title}</strong><small>{candidate.kind} · {candidate.referenceId}</small>
     </button>)}
   </div> : null;
   const directorPlans = useMemo(() => messages.flatMap(entry => {
@@ -1337,7 +1344,7 @@ export function AgentPageV2({ theme = 'dark' }) {
             {messages.map((entry, index) => <article key={`${entry.createdAt || index}-${entry.role}`} className={`agent-workbench-message agent-workbench-message--${entry.role}`}><strong>{entry.role === 'assistant' ? (viewState.activeView === 'storyboard' ? '导演' : 'CM') : '你'}</strong><span>{entry.content}</span></article>)}
           </div>
           {executions.length ? <section className="agent-execution-records" aria-label="执行记录"><strong>执行记录</strong>{executions.slice(0, 4).map((execution, index) => <span key={execution.id || index}>{execution.toolName || execution.tool || execution.name || '工具'} · {execution.status || '已完成'}</span>)}</section> : null}
-          {selectedNodeContext.length ? <div className="agent-selected-node-references" aria-label="已选节点引用">{selectedNodeContext.map(node => <Tag key={node.id}>{node.title}</Tag>)}</div> : null}
+          {selectedNodeContext.length ? <div className="agent-selected-node-references" aria-label="已选节点引用">{selectedNodeContext.map(node => <Tag closable key={node.id} onClose={() => setSelectedCanvasNodes(current => current.filter(id => id !== node.id))}>{node.title}</Tag>)}</div> : null}
         <div
           className={`agent-workbench-composer${problemSearchMode ? ' is-problem-search' : ''}${viewState.activeView === 'storyboard' ? ' is-director' : ''}${conversationAssetDropActive ? ' is-asset-drop-target' : ''}`}
           onDragOver={handleConversationAssetDragOver}
@@ -1402,7 +1409,7 @@ export function AgentPageV2({ theme = 'dark' }) {
               }
             }}
           />
-          {nodeMentionPicker}
+          {mentionPicker}
           <div className="agent-composer-actions">
             <div className="agent-composer-tools">
               <div className="agent-composer-plus-wrap">
@@ -1467,7 +1474,7 @@ export function AgentPageV2({ theme = 'dark' }) {
             <input ref={attachmentInputRef} className="agent-attachment-input" type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json,image/*,video/*,audio/*" onChange={readAttachment} />
             <div className="agent-selected-skills">{selectedSkills.map(skill => <Tag closable key={skill.id} onClose={() => toggleSkill(skill.id)}>{skill.name}</Tag>)}{attachedFile ? <Tag closable onClose={() => setAttachedFile(null)}>{attachedFile.kind === 'media' ? '媒体' : '附件'}：{attachedFile.name}</Tag> : null}</div>
             <Input.TextArea ref={questionInputRef} value={question} autoSize={{ minRows: 4, maxRows: 8 }} placeholder="描述你的创作需求…" onChange={event => setQuestion(event.target.value)} onPressEnter={event => { if (!event.shiftKey) { event.preventDefault(); sendQuestion(); } }} />
-            {nodeMentionPicker}
+            {mentionPicker}
             <div className="agent-creation-type-picker" aria-label="作品类型"><span>作品类型</span><Segmented value={newProjectType} onChange={setNewProjectType} options={agentProjectTypeOptions().map(option => ({ value: option.value, label: option.label }))} /></div>
             <div className="agent-composer-actions"><div className="agent-composer-actions-left"><button className="agent-context-chip" type="button" onClick={() => openComposerTool('mode')}>{selectedMode}<ChevronDown size={13} /></button><button className="agent-context-chip" type="button" onClick={() => openComposerTool('expert')}>{selectedExpert}<ChevronDown size={13} /></button><button className="agent-context-chip" type="button" onClick={() => openComposerTool('skill')}>技能{selectedSkillIds.length ? ` ${selectedSkillIds.length}` : ''}<ChevronDown size={13} /></button><button className="agent-context-chip" type="button" onClick={() => openComposerTool('file')}>添加附件</button></div><Button type="primary" icon={<Send size={15} />} loading={asking} disabled={!question.trim()} onClick={() => sendQuestion()}>开始创作</Button></div>
             {composerPanel === 'mode' ? <div className="agent-composer-context"><strong>模式</strong>{['创作助手', '分析拆解', '修改润色'].map(value => <button type="button" key={value} className={selectedMode === value ? 'active' : ''} onClick={() => { setSelectedMode(value); setComposerPanel(null); }}>{value}</button>)}</div> : null}

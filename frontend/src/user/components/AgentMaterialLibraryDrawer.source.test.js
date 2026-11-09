@@ -7,5 +7,7 @@ test('material library drawer keeps save and insert separate from current projec
   assert.match(source, /保存当前素材/);
   assert.match(source, /放入当前画布/);
   assert.match(source, /来源项目/);
+  assert.match(source, /来源素材/);
+  assert.match(source, /版本/);
   assert.match(source, /listAgentMaterialLibraryFolders/);
 });
