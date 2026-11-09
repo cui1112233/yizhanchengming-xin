@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -70,6 +71,11 @@ func TestScriptSplitPersistsStructuredShotsAndStaysProjectScoped(t *testing.T) {
 	durable, err := store.ListShots(context.Background(), "alice", "project-1", "script-1")
 	if err != nil || len(durable) != 1 || durable[0].TTSText != "林夏：有人吗？" {
 		t.Fatalf("durable=%+v err=%v", durable, err)
+	}
+	tasks, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	definition, _ := tasks[0].Settings["promptDefinition"].(map[string]any)
+	if err != nil || len(tasks) != 1 || definition["id"] != "storyboard.script-split" || fmt.Sprint(definition["version"]) != "1" {
+		t.Fatalf("tasks=%+v err=%v", tasks, err)
 	}
 }
 
@@ -189,6 +195,10 @@ func TestShotBatchCreatesValidNodesAndSkipsMissingShots(t *testing.T) {
 	tasks, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
 	if err != nil || len(tasks) != 1 || tasks[0].Kind != "image" || tasks[0].NodeID != canvas.Nodes[1].ID {
 		t.Fatalf("tasks=%+v err=%v", tasks, err)
+	}
+	definition, _ := tasks[0].Settings["promptDefinition"].(map[string]any)
+	if definition["id"] != "asset.visual-reference" || fmt.Sprint(definition["version"]) != "1" {
+		t.Fatalf("prompt definition=%v", definition)
 	}
 
 	duplicate := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/shots/batch-nodes", map[string]any{

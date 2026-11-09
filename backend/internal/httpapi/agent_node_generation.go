@@ -13,6 +13,8 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
 	promptcatalog "qiantie/backend/internal/prompt"
+	promptagent "qiantie/backend/internal/prompt/agent"
+	promptstoryboard "qiantie/backend/internal/prompt/storyboard"
 )
 
 type AgentTextModelResolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error)
@@ -182,7 +184,7 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			return
 		}
 		result, err := services.TextComplete(req.Context(), identity.Username, input.ModelID, batchfactoryv11.TextCompletionRequest{
-			SystemPrompt: promptcatalog.AgentTextNodeSystemPrompt, UserPrompt: input.Prompt,
+			SystemPrompt: promptagent.TextNode.SystemPrompt, UserPrompt: input.Prompt,
 			Temperature: 0.7, MaxTokens: 4096, DisableJSONResponse: true,
 		})
 		result = strings.TrimSpace(result)
@@ -478,6 +480,11 @@ func beginAgentGenerationTask(ctx context.Context, store agentworkspace.Store, o
 		provider = "configured_model"
 	}
 	settings := map[string]any{"prompt": strings.TrimSpace(prompt), "parameters": cloneAgentSettings(parameters), "advanced": cloneAgentSettings(advanced)}
+	definition := promptagent.TextNode
+	if strings.TrimSpace(mode) == "script_split" {
+		definition = promptstoryboard.ScriptSplit
+	}
+	settings["promptDefinition"] = agentPromptDefinitionSetting(definition)
 	if strings.TrimSpace(mode) != "" {
 		settings["mode"] = strings.TrimSpace(mode)
 	}
@@ -493,6 +500,10 @@ func beginAgentGenerationTask(ctx context.Context, store agentworkspace.Store, o
 		return task, nil
 	}
 	return store.TransitionGenerationTask(ctx, owner, projectID, task.ID, agentworkspace.GenerationTaskTransition{State: agentworkspace.GenerationRunning, ExpectedUpdatedAt: task.UpdatedAt, Now: now})
+}
+
+func agentPromptDefinitionSetting(definition promptcatalog.Definition) map[string]any {
+	return map[string]any{"id": definition.ID, "version": definition.Version}
 }
 
 func failAgentGenerationTask(ctx context.Context, store agentworkspace.Store, owner, projectID string, task agentworkspace.GenerationTask, message string, now time.Time) {

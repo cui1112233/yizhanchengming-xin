@@ -16,6 +16,8 @@ import (
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/novelfetchworkshop"
+	promptasset "qiantie/backend/internal/prompt/asset"
+	promptstoryboard "qiantie/backend/internal/prompt/storyboard"
 )
 
 type AgentModelCapabilityResolver func(context.Context, string, string, string) (map[string]any, error)
@@ -416,7 +418,7 @@ func RegisterAgentScriptShotRoutes(root *http.ServeMux, middleware BridgeAuth, s
 				return
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"shots": merged, "targetDurationSeconds": input.TargetDurationSeconds})
+		writeJSON(w, http.StatusOK, map[string]any{"shots": merged, "targetDurationSeconds": input.TargetDurationSeconds, "promptDefinition": agentPromptDefinitionSetting(promptstoryboard.ShotMerge)})
 	})
 }
 
@@ -425,7 +427,7 @@ func enqueueAgentScriptSplit(ctx context.Context, services AgentScriptShotServic
 	return services.Projects.CreateGenerationTask(ctx, owner, agentworkspace.CreateGenerationTaskInput{
 		ID: newAgentID("generation"), ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version,
 		Kind: "text", Provider: "configured_model", ModelID: modelID, Mode: "script_split",
-		Settings:       map[string]any{"prompt": sourceText, "sourceText": sourceText, "parameters": map[string]any{}, "advanced": map[string]any{}},
+		Settings:       map[string]any{"prompt": sourceText, "sourceText": sourceText, "parameters": map[string]any{}, "advanced": map[string]any{}, "promptDefinition": agentPromptDefinitionSetting(promptstoryboard.ScriptSplit)},
 		IdempotencyKey: fmt.Sprintf("script-split:%s:v%d:%d", node.ID, node.Version, now.UnixNano()), Now: now,
 	})
 }
@@ -574,7 +576,7 @@ func createShotBatchNodes(ctx context.Context, services AgentScriptShotServices,
 			taskID = newAgentID("video-job")
 			taskIdempotencyKey = "video:" + idempotencyKey
 		}
-		taskInput := agentworkspace.CreateGenerationTaskInput{ID: taskID, ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version, Kind: input.Kind, Provider: provider, ModelID: input.ModelID, Mode: operation, Settings: map[string]any{"prompt": prompt, "parameters": map[string]any{}, "advanced": map[string]any{}, "source": source, "submissionIdempotencyKey": idempotencyKey, "batchRequestId": input.RequestID}, IdempotencyKey: taskIdempotencyKey, Now: services.Now().UTC()}
+		taskInput := agentworkspace.CreateGenerationTaskInput{ID: taskID, ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version, Kind: input.Kind, Provider: provider, ModelID: input.ModelID, Mode: operation, Settings: map[string]any{"prompt": prompt, "parameters": map[string]any{}, "advanced": map[string]any{}, "source": source, "submissionIdempotencyKey": idempotencyKey, "batchRequestId": input.RequestID, "promptDefinition": agentPromptDefinitionSetting(promptasset.VisualReference)}, IdempotencyKey: taskIdempotencyKey, Now: services.Now().UTC()}
 		link := agentworkspace.ShotGenerationLink{ProjectID: projectID, ScriptNodeID: scriptNode.ID, ShotID: shot.ID, NodeID: node.ID, GenerationID: taskID, Attempt: attempt, Active: true}
 		createdCanvas, task, createdLink, err := services.Projects.CreateShotGeneration(ctx, owner, agentworkspace.CreateShotGenerationInput{ExpectedCanvasRevision: canvas.Revision, Node: node, Edge: agentworkspace.Edge{ID: newAgentID("edge"), Source: scriptNode.ID, Target: node.ID, Relation: "shot-generation"}, Task: taskInput, Link: link, Now: services.Now().UTC()})
 		if err != nil {

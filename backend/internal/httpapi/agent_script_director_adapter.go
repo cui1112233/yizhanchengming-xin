@@ -8,6 +8,7 @@ import (
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
+	promptstoryboard "qiantie/backend/internal/prompt/storyboard"
 )
 
 // adaptDirectorResultToScriptShots keeps one Batch Factory VIDEO as one Agent
@@ -119,6 +120,7 @@ func buildAgentDirectorContract(scriptNodeID, title, sourceText string) (batchfa
 	// so it needs the visual prompt together with the director timeline.
 	contract.Normalization.RequireVisualPrompt = true
 	contract.SystemPrompt += "\n每个 storyboard 必须额外输出非空 visual_prompt，作为同一 VIDEO 的图片生成提示词；它要和角色、场景、道具及镜头动作保持一致。"
+	contract.SystemPrompt += "\n" + promptstoryboard.ScriptSplit.SystemPrompt
 	return contract, nil
 }
 

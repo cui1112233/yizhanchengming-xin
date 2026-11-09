@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -124,7 +125,8 @@ func TestAgentTextGenerationUsesRequestedOwnerModelAndAppliesResult(t *testing.T
 		t.Fatalf("canvas=%+v err=%v", canvas, err)
 	}
 	generations, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
-	if err != nil || len(generations) != 1 || generations[0].State != agentworkspace.GenerationCompleted || generations[0].Kind != "text" {
+	definition, _ := generations[0].Settings["promptDefinition"].(map[string]any)
+	if err != nil || len(generations) != 1 || generations[0].State != agentworkspace.GenerationCompleted || generations[0].Kind != "text" || definition["id"] != "agent.text-node" || fmt.Sprint(definition["version"]) != "1" {
 		t.Fatalf("generations=%+v err=%v", generations, err)
 	}
 }

@@ -15,7 +15,7 @@ import (
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
-	promptcatalog "qiantie/backend/internal/prompt"
+	promptagent "qiantie/backend/internal/prompt/agent"
 )
 
 var agentSensitiveContextKey = regexp.MustCompile(`(?i)token|secret|password|authorization|credential|api.?key`)
@@ -199,12 +199,12 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 			cleanContext := sanitizeAgentContext(body.Context)
 			contextJSON, _ := json.Marshal(cleanContext)
 			directorRequest := agentDirectorRequested(cleanContext)
-			systemPrompt := promptcatalog.AgentWorkspaceSystemPrompt
+			definition := promptagent.WorkspaceChat
 			if directorRequest {
-				systemPrompt = promptcatalog.AgentDirectorPlanSystemPrompt
+				definition = promptagent.DirectorPlan
 			}
 			completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{
-				SystemPrompt: systemPrompt,
+				SystemPrompt: definition.SystemPrompt,
 				UserPrompt:   strings.TrimSpace(body.Prompt) + "\n\n页面上下文：\n" + string(contextJSON),
 				MaxTokens:    2048, Temperature: 0.7, DisableJSONResponse: !directorRequest,
 			})
@@ -232,6 +232,10 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 					}
 				}
 			}
+			if assistantMessage.Context == nil {
+				assistantMessage.Context = map[string]any{}
+			}
+			assistantMessage.Context["promptDefinition"] = agentPromptDefinitionSetting(definition)
 			updatedProject, err := store.AppendExchange(req.Context(), owner, body.TaskID, userMessage, assistantMessage)
 			if err != nil {
 				writeAgentStoreError(w, err)
