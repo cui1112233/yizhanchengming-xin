@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 
-import { inferBatchN8AudioCategory, inferBookN8AudioCategory } from './batchFactoryAudioCategory.js';
+import * as audioCategory from './batchFactoryAudioCategory.js';
+
+const { inferBatchN8AudioCategory, inferBookN8AudioCategory } = audioCategory;
 
 const unifiedSettingsSource = fs.readFileSync(new URL('./BatchFactoryUnifiedSettingsModal.jsx', import.meta.url), 'utf8');
 
@@ -48,9 +50,48 @@ test('keeps batch inference compatible without treating mixed books as one categ
   assert.equal(result.category, null);
 });
 
+test('batch and automation preset configs always clear manual audio selection', () => {
+  assert.equal(typeof audioCategory.normalizeBatchAutoAudioConfig, 'function');
+  const original = {
+    productionMode: 'comic',
+    comicPublishSettings: {
+      organizationId: '1',
+      audioCategorySelectionMode: 'manual',
+      audioCategoryId: 14,
+      audioCategoryName: '现代悬疑',
+      audioCandidates: [{ id: 199, name: '旧音频' }],
+      specifiedAudioId: 199,
+      specifiedAudioName: '旧音频'
+    }
+  };
+
+  const normalized = audioCategory.normalizeBatchAutoAudioConfig(original);
+
+  assert.equal(normalized.comicPublishSettings.audioCategorySelectionMode, 'auto');
+  assert.equal(normalized.comicPublishSettings.audioCategoryId, null);
+  assert.equal(normalized.comicPublishSettings.audioCategoryName, '');
+  assert.deepEqual(normalized.comicPublishSettings.audioCandidates, []);
+  assert.equal(normalized.comicPublishSettings.specifiedAudioId, '');
+  assert.equal(normalized.comicPublishSettings.specifiedAudioName, '');
+  assert.equal(original.comicPublishSettings.audioCategorySelectionMode, 'manual', 'must not mutate the saved source preset');
+});
+
+test('only single-book settings expose manual audio matching', () => {
+  assert.equal(typeof audioCategory.audioMatchingModeOptions, 'function');
+  assert.deepEqual(audioCategory.audioMatchingModeOptions(false), [
+    { value: 'auto', label: '按风格自动匹配' }
+  ]);
+  assert.deepEqual(audioCategory.audioMatchingModeOptions(true), [
+    { value: 'auto', label: '按风格自动匹配' },
+    { value: 'manual', label: '手动指定' }
+  ]);
+});
+
 test('comic publish defaults to per-book automatic audio instead of one batch category', () => {
   assert.match(unifiedSettingsSource, /发布时按每本书的男女频和风格自动匹配并随机选择音频/);
-  assert.match(unifiedSettingsSource, /value=\{comicPublishSettings\.audioCategorySelectionMode === 'manual' \? 'manual' : 'auto'\}/);
+  assert.match(unifiedSettingsSource, /const manualAudioMode = singleBook && comicPublishSettings\.audioCategorySelectionMode === 'manual'/);
+  assert.match(unifiedSettingsSource, /options=\{audioMatchingModeOptions\(singleBook\)\}/);
+  assert.match(unifiedSettingsSource, /createAutomationPreset\(\{ name, config: normalizeBatchAutoAudioConfig\(value\) \}\)/);
   assert.doesNotMatch(unifiedSettingsSource, /inferBatchN8AudioCategory/);
   assert.doesNotMatch(unifiedSettingsSource, /批次书籍分类不一致，需手动选择音频分类/);
 });

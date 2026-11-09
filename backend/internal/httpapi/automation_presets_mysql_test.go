@@ -12,6 +12,35 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+func TestMySQLAutomationPresetStoreListQualifiesJoinedColumns(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	now := time.Date(2026, 11, 9, 13, 0, 0, 0, time.UTC)
+	store, err := NewMySQLAutomationPresetStore(db, "", func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT p.id,p.name,p.current_revision,r.config_json,p.created_at,p.updated_at FROM batch_factory_v12_automation_presets p JOIN batch_factory_v12_automation_preset_revisions r ON r.preset_id=p.id AND r.revision=p.current_revision WHERE p.owner_username=?`)).
+		WithArgs("alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "current_revision", "config_json", "created_at", "updated_at"}).
+			AddRow("preset-1", "漫画自动化", 2, `{"productionMode":"comic"}`, now, now))
+
+	items, err := store.List("alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "漫画自动化" || items[0].Version != 2 {
+		t.Fatalf("items=%+v, want one current preset revision", items)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMySQLAutomationPresetStoreUpdateConflictKeepsHistoryUntouched(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

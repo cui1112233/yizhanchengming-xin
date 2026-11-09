@@ -17,6 +17,7 @@ import {
 } from '../../../shared/api/batchFactory';
 import { modelOptionsForProvider, normalizeModelProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
+import { audioMatchingModeOptions, normalizeBatchAutoAudioConfig } from './batchFactoryAudioCategory';
 import { getConstraintPresetTexts } from '../../../shared/api/generation';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { batchFactoryProductionModeVisibility, batchFactoryShouldLoadPublishEnvironment } from './batchFactoryProductionMode';
@@ -409,7 +410,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
     }).finally(() => { if (active) setProducerAccountsLoading(false); });
     return () => { active = false; };
   }, []);
-  const manualAudioMode = comicPublishSettings.audioCategorySelectionMode === 'manual';
+  const manualAudioMode = singleBook && comicPublishSettings.audioCategorySelectionMode === 'manual';
   const manualAudioReady = Boolean(singleBook && manualAudioMode && comicPublishSettings.organizationId && comicPublishSettings.audioCategoryId);
   const loadComicPublishAudios = async (organizationId, audioCategoryId, selectedCategory = {}) => {
     if (!organizationId || !audioCategoryId) return;
@@ -478,9 +479,9 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
       <div className="batch-factory-engine-card-body batch-factory-engine-grid">
 		<label className="batch-factory-engine-field" style={{ gridColumn: '1 / -1' }}>
 		  <span className="batch-factory-field-title-inline"><b>音频匹配方式</b><HelpTip title="音频匹配方式">发布时按每本书的男女频和风格自动匹配并随机选择音频；重试会继续使用第一次选中的音频。</HelpTip></span>
-		  <Segmented block value={comicPublishSettings.audioCategorySelectionMode === 'manual' ? 'manual' : 'auto'} options={[{ value: 'auto', label: '按风格自动匹配' }, { value: 'manual', label: '手动指定' }]} onChange={audioCategorySelectionMode => patchComicPublishSettings(audioCategorySelectionMode === 'manual' ? { audioCategorySelectionMode: 'manual' } : { audioCategorySelectionMode: 'auto', audioCategoryId: null, audioCategoryName: '', specifiedAudioId: '', specifiedAudioName: '' })} />
+		  <Segmented block value={manualAudioMode ? 'manual' : 'auto'} options={audioMatchingModeOptions(singleBook)} onChange={audioCategorySelectionMode => patchComicPublishSettings(audioCategorySelectionMode === 'manual' ? { audioCategorySelectionMode: 'manual' } : { audioCategorySelectionMode: 'auto', audioCategoryId: null, audioCategoryName: '', audioCandidates: [], specifiedAudioId: '', specifiedAudioName: '' })} />
 		</label>
-		<div className="batch-factory-engine-field">
+		{singleBook ? <div className="batch-factory-engine-field">
           <span><b>启用中的音频分类</b><HelpTip title="启用中的音频分类">请照着漫画后台“音频分类”页面中启用状态的分类名称填写，发布前会同时显示名称和 ID 供你核对。</HelpTip></span>
           <Select
             value={comicPublishSettings.audioCategoryName || ''}
@@ -499,7 +500,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
             }}
           />
           {audioCategoriesWarning ? <small className="batch-factory-engine-note">{audioCategoriesWarning}</small> : null}
-		</div>
+		</div> : null}
         {singleBook ? <div className="batch-factory-engine-field"><span><b>指定音频</b></span><Select loading={audiosLoading} disabled={!manualAudioReady} showSearch optionFilterProp="label" value={String(comicPublishSettings.specifiedAudioId || '') || undefined} options={audios.map(item => ({ value: String(item.id), label: `${item.name}（ID ${item.id}）` }))} placeholder={manualAudioMode ? (manualAudioReady ? '选择分类后随机带出，可手动更换' : '请先选择组织和音频分类') : '自动模式将在每本书发布时随机选择'} onChange={specifiedAudioId => { const selected = audios.find(item => String(item.id) === String(specifiedAudioId)); patchComicPublishSettings({ specifiedAudioId: selected?.id || '', specifiedAudioName: selected?.name || '', audioCategorySelectionMode: 'manual' }); }} />
           {manualAudioMode && comicPublishSettings.organizationId && comicPublishSettings.audioCategoryId ? <Button size="small" loading={audiosLoading} onClick={() => loadComicPublishAudios(String(comicPublishSettings.organizationId), String(comicPublishSettings.audioCategoryId))}>刷新指定音频</Button> : null}
           {audiosError ? <small className="batch-factory-engine-note">{audiosError}</small> : null}
@@ -642,7 +643,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
     try { await loadPresets(); setPresetOpen(true); }
     catch (error) { message.error(error?.message || '读取自动化预设失败'); }
   };
-  const clonePresetConfig = clone(selectedPreset?.config);
+  const clonePresetConfig = normalizeBatchAutoAudioConfig(selectedPreset?.config);
   const loadPreset = () => {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
     Modal.confirm({ title: '确认载入此预设', content: '它只替换当前统一配置草稿；确认当前批量配置后才会应用。', okText: '载入草稿', onOk: () => onLoad(clonePresetConfig) });
@@ -651,7 +652,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
     const name = presetName.trim();
     if (!name) return message.warning('请填写预设名称');
     setPresetBusy(true);
-    try { const result = await createAutomationPreset({ name, config: value }); const saved = result?.preset || result; await loadPresets(); setSelectedPresetId(saved?.id || ''); setPresetName(''); message.success('已保存自动化预设。'); }
+    try { const result = await createAutomationPreset({ name, config: normalizeBatchAutoAudioConfig(value) }); const saved = result?.preset || result; await loadPresets(); setSelectedPresetId(saved?.id || ''); setPresetName(''); message.success('已保存自动化预设。'); }
     catch (error) { message.error(error?.message || '保存自动化预设失败'); }
     finally { setPresetBusy(false); }
   };
@@ -660,7 +661,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
     const name = presetName.trim();
     if (!name) return message.warning('请填写新的预设名称');
     setPresetBusy(true);
-    try { await updateAutomationPreset(selectedPreset.id, { name, config: selectedPreset.config, expectedVersion: selectedPreset.version }); await loadPresets(); setPresetName(''); message.success('自动化预设已重命名。'); }
+    try { await updateAutomationPreset(selectedPreset.id, { name, config: normalizeBatchAutoAudioConfig(selectedPreset.config), expectedVersion: selectedPreset.version }); await loadPresets(); setPresetName(''); message.success('自动化预设已重命名。'); }
     catch (error) { message.error(error?.message || '重命名自动化预设失败'); }
     finally { setPresetBusy(false); }
   };
@@ -695,13 +696,16 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     setSaving(true);
     const aiPromptConfig = draftPatch.aiPromptConfig && typeof draftPatch.aiPromptConfig === 'object' ? draftPatch.aiPromptConfig : {};
     const video = requiredVideoPrompt(aiPromptConfig.video);
-    const nextPatch = {
+    const preparedPatch = {
       ...draftPatch,
       aiPromptConfig: { ...aiPromptConfig, video },
       ...(video.presetId === 'batch-video-sd' && !draftPatch.storyTimelineVersion
         ? { storyTimelineVersion: 'sd.original-story.v1' }
         : {})
     };
+    const nextPatch = batchFactoryProductionModeVisibility(draftPatch.productionMode).mode === 'comic'
+      ? normalizeBatchAutoAudioConfig(preparedPatch)
+      : preparedPatch;
     try { const result = await onSaved(nextPatch); if (result !== false) onClose(); }
     finally { setSaving(false); }
   };

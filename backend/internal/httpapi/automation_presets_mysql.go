@@ -111,7 +111,7 @@ func parseAutomationPresetTime(value string, now func() time.Time) time.Time {
 }
 
 func (s *MySQLAutomationPresetStore) List(owner string) ([]AutomationPreset, error) {
-	rows, err := s.db.Query(`SELECT id,name,current_revision,config_json,created_at,updated_at FROM batch_factory_v12_automation_presets p JOIN batch_factory_v12_automation_preset_revisions r ON r.preset_id=p.id AND r.revision=p.current_revision WHERE p.owner_username=?`, strings.TrimSpace(owner))
+	rows, err := s.db.Query(`SELECT p.id,p.name,p.current_revision,r.config_json,p.created_at,p.updated_at FROM batch_factory_v12_automation_presets p JOIN batch_factory_v12_automation_preset_revisions r ON r.preset_id=p.id AND r.revision=p.current_revision WHERE p.owner_username=?`, strings.TrimSpace(owner))
 	if err != nil {
 		return nil, err
 	}

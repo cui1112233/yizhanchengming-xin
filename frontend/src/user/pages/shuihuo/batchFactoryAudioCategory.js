@@ -1,5 +1,27 @@
 const text = value => String(value || '').trim();
 
+export function normalizeBatchAutoAudioConfig(config = {}) {
+  const next = JSON.parse(JSON.stringify(config && typeof config === 'object' ? config : {}));
+  const publish = next.comicPublishSettings && typeof next.comicPublishSettings === 'object'
+    ? next.comicPublishSettings
+    : {};
+  next.comicPublishSettings = {
+    ...publish,
+    audioCategorySelectionMode: 'auto',
+    audioCategoryId: null,
+    audioCategoryName: '',
+    audioCandidates: [],
+    specifiedAudioId: '',
+    specifiedAudioName: ''
+  };
+  return next;
+}
+
+export function audioMatchingModeOptions(singleBook = false) {
+  const options = [{ value: 'auto', label: '按风格自动匹配' }];
+  return singleBook ? [...options, { value: 'manual', label: '手动指定' }] : options;
+}
+
 export function mappedAudioCategoryName(metadata = {}) {
   if (text(metadata.classifyStatus || metadata.classify_status).toLowerCase() !== 'classified') return '';
   const gender = text(metadata.gender || metadata.gender_name);
