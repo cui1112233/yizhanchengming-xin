@@ -27,6 +27,15 @@ export function resolveComicImageSources(image) {
   return { thumbnail, original };
 }
 
+// 详情页先显示小图，再在后台替换成原图；列表只读小图，避免一打开同时下载大量原图。
+export function comicImageLoadPlan(image, preview = false) {
+  const { thumbnail, original } = resolveComicImageSources(image);
+  const plan = [];
+  if (thumbnail) plan.push(thumbnail);
+  if (preview && original && original !== thumbnail) plan.push(original);
+  return plan;
+}
+
 // 漫画输出卡首屏只挂 4 张。35 页原图一次性挂载会同时发起 35 个 3MB 级请求，
 // 滚动到尾部哨兵后再按批追加，交互（点击看原图、下载本页）保持不变。
 export const COMIC_OUTPUT_FIRST_SCREEN = 4;

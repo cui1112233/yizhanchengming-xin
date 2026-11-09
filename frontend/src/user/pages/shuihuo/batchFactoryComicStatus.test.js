@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { comicInlinePresentation, nextComicOutputVisibleCount, resolveComicImageSources } from './batchFactoryComicStatus.js';
+import { comicImageLoadPlan, comicInlinePresentation, nextComicOutputVisibleCount, resolveComicImageSources } from './batchFactoryComicStatus.js';
 
 test('已选主图时优先显示图片，不被历史失败状态覆盖', () => {
   const result = comicInlinePresentation({
@@ -74,6 +74,18 @@ test('列表行优先取缩略图，缺缩略图时回落原图', () => {
   assert.equal(withoutThumbnail.original, '/content');
   const empty = resolveComicImageSources(null);
   assert.deepEqual(empty, { thumbnail: '', original: '' });
+});
+
+test('详情预览先显示缩略图再后台升级原图', () => {
+  assert.deepEqual(
+    comicImageLoadPlan({ url: '/content', thumbnailUrl: '/thumbnail' }, true),
+    ['/thumbnail', '/content']
+  );
+  assert.deepEqual(
+    comicImageLoadPlan({ url: '/content', thumbnailUrl: '/thumbnail' }, false),
+    ['/thumbnail']
+  );
+  assert.deepEqual(comicImageLoadPlan({ url: '/content' }, true), ['/content']);
 });
 
 test('漫画输出卡首屏只挂 4 张，滚动按批追加并封顶总页数', () => {

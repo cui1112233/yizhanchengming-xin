@@ -148,7 +148,7 @@ import '../private-studio/private-studio-asset-editor.css';
 import { BatchFactoryBookSettingsModal } from './BatchFactoryBookSettingsModal';
 import { audioPlanningRequired, normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { BatchFactoryGiantMaterialPendingProgress } from './BatchFactoryGiantMaterialPendingProgress';
-import { comicInlinePresentation, resolveComicImageSources } from './batchFactoryComicStatus.js';
+import { comicImageLoadPlan, comicInlinePresentation, resolveComicImageSources } from './batchFactoryComicStatus.js';
 import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError, bookFailureIsHistorical } from './batchFactoryBookState';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, comicAnalysisCharactersForBook, comicEstimatedPageRange, batchFactoryProductionText, batchFactorySourceText, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange';
 import { assetsForProductionMode } from './batchFactoryAssetMode';
@@ -673,14 +673,12 @@ function comicImageFailureText(error) {
 
 function AuthenticatedComicPageImage({ imageUrl, thumbnailUrl = '', alt = '', preview = false, lazy = false }) {
   const hostRef = useRef(null);
-  // 列表行取 420px 缩略图，详情/放大预览必须用原图。
+  // 列表行只取 420px 缩略图；详情先显示缩略图，再静默替换成原图。
   const sources = resolveComicImageSources({ url: imageUrl, thumbnailUrl });
-  const preferredSource = preview ? sources.original : sources.thumbnail;
+  const loadPlan = comicImageLoadPlan({ url: imageUrl, thumbnailUrl }, preview);
   const [visible, setVisible] = useState(!lazy);
-  const [source, setSource] = useState(preferredSource);
   const [display, setDisplay] = useState({ url: '', failed: false, message: '' });
   const [retryToken, setRetryToken] = useState(0);
-  useEffect(() => { setSource(preferredSource); }, [preferredSource]);
   useEffect(() => {
     if (!lazy) { setVisible(true); return undefined; }
     if (visible) return undefined;
@@ -693,25 +691,34 @@ function AuthenticatedComicPageImage({ imageUrl, thumbnailUrl = '', alt = '', pr
     return () => observer.disconnect();
   }, [lazy, visible]);
   useEffect(() => {
-    if (!visible || !source) return undefined;
+    if (!visible || loadPlan.length === 0) return undefined;
     let active = true;
     let ownedUrl = '';
     setDisplay({ url: '', failed: false, message: '' });
-    getComicPageImageBlob(source).then(blob => {
-      if (!active) return;
-      ownedUrl = URL.createObjectURL(blob);
-      setDisplay({ url: ownedUrl, failed: false, message: '' });
-    }).catch(error => {
-      if (!active) return;
-      // 缩略图失败先自动回落原图；原图也失败才显示重试，避免一直转圈。
-      if (source !== sources.original) { setSource(sources.original); return; }
-      setDisplay({ url: '', failed: true, message: comicImageFailureText(error) });
-    });
+    void (async () => {
+      let loaded = false;
+      let lastError;
+      for (const source of loadPlan) {
+        try {
+          const blob = await getComicPageImageBlob(source);
+          if (!active) return;
+          const nextUrl = URL.createObjectURL(blob);
+          const previousUrl = ownedUrl;
+          ownedUrl = nextUrl;
+          loaded = true;
+          setDisplay({ url: nextUrl, failed: false, message: '' });
+          if (previousUrl) URL.revokeObjectURL(previousUrl);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (active && !loaded) setDisplay({ url: '', failed: true, message: comicImageFailureText(lastError) });
+    })();
     return () => {
       active = false;
       if (ownedUrl) URL.revokeObjectURL(ownedUrl);
     };
-  }, [source, visible, retryToken, sources.original]);
+  }, [visible, retryToken, preview, sources.thumbnail, sources.original]);
   if (!visible) return <span ref={hostRef} className="batch-factory-comic-image-state" aria-hidden="true" />;
   if (!display.url) {
     return display.failed
@@ -2214,14 +2221,14 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	const pageTab = <div className="batch-factory-comic-page-controls">
 		<section className="batch-factory-comic-media-section batch-factory-comic-media-candidates">
 			<header><div><b>候选图</b><small>选择一张作为本页主图</small></div><span>{selectedPage?.images?.length || 0} 张</span></header>
-			<div>{(selectedPage?.images || []).map((image, index) => <button type="button" className={image.isPrimary ? 'is-primary' : ''} key={image.id} disabled={busy === image.id} onClick={() => choosePrimary(image)}><AuthenticatedComicPageImage imageUrl={image.url} alt={`候选图 ${index + 1}`} /><span>{image.isPrimary ? '当前主图' : `候选 ${index + 1}`}</span></button>)}{!selectedPage?.images?.length ? <p>生成当前漫画页后，候选图会保留在这里。</p> : null}</div>
+			<div>{(selectedPage?.images || []).map((image, index) => <button type="button" className={image.isPrimary ? 'is-primary' : ''} key={image.id} disabled={busy === image.id} onClick={() => choosePrimary(image)}><AuthenticatedComicPageImage imageUrl={image.url} thumbnailUrl={image.thumbnailUrl} alt={`候选图 ${index + 1}`} /><span>{image.isPrimary ? '当前主图' : `候选 ${index + 1}`}</span></button>)}{!selectedPage?.images?.length ? <p>生成当前漫画页后，候选图会保留在这里。</p> : null}</div>
 		</section>
 		<section className="batch-factory-comic-media-section batch-factory-comic-page-reference"><header><div><b>本页参考图</b><small>约束人物、服装和画风</small></div><span>{selectedPage?.referenceImageUrls?.length ? `已设置 ${selectedPage.referenceImageUrls.length} 张` : '未设置'}</span></header><Space wrap>{(selectedPage?.referenceImageUrls || []).map(referenceURL => <AuthenticatedComicPageReference key={referenceURL} referenceURL={referenceURL} />)}<AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadPageReference} disabled={!selectedVideoId || referenceUploading || Boolean(busy)}><Button size="small" icon={<UploadOutlined />} loading={referenceUploading}>上传参考图</Button></AntUpload><Button size="small" disabled={!selectedPage?.referenceImageUrls?.length || Boolean(busy)} loading={busy === 'reference-all'} onClick={applyPageReferenceToAll}>应用到全部</Button>{selectedPage?.referenceImageUrls?.length ? <Button size="small" danger disabled={Boolean(busy)} loading={busy === 'reference'} onClick={() => savePageReferences([], '当前漫画页参考图已清空。')}>清空</Button> : null}</Space></section>
 		<section className="batch-factory-comic-media-section batch-factory-comic-media-source"><ComicSourceContent segment={sourceSegment} ordinal={selectedIndex} onSplit={splitSource} embedded /></section>
 	</div>;
 	const collectionTab = <div className="batch-factory-comic-collections"><div className="batch-factory-comic-collection-actions"><div><b>漫画合集</b><small>按页码范围收集当前主图；同一本书可以分批生成多个合集。</small></div><Tag color={publishConfigured ? 'success' : 'warning'}>{publishStatusLoaded ? (publishConfigured ? '漫画后台已连接' : '漫画后台未配置') : '检查连接中'}</Tag></div><section className="batch-factory-comic-collection-range"><header><div><b>生成漫画合集</b><small>发布接口支持 2–35 页，未选中的页不会进入本合集。</small></div><Tag color={canMakeCollection ? 'success' : 'warning'}>{selectedCollectionPageCount} 页 · 已就绪 {selectedReadyPageCount} 页</Tag></header><div className="batch-factory-comic-collection-range-fields"><span>第</span><InputNumber min={1} max={maxCollectionPage} value={normalizedCollectionStart} onChange={value => updateCollectionRange(value, normalizedCollectionEnd)} /><span>页至</span><InputNumber min={normalizedCollectionStart} max={maxCollectionPage} value={normalizedCollectionEnd} onChange={value => updateCollectionRange(normalizedCollectionStart, value)} /><span>页</span></div><div className="batch-factory-comic-collection-range-shortcuts"><Button type="link" size="small" onClick={() => updateCollectionRange(1, Math.min(maxCollectionPage, 35))}>前 35 页</Button><Button type="link" size="small" onClick={() => updateCollectionRange(Math.max(1, maxCollectionPage - 34), maxCollectionPage)}>后 35 页</Button></div><Button className="batch-factory-comic-collection-range-submit" type="primary" loading={busy === 'collection'} disabled={!canMakeCollection || Boolean(busy)} onClick={makeCollection}>整理所选页为合集</Button></section>{collections.slice().reverse().map(collection => { const published = publishedByCollection[collection.id]; return <section key={collection.id}><header><b>{new Date(collection.createdAt).toLocaleString()}</b><Space><Tag color="success">{collection.items?.length || 0} 页</Tag><Button size="small" icon={<DownloadOutlined />} disabled={!collection.items?.length || Boolean(busy)} loading={busy === `collection-download-${collection.id}`} onClick={() => downloadCollectionImages(collection)}>下载图片</Button>{published ? <Tag color="blue">已发布 #{published.carouselId}</Tag> : <Button size="small" disabled={!publishConfigured || (collection.items?.length || 0) < 2 || (collection.items?.length || 0) > 35} loading={busy === `publish-${collection.id}`} onClick={() => openComicPublish(collection)}>发布到漫画后台</Button>}</Space></header><div>{(collection.items || []).map(item => <figure key={`${collection.id}-${item.ordinal}`}><AuthenticatedComicPageImage imageUrl={item.url} thumbnailUrl={item.thumbnailUrl} alt={`第 ${item.ordinal} 页`} lazy /><figcaption>第 ${item.ordinal} 页</figcaption></figure>)}</div></section>; })}{!collections.length ? <div className="batch-factory-cell-empty">先选择页码范围，再整理当前选中页的主图。</div> : null}</div>;
 	return <><div className="batch-factory-comic-media-workbench">
-		<section className="batch-factory-comic-media-preview">{primary?.url ? <AuthenticatedComicPageImage imageUrl={primary.url} alt="当前漫画主图" preview /> : <div className="batch-factory-comic-media-preview-empty"><PictureOutlined /><strong>{selectedPage ? '当前漫画页还没有主图' : '当前分镜还没有漫画候选图'}</strong><span>{selectedComicPageStatus}</span><small>{pageAccessMessage || `整体完成度 ${readyComicPageCount} / ${videos.length} 页（${comicCompletionPercent}%）`}</small></div>}</section>
+		<section className="batch-factory-comic-media-preview">{primary?.url ? <AuthenticatedComicPageImage imageUrl={primary.url} thumbnailUrl={primary.thumbnailUrl} alt="当前漫画主图" preview /> : <div className="batch-factory-comic-media-preview-empty"><PictureOutlined /><strong>{selectedPage ? '当前漫画页还没有主图' : '当前分镜还没有漫画候选图'}</strong><span>{selectedComicPageStatus}</span><small>{pageAccessMessage || `整体完成度 ${readyComicPageCount} / ${videos.length} 页（${comicCompletionPercent}%）`}</small></div>}</section>
 		<aside className="batch-factory-comic-media-tools">
 		<header className="batch-factory-comic-media-header"><div className="batch-factory-comic-media-title"><small>媒体库</small><b>{book?.title || '未命名作品'}</b><span>{selectedVideo ? `漫画页 ${String(selectedIndex + 1).padStart(2, '0')}` : '漫画页'} · {primary ? '主图已就绪' : '尚未选择主图'}</span>{selectedPage?.configStale ? <em>原文已变化，建议重新分析分页与提示词</em> : null}</div>{pageAccessMessage ? <div className="batch-factory-comic-media-completion" role="status" aria-label={pageAccessMessage}><span>完成度</span><b>无数据</b><i>—</i></div> : <div className="batch-factory-comic-media-completion" aria-label={`完成度 ${readyComicPageCount}/${videos.length} 页`}><span>完成度</span><b>{readyComicPageCount} / {videos.length} 页</b><i>{comicCompletionPercent}%</i><div className="batch-factory-comic-media-completion-track"><span style={{ width: `${comicCompletionPercent}%` }} /></div></div>}<Space><Tooltip title="让 AI 按剧情重新分析小说分段"><Button loading={busy === 'segmentation'} disabled={Boolean(busy)} onClick={resegmentSource}>重新分析分段</Button></Tooltip><Tooltip title={canMakeCollection ? `按当前选择的第 ${normalizedCollectionStart}-${normalizedCollectionEnd} 页生成漫画合集` : `所选页需要全部有主图，且合集必须为 2–35 页`}><Button type="primary" loading={busy === 'collection'} disabled={!canMakeCollection || Boolean(busy)} onClick={makeCollection}>生成漫画合集（所选页）</Button></Tooltip>{onClose ? <Button type="text" aria-label="关闭漫画媒体库" icon={<CloseOutlined />} onClick={onClose} /> : null}</Space></header>
 			<Tabs className="batch-factory-comic-media-tabs" activeKey={activeView} onChange={setActiveView} items={[{ key: 'pages', label: `漫画页 ${videos.length}` }, { key: 'collections', label: `漫画合集 ${collections.length}` }]} />

@@ -74,3 +74,9 @@ test('comic collection card downloads its ordered primary images as a ZIP', () =
 test('comic collection grid requests the server thumbnail before the original', () => {
   assert.match(panel, /collection\.items[\s\S]*thumbnailUrl=\{item\.thumbnailUrl\}[\s\S]*lazy/);
 });
+
+test('comic media main preview and candidates request thumbnails before originals', () => {
+  assert.match(panel, /imageUrl=\{primary\.url\}\s+thumbnailUrl=\{primary\.thumbnailUrl\}[\s\S]*alt="当前漫画主图"[\s\S]*preview/);
+  assert.match(panel, /selectedPage\?\.images[\s\S]*imageUrl=\{image\.url\}\s+thumbnailUrl=\{image\.thumbnailUrl\}/);
+  assert.match(jsx, /comicImageLoadPlan\(\{ url: imageUrl, thumbnailUrl \}, preview\)/);
+});
