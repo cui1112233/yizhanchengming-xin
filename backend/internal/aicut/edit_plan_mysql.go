@@ -110,6 +110,44 @@ func (s *MySQLStore) EditPlanByRequest(ctx context.Context, owner, projectID, re
 	return readEditPlanSQL(ctx, s.db, owner, projectID, "client_request_id", requestID, false)
 }
 
+func (s *MySQLStore) UpdateEditPlan(ctx context.Context, plan EditPlan) (EditPlan, error) {
+	normalized, err := NormalizeEditPlan(plan)
+	if err != nil {
+		return EditPlan{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return EditPlan{}, err
+	}
+	defer tx.Rollback()
+	current, err := readEditPlanSQL(ctx, tx, normalized.Owner, normalized.ProjectID, "id", normalized.ID, true)
+	if err != nil {
+		return EditPlan{}, err
+	}
+	if current.ClientRequestID != normalized.ClientRequestID || !validEditPlanStateTransition(current.State, normalized.State) {
+		return EditPlan{}, ErrInvalidEditPlan
+	}
+	requestJSON, _ := json.Marshal(normalized.Request)
+	summaryJSON, _ := json.Marshal(normalized.Summary)
+	warningsJSON, _ := json.Marshal(normalized.Warnings)
+	if _, err := tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET state = ?, request_json = ?, summary_json = ?, warnings_json = ?, error_message = ?, applied_revision = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`, normalized.State, requestJSON, summaryJSON, warningsJSON, normalized.Error, normalized.AppliedRevision, normalized.UpdatedAt, normalized.ID, normalized.ProjectID, normalized.Owner); err != nil {
+		return EditPlan{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM aicut_edit_plan_operations WHERE plan_id = ?`, normalized.ID); err != nil {
+		return EditPlan{}, err
+	}
+	for index, operation := range normalized.Operations {
+		encoded, _ := json.Marshal(operation)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO aicut_edit_plan_operations (plan_id, operation_id, ordinal_no, operation_json) VALUES (?, ?, ?, ?)`, normalized.ID, operation.ID, index, encoded); err != nil {
+			return EditPlan{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return EditPlan{}, err
+	}
+	return normalized, nil
+}
+
 func (s *MySQLStore) UpdateEditPlanState(ctx context.Context, owner, projectID, id string, state EditPlanState, message string, now time.Time) (EditPlan, error) {
 	plan, err := s.EditPlan(ctx, owner, projectID, id)
 	if err != nil {

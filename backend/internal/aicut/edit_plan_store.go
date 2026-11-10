@@ -14,8 +14,28 @@ type EditPlanStore interface {
 	CreateEditPlan(context.Context, EditPlan) (EditPlan, error)
 	EditPlan(context.Context, string, string, string) (EditPlan, error)
 	EditPlanByRequest(context.Context, string, string, string) (EditPlan, error)
+	UpdateEditPlan(context.Context, EditPlan) (EditPlan, error)
 	UpdateEditPlanState(context.Context, string, string, string, EditPlanState, string, time.Time) (EditPlan, error)
 	ApplyStoredEditPlan(context.Context, string, string, string, []string, time.Time) (EditPlan, Timeline, EditPlanApplySummary, error)
+}
+
+func (s *MemoryStore) UpdateEditPlan(_ context.Context, plan EditPlan) (EditPlan, error) {
+	normalized, err := NormalizeEditPlan(plan)
+	if err != nil {
+		return EditPlan{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := editPlanKey(normalized.Owner, normalized.ProjectID, normalized.ID)
+	current, ok := s.editPlans[key]
+	if !ok {
+		return EditPlan{}, ErrEditPlanNotFound
+	}
+	if current.ClientRequestID != normalized.ClientRequestID || !validEditPlanStateTransition(current.State, normalized.State) {
+		return EditPlan{}, ErrInvalidEditPlan
+	}
+	s.editPlans[key] = cloneEditPlan(normalized)
+	return cloneEditPlan(normalized), nil
 }
 
 func cloneEditPlan(plan EditPlan) EditPlan {
