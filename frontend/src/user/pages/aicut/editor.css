@@ -35,6 +35,10 @@
   border-radius: 0;
 }
 
+.aicut-editor-v3 .aicut-timeline-collapse {
+  margin-right: 52px;
+}
+
 .aicut-resource-tabs button {
   display: grid;
   place-items: center;
