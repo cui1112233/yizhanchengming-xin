@@ -82,7 +82,7 @@ func (s *MySQLStore) CreateEditPlan(ctx context.Context, plan EditPlan) (EditPla
 		return EditPlan{}, err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `INSERT INTO aicut_edit_plans (id, client_request_id, project_id, owner_username, base_revision, model_id, state, request_json, summary_json, warnings_json, error_message, applied_revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, normalized.ID, normalized.ClientRequestID, normalized.ProjectID, normalized.Owner, normalized.BaseRevision, normalized.ModelID, normalized.State, requestJSON, summaryJSON, warningsJSON, normalized.Error, normalized.AppliedRevision, normalized.CreatedAt, normalized.UpdatedAt)
+	_, err = tx.ExecContext(ctx, `INSERT INTO aicut_edit_plans (id, client_request_id, project_id, owner_username, base_revision, model_id, state, request_json, summary_json, warnings_json, error_message, applied_revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, normalized.ID, normalized.ClientRequestID, normalized.ProjectID, normalized.Owner, normalized.BaseRevision, normalized.ModelID, normalized.State, string(requestJSON), string(summaryJSON), string(warningsJSON), normalized.Error, normalized.AppliedRevision, normalized.CreatedAt, normalized.UpdatedAt)
 	if err != nil {
 		var mysqlErr *mysql.MySQLError
 		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
@@ -92,7 +92,7 @@ func (s *MySQLStore) CreateEditPlan(ctx context.Context, plan EditPlan) (EditPla
 	}
 	for index, operation := range normalized.Operations {
 		encoded, _ := json.Marshal(operation)
-		if _, err := tx.ExecContext(ctx, `INSERT INTO aicut_edit_plan_operations (plan_id, operation_id, ordinal_no, operation_json) VALUES (?, ?, ?, ?)`, normalized.ID, operation.ID, index, encoded); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO aicut_edit_plan_operations (plan_id, operation_id, ordinal_no, operation_json) VALUES (?, ?, ?, ?)`, normalized.ID, operation.ID, index, string(encoded)); err != nil {
 			return EditPlan{}, err
 		}
 	}
@@ -130,7 +130,7 @@ func (s *MySQLStore) UpdateEditPlan(ctx context.Context, plan EditPlan) (EditPla
 	requestJSON, _ := json.Marshal(normalized.Request)
 	summaryJSON, _ := json.Marshal(normalized.Summary)
 	warningsJSON, _ := json.Marshal(normalized.Warnings)
-	if _, err := tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET state = ?, request_json = ?, summary_json = ?, warnings_json = ?, error_message = ?, applied_revision = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`, normalized.State, requestJSON, summaryJSON, warningsJSON, normalized.Error, normalized.AppliedRevision, normalized.UpdatedAt, normalized.ID, normalized.ProjectID, normalized.Owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET state = ?, request_json = ?, summary_json = ?, warnings_json = ?, error_message = ?, applied_revision = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`, normalized.State, string(requestJSON), string(summaryJSON), string(warningsJSON), normalized.Error, normalized.AppliedRevision, normalized.UpdatedAt, normalized.ID, normalized.ProjectID, normalized.Owner); err != nil {
 		return EditPlan{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM aicut_edit_plan_operations WHERE plan_id = ?`, normalized.ID); err != nil {
@@ -138,7 +138,7 @@ func (s *MySQLStore) UpdateEditPlan(ctx context.Context, plan EditPlan) (EditPla
 	}
 	for index, operation := range normalized.Operations {
 		encoded, _ := json.Marshal(operation)
-		if _, err := tx.ExecContext(ctx, `INSERT INTO aicut_edit_plan_operations (plan_id, operation_id, ordinal_no, operation_json) VALUES (?, ?, ?, ?)`, normalized.ID, operation.ID, index, encoded); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO aicut_edit_plan_operations (plan_id, operation_id, ordinal_no, operation_json) VALUES (?, ?, ?, ?)`, normalized.ID, operation.ID, index, string(encoded)); err != nil {
 			return EditPlan{}, err
 		}
 	}

@@ -28,9 +28,9 @@ type createEditPlanInput struct {
 }
 
 var (
-	editPlanTransitions = []string{"none", "fade", "flash-black", "slide-left", "slide-right", "zoom", "blur"}
-	editPlanFilters     = []string{"original", "bright", "cool-cinema", "warm", "grayscale", "soft-focus", "vignette"}
-	editPlanTextStyles  = []string{"title-basic", "title-bold", "subtitle-clean", "subtitle-outline"}
+	editPlanTransitions = []string{"fade", "flash-black", "flash-white", "slide-left", "slide-right", "zoom", "blur"}
+	editPlanFilters     = []string{"filter-original", "filter-bright", "filter-warm-sun", "filter-cool-blue", "filter-cinema", "filter-monochrome", "filter-soft"}
+	editPlanTextStyles  = []string{"text-basic-caption", "text-bold-title", "text-outline-caption", "text-shadow-caption", "text-panel-caption", "text-gradient-title"}
 )
 
 func writeEditPlanError(w http.ResponseWriter, err error) {

@@ -3,6 +3,7 @@ package aicut
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"regexp"
 	"testing"
 	"time"
@@ -21,16 +22,20 @@ func TestMySQLCreateEditPlanPersistsPlanAndOrderedOperations(t *testing.T) {
 	plan := editPlanForApply(EditOperation{ID: "op-caption", Type: EditAddCaption, TrackID: "subtitle-1", StartMS: 100, DurationMS: 800, Text: "自动字幕", Reason: "补充字幕", Enabled: true})
 	plan.ID, plan.ClientRequestID, plan.Owner, plan.ProjectID = "plan-1", "request-1", "alice", "cut-1"
 	plan.State, plan.CreatedAt, plan.UpdatedAt = EditPlanReady, now, now
+	requestJSON, _ := json.Marshal(plan.Request)
+	summaryJSON, _ := json.Marshal(plan.Summary)
+	warningsJSON, _ := json.Marshal(plan.Warnings)
+	operationJSON, _ := json.Marshal(plan.Operations[0])
 
 	mock.ExpectQuery("SELECT id, client_request_id, base_revision").
 		WithArgs("alice", "cut-1", "request-1").
 		WillReturnError(sql.ErrNoRows)
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO aicut_edit_plans")).
-		WithArgs(plan.ID, plan.ClientRequestID, plan.ProjectID, plan.Owner, plan.BaseRevision, plan.ModelID, plan.State, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), "", int64(0), now, now).
+		WithArgs(plan.ID, plan.ClientRequestID, plan.ProjectID, plan.Owner, plan.BaseRevision, plan.ModelID, plan.State, string(requestJSON), string(summaryJSON), string(warningsJSON), "", int64(0), now, now).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO aicut_edit_plan_operations")).
-		WithArgs(plan.ID, "op-caption", 0, sqlmock.AnyArg()).
+		WithArgs(plan.ID, "op-caption", 0, string(operationJSON)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
