@@ -140,6 +140,36 @@
   font-size: 10px;
 }
 
+.aicut-caption-workspace {
+  z-index: 18;
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+  background: var(--surface-panel);
+  color: var(--text-primary);
+}
+
+.aicut-caption-workspace header,
+.aicut-caption-workspace label,
+.aicut-caption-workspace article {
+  display: grid;
+  gap: 5px;
+}
+
+.aicut-caption-workspace header span,
+.aicut-caption-workspace small {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.aicut-caption-jobs { display: grid; gap: 6px; }
+.aicut-caption-workspace article { grid-template-columns: minmax(0, 1fr) auto; padding: 7px; border: 1px solid var(--border-default); border-radius: 6px; }
+.aicut-caption-workspace footer { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .aicut-resource-thumb {
   display: grid;
   place-items: center;
