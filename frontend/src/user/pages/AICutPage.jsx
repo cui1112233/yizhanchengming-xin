@@ -10,6 +10,7 @@ import { resolveAICutShortcut, timelineDropTime } from './aicutWorkbench.js';
 import { createAICutCapabilities, filterAICutCapabilities, recordRecentAICutFeature, toggleFavoriteAICutFeature } from './aicutCapabilities.js';
 import { normalizeVisualEffect, subtitleAnimationCatalog, subtitleStyleCatalog, textStyleCatalog, transitionCatalog, visualEffectCatalog, visualEffectPreviewStyle, visualEffectPreset } from './aicutEffects.js';
 import EditorShell from './aicut/EditorShell.jsx';
+import ResourceLibrary from './aicut/ResourceLibrary.jsx';
 import { normalizeEditorLayout } from './aicut/editorLayout.js';
 import './aicut-page.css';
 import './aicut/editor.css';
@@ -24,6 +25,19 @@ const editorTools = [
 ];
 const inspectorTabs = ['基础', '速度'];
 const toolSourceLabels = { browser: '浏览器', cloud: '云服务', ai: 'AI模型', render: 'Go后台' };
+const catalogPresetMap = {
+  'filter-original': 'original', 'filter-bright': 'bright', 'filter-warm-sun': 'warm', 'filter-cool-blue': 'cool-cinema',
+  'filter-monochrome': 'grayscale', 'filter-soft': 'soft-focus', 'effect-blur': 'soft-focus', 'effect-vignette': 'vignette',
+  'effect-glow': 'glow', 'effect-shake': 'shake', 'effect-breathe-zoom': 'breathe', 'effect-flash': 'flash', 'effect-mosaic': 'mosaic',
+};
+
+function visualEffectForCatalogResource(resource) {
+  const preset = catalogPresetMap[resource?.id];
+  if (preset) return visualEffectPreset(preset);
+  if (resource?.category === 'filter') return normalizeVisualEffect({ preset: 'custom', contrast: 1.08, saturation: 1.12, intensity: .5, speed: 1 });
+  if (resource?.category === 'effect') return normalizeVisualEffect({ preset: 'custom', intensity: .5, speed: 1 });
+  return null;
+}
 function newID(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -107,6 +121,7 @@ export default function AICutPage() {
   const [materialTab, setMaterialTab] = useState('我的素材');
   const [workspaceMode, setWorkspaceMode] = useState('editor');
   const [toolCategory, setToolCategory] = useState('媒体');
+  const [previewResource, setPreviewResource] = useState(null);
   const [inspectorTab, setInspectorTab] = useState('基础');
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
@@ -192,7 +207,13 @@ export default function AICutPage() {
     return !assetSearch.trim() || asset.name.toLowerCase().includes(assetSearch.trim().toLowerCase());
   }), [assets, assetSearch, materialTab]);
   const durationMs = useMemo(() => getAICutTimelineDuration(timeline), [timeline]);
-  const previewFrame = useMemo(() => buildAICutPreviewFrame(timeline, assets, previewTimeMs), [timeline, assets, previewTimeMs]);
+  const previewFrame = useMemo(() => {
+    const frame = buildAICutPreviewFrame(timeline, assets, previewTimeMs);
+    const previewEffect = visualEffectForCatalogResource(previewResource);
+    const selectedPreviewClipId = selectedClipKey.split('::')[1];
+    if (!previewEffect || !selectedPreviewClipId) return frame;
+    return { ...frame, visuals: frame.visuals.map(item => item.clipId === selectedPreviewClipId ? { ...item, visualEffect: previewEffect } : item) };
+  }, [timeline, assets, previewTimeMs, previewResource, selectedClipKey]);
   const selectedClipEntry = useMemo(() => {
     const [trackId, clipId] = selectedClipKey.split('::');
     const track = timeline.tracks.find(item => item.id === trackId);
@@ -1055,6 +1076,41 @@ export default function AICutPage() {
     message.success('文字已加入时间线');
   }
 
+  function previewCatalogResource(resource) {
+    setPreviewResource(resource);
+    if (['filter', 'effect'].includes(resource.category) && !selectedClipEntry) message.info('先选择一个画面片段，再预览该资源');
+  }
+
+  function applyCatalogResource(resource) {
+    setRecentFeatures(current => recordRecentAICutFeature(current, resource.id));
+    if (['filter', 'effect'].includes(resource.category)) {
+      if (!selectedClipEntry || !['video', 'image'].includes(selectedClipEntry.clip.kind)) return message.warning('请先选择视频或图片片段');
+      if (selectedClipEntry.track.locked) return message.warning('轨道已锁定');
+      const visualEffect = visualEffectForCatalogResource(resource);
+      updateClip(selectedClipEntry.track.id, selectedClipEntry.clip.id, { visualEffect, catalogResourceId: resource.id });
+      setPreviewResource(null);
+      return message.success(`已应用${resource.labelZh}`);
+    }
+    if (resource.category === 'transition') {
+      if (!selectedClipEntry || selectedClipEntry.track.kind !== 'video') return message.warning('请先选择同一视频轨中的后一个片段');
+      updateClip(selectedClipEntry.track.id, selectedClipEntry.clip.id, { transition: resource.id, transitionMs: 500 });
+      return message.success(`已添加${resource.labelZh}`);
+    }
+    if (resource.category === 'text') {
+      commitTimeline(current => {
+        const tracks = current.tracks.map(track => ({ ...track, clips: [...(track.clips || [])] }));
+        const track = { id: newID('track-text'), kind: 'subtitle', name: resource.labelZh, order: tracks.length, muted: false, locked: false, settings: { textResourceId: resource.id, previewVisible: true }, clips: [{ id: newID('text'), kind: 'subtitle', name: resource.labelZh, startMs: previewTimeMs, durationMs: 3000, sourceStartMs: 0, sourceDurationMs: 3000, text: '双击编辑文字', textResourceId: resource.id }] };
+        tracks.push(track);
+        return { ...current, tracks };
+      });
+      return message.success(`${resource.labelZh}已加入时间线`);
+    }
+    if (resource.category === 'template') {
+      commitTimeline(current => ({ ...current, editorTemplateId: resource.id }));
+      return message.success(`已应用${resource.labelZh}工程模板`);
+    }
+  }
+
   function applyTransition(kind) {
     const [trackId, clipId] = selectedClipKey.split('::');
     return applyTransitionTo(trackId, clipId, kind);
@@ -1173,6 +1229,7 @@ export default function AICutPage() {
           <div className="aicut-canvas-agent"><AICutAgentPanel embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} activeSkill={activeAgentSkill} draft={agentDraft} onTimelineChanged={refreshTimelineFromAgent} /></div>
         </section> : <EditorShell ref={editorShellRef} layout={editorLayout} inspectorDrawerOpen={inspectorDrawerOpen}>
           {editorLayout.inspectorMode === 'drawer' ? <button type="button" className="aicut-open-inspector" aria-label={inspectorDrawerOpen ? '关闭属性栏' : '打开属性栏'} onClick={() => setInspectorDrawerOpen(value => !value)}>{inspectorDrawerOpen ? '关闭属性' : '属性'}</button> : null}
+          <ResourceLibrary activeTab={toolCategory} assets={assets} favorites={favoriteFeatures} recent={recentFeatures} uploading={uploading} onTabChange={setToolCategory} onUpload={upload} onPreviewAsset={(asset) => setSelectedAssetId(asset.id)} onAddAsset={addAssetToTimeline} onOpenASR={(asset) => { setSelectedAssetId(asset.id); setASROpen(true); }} onPreviewResource={previewCatalogResource} onApplyResource={applyCatalogResource} onToggleFavorite={(id) => setFavoriteFeatures(current => toggleFavoriteAICutFeature(current, id))} />
           <nav className="aicut-tool-rail aicut-reference-rail" aria-label="剪辑工具">{visibleEditorTools.map(([label, Icon]) => <button type="button" key={label} className={toolCategory === label ? 'active' : ''} onClick={() => chooseToolCategory(label)}><Icon size={18} /><span>{label}</span></button>)}</nav>
           <section className={`aicut-library-panel aicut-reference-library-panel${mediaCollapsed ? ' collapsed' : ''}`}>{mediaCollapsed ? <button type="button" className="aicut-collapsed-rail" aria-label="展开素材区" onClick={() => setMediaCollapsed(false)}><PanelLeftOpen size={17} /><span>工具</span></button> : <><header><div><strong>{toolCategory}</strong><small>{capabilities.filter(item => item.category === toolCategory).length} 项</small></div><Button type="text" size="small" aria-label="收起素材区" icon={<PanelLeftClose size={15} />} onClick={() => setMediaCollapsed(true)} /></header>{renderToolLibrary()}</>}</section>
           {!mediaCollapsed ? <div role="separator" aria-label="调整素材区宽度" className="aicut-resize-handle library-preview" onPointerDown={event => beginLayoutResize('media', event)} onPointerMove={updateLayoutResize} onPointerUp={finishLayoutResize} onPointerCancel={finishLayoutResize} /> : null}

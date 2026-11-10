@@ -3,6 +3,167 @@
   grid-template-rows: minmax(260px, calc(100% - var(--aicut-timeline-height))) var(--aicut-timeline-height) !important;
 }
 
+.aicut-editor-v3 > .aicut-tool-rail,
+.aicut-editor-v3 > .aicut-library-panel {
+  display: none;
+}
+
+.aicut-resource-library {
+  display: contents;
+}
+
+.aicut-editor-v3.media-collapsed > .aicut-resource-panel {
+  display: none;
+}
+
+.aicut-editor-v3.media-collapsed > .aicut-library-panel.collapsed {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+}
+
+.aicut-resource-tabs {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 6px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+.aicut-resource-tabs button {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 6px 3px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.aicut-resource-tabs button.active {
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--surface-panel));
+  color: var(--accent-primary);
+}
+
+.aicut-resource-panel {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: 44px 32px minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 7px;
+  overflow: hidden;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+.aicut-resource-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.aicut-resource-filters {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.aicut-resource-filters button {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.aicut-resource-filters button.active {
+  background: color-mix(in srgb, var(--accent-primary) 18%, var(--surface-panel));
+  color: var(--text-primary);
+}
+
+.aicut-resource-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow: auto;
+  padding: 3px 1px 8px;
+}
+
+.aicut-resource-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  cursor: grab;
+}
+
+.aicut-resource-card:hover {
+  border-color: var(--accent-primary);
+}
+
+.aicut-resource-card > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.aicut-resource-card strong,
+.aicut-resource-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aicut-resource-card small,
+.aicut-resource-hint {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.aicut-resource-thumb {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent-primary) 14%, var(--surface-subtle));
+  color: var(--accent-primary);
+}
+
+.aicut-resource-card button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.aicut-resource-card button.favorite.active {
+  color: var(--accent-primary);
+}
+
+.aicut-resource-hint {
+  margin: 4px 2px 0;
+}
+
 .aicut-editor-v3.inspector-collapsed .aicut-inspector,
 .aicut-editor-v3.inspector-drawer-mode:not(.inspector-drawer-open) .aicut-inspector {
   display: none;
