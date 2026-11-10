@@ -10,7 +10,15 @@
 }
 
 .aicut-resource-library {
-  display: contents;
+  grid-column: 1 / 3;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: 64px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-panel);
 }
 
 .aicut-editor-v3.media-collapsed .aicut-resource-panel {
@@ -19,20 +27,27 @@
 
 .aicut-resource-tabs {
   grid-column: 1;
-  grid-row: 1 / 3;
+  grid-row: 1;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 6px;
-  overflow-y: auto;
-  border-right: 1px solid var(--border-default);
+  flex-direction: row;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border-default);
   background: var(--surface-panel);
 }
 
+.aicut-resource-tabs::-webkit-scrollbar { display: none; }
+
 .aicut-resource-tabs .aicut-resource-collapse {
-  margin-top: auto;
-  border-top: 1px solid var(--border-default);
-  border-radius: 0;
+  flex: 0 0 34px;
+  margin-left: auto;
+  border-left: 1px solid var(--border-default);
+  border-radius: 6px;
 }
 
 .aicut-editor-v3 .aicut-timeline-collapse {
@@ -40,11 +55,15 @@
 }
 
 .aicut-resource-tabs button {
-  display: grid;
+  flex: 1 0 44px;
+  display: flex;
+  flex-direction: column;
   place-items: center;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
-  min-height: 52px;
-  padding: 6px 3px;
+  min-height: 48px;
+  padding: 5px 4px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -59,16 +78,29 @@
 }
 
 .aicut-resource-panel {
-  grid-column: 2;
-  grid-row: 1;
+  grid-column: 1;
+  grid-row: 2;
   display: grid;
   grid-template-rows: 44px 32px minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   padding: 7px;
   overflow: hidden;
-  border-right: 1px solid var(--border-default);
   background: var(--surface-panel);
+}
+
+.aicut-editor-v3.media-collapsed .aicut-resource-library {
+  grid-column: 1 / 3;
+  grid-template-rows: 64px 0;
+}
+
+.aicut-editor-v3.media-collapsed .aicut-resource-tabs button:not(.aicut-resource-collapse) {
+  display: none;
+}
+
+.aicut-editor-v3.media-collapsed .aicut-resource-tabs .aicut-resource-collapse {
+  margin: 0 auto;
+  border-left: 0;
 }
 
 .aicut-resource-search {
@@ -146,11 +178,12 @@
 
 .aicut-caption-workspace {
   z-index: 18;
-  grid-column: 2;
+  grid-column: 1 / 3;
   grid-row: 1;
   display: grid;
   align-content: start;
   gap: 10px;
+  margin-top: 64px;
   padding: 12px;
   overflow: auto;
   background: var(--surface-panel);
@@ -278,8 +311,37 @@
 }
 
 .aicut-editor-v3 > .aicut-resize-handle.upper-timeline {
-  left: 74px !important;
+  left: 0 !important;
   top: calc(100% - var(--aicut-timeline-height) - 4px) !important;
+}
+
+.aicut-editor-v3 > .aicut-timeline {
+  grid-column: 1 / 5 !important;
+}
+
+.aicut-timeline-body.blade-mode .aicut-clip {
+  cursor: crosshair;
+}
+
+.aicut-transition-chip {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: -12px;
+  min-width: 38px;
+  max-width: 76px;
+  padding: 2px 5px;
+  overflow: hidden;
+  transform: translateY(-50%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 72%, var(--border-default));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent-primary) 26%, var(--surface-panel));
+  color: var(--text-primary);
+  font-size: 9px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 @media (max-width: 1180px) {
@@ -290,6 +352,8 @@
   .aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-context-inspector {
     width: min(360px, calc(100% - 68px));
   }
+
+  .aicut-editor-v3 > .aicut-timeline { grid-column: 1 / 4 !important; }
 }
 
 .aicut-context-inspector {

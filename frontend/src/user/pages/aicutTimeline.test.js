@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, mergeTimelineClipWithNext, moveEffectLayer, moveTimelineClip, normalizeSubtitleRhythm, planTimelineBGM, removeTimelineObject, removeTimelineTrack, renameTimelineTrack, resizeEffectLayer, resolveAICutAgentTool, setClipPlaybackRate, setClipTransition, setTimelineClipText, splitTimelineClip, subtitleRhythmLabel, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, trimTimelineClipEdge, updateTimelineTrackSettings } from './aicutTimeline.js';
+import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, mergeTimelineClipWithNext, moveEffectLayer, moveTimelineClip, normalizeSubtitleRhythm, planTimelineBGM, removeTimelineObject, removeTimelineTrack, renameTimelineTrack, resizeEffectLayer, resolveAICutAgentTool, setClipPlaybackRate, setClipTransition, setTimelineClipText, splitTimelineClip, splitTimelineClipAt, subtitleRhythmLabel, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, trimTimelineClipEdge, updateTimelineTrackSettings } from './aicutTimeline.js';
 
 const base = {
   revision: 3,
@@ -29,6 +29,16 @@ test('刀片在片段中点生成前后连续的两个片段', () => {
   assert.equal(second.startMs, 3000);
   assert.equal(second.sourceStartMs, 2200);
   assert.equal(second.durationMs, 2000);
+});
+
+test('剃刀模式按点击位置分割并保持源素材时间连续', () => {
+  const result = splitTimelineClipAt(base, 'video-1', 'clip-1', 1250, () => 'clip-razor');
+  const [first, second] = result.tracks[0].clips;
+  assert.equal(first.durationMs, 1250);
+  assert.equal(second.startMs, 2250);
+  assert.equal(second.sourceStartMs, 1450);
+  assert.equal(second.durationMs, 2750);
+  assert.throws(() => splitTimelineClipAt(base, 'video-1', 'clip-1', 20, () => 'bad'), /分割点距离片段边缘太近/);
 });
 
 test('字幕可拆分、编辑并与下一条合并，锁定轨道拒绝修改', () => {

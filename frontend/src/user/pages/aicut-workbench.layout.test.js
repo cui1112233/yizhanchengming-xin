@@ -56,6 +56,11 @@ test('AI-CUT专业剪辑严格使用57201确认的桌面网格和统一时间线
   assert.doesNotMatch(page, /if \(true\) return/);
 });
 
+test('AI-CUT全屏编辑器覆盖旧窄屏最小高度，骨架始终收进单个视口', () => {
+  assert.match(pageCSS, /\.aicut-editor-shell\.aicut-reference-editor\{[^}]*min-height:0/);
+  assert.match(pageCSS, /\.aicut-fullscreen-editor\{[^}]*overflow:hidden/);
+});
+
 test('AI-CUT默认媒体栏只显示已经接通的功能卡', () => {
   const capabilities = fs.readFileSync(new URL('./aicutCapabilities.js', import.meta.url), 'utf8');
   for (const text of ['网页上传', '项目素材']) assert.match(capabilities, new RegExp(text));
@@ -86,6 +91,14 @@ test('AI-CUT播放器和真实轨道时间线保留完整可见控制', () => {
   assert.match(pageCSS, /height:45px/);
   assert.match(pageCSS, /height:52px/);
   assert.match(pageCSS, /min-width:950px/);
+});
+
+test('AI-CUT时间线提供真实剃刀与联动模式并把转场显示在连接处', () => {
+  assert.match(page, /setBladeMode/);
+  assert.match(page, />剃刀</);
+  assert.match(page, /setLinkedMove/);
+  assert.match(page, />联动</);
+  assert.match(page, /aicut-transition-chip/);
 });
 
 test('AI-CUT专业编辑器使用57201的紧凑字号和低对比表面系统', () => {

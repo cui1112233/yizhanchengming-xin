@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 const source = fs.readFileSync(new URL('./ResourceLibrary.jsx', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('./editor.css', import.meta.url), 'utf8');
 
 test('资源库提供六个中文主分类和直接搜索筛选', () => {
   for (const label of ['媒体', '文字', '转场', '特效', '滤镜', '模板']) {
@@ -35,4 +36,10 @@ test('资源库不再通过大弹窗作为资源的唯一入口', () => {
 test('资源库提供用户可见的收起与展开按钮', () => {
   assert.match(source, /aria-label={collapsed \? '展开素材区' : '收起素材区'}/);
   assert.match(source, /onToggleCollapsed/);
+});
+
+test('资源主分类采用桌面剪辑器顶部横向页签而不是竖向图标栏', () => {
+  assert.match(css, /\.aicut-resource-library\s*\{[^}]*grid-column:\s*1\s*\/\s*3/);
+  assert.match(css, /\.aicut-resource-tabs\s*\{[^}]*flex-direction:\s*row/);
+  assert.match(css, /\.aicut-resource-panel\s*\{[^}]*grid-row:\s*2/);
 });

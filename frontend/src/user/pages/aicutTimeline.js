@@ -151,7 +151,7 @@ export function removeTimelineTrack(timeline, trackId) {
   return { ...timeline, tracks: copyTracks(timeline).filter(item => item.id !== trackId).map((item, order) => ({ ...item, order })) };
 }
 
-export function splitTimelineClip(timeline, trackId, clipId, idFactory) {
+export function splitTimelineClipAt(timeline, trackId, clipId, offsetMs, idFactory) {
   let found = false;
   const tracks = copyTracks(timeline).map(track => {
     if (track.id !== trackId) return track;
@@ -159,33 +159,39 @@ export function splitTimelineClip(timeline, trackId, clipId, idFactory) {
     const index = track.clips.findIndex(clip => clip.id === clipId);
     if (index < 0) return track;
     const clip = track.clips[index];
-    if (clip.durationMs < 2) throw new Error('片段太短，无法分割');
+    const durationMs = Math.round(Number(clip.durationMs) || 0);
+    const splitAt = Math.round(Number(offsetMs));
+    if (durationMs < 200) throw new Error('片段太短，无法分割');
+    if (!Number.isFinite(splitAt) || splitAt < 100 || splitAt > durationMs - 100) throw new Error('分割点距离片段边缘太近');
     found = true;
-    const firstDuration = Math.floor(clip.durationMs / 2);
+    const firstDuration = splitAt;
     let firstText = clip.text;
     let secondText = clip.text;
     if (track.kind === 'subtitle' || clip.kind === 'subtitle') {
       const sourceText = String(clip.text || '').trim();
       const words = sourceText.split(/\s+/).filter(Boolean);
       if (words.length > 1) {
-        const middle = Math.ceil(words.length / 2);
+        const middle = Math.max(1, Math.min(words.length - 1, Math.round(words.length * firstDuration / durationMs)));
         firstText = words.slice(0, middle).join(' ');
         secondText = words.slice(middle).join(' ');
       } else {
         const runes = [...sourceText];
-        const middle = Math.ceil(runes.length / 2);
+        const middle = Math.max(1, Math.min(runes.length - 1, Math.round(runes.length * firstDuration / durationMs)));
         firstText = runes.slice(0, middle).join('');
         secondText = runes.slice(middle).join('');
       }
     }
-    const first = { ...clip, text: firstText, name: String(firstText || clip.name).slice(0, 16), durationMs: firstDuration };
+    const rate = Number(clip.playbackRate) > 0 ? Number(clip.playbackRate) : 1;
+    const sourceSplit = Math.round(firstDuration * rate);
+    const first = { ...clip, text: firstText, name: String(firstText || clip.name).slice(0, 16), durationMs: firstDuration, sourceDurationMs: sourceSplit };
     const second = {
       ...clip,
       id: idFactory(),
       name: `${clip.name}（后半段）`,
       startMs: clip.startMs + firstDuration,
-      sourceStartMs: clip.sourceStartMs + firstDuration,
-      durationMs: clip.durationMs - firstDuration,
+      sourceStartMs: (Number(clip.sourceStartMs) || 0) + sourceSplit,
+      sourceDurationMs: Math.max(1, (Number(clip.sourceDurationMs) || Math.round(durationMs * rate)) - sourceSplit),
+      durationMs: durationMs - firstDuration,
       text: secondText,
       name: String(secondText || `${clip.name}（后半段）`).slice(0, 16)
     };
@@ -193,6 +199,13 @@ export function splitTimelineClip(timeline, trackId, clipId, idFactory) {
   });
   if (!found) throw new Error('片段不存在');
   return { ...timeline, tracks };
+}
+
+export function splitTimelineClip(timeline, trackId, clipId, idFactory) {
+  const track = (timeline?.tracks || []).find(item => item.id === trackId);
+  const clip = track?.clips?.find(item => item.id === clipId);
+  if (!clip) throw new Error('片段不存在');
+  return splitTimelineClipAt(timeline, trackId, clipId, Math.floor(Number(clip.durationMs) / 2), idFactory);
 }
 
 export function setTimelineClipText(timeline, trackId, clipId, text) {
