@@ -332,3 +332,13 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+
+.aicut-editor-v3 .aicut-track-labels {
+  grid-template-rows: 28px repeat(4, 52px);
+}
+
+.aicut-editor-v3 .aicut-track-row.kind-effect .aicut-clip,
+.aicut-editor-v3 .aicut-clip.effect {
+  border-color: color-mix(in srgb, #b07cff 70%, var(--border-default));
+  background: color-mix(in srgb, #8f5bd7 42%, var(--surface-subtle));
+}

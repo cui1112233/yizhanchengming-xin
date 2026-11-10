@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { cancelAICutASRJob, cancelAICutExportJob, cleanAICutOralTimeline, correctAICutCaptions, createAICutASRJob, createAICutExportJob, createAICutProject, downloadAICutExportJob, extractAICutAudio, extractAICutVisualFrames, getAICutExportJob, getAICutTimelineHistory, importAICutSRT, listAICutASRJobs, listAICutAssets, listAICutProjects, loadAICutTimeline, redoAICutTimeline, saveAICutTimeline, smartSplitAICutVideo, trimAICutFillers, undoAICutTimeline, uploadAICutAsset } from '../../shared/api/aicut.js';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
 import AICutAgentPanel from '../components/AICutAgentPanel.jsx';
-import { addTimelineTrack, draggedTimelineStart, markTimelineClip, mergeTimelineClipWithNext, moveTimelineClip, normalizeSubtitleRhythm, planTimelineBGM, removeTimelineTrack, renameTimelineTrack, setClipPlaybackRate, setTimelineClipText, splitTimelineClip, subtitleRhythmLabel, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, trimTimelineClipEdge, updateTimelineTrackSettings } from './aicutTimeline.js';
+import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, mergeTimelineClipWithNext, moveTimelineClip, normalizeSubtitleRhythm, planTimelineBGM, removeTimelineTrack, renameTimelineTrack, setClipPlaybackRate, setClipTransition, setTimelineClipText, splitTimelineClip, subtitleRhythmLabel, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, trimTimelineClipEdge, updateTimelineTrackSettings } from './aicutTimeline.js';
 import { buildAICutPreviewFrame, getAICutTimelineDuration, nextAICutCanvasFit, seekAICutPreviewTime } from './aicutPreview.js';
 import { resolveAICutShortcut, timelineDropTime } from './aicutWorkbench.js';
 import { createAICutCapabilities, filterAICutCapabilities, recordRecentAICutFeature, toggleFavoriteAICutFeature } from './aicutCapabilities.js';
@@ -19,7 +19,7 @@ import './aicut/editor.css';
 
 const kindLabels = { image: '图片', video: '视频', audio: '音频', subtitle: '字幕' };
 const trackLabels = { video: '画面轨道', audio: '音频轨道', subtitle: '字幕轨道' };
-const referenceTrackNames = { subtitle: '字幕 1', video: '视频 1', audio: '音频 1' };
+const referenceTrackNames = { subtitle: '字幕 1', effect: '特效 1', video: '视频 1', audio: '音频 1' };
 const asrStateLabels = { queued: '排队中', running: '识别中', cancel_requested: '正在取消', succeeded: '已写入字幕', failed: '失败', canceled: '已取消' };
 const editorTools = [
   ['媒体', ImageIcon], ['音频', Music], ['文本', Type], ['特效', Sparkles], ['转场', Film],
@@ -1091,7 +1091,14 @@ export default function AICutPage() {
 
   function applyCatalogResource(resource) {
     setRecentFeatures(current => recordRecentAICutFeature(current, resource.id));
-    if (['filter', 'effect'].includes(resource.category)) {
+    if (resource.category === 'effect') {
+      const result = addEffectLayer(timeline, { resourceId: resource.id, name: resource.labelZh, startMs: previewTimeMs, durationMs: 2000, parameters: { intensity: .5, speed: 1 } }, () => newID('effect'));
+      if (!result.ok) return message.warning(result.reasonZh);
+      commitTimeline(result.timeline);
+      setPreviewResource(null);
+      return message.success(`已把${resource.labelZh}加入特效轨`);
+    }
+    if (resource.category === 'filter') {
       if (!selectedClipEntry || !['video', 'image'].includes(selectedClipEntry.clip.kind)) return message.warning('请先选择视频或图片片段');
       if (selectedClipEntry.track.locked) return message.warning('轨道已锁定');
       const visualEffect = visualEffectForCatalogResource(resource);
@@ -1101,7 +1108,9 @@ export default function AICutPage() {
     }
     if (resource.category === 'transition') {
       if (!selectedClipEntry || selectedClipEntry.track.kind !== 'video') return message.warning('请先选择同一视频轨中的后一个片段');
-      updateClip(selectedClipEntry.track.id, selectedClipEntry.clip.id, { transition: resource.id, transitionMs: 500 });
+      const result = setClipTransition(timeline, selectedClipEntry.track.id, selectedClipEntry.clip.id, resource.id, 500);
+      if (!result.ok) return message.warning(result.reasonZh);
+      commitTimeline(result.timeline);
       return message.success(`已添加${resource.labelZh}`);
     }
     if (resource.category === 'text') {
@@ -1215,7 +1224,7 @@ export default function AICutPage() {
 
   function renderUnifiedTimeline() {
     const canvasWidth = Math.max(900, timelineTimeToPixels(durationMs + 2000, timelineZoom) + 20);
-    const orderedTracks = ['subtitle', 'video', 'audio'].map(kind => displayTracks.find(track => track.kind === kind) || { id: `${kind}-display-track`, kind, name: referenceTrackNames[kind], clips: [], placeholder: true });
+    const orderedTracks = ['subtitle', 'effect', 'video', 'audio'].map(kind => displayTracks.find(track => track.kind === kind) || { id: `${kind}-display-track`, kind, name: referenceTrackNames[kind], clips: [], placeholder: true });
     return <div className="aicut-timeline-body"><div className="aicut-track-labels aicut-reference-labels"><div className="aicut-ruler-spacer">00:00:00</div>{orderedTracks.map(track => <div className={`aicut-track-label kind-${track.kind}`} key={track.id}><span className="aicut-track-kind">{track.kind === 'subtitle' ? 'T' : track.kind === 'video' ? '▣' : '♫'}</span><span className="aicut-track-copy"><strong>{track.name}</strong><small>{track.kind === 'subtitle' ? `${track.locked ? '锁定' : '未锁定'} · 显示` : track.kind === 'video' ? `主轨 · ${linkedMove ? '联动' : '独立'}` : `${track.muted ? '静音' : '有声'} · 波形`}</small></span><div className="aicut-track-actions">{!track.placeholder && <><Dropdown trigger={['click']} menu={{ items: trackMenuItems(track) }}><button type="button" title="轨道菜单" onClick={event => event.stopPropagation()}>☷</button></Dropdown><button type="button" title={track.locked ? '解锁轨道' : '锁定轨道'} onClick={() => toggleTrackFlag(track.id, 'locked')}>{track.locked ? '🔒' : '♢'}</button><button type="button" title={track.muted ? '取消静音' : '静音'} onClick={() => toggleTrackFlag(track.id, 'muted')}>{track.muted ? '×' : '◉'}</button></>}</div></div>)}</div><div className="aicut-tracks-scroll"><div className="aicut-tracks-canvas aicut-reference-tracks" style={{ width: canvasWidth }}><div className="aicut-shared-ruler">00.00　　02.00　　04.00　　06.00　　08.00　　10.00　　12.00　　14.00　　16.00　　18.00　　20.00</div><i className="aicut-playhead" style={{ left: timelineTimeToPixels(previewTimeMs, timelineZoom) }} />{orderedTracks.map(track => <div className={`aicut-track-row kind-${track.kind}`} key={track.id} onPointerDown={seekFromTrack} onDragOver={event => { if (!track.locked && event.dataTransfer.types.includes('application/x-aicut-asset')) event.preventDefault(); }} onDrop={event => { if (event.dataTransfer.types.includes('application/x-aicut-asset')) dropAssetOnTrack(event, track); }}>{track.clips.map(clip => { const key = `${track.id}::${clip.id}`; const shownStart = dragPreview?.key === key ? dragPreview.startMs : Number(clip.startMs) || 0; return <article key={clip.id} style={{ left: timelineTimeToPixels(shownStart, timelineZoom), width: Math.max(80, timelineTimeToPixels(clip.durationMs, timelineZoom)) }} className={`aicut-clip ${track.kind}${track.locked ? ' locked' : ''}${clip.reviewStatus ? ` review-${clip.reviewStatus}` : ''}${selectedClipKey === key ? ' selected' : ''}${dragPreview?.key === key ? ' dragging' : ''}`} onPointerDown={event => beginClipDrag(event, track, clip)} onPointerMove={updateClipDrag} onPointerUp={finishClipDrag} onPointerCancel={() => { clipDragRef.current = null; setDragPreview(null); }} onClick={() => setSelectedClipKey(key)}><strong>{clip.name}</strong>{clip.transition ? <span>{clip.transition === 'flash-black' ? '闪黑' : '闪白'}</span> : null}</article>; })}</div>)}</div></div></div>;
   }
 
