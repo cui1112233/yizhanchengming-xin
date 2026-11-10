@@ -35,6 +35,12 @@
   background: var(--surface-panel);
 }
 
+.aicut-resource-tabs .aicut-resource-collapse {
+  margin-top: auto;
+  border-top: 1px solid var(--border-default);
+  border-radius: 0;
+}
+
 .aicut-resource-tabs button {
   display: grid;
   place-items: center;

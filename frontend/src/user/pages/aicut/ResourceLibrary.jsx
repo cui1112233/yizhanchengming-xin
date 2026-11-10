@@ -1,5 +1,5 @@
 import { Button, Empty, Input, Upload } from 'antd';
-import { Clapperboard, Film, Image as ImageIcon, Plus, Sparkles, Star, Type, WandSparkles } from 'lucide-react';
+import { Clapperboard, Film, Image as ImageIcon, PanelLeftClose, PanelLeftOpen, Plus, Sparkles, Star, Type, WandSparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { catalogForTab } from './editorCatalog.js';
 
@@ -30,6 +30,7 @@ export default function ResourceLibrary({
   favorites = [],
   recent = [],
   uploading = false,
+  collapsed = false,
   onTabChange,
   onUpload,
   onPreviewAsset,
@@ -38,6 +39,7 @@ export default function ResourceLibrary({
   onPreviewResource,
   onApplyResource,
   onToggleFavorite,
+  onToggleCollapsed,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('全部');
@@ -55,7 +57,7 @@ export default function ResourceLibrary({
   const visibleAssets = assets.filter((asset) => !query.trim() || String(asset.name || '').toLowerCase().includes(query.trim().toLowerCase()));
 
   return <div className="aicut-resource-library">
-    <nav className="aicut-resource-tabs" aria-label="资源分类">{resourceTabs.map(([label, , Icon]) => <button type="button" key={label} className={activeTab === label ? 'active' : ''} onClick={() => onTabChange(label)}><Icon size={17} /><span>{label}</span></button>)}</nav>
+    <nav className="aicut-resource-tabs" aria-label="资源分类">{resourceTabs.map(([label, , Icon]) => <button type="button" key={label} className={activeTab === label ? 'active' : ''} onClick={() => onTabChange(label)}><Icon size={17} /><span>{label}</span></button>)}<button type="button" className="aicut-resource-collapse" aria-label={collapsed ? '展开素材区' : '收起素材区'} onClick={onToggleCollapsed}>{collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}<span>{collapsed ? '展开' : '收起'}</span></button></nav>
     <section className="aicut-resource-panel">
       <div className="aicut-resource-search"><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资源" />{category === 'media' ? <Upload multiple showUploadList={false} beforeUpload={onUpload} accept="image/*,video/*,audio/*"><Button loading={uploading} icon={<Plus size={14} />}>添加</Button></Upload> : null}</div>
       <div className="aicut-resource-filters">{['全部', '收藏', '最近使用'].map((item) => <button type="button" key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}</button>)}</div>

@@ -1,5 +1,5 @@
 import { Input, InputNumber, Slider } from 'antd';
-import { X } from 'lucide-react';
+import { PanelRightClose, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { catalogById } from './editorCatalog.js';
 import { normalizeTransform } from './canvasTransform.js';
@@ -13,7 +13,7 @@ function kindTitle(clip) {
   return '画面';
 }
 
-export default function InspectorPanel({ selection, drawerMode = false, onClose, onPatchClip, onPatchEffect, onPatchTransition }) {
+export default function InspectorPanel({ selection, drawerMode = false, onClose, onCollapse, onPatchClip, onPatchEffect, onPatchTransition }) {
   const clip = selection?.clip;
   const [draft, setDraft] = useState(() => ({ ...(clip || {}), canvasTransform: normalizeTransform(clip?.canvasTransform) }));
   useEffect(() => setDraft({ ...(clip || {}), canvasTransform: normalizeTransform(clip?.canvasTransform) }), [clip]);
@@ -27,7 +27,7 @@ export default function InspectorPanel({ selection, drawerMode = false, onClose,
   };
 
   return <aside className="aicut-context-inspector" aria-label="属性栏">
-    <header><strong>{kindTitle(clip)}</strong>{drawerMode ? <button type="button" aria-label="关闭属性栏" onClick={onClose}><X size={15} /></button> : null}</header>
+    <header><strong>{kindTitle(clip)}</strong>{drawerMode ? <button type="button" aria-label="关闭属性栏" onClick={onClose}><X size={15} /></button> : <button type="button" aria-label="收起属性栏" onClick={onCollapse}><PanelRightClose size={15} /></button>}</header>
     {!clip ? <div className="aicut-inspector-placeholder"><strong>未选择对象</strong><span>在时间线或播放器中选择片段后，这里会显示可编辑参数。</span></div> : <div className="aicut-inspector-sections">
       <section><h3>时间</h3><label>开始时间<InputNumber value={draft.startMs} min={0} onChange={(value) => setDraft(current => ({ ...current, startMs: value }))} onBlur={() => commitNumber('startMs', draft.startMs)} onPressEnter={() => commitNumber('startMs', draft.startMs)} addonAfter="ms" /></label><label>片段时长<InputNumber value={draft.durationMs} min={1} onChange={(value) => setDraft(current => ({ ...current, durationMs: value }))} onBlur={() => commitNumber('durationMs', draft.durationMs)} onPressEnter={() => commitNumber('durationMs', draft.durationMs)} addonAfter="ms" /></label></section>
       {['video', 'image'].includes(clip.kind) ? <section><h3>位置与大小</h3><div className="aicut-inspector-grid"><label>水平位置<InputNumber value={draft.canvasTransform.x} min={-1} max={1} step={.01} onChange={(value) => patchTransform({ x: value })} onBlur={() => patchTransform({}, true)} /></label><label>垂直位置<InputNumber value={draft.canvasTransform.y} min={-1} max={1} step={.01} onChange={(value) => patchTransform({ y: value })} onBlur={() => patchTransform({}, true)} /></label><label>横向缩放<InputNumber value={draft.canvasTransform.scaleX} min={.05} max={20} step={.05} onChange={(value) => patchTransform({ scaleX: value })} onBlur={() => patchTransform({}, true)} /></label><label>纵向缩放<InputNumber value={draft.canvasTransform.scaleY} min={.05} max={20} step={.05} onChange={(value) => patchTransform({ scaleY: value })} onBlur={() => patchTransform({}, true)} /></label><label>旋转<InputNumber value={draft.canvasTransform.rotation} min={-180} max={180} onChange={(value) => patchTransform({ rotation: value })} onBlur={() => patchTransform({}, true)} addonAfter="°" /></label></div><label>不透明度<Slider min={0} max={1} step={.01} value={draft.canvasTransform.opacity} onChange={(value) => patchTransform({ opacity: value })} onPointerUp={() => patchTransform({}, true)} /></label></section> : null}

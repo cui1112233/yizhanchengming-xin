@@ -79,8 +79,8 @@ test('AI-CUT使用57201原始顶栏和编辑器语义结构而不是AntD近似�
 });
 
 test('AI-CUT播放器和真实轨道时间线保留完整可见控制', () => {
-  for (const label of ['适应', '安全框', '全屏预览', '轨道菜单', '字幕 1', '视频 1', '音频 1']) assert.match(page, new RegExp(label));
-  for (const label of ['多时间线', '特效 1']) assert.doesNotMatch(page, new RegExp(label));
+  for (const label of ['适应', '安全框', '全屏预览', '轨道菜单', '字幕 1', '特效 1', '视频 1', '音频 1']) assert.match(page, new RegExp(label));
+  assert.doesNotMatch(page, /多时间线/);
   assert.match(page, /aicut-reference-labels/);
   assert.match(page, /aicut-reference-tracks/);
   assert.match(pageCSS, /height:45px/);

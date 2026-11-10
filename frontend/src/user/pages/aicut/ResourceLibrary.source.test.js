@@ -31,3 +31,8 @@ test('媒体卡支持上传、识别字幕、预览和加入时间线', () => {
 test('资源库不再通过大弹窗作为资源的唯一入口', () => {
   assert.doesNotMatch(source, /Modal|setToolWorkbenchOpen|功能说明/);
 });
+
+test('资源库提供用户可见的收起与展开按钮', () => {
+  assert.match(source, /aria-label={collapsed \? '展开素材区' : '收起素材区'}/);
+  assert.match(source, /onToggleCollapsed/);
+});

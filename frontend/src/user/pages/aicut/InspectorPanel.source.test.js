@@ -22,3 +22,8 @@ test('未知资源只读显示并提供窄屏关闭入口', () => {
   assert.match(source, /未知资源/);
   assert.match(source, /关闭属性栏/);
 });
+
+test('桌面属性栏也可以收起', () => {
+  assert.match(source, /收起属性栏/);
+  assert.match(source, /onCollapse/);
+});
