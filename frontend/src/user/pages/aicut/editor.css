@@ -164,6 +164,49 @@
   margin: 4px 2px 0;
 }
 
+.aicut-canvas-direct-layer {
+  z-index: 12;
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  margin: 51px 12px 53px;
+  pointer-events: none;
+}
+
+.aicut-canvas-selection {
+  position: relative;
+  left: 15%;
+  top: 15%;
+  width: 70%;
+  height: 70%;
+  border: 1px solid var(--accent-primary);
+  transform-origin: center;
+  pointer-events: auto;
+  cursor: move;
+}
+
+.aicut-canvas-selection .handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid var(--surface-panel);
+  border-radius: 50%;
+  background: var(--accent-primary);
+}
+
+.aicut-canvas-selection .corner-nw { left: -5px; top: -5px; cursor: nwse-resize; }
+.aicut-canvas-selection .corner-ne { right: -5px; top: -5px; cursor: nesw-resize; }
+.aicut-canvas-selection .corner-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.aicut-canvas-selection .corner-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.aicut-canvas-selection .rotate { left: calc(50% - 5px); top: -28px; cursor: grab; }
+.aicut-canvas-selection .rotate::after { content: ''; position: absolute; left: 4px; top: 9px; width: 1px; height: 18px; background: var(--accent-primary); }
+
+@media (max-width: 1180px) {
+  .aicut-canvas-direct-layer { grid-column: 3; }
+}
+
 .aicut-editor-v3.inspector-collapsed .aicut-inspector,
 .aicut-editor-v3.inspector-drawer-mode:not(.inspector-drawer-open) .aicut-inspector {
   display: none;

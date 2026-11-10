@@ -11,6 +11,7 @@ import { createAICutCapabilities, filterAICutCapabilities, recordRecentAICutFeat
 import { normalizeVisualEffect, subtitleAnimationCatalog, subtitleStyleCatalog, textStyleCatalog, transitionCatalog, visualEffectCatalog, visualEffectPreviewStyle, visualEffectPreset } from './aicutEffects.js';
 import EditorShell from './aicut/EditorShell.jsx';
 import ResourceLibrary from './aicut/ResourceLibrary.jsx';
+import PreviewCanvas from './aicut/PreviewCanvas.jsx';
 import { normalizeEditorLayout } from './aicut/editorLayout.js';
 import './aicut-page.css';
 import './aicut/editor.css';
@@ -88,6 +89,12 @@ function PreviewMedia({ item, playing }) {
     else media.pause();
   }, [item.kind, item.playbackRate, item.sourceTimeMs, item.volume, playing]);
   const style = visualEffectPreviewStyle(item.visualEffect, item.sourceTimeMs);
+  if (item.canvasTransform) {
+    const transform = item.canvasTransform;
+    const directTransform = `translate(${Number(transform.x || 0) * 100}%, ${Number(transform.y || 0) * 100}%) rotate(${Number(transform.rotation || 0)}deg) scale(${Number(transform.scaleX || 1)}, ${Number(transform.scaleY || 1)})`;
+    style.transform = `${style.transform || ''} ${directTransform}`.trim();
+    style.opacity = Number.isFinite(Number(transform.opacity)) ? Number(transform.opacity) : (style.opacity ?? 1);
+  }
   if (item.kind === 'image') return <img src={item.asset.url} alt={item.asset.name} style={style} />;
   if (item.kind === 'audio') return <audio ref={mediaRef} src={item.asset.url} preload="auto" />;
   return <video ref={mediaRef} src={item.asset.url} preload="auto" muted playsInline style={style} />;
@@ -1230,6 +1237,7 @@ export default function AICutPage() {
         </section> : <EditorShell ref={editorShellRef} layout={editorLayout} inspectorDrawerOpen={inspectorDrawerOpen}>
           {editorLayout.inspectorMode === 'drawer' ? <button type="button" className="aicut-open-inspector" aria-label={inspectorDrawerOpen ? '关闭属性栏' : '打开属性栏'} onClick={() => setInspectorDrawerOpen(value => !value)}>{inspectorDrawerOpen ? '关闭属性' : '属性'}</button> : null}
           <ResourceLibrary activeTab={toolCategory} assets={assets} favorites={favoriteFeatures} recent={recentFeatures} uploading={uploading} onTabChange={setToolCategory} onUpload={upload} onPreviewAsset={(asset) => setSelectedAssetId(asset.id)} onAddAsset={addAssetToTimeline} onOpenASR={(asset) => { setSelectedAssetId(asset.id); setASROpen(true); }} onPreviewResource={previewCatalogResource} onApplyResource={applyCatalogResource} onToggleFavorite={(id) => setFavoriteFeatures(current => toggleFavoriteAICutFeature(current, id))} />
+          <PreviewCanvas enabled={Boolean(selectedClipEntry && ['video', 'image'].includes(selectedClipEntry.clip.kind))} transform={selectedClipEntry?.clip?.canvasTransform} onCommitTransform={(canvasTransform) => selectedClipEntry && updateClip(selectedClipEntry.track.id, selectedClipEntry.clip.id, { canvasTransform })} />
           <nav className="aicut-tool-rail aicut-reference-rail" aria-label="剪辑工具">{visibleEditorTools.map(([label, Icon]) => <button type="button" key={label} className={toolCategory === label ? 'active' : ''} onClick={() => chooseToolCategory(label)}><Icon size={18} /><span>{label}</span></button>)}</nav>
           <section className={`aicut-library-panel aicut-reference-library-panel${mediaCollapsed ? ' collapsed' : ''}`}>{mediaCollapsed ? <button type="button" className="aicut-collapsed-rail" aria-label="展开素材区" onClick={() => setMediaCollapsed(false)}><PanelLeftOpen size={17} /><span>工具</span></button> : <><header><div><strong>{toolCategory}</strong><small>{capabilities.filter(item => item.category === toolCategory).length} 项</small></div><Button type="text" size="small" aria-label="收起素材区" icon={<PanelLeftClose size={15} />} onClick={() => setMediaCollapsed(true)} /></header>{renderToolLibrary()}</>}</section>
           {!mediaCollapsed ? <div role="separator" aria-label="调整素材区宽度" className="aicut-resize-handle library-preview" onPointerDown={event => beginLayoutResize('media', event)} onPointerMove={updateLayoutResize} onPointerUp={finishLayoutResize} onPointerCancel={finishLayoutResize} /> : null}
