@@ -17,12 +17,6 @@
   display: none;
 }
 
-.aicut-editor-v3.media-collapsed > .aicut-library-panel.collapsed {
-  grid-column: 2;
-  grid-row: 1;
-  display: grid;
-}
-
 .aicut-resource-tabs {
   grid-column: 1;
   grid-row: 1 / 3;
