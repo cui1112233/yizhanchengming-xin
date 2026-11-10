@@ -13,7 +13,7 @@
   display: contents;
 }
 
-.aicut-editor-v3.media-collapsed > .aicut-resource-panel {
+.aicut-editor-v3.media-collapsed .aicut-resource-panel {
   display: none;
 }
 
