@@ -122,31 +122,34 @@ type TrackSettings struct {
 	SubtitleStyleID   string `json:"subtitleStyleId,omitempty"`
 	SubtitleRhythm    string `json:"subtitleRhythm,omitempty"`
 	SubtitleAnimation string `json:"subtitleAnimation,omitempty"`
+	TextResourceID    string `json:"textResourceId,omitempty"`
 	PreviewVisible    bool   `json:"previewVisible,omitempty"`
 }
 
 type Clip struct {
-	ID               string             `json:"id"`
-	AssetID          string             `json:"assetId,omitempty"`
-	Kind             ClipKind           `json:"kind"`
-	Name             string             `json:"name"`
-	StartMS          int64              `json:"startMs"`
-	DurationMS       int64              `json:"durationMs"`
-	SourceStartMS    int64              `json:"sourceStartMs"`
-	SourceDurationMS int64              `json:"sourceDurationMs"`
-	Text             string             `json:"text,omitempty"`
-	Transition       string             `json:"transition,omitempty"`
-	TransitionMS     int64              `json:"transitionMs,omitempty"`
-	PlaybackRate     float64            `json:"playbackRate,omitempty"`
-	Volume           float64            `json:"volume,omitempty"`
-	FadeInMS         int64              `json:"fadeInMs,omitempty"`
-	FadeOutMS        int64              `json:"fadeOutMs,omitempty"`
-	ReviewStatus     string             `json:"reviewStatus,omitempty"`
-	ReviewReason     string             `json:"reviewReason,omitempty"`
-	VisualEffect     *VisualEffect      `json:"visualEffect,omitempty"`
-	ResourceID       string             `json:"resourceId,omitempty"`
-	Parameters       map[string]float64 `json:"parameters,omitempty"`
-	CanvasTransform  *CanvasTransform   `json:"canvasTransform,omitempty"`
+	ID                string             `json:"id"`
+	AssetID           string             `json:"assetId,omitempty"`
+	Kind              ClipKind           `json:"kind"`
+	Name              string             `json:"name"`
+	StartMS           int64              `json:"startMs"`
+	DurationMS        int64              `json:"durationMs"`
+	SourceStartMS     int64              `json:"sourceStartMs"`
+	SourceDurationMS  int64              `json:"sourceDurationMs"`
+	Text              string             `json:"text,omitempty"`
+	Transition        string             `json:"transition,omitempty"`
+	TransitionMS      int64              `json:"transitionMs,omitempty"`
+	PlaybackRate      float64            `json:"playbackRate,omitempty"`
+	Volume            float64            `json:"volume,omitempty"`
+	FadeInMS          int64              `json:"fadeInMs,omitempty"`
+	FadeOutMS         int64              `json:"fadeOutMs,omitempty"`
+	ReviewStatus      string             `json:"reviewStatus,omitempty"`
+	ReviewReason      string             `json:"reviewReason,omitempty"`
+	VisualEffect      *VisualEffect      `json:"visualEffect,omitempty"`
+	CatalogResourceID string             `json:"catalogResourceId,omitempty"`
+	TextResourceID    string             `json:"textResourceId,omitempty"`
+	ResourceID        string             `json:"resourceId,omitempty"`
+	Parameters        map[string]float64 `json:"parameters,omitempty"`
+	CanvasTransform   *CanvasTransform   `json:"canvasTransform,omitempty"`
 }
 
 type CanvasTransform struct {
@@ -247,6 +250,9 @@ func validateTimeline(timeline Timeline) error {
 			(track.Settings.SubtitleRhythm != "" && track.Settings.SubtitleRhythm != "sentence" && track.Settings.SubtitleRhythm != "word") {
 			return ErrInvalidTimeline
 		}
+		if track.Settings.TextResourceID != "" && !validTextResource(track.Settings.TextResourceID) {
+			return ErrInvalidTimeline
+		}
 		for _, clip := range track.Clips {
 			if strings.TrimSpace(clip.ID) == "" || !validClipKind(clip.Kind) || clip.StartMS < 0 || clip.DurationMS <= 0 || clip.SourceStartMS < 0 || clip.SourceDurationMS < 0 {
 				return ErrInvalidTimeline
@@ -273,6 +279,12 @@ func validateTimeline(timeline Timeline) error {
 				return ErrInvalidTimeline
 			}
 			if !validVisualEffect(clip.VisualEffect) {
+				return ErrInvalidTimeline
+			}
+			if clip.CatalogResourceID != "" && !validCatalogVisualResource(clip.CatalogResourceID) {
+				return ErrInvalidTimeline
+			}
+			if clip.TextResourceID != "" && !validTextResource(clip.TextResourceID) {
 				return ErrInvalidTimeline
 			}
 			if clip.Kind == ClipEffect {
@@ -304,6 +316,26 @@ func validateTimeline(timeline Timeline) error {
 		}
 	}
 	return nil
+}
+
+func validCatalogVisualResource(value string) bool {
+	switch value {
+	case "filter-original", "filter-bright", "filter-clear", "filter-natural", "filter-warm-sun", "filter-cool-blue", "filter-cinema", "filter-retro",
+		"filter-monochrome", "filter-high-contrast", "filter-low-saturation", "filter-teal-orange", "filter-night", "filter-portrait", "filter-vivid", "filter-soft":
+		return true
+	default:
+		return false
+	}
+}
+
+func validTextResource(value string) bool {
+	switch value {
+	case "text-basic-caption", "text-bold-title", "text-outline-caption", "text-shadow-caption", "text-panel-caption", "text-word-highlight",
+		"text-news-bar", "text-lower-third", "text-comic", "text-handwriting", "text-vertical", "text-gradient-title":
+		return true
+	default:
+		return false
+	}
 }
 
 func validTrackKind(kind TrackKind) bool {

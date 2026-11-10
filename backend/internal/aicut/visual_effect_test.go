@@ -67,3 +67,21 @@ func TestValidateTimelineAcceptsChineseEditorTransitionIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateTimelinePreservesCatalogResourceID(t *testing.T) {
+	timeline := Timeline{Tracks: []Track{{ID: "v1", Kind: TrackVideo, Clips: []Clip{{
+		ID: "c1", Kind: ClipVideo, AssetID: "asset-1", DurationMS: 1000, CatalogResourceID: "filter-warm-sun",
+	}}}}}
+	if err := validateTimeline(timeline); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateTimelinePreservesTextResourceID(t *testing.T) {
+	timeline := Timeline{Tracks: []Track{{ID: "s1", Kind: TrackSubtitle, Settings: TrackSettings{TextResourceID: "text-comic"}, Clips: []Clip{{
+		ID: "c1", Kind: ClipSubtitle, DurationMS: 1000, Text: "测试", TextResourceID: "text-comic",
+	}}}}}
+	if err := validateTimeline(timeline); err != nil {
+		t.Fatal(err)
+	}
+}
