@@ -1,0 +1,54 @@
+.aicut-editor-v3 {
+  grid-template-columns: 74px var(--aicut-resource-width) minmax(460px, 1fr) var(--aicut-inspector-width) !important;
+  grid-template-rows: minmax(260px, calc(100% - var(--aicut-timeline-height))) var(--aicut-timeline-height) !important;
+}
+
+.aicut-editor-v3.inspector-collapsed .aicut-inspector,
+.aicut-editor-v3.inspector-drawer-mode:not(.inspector-drawer-open) .aicut-inspector {
+  display: none;
+}
+
+.aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-inspector {
+  position: absolute;
+  z-index: 45;
+  top: 0;
+  right: 0;
+  bottom: var(--aicut-timeline-height);
+  display: block;
+  width: min(var(--aicut-inspector-panel-width), 360px);
+  min-width: 280px;
+  box-shadow: -14px 0 36px rgb(0 0 0 / 32%);
+}
+
+.aicut-open-inspector {
+  position: absolute;
+  z-index: 46;
+  top: 7px;
+  right: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.aicut-editor-v3 > .aicut-resize-handle.library-preview {
+  left: calc(74px + var(--aicut-resource-width) - 4px) !important;
+  height: calc(100% - var(--aicut-timeline-height)) !important;
+}
+
+.aicut-editor-v3 > .aicut-resize-handle.upper-timeline {
+  left: 74px !important;
+  top: calc(100% - var(--aicut-timeline-height) - 4px) !important;
+}
+
+@media (max-width: 1180px) {
+  .aicut-editor-v3 {
+    grid-template-columns: 68px var(--aicut-resource-width) minmax(360px, 1fr) !important;
+  }
+
+  .aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-inspector {
+    width: min(360px, calc(100% - 68px));
+  }
+}
