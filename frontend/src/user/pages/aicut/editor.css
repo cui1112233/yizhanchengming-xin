@@ -4,7 +4,8 @@
 }
 
 .aicut-editor-v3 > .aicut-tool-rail,
-.aicut-editor-v3 > .aicut-library-panel {
+.aicut-editor-v3 > .aicut-library-panel,
+.aicut-editor-v3 > .aicut-inspector {
   display: none;
 }
 
@@ -207,12 +208,12 @@
   .aicut-canvas-direct-layer { grid-column: 3; }
 }
 
-.aicut-editor-v3.inspector-collapsed .aicut-inspector,
-.aicut-editor-v3.inspector-drawer-mode:not(.inspector-drawer-open) .aicut-inspector {
+.aicut-editor-v3.inspector-collapsed .aicut-context-inspector,
+.aicut-editor-v3.inspector-drawer-mode:not(.inspector-drawer-open) .aicut-context-inspector {
   display: none;
 }
 
-.aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-inspector {
+.aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-context-inspector {
   position: absolute;
   z-index: 45;
   top: 0;
@@ -252,7 +253,82 @@
     grid-template-columns: 68px var(--aicut-resource-width) minmax(360px, 1fr) !important;
   }
 
-  .aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-inspector {
+  .aicut-editor-v3.inspector-drawer-mode.inspector-drawer-open .aicut-context-inspector {
     width: min(360px, calc(100% - 68px));
   }
+}
+
+.aicut-context-inspector {
+  grid-column: 4;
+  grid-row: 1;
+  min-width: 0;
+  overflow: auto;
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+}
+
+.aicut-context-inspector > header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+.aicut-context-inspector > header button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.aicut-inspector-placeholder {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 180px;
+  padding: 24px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 12px;
+}
+
+.aicut-inspector-sections {
+  display: grid;
+  align-content: start;
+}
+
+.aicut-inspector-sections section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.aicut-inspector-sections h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.aicut-inspector-sections label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.aicut-inspector-sections .ant-input-number {
+  width: 100%;
+}
+
+.aicut-inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
