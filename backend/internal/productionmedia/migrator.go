@@ -31,8 +31,8 @@ func (m Migrator) RunOnce(ctx context.Context) (MigrationSummary, error) {
 		return summary, fmt.Errorf("production media migrator is not configured")
 	}
 	limit := m.MaxPerRun
-	if limit <= 0 || limit > 50 {
-		limit = 50
+	if limit <= 0 || limit > 200 {
+		limit = 200
 	}
 	now := m.Now
 	if now == nil {
@@ -96,6 +96,12 @@ func (m Migrator) uploadOne(ctx context.Context, item *Object, verifiedAt time.T
 	item.RetentionDays = NormalizeRetentionDays(item.RetentionDays)
 	item.RemoteVerifiedAt = verifiedAt
 	item.PurgeAfter = verifiedAt.Add(time.Duration(item.RetentionDays) * 24 * time.Hour)
+	// 漫画页图片校验通过后立即释放本地副本：本机磁盘小，图片只需要作为
+	// 结果分发；缺失时 Store.Open 会自动从 TOS 回源。保留期仍作用于
+	// 素材图、音频和视频。
+	if item.MediaKind == KindComicImage {
+		item.PurgeAfter = verifiedAt
+	}
 	return nil
 }
 

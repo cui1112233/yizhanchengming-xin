@@ -492,8 +492,8 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			}
 		}
 		scanner := productionmedia.Scanner{DB: db, Repository: repository, Local: artifactStore, Prefix: cfg.ProductionMediaTOSPrefix, RetentionDays: retentionDays}
-		migrator := productionmedia.Migrator{Repository: repository, Local: artifactStore, Remote: remote, MaxPerRun: 50}
-		cleanup := productionmedia.CleanupSupervisor{Purger: productionmedia.Purger{Repository: repository, Local: artifactStore, MaxPerRun: 100}, Usage: usage}
+		migrator := productionmedia.Migrator{Repository: repository, Local: artifactStore, Remote: remote, MaxPerRun: 200}
+		cleanup := productionmedia.CleanupSupervisor{Purger: productionmedia.Purger{Repository: repository, Local: artifactStore, MaxPerRun: 200}, Usage: usage}
 		scanner.Start(time.Minute)
 		migrator.Start(time.Minute)
 		// Retention still controls normal deletion. The short supervisor cadence

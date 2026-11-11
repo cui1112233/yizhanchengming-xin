@@ -24,8 +24,8 @@ func (p Purger) RunOnce(ctx context.Context, pressure bool) (PurgeSummary, error
 		return summary, fmt.Errorf("production media purger is not configured")
 	}
 	limit := p.MaxPerRun
-	if limit <= 0 || limit > 100 {
-		limit = 100
+	if limit <= 0 || limit > 200 {
+		limit = 200
 	}
 	for count := 0; count < limit; count++ {
 		item, found, err := p.Repository.ClaimDuePurge(ctx, pressure)

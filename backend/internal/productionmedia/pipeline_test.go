@@ -127,6 +127,26 @@ func TestMigratorMarksVerifiedOnlyAfterRemoteSizeAndChecksumMatch(t *testing.T) 
 	}
 }
 
+func TestMigratorReleasesLocalComicImageImmediatelyAfterVerification(t *testing.T) {
+	root := t.TempDir()
+	files := localartifact.NewStore(root, 1<<20)
+	artifact, err := files.SaveImage("lea_comic_1", "image/png", bytes.NewReader(append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 24)...)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := &memoryRepository{uploads: []Object{{ID: 11, Owner: "alice", MediaKind: KindComicImage, MediaType: artifact.MediaType, LocalStorageRef: artifact.StorageRef, ObjectKey: "production-media/comic/images/lea_comic_1.png", RetentionDays: 7}}}
+	now := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+	if _, err := (Migrator{Repository: repo, Local: files, Remote: &memoryRemote{}, Now: func() time.Time { return now }}).RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.verified) != 1 {
+		t.Fatalf("verified=%v", repo.verified)
+	}
+	if !repo.verified[0].PurgeAfter.Equal(now) {
+		t.Fatalf("comic image purge_after=%s, want immediate %s", repo.verified[0].PurgeAfter, now)
+	}
+}
+
 func TestMigratorKeepsLocalFileWhenRemoteVerificationDiffers(t *testing.T) {
 	files := localartifact.NewStore(t.TempDir(), 1<<20)
 	artifact, err := files.SaveMedia("video_123", "video/mp4", "mp4", strings.NewReader("video"))
