@@ -279,7 +279,14 @@ func NewRouter(options RouterOptions) http.Handler {
 				return err
 			}
 		}
-		registerBookStageRoutes(v11, stageService)
+		retryComicPages := (comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: runtimeCatalogStore, userConfig: options.UserConfigStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, imageCache: options.ImageGenerationCache, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
+			if provider == nil {
+				return "", batchfactoryv11.ErrUnavailable
+			}
+			return provider.Complete(ctx, request)
+		}}).retryFailedComicPages
+		registerBookStageRoutes(v11, stageService, retryComicPages)
 	} else if options.Store != nil {
 		registerBookStageSummaryRoute(v11, &batchfactoryv11.BookStageService{Store: options.Store}, "v11")
 	}

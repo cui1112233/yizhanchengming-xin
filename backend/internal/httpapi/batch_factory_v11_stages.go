@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"qiantie/backend/internal/batchfactoryv11"
@@ -18,7 +19,7 @@ type bookStageRunInput struct {
 	H3                bool                           `json:"h3"`
 }
 
-func registerBookStageRoutes(mux *http.ServeMux, service *batchfactoryv11.BookStageService) {
+func registerBookStageRoutes(mux *http.ServeMux, service *batchfactoryv11.BookStageService, retryComicPages comicPageRetryFunc) {
 	registerBookStageSummaryRoute(mux, service, "v11")
 	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/stages/{stage}", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -75,6 +76,22 @@ func registerBookStageRoutes(mux *http.ServeMux, service *batchfactoryv11.BookSt
 		runner.ProviderOverride = input.Provider
 		summary, err := runner.RetryLastFailed(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.RequestID, input.VideoID)
 		if err != nil {
+			// 页级失败（漫画页 generation_failed）不会写阶段运行记录，
+			// RetryLastFailed 会判定“没有失败步骤”并返回冲突。此时回退到
+			// 页级重试，避免用户点“重试失败步骤”只能看到 409。
+			if errors.Is(err, batchfactoryv11.ErrConflict) && retryComicPages != nil {
+				retried, retryErr := retryComicPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+				if retryErr == nil && retried > 0 {
+					fallback, summaryErr := service.Summary(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+					if summaryErr != nil {
+						writeStoreError(w, summaryErr)
+						return
+					}
+					log.Printf("book stage retry fell back to comic pages batch=%s book=%s pages=%d", r.PathValue("batchId"), r.PathValue("bookId"), retried)
+					writeJSON(w, http.StatusCreated, fallback)
+					return
+				}
+			}
 			if errors.Is(err, batchfactoryv11.ErrUnavailable) {
 				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 				return
