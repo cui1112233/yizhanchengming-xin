@@ -139,6 +139,12 @@ func registerModelCatalogRoutes(root *http.ServeMux, bridgeAuth NovelFetchBridge
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
+		// H3 新建时必须同时给出 Key 和工作流，否则建出来就是一条不可用配置。
+		// 已有条目清空 Key 仍按“停用”处理，不走这条新建校验。
+		if model["id"] == "minimax-h3-video" && strings.TrimSpace(fmt.Sprint(model["credential"])) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "H3 需要填写 API Key"})
+			return
+		}
 		settings, _ := store.GetConfig(req.Context(), identity.Username)
 		catalog := modelCatalog(settings)
 		for _, current := range catalog {
