@@ -205,6 +205,15 @@ func captureBatchFetchedSource(ctx context.Context, store batchfactoryv11.Store,
 	return batchfactoryv11.Book{}, batchfactoryv11.ErrNotFound
 }
 
+// fetchedBookSourceTitle 优先使用上游 bookinfo.book_name；旧数据没有书名时
+// 保留原标题，交给 store 的占位名判断决定是否覆盖。
+func fetchedBookSourceTitle(result novelfetchworkshop.FetchAndProcessResult, fallback string) string {
+	if title := strings.TrimSpace(result.BookInfo.WorkTitle); title != "" {
+		return title
+	}
+	return fallback
+}
+
 func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchworkshop.Store, owner, bookID string, result novelfetchworkshop.FetchAndProcessResult, classification batchFetchClassification, sensitive batchSensitiveConfig) (novelfetchworkshop.FetchAndProcessResult, map[string]any, error) {
 	metadata := map[string]any{
 		"originalRawStatus":        "done",
@@ -225,6 +234,11 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 	}
 	if result.BookInfo.Genre != "" {
 		metadata["genre"] = result.BookInfo.Genre
+	}
+	// 抓正文的上游响应里本来就带 bookinfo.book_name；顺手回填书名，
+	// 避免书城导入的书一直停留在「小说 <id>」这类占位名。
+	if title := strings.TrimSpace(result.BookInfo.WorkTitle); title != "" {
+		metadata["bookName"] = title
 	}
 	if workshopStore == nil {
 		metadata["originalStatus"] = "done"
@@ -727,7 +741,7 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		if processErr != nil {
 			productionText = ""
 		}
-		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceBookID: bookID, SourceTitle: book.Title, SourceMetadata: metadata, ExpectedRevision: book.Revision})
+		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceBookID: bookID, SourceTitle: fetchedBookSourceTitle(result, book.Title), SourceMetadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
 			return

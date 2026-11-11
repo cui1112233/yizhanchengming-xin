@@ -32,6 +32,32 @@ func TestCaptureBookSourceReplacesOnlyGeneratedTitle(t *testing.T) {
 	}
 }
 
+// 书城导入的占位书名「小说 <来源ID>」与内部 bookID 不同，抓正文拿到真实书名后
+// 也必须能回填，否则发布阶段永远匹配不到漫画作品。
+func TestCaptureBookSourceReplacesPlaceholderTitleWithSourceBookID(t *testing.T) {
+	ctx := context.Background()
+	s := NewMemoryStore()
+	batch, err := s.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批量", Books: []CreateBookInput{{
+		Title: "小说 793433",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	updated, err := s.CaptureBookSource(ctx, "alice", batch.ID, book.ID, CaptureBookSourceInput{
+		SourceText:       "第一章 正文",
+		SourceBookID:     "793433",
+		SourceTitle:      "她为发小有求必应，我转身离开",
+		ExpectedRevision: book.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Title != "她为发小有求必应，我转身离开" {
+		t.Fatalf("title=%q", updated.Title)
+	}
+}
+
 func TestCaptureBookSourcePreservesUserTitle(t *testing.T) {
 	ctx := context.Background()
 	s := NewMemoryStore()

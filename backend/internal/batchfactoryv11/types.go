@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -587,11 +588,21 @@ type CaptureBookSourceInput struct {
 	ExpectedRevision int64          `json:"expectedRevision"`
 }
 
+// generatedBookTitlePattern 匹配书城导入时的占位书名，例如「小说 793433」。
+// 占位名里的数字是来源书城 ID，和内部 book.BookID 并不相同，所以不能只比较 bookID。
+var generatedBookTitlePattern = regexp.MustCompile(`^小说\s*[_-]?\s*\d{3,}$`)
+
 func shouldReplaceGeneratedBookTitle(currentTitle, bookID, sourceTitle string) bool {
 	currentTitle = strings.TrimSpace(currentTitle)
 	bookID = strings.TrimSpace(bookID)
 	sourceTitle = strings.TrimSpace(sourceTitle)
-	return sourceTitle != "" && (currentTitle == "" || currentTitle == bookID || currentTitle == "小说 "+bookID)
+	if sourceTitle == "" {
+		return false
+	}
+	if currentTitle == "" || currentTitle == bookID || currentTitle == "小说 "+bookID {
+		return true
+	}
+	return generatedBookTitlePattern.MatchString(currentTitle)
 }
 
 type Store interface {
