@@ -1,0 +1,58 @@
+u# 医生改稿写回规范（rewrite 模式）
+
+## 总原则
+
+1. **先读再写**：`read_workspace_file` / `read_screenplay_db_summary` / 读 JSON 资产，确认当前版本。
+2. **范围最小化**：用户说「第 N 集」只改第 N 集，勿动其他集。
+3. **写后必记**：产出 `rewrite_manifest.json`（见下），并在对话中说明下游需重做的步骤。
+4. **禁止静默覆盖**：rewrite 前若用户未确认方案（交互模式），先完成 review + 讨论。
+
+## rewrite_manifest.json（每次 rewrite 追加或更新）
+
+路径：`.luoshui/batch/rewrite_manifest.json`（无 batch 时仍写入，便于追溯）
+
+```json
+{
+  "entries": [
+    {
+      "doctor": "screenplay",
+      "mode": "rewrite",
+      "episode": 1,
+      "updated_at": "2026-06-19T12:00:00",
+      "updated_artifacts": ["screenplay.db", ".luoshui/context/screenplay.md"],
+      "invalidates": ["preset_review", "storyboard:ep1", "video:ep1"]
+    }
+  ]
+}
+```
+
+### invalidates 约定
+
+| 医生改动了什么 | invalidates |
+|----------------|-------------|
+| 剧本某集 | `storyboard:epN` · `video:epN`；若人名/场景名变了加 `preset_review` · `assets:*` |
+| 预设资产 | `preset_review` · `storyboard:*`（若分镜引用了改名资产）· `video:*` |
+| 分镜某集 | `video:epN` |
+
+## 工具优先级
+
+| 产物 | 推荐工具 |
+|------|----------|
+| `screenplay.md` 某集段落 | `write_context_file`（合并替换该集区块） |
+| `screenplay.db` | `run_skill(luoshui-novel-screenplay-v1)` 仅当需整集重生成；局部用 `write_context_file` + 提示用户同步 DB，或后续专用 patch 工具 |
+| `character_parse_result.json` 等 | `write_workspace_file` |
+| `character_tags.json` | `write_workspace_file`（合并，勿丢已有 tag） |
+| `chapter_N_storyboard.json` | `write_workspace_file`；单字段可用 `update_shot_field` |
+| 审核报告 md | `write_context_file` |
+| 审核闸门 json | `write_workspace_file` → `.luoshui/batch/reviews/*.json` |
+
+## 批次 review 模式（自动化）
+
+- 用户**未**明确要求改稿时，默认 `mode=review`。
+- review **不得**修改剧本/资产/分镜正文，只写报告 + review JSON。
+- `pass: false` 且 `block_next_step: true` 时停止批次，等待用户指示。
+
+## 交互 rewrite 模式（聊天默认）
+
+- 遵循各医生 `references/doctor-core.md` 中的讨论确认流程。
+- 用户说「重写第 N 集」「按方案改」→ 进入 rewrite，写回后给三段进度反馈（剧本医生）或等效摘要。

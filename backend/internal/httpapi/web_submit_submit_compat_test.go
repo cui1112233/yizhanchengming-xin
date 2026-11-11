@@ -203,10 +203,10 @@ func TestWebSubmitPreviewBlocksUnclassifiedStyle(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}}}
+	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}}
 	RegisterWebSubmitPreviewCompat(mux, middleware, store)
 	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/preview", stringsReader(`{"taskIds":["book-preview"],"versions":["ai1"]}`))
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 
@@ -257,10 +257,10 @@ func TestWebSubmitAppliesSavedProfileAndDoesNotResendAfterUncertainSubmit(t *tes
 	}
 	connector := &configuredSubmitConnector{}
 	mux := http.NewServeMux()
-	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}}}
+	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}}
 	RegisterWebSubmitSubmitCompat(mux, middleware, usersDir, store, nil, nil, connector)
 	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/submit", stringsReader(`{"taskIds":["123456"],"versions":["ai1"]}`))
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 
@@ -378,10 +378,10 @@ func TestWebSubmitBlocksUnclassifiedStyleAndPersistsFailureLog(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}}}
+	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}}
 	RegisterWebSubmitSubmitCompat(mux, middleware, usersDir, store, nil, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/submit", stringsReader(`{"taskIds":["book-submit"],"versions":["ai1"]}`))
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 

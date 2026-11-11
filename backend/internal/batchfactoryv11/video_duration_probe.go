@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const maxVideoDurationProbeBytes = 512 << 20
@@ -55,7 +57,7 @@ func (p HTTPVideoDurationProbe) durationSecondsOnce(ctx context.Context, rawURL 
 	}
 	client := p.Client
 	if client == nil {
-		client = &http.Client{Timeout: 3 * time.Minute}
+		client = safehttp.NewClientWithTimeout(3 * time.Minute)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {

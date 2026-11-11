@@ -248,6 +248,32 @@ func TestResolveShuihuoImageTargetUsesCustomImageChannel(t *testing.T) {
 	}
 }
 
+// 旧作品保存的是 custom-<模型名>，新配置保存的是 custom:<渠道 ID>。
+// 组员继承管理者渠道后，旧编号也必须能按真实模型名找到同一条渠道。
+func TestResolveShuihuoImageTargetUsesLegacyCustomImageAlias(t *testing.T) {
+	userConfig := NewUserConfigStore(t.TempDir())
+	if err := userConfig.write("manager", map[string]any{apiIntegrationsSettingKey: map[string]any{
+		"values": map[string]any{},
+		"customChannels": []any{map[string]any{
+			"id": "ch_current_image", "name": "当前图片模型", "group": "image",
+			"baseUrl": "https://img.example.test/v1", "model": "gpt-image-2", "apiKey": "sk-image", "enabled": true,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	target, err := resolveShuihuoImageTargetWithChannels(context.Background(), userConfig, "manager",
+		"custom-gpt-image-2", "custom-gpt-image-2", "9:16", "personal_api", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.ModelID != "gpt-image-2" {
+		t.Fatalf("ModelID=%q, want legacy alias to resolve current channel model", target.ModelID)
+	}
+	if got := fmt.Sprint(target.CatalogModel["baseUrl"]); got != "https://img.example.test/v1" {
+		t.Fatalf("baseUrl=%q, want current channel baseUrl", got)
+	}
+}
+
 // 把文本渠道误选成图片模型时必须明确报错，不能悄悄用旧目录出图。
 func TestResolveShuihuoImageTargetRejectsNonImageChannel(t *testing.T) {
 	userConfig := newIntegrationTestUserConfig(t, map[string]any{

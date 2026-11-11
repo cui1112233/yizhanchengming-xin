@@ -4,4 +4,3 @@ package external
 func NewYadiProvider(endpoint, apiKey string) *HTTPProvider {
 	return &HTTPProvider{Provider: ProviderYadi, Endpoint: endpoint, APIKey: apiKey}
 }
-

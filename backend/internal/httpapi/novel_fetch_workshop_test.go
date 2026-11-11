@@ -2032,7 +2032,10 @@ func TestNovelFetchBatchRetryReusesStoredRawInsteadOfFetchingAgain(t *testing.T)
 	}))
 	defer upstream.Close()
 	store := novelfetchworkshop.NewMemoryStore()
-	document := novelfetchworkshop.Document{BookID: "stored-raw", OriginalRaw: "已保存的完整原文", MaxTxt: 4000, Meta: map[string]any{"platformId": "15", "originalStatus": "waiting_sensitive_ai", "sensitiveStatus": "waiting_retry"}}
+	document := novelfetchworkshop.Document{BookID: "stored-raw", OriginalRaw: "已保存的完整原文", MaxTxt: 4000, Meta: map[string]any{
+		"platformId": "15", "originalStatus": "waiting_sensitive_ai", "sensitiveStatus": "waiting_retry",
+		"status": "waiting_retry", "queueState": "waiting_retry", "error": "旧的敏感词处理失败",
+	}}
 	if err := store.PutDocument(context.Background(), "tester", document); err != nil {
 		t.Fatal(err)
 	}
@@ -2047,6 +2050,16 @@ func TestNovelFetchBatchRetryReusesStoredRawInsteadOfFetchingAgain(t *testing.T)
 	}
 	if requests != 0 || updated.OriginalRaw != "已保存的完整原文" || updated.Meta["originalStatus"] != "done" {
 		t.Fatalf("retry did not resume from stored raw: requests=%d doc=%#v", requests, updated)
+	}
+	if updated.Meta["status"] != novelfetchworkshop.TaskStatusInputReady || updated.Meta["queueState"] != novelfetchworkshop.TaskStatusInputReady || updated.Meta["error"] != nil {
+		t.Fatalf("successful retry kept a stale failure state: %#v", updated.Meta)
+	}
+	if len(updated.Logs) == 0 {
+		t.Fatal("successful retry did not append a recovery log")
+	}
+	lastLog, _ := updated.Logs[len(updated.Logs)-1].(map[string]any)
+	if lastLog["event"] != "process_input_ready" {
+		t.Fatalf("successful retry left the task detail on a stale failure log: %#v", updated.Logs)
 	}
 }
 

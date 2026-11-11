@@ -28,6 +28,7 @@ func TestShuihuoImageProviderChatChannelResponseDetection(t *testing.T) {
 	}{
 		{"chinese chat reply 400", http.StatusBadRequest, testChatChannelImageReply, true},
 		{"english chat reply 400", http.StatusBadRequest, "I can't generate images in this chat.", true},
+		{"json chat reply 400", http.StatusBadRequest, `{"error":{"message":"目前无法在此聊天中直接生成图片"}}`, true},
 		{"json error 400", http.StatusBadRequest, `{"error":{"message":"bad request"}}`, false},
 		{"plain non-chat 400", http.StatusBadRequest, "invalid request", false},
 		{"chat reply 200", http.StatusOK, testChatChannelImageReply, false},
@@ -111,6 +112,45 @@ func TestGenerateShuihuoAssetImageArtifactChatChannelFailureKeepsUpstreamText(t 
 		if !strings.Contains(err.Error(), part) {
 			t.Fatalf("terminal error misses upstream text %q: %v", part, err)
 		}
+	}
+}
+
+func TestShuihuoImageUpstreamErrorKeepsRawBelowChineseHeadline(t *testing.T) {
+	err := shuihuoImageUpstreamError{
+		Message: "图片通道拒绝了本次请求（HTTP 400），当前配置的模型可能不支持出图",
+		Raw:     testChatChannelImageReply,
+	}
+	headline, raw, found := strings.Cut(err.Error(), "\n上游原文：")
+	if !found {
+		t.Fatalf("raw upstream must be on its own line: %q", err.Error())
+	}
+	if headline != "图片通道拒绝了本次请求（HTTP 400），当前配置的模型可能不支持出图" {
+		t.Fatalf("headline=%q", headline)
+	}
+	for _, english := range []string{"temporary upstream failure", "image provider returned", "invalid input"} {
+		if strings.Contains(headline, english) {
+			t.Fatalf("headline leaks english sentinel %q: %q", english, headline)
+		}
+	}
+	if !strings.Contains(raw, "在这个聊天中直接生成图片") {
+		t.Fatalf("raw upstream text missing: %q", raw)
+	}
+	if !errors.Is(err, batchfactoryv11.ErrUpstream) {
+		t.Fatalf("error must stay classifiable: %v", err)
+	}
+}
+
+func TestShuihuoImageUpstreamErrorDropsLeadingColonInRaw(t *testing.T) {
+	err := shuihuoImageUpstreamError{
+		Message: "图片通道鉴权失败（HTTP 401），请检查渠道 Key 是否有效、是否具备出图权限",
+		Raw:     ": Incorrect API key provided: wrong-key",
+	}
+	got := err.Error()
+	if strings.Contains(got, "上游原文：:") {
+		t.Fatalf("raw upstream must not start with a second colon: %q", got)
+	}
+	if !strings.Contains(got, "上游原文：Incorrect API key provided: wrong-key") {
+		t.Fatalf("raw upstream text missing: %q", got)
 	}
 }
 

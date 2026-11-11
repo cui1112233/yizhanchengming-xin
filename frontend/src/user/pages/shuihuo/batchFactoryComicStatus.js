@@ -12,11 +12,20 @@ export function comicInlinePresentation({ page, selectedVideo, loading, error, h
       : { statusText: '等待提取漫画提示词', stateText: '待分析', placeholder: '尚未提取漫画提示词', tone: '', retry: false };
   }
   if (page.generationState === 'generating') return { statusText: '生成中', stateText: '生成中', placeholder: '漫画页生成中…', tone: 'busy', retry: false };
-  if (page.generationState === 'failed') return { statusText: '生成失败', stateText: '失败', placeholder: '漫画页生成失败，点击查看', tone: 'error', retry: false };
+  if (page.generationState === 'failed') return { statusText: '生成失败', stateText: '失败', placeholder: comicPageErrorHeadline(page) || '漫画页生成失败，点击查看', tone: 'error', retry: false };
   if (page.promptStatus === 'missing') return { statusText: '提示词缺失', stateText: '待分析', placeholder: '尚未提取漫画提示词', tone: '', retry: false };
   if (page.imageStatus === 'candidates') return { statusText: '已有候选图', stateText: '待选主图', placeholder: '已有候选图，打开媒体库选主图', tone: '', retry: false };
-  if (page.imageStatus === 'none' && page.status === 'generation_failed') return { statusText: '生成失败', stateText: '失败', placeholder: '漫画页生成失败，点击查看', tone: 'error', retry: false };
+  if (page.imageStatus === 'none' && page.status === 'generation_failed') return { statusText: '生成失败', stateText: '失败', placeholder: comicPageErrorHeadline(page) || '漫画页生成失败，点击查看', tone: 'error', retry: false };
   return { statusText: '等待生成图片', stateText: '待生成', placeholder: '等待生成漫画页图片', tone: '', retry: false };
+}
+
+// 页级失败文案是“中文主文案 + \n上游原文：”两段式；列表行只取第一行，
+// 原文交给 BatchFactoryErrorNotice 折叠区，不把英文原文顶到主文案。
+export function comicPageErrorHeadline(page) {
+  const text = String(page?.generationError || '').trim();
+  if (!text) return '';
+  const [headline] = text.split('\n上游原文：');
+  return headline.trim();
 }
 
 // 列表行/缩略图格优先取服务端缩略图；没有 thumbnailUrl 时回落到原图。

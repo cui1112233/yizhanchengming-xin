@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/agentproxy"
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/aicut"
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
@@ -29,7 +32,11 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/productionmedia"
 	"qiantie/backend/internal/prompt"
+	"qiantie/backend/internal/safehttp"
+	"qiantie/backend/internal/safepath"
+	"qiantie/backend/internal/screenplay"
 	"qiantie/backend/internal/storage"
+	"qiantie/backend/internal/upscale"
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
@@ -179,7 +186,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		return nil, err
 	}
 	migrations := append(storage.AppMigrations(), storage.NovelFetchWorkshopMigrations()...)
+	migrations = append(migrations, storage.AgentProxyMigrations()...)
 	migrations = append(migrations, storage.AuthMigrations()...)
+	migrations = append(migrations, storage.ScreenplayMigrations()...)
 	if err := storage.RunMigrations(ctx, db, migrations); err != nil {
 		return nil, err
 	}
@@ -190,6 +199,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	novelFetchStore := novelfetchworkshop.NewMySQLStore(db)
 	agentWorkspaceStore := agentworkspace.NewMySQLStore(db)
+	agentProxyStore := agentproxy.NewMySQLStore(db)
+	aiCutStore := aicut.NewMySQLStore(db)
+	screenplayStore := screenplay.NewMySQLStore(db)
 	agentAssetStore := agentworkspace.NewMySQLAssetStore(db)
 	var agentAssetObjects agentworkspace.AssetObjectStore
 	var legacyAgentAssetObjects agentworkspace.AssetObjectStore
@@ -244,6 +256,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		}
 		novelFetchRewrite = novelFetchRewriteAdapter{provider: textProvider}
 	}
+	var userConfigStore *httpapi.UserConfigStore
 	resolveCatalogTextProviderWithSelection := func(ctx context.Context, owner, selection string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
 		settings, err := novelFetchStore.GetConfig(ctx, owner)
 		if err != nil {
@@ -263,7 +276,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		// Explicit per-task selections must never be swapped for the legacy
 		// account model: a bad selection has to fail visibly instead.
 		if provider == nil && strings.TrimSpace(selection) == "" && strings.TrimSpace(cfg.ScriptHistoryDir) != "" {
-			raw, readErr := os.ReadFile(filepath.Join(cfg.ScriptHistoryDir, owner, "api-config.json"))
+			legacyPath, pathErr := safepath.UserPath(cfg.ScriptHistoryDir, owner, "api-config.json")
+			if pathErr != nil {
+				return nil, pathErr
+			}
+			raw, readErr := os.ReadFile(legacyPath)
 			if readErr == nil {
 				var legacy map[string]any
 				if json.Unmarshal(raw, &legacy) == nil {
@@ -295,6 +312,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		modelID = strings.TrimSpace(modelID)
 		if modelID == "" {
 			return nil, nil
+		}
+		if provider, matched, err := httpapi.ResolveIntegrationTextProvider(ctx, userConfigStore, owner, modelID); matched {
+			return provider, err
 		}
 		provider, err := resolveCatalogTextProviderWithSelection(ctx, owner, modelID)
 		if err != nil {
@@ -350,7 +370,96 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	giantMaterialResolver := selectGiantMaterialResolver(cfg)
 	artifactStore := localartifact.NewStore(cfg.LocalExecutorArtifactDir, cfg.LocalExecutorArtifactMaxBytes)
 	imageGenerationCache := imagegenerationcache.NewMySQLRepository(db)
-	userConfigStore := httpapi.NewUserConfigStore(cfg.ScriptHistoryDir)
+	userConfigStore = httpapi.NewUserConfigStore(cfg.ScriptHistoryDir)
+	var aiCutASRService *aicut.ASRService
+	if strings.TrimSpace(cfg.RedisURL) != "" && agentAssetObjects != nil {
+		redisTransport, redisErr := mergeworker.NewRedisStore(cfg.RedisURL, "qiantie:aicut:asr")
+		if redisErr != nil {
+			return nil, redisErr
+		}
+		queue := aicut.NewRedisASRQueue("qiantie:aicut:asr", aicut.RedisDoFunc(redisTransport.Do))
+		aiCutASRService = aicut.NewASRService(aicut.ASRServiceOptions{
+			Store:    aiCutStore,
+			Notifier: queue,
+			OpenObject: func(ctx context.Context, asset aicut.Asset) (io.ReadCloser, error) {
+				return agentAssetObjects.Open(ctx, agentworkspace.Asset{ID: asset.ID, ProjectID: asset.ProjectID, Kind: asset.Kind, Name: asset.Name, ContentType: asset.ContentType, ObjectKey: asset.ObjectKey, ByteSize: asset.ByteSize, CreatedAt: asset.CreatedAt})
+			},
+			ResolveProvider: func(ctx context.Context, owner, modelID string) (aicut.ASRProvider, error) {
+				settings, err := novelFetchStore.GetConfig(ctx, owner)
+				if err != nil {
+					return nil, err
+				}
+				return aicut.ASRProviderFromCatalog(settings, modelID, nil)
+			},
+		})
+		go aiCutASRService.Run(context.Background(), queue)
+	}
+	var aiCutExportService *httpapi.AICutExportService
+	if strings.TrimSpace(cfg.RedisURL) != "" && agentAssetObjects != nil {
+		redisTransport, redisErr := mergeworker.NewRedisStore(cfg.RedisURL, "qiantie:aicut:export")
+		if redisErr != nil {
+			return nil, redisErr
+		}
+		queue := aicut.NewRedisExportQueue("qiantie:aicut:export", aicut.RedisDoFunc(redisTransport.Do))
+		aiCutExportService = httpapi.NewAICutExportService(aiCutStore, agentAssetObjects, queue, time.Now)
+		go aiCutExportService.Run(context.Background(), queue)
+	}
+	agentTools := aicut.NewAgentToolExecutor(aiCutStore, aiCutStore, time.Now)
+	agentTools.ConfigureCompositeTools(aicut.AgentCompositeTools{
+		SubmitASR: func(ctx context.Context, owner string, input aicut.ASRSubmit) (aicut.ASRJob, error) {
+			if aiCutASRService == nil {
+				return aicut.ASRJob{}, errors.New("ASR 服务尚未配置，请先配置 Redis、素材存储和 ASR 模型")
+			}
+			return aiCutASRService.Submit(ctx, owner, input)
+		},
+		SmartSplit: func(ctx context.Context, owner, projectID, assetID string, threshold float64, minIntervalMS, expectedRevision int64) (aicut.Timeline, int, string, error) {
+			if agentAssetObjects == nil {
+				return aicut.Timeline{}, 0, "", errors.New("素材存储尚未配置")
+			}
+			return httpapi.RunAICutSmartSplit(ctx, aiCutStore, agentAssetObjects, time.Now, owner, projectID, assetID, threshold, minIntervalMS, expectedRevision)
+		},
+		ExtractAudio: func(ctx context.Context, owner, projectID, assetID string) (aicut.Asset, error) {
+			if agentAssetObjects == nil {
+				return aicut.Asset{}, errors.New("素材存储尚未配置")
+			}
+			return httpapi.RunAICutExtractAudio(ctx, aiCutStore, agentAssetObjects, time.Now, owner, projectID, assetID)
+		},
+		OralClean: func(ctx context.Context, owner, projectID, modelID string, maxPauseMS, expectedRevision int64) (aicut.Timeline, aicut.FillerTrimSummary, string, error) {
+			return httpapi.RunAICutOralClean(ctx, aiCutStore, httpapi.AICutTextProviderResolver(textProviderForModel), time.Now, owner, projectID, modelID, maxPauseMS, expectedRevision)
+		},
+	})
+	agentService := aicut.NewAgentService(aiCutStore, agentTools, func(ctx context.Context, owner, modelID string) (aicut.AgentModel, error) {
+		var provider batchfactoryv11.DirectorProvider
+		var err error
+		if strings.TrimSpace(modelID) == "" {
+			provider, err = resolveCatalogTextProvider(ctx, owner)
+		} else {
+			provider, err = textProviderForModel(ctx, owner, modelID)
+		}
+		if err != nil || provider == nil {
+			return nil, err
+		}
+		return aicut.AgentModelFunc(func(callCtx context.Context, request aicut.AgentModelRequest) (string, error) {
+			return provider.Complete(callCtx, batchfactoryv11.TextCompletionRequest{SystemPrompt: request.SystemPrompt, UserPrompt: request.UserPrompt, Temperature: 0.1, MaxTokens: 4096, DisableJSONResponse: true})
+		}), nil
+	}, func(mode aicut.AgentMode) string {
+		return prompt.BuildAICutAgentSystemPrompt(string(mode))
+	}, time.Now)
+	var aiCutAgentStarter httpapi.AICutAgentStarter
+	if strings.TrimSpace(cfg.RedisURL) != "" {
+		redisTransport, redisErr := mergeworker.NewRedisStore(cfg.RedisURL, "qiantie:aicut:agent")
+		if redisErr != nil {
+			return nil, redisErr
+		}
+		queue := aicut.NewRedisAgentQueue("qiantie:aicut:agent", aicut.RedisDoFunc(redisTransport.Do))
+		aiCutAgentStarter = queue.Notify
+		go agentService.RunQueue(context.Background(), queue)
+	} else {
+		aiCutAgentStarter = func(_ context.Context, runID string) error {
+			go func() { _, _ = agentService.Run(context.Background(), runID) }()
+			return nil
+		}
+	}
 	productionMediaEnabled := strings.TrimSpace(cfg.ProductionMediaTOSEndpoint) != "" || strings.TrimSpace(cfg.ProductionMediaTOSBucket) != ""
 	if productionMediaEnabled {
 		if err := os.MkdirAll(artifactStore.Root(), 0o750); err != nil {
@@ -502,7 +611,8 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	n8ComicClient := n8comic.NewClient(n8comic.Config{BaseURL: cfg.N8ComicBaseURL, APIKey: cfg.N8ComicOpenAPIKey})
 	n8ProducerDirectory := n8catalog.NewClient(nil, cfg.N8AdminBaseURL, cfg.QingyuN8AdminToken)
 	n8ComicWorks := n8catalog.NewWorksClientWithPath(nil, cfg.N8ComicBaseURL, cfg.QingyuN8AdminToken, os.Getenv("QIANTIE_N8_WORKS_PATH"))
-	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, ImageGenerationCache: imageGenerationCache, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), AutomationStateStore: httpapi.NewMySQLAutomationStateStore(db), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: userConfigStore, TextProvider: effectiveTextProvider, TextProviderResolver: textProviderForModel, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts, WorkTitleMapPath: os.Getenv("QIANTIE_N8_WORK_TITLE_MAP_PATH")}, ComicDirectRecordPath: comicDirectRecordPath(cfg)}), nil
+	upscaleService := upscale.NewService(upscale.NewClient(cfg.VolcanoMediaKitBaseURL, cfg.VolcanoMediaKitAPIKey), time.Now)
+	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), AuthRateLimits: httpapi.AuthRateLimitConfig{LoginWindow: cfg.AuthRateLimitLoginWindow, LoginMaxFailures: cfg.AuthRateLimitLoginMaxFailures, LoginLockout: cfg.AuthRateLimitLoginLockout, RegisterWindow: cfg.AuthRateLimitRegisterWindow, RegisterMax: cfg.AuthRateLimitRegisterMax, RegisterLockout: cfg.AuthRateLimitRegisterLockout, PasswordResetWindow: cfg.AuthRateLimitPasswordResetWindow, PasswordResetMax: cfg.AuthRateLimitPasswordResetMax, PasswordResetLockout: cfg.AuthRateLimitPasswordResetLockout}, Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: safehttp.NewClientWithTimeout(cfg.NovelFetch121Timeout)}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, ImageGenerationCache: imageGenerationCache, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), AutomationStateStore: httpapi.NewMySQLAutomationStateStore(db), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: userConfigStore, TextProvider: effectiveTextProvider, TextProviderResolver: textProviderForModel, AgentWorkspace: agentWorkspaceStore, AgentProxy: agentProxyStore, AICut: aiCutStore, Screenplay: screenplayStore, AICutASR: aiCutASRService, AICutExport: aiCutExportService, AICutAgentStore: aiCutStore, AICutAgentStarter: aiCutAgentStarter, Upscale: upscaleService, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts, WorkTitleMapPath: os.Getenv("QIANTIE_N8_WORK_TITLE_MAP_PATH")}, ComicDirectRecordPath: comicDirectRecordPath(cfg)}), nil
 }
 
 func shouldStartLocalArtifactPurger(cfg config.Config) bool {

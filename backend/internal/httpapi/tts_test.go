@@ -22,6 +22,17 @@ func TestConfiguredTTSRequestRendersTemplateWithoutLeakingShape(t *testing.T) {
 	}
 }
 
+func TestConfiguredTTSRequestEscapesUserTextInsideJSONTemplate(t *testing.T) {
+	_, _, body, err := configuredTTSRequest(`{"method":"POST","body":{"text":"{{prompt}}"}}`, ttsRequest{Input: "他说：\"你好\"\n下一行"}, "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil || decoded["text"] != "他说：\"你好\"\n下一行" {
+		t.Fatalf("body=%s decoded=%#v err=%v", body, decoded, err)
+	}
+}
+
 func TestConfiguredTTSModelUsesEnabledManagedAudioModel(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutConfig(context.Background(), "tts-owner", map[string]any{"modelCatalog": []any{

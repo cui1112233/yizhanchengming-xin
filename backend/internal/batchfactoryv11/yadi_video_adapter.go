@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const defaultYadiFirstFrameURL = "https://tvmao-public.tos-cn-beijing.volces.com/tapnow/empty.png"
@@ -264,7 +266,7 @@ func yadiResultMediaURL(raw []byte) string {
 func (a *YadiVideoAdapter) doJSON(req *http.Request) ([]byte, error) {
 	client := a.Client
 	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
+		client = safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	resp, err := client.Do(req)
 	if err != nil {

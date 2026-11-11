@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/safehttp"
 )
 
 type ttsRequest struct {
@@ -41,15 +44,29 @@ func configuredTTSProxyURL() string {
 func ttsHTTPClient() *http.Client {
 	proxyURL := configuredTTSProxyURL()
 	if proxyURL == "" {
-		return &http.Client{Timeout: 60 * time.Second}
+		return safehttp.NewClientWithTimeout(60 * time.Second)
 	}
 	parsed, err := url.Parse(proxyURL)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return &http.Client{Timeout: 60 * time.Second}
+		return safehttp.NewClientWithTimeout(60 * time.Second)
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = http.ProxyURL(parsed)
-	return &http.Client{Timeout: 60 * time.Second, Transport: transport}
+	return safehttp.NewClientWithTransport(60*time.Second, transport)
+}
+
+// ttsTransportError 把 http.Client.Do 的传输层错误归成中文结论，避免把
+// “Post ...: dial tcp ...” 直接抛给用户。原始错误只放在「上游原文」后面，
+// 交给界面的展开区查看；上游返回的业务错误不走这里，仍按状态码单独归类。
+func ttsTransportError(err error) error {
+	message := "音频模型网络不可达，请检查网络或代理设置"
+	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
+		message = "音频模型连接超时，请稍后重试"
+	} else if errors.Is(err, context.Canceled) {
+		message = "音频模型请求已取消"
+	}
+	return fmt.Errorf("%s", appendShuihuoUpstreamRaw(message, err.Error()))
 }
 
 func registerTTSRoute(root *http.ServeMux, auth BridgeAuth, catalogStore novelfetchworkshop.Store) {
@@ -114,7 +131,7 @@ func requestDefaultTTSBytes(ctx context.Context, input ttsRequest) ([]byte, stri
 	req.Header.Set("Content-Type", "application/json")
 	response, err := ttsHTTPClient().Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("TTS 服务请求失败: %w", err)
+		return nil, "", ttsTransportError(err)
 	}
 	defer response.Body.Close()
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
@@ -196,7 +213,7 @@ func requestConfiguredTTSBytes(ctx context.Context, input ttsRequest, model map[
 	}
 	response, err := ttsHTTPClient().Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", ttsTransportError(err)
 	}
 	defer response.Body.Close()
 	payload, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
@@ -274,7 +291,7 @@ func fetchConfiguredTTSAudio(ctx context.Context, audioURL string) ([]byte, stri
 	if err != nil {
 		return nil, "", fmt.Errorf("音频 URL 无效")
 	}
-	response, err := (&http.Client{Timeout: 60 * time.Second}).Do(req)
+	response, err := safehttp.NewClientWithTimeout(60 * time.Second).Do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("音频 URL 请求失败: %w", err)
 	}
@@ -296,14 +313,11 @@ func configuredTTSRequest(template string, input ttsRequest, credential string) 
 		"{{speech_rate}}": fmt.Sprint(input.Speed), "{{speed}}": fmt.Sprint(input.Speed),
 		"{{pitch}}": fmt.Sprint(input.Pitch), "{{style}}": input.Style, "{{credential}}": credential,
 	}
-	raw := template
-	for from, to := range replacements {
-		raw = strings.ReplaceAll(raw, from, to)
-	}
 	var envelope map[string]any
-	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
+	if err := json.Unmarshal([]byte(template), &envelope); err != nil {
 		return "", nil, nil, err
 	}
+	envelope = replaceTTSPlaceholders(envelope, replacements).(map[string]any)
 	method := strings.ToUpper(strings.TrimSpace(fmt.Sprint(envelope["method"])))
 	if method == "" || strings.EqualFold(method, "<nil>") {
 		method = http.MethodPost
@@ -320,4 +334,29 @@ func configuredTTSRequest(template string, input ttsRequest, credential string) 
 	}
 	body, err := json.Marshal(bodyValue)
 	return method, headers, body, err
+}
+
+func replaceTTSPlaceholders(value any, replacements map[string]string) any {
+	switch typed := value.(type) {
+	case string:
+		result := typed
+		for from, to := range replacements {
+			result = strings.ReplaceAll(result, from, to)
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, child := range typed {
+			result[key] = replaceTTSPlaceholders(child, replacements)
+		}
+		return result
+	case []any:
+		result := make([]any, len(typed))
+		for index, child := range typed {
+			result[index] = replaceTTSPlaceholders(child, replacements)
+		}
+		return result
+	default:
+		return value
+	}
 }

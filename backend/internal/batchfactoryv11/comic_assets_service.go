@@ -76,7 +76,7 @@ func (s *DirectorService) hydratePrivateComicAssetPreset(book Book, snapshot Dir
 // asset preset into the one text-model call that establishes comic continuity.
 func BuildComicAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptContract, error) {
 	if strings.TrimSpace(book.SourceText) == "" {
-		return PromptContract{}, fmt.Errorf("%w: source text is required", ErrInvalid)
+		return PromptContract{}, fmt.Errorf("%w: 小说原文为空，请先导入或粘贴原文后再生成漫画提示词", ErrInvalid)
 	}
 	if normalizeProductionMode(snapshot.Effective) != "comic" {
 		return PromptContract{}, NewConfigRequiredError("请先打开漫画生成")

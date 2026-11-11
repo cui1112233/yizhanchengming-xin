@@ -2,6 +2,7 @@ import { Alert, Button, Drawer, Empty, Popconfirm, Select, Tag, message } from '
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../../shared/api/client';
 import { cancelTask, createTask, listModels, listTasks, retryTask } from '../../../shared/api/shuihuoProduction';
+import { BatchFactoryErrorNotice } from './BatchFactoryErrorNotice';
 import { taskReadiness } from './taskReadiness';
 
 const labels = { draft: '草稿', queued: '排队中', running: '生成中', succeeded: '已完成', failed: '失败', cancelled: '已取消' };
@@ -13,6 +14,7 @@ function completedMediaFor(task, media) {
 
 export function TaskDrawer({ open, taskFilter = 'all', project, segments, media = [], readiness, onClose, onCompleted }) {
   const [models, setModels] = useState([]); const [tasks, setTasks] = useState([]); const [modelId, setModelId] = useState(); const [segmentId, setSegmentId] = useState(); const [kind, setKind] = useState('image'); const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const requestGeneration = useRef(0);
   const availableModels = useMemo(() => models.filter(model => model.kind === kind), [models, kind]);
   const eligibleSegments = useMemo(() => segments.filter(segment => segment.confirmed), [segments]);
@@ -40,8 +42,13 @@ export function TaskDrawer({ open, taskFilter = 'all', project, segments, media 
     requestGeneration.current += 1;
     if (!open) return undefined;
     let active = true;
-    setModels([]); setTasks([]); setSegmentId(undefined);
-    refresh().catch(error => { if (active) message.error(error.message || '读取任务中心失败'); });
+    setModels([]); setTasks([]); setSegmentId(undefined); setLoadError('');
+    refresh().catch(error => {
+      if (!active) return;
+      // 读取失败要单独标记，不能和「还没有任务」共用同一个空状态。
+      setLoadError(error.message || '读取任务中心失败');
+      message.error(error.message || '读取任务中心失败');
+    });
     return () => { active = false; requestGeneration.current += 1; };
   }, [open, refresh]);
   useEffect(() => {
@@ -64,7 +71,7 @@ export function TaskDrawer({ open, taskFilter = 'all', project, segments, media 
     } catch (error) { message.error(error.message || '提交任务失败'); } finally { setBusy(false); }
   }
   async function operate(task, action) { setBusy(true); try { if (action === 'cancel') await cancelTask(task.id); else await retryTask(task.id); await refresh(); } catch (error) { message.error(error.message || '任务操作失败'); } finally { setBusy(false); } }
-  async function manuallyRefresh() { setBusy(true); try { await refresh(); } catch (error) { message.error(error.message || '读取任务中心失败'); } finally { setBusy(false); } }
+  async function manuallyRefresh() { setBusy(true); try { await refresh(); setLoadError(''); } catch (error) { setLoadError(error.message || '读取任务中心失败'); message.error(error.message || '读取任务中心失败'); } finally { setBusy(false); } }
   async function openCompletedMedia(completedMedia) {
     try {
       const blob = await apiRequest(`/api/shuihuo-production/media/${completedMedia.id}/download`, { responseType: 'blob' });
@@ -82,11 +89,12 @@ export function TaskDrawer({ open, taskFilter = 'all', project, segments, media 
     {kind === 'video' ? <Alert type="info" showIcon message="图生视频" description="YD 优先使用绑定场景预设图作为场景图，没有时使用当前分镜主图片；人物和道具预设图会作为参考图。" /> : null}
     {!kindReady ? <Alert className="shuihuo-inline-alert" type="warning" showIcon message="当前任务依赖未就绪" description={kindAvailability.reason || '请检查运行配置'} /> : null}
     {!availableModels.length ? <p className="shuihuo-task-empty-note">当前没有启用的{kind === 'image' ? '图片' : kind === 'video' ? '视频' : '配音'}模型，不能提交生成任务。</p> : null}
+    {loadError ? <Alert type="error" showIcon message="任务列表读取失败" description={loadError} action={<Button size="small" onClick={manuallyRefresh} disabled={busy}>重试</Button>} style={{ marginBottom: 12 }} /> : null}
     <div className="shuihuo-task-list">{visibleTasks.map(task => {
       const completedMedia = task.status === 'succeeded' ? completedMediaFor(task, media) : null;
       const retryable = task.status === 'failed' || task.status === 'cancelled';
       const taskSegment = segments.find(segment => segment.id === task.segmentId);
-      return <article key={task.id} className="shuihuo-task-item"><div><strong>{task.kind === 'image' ? '图片生成' : task.kind === 'video' ? '视频生成' : task.kind === 'audio' ? '配音生成' : task.kind}</strong><span>#{task.id} · 第 {segmentOrder(taskSegment)} 个分镜</span>{task.provider ? <span>提供方：{task.provider}{task.providerTaskId ? ` · 上游任务 ${task.providerTaskId}` : ''}</span> : null}{task.errorCode ? <span>错误代码：{task.errorCode}</span> : null}{task.errorMessage ? <p>{task.errorMessage}</p> : null}{retryable ? <span>此任务可重试</span> : null}{completedMedia ? <Button type="link" size="small" onClick={() => openCompletedMedia(completedMedia)}>查看完成素材</Button> : null}</div><Tag color={colors[task.status]}>{labels[task.status] || task.status}</Tag>{task.status === 'queued' || task.status === 'running' ? <Popconfirm title="取消该任务？" onConfirm={() => operate(task, 'cancel')}><Button size="small">取消</Button></Popconfirm> : null}{retryable ? <Button size="small" onClick={() => operate(task, 'retry')}>重试</Button> : null}</article>;
-    })}{!visibleTasks.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={taskFilter === 'active' ? '暂无可取消任务' : '暂未提交任务'} /> : null}</div>
+      return <article key={task.id} className="shuihuo-task-item"><div><strong>{task.kind === 'image' ? '图片生成' : task.kind === 'video' ? '视频生成' : task.kind === 'audio' ? '配音生成' : task.kind}</strong><span>#{task.id} · 第 {segmentOrder(taskSegment)} 个分镜</span>{task.provider ? <span>提供方：{task.provider}{task.providerTaskId ? ` · 上游任务 ${task.providerTaskId}` : ''}</span> : null}{task.errorCode ? <span>错误代码：{task.errorCode}</span> : null}{task.errorMessage ? <BatchFactoryErrorNotice compact title="生成任务失败" error={task.errorMessage} /> : null}{retryable ? <span>此任务可重试</span> : null}{completedMedia ? <Button type="link" size="small" onClick={() => openCompletedMedia(completedMedia)}>查看完成素材</Button> : null}</div><Tag color={colors[task.status]}>{labels[task.status] || task.status}</Tag>{task.status === 'queued' || task.status === 'running' ? <Popconfirm title="取消该任务？" onConfirm={() => operate(task, 'cancel')}><Button size="small">取消</Button></Popconfirm> : null}{retryable ? <Button size="small" onClick={() => operate(task, 'retry')}>重试</Button> : null}</article>;
+    })}{!visibleTasks.length && !loadError ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={taskFilter === 'active' ? '暂无可取消任务' : '暂未提交任务'} /> : null}</div>
   </Drawer>;
 }

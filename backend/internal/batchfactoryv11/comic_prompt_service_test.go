@@ -681,6 +681,116 @@ func TestRunComicPromptExtractionCallsTextProviderOncePerPage(t *testing.T) {
 	}
 }
 
+type comicPolicyRetryProvider struct {
+	calls []TextCompletionRequest
+}
+
+func (p *comicPolicyRetryProvider) Complete(_ context.Context, input TextCompletionRequest) (string, error) {
+	p.calls = append(p.calls, input)
+	if len(p.calls) == 1 {
+		return "", &DirectorHTTPError{StatusCode: 400, Model: "text-model", Body: `{"error":{"message":"PROHIBITED_CONTENT"}}`}
+	}
+	return `{"screen_prompt":"安全镜头：人物隔着门对话","image_prompt":"人物隔着门对话，无暴力血腥画面","roles":["女主"],"role_stage":{"女主":"女主"},"scene_presets":[]}`, nil
+}
+
+func TestRunComicPromptExtractionRetriesContentPolicyWithSafeVisualRequest(t *testing.T) {
+	store := NewMemoryStore()
+	ctx := context.Background()
+	source := `门外传来打斗声，鲜血喷射。女主喊道：“放下刀，你别过来！”`
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{Title: "K", SourceText: source, Videos: []CreateVideoInput{{Label: "漫画页 01", VideoPrompt: source}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	config := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "整书漫画页提示词"}})
+	if _, err = store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": config}, ExpectedRevision: book.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	store.mu.Lock()
+	store.bookAssets["comic-asset"] = memoryOwned[BookAsset]{Owner: "alice", Value: BookAsset{ID: "comic-asset", BatchID: batch.ID, BookID: book.ID, Kind: "character", Name: "女主", Prompt: "漫画少女", Source: "comic"}}
+	store.mu.Unlock()
+	provider := &comicPolicyRetryProvider{}
+
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(ctx, "alice", batch.ID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Updated) != 1 || len(provider.calls) != 2 {
+		t.Fatalf("updated=%d calls=%d, want one page and one safe retry", len(result.Updated), len(provider.calls))
+	}
+	retry := provider.calls[1]
+	if strings.Contains(retry.UserPrompt, "鲜血喷射") || strings.Contains(retry.UserPrompt, "打斗") {
+		t.Fatalf("safe retry still contains rejected visual descriptions: %s", retry.UserPrompt)
+	}
+	if strings.Contains(retry.UserPrompt, "放下刀，你别过来") || !strings.Contains(retry.UserPrompt, "{对白1}") {
+		t.Fatalf("safe retry did not replace original dialogue with a placeholder: %s", retry.UserPrompt)
+	}
+	if !strings.Contains(retry.SystemPrompt, "禁止画面出现暴力血腥") {
+		t.Fatalf("safe retry is missing the backend visual safety rule: %s", retry.SystemPrompt)
+	}
+	if !strings.Contains(result.Updated[0].ComicPrompt, "放下刀，你别过来") {
+		t.Fatalf("persisted screen prompt did not restore original dialogue: %s", result.Updated[0].ComicPrompt)
+	}
+}
+
+type comicAdultPolicyRetryProvider struct {
+	calls []TextCompletionRequest
+}
+
+func (p *comicAdultPolicyRetryProvider) Complete(_ context.Context, input TextCompletionRequest) (string, error) {
+	p.calls = append(p.calls, input)
+	if len(p.calls) <= 2 {
+		return "", &DirectorHTTPError{StatusCode: 400, Model: "text-model", Body: `{"error":{"message":"PROHIBITED_CONTENT/成人内容拒绝"}}`}
+	}
+	return `{"screen_prompt":"安全日常镜头，页面文字：{对白1}","image_prompt":"两名成年人在客厅保持距离交谈，日常服装，无身体接触","roles":["女主"],"role_stage":{"女主":"女主"},"scene_presets":[]}`, nil
+}
+
+func TestRunComicPromptExtractionRetriesAdultPolicyTwiceAndRestoresDialogueOnlyToScreen(t *testing.T) {
+	store := NewMemoryStore()
+	ctx := context.Background()
+	dialogue := "今晚来我房间，我们单独谈谈"
+	source := `夜里，两人靠得很近，气氛暧昧。女主低声说：“` + dialogue + `。”`
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{Title: "K", SourceText: source, Videos: []CreateVideoInput{{Label: "漫画页 01", VideoPrompt: source}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	config := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "整书漫画页提示词"}})
+	if _, err = store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": config}, ExpectedRevision: book.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	store.mu.Lock()
+	store.bookAssets["comic-asset"] = memoryOwned[BookAsset]{Owner: "alice", Value: BookAsset{ID: "comic-asset", BatchID: batch.ID, BookID: book.ID, Kind: "character", Name: "女主", Prompt: "漫画少女", Source: "comic"}}
+	store.mu.Unlock()
+	provider := &comicAdultPolicyRetryProvider{}
+
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(ctx, "alice", batch.ID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Updated) != 1 || len(provider.calls) != 3 {
+		t.Fatalf("updated=%d calls=%d, want one page and two safe retries", len(result.Updated), len(provider.calls))
+	}
+	for index, retry := range provider.calls[1:] {
+		if strings.Contains(retry.UserPrompt, dialogue) || strings.Contains(retry.UserPrompt, "暧昧") || strings.Contains(retry.UserPrompt, "靠得很近") {
+			t.Fatalf("safe retry %d still contains rejected adult content: %s", index+1, retry.UserPrompt)
+		}
+		if !strings.Contains(retry.UserPrompt, "{对白1}") {
+			t.Fatalf("safe retry %d is missing the stable dialogue placeholder: %s", index+1, retry.UserPrompt)
+		}
+	}
+	page := result.Updated[0]
+	if !strings.Contains(page.ComicPrompt, dialogue) {
+		t.Fatalf("screen prompt did not restore original dialogue: %s", page.ComicPrompt)
+	}
+	if strings.Contains(page.ComicImagePrompt, dialogue) {
+		t.Fatalf("image prompt restored rejected dialogue: %s", page.ComicImagePrompt)
+	}
+	if !strings.Contains(provider.calls[2].SystemPrompt, "无身体接触") {
+		t.Fatalf("second safe retry is missing the strict rule: %s", provider.calls[2].SystemPrompt)
+	}
+}
+
 func TestRunMissingComicPromptExtractionPreservesCompletedPages(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
@@ -965,5 +1075,29 @@ func TestParseComicBookPromptResultsReportsMissingPagesWithDetails(t *testing.T)
 		if !strings.Contains(message, part) {
 			t.Fatalf("mismatch message misses %q: %s", part, message)
 		}
+	}
+}
+
+func TestComicPromptMessagesNeverExposeEnglishSentinels(t *testing.T) {
+	countErr := newComicPageCountError([]Video{{ID: "video-1", Label: "漫画页 01"}}, nil)
+	if !errors.Is(countErr, ErrInvalid) {
+		t.Fatalf("page count error must stay classifiable: %v", countErr)
+	}
+	partial := &ComicPromptPartialError{
+		Result: ComicPromptExtractionResult{Failed: []ComicPromptExtractionFailure{{VideoID: "video-1", Label: "漫画页 01"}}},
+		Cause:  countErr,
+	}
+	for _, message := range []string{countErr.Error(), partial.Error()} {
+		if !strings.Contains(message, "漫画页数量与分页不一致") {
+			t.Fatalf("message misses business reason: %s", message)
+		}
+		for _, english := range []string{"invalid input", "temporary upstream failure"} {
+			if strings.Contains(message, english) {
+				t.Fatalf("message leaks english sentinel %q: %s", english, message)
+			}
+		}
+	}
+	if !strings.Contains(partial.Error(), "漫画页提示词 1/1 张失败") {
+		t.Fatalf("partial message must keep the failure count in Chinese: %s", partial.Error())
 	}
 }

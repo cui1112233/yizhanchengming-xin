@@ -25,7 +25,11 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		path := filepath.Join(usersDir, identity.Username, "upload-target.json")
+		path, pathErr := UserScopedPath(usersDir, identity.Username, "upload-target.json")
+		if pathErr != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "用户名不合法"})
+			return
+		}
 		session := map[string]any{}
 		raw, err := os.ReadFile(path)
 		if err != nil || json.Unmarshal(raw, &session) != nil || strings.TrimSpace(toString(session["cookie"])) == "" {
@@ -97,7 +101,10 @@ func videoManagementLoginError(err error, cookie string) string {
 }
 
 func saveUploadTargetSession(usersDir, username string, value map[string]any) error {
-	directory := filepath.Join(usersDir, username)
+	directory, err := UserScopedPath(usersDir, username)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return err
 	}

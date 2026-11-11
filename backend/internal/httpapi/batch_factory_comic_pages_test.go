@@ -21,6 +21,47 @@ import (
 	"qiantie/backend/internal/prompt"
 )
 
+func TestComicPageFailureMessagesDropEnglishSentinelsAndDuplicateLabels(t *testing.T) {
+	failure := comicPageFailure{
+		VideoID: "video-04",
+		Label:   "漫画页 04",
+		Err:     errors.New("漫画页 04 生成失败: temporary upstream failure: image provider returned HTTP 400: 目前无法在此聊天中直接生成图片"),
+	}
+	message := comicPageFailureMessage(failure)
+	for _, english := range []string{"temporary upstream failure", "image provider returned", "invalid input"} {
+		if strings.Contains(message, english) {
+			t.Fatalf("page failure message leaks %q: %s", english, message)
+		}
+	}
+	if strings.Count(message, "漫画页 04") != 1 {
+		t.Fatalf("page label must not be duplicated: %s", message)
+	}
+	if !strings.Contains(message, "图片通道拒绝了本次请求（HTTP 400）") {
+		t.Fatalf("status code must stay in parentheses with a Chinese conclusion: %s", message)
+	}
+
+	multi := &comicPageWorkError{Failures: []comicPageFailure{
+		failure,
+		{VideoID: "video-05", Label: "漫画页 05", Err: errors.New("漫画页 05 生成失败: invalid input: 提示词为空")},
+	}}
+	workMessage := multi.Error()
+	if !strings.HasPrefix(workMessage, "2 个漫画页生成失败（首个：") {
+		t.Fatalf("work error=%s", workMessage)
+	}
+	partial := &comicPagePartialError{comicPageWorkError: multi, Completed: 22, Total: 26}
+	partialMessage := partial.Error()
+	if !strings.HasPrefix(partialMessage, "已生成 22/26 页，2 页失败（首个：") {
+		t.Fatalf("partial error=%s", partialMessage)
+	}
+	for _, candidate := range []string{workMessage, partialMessage} {
+		for _, english := range []string{"temporary upstream failure", "image provider returned", "invalid input"} {
+			if strings.Contains(candidate, english) {
+				t.Fatalf("aggregated message leaks %q: %s", english, candidate)
+			}
+		}
+	}
+}
+
 func TestRepairComicAssetPromptUsesRewriteSanitizesAndCaches(t *testing.T) {
 	key := comicAssetRepairKey("batch-1", "book-1", "asset-1")
 	shuihuoRepairedPrompts.Delete(key)
@@ -47,7 +88,7 @@ func TestRepairComicAssetPromptUsesRewriteSanitizesAndCaches(t *testing.T) {
 	_ = repairComicImagePrompt
 }
 
-func TestComicBookGenerationContextPreservesParentDeadlineWhileIgnoringCancellation(t *testing.T) {
+func TestComicBookGenerationContextUsesItsOwnDeadlineWhileIgnoringParentCancellation(t *testing.T) {
 	parent, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	child, childCancel := comicBookGenerationContext(parent)
@@ -60,10 +101,13 @@ func TestComicBookGenerationContextPreservesParentDeadlineWhileIgnoringCancellat
 	case <-time.After(2 * time.Millisecond):
 	}
 
-	select {
-	case <-child.Done():
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("detached comic generation did not preserve the parent deadline")
+	time.Sleep(30 * time.Millisecond)
+	if err := child.Err(); err != nil {
+		t.Fatalf("detached comic generation inherited the short parent deadline: %v", err)
+	}
+	deadline, ok := child.Deadline()
+	if !ok || time.Until(deadline) < 5*time.Hour {
+		t.Fatalf("detached comic generation deadline=%v ok=%t, want its own long bounded lifetime", deadline, ok)
 	}
 }
 
@@ -1357,5 +1401,25 @@ func TestComicPromptRepairCoversVisualFieldsAndRecordsLedger(t *testing.T) {
 	}
 	if count, _ := record["repairCount"].(int); count != 2 {
 		t.Fatalf("清零后修复次数不得丢失: %v", record["repairCount"])
+	}
+}
+
+func TestComicPagePersistedErrorKeepsChineseHeadlineAndRaw(t *testing.T) {
+	withRaw := errors.New("图片通道拒绝了本次请求（HTTP 400）：提示词包含敏感内容\n上游原文：HTTP 400 · content policy violation")
+	if got, want := comicPagePersistedError(withRaw), withRaw.Error(); got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	// 没有标准分隔符时，主文案去掉内部哨兵，完整原文放到第二段。
+	got := comicPagePersistedError(errors.New("invalid input: 漫画页正在生成，请稍后重试"))
+	headline, raw, found := strings.Cut(got, "\n上游原文：")
+	if !found || strings.Contains(headline, "invalid input") || raw != "invalid input: 漫画页正在生成，请稍后重试" {
+		t.Fatalf("unexpected persisted error: %q", got)
+	}
+	// 已经是纯中文业务原因时不重复拼接原文。
+	if got := comicPagePersistedError(errors.New("漫画页提示词包含敏感内容")); got != "漫画页提示词包含敏感内容" {
+		t.Fatalf("unexpected pure chinese error: %q", got)
+	}
+	if got := comicPagePersistedError(nil); got != "漫画页生成失败，请重试" {
+		t.Fatalf("unexpected fallback: %q", got)
 	}
 }

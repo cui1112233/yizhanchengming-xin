@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const DefaultMaterialURL = "https://n8.hnqingyuwen.top/center-api/material/video/select"
@@ -67,7 +69,7 @@ type Client struct {
 
 func NewClient(httpClient *http.Client, endpoint, token string) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 20 * time.Second}
+		httpClient = safehttp.NewClientWithTimeout(20 * time.Second)
 	}
 	if strings.TrimSpace(endpoint) == "" {
 		endpoint = DefaultMaterialURL

@@ -2,21 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as theme from './theme.js';
 
-const expectedThemeIds = [
-  'system',
-  'dark',
-  'light',
-  'graywhite',
-  'mint',
-  'snow',
-  'vanilla',
-  'sakura',
-  'pureblack',
-  'purple',
-  'willow',
-  'ivory',
-  'lotus'
-];
+const expectedThemeIds = ['system', 'dark', 'light'];
 
 const requiredTokens = [
   'background',
@@ -42,7 +28,7 @@ const requiredTokens = [
   'timelineBackground'
 ];
 
-test('theme catalog exposes system plus the twelve approved visual themes', () => {
+test('theme catalog exposes system plus the two approved visual themes', () => {
   const definitions = theme.listThemeDefinitions();
   assert.deepEqual(definitions.map(item => item.id), expectedThemeIds);
   for (const definition of definitions) {
@@ -54,30 +40,41 @@ test('theme catalog exposes system plus the twelve approved visual themes', () =
   }
 });
 
+test('retired palette ids fall back to system instead of leaking an unknown theme', () => {
+  for (const retired of ['graywhite', 'mint', 'snow', 'vanilla', 'sakura', 'pureblack', 'purple', 'willow', 'ivory', 'lotus']) {
+    assert.equal(theme.normalizeThemeId(retired), 'system', `${retired} must fall back to system`);
+    assert.equal(theme.resolveThemeId(retired, 'light'), 'light', `${retired} must resolve through system`);
+    assert.equal(theme.resolveThemeId(retired, 'dark'), 'dark', `${retired} must resolve through system`);
+  }
+  assert.equal(theme.themeDefinition('pureblack', 'light').id, 'light');
+});
+
 test('theme ids keep legacy choices and reject unsupported stored values', () => {
   assert.equal(theme.normalizeThemeId('light'), 'light');
   assert.equal(theme.normalizeThemeId('dark'), 'dark');
   assert.equal(theme.normalizeThemeId('system'), 'system');
-  assert.equal(theme.normalizeThemeId('unknown-theme'), 'dark');
-  assert.equal(theme.normalizeThemeId(''), 'dark');
+  assert.equal(theme.normalizeThemeId('unknown-theme'), 'system');
+  assert.equal(theme.normalizeThemeId(''), 'system');
 });
 
 test('system theme resolves without replacing the stored user choice', () => {
   assert.equal(theme.resolveThemeId('system', 'light'), 'light');
   assert.equal(theme.resolveThemeId('system', 'dark'), 'dark');
   assert.equal(theme.resolveThemeId('system', 'unexpected'), 'dark');
-  assert.equal(theme.resolveThemeId('mint', 'dark'), 'mint');
   assert.equal(theme.themeDefinition('system', 'light').id, 'light');
 });
 
 test('Ant Design tokens are derived from the selected semantic theme', () => {
-  const pureBlack = theme.createAntTheme('pureblack').token;
-  assert.equal(pureBlack.colorBgBase, '#000000');
-  assert.equal(pureBlack.colorText, '#f7f8fb');
-  assert.equal(pureBlack.colorPrimary, '#63dfc0');
+  const dark = theme.createAntTheme('dark').token;
+  assert.equal(dark.colorBgBase, '#070b11');
+  assert.equal(dark.colorText, '#f5f7fb');
+  assert.equal(dark.colorPrimary, '#f07167');
 
-  const mint = theme.createAntTheme('mint').token;
-  assert.equal(mint.colorBgBase, '#eef8f2');
-  assert.equal(mint.colorText, '#17372d');
-  assert.equal(mint.colorPrimary, '#16866c');
+  const light = theme.createAntTheme('light').token;
+  assert.equal(light.colorBgBase, '#f4f6fa');
+  assert.equal(light.colorText, '#172033');
+  assert.equal(light.colorPrimary, '#f07167');
+
+  assert.deepEqual(theme.createAntTheme('system', 'light').token, light);
+  assert.deepEqual(theme.createAntTheme('system', 'dark').token, dark);
 });

@@ -50,21 +50,24 @@ func TestMemberProfileThemePreferenceDefaultsPersistsAndValidates(t *testing.T) 
 	if got := store.member("alice", accounts)["themeId"]; got != "system" {
 		t.Fatalf("default themeId=%v, want system", got)
 	}
-	updated, err := store.update("alice", map[string]any{"themeId": "mint"}, accounts)
+	updated, err := store.update("alice", map[string]any{"themeId": "dark"}, accounts)
 	if err != nil {
 		t.Fatalf("update theme: %v", err)
 	}
-	if got := updated["themeId"]; got != "mint" {
-		t.Fatalf("updated themeId=%v, want mint", got)
+	if got := updated["themeId"]; got != "dark" {
+		t.Fatalf("updated themeId=%v, want dark", got)
 	}
-	if got := store.member("alice", accounts)["themeId"]; got != "mint" {
-		t.Fatalf("persisted themeId=%v, want mint", got)
+	if got := store.member("alice", accounts)["themeId"]; got != "dark" {
+		t.Fatalf("persisted themeId=%v, want dark", got)
 	}
 	if _, err := store.update("alice", map[string]any{"themeId": "unknown-theme"}, accounts); err == nil {
 		t.Fatal("unsupported themeId should be rejected")
 	}
-	if got := store.member("alice", accounts)["themeId"]; got != "mint" {
-		t.Fatalf("rejected update changed themeId=%v, want mint", got)
+	if _, err := store.update("alice", map[string]any{"themeId": "mint"}, accounts); err == nil {
+		t.Fatal("retired themeId mint should be rejected")
+	}
+	if got := store.member("alice", accounts)["themeId"]; got != "dark" {
+		t.Fatalf("rejected update changed themeId=%v, want dark", got)
 	}
 }
 
@@ -179,8 +182,8 @@ func TestAuthAccountPayloadIncludesOwnerAvatar(t *testing.T) {
 	if payload["displayName"] != "站长" {
 		t.Fatalf("owner displayName=%v, want profile displayName", payload["displayName"])
 	}
-	if payload["themeId"] != "mint" {
-		t.Fatalf("owner themeId=%v, want profile theme", payload["themeId"])
+	if payload["themeId"] != "system" {
+		t.Fatalf("retired stored themeId=%v, want graceful fallback to system", payload["themeId"])
 	}
 }
 

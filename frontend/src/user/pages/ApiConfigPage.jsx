@@ -1,23 +1,19 @@
-import { Button, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Switch, Table, Tag, message } from 'antd';
-import { KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, Video, Volume2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Input, Select, Skeleton, Space, Tag, message } from 'antd';
+import { Cpu, KeyRound, RefreshCw, ShieldCheck, Video } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canManageModelCatalog, getConfig } from '../../shared/api/config';
-import { createManagedModel, deleteManagedModel, getManagedModelQuotas, listManagedModels, testManagedAudioModel, testManagedTextModel, updateManagedModel } from '../../shared/api/modelCatalog';
-import { createCustomModelId } from '../../shared/modelCatalog/customModelId';
-import { isTextModelVerified, textModelVerificationKey } from '../../shared/modelCatalog/textModelVerification';
+import { createManagedModel, getManagedModelQuotas, invalidateAvailableModelCatalog, listManagedModels, updateManagedModel } from '../../shared/api/modelCatalog';
 import { getMemberCenter } from '../../shared/api/member';
 import { FANKE_VIDEO_MODELS } from './shuihuo/providerModelBinding';
 import { PageHeader, Panel, RoleBadge } from './accountCenterShared';
 import { getPresetCardState } from './api-config-preset-state';
-
-const MODEL_KINDS = [
-  { key: 'text', title: '文本模型', eyebrow: 'TEXT MODELS' },
-  { key: 'video', title: '视频模型', eyebrow: 'VIDEO MODELS' },
-  { key: 'image', title: '图片模型', eyebrow: 'IMAGE MODELS' },
-  { key: 'audio', title: '音频 / TTS 模型', eyebrow: 'AUDIO / TTS MODELS' }
-];
+import { isCatalogModelAvailable, modelNeedsNoCredential } from './apiConfigCatalogMerge';
+import ApiIntegrationSettings from './ApiIntegrationSettings';
 
 const DEFAULT_H3_WORKFLOW_ID = 'minimax_h3_image_audio_to_video_v2_15s';
+
+// 输入类字段停止输入后自动提交；失焦会立即提交。
+const AUTOSAVE_DELAY = 800;
 
 const PLATFORM_PRESETS = [
   { id: 'yd2-mini-video', displayName: 'YD2.0 Mini（图生）', description: '平台已维护视频适配器；只需填写 API Key。', credentialMode: 'apiKey' },
@@ -26,15 +22,16 @@ const PLATFORM_PRESETS = [
   { id: 'fanke-video-api', displayName: '梵客视频 API', description: '支持多个视频模型；填写 API Key 并选择一个模型。', credentialMode: 'apiKey' }
 ];
 
-function customModels(models, kind) {
-  return models.filter(model => model.kind === kind && !PLATFORM_PRESETS.some(preset => preset.id === model.id));
-}
+const PLATFORM_PRESET_IDS = PLATFORM_PRESETS.map(preset => preset.id);
+
+const SAVE_STATUS_TEXT = { idle: '修改后自动保存', saving: '保存中…', saved: '已保存', error: '保存失败' };
 
 function quotaText(value) {
   return Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 }) : '—';
 }
 
-function ModelQuotaStatus({ quota }) {
+function ModelQuotaStatus({ quota, error }) {
+  if (error && !quota) return <div className="ac-model-quota error"><span>额度读取失败</span></div>;
   if (!quota) return <div className="ac-model-quota unknown"><span>额度尚未查询</span></div>;
   const labels = { available: '额度正常', depleted: '额度已耗尽', unauthorized: '密钥无效或无权限', timeout: '额度查询超时', error: '额度查询失败', unknown: '额度未知', not_configured: '未配置 API Key', not_applicable: '无需 API 额度' };
   const label = labels[quota.status] || '额度未知';
@@ -46,55 +43,72 @@ function ModelQuotaStatus({ quota }) {
   </div>;
 }
 
-function CatalogTable({ models, quotas, onEdit, onDelete, onToggle }) {
-  return <Table className="ac-model-catalog-table" size="small" rowKey="id" pagination={false} tableLayout="fixed" scroll={{ x: 720 }} dataSource={models} locale={{ emptyText: '尚未添加可用模型' }} columns={[
-    { title: '模型', dataIndex: 'displayName', width: '34%', render: (name, model) => <Space direction="vertical" size={0}><b>{name}</b><span className="ac-muted-copy">{model.modelId || model.adapterKind || '平台预设模型'}</span></Space> },
-    { title: '服务商', dataIndex: 'providerType', width: '18%', render: value => value === 'platform_preset' ? '平台预设' : '自定义' },
-    { title: '额度', width: '24%', render: (_, model) => <ModelQuotaStatus quota={quotas.get(model.id)} /> },
-    { title: '状态', width: '12%', align: 'center', render: (_, model) => <Switch checked={model.enabled} onChange={checked => onToggle(model, checked)} /> },
-    { title: '操作', width: '22%', render: (_, model) => <Space><Button type="link" onClick={() => onEdit(model)}>编辑</Button><Button danger type="link" icon={<Trash2 size={14} />} onClick={() => onDelete(model)}>删除</Button></Space> }
-  ]} />;
-}
-
 export default function ApiConfigPage() {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState(null);
   const [center, setCenter] = useState(null);
   const [models, setModels] = useState([]);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [testingTextModel, setTestingTextModel] = useState(false);
-  const [testingAudioModel, setTestingAudioModel] = useState(false);
-  const [verifiedTextModelKey, setVerifiedTextModelKey] = useState('');
-  const [customForm] = Form.useForm();
   const [presetKeys, setPresetKeys] = useState({});
   const [presetWorkflowIds, setPresetWorkflowIds] = useState({});
   const [presetModelIds, setPresetModelIds] = useState({});
   const [presetBaseURLs, setPresetBaseURLs] = useState({});
   const [presetSavingId, setPresetSavingId] = useState('');
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [quotas, setQuotas] = useState([]);
+  const [quotaError, setQuotaError] = useState('');
   const [quotaLoading, setQuotaLoading] = useState(false);
+  const [catalogModelSavingId, setCatalogModelSavingId] = useState('');
   const canManageApi = canManageModelCatalog(config);
   const member = center?.member;
+
+  // 自动保存需要的“最新值”引用：定时器里不能依赖闭包里的旧 state。
+  const queueRef = useRef(Promise.resolve());
+  const timersRef = useRef({});
+  const dirtyRef = useRef({});
+  const versionsRef = useRef({});
+  const modelsRef = useRef([]);
+  const keysRef = useRef({});
+  const workflowRef = useRef({});
+  const modelIdsRef = useRef({});
+  const baseURLsRef = useRef({});
+  // 记录用户是否真的动过 Key 输入框：只有“输入过又清空”才算清除，没动过则保持已存 Key。
+  const touchedKeysRef = useRef(new Set());
+  // 正在输入的 Key 字段：保存回包先不清输入框，避免把用户没输完的 Key 冲掉。
+  const focusedKeyRef = useRef(new Set());
+
+  useEffect(() => { modelsRef.current = models; }, [models]);
+  useEffect(() => { keysRef.current = presetKeys; }, [presetKeys]);
+  useEffect(() => { workflowRef.current = presetWorkflowIds; }, [presetWorkflowIds]);
+  useEffect(() => { modelIdsRef.current = presetModelIds; }, [presetModelIds]);
+  useEffect(() => { baseURLsRef.current = presetBaseURLs; }, [presetBaseURLs]);
 
   const refreshQuotaState = useCallback(async () => {
     if (!canManageApi) return;
     setQuotaLoading(true);
-    try { setQuotas(await getManagedModelQuotas()); }
-    catch (error) { message.error(error.message || '额度查询失败'); }
+    try {
+      setQuotas(await getManagedModelQuotas());
+      setQuotaError('');
+    } catch (error) {
+      // 读取失败不能退化成“额度尚未查询”，否则用户会把服务异常当成没填 Key。
+      setQuotaError(error.message || '额度查询失败');
+      message.error(error.message || '额度查询失败');
+    }
     finally { setQuotaLoading(false); }
   }, [canManageApi]);
 
   const refreshModels = useCallback(async () => {
     if (!canManageApi) return;
-    const [nextModels, nextQuotas] = await Promise.all([listManagedModels(), getManagedModelQuotas().catch(() => [])]);
+    const [nextModels, nextQuotas] = await Promise.all([
+      listManagedModels(),
+      getManagedModelQuotas().then(data => ({ data })).catch(error => ({ error }))
+    ]);
     setModels(nextModels);
     const h3 = nextModels.find(model => model.id === 'minimax-h3-video');
-    if (h3) setPresetWorkflowIds(current => ({ ...current, 'minimax-h3-video': h3.workflowId || DEFAULT_H3_WORKFLOW_ID }));
+    if (h3 && !dirtyRef.current['minimax-h3-video']) setPresetWorkflowIds(current => ({ ...current, 'minimax-h3-video': h3.workflowId || DEFAULT_H3_WORKFLOW_ID }));
     const fanke = nextModels.find(model => model.id === 'fanke-video-api');
-    if (fanke) setPresetModelIds(current => ({ ...current, 'fanke-video-api': fanke.modelId || FANKE_VIDEO_MODELS[0].value }));
-    setQuotas(nextQuotas);
+    if (fanke && !dirtyRef.current['fanke-video-api']) setPresetModelIds(current => ({ ...current, 'fanke-video-api': fanke.modelId || FANKE_VIDEO_MODELS[0].value }));
+    if (nextQuotas.error) setQuotaError(nextQuotas.error.message || '额度查询失败');
+    else { setQuotas(nextQuotas.data || []); setQuotaError(''); }
   }, [canManageApi]);
 
   useEffect(() => {
@@ -104,13 +118,17 @@ export default function ApiConfigPage() {
       setConfig(nextConfig);
       setCenter(nextCenter);
       if (canManageModelCatalog(nextConfig)) {
-        const [nextModels, nextQuotas] = await Promise.all([listManagedModels(), getManagedModelQuotas().catch(() => [])]);
+        const [nextModels, nextQuotas] = await Promise.all([
+          listManagedModels(),
+          getManagedModelQuotas().then(data => ({ data })).catch(error => ({ error }))
+        ]);
         setModels(nextModels);
         const h3 = nextModels.find(model => model.id === 'minimax-h3-video');
-        if (h3) setPresetWorkflowIds(current => ({ ...current, 'minimax-h3-video': h3.workflowId || DEFAULT_H3_WORKFLOW_ID }));
+        if (h3 && !dirtyRef.current['minimax-h3-video']) setPresetWorkflowIds(current => ({ ...current, 'minimax-h3-video': h3.workflowId || DEFAULT_H3_WORKFLOW_ID }));
         const fanke = nextModels.find(model => model.id === 'fanke-video-api');
-        if (fanke) setPresetModelIds(current => ({ ...current, 'fanke-video-api': fanke.modelId || FANKE_VIDEO_MODELS[0].value }));
-        setQuotas(nextQuotas);
+        if (fanke && !dirtyRef.current['fanke-video-api']) setPresetModelIds(current => ({ ...current, 'fanke-video-api': fanke.modelId || FANKE_VIDEO_MODELS[0].value }));
+        if (nextQuotas.error) setQuotaError(nextQuotas.error.message || '额度查询失败');
+        else { setQuotas(nextQuotas.data || []); setQuotaError(''); }
       }
     }).catch(error => message.error(error.message || 'API 配置加载失败'))
       .finally(() => { if (alive) setLoading(false); });
@@ -119,162 +137,166 @@ export default function ApiConfigPage() {
 
   const modelById = useMemo(() => new Map(models.map(model => [model.id, model])), [models]);
   const quotaById = useMemo(() => new Map(quotas.map(quota => [quota.modelId, quota])), [quotas]);
+  // 不需要凭证的本地执行器：三组里按“平台托管”过滤掉，但不等于从下拉消失。
+  // 在这里只读列出，保证「页面上看得到的」与「下拉里选得到的」一致。
+  const noCredentialModels = useMemo(
+    () => models.filter(model => modelNeedsNoCredential(model) && isCatalogModelAvailable(model)),
+    [models]
+  );
 
-  function openCreate() {
-    setEditing(null);
-    setVerifiedTextModelKey('');
-    customForm.setFieldsValue({
-      kind: 'text',
-      providerType: 'openai_compatible',
-      enabled: true,
-      displayName: '',
-      baseUrl: '',
-      modelId: '',
-      credential: '',
-      endpoint: '',
-      requestTemplate: '',
-      responseMapping: '',
-      capabilities: { supportsReferenceImages: false, requiresImageInput: false, maxVideoDuration: undefined }
+  // 串行队列：同一时刻只有一个请求在飞，后提交的一定后落库，
+  // 避免连打时“先发的旧值覆盖后发的新值”。
+  function enqueuePresetSave(task) {
+    queueRef.current = queueRef.current.then(task).catch(error => {
+      setSaveStatus('error');
+      message.error(error.message || '保存失败');
     });
-    setCustomOpen(true);
+    return queueRef.current;
   }
 
-  function openEdit(model) {
-    setEditing(model);
-    setVerifiedTextModelKey('');
-    customForm.setFieldsValue({ ...model, credential: '' });
-    setCustomOpen(true);
-  }
-
-  async function submitCustom() {
-    try {
-      const values = await customForm.validateFields();
-      if (values.kind === 'text' && !isTextModelVerified(values, verifiedTextModelKey, editing?.id, editing)) {
-        message.warning('请先测试文本模型连接成功，再保存或启用该模型');
-        return;
-      }
-      if (values.kind === 'audio' && values.enabled && (!String(values.endpoint || '').trim() || !String(values.requestTemplate || '').trim() || !String(values.responseMapping || '').trim())) {
-        customForm.setFields([{ name: 'endpoint', errors: ['启用音频模型前必须填写服务地址、请求模板和返回映射'] }]);
-        return;
-      }
-      const payload = {
-        ...values,
-        ...(editing ? {} : { id: createCustomModelId(values, models.map(model => model.id)) }),
-        capabilities: {
-          supportsReferenceImages: values.capabilities?.supportsReferenceImages === true,
-          requiresImageInput: values.capabilities?.requiresImageInput === true,
-          ...(Number.isInteger(values.capabilities?.maxVideoDuration) ? { maxVideoDuration: values.capabilities.maxVideoDuration } : {})
-        }
-      };
-      if (!payload.credential) delete payload.credential;
-      if (payload.enabled && (!payload.baseUrl || !payload.modelId || !payload.credential && !editing?.hasCredential)) {
-        customForm.setFields([{ name: 'credential', errors: ['启用模型前必须填写 API Key'] }]);
-        return;
-      }
-      setSaving(true);
-      if (editing) await updateManagedModel(editing.id, payload);
-      else await createManagedModel(payload);
-      message.success(editing ? '模型已更新' : '模型已添加');
-      setCustomOpen(false);
-      await refreshModels();
-    } catch (error) {
-      if (!error?.errorFields) message.error(error.message || '模型保存失败');
-    } finally { setSaving(false); }
-  }
-
-  async function testCustomTextModel() {
-    try {
-      const values = await customForm.validateFields(['kind', 'baseUrl', 'modelId']);
-      if (values.kind !== 'text') return message.warning('只有文本模型需要连接测试');
-      setTestingTextModel(true);
-      const candidate = customForm.getFieldsValue(true);
-      await testManagedTextModel(candidate, editing?.id);
-      setVerifiedTextModelKey(textModelVerificationKey(candidate, editing?.id));
-      message.success('文本模型连接成功，现在可以保存并启用。');
-    } catch (error) {
-      if (!error?.errorFields) message.error(error.message || '文本模型连接测试失败');
-    } finally { setTestingTextModel(false); }
-  }
-
-  async function testCustomAudioModel() {
-    try {
-      const values = await customForm.validateFields(['kind', 'endpoint', 'requestTemplate', 'responseMapping']);
-      if (values.kind !== 'audio') return message.warning('只有音频模型需要音频连接测试');
-      setTestingAudioModel(true);
-      const candidate = customForm.getFieldsValue(true);
-      await testManagedAudioModel(candidate, editing?.id);
-      message.success('音频模型连接成功，现在可以保存并启用。');
-    } catch (error) {
-      if (!error?.errorFields) message.error(error.message || '音频模型连接测试失败');
-    } finally { setTestingAudioModel(false); }
-  }
-
-  async function deleteModel(model) {
-    try { await deleteManagedModel(model.id); message.success('模型已删除'); await refreshModels(); }
-    catch (error) { message.error(error.message || '模型删除失败'); }
-  }
-
-  async function toggleModel(model, enabled) {
-    try { await updateManagedModel(model.id, { enabled }); message.success(enabled ? '模型已启用' : '模型已停用'); await refreshModels(); }
-    catch (error) { message.error(error.message || '模型状态更新失败'); }
-  }
-
-  async function confirmPreset(preset) {
-    const existing = modelById.get(preset.id);
-    const key = String(presetKeys[preset.id] || '').trim();
-    const workflowId = String(presetWorkflowIds[preset.id] || '').trim();
-    if (preset.id === 'minimax-h3-video' && !key && existing?.hasCredential !== true) return message.warning('请输入 API Key');
-    if (preset.credentialMode === 'apiKey' && !key && existing?.hasCredential !== true) return message.warning('请输入 API Key');
-    const payload = { id: preset.id, kind: preset.kind || 'video', displayName: preset.displayName, enabled: true };
+  function presetPayload(preset) {
+    const existing = new Map(modelsRef.current.map(model => [model.id, model])).get(preset.id);
+    const key = String(keysRef.current[preset.id] || '').trim();
+    // 输入过 Key 又清空 = 停用：显式清除凭证，页面与下拉同时消失。
+    const clearing = !key && touchedKeysRef.current.has(preset.id) && existing?.hasCredential === true;
+    const payload = {
+      id: preset.id,
+      kind: preset.kind || 'video',
+      displayName: preset.displayName,
+      enabled: !clearing
+    };
     if (key) payload.credential = key;
+    else if (clearing) payload.clearCredential = true;
+    if (preset.id === 'minimax-h3-video') payload.workflowId = String(workflowRef.current[preset.id] || '').trim() || DEFAULT_H3_WORKFLOW_ID;
+    if (preset.id === 'fanke-video-api') payload.modelId = modelIdsRef.current[preset.id] || FANKE_VIDEO_MODELS[0].value;
     if (preset.provider) {
       payload.provider = preset.provider;
-      payload.baseUrl = String(presetBaseURLs[preset.id] || existing?.baseUrl || 'http://127.0.0.1:8787').trim();
+      payload.baseUrl = String(baseURLsRef.current[preset.id] || existing?.baseUrl || 'http://127.0.0.1:8787').trim();
       payload.modelId = preset.modelId;
     }
-    if (preset.id === 'minimax-h3-video') payload.workflowId = workflowId || DEFAULT_H3_WORKFLOW_ID;
-    if (preset.id === 'fanke-video-api') payload.modelId = presetModelIds[preset.id] || FANKE_VIDEO_MODELS[0].value;
+    return { existing, key, payload };
+  }
+
+  async function persistPreset(preset) {
+    const version = versionsRef.current[preset.id] || 0;
+    const { existing, key, payload } = presetPayload(preset);
+    // 新预设至少要有一个 Key 才建条目，避免只改工作流 ID 就生成空配置。
+    if (!existing && !key) return;
     setPresetSavingId(preset.id);
+    setSaveStatus('saving');
     try {
       if (existing) await updateManagedModel(preset.id, payload);
       else await createManagedModel(payload);
-      setPresetKeys(current => ({ ...current, [preset.id]: '' }));
+      // 只清掉刚刚提交的那份输入；保存期间又输入的新内容保留，等待下一轮保存。
+      if (key && !focusedKeyRef.current.has(preset.id)) {
+        setPresetKeys(current => (String(current[preset.id] || '').trim() === key ? { ...current, [preset.id]: '' } : current));
+      }
+      touchedKeysRef.current.delete(preset.id);
       await refreshModels();
-      message.success('配置已保存');
-    } catch (error) {
-      message.error(error.message || '预设模型保存失败');
+      if ((versionsRef.current[preset.id] || 0) === version) dirtyRef.current[preset.id] = false;
+      setSaveStatus('saved');
     } finally {
       setPresetSavingId('');
     }
   }
 
-  async function togglePreset(preset, enabled) {
-    if (enabled) return confirmPreset(preset);
-    const existing = modelById.get(preset.id);
-    if (!existing) return;
-    setPresetSavingId(preset.id);
+  // Key 输入只登记“有改动”，不启防抖定时器；真正提交发生在失焦或显式保存。
+  function markPresetDirty(preset) {
+    versionsRef.current[preset.id] = (versionsRef.current[preset.id] || 0) + 1;
+    dirtyRef.current[preset.id] = true;
+    if (timersRef.current[preset.id]) {
+      clearTimeout(timersRef.current[preset.id]);
+      delete timersRef.current[preset.id];
+    }
+  }
+
+  function schedulePresetSave(preset) {
+    versionsRef.current[preset.id] = (versionsRef.current[preset.id] || 0) + 1;
+    dirtyRef.current[preset.id] = true;
+    if (timersRef.current[preset.id]) clearTimeout(timersRef.current[preset.id]);
+    timersRef.current[preset.id] = setTimeout(() => {
+      delete timersRef.current[preset.id];
+      if (!dirtyRef.current[preset.id]) return;
+      enqueuePresetSave(() => persistPreset(preset));
+    }, AUTOSAVE_DELAY);
+  }
+
+  function flushPreset(preset) {
+    if (timersRef.current[preset.id]) {
+      clearTimeout(timersRef.current[preset.id]);
+      delete timersRef.current[preset.id];
+    }
+    if (!dirtyRef.current[preset.id]) return;
+    enqueuePresetSave(() => persistPreset(preset));
+  }
+
+  // 目录模型凭证的唯一编辑入口（管理员）：写入 modelCatalog.credential，
+  // 服务端据此重新计算 available，页面与 /api/models 下拉同时生效/消失。
+  async function saveCatalogCredential(model, key, clear) {
+    if (!canManageApi || !model?.id) throw new Error('无权修改目录模型凭证');
+    const trimmed = String(key || '').trim();
+    if (!clear && !trimmed) throw new Error('请输入 API Key');
+    setCatalogModelSavingId(model.id);
     try {
-      await updateManagedModel(preset.id, { enabled: false });
+      await updateManagedModel(model.id, clear ? { clearCredential: true } : { credential: trimmed, enabled: true });
+      invalidateAvailableModelCatalog();
       await refreshModels();
-      message.success('已关闭，可修改配置');
+      message.success(clear ? '已清除目录 Key，该模型不再出现在下拉里' : '目录 Key 已保存，立即生效');
     } catch (error) {
-      message.error(error.message || '模型状态更新失败');
+      message.error(error.message || '目录模型凭证保存失败');
+      throw error;
     } finally {
-      setPresetSavingId('');
+      setCatalogModelSavingId('');
+    }
+  }
+
+  // 用户自建目录模型的唯一编辑入口：与自定义渠道共用同一张表单，
+  // 保存写回 modelCatalog 的这一条（displayName / modelId / baseUrl / credential）。
+  async function saveCatalogModel(model, values) {
+    if (!canManageApi || !model?.id) throw new Error('无权修改目录模型');
+    setCatalogModelSavingId(model.id);
+    try {
+      const payload = {
+        displayName: values.name,
+        name: values.name,
+        modelId: values.model,
+        baseUrl: values.baseUrl
+      };
+      if (values.keyTouched && values.apiKey) payload.credential = values.apiKey;
+      else if (values.keyTouched && !values.apiKey) payload.clearCredential = true;
+      await updateManagedModel(model.id, payload);
+      invalidateAvailableModelCatalog();
+      await refreshModels();
+      message.success('目录模型已保存，立即生效');
+    } catch (error) {
+      message.error(error.message || '目录模型保存失败');
+      throw error;
+    } finally {
+      setCatalogModelSavingId('');
     }
   }
 
   if (loading) return <div className="account-center-page"><Skeleton active paragraph={{ rows: 9 }} /></div>;
 
   return <div className="account-center-page api-config-page">
-    <PageHeader title="API 配置" subtitle="模型只在此处配置一次；业务页面按文本、视频、图片和配音类型读取已启用模型。" />
+    <PageHeader title="API 配置" subtitle="统一管理平台预设模型与各渠道 API 接口；业务页面按凭证自动读取可用模型。" />
     {!canManageApi ? <div className="ac-managed-api-card">
       <span><ShieldCheck size={28} /></span>
-      <div><div><h2>模型服务由团队托管</h2>{member ? <RoleBadge role={member.role} /> : null}</div><p>你可在获授权的业务下拉框中选择管理员已启用的模型；不会显示 API Key。</p></div>
+      <div><div><h2>模型服务由团队托管</h2>{member ? <RoleBadge role={member.role} /> : null}</div><p>你可在获授权的业务下拉框中选择管理员已配置凭证的模型；不会显示 API Key。</p></div>
       <Tag color={config?.managedBy ? 'green' : 'gold'}>{config?.managedBy ? `托管账号 @${config.managedBy}` : '等待绑定 MANAGER'}</Tag>
-    </div> : <>
-      <Panel title="平台预设模型" eyebrow="PLATFORM PRESETS" className="ac-form-panel" action={<Button icon={<RefreshCw size={15} />} loading={quotaLoading} onClick={refreshQuotaState}>刷新额度</Button>}>
-        <p className="ac-muted-copy">只有完成所需配置并启用后，才会出现在业务的视频模型下拉框。额度状态由服务商接口返回；不支持查询的服务商会显示“额度未知”。</p>
+    </div> : <Panel title="平台预设模型" eyebrow="PLATFORM PRESETS" className="ac-form-panel" action={<Space size={12}>
+        <span className="ac-muted-copy" role="status" aria-live="polite">{SAVE_STATUS_TEXT[saveStatus]}</span>
+        <Button icon={<RefreshCw size={15} />} loading={quotaLoading} onClick={refreshQuotaState}>刷新额度</Button>
+      </Space>}>
+        <p className="ac-muted-copy">填好 API Key 后立即生效并出现在业务的视频模型下拉框；清空 Key 即从下拉移除，不需要额外开关。输入框失焦或停止输入约 0.8 秒自动保存；额度状态由服务商接口返回，不支持查询的服务商会显示“额度未知”。</p>
+        {quotaError ? <Alert
+          type="error"
+          showIcon
+          message="额度信息读取失败"
+          description={quotaError}
+          action={<Button size="small" onClick={refreshQuotaState} loading={quotaLoading}>重试</Button>}
+          style={{ marginBottom: 12 }}
+        /> : null}
         {PLATFORM_PRESETS.map(preset => {
           const model = modelById.get(preset.id);
           const cardState = getPresetCardState(preset, model, presetSavingId === preset.id);
@@ -282,59 +304,33 @@ export default function ApiConfigPage() {
             <div className="ac-platform-preset-info"><span className="ac-security-card-icon violet"><Video size={20} /></span><div><strong>{preset.displayName}</strong><small>{preset.description}</small></div></div>
             <div className="ac-platform-preset-credential">
               <Space direction="vertical" style={{ width: '100%' }} size={6}>
-                {preset.provider ? <Input disabled={!cardState.editable} value={presetBaseURLs[preset.id] ?? model?.baseUrl ?? 'http://127.0.0.1:8787'} onChange={event => setPresetBaseURLs(current => ({ ...current, [preset.id]: event.target.value }))} addonBefore="Relay 地址" placeholder="http://127.0.0.1:8787" /> : null}
-                <Input.Password disabled={!cardState.editable} value={presetKeys[preset.id] || ''} onChange={event => setPresetKeys(current => ({ ...current, [preset.id]: event.target.value }))} prefix={<KeyRound size={15} />} placeholder={model?.hasCredential ? '留空表示不修改已保存的 Key' : '填写 API Key'} />
-                {preset.id === 'minimax-h3-video' ? <Input disabled={!cardState.editable} value={presetWorkflowIds[preset.id] || DEFAULT_H3_WORKFLOW_ID} onChange={event => setPresetWorkflowIds(current => ({ ...current, [preset.id]: event.target.value }))} addonBefore="AutoDL 工作流 ID" placeholder={DEFAULT_H3_WORKFLOW_ID} /> : null}
-                {preset.id === 'fanke-video-api' ? <Select disabled={!cardState.editable} value={presetModelIds[preset.id] || model?.modelId || FANKE_VIDEO_MODELS[0].value} onChange={value => setPresetModelIds(current => ({ ...current, [preset.id]: value }))} options={FANKE_VIDEO_MODELS} placeholder="选择视频模型" /> : null}
+                {preset.provider ? <Input disabled={!cardState.editable} value={presetBaseURLs[preset.id] ?? model?.baseUrl ?? 'http://127.0.0.1:8787'} onChange={event => { setPresetBaseURLs(current => ({ ...current, [preset.id]: event.target.value })); schedulePresetSave(preset); }} onBlur={() => flushPreset(preset)} addonBefore="Relay 地址" placeholder="http://127.0.0.1:8787" /> : null}
+                <Input.Password disabled={!cardState.editable} value={presetKeys[preset.id] || ''} onChange={event => { touchedKeysRef.current.add(preset.id); setPresetKeys(current => ({ ...current, [preset.id]: event.target.value })); markPresetDirty(preset); }} onFocus={() => focusedKeyRef.current.add(preset.id)} onBlur={() => { focusedKeyRef.current.delete(preset.id); flushPreset(preset); }} prefix={<KeyRound size={15} />} placeholder={model?.hasCredential ? '已保存；输入新 Key 覆盖，输入后清空并离开即停用' : '填写 API Key 后生效'} />
+                {preset.id === 'minimax-h3-video' ? <Input disabled={!cardState.editable} value={presetWorkflowIds[preset.id] || DEFAULT_H3_WORKFLOW_ID} onChange={event => { setPresetWorkflowIds(current => ({ ...current, [preset.id]: event.target.value })); schedulePresetSave(preset); }} onBlur={() => flushPreset(preset)} addonBefore="AutoDL 工作流 ID" placeholder={DEFAULT_H3_WORKFLOW_ID} /> : null}
+                {preset.id === 'fanke-video-api' ? <Select disabled={!cardState.editable} value={presetModelIds[preset.id] || model?.modelId || FANKE_VIDEO_MODELS[0].value} onChange={value => { setPresetModelIds(current => ({ ...current, [preset.id]: value })); schedulePresetSave(preset); flushPreset(preset); }} options={FANKE_VIDEO_MODELS} placeholder="选择视频模型" /> : null}
               </Space>
-              <ModelQuotaStatus quota={quotaById.get(preset.id)} />
-              {cardState.active ? <button type="button" className="ac-platform-preset-lock" aria-label={`修改 ${preset.displayName} 配置`} title="请先关闭开关，再修改配置" onClick={() => message.info('请先关闭开关，再修改配置')} /> : null}
+              <ModelQuotaStatus quota={quotaById.get(preset.id)} error={quotaError} />
             </div>
             <div className="ac-platform-preset-state">
-              <Space direction="vertical" size={4}>
-                <Switch checked={cardState.active} disabled={presetSavingId === preset.id} onChange={enabled => togglePreset(preset, enabled)} />
-                <small>{presetSavingId === preset.id ? '保存中' : cardState.active ? '已启用' : cardState.configured ? '已关闭' : '未配置'}</small>
-                {preset.credentialMode === 'apiKey' ? <Button size="small" loading={presetSavingId === preset.id} disabled={cardState.buttonDisabled} onClick={() => confirmPreset(preset)}>{cardState.buttonText}</Button> : null}
-              </Space>
+              <small>{presetSavingId === preset.id ? '保存中' : cardState.configured ? 'Key 已填写，已生效' : '填写 Key 后生效'}</small>
             </div>
           </div>;
         })}
-      </Panel>
-      {MODEL_KINDS.map(group => <Panel key={group.key} title={group.title} eyebrow={group.eyebrow} className="ac-form-panel" action={<Space><Button icon={<RefreshCw size={15} />} loading={quotaLoading} onClick={refreshQuotaState}>刷新额度</Button><Button icon={<Plus size={15} />} onClick={openCreate}>添加自定义模型</Button></Space>}>
-        <CatalogTable models={customModels(models, group.key)} quotas={quotaById} onEdit={openEdit} onDelete={deleteModel} onToggle={toggleModel} />
-      </Panel>)}
-    </>}
-    <Modal title={editing ? '编辑自定义模型' : '添加自定义模型'} open={customOpen} onCancel={() => setCustomOpen(false)} onOk={submitCustom} okText={editing ? '保存修改' : '添加模型'} confirmLoading={saving}>
-      <Form form={customForm} layout="vertical">
-        <Form.Item name="kind" label="模型类型" rules={[{ required: true }]}><Select disabled={Boolean(editing)} options={MODEL_KINDS.map(group => ({ label: group.title, value: group.key }))} /></Form.Item>
-        <Form.Item name="providerType" label="API 格式" rules={[{ required: true }]}><Select options={[{ label: 'OpenAI Chat Completions 格式', value: 'openai_compatible' }, { label: '自定义 API 格式', value: 'custom' }]} /></Form.Item>
-        <Form.Item noStyle shouldUpdate={(previous, current) => previous.kind !== current.kind}>
-          {() => customForm.getFieldValue('kind') === 'audio' ? <>
-            <Form.Item name="endpoint" label="音频服务地址" rules={[{ required: true, message: '请输入音频服务地址' }]}><Input placeholder="例如 https://provider.example.com/v1/audio/speech" /></Form.Item>
-            <Form.Item name="requestTemplate" label="请求模板" rules={[{ required: true, message: '请输入请求模板 JSON' }]} extra="可用占位符：{{input}}、{{voice}}、{{speed}}、{{pitch}}、{{credential}}"><Input.TextArea rows={6} placeholder={'{"method":"POST","headers":{"Authorization":"Bearer {{credential}}"},"body":{"text":"{{input}}","voice":"{{voice}}"}}'} /></Form.Item>
-            <Form.Item name="responseMapping" label="返回映射" rules={[{ required: true, message: '请输入返回映射 JSON' }]} extra="例如 {&quot;resultUrl&quot;:&quot;data.url&quot;}；直接返回音频文件时也请填写 {}"><Input.TextArea rows={3} placeholder={'{"resultUrl":"data.url"}'} /></Form.Item>
-          </> : <>
-            <Form.Item name="baseUrl" label="自定义请求地址" rules={[{ required: true, message: '请输入 Base URL' }]}><Input placeholder="例如 https://api.openai.com/v1" /></Form.Item>
-            <Form.Item name="modelId" label="模型 ID" rules={[{ required: true, message: '请输入模型 ID' }]}><Input placeholder="例如 gpt-5.4" /></Form.Item>
-          </>}
-        </Form.Item>
-        <Form.Item name="displayName" label="模型显示名称" rules={[{ required: true, message: '请输入显示名称' }]}><Input maxLength={80} /></Form.Item>
-        <Form.Item name="credential" label="API 密钥" rules={[({ getFieldValue }) => ({ validator(_, value) {
-          if (!getFieldValue('enabled') || String(value || '').trim() || editing?.hasCredential) return Promise.resolve();
-          return Promise.reject(new Error('启用模型前必须填写 API Key'));
-        } })]}><Input.Password prefix={<KeyRound size={15} />} placeholder={editing?.hasCredential ? '留空表示不修改已保存的 Key' : '请输入 API Key'} /></Form.Item>
-        <Form.Item noStyle shouldUpdate={(previous, current) => previous.kind !== current.kind || previous.baseUrl !== current.baseUrl || previous.modelId !== current.modelId || previous.credential !== current.credential || previous.enabled !== current.enabled}>
-          {() => customForm.getFieldValue('kind') === 'text' ? <div className="ac-api-actions"><Button onClick={testCustomTextModel} loading={testingTextModel}>测试文本连接</Button><span className="ac-muted-copy">启用保存前必须测试成功；修改地址、模型或密钥后需要重新测试。</span></div> : customForm.getFieldValue('kind') === 'audio' ? <div className="ac-api-actions"><Button onClick={testCustomAudioModel} loading={testingAudioModel}>测试音频连接</Button><span className="ac-muted-copy"><Volume2 size={14} /> TTS 会按请求模板调用；测试成功后再启用。</span></div> : null}
-        </Form.Item>
-        <Form.Item label="适用能力" extra="仅保存模型运行时可识别的能力；留空的时长不限制。">
-          <Space direction="vertical">
-            <Form.Item name={['capabilities', 'supportsReferenceImages']} valuePropName="checked" noStyle><Switch checkedChildren="支持参考图" unCheckedChildren="不支持参考图" /></Form.Item>
-            <Form.Item name={['capabilities', 'requiresImageInput']} valuePropName="checked" noStyle><Switch checkedChildren="需要图片输入" unCheckedChildren="不需要图片输入" /></Form.Item>
-            <Form.Item name={['capabilities', 'maxVideoDuration']} noStyle><InputNumber min={1} max={60} precision={0} placeholder="最大视频时长（1–60 秒）" /></Form.Item>
-          </Space>
-        </Form.Item>
-        <Form.Item name="enabled" label="立即启用" valuePropName="checked"><Switch /></Form.Item>
-      </Form>
-    </Modal>
+        {noCredentialModels.map(model => (
+          <div className="ac-platform-preset-grid" key={model.id}>
+            <div className="ac-platform-preset-info"><span className="ac-security-card-icon violet"><Cpu size={20} /></span><div><strong>{model.displayName || model.id}</strong><small>本地执行器：不需要 API Key，始终出现在业务下拉框里。</small></div></div>
+            <div className="ac-platform-preset-credential"><span className="ac-muted-copy">无需填写凭证</span></div>
+            <div className="ac-platform-preset-state"><small>始终可用</small></div>
+          </div>
+        ))}
+      </Panel>}
+    <ApiIntegrationSettings
+      models={models}
+      quotas={quotas}
+      platformPresetIds={PLATFORM_PRESET_IDS}
+      onSaveCatalogCredential={canManageApi ? saveCatalogCredential : null}
+      onUpdateCatalogModel={canManageApi ? saveCatalogModel : null}
+      catalogModelSavingId={catalogModelSavingId}
+    />
   </div>;
 }

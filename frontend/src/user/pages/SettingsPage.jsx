@@ -320,7 +320,7 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
         <div className="settings-heading">
           <div>
             <Typography.Title level={3}>工作台设置</Typography.Title>
-            <Typography.Paragraph>管理前贴桌面宠物、工作提醒、本地视频执行器与服务器归档。模型服务统一在个人中心配置。</Typography.Paragraph>
+            <Typography.Paragraph>管理前贴桌面宠物、工作提醒、本地视频执行器与服务器归档。模型密钥在个人中心「API 配置」统一配置。</Typography.Paragraph>
           </div>
           <span className="settings-status">本账号配置</span>
         </div>

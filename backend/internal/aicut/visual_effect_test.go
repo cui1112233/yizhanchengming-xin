@@ -68,12 +68,61 @@ func TestValidateTimelineAcceptsChineseEditorTransitionIDs(t *testing.T) {
 	}
 }
 
+func TestIndependentTransitionClipValidatesAndKeepsBinding(t *testing.T) {
+	timeline := Timeline{Tracks: []Track{
+		{ID: "video-1", Kind: TrackVideo, Clips: []Clip{
+			{ID: "left", Kind: ClipVideo, DurationMS: 1000},
+			{ID: "right", Kind: ClipVideo, StartMS: 1000, DurationMS: 1000, Transition: "transition-fade", TransitionMS: 400},
+		}},
+		{ID: "transition-1", Kind: TrackTransition, Clips: []Clip{{
+			ID: "tr-1", Kind: ClipTransition, Name: "淡化", StartMS: 800, DurationMS: 400,
+			Transition: "transition-fade", TransitionMS: 400, ResourceID: "transition-fade",
+			TransitionTrackID: "video-1", TransitionLeftClipID: "left", TransitionRightClipID: "right",
+		}}},
+	}}
+	if err := validateTimeline(timeline); err != nil {
+		t.Fatalf("validateTimeline() error = %v", err)
+	}
+	invalid := timeline
+	invalid.Tracks = append([]Track(nil), timeline.Tracks...)
+	invalid.Tracks[1].Clips = append([]Clip(nil), timeline.Tracks[1].Clips...)
+	invalid.Tracks[1].Clips[0].TransitionRightClipID = ""
+	if err := validateTimeline(invalid); !errors.Is(err, ErrInvalidTimeline) {
+		t.Fatalf("missing binding error = %v", err)
+	}
+}
+
+func TestIndependentTransitionBindingPersistsInEditorJSON(t *testing.T) {
+	want := Clip{ID: "tr-1", Kind: ClipTransition, TransitionTrackID: "video-1", TransitionLeftClipID: "left", TransitionRightClipID: "right"}
+	encoded, err := encodeClipEditorJSON(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got Clip
+	if err := decodeClipEditorJSON(encoded, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.TransitionTrackID != want.TransitionTrackID || got.TransitionLeftClipID != want.TransitionLeftClipID || got.TransitionRightClipID != want.TransitionRightClipID {
+		t.Fatalf("binding=%#v", got)
+	}
+}
+
 func TestValidateTimelinePreservesCatalogResourceID(t *testing.T) {
 	timeline := Timeline{Tracks: []Track{{ID: "v1", Kind: TrackVideo, Clips: []Clip{{
 		ID: "c1", Kind: ClipVideo, AssetID: "asset-1", DurationMS: 1000, CatalogResourceID: "filter-warm-sun",
 	}}}}}
 	if err := validateTimeline(timeline); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateTimelineAcceptsSecondBatchCatalogFilterIDs(t *testing.T) {
+	ids := []string{"filter-golden-hour", "filter-noir", "filter-vintage", "filter-cyberpunk", "filter-vaporwave", "filter-mint-haze", "filter-bleach-bypass", "filter-winter-cool", "filter-rosy", "filter-film", "filter-super-8", "filter-instant-print"}
+	for _, id := range ids {
+		timeline := Timeline{Tracks: []Track{{ID: "v1", Kind: TrackVideo, Clips: []Clip{{ID: "c1", Kind: ClipVideo, AssetID: "asset-1", DurationMS: 1000, CatalogResourceID: id}}}}}
+		if err := validateTimeline(timeline); err != nil {
+			t.Fatalf("filter %s rejected: %v", id, err)
+		}
 	}
 }
 

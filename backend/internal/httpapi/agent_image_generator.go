@@ -49,8 +49,15 @@ func agentLocalDoubaoImageModelForQuality(quality string) string {
 	}
 }
 
-func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, executors *localexecutor.Service, files *localartifact.Store, assets agentworkspace.AssetStore, references agentworkspace.ReferenceURLProvider) AgentImageGenerator {
+func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, executors *localexecutor.Service, files *localartifact.Store, assets agentworkspace.AssetStore, references agentworkspace.ReferenceURLProvider) AgentImageGenerator {
 	return func(ctx context.Context, owner string, input AgentImageGenerationInput) ([]string, int, error) {
+		// channel:/custom: 候选走 API 接口配置里的地址、Key 和模型名。
+		if target, matched, err := integrationChannelTargetFor(ctx, userConfig, owner, input.ModelID); matched {
+			if err != nil {
+				return nil, http.StatusUnprocessableEntity, err
+			}
+			return generateIntegrationChannelImage(ctx, target, input)
+		}
 		localModel, local := agentLocalDoubaoImageModel(input)
 		if strings.EqualFold(strings.TrimSpace(input.Provider), "doubao_local_executor") && !local {
 			return nil, http.StatusUnprocessableEntity, fmt.Errorf("所选豆包图片模型不可用")

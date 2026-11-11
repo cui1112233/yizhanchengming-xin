@@ -54,10 +54,15 @@ test('routes account-center pages through the dedicated layout while the avatar 
   assert.doesNotMatch(source, /accountCenterOpen/);
 });
 
-test('keeps the shared multi-theme picker and logout controls compact inside the collapsed sidebar', () => {
+test('keeps the collapsed sidebar free of a standalone theme entry while theme changes still persist', () => {
+  // 侧栏不再有独立的主题图标入口，主题在设置页/管理端切换。
+  assert.doesNotMatch(source, /<ThemePicker/);
+  // 触发器样式只能按用途限定在管理端侧栏，不能再出现全局 .theme-picker-trigger 规则。
+  assert.doesNotMatch(stylesheet, /^\.theme-picker-trigger/m);
+  assert.match(stylesheet, /\.admin-sidebar-footer \.theme-picker-trigger\s*\{[^}]*color:\s*var\(--text-secondary\)/s);
+  assert.doesNotMatch(stylesheet, /\.legacy-theme-switch/);
   assert.match(source, /className="legacy-sidebar-logout"/);
   assert.match(source, /<LogOut/);
-  assert.match(source, /<ThemePicker value=\{theme\} onChange=\{changeTheme\} compact \/>/);
   assert.match(source, /const nextThemeId = persistCachedTheme\(themeId\)/);
   assert.match(source, /updateMemberProfile\(\{ themeId: nextThemeId \}\)/);
   assert.match(source, /主题已在本机切换，但未同步到账号/);

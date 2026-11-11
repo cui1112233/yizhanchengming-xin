@@ -71,14 +71,33 @@ func (s *BookStageService) RunComicBootstrap(ctx context.Context, owner, batchID
 	if s == nil || s.Director == nil {
 		return ComicBootstrapResult{}, fmt.Errorf("%w: 漫画首次统一生成服务未配置", ErrUnavailable)
 	}
-	return s.Director.RunComicBootstrap(ctx, owner, batchID, bookID)
+	director, err := s.directorForBookTextModel(ctx, owner, batchID, bookID)
+	if err != nil {
+		return ComicBootstrapResult{}, err
+	}
+	return director.RunComicBootstrap(ctx, owner, batchID, bookID)
 }
 
 func (s *BookStageService) RunMissingComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) (ComicPromptExtractionResult, error) {
 	if s == nil || s.Director == nil {
 		return ComicPromptExtractionResult{Updated: []Video{}}, fmt.Errorf("%w: 漫画缺页提示词恢复服务未配置", ErrUnavailable)
 	}
-	return s.Director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
+	director, err := s.directorForBookTextModel(ctx, owner, batchID, bookID)
+	if err != nil {
+		return ComicPromptExtractionResult{Updated: []Video{}}, err
+	}
+	return director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
+}
+
+func (s *BookStageService) RunComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) (ComicPromptExtractionResult, error) {
+	if s == nil || s.Director == nil {
+		return ComicPromptExtractionResult{Updated: []Video{}}, fmt.Errorf("%w: 漫画提示词生成服务未配置", ErrUnavailable)
+	}
+	director, err := s.directorForBookTextModel(ctx, owner, batchID, bookID)
+	if err != nil {
+		return ComicPromptExtractionResult{Updated: []Video{}}, err
+	}
+	return director.RunComicPromptExtraction(ctx, owner, batchID, bookID)
 }
 
 func (s *BookStageService) repository() (BookStageRunRepository, error) {
@@ -226,6 +245,9 @@ func (s *BookStageService) directorForTextModel(ctx context.Context, owner strin
 	}
 	modelID := rawString(settings, "textModelId", "")
 	if modelID == "" {
+		if s.TextProviderResolver != nil {
+			return nil, NewConfigRequiredError("请先选择文本模型")
+		}
 		return s.Director, nil
 	}
 	provider, err := s.TextProviderResolver(ctx, owner, modelID)
@@ -241,6 +263,24 @@ func (s *BookStageService) directorForTextModel(ctx context.Context, owner strin
 	clone := *s.Director
 	clone.Provider = provider
 	return &clone, nil
+}
+
+func (s *BookStageService) directorForBookTextModel(ctx context.Context, owner, batchID, bookID string) (*DirectorService, error) {
+	if s == nil || s.Store == nil {
+		return nil, ErrUnavailable
+	}
+	if s.TextProviderResolver == nil {
+		return s.Director, nil
+	}
+	batch, err := s.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return nil, err
+	}
+	book, err := bookFromBatch(batch, bookID)
+	if err != nil {
+		return nil, err
+	}
+	return s.directorForTextModel(ctx, owner, ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
 }
 
 // immediateVideoProviderFailure turns a provider-side rejection that was

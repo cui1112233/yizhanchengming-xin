@@ -94,7 +94,10 @@ export function normalizeModelProvider(provider, fallback = 'personal_api', mode
   const value = String(provider || '').trim().toLowerCase();
   const legacyModel = String(modelId || '').trim().toLowerCase();
   if (!value) return fallback;
-  if (value === 'personal' || value === 'yd_video' || value === 'yadi' || value === 'openai_compatible' || value === 'custom' || value === 'custom_api') return 'personal_api';
+  // API 配置页新增的自定义渠道由后端标记为 api_integrations，但执行方式
+  // 仍是账号自己的兼容 API。业务页必须把它和“个人中心 API”放在同一组，
+  // 否则模型已经保存并带 Key，也会被通道筛选从下拉框里隐藏。
+  if (value === 'personal' || value === 'yd_video' || value === 'yadi' || value === 'openai_compatible' || value === 'custom' || value === 'custom_api' || value === 'api_integrations') return 'personal_api';
   if (value === 'doubao' || value === 'doubao_local' || value === 'local-doubao-executor-video') return 'doubao_local_executor';
   if (value === 'h3' || value === 'autodl' || value === 'minimax_h3' || value === 'minimax-h3-video') return 'autodl_comfyui';
   if (value === 'yfai' || value === 'seedance-2-0-official') return 'yfai';

@@ -1,10 +1,9 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Settings2 } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Puzzle, Scissors, Settings2 } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
 import { ProductUpdateModal } from '../components/ProductUpdateModal';
-import { ThemePicker } from '../components/ThemePicker';
 import { getCurrentAccount, getCurrentUsername, login, loginWithPasskey, logout } from '../api/auth';
 import { getToken } from '../api/client';
 import { getConfig } from '../api/config';
@@ -18,6 +17,7 @@ import { loadCachedTheme, persistCachedTheme, selectThemePreference } from '../s
 import { normalizeWindowBackgroundId, windowBackgroundStyle } from '../styles/window-background.js';
 import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAccess.js';
 import { AccountCenterLayout } from './AccountCenterLayout';
+import WorkModeMenu from './WorkModeMenu';
 import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
 import { shouldAutoCollapseAgentNavigation } from './agentNavigation.js';
 import { preloadRoute } from '../../user/workbenchPreload.js';
@@ -32,8 +32,11 @@ const navItems = [
   // document navigation so the SPA cannot swap in a stale React-only page.
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
   { href: '/batch-factory', icon: Clapperboard, label: '水货生产' },
-  { href: '/agent', icon: Bot, label: 'Agent 工作区' },
-  { href: '/tts', icon: AudioLines, label: '配音' }
+  { href: '/comic-screenplay', icon: FilePenLine, label: '漫剧创作' },
+  { href: '/agent', icon: Bot, label: 'CM 画布' },
+  { href: '/tts', icon: AudioLines, label: '配音' },
+  { href: '/ai-cut', icon: Scissors, label: 'AI-CUT' },
+  { href: '/plugins', icon: Puzzle, label: '插件' }
 ];
 
 const ACCOUNT_CENTER_RETURN_PATH_KEY = 'qiantie:account-center-return-path';
@@ -90,8 +93,9 @@ export function UserLayout({ children }) {
   const isAccountCenterRoute = isAccountCenterPath(pathname);
   const isLoggedIn = Boolean(username);
   const isHome = pathname === '/';
-  const isAgentRoute = pathname === '/agent' || pathname === '/agent/canvas';
+  const isAgentRoute = pathname === '/agent' || pathname === '/agent/canvas' || pathname === '/agent/chat';
   const isAgentCanvasRoute = pathname === '/agent/canvas';
+  const isAICutRoute = pathname === '/ai-cut';
   // 全站统一：页面标题只在内容区出现一次；顶栏只显示真实全局状态，没有状态时整条收起。
   const routeAccess = getRouteAccessState({ pathname, isLoggedIn });
   const displayAvatar = avatarDisplay(avatar, username);
@@ -502,12 +506,12 @@ export function UserLayout({ children }) {
           >
             {sidebarCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
           </button>
-          <Link href="/" className="legacy-brand-link">
+          <WorkModeMenu pathname={pathname} className="legacy-brand-link">
             <Suspense fallback={<BrandLogo className="legacy-brand-logo" />}>
               <SuperOpcLiquidMetalLogo theme={resolvedTheme} scale={1} className="legacy-brand-logo" />
             </Suspense>
             <span className="legacy-brand-title shine">一战晟铭</span>
-          </Link>
+          </WorkModeMenu>
         </div>
         <nav className="legacy-nav">
           {visibleNavItems.map(item => {
@@ -522,7 +526,6 @@ export function UserLayout({ children }) {
           })}
         </nav>
         <div className="legacy-sidebar-tools">
-          <ThemePicker value={theme} onChange={changeTheme} compact />
           <Link href="/settings" className="legacy-sidebar-tool" title="设置">
             <span className="legacy-nav-icon"><Settings2 size={18} strokeWidth={1.8} aria-hidden="true" /></span>
             <span className="legacy-nav-label">设置</span>
@@ -559,7 +562,7 @@ export function UserLayout({ children }) {
             <div className="legacy-userbar" aria-hidden="true" />
             <div className={`legacy-global-status legacy-global-status--${globalStatus.tone}`} role="status" aria-live="polite">{globalStatus.text}</div>
           </header> : null}
-          <section className={`legacy-content${isAgentRoute ? ' legacy-content--agent' : ''}${isAgentCanvasRoute ? ' legacy-content--agent-canvas' : ''}`}>{pageContent}</section>
+          <section className={`legacy-content${isAgentRoute ? ' legacy-content--agent' : ''}${isAgentCanvasRoute ? ' legacy-content--agent-canvas' : ''}${isAICutRoute ? ' legacy-content--aicut' : ''}`}>{pageContent}</section>
         </main>
         {isLoggedIn && pathname !== '/' && petVisible ? <CmPenguinCompanion username={username} accountSessionKey={accountSessionKey} /> : null}
       </Fragment>

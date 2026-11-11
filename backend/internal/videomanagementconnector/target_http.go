@@ -15,15 +15,17 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 // 目标站的会话失效不会返回 401/403：zidingyi.php 会 302 跳转到 login.php，
 // 而 http.Client 默认跟随跳转，最终仍是 HTTP 200 的登录页。因此会话状态
 // 必须同时看“响应正文是不是登录页”，否则状态接口会把已过期会话当成已登录。
 var (
-	ErrSessionMissing     = errors.New("target site session missing")
-	ErrSessionExpired     = errors.New("target site session expired")
-	ErrSessionUnavailable = errors.New("target site session unavailable")
+	ErrSessionMissing     = errors.New("视频后台尚未登录")
+	ErrSessionExpired     = errors.New("视频后台登录已失效")
+	ErrSessionUnavailable = errors.New("视频后台暂时无法连接")
 )
 
 // VideoUploadService is the optional media step used by the batch publisher.
@@ -231,6 +233,17 @@ func LooksLikeLoginPage(page string) bool {
 	return strings.Contains(lower, `name="password"`) && strings.Contains(lower, `name="username"`)
 }
 
+func targetResponseSessionExpired(raw []byte, result map[string]any) bool {
+	if LooksLikeLoginPage(string(raw)) {
+		return true
+	}
+	message := strings.ToLower(strings.TrimSpace(fmt.Sprint(result["message"])))
+	return strings.Contains(message, "未登录") ||
+		strings.Contains(message, "请登录") ||
+		strings.Contains(message, "not logged in") ||
+		strings.Contains(message, "login required")
+}
+
 func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input SubmissionInput) (Submission, error) {
 	base, err := s.base()
 	if err != nil {
@@ -275,6 +288,9 @@ func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input S
 	var result map[string]any
 	_ = json.Unmarshal(raw, &result)
 	if result["success"] != true {
+		if targetResponseSessionExpired(raw, result) {
+			return Submission{}, ErrSessionExpired
+		}
 		return Submission{}, fmt.Errorf("target site rejected submission")
 	}
 	id := strings.TrimSpace(fmt.Sprint(result["id"]))
@@ -304,6 +320,9 @@ func (s *TargetHTTPService) UploadVideo(ctx context.Context, session Session, fi
 	var result map[string]any
 	_ = json.Unmarshal(raw, &result)
 	if response.StatusCode < 200 || response.StatusCode >= 300 || result["success"] != true {
+		if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || targetResponseSessionExpired(raw, result) {
+			return "", ErrSessionExpired
+		}
 		return "", fmt.Errorf("target site did not return video upload URL")
 	}
 	dataObject := mapOrEmpty(result["data"])
@@ -352,6 +371,11 @@ func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, 
 	}
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	var result map[string]any
+	_ = json.Unmarshal(raw, &result)
+	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || targetResponseSessionExpired(raw, result) {
+		return Submission{}, ErrSessionExpired
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return Submission{}, fmt.Errorf("target site readback returned HTTP %d", response.StatusCode)
 	}
@@ -378,15 +402,15 @@ func (s *TargetHTTPService) client() *http.Client {
 	}
 	proxyURL := strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_CONNECTOR_PROXY"))
 	if proxyURL == "" {
-		return &http.Client{Timeout: 120 * time.Second}
+		return safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	proxy, err := url.Parse(proxyURL)
 	if err != nil || proxy.Scheme == "" || proxy.Host == "" {
-		return &http.Client{Timeout: 120 * time.Second}
+		return safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = http.ProxyURL(proxy)
-	return &http.Client{Timeout: 120 * time.Second, Transport: transport}
+	return safehttp.NewClientWithTransport(120*time.Second, transport)
 }
 func (s *TargetHTTPService) do(ctx context.Context, client *http.Client, method, endpoint, cookie string, body io.Reader) (*http.Response, error) {
 	return s.doWithContentType(ctx, client, method, endpoint, cookie, body, "application/json")

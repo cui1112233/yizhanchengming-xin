@@ -3309,10 +3309,10 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 type comicPromptRewriter func(context.Context, string, novelfetchworkshop.RewriteRequest) (string, error)
 
 func generateShuihuoAssetImagesWithPresetCatalog(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
-	return generateShuihuoAssetImagesWithRepair(ctx, store, files, owner, batch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, nil, nil, catalogStores...)
+	return generateShuihuoAssetImagesWithRepair(ctx, store, files, owner, batch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, nil, nil, owner, catalogStores...)
 }
 
-func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, rewrite comicPromptRewriter, userConfig *UserConfigStore, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
+func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, rewrite comicPromptRewriter, userConfig *UserConfigStore, modelConfigOwner string, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -3346,7 +3346,10 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 		if prompt == "" {
 			return nil, fmt.Errorf("%w: asset %s has no prompt", batchfactoryv11.ErrInvalid, asset.ID)
 		}
-		target, targetErr := resolveShuihuoAssetImageTargetWithChannels(ctx, userConfig, owner, asset, modelID, aspectRatio, provider, catalog)
+		if strings.TrimSpace(modelConfigOwner) == "" {
+			modelConfigOwner = owner
+		}
+		target, targetErr := resolveShuihuoAssetImageTargetWithChannels(ctx, userConfig, modelConfigOwner, asset, modelID, aspectRatio, provider, catalog)
 		if targetErr != nil {
 			return nil, targetErr
 		}
@@ -5257,6 +5260,11 @@ func resolveShuihuoImageTargetWithChannels(ctx context.Context, userConfig *User
 	if entry, matched, err := resolveIntegrationImageCatalogEntry(ctx, userConfig, owner, selectedModelID); matched {
 		if err != nil {
 			return shuihuoAssetImageTarget{}, withErrorCode(err, ErrorCodeImageModelNotConfigured)
+		}
+		catalog = append([]map[string]any{entry}, catalog...)
+	} else if entry, legacyMatched, legacyErr := resolveLegacyIntegrationImageCatalogEntry(ctx, userConfig, owner, selectedModelID); legacyMatched {
+		if legacyErr != nil {
+			return shuihuoAssetImageTarget{}, withErrorCode(legacyErr, ErrorCodeImageModelNotConfigured)
 		}
 		catalog = append([]map[string]any{entry}, catalog...)
 	}

@@ -21,6 +21,7 @@ type AuthOptions struct {
 	SessionResolver func(context.Context, string) (BridgeIdentity, error)
 	MFAFile         string
 	PasskeyFile     string
+	RateLimiter     *authRateLimiter
 }
 
 func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[string]any {
@@ -73,9 +74,18 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 	if now == nil {
 		now = time.Now
 	}
+	limiter := options.RateLimiter
+	if limiter == nil {
+		limiter = newAuthRateLimiter(AuthRateLimitConfig{}, now)
+	}
 	root.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		if options.Store == nil {
 			writeAuthError(w, http.StatusServiceUnavailable, "登录服务暂不可用")
+			return
+		}
+		ipKey := authRateLimitIPDimension(r)
+		if retryAfter, allowed := limiter.allow(authRateScopeLogin, ipKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
 			return
 		}
 		var input struct {
@@ -84,16 +94,32 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			Remember bool   `json:"remember"`
 			MFACode  string `json:"mfaCode"`
 		}
+		username := strings.TrimSpace(input.Username)
+		userKey := authRateLimitUserDimension(username)
+		recordFailure := func() {
+			limiter.record(authRateScopeLogin, ipKey)
+			if username != "" {
+				limiter.record(authRateScopeLogin, userKey)
+			}
+		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&input); err != nil || strings.TrimSpace(input.Username) == "" || input.Password == "" {
+			recordFailure()
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
-		account, err := options.Store.FindAccount(r.Context(), strings.TrimSpace(input.Username))
+		username = strings.TrimSpace(input.Username)
+		userKey = authRateLimitUserDimension(username)
+		if retryAfter, allowed := limiter.allow(authRateScopeLogin, userKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
+		account, err := options.Store.FindAccount(r.Context(), username)
 		if err != nil && !errors.Is(err, auth.ErrNotFound) {
 			writeAuthError(w, http.StatusServiceUnavailable, "登录服务暂不可用")
 			return
 		}
 		if err != nil || !account.Active || !auth.VerifyPassword(input.Password, account.PasswordHash, account.PasswordAlgorithm) {
+			recordFailure()
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
@@ -104,6 +130,7 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 				return
 			}
 			if required && !valid {
+				recordFailure()
 				writeJSON(w, http.StatusPreconditionRequired, map[string]string{"error": "请输入 MFA 动态验证码或恢复码", "code": "MFA_REQUIRED"})
 				return
 			}
@@ -123,6 +150,8 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
+		limiter.reset(authRateScopeLogin, ipKey)
+		limiter.reset(authRateScopeLogin, userKey)
 		payload := authAccountPayload(account, options.Profiles)
 		payload["token"] = token
 		writeJSON(w, http.StatusOK, payload)

@@ -17,12 +17,82 @@ import (
 	"sync"
 	"time"
 
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/safehttp"
 )
 
-var modelKinds = map[string]bool{"text": true, "video": true, "image": true, "audio": true}
+var modelKinds = map[string]bool{"text": true, "video": true, "image": true, "audio": true, "asr": true}
 
-func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, store novelfetchworkshop.Store) {
+// modelIdentityKey 是「同一个真实模型」的去重键：地址忽略大小写与末尾斜杠，
+// 模型名忽略大小写。任一为空时返回空串，表示无法判定为同一模型，宁可不合并。
+func modelIdentityKey(baseURL, modelID string) string {
+	baseURL = strings.ToLower(strings.TrimSpace(baseURL))
+	baseURL = strings.TrimRight(baseURL, "/")
+	modelID = strings.ToLower(strings.TrimSpace(modelID))
+	if baseURL == "" || modelID == "" {
+		return ""
+	}
+	return baseURL + "|" + modelID
+}
+
+func effectiveModelCatalogOwner(identity BridgeIdentity, profiles *MemberProfileStore, accounts auth.Store) string {
+	_, managedBy := configManagementState(identity, profiles, accounts)
+	if owner := strings.TrimSpace(fmt.Sprint(managedBy)); owner != "" && owner != "<nil>" {
+		return owner
+	}
+	return identity.Username
+}
+
+// resolvedOwnerModelCatalogStore keeps every user's own workflow settings but
+// reads the model catalog from the manager that owns the member's configuration.
+// Writes still go to the original owner through the embedded Store.
+type resolvedOwnerModelCatalogStore struct {
+	novelfetchworkshop.Store
+	resolveOwner func(string) string
+}
+
+func runtimeModelCatalogStore(store novelfetchworkshop.Store, resolveOwner func(string) string) novelfetchworkshop.Store {
+	if store == nil {
+		return nil
+	}
+	return resolvedOwnerModelCatalogStore{Store: store, resolveOwner: resolveOwner}
+}
+
+func (s resolvedOwnerModelCatalogStore) GetConfig(ctx context.Context, owner string) (map[string]any, error) {
+	config, err := s.Store.GetConfig(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	resolvedOwner := owner
+	if s.resolveOwner != nil {
+		resolvedOwner = strings.TrimSpace(s.resolveOwner(owner))
+	}
+	if resolvedOwner == "" || resolvedOwner == owner {
+		return config, nil
+	}
+	managed, err := s.Store.GetConfig(ctx, resolvedOwner)
+	if err != nil {
+		return nil, err
+	}
+	merged := make(map[string]any, len(config)+2)
+	for key, value := range config {
+		merged[key] = value
+	}
+	if catalog, ok := managed["modelCatalog"]; ok {
+		merged["modelCatalog"] = catalog
+	} else {
+		delete(merged, "modelCatalog")
+	}
+	if version, ok := managed["modelCatalogVersion"]; ok {
+		merged["modelCatalogVersion"] = version
+	} else {
+		delete(merged, "modelCatalogVersion")
+	}
+	return merged, nil
+}
+
+func registerModelCatalogRoutes(root *http.ServeMux, bridgeAuth NovelFetchBridgeAuth, store novelfetchworkshop.Store, userConfig *UserConfigStore, accounts auth.Store, profiles *MemberProfileStore) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/test/text", func(w http.ResponseWriter, req *http.Request) {
 		testConfiguredModel(w, req, store, "text")
@@ -32,7 +102,8 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 	})
 	mux.HandleFunc("GET /api/models", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
-		models, err := readModelCatalog(req, store, identity.Username, req.URL.Query().Get("kind"), identity.IsOwner)
+		modelOwner := effectiveModelCatalogOwner(identity, profiles, accounts)
+		models, err := readModelCatalog(req, store, userConfig, modelOwner, req.URL.Query().Get("kind"), true)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
@@ -45,7 +116,7 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 			writeJSON(w, http.StatusForbidden, map[string]any{"error": "无权管理模型"})
 			return
 		}
-		models, err := readModelCatalog(req, store, identity.Username, req.URL.Query().Get("kind"), true)
+		models, err := readModelCatalog(req, store, userConfig, identity.Username, req.URL.Query().Get("kind"), false)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
@@ -148,7 +219,7 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 		}
 		probe.Header.Set("Content-Type", "application/json")
 		probe.Header.Set("Authorization", "Bearer "+credential)
-		response, err := http.DefaultClient.Do(probe)
+		response, err := safehttp.NewClientWithTimeout(20 * time.Second).Do(probe)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": "文本模型连接失败：" + err.Error()})
 			return
@@ -238,7 +309,7 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 				continue
 			}
 			for key, value := range patch {
-				if key == "id" {
+				if key == "id" || key == "clearCredential" {
 					continue
 				}
 				// Older settings pages called the secret apiKey. Keep accepting
@@ -254,6 +325,12 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 					continue
 				}
 				current[key] = value
+			}
+			// 清空 Key 就是停用：只清凭证，不再写 enabled=false。
+			// 可用性完全由凭证决定，用户重新填 Key 时无需再“打开开关”。
+			if clear, ok := patch["clearCredential"].(bool); ok && clear {
+				current["credential"] = ""
+				current["apiKey"] = ""
 			}
 			// Migrate a legacy stored apiKey before normalizeManagedModel checks
 			// the H3 key requirement. The secret never leaves public responses.
@@ -341,7 +418,7 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"executorPaired": false})
 	})
-	secured := auth.Middleware(mux)
+	secured := bridgeAuth.Middleware(mux)
 	root.Handle("/api/models", secured)
 	root.Handle("/api/models/", secured)
 	root.Handle("/api/config/models", secured)
@@ -374,7 +451,7 @@ func testConfiguredModel(w http.ResponseWriter, req *http.Request, store novelfe
 	credential := firstText(input["apiKey"], input["api_key"], input["credential"])
 	if baseURL == "" || modelID == "" || credential == "" {
 		for _, model := range modelCatalog(settings) {
-			if model["kind"] != kind || model["enabled"] != true {
+			if model["kind"] != kind || !managedModelAvailable(model) {
 				continue
 			}
 			if baseURL == "" {
@@ -403,7 +480,7 @@ func testConfiguredModel(w http.ResponseWriter, req *http.Request, store novelfe
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "kind": kind, "error": "Base URL 格式不正确"})
 		return
 	}
-	client := &http.Client{Timeout: 20 * time.Second}
+	client := safehttp.NewClientWithTimeout(20 * time.Second)
 	if kind == "image" {
 		testModelCatalogEndpoint(w, client, baseURL, modelID, credential)
 		return
@@ -481,7 +558,7 @@ func testModelCatalogEndpoint(w http.ResponseWriter, client *http.Client, baseUR
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": "image", "modelListed": listed, "message": message})
 }
 
-func readModelCatalog(req *http.Request, store novelfetchworkshop.Store, owner, kind string, includeDisabled bool) ([]map[string]any, error) {
+func readModelCatalog(req *http.Request, store novelfetchworkshop.Store, userConfig *UserConfigStore, owner, kind string, includeChannelModels bool) ([]map[string]any, error) {
 	if kind != "" && !modelKinds[kind] {
 		return nil, errors.New("模型类型无效")
 	}
@@ -494,10 +571,12 @@ func readModelCatalog(req *http.Request, store novelfetchworkshop.Store, owner, 
 		if kind != "" && model["kind"] != kind {
 			continue
 		}
-		if !includeDisabled && model["enabled"] != true {
+		// 唯一可用性口径：凭证填了就生效；[off] 已下线与空凭证都不进页面也不进下拉。
+		public := publicManagedModel(model)
+		if public["available"] != true {
 			continue
 		}
-		result = append(result, publicManagedModel(model))
+		result = append(result, public)
 	}
 	// The maintained default TTS service backs /api/tts even when an account has
 	// not created a custom audio catalog entry. Surface it to Agent so the
@@ -510,7 +589,171 @@ func readModelCatalog(req *http.Request, store novelfetchworkshop.Store, owner, 
 			"configured": true, "hasCredential": true,
 		}}, result...)
 	}
+	// API 配置里已启用且填了 Key 的渠道，会作为只读候选项追加到下拉里。
+	// 不改写 modelCatalog，只在读取时合成；模型目录管理接口不追加。
+	if includeChannelModels {
+		result = append(result, integrationChannelModels(req.Context(), kind, userConfig, owner, result)...)
+	}
 	return result, nil
+}
+
+// integrationChannelPreset 与前端 apiIntegrationSchema.js 的预置渠道一一对应。
+// 后端只需要 kind、显示名、模型 id、地址和判断“是否填了 Key”的字段名。
+type integrationChannelPreset struct {
+	Group        string
+	ID           string
+	Label        string
+	ModelID      string
+	BaseURL      string
+	KeyField     string
+	AddressField string
+}
+
+var integrationChannelPresets = []integrationChannelPreset{
+	// 文本模型
+	{Group: "text", ID: "deepseek", Label: "深度探索 DeepSeek", ModelID: "deepseek-chat", BaseURL: "https://api.deepseek.com/v1", KeyField: "deepseekOfficialApiKey"},
+	{Group: "text", ID: "doubao", Label: "火山豆包", ModelID: "doubao-seed-1-6", BaseURL: "https://ark.cn-beijing.volces.com/api/v3", KeyField: "doubaoOfficialApiKey"},
+	{Group: "text", ID: "qwen", Label: "阿里通义千问", ModelID: "qwen-max", BaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", KeyField: "qwenOfficialApiKey"},
+	{Group: "text", ID: "openrouter", Label: "OpenRouter", ModelID: "openrouter/auto", BaseURL: "https://openrouter.ai/api/v1", KeyField: "openrouterApiKey"},
+	{Group: "text", ID: "kimi", Label: "Kimi", ModelID: "kimi-k2", BaseURL: "https://api.moonshot.cn/v1", KeyField: "kimiOfficialApiKey"},
+	{Group: "text", ID: "glm", Label: "智谱 GLM", ModelID: "glm-4.5", BaseURL: "https://open.bigmodel.cn/api/paas/v4", KeyField: "glmOfficialApiKey"},
+	{Group: "text", ID: "mimo", Label: "小米 MiMo", ModelID: "mimo", BaseURL: "https://api.xiaomimimo.com/v1", KeyField: "mimoOfficialApiKey"},
+	// 视频模型
+	{Group: "video", ID: "seedance2", Label: "Seedance2.0", ModelID: "doubao-seedance-2-0", BaseURL: "https://ark.cn-beijing.volces.com/api/v3", KeyField: "seedance2Api"},
+	{Group: "video", ID: "minimaxH3", Label: "MiniMax-H3", ModelID: "MiniMax-H3", BaseURL: "https://api.minimaxi.com/v1", KeyField: "minimaxH3Key"},
+	{Group: "video", ID: "runninghub", Label: "RunningHub", ModelID: "工作流任务", BaseURL: "https://www.runninghub.cn", KeyField: "runninghubApi"},
+	{Group: "video", ID: "viduVideo", Label: "Vidu", ModelID: "Vidu 默认", BaseURL: "https://api.vidu.cn", KeyField: "viduApi"},
+	{Group: "video", ID: "wanx", Label: "阿里万相", ModelID: "万相视频", BaseURL: "https://dashscope.aliyuncs.com/api/v1", KeyField: "wanxApiKey"},
+	{Group: "video", ID: "xiaoyunque", Label: "小云雀", ModelID: "小云雀默认", BaseURL: "", KeyField: "xiaoyunqueAccessKey"},
+	{Group: "video", ID: "xiaoyunqueIntl", Label: "小云雀-国际版", ModelID: "Pippit 默认", BaseURL: "https://www.pippit.ai", KeyField: "xiaoyunqueIntlAccessKey"},
+	{Group: "video", ID: "localGrokVideo", Label: "本地 Grok 视频", ModelID: "本地服务", BaseURL: "http://localhost:5400", KeyField: "localGrokVideoApiKey", AddressField: "localGrokVideoBaseUrl"},
+	{Group: "video", ID: "happyhorse", Label: "HappyHorse", ModelID: "HappyHorse 默认", BaseURL: "https://dashscope.aliyuncs.com/api/v1", KeyField: "happyHorseKey"},
+	// 图片模型
+	{Group: "image", ID: "volcanoSeedream", Label: "火山 Seedream", ModelID: "doubao-seedream-3-0-t2i", BaseURL: "https://ark.cn-beijing.volces.com/api/v3", KeyField: "volcanoSeedreamApi"},
+	{Group: "image", ID: "grsai", Label: "grsai", ModelID: "gpt-image-2", BaseURL: "https://grsai.ai", KeyField: "grsaiImage2Key"},
+	{Group: "image", ID: "geeknow", Label: "geeknow", ModelID: "gpt-image-2", BaseURL: "https://www.geeknow.top", KeyField: "geeknowImageApi"},
+	{Group: "image", ID: "qwenImage", Label: "Qwen-Image", ModelID: "qwen-image", BaseURL: "https://dashscope.aliyuncs.com/api/v1", KeyField: "qwenImageApi"},
+	{Group: "image", ID: "zImage", Label: "阿里云 Z-Image", ModelID: "z-image", BaseURL: "https://dashscope.aliyuncs.com/api/v1", KeyField: "zImageApi"},
+	{Group: "image", ID: "nano2", Label: "Nano2", ModelID: "自定义渠道", BaseURL: "", KeyField: "nano2ApiKey", AddressField: "nano2BaseUrl"},
+	{Group: "image", ID: "localGrokImage", Label: "本地 Grok 图片", ModelID: "本地服务", BaseURL: "http://localhost:8000", KeyField: "localGrokImageApiKey", AddressField: "localGrokImageBaseUrl"},
+	{Group: "image", ID: "localBanana", Label: "本地大香蕉", ModelID: "本地服务", BaseURL: "http://127.0.0.1:38000", KeyField: "localBananaApiKey", AddressField: "localBananaBaseUrl"},
+}
+
+// integrationChannelBaseURL 返回渠道实际生效的地址：自定义地址字段优先于预置默认值。
+func integrationChannelBaseURL(preset integrationChannelPreset, values map[string]any) string {
+	if preset.AddressField != "" {
+		if value, ok := values[preset.AddressField]; ok && !isEmptyIntegrationValue(value) {
+			return strings.TrimSpace(fmt.Sprint(value))
+		}
+	}
+	return preset.BaseURL
+}
+
+// integrationChannelModels 把“已启用 + 已填 Key”的渠道合成为模型下拉候选项。
+// 只读合成：不写入 modelCatalog，也不改动模型目录。
+func integrationChannelModels(ctx context.Context, kind string, userConfig *UserConfigStore, owner string, existing []map[string]any) []map[string]any {
+	if kind != "text" && kind != "video" && kind != "image" {
+		return nil
+	}
+	if userConfig == nil {
+		return nil
+	}
+	config, err := userConfig.GetConfig(ctx, owner)
+	if err != nil {
+		return nil
+	}
+	stored := apiIntegrationStoredMap(config)
+	selection := apiIntegrationChannelSelection(stored)
+	values := apiIntegrationValues(stored)
+
+	seenID := map[string]bool{}
+	seenModel := map[string]bool{}
+	for _, model := range existing {
+		if id, _ := model["id"].(string); id != "" {
+			seenID[id] = true
+		}
+		baseURL, _ := model["baseUrl"].(string)
+		modelID, _ := model["modelId"].(string)
+		if key := modelIdentityKey(baseURL, modelID); key != "" {
+			seenModel[key] = true
+		}
+	}
+
+	result := make([]map[string]any, 0)
+	appendModel := func(id, label, modelID, baseURL string) {
+		baseURL = strings.TrimSpace(baseURL)
+		modelID = strings.TrimSpace(modelID)
+		key := modelIdentityKey(baseURL, modelID)
+		if seenID[id] || (key != "" && seenModel[key]) {
+			return
+		}
+		seenID[id] = true
+		if key != "" {
+			seenModel[key] = true
+		}
+		displayName := label
+		if modelID != "" && modelID != "本地服务" && modelID != "自定义渠道" {
+			displayName = label + " · " + modelID
+		}
+		result = append(result, map[string]any{
+			"id": id, "kind": kind, "displayName": displayName, "modelId": modelID,
+			"baseUrl": baseURL, "provider": "api_integrations", "enabled": true,
+			"configured": true, "hasCredential": true, "channel": id,
+		})
+	}
+
+	for _, preset := range integrationChannelPresets {
+		// 不再看“是否勾选启用”：预置渠道只要填了 Key 就进入候选。
+		if preset.Group != kind {
+			continue
+		}
+		value, ok := values[preset.KeyField]
+		if !ok || isEmptyIntegrationValue(value) {
+			continue
+		}
+		appendModel("channel:"+preset.ID, preset.Label, preset.ModelID, integrationChannelBaseURL(preset, values))
+	}
+
+	// 自己新增的渠道：填了 Key 且分组匹配时同样进入候选。
+	rawChannels, _ := stored["customChannels"].([]any)
+	for _, raw := range rawChannels {
+		channel, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if integrationChannelGroup(channel, selection) != kind {
+			continue
+		}
+		if isEmptyIntegrationValue(channel["apiKey"]) {
+			continue
+		}
+		appendModel("custom:"+fmt.Sprint(channel["id"]), fmt.Sprint(channel["name"]), fmt.Sprint(channel["model"]), fmt.Sprint(channel["baseUrl"]))
+	}
+	return result
+}
+
+// integrationChannelGroup 返回渠道所属分组。旧版把渠道放在独立的“自定义”组里，
+// group 为空但 id 出现在 channelSelection 的某个分组列表里；这里按勾选列表补回，
+// 保证页面与下拉对同一条渠道得出相同分组。
+func integrationChannelGroup(channel map[string]any, selection map[string]any) string {
+	group := strings.TrimSpace(fmt.Sprint(channel["group"]))
+	if group != "" && group != "<nil>" {
+		return group
+	}
+	id := fmt.Sprint(channel["id"])
+	if id == "" || id == "<nil>" {
+		return ""
+	}
+	for candidate, raw := range selection {
+		typed, _ := raw.(map[string]any)
+		list, _ := typed["enabled"].([]string)
+		for _, item := range list {
+			if item == id {
+				return candidate
+			}
+		}
+	}
+	return ""
 }
 
 func modelCatalog(settings map[string]any) []map[string]any {
@@ -557,6 +800,7 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if id == "minimax-h3-video" && workflowID == "" {
 		return nil, errors.New("H3 工作流 ID 不能为空")
 	}
+	// 凭证允许为空：空凭证就是停用，不再用额外开关或必填校验拦截。
 	credential := strings.TrimSpace(fmt.Sprint(input["credential"]))
 	if credential == "<nil>" || credential == "" {
 		credential = strings.TrimSpace(fmt.Sprint(input["apiKey"]))
@@ -564,12 +808,13 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if credential == "<nil>" {
 		credential = ""
 	}
-	if id == "minimax-h3-video" && credential == "" {
-		return nil, errors.New("保存 H3 配置前必须填写 API Key")
-	}
-	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "provider": strings.TrimSpace(fmt.Sprint(input["provider"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "credential": credential, "workflowId": workflowID, "enabled": input["enabled"] == true}
+	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "provider": strings.TrimSpace(fmt.Sprint(input["provider"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "voiceCloneRequestTemplate": strings.TrimSpace(fmt.Sprint(input["voiceCloneRequestTemplate"])), "voiceCloneResponseMapping": strings.TrimSpace(fmt.Sprint(input["voiceCloneResponseMapping"])), "credential": credential, "workflowId": workflowID, "enabled": normalizedModelEnabled(input["enabled"])}
 	if model["displayName"] == "<nil>" || model["displayName"] == "" {
-		model["displayName"] = id
+		if name := strings.TrimSpace(fmt.Sprint(input["name"])); name != "" && name != "<nil>" {
+			model["displayName"] = name
+		} else {
+			model["displayName"] = id
+		}
 	}
 	if model["modelId"] == "<nil>" {
 		model["modelId"] = ""
@@ -577,10 +822,21 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if model["baseUrl"] == "<nil>" {
 		model["baseUrl"] = ""
 	}
-	for _, key := range []string{"endpoint", "provider", "requestTemplate", "responseMapping"} {
+	for _, key := range []string{"endpoint", "provider", "requestTemplate", "responseMapping", "voiceCloneRequestTemplate", "voiceCloneResponseMapping"} {
 		if model[key] == "<nil>" {
 			model[key] = ""
 		}
+	}
+	// 管理端「水货生产模型」写 name / adapterKind / credentialRef / parameterSchema，
+	// 个人中心平台预设卡写 displayName / baseUrl / credential。两处共用这份规范化，
+	// 只改 Key 或启用状态时不能把另一侧写入的扩展字段冲掉。
+	for _, key := range []string{"name", "adapterKind", "credentialRef", "parameterSchema", "tasksEndpoint", "resultEndpoint", "group", "capabilities"} {
+		if value, exists := input[key]; exists && fmt.Sprint(value) != "<nil>" {
+			model[key] = value
+		}
+	}
+	if name := strings.TrimSpace(fmt.Sprint(model["name"])); name == "" || name == "<nil>" {
+		model["name"] = model["displayName"]
 	}
 	return model, nil
 }
@@ -592,9 +848,56 @@ func publicManagedModel(model map[string]any) map[string]any {
 			result[key] = value
 		}
 	}
-	result["hasCredential"] = strings.TrimSpace(fmt.Sprint(model["credential"])) != "" && fmt.Sprint(model["credential"]) != "<nil>"
+	result["hasCredential"] = managedModelHasCredential(model)
+	result["available"] = managedModelAvailable(model)
 	result["capabilities"] = publicModelCapabilities(model)
 	return result
+}
+
+func managedModelHasCredential(model map[string]any) bool {
+	credential := strings.TrimSpace(fmt.Sprint(model["credential"]))
+	return credential != "" && credential != "<nil>"
+}
+
+// managedModelRetired 识别已下线模型：沿用数据里的 [off] 命名约定。
+func managedModelRetired(model map[string]any) bool {
+	for _, key := range []string{"displayName", "modelId", "name"} {
+		value := strings.ToLower(strings.TrimSpace(fmt.Sprint(model[key])))
+		if strings.HasPrefix(value, "[off]") {
+			return true
+		}
+	}
+	return false
+}
+
+// managedModelNeedsNoCredential 本地执行器靠配对心跳工作，没有 API Key 也可用，
+// 不能因为“凭证为空”被当成停用。
+func managedModelNeedsNoCredential(model map[string]any) bool {
+	for _, key := range []string{"provider", "adapterKind"} {
+		value := strings.ToLower(strings.TrimSpace(fmt.Sprint(model[key])))
+		if strings.Contains(value, "local_executor") || strings.Contains(value, "local-executor") {
+			return true
+		}
+	}
+	id := strings.ToLower(strings.TrimSpace(fmt.Sprint(model["id"])))
+	return strings.HasPrefix(id, "local-")
+}
+
+// managedModelAvailable 是页面与 /api/models 下拉共用的唯一可用性口径：
+// 1) enabled=false 或 [off] 命名 = 已下线，页面与下拉都不出现；
+// 2) 填了凭证就生效；3) 本地执行器无需凭证。
+// 本页不再写入 enabled=false：清空 Key 就是停用，enabled 只用于承接旧数据。
+func managedModelAvailable(model map[string]any) bool {
+	if managedModelRetired(model) {
+		return false
+	}
+	if _, present := model["enabled"]; present && !normalizedModelEnabled(model["enabled"]) {
+		return false
+	}
+	if managedModelHasCredential(model) {
+		return true
+	}
+	return managedModelNeedsNoCredential(model)
 }
 
 const (
@@ -677,7 +980,7 @@ func fetchYFAIBalance(ctx context.Context, baseURL, credential string) yfaiBalan
 	}
 	request.Header.Set("Authorization", "Bearer "+credential)
 	request.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: yfaiBalanceTimeout}
+	client := safehttp.NewClientWithTimeout(yfaiBalanceTimeout)
 	response, err := client.Do(request)
 	if err != nil {
 		var timeoutErr net.Error

@@ -124,6 +124,9 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
+		if req.URL.Query().Get("module") == prompt.LuoshuiAdminModule {
+			items = prompt.MergeLuoshuiAdminPresets(items)
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"presets": items})
 	})))
 	root.Handle("GET /api/admin/presets/{id}/{version}", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -134,6 +137,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		version, _ := strconv.Atoi(req.PathValue("version"))
 		item, err := adminStore.Get(req.PathValue("id"), version)
 		if err != nil {
+			if base, ok := prompt.LuoshuiAdminPreset(req.PathValue("id"), version); ok {
+				writeJSON(w, http.StatusOK, map[string]any{"preset": base})
+				return
+			}
 			writeAdminStoreError(w, err)
 			return
 		}
@@ -148,6 +155,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		version, _ := strconv.Atoi(req.PathValue("version"))
 		item, err := adminStore.Delete(identity.Username, req.PathValue("id"), version)
 		if err != nil {
+			if _, ok := prompt.LuoshuiAdminPreset(req.PathValue("id"), version); ok {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "这是内嵌 CM 原文，不能删除；保存覆盖版本后删除覆盖即可回退到原文"})
+				return
+			}
 			writeAdminStoreError(w, err)
 			return
 		}
@@ -224,6 +235,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 	root.Handle("GET /api/admin/preset-slots", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if catalog == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		if req.URL.Query().Get("module") == prompt.LuoshuiAdminModule {
+			writeJSON(w, http.StatusOK, map[string]any{"slots": prompt.LuoshuiPluginSlots()})
 			return
 		}
 		items, err := catalog.All(req.URL.Query().Get("module"))

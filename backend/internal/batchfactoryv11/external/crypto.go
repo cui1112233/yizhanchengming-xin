@@ -50,4 +50,3 @@ func DecryptCredential(key, nonce, ciphertext []byte) ([]byte, error) {
 	}
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }
-

@@ -14,6 +14,9 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 	if root == nil || store == nil {
 		return
 	}
+	// Preview is read-only, but it must still identify the caller from a real
+	// session instead of caller-supplied signed headers.
+	middleware = middleware.SessionOnly()
 	previewHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {

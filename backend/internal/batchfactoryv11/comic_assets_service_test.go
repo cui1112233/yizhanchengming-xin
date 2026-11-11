@@ -53,7 +53,7 @@ func TestBuildComicAssetExtractionContractAllowsCompleteCMOutput(t *testing.T) {
 			"productionMode": rawSetting(t, "comic"),
 			"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
 				"enabled": true,
-				"assets": map[string]any{"presetId": "batch-comic-assets", "body": "完整提取人物、场景和道具"},
+				"assets":  map[string]any{"presetId": "batch-comic-assets", "body": "完整提取人物、场景和道具"},
 			}}),
 		},
 	})

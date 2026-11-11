@@ -838,7 +838,7 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
             </div>
             <div className="cm-penguin-header-actions">
               <button type="button" title="分析当前内容" aria-label="分析当前内容" onClick={analyzePage} disabled={asking}><ScanSearch size={16} /></button>
-              <button type="button" title="在 Agent 工作区继续" aria-label="在 Agent 工作区继续" onClick={openAgent} disabled={!petTaskId}><ExternalLink size={16} /></button>
+              <button type="button" title="在 CM 画布继续" aria-label="在 CM 画布继续" onClick={openAgent} disabled={!petTaskId}><ExternalLink size={16} /></button>
               <button type="button" title="关闭" aria-label={`关闭 ${pet.displayName} 对话`} onClick={closeChat}><X size={16} /></button>
             </div>
           </header>

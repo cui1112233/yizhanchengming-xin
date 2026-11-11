@@ -11,6 +11,7 @@ test('默认布局按桌面视口生成三块可用尺寸', () => {
     resourceCollapsed: false,
     inspectorCollapsed: false,
     timelineCollapsed: false,
+    playheadFollow: true,
     inspectorMode: 'panel',
   });
 });
@@ -25,6 +26,7 @@ test('布局尺寸会限制到可操作边界并修复非法持久化值', () =>
       resourceCollapsed: false,
       inspectorCollapsed: false,
       timelineCollapsed: false,
+      playheadFollow: true,
       inspectorMode: 'panel',
     },
   );
@@ -46,6 +48,11 @@ test('三个区域可独立收起和恢复且不改变尺寸', () => {
   assert.equal(layout.timelineHeight, 280);
   layout = toggleEditorPane(layout, 'resource');
   assert.equal(layout.resourceCollapsed, false);
+});
+
+test('播放头跟随默认开启并保留用户关闭选择', () => {
+  assert.equal(normalizeEditorLayout({}, { width: 1440, height: 900 }).playheadFollow, true);
+  assert.equal(normalizeEditorLayout({ playheadFollow: false }, { width: 1440, height: 900 }).playheadFollow, false);
 });
 
 test('未知区域不会修改布局对象', () => {

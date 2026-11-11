@@ -16,6 +16,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/safehttp"
 )
 
 const localReferenceAssetImageTaskPrefix = "go-local-image:"
@@ -118,7 +119,7 @@ func registerReferenceAssetImageGenerateRoute(root *http.ServeMux, middleware Br
 		upstreamReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(body)))
 		upstreamReq.Header.Set("Content-Type", "application/json")
 		upstreamReq.Header.Set("Authorization", "Bearer "+toString(settings["api_key"]))
-		response, err := http.DefaultClient.Do(upstreamReq)
+		response, err := safehttp.NewClientWithTimeout(time.Duration(timeout) * time.Second).Do(upstreamReq)
 		if err != nil {
 			if ctx.Err() != nil {
 				writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": fmt.Sprintf("图片AI请求超时（超过 %d 秒）", timeout), "code": "IMAGE_AI_TIMEOUT"})
@@ -150,7 +151,12 @@ func registerReferenceAssetImageGenerateRoute(root *http.ServeMux, middleware Br
 			assetID = "gen_" + fmt.Sprint(time.Now().Unix())
 		}
 		revision := referenceAssetRevision("candidate")
-		path := filepath.Join(referenceAssetDir(store.BaseDir, identity.Username, assetType), assetID+"_"+revision+referenceAssetImageExtension(mime))
+		dir, dirErr := referenceAssetDir(store.BaseDir, identity.Username, assetType)
+		if dirErr != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "用户名不合法"})
+			return
+		}
+		path := filepath.Join(dir, assetID+"_"+revision+referenceAssetImageExtension(mime))
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "图片保存失败"})
 			return
@@ -270,7 +276,7 @@ func decodeReferenceAssetImageResult(ctx context.Context, result map[string]any)
 	if err != nil {
 		return nil, "", err
 	}
-	response, err := http.DefaultClient.Do(req)
+	response, err := safehttp.NewClientWithTimeout(60 * time.Second).Do(req)
 	if err != nil {
 		return nil, "", err
 	}

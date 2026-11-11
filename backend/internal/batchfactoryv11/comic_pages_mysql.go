@@ -111,13 +111,13 @@ func (s *MySQLStore) upsertComicPageOnce(ctx context.Context, owner, batchID, bo
 			return ComicPage{}, err
 		}
 		page.Revision, page.CreatedAt = 1, now
-		_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_pages(id,owner_username,batch_id,book_id,video_id,comic_prompt,image_prompt,model_id,aspect_ratio,status,snapshot_hash,reference_image_urls,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, page.ID, owner, batchID, bookID, videoID, input.ComicPrompt, input.ImagePrompt, nullableString(input.ModelID), input.AspectRatio, input.Status, nullableString(input.SnapshotHash), comicReferenceURLsJSON(input.ReferenceImageURLs), now, now)
+		_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_pages(id,owner_username,batch_id,book_id,video_id,comic_prompt,image_prompt,model_id,aspect_ratio,status,last_error,snapshot_hash,reference_image_urls,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, page.ID, owner, batchID, bookID, videoID, input.ComicPrompt, input.ImagePrompt, nullableString(input.ModelID), input.AspectRatio, input.Status, nullableString(input.GenerationError), nullableString(input.SnapshotHash), comicReferenceURLsJSON(input.ReferenceImageURLs), now, now)
 	} else if err == nil {
 		if input.ExpectedRevision > 0 && page.Revision != input.ExpectedRevision {
 			return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
 		}
 		page.Revision++
-		_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET comic_prompt=?,image_prompt=?,model_id=?,aspect_ratio=?,status=?,snapshot_hash=?,reference_image_urls=?,revision=?,updated_at=? WHERE id=? AND owner_username=?`, input.ComicPrompt, input.ImagePrompt, nullableString(input.ModelID), input.AspectRatio, input.Status, nullableString(input.SnapshotHash), comicReferenceURLsJSON(input.ReferenceImageURLs), page.Revision, now, page.ID, owner)
+		_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET comic_prompt=?,image_prompt=?,model_id=?,aspect_ratio=?,status=?,last_error=?,snapshot_hash=?,reference_image_urls=?,revision=?,updated_at=? WHERE id=? AND owner_username=?`, input.ComicPrompt, input.ImagePrompt, nullableString(input.ModelID), input.AspectRatio, input.Status, nullableString(input.GenerationError), nullableString(input.SnapshotHash), comicReferenceURLsJSON(input.ReferenceImageURLs), page.Revision, now, page.ID, owner)
 	}
 	if err != nil {
 		return ComicPage{}, err
@@ -127,7 +127,7 @@ func (s *MySQLStore) upsertComicPageOnce(ctx context.Context, owner, batchID, bo
 	}
 	page.BatchID, page.BookID, page.VideoID = batchID, bookID, videoID
 	page.ComicPrompt, page.ImagePrompt, page.ModelID = input.ComicPrompt, input.ImagePrompt, input.ModelID
-	page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt = input.AspectRatio, input.Status, input.SnapshotHash, input.ReferenceImageURLs, now
+	page.AspectRatio, page.Status, page.GenerationError, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt = input.AspectRatio, input.Status, input.GenerationError, input.SnapshotHash, input.ReferenceImageURLs, now
 	return page, nil
 }
 
@@ -166,7 +166,7 @@ func (s *MySQLStore) patchComicPageOnce(ctx context.Context, owner, batchID, boo
 		existing  UpsertComicPageInput
 		refsJSON  []byte
 	)
-	err = tx.QueryRowContext(ctx, `SELECT id,revision,created_at,comic_prompt,image_prompt,COALESCE(model_id,''),aspect_ratio,status,COALESCE(snapshot_hash,''),COALESCE(reference_image_urls,JSON_ARRAY()) FROM batch_factory_v12_comic_pages WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? FOR UPDATE`, owner, batchID, bookID, videoID).Scan(&pageID, &revision, &createdAt, &existing.ComicPrompt, &existing.ImagePrompt, &existing.ModelID, &existing.AspectRatio, &existing.Status, &existing.SnapshotHash, &refsJSON)
+	err = tx.QueryRowContext(ctx, `SELECT id,revision,created_at,comic_prompt,image_prompt,COALESCE(model_id,''),aspect_ratio,status,COALESCE(last_error,''),COALESCE(snapshot_hash,''),COALESCE(reference_image_urls,JSON_ARRAY()) FROM batch_factory_v12_comic_pages WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? FOR UPDATE`, owner, batchID, bookID, videoID).Scan(&pageID, &revision, &createdAt, &existing.ComicPrompt, &existing.ImagePrompt, &existing.ModelID, &existing.AspectRatio, &existing.Status, &existing.GenerationError, &existing.SnapshotHash, &refsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		merged, mergeErr := applyComicPagePatch(UpsertComicPageInput{}, patch)
 		if mergeErr != nil {
@@ -177,7 +177,7 @@ func (s *MySQLStore) patchComicPageOnce(ctx context.Context, owner, batchID, boo
 			return ComicPage{}, err
 		}
 		revision, createdAt = 1, now
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_pages(id,owner_username,batch_id,book_id,video_id,comic_prompt,image_prompt,model_id,aspect_ratio,status,snapshot_hash,reference_image_urls,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, pageID, owner, batchID, bookID, videoID, merged.ComicPrompt, merged.ImagePrompt, nullableString(merged.ModelID), merged.AspectRatio, merged.Status, nullableString(merged.SnapshotHash), comicReferenceURLsJSON(merged.ReferenceImageURLs), now, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_pages(id,owner_username,batch_id,book_id,video_id,comic_prompt,image_prompt,model_id,aspect_ratio,status,last_error,snapshot_hash,reference_image_urls,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, pageID, owner, batchID, bookID, videoID, merged.ComicPrompt, merged.ImagePrompt, nullableString(merged.ModelID), merged.AspectRatio, merged.Status, nullableString(merged.GenerationError), nullableString(merged.SnapshotHash), comicReferenceURLsJSON(merged.ReferenceImageURLs), now, now); err != nil {
 			return ComicPage{}, err
 		}
 		if err := tx.Commit(); err != nil {
@@ -194,7 +194,7 @@ func (s *MySQLStore) patchComicPageOnce(ctx context.Context, owner, batchID, boo
 		return ComicPage{}, err
 	}
 	revision++
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET comic_prompt=?,image_prompt=?,model_id=?,aspect_ratio=?,status=?,snapshot_hash=?,reference_image_urls=?,revision=?,updated_at=? WHERE id=? AND owner_username=?`, merged.ComicPrompt, merged.ImagePrompt, nullableString(merged.ModelID), merged.AspectRatio, merged.Status, nullableString(merged.SnapshotHash), comicReferenceURLsJSON(merged.ReferenceImageURLs), revision, now, pageID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET comic_prompt=?,image_prompt=?,model_id=?,aspect_ratio=?,status=?,last_error=?,snapshot_hash=?,reference_image_urls=?,revision=?,updated_at=? WHERE id=? AND owner_username=?`, merged.ComicPrompt, merged.ImagePrompt, nullableString(merged.ModelID), merged.AspectRatio, merged.Status, nullableString(merged.GenerationError), nullableString(merged.SnapshotHash), comicReferenceURLsJSON(merged.ReferenceImageURLs), revision, now, pageID, owner); err != nil {
 		return ComicPage{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -207,7 +207,7 @@ func comicPageFromUpsertInput(pageID string, revision int64, createdAt, updatedA
 	return ComicPage{
 		ID: pageID, BatchID: batchID, BookID: bookID, VideoID: videoID,
 		ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID,
-		AspectRatio: input.AspectRatio, Status: input.Status, SnapshotHash: input.SnapshotHash,
+		AspectRatio: input.AspectRatio, Status: input.Status, GenerationError: input.GenerationError, SnapshotHash: input.SnapshotHash,
 		ReferenceImageURLs: input.ReferenceImageURLs, Revision: revision, CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}
 }
@@ -221,6 +221,42 @@ func (s *MySQLStore) ListComicPages(ctx context.Context, owner, batchID, bookID 
 // ListComicPages and receive the complete page payload.
 func (s *MySQLStore) ListComicPagesLite(ctx context.Context, owner, batchID, bookID string) ([]ComicPage, error) {
 	return s.listComicPages(ctx, owner, batchID, bookID, true)
+}
+
+// ListStaleGeneratingComicPages 只返回停在 generating 且 updated_at 早于
+// before 的页，供启动/每分钟回收任务使用。limit 防止一次扫出过多。
+func (s *MySQLStore) ListStaleGeneratingComicPages(ctx context.Context, before time.Time, limit int) ([]StaleComicPage, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT owner_username,batch_id,book_id,video_id,revision,updated_at FROM batch_factory_v12_comic_pages WHERE status='generating' AND updated_at < ? ORDER BY updated_at LIMIT ?`, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	pages := make([]StaleComicPage, 0, limit)
+	for rows.Next() {
+		var page StaleComicPage
+		if err := rows.Scan(&page.Owner, &page.BatchID, &page.BookID, &page.VideoID, &page.Revision, &page.UpdatedAt); err != nil {
+			return nil, err
+		}
+		pages = append(pages, page)
+	}
+	return pages, rows.Err()
+}
+
+// ExpireStaleGeneratingComicPage 用 revision 做乐观锁：扫描之后如果该页刚被
+// 重新认领、或已经不再是 generating，条件不成立，不会误伤正在跑的页。
+func (s *MySQLStore) ExpireStaleGeneratingComicPage(ctx context.Context, page StaleComicPage, before time.Time) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET status='generation_failed',last_error='漫画页生成超时，请重试',revision=revision+1,updated_at=? WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? AND revision=? AND status='generating' AND updated_at < ?`, time.Now().UTC(), page.Owner, page.BatchID, page.BookID, page.VideoID, page.Revision, before)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected == 1, nil
 }
 
 // GetComicPageImage is the thumbnail/content hot path. Looking up one image
@@ -246,9 +282,9 @@ func (s *MySQLStore) listComicPages(ctx context.Context, owner, batchID, bookID 
 	if err := ensureBookOwnership(ctx, s.db, owner, batchID, bookID); err != nil {
 		return nil, err
 	}
-	query := `SELECT p.id,p.video_id,p.comic_prompt,p.image_prompt,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.snapshot_hash,''),COALESCE(p.reference_image_urls,JSON_ARRAY()),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`
+	query := `SELECT p.id,p.video_id,p.comic_prompt,p.image_prompt,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.last_error,''),COALESCE(p.snapshot_hash,''),COALESCE(p.reference_image_urls,JSON_ARRAY()),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`
 	if lite {
-		query = `SELECT p.id,p.video_id,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.snapshot_hash,''),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`
+		query = `SELECT p.id,p.video_id,COALESCE(p.model_id,''),p.aspect_ratio,p.status,COALESCE(p.last_error,''),COALESCE(p.snapshot_hash,''),p.revision,p.created_at,p.updated_at FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_videos v ON v.id=p.video_id WHERE p.owner_username=? AND p.batch_id=? AND p.book_id=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`
 	}
 	rows, err := s.db.QueryContext(ctx, query, owner, batchID, bookID)
 	if err != nil {
@@ -260,12 +296,12 @@ func (s *MySQLStore) listComicPages(ctx context.Context, owner, batchID, bookID 
 		var page ComicPage
 		page.BatchID, page.BookID = batchID, bookID
 		if lite {
-			if err := rows.Scan(&page.ID, &page.VideoID, &page.ModelID, &page.AspectRatio, &page.Status, &page.SnapshotHash, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
+			if err := rows.Scan(&page.ID, &page.VideoID, &page.ModelID, &page.AspectRatio, &page.Status, &page.GenerationError, &page.SnapshotHash, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
 				return nil, err
 			}
 		} else {
 			var referencesJSON []byte
-			if err := rows.Scan(&page.ID, &page.VideoID, &page.ComicPrompt, &page.ImagePrompt, &page.ModelID, &page.AspectRatio, &page.Status, &page.SnapshotHash, &referencesJSON, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
+			if err := rows.Scan(&page.ID, &page.VideoID, &page.ComicPrompt, &page.ImagePrompt, &page.ModelID, &page.AspectRatio, &page.Status, &page.GenerationError, &page.SnapshotHash, &referencesJSON, &page.Revision, &page.CreatedAt, &page.UpdatedAt); err != nil {
 				return nil, err
 			}
 			_ = json.Unmarshal(referencesJSON, &page.ReferenceImageURLs)
@@ -447,7 +483,7 @@ func (s *MySQLStore) createComicPageImageOnce(ctx context.Context, owner, batchI
 	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_page_images(id,owner_username,comic_page_id,url,storage_ref,media_type,source,is_primary,revision,created_at) VALUES(?,?,?,?,?,?,?,?,1,?)`, image.ID, owner, pageID, nullableString(image.URL), nullableString(image.StorageRef), image.MediaType, image.Source, image.IsPrimary, now); err != nil {
 		return ComicPageImage{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET status='image_ready',revision=revision+1,updated_at=? WHERE id=? AND owner_username=?`, now, pageID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET status='image_ready',last_error=NULL,revision=revision+1,updated_at=? WHERE id=? AND owner_username=?`, now, pageID, owner); err != nil {
 		return ComicPageImage{}, err
 	}
 	if err := tx.Commit(); err != nil {

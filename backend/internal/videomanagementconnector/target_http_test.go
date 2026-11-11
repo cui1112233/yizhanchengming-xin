@@ -139,6 +139,27 @@ func TestTargetHTTPServiceCheckSessionAcceptsRealStylePage(t *testing.T) {
 	}
 }
 
+func TestTargetHTTPServiceUploadVideoClassifiesExpiredSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tttadmin/api/music_put_url.php" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":false,"message":"未登录"}`))
+	}))
+	defer server.Close()
+
+	service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+	_, err := service.UploadVideo(context.Background(), Session{Cookie: "PHPSESSID=stale"}, "head.mp4", []byte("video"))
+	if !errors.Is(err, ErrSessionExpired) {
+		t.Fatalf("UploadVideo() error = %v, want ErrSessionExpired", err)
+	}
+	if !strings.Contains(err.Error(), "视频后台登录已失效") {
+		t.Fatalf("UploadVideo() error = %q, want a clear Chinese login-expired message", err)
+	}
+}
+
 func TestTargetHTTPServiceRejectsInvalidTargetURL(t *testing.T) {
 	service := &TargetHTTPService{BaseURL: "://invalid"}
 	_, err := service.Login(context.Background(), LoginInput{Username: "u", Password: "p"})

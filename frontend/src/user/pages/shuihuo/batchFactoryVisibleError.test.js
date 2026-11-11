@@ -7,6 +7,11 @@ test('maps upstream 401 to an API key check message', () => {
   assert.equal(message, '视频模型的 API Key 无效或无权限，请到「API 配置」检查或重建密钥。');
 });
 
+test('keeps text-model authentication failures out of the video-model message', () => {
+  const message = batchFactoryVisibleError('漫画原文分页与提示词提取失败：文本模型请求失败：HTTP 401 Invalid token');
+  assert.equal(message, '文本模型的 API Key 无效或无权限，请检查当前选中的文本模型。');
+});
+
 test('maps upstream 429 to a rate limit message', () => {
   const message = batchFactoryVisibleError('YFAI Seedance returned HTTP 429（接口限流，请 7 秒后重试）');
   assert.equal(message, '视频模型接口限流，请稍后再试；系统会按上游 Retry-After 自动退避。');

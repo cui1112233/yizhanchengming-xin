@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -48,12 +47,18 @@ func referenceAssetTimeout(value any) int {
 	return parsed
 }
 
-func referenceAssetImageSettingsPath(store *UserConfigStore, username string) string {
-	return filepath.Join(store.BaseDir, username, "reference-assets", "image-settings.json")
+func referenceAssetImageSettingsPath(store *UserConfigStore, username string) (string, error) {
+	if store == nil || strings.TrimSpace(store.BaseDir) == "" {
+		return "", fmt.Errorf("用户配置存储未配置")
+	}
+	return UserScopedPath(store.BaseDir, username, "reference-assets", "image-settings.json")
 }
 
-func legacyReferenceAssetImageSettingsPath(store *UserConfigStore, username string) string {
-	return filepath.Join(store.BaseDir, username, "novel-panel", "image-settings.json")
+func legacyReferenceAssetImageSettingsPath(store *UserConfigStore, username string) (string, error) {
+	if store == nil || strings.TrimSpace(store.BaseDir) == "" {
+		return "", fmt.Errorf("用户配置存储未配置")
+	}
+	return UserScopedPath(store.BaseDir, username, "novel-panel", "image-settings.json")
 }
 
 func readReferenceAssetImageSettings(store *UserConfigStore, username string) map[string]any {
@@ -61,9 +66,17 @@ func readReferenceAssetImageSettings(store *UserConfigStore, username string) ma
 	if store == nil || strings.TrimSpace(store.BaseDir) == "" {
 		return result
 	}
-	raw, err := os.ReadFile(referenceAssetImageSettingsPath(store, username))
+	path, err := referenceAssetImageSettingsPath(store, username)
+	if err != nil {
+		return result
+	}
+	raw, err := os.ReadFile(path)
 	if err != nil && os.IsNotExist(err) {
-		raw, err = os.ReadFile(legacyReferenceAssetImageSettingsPath(store, username))
+		legacyPath, legacyErr := legacyReferenceAssetImageSettingsPath(store, username)
+		if legacyErr != nil {
+			return result
+		}
+		raw, err = os.ReadFile(legacyPath)
 	}
 	if err == nil {
 		var saved map[string]any
@@ -89,6 +102,12 @@ func readReferenceAssetImageSettingsWithCatalog(ctx context.Context, store *User
 func readReferenceAssetImageSettingsForModel(ctx context.Context, store *UserConfigStore, username string, catalogStore novelfetchworkshop.Store, selectedModelID string) map[string]any {
 	result := readReferenceAssetImageSettings(store, username)
 	selectedModelID = strings.TrimSpace(selectedModelID)
+	if target, matched, err := integrationChannelTargetFor(ctx, store, username, selectedModelID); matched {
+		if err == nil && target.Kind == "image" {
+			result["base_url"], result["model"], result["api_key"] = target.BaseURL, target.ModelID, target.Credential
+			return result
+		}
+	}
 	if selectedModelID == "" && strings.TrimSpace(fmt.Sprint(result["base_url"])) != "" && strings.TrimSpace(fmt.Sprint(result["model"])) != "" && strings.TrimSpace(fmt.Sprint(result["api_key"])) != "" {
 		return result
 	}

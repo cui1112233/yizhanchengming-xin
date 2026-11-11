@@ -2,6 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -18,15 +23,20 @@ import (
 )
 
 type recording121Connector struct {
-	uploadNames []string
-	submissions []videomanagementconnector.SubmissionInput
-	readbacks   int
-	readbackErr error
-	readbackRaw map[string]any
+	uploadNames    []string
+	uploadCookies  []string
+	uploadFailures int
+	loginInputs    []videomanagementconnector.LoginInput
+	loginSession   videomanagementconnector.Session
+	submissions    []videomanagementconnector.SubmissionInput
+	readbacks      int
+	readbackErr    error
+	readbackRaw    map[string]any
 }
 
-func (c *recording121Connector) Login(context.Context, videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
-	return videomanagementconnector.Session{}, nil
+func (c *recording121Connector) Login(_ context.Context, input videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
+	c.loginInputs = append(c.loginInputs, input)
+	return c.loginSession, nil
 }
 
 func (c *recording121Connector) CheckSession(context.Context, videomanagementconnector.Session) error {
@@ -37,8 +47,13 @@ func (c *recording121Connector) RefreshCatalogs(context.Context, videomanagement
 	return videomanagementconnector.Catalogs{}, nil
 }
 
-func (c *recording121Connector) UploadVideo(_ context.Context, _ videomanagementconnector.Session, filename string, _ []byte) (string, error) {
+func (c *recording121Connector) UploadVideo(_ context.Context, session videomanagementconnector.Session, filename string, _ []byte) (string, error) {
 	c.uploadNames = append(c.uploadNames, filename)
+	c.uploadCookies = append(c.uploadCookies, session.Cookie)
+	if c.uploadFailures > 0 {
+		c.uploadFailures--
+		return "", videomanagementconnector.ErrSessionExpired
+	}
 	raw, _ := json.Marshal(map[string]any{"name": filename, "url": "https://video.test/" + filename})
 	return string(raw), nil
 }
@@ -204,6 +219,77 @@ func TestBatchFactory121PublisherUploadsAllOpeningsInOneSubmission(t *testing.T)
 	entry, ok := history[0].(map[string]any)
 	if !ok || entry["videoCount"] != 4 {
 		t.Fatalf("history entry = %#v, want videoCount 4", history[0])
+	}
+}
+
+func TestBatchFactory121PublisherRelogsInOnceWhenUploadSessionExpires(t *testing.T) {
+	publisher, connector, _, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	const secret = "test-credential-secret"
+	writeEncrypted121CredentialForTest(t, publisher.UsersDir, "alice", secret, map[string]string{
+		"targetUsername": "operator",
+		"password":       "secret-password",
+		"baseUrl":        "https://two.121w.com/tttadmin",
+	})
+	publisher.CredentialSecret = secret
+	connector.uploadFailures = 1
+	connector.loginSession = videomanagementconnector.Session{Cookie: "PHPSESSID=fresh", TargetUsername: "operator"}
+
+	if _, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1"}); err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if len(connector.loginInputs) != 1 {
+		t.Fatalf("login calls = %d, want exactly one automatic relogin", len(connector.loginInputs))
+	}
+	if connector.loginInputs[0].Username != "operator" || connector.loginInputs[0].Password != "secret-password" {
+		t.Fatalf("automatic relogin used the wrong saved credential")
+	}
+	if got := connector.uploadCookies; len(got) < 2 || got[0] != "session=ok" || got[1] != "PHPSESSID=fresh" {
+		t.Fatalf("upload cookies = %v, want stale attempt followed by fresh session", got)
+	}
+	saved := readUploadTargetSession(publisher.UsersDir, "alice")
+	if saved["cookie"] != "PHPSESSID=fresh" {
+		t.Fatalf("saved upload session cookie = %#v, want refreshed session", saved["cookie"])
+	}
+}
+
+func writeEncrypted121CredentialForTest(t *testing.T, usersDir, owner, secret string, value map[string]string) {
+	t.Helper()
+	key := sha256.Sum256([]byte(secret))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iv := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(iv); err != nil {
+		t.Fatal(err)
+	}
+	plain, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed := gcm.Seal(nil, iv, plain, nil)
+	tagSize := gcm.Overhead()
+	record := map[string]any{
+		"version":    1,
+		"algorithm":  "aes-256-gcm",
+		"iv":         base64.StdEncoding.EncodeToString(iv),
+		"tag":        base64.StdEncoding.EncodeToString(sealed[len(sealed)-tagSize:]),
+		"ciphertext": base64.StdEncoding.EncodeToString(sealed[:len(sealed)-tagSize]),
+	}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := filepath.Join(usersDir, owner, "novel-fetch-workshop")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "121-credentials.json"), raw, 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -501,6 +587,20 @@ func TestPublishOrganizationFallsBackToWebsiteProfile(t *testing.T) {
 	}
 	if got := publishOrganization(map[string]any{}, settings); got != "1" {
 		t.Fatalf("publishOrganization() = %q, want profile-derived 1", got)
+	}
+}
+
+func TestSelectedPublishProfileFallsBackToNameWhenStoredIDIsStale(t *testing.T) {
+	publish := map[string]any{
+		"websiteProfileId": "121-420",
+		"versionProfile":   "8个解压",
+		"websiteProfiles": []any{
+			map[string]any{"id": "121-1", "config_id": "1", "name": "8个解压", "organization": "1"},
+		},
+	}
+	profile := selectedPublishProfile(publish)
+	if profile == nil || profile["id"] != "121-1" {
+		t.Fatalf("selected profile = %#v, want the same named current profile", profile)
 	}
 }
 

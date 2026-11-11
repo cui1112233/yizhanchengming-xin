@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 // HTTPPluginClient talks to an independently deployed giant-material plugin.
@@ -23,7 +25,7 @@ type HTTPPluginClient struct {
 
 func NewHTTPPluginClient(httpClient *http.Client, baseURL, token string) *HTTPPluginClient {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 20 * time.Second}
+		httpClient = safehttp.NewClientWithTimeout(20 * time.Second)
 	}
 	return &HTTPPluginClient{HTTPClient: httpClient, BaseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"), Token: strings.TrimSpace(token)}
 }

@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const DefaultWorkspaceURL = "https://www.doubao.com/chat/create-image"
@@ -187,7 +189,7 @@ func (a *Adapter) Download(ctx context.Context, completion Completion, output st
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := safehttp.NewClientWithTimeout(30 * time.Minute).Do(req)
 	if err != nil {
 		return err
 	}
@@ -357,7 +359,7 @@ func downloadReference(ctx context.Context, value string, index int) (string, er
 		if err != nil {
 			return cleanup(err)
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := safehttp.NewClientWithTimeout(30 * time.Minute).Do(req)
 		if err != nil {
 			return cleanup(err)
 		}

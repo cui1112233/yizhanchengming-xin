@@ -676,6 +676,94 @@ func TestBookStageUsesSelectedTextModelProvider(t *testing.T) {
 	}
 }
 
+func TestComicBootstrapUsesSelectedTextModelProvider(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{
+		"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"presetId": "batch-comic-assets", "body": "提取漫画资产"},
+	}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode":     rawSetting(t, "comic"),
+			"aiPromptConfig":     comicConfig,
+			"textModelId":        rawSetting(t, "model-selected"),
+			"assetImagesEnabled": rawSetting(t, false),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defaultProvider := &queuedDirectorProvider{}
+	selectedProvider := &queuedDirectorProvider{values: []string{
+		`{"boundaryIds":["b1"]}`,
+		`{"screen_prompt":"单页漫画导演说明","image_prompt":"单页漫画图片提示词","roles":[],"scene_presets":[]}`,
+	}}
+	var resolvedOwner, resolvedModel string
+	service := &BookStageService{
+		Store:    store,
+		Director: &DirectorService{Store: store, Provider: defaultProvider},
+		TextProviderResolver: func(_ context.Context, owner, modelID string) (DirectorProvider, error) {
+			resolvedOwner, resolvedModel = owner, modelID
+			return selectedProvider, nil
+		},
+	}
+
+	if _, err := service.RunComicBootstrap(ctx, "alice", batch.ID, batch.Books[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if resolvedOwner != "alice" || resolvedModel != "model-selected" {
+		t.Fatalf("resolver got owner=%q model=%q, want alice/model-selected", resolvedOwner, resolvedModel)
+	}
+	if len(defaultProvider.calls) != 0 {
+		t.Fatalf("comic bootstrap used the account default provider %d times", len(defaultProvider.calls))
+	}
+	if len(selectedProvider.calls) != 2 {
+		t.Fatalf("selected provider calls=%d, want segmentation and prompt calls", len(selectedProvider.calls))
+	}
+}
+
+func TestTextDrivenStageRequiresExplicitModelWhenCatalogResolverIsEnabled(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{
+		"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"body": "提取漫画资产"},
+	}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode": rawSetting(t, "comic"),
+			"aiPromptConfig": comicConfig,
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defaultProvider := &queuedDirectorProvider{values: []string{`{"characters":[],"scenes":[],"props":[]}`}}
+	service := &BookStageService{
+		Store:    store,
+		Director: &DirectorService{Store: store, Provider: defaultProvider},
+		TextProviderResolver: func(context.Context, string, string) (DirectorProvider, error) {
+			t.Fatal("没有选择文本模型时不应调用任何模型解析器")
+			return nil, nil
+		},
+	}
+
+	_, err = service.Run(ctx, "alice", batch.ID, batch.Books[0].ID, BookStageAssets, StageModeMissing, "assets-no-model", "")
+	if !errors.Is(err, ErrConfigRequired) || !strings.Contains(err.Error(), "选择文本模型") {
+		t.Fatalf("没有选择文本模型应明确停止，实际错误=%v", err)
+	}
+	if len(defaultProvider.calls) != 0 {
+		t.Fatalf("没有选择文本模型时仍调用了历史默认模型 %d 次", len(defaultProvider.calls))
+	}
+}
+
 func TestBookStageFailsExplicitlyWhenSelectedTextModelIsUnavailable(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

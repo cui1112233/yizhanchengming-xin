@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -296,6 +298,7 @@ func stripProductionErrorPrefixes(message string) string {
 	prefixes := []string{
 		ErrConflict.Error() + ": ",
 		ErrConflict.Error() + ":",
+		ErrDirectorRevisionRequired.Error() + ": ",
 		ErrUnavailable.Error() + ": ",
 		ErrConfigRequired.Error() + ": ",
 		ErrInvalid.Error() + ": ",
@@ -314,6 +317,87 @@ func stripProductionErrorPrefixes(message string) string {
 			return message
 		}
 	}
+}
+
+// legacyImageProviderStatusPattern 匹配旧记录里 “image provider returned HTTP 400:”
+// 这类英文状态码直译，替换成中文结论并把状态码放回括号里。
+var legacyImageProviderStatusPattern = regexp.MustCompile(`image provider returned HTTP (\d{3}):?\s*`)
+
+// legacyDirectorHTTPPattern 匹配旧记录里文本模型的英文参数直译：
+// “漫画页提示词 1/1 张失败: 文本模型请求失败（参数或请求格式不合法，HTTP 400,
+// model=…): {json}”。括号里是状态码/模型名，括号后是上游原始响应。
+var (
+	legacyDirectorHTTPPattern   = regexp.MustCompile(`文本模型请求失败[（(]([^）)\n]*)[）)]\s*[:：]?\s*([\s\S]+)`)
+	legacyDirectorStatusPattern = regexp.MustCompile(`HTTP\s*(\d{3})`)
+	legacyDirectorModelPattern  = regexp.MustCompile(`model=([^\s,，)）]+)`)
+)
+
+// normalizeLegacyDirectorHTTPMessage 把旧记录里的文本模型错误改写成
+// “中文结论 + 上游原文”两段，历史任务不必重跑也能正确展示。
+func normalizeLegacyDirectorHTTPMessage(message string) string {
+	match := legacyDirectorHTTPPattern.FindStringSubmatchIndex(message)
+	if match == nil {
+		return message
+	}
+	detail := message[match[2]:match[3]]
+	body := strings.TrimSpace(message[match[4]:match[5]])
+	statusMatch := legacyDirectorStatusPattern.FindStringSubmatch(detail)
+	if statusMatch == nil {
+		return message
+	}
+	status, err := strconv.Atoi(statusMatch[1])
+	if err != nil {
+		return message
+	}
+	prefix := strings.Trim(strings.TrimSpace(message[:match[0]]), "：: ")
+	headline := directorHTTPFailureHeadline(status, body)
+	if prefix != "" {
+		headline = prefix + "：" + headline
+	}
+	raw := "HTTP " + statusMatch[1]
+	if model := legacyDirectorModelPattern.FindStringSubmatch(detail); model != nil {
+		raw += " · model=" + model[1]
+	}
+	if body = directorHTTPBodySnippet([]byte(body), 400); body != "" {
+		raw += " · " + body
+	}
+	return headline + "\n上游原文：" + raw
+}
+
+// UserFacingErrorText 供接口层/页账本复用：去掉内部英文哨兵前缀，只留业务原因。
+func UserFacingErrorText(message string) string {
+	message = stripProductionErrorPrefixes(strings.TrimSpace(message))
+	// 历史记录里哨兵可能出现在句子中间（例如“漫画页提示词 4/29 张失败:
+	// invalid input: ...”），这里一并清掉，避免旧数据继续把英文顶给用户。
+	for _, prefix := range []string{
+		ErrInvalid.Error() + ": ",
+		ErrUpstream.Error() + ": ",
+		ErrConflict.Error() + ": ",
+		ErrUnavailable.Error() + ": ",
+		ErrNotFound.Error() + ": ",
+		ErrConfigRequired.Error() + ": ",
+	} {
+		message = strings.ReplaceAll(message, prefix, "")
+	}
+	message = legacyImageProviderStatusPattern.ReplaceAllString(message, "图片通道拒绝了本次请求（HTTP $1）：")
+	message = normalizeLegacyDirectorHTTPMessage(message)
+	// 只剩裸哨兵时没有业务原因可展示，回退到可执行的中文文案，不能再把
+	// "invalid input" / "temporary upstream failure" 直接交给界面。
+	switch message {
+	case ErrInvalid.Error():
+		return "请求参数无效，请检查后重试"
+	case ErrUpstream.Error():
+		return "上游服务暂时不可用，请稍后重试"
+	case ErrConflict.Error():
+		return "数据版本冲突，请重试"
+	case ErrUnavailable.Error():
+		return "当前能力暂不可用，请检查相关配置后重试"
+	case ErrNotFound.Error():
+		return "目标数据不存在，请刷新列表后重试"
+	case ErrConfigRequired.Error():
+		return "请先在设置中完成所需配置后重试"
+	}
+	return message
 }
 
 func normalizeProductionState(value ProductionState) ProductionState {
@@ -423,7 +507,7 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		return ProductionJob{}, fmt.Errorf("%w: frozen video model is required", ErrInvalid)
 	}
 	if book.DirectorRevision == nil || book.DirectorRevision.ID == "" {
-		return ProductionJob{}, fmt.Errorf("%w: active Director revision is required", ErrConflict)
+		return ProductionJob{}, fmt.Errorf("%w: %s", ErrDirectorRevisionRequired, DirectorRevisionRequiredMessage)
 	}
 	if len(book.Videos) == 0 {
 		return ProductionJob{}, fmt.Errorf("%w: no active VIDEOs to produce", ErrConflict)
@@ -824,7 +908,7 @@ func (s *ProductionService) RegisterUploadedVideo(ctx context.Context, owner, ba
 		return ProductionTask{}, err
 	}
 	if book.DirectorRevision == nil || strings.TrimSpace(book.DirectorRevision.ID) == "" {
-		return ProductionTask{}, fmt.Errorf("%w: active Director revision is required", ErrConflict)
+		return ProductionTask{}, fmt.Errorf("%w: %s", ErrDirectorRevisionRequired, DirectorRevisionRequiredMessage)
 	}
 	var video Video
 	found := false

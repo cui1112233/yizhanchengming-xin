@@ -15,11 +15,16 @@ test('classifies timeout, configuration, upstream, and unknown pet request failu
   assert.deepEqual(classifyPetRequestError({ status: 504, message: '上游模型请求超时，请稍后重试' }), {
     message: '连接模型超时，当前剧本已保留。', action: 'retry'
   });
+  // 401/403 是会话失效，即使响应体里带 key 字样也不能说成模型配置问题。
   assert.deepEqual(classifyPetRequestError({ status: 401, message: 'API key invalid' }), {
-    message: '模型配置无法使用，请检查接口、模型名或密钥。', action: 'settings'
+    message: '登录已过期，请重新登录后再试。', action: 'login'
   });
-  assert.deepEqual(classifyPetRequestError({ status: 422, message: 'Base URL is required' }), {
-    message: '模型配置无法使用，请检查接口、模型名或密钥。', action: 'settings'
+  assert.deepEqual(classifyPetRequestError({ status: 403, message: 'API key invalid' }), {
+    message: '登录已过期，请重新登录后再试。', action: 'login'
+  });
+  // 422 直接展示后端业务校验文案，不再统一翻译成模型配置。
+  assert.deepEqual(classifyPetRequestError({ status: 422, message: '第三场缺少出场人物' }), {
+    message: '第三场缺少出场人物', action: 'retry'
   });
   assert.deepEqual(classifyPetRequestError(new Error('Model is required')), {
     message: '模型配置无法使用，请检查接口、模型名或密钥。', action: 'settings'

@@ -1,0 +1,111 @@
+u请按**短剧生成批次流程**严格分步执行；每步完成后简要汇报进度、产出路径与下一步。
+
+任一步失败则停止并说明原因，不要跳步。
+
+
+
+## 准备
+
+若工作区尚无整理好的原文，先将 `input/` 下小说整理到 `.luoshui/context/novel.md`（可用 `ingest_novel_to_context`）。
+
+
+
+## 1. 生成完整剧本
+
+- Skill：`luoshui-novel-screenplay-v1`（CM·网文转漫剧剧本 B档）
+
+- 根据原文生成完整剧本，写入 `screenplay.db` 与 `context/screenplay.md`
+
+- 执行前 `skill_view` 读取该 Skill 工作流；生产步骤用 `run_skill`
+
+
+
+## 2. 剧本审核
+
+- Skill：`luoshui-screenplay-doctor-v1`（CM·剧本医生），`skill_view` 后 **mode=review**
+
+- 读 `references/doctor-core.md` 与 `references/review-output-schema.md`
+
+- 对照原文与剧本；写 `screenplay_doctor_report.md` + `.luoshui/batch/reviews/screenplay_review.json`
+
+- `pass: false` 且 `block_next_step: true` 时停止，等待用户；用户要求改稿时用 **mode=rewrite**
+
+
+
+## 3. 人物 / 场景 / 道具提取
+
+- 根据**小说 + 剧本原文**提取（人物、场景、道具名称须与剧本一致）
+
+- Skills（依次，先 `skill_view`，生产用 `run_skill`）：
+
+  - `luoshui-character-parse-v1` → `character_parse_result.json`
+
+  - `luoshui-scene-parse-v1` → `scene_parse_result.json`
+
+  - `luoshui-prop-parse-v1` → `prop_parse_result.json`
+
+- 汇总写入 `character_tags.json`（如 Skill 要求）
+
+
+
+## 4. 预设质检
+
+- Skill：`luoshui-preset-doctor-v1`（CM·预设医生），`skill_view` 后 **mode=review**
+
+- 检查人物/场景/道具是否与剧本一致、是否缺失
+
+- 写 `preset_doctor_report.md` + `.luoshui/batch/reviews/preset_review.json`
+
+- 有问题可用 **mode=rewrite** 修补 JSON 或 `run_skill` 重跑提取
+
+
+
+## 5. 按集生成分镜词
+
+- Skill：`luoshui-storyboard-prompt-v1`（CM·小云雀分镜词 v3）
+
+- **从第 1 集开始，一次只生成一集**，写入 `chapter_{N}_storyboard.json`
+
+- 生产用 `run_skill`；每集完成后再生成下一集
+
+
+
+## 6. 分镜词审核
+
+- Skill：`luoshui-storyboard-doctor-v1`（CM·分镜词医生），`skill_view` 后 **mode=review**
+
+- 读取剧本、资产与各集分镜，**逐集**检查
+
+- 写 `storyboard_doctor_report_ep{N}.md` + `.luoshui/batch/reviews/storyboard_review_ep{N}.json`
+
+- 有问题用 **mode=rewrite** 或 `update_shot_field` 修正后再继续
+
+
+
+## 7. 批量生成视频（CLI Provider）
+
+- 先 `video_batch_detect_providers`（或 `video_provider=auto`）
+- `video_batch_from_storyboard` → `.luoshui/batch/video_batch_plan.json`
+- `video_batch_submit`（建议 `poll_seconds=0`）→ `video_batch_submit.json`
+- `video_batch_poll` 下载到 `assets/video_batch/分镜_XX`
+- 即梦固定可用兼容工具 `dreamina_*`；配置见 `.luoshui/batch/video_config.json`
+- 完整 walkthrough：[`SCREENPLAY_BATCH_GUIDE.md`](./SCREENPLAY_BATCH_GUIDE.md)
+
+
+
+## 8. 收尾：下载、编号与失败重试
+
+- `video_batch_finalize` → `assets/分镜_01.mp4`… + `finalize_report.md`
+
+
+
+## 约束
+
+- **pipeline Skill**（剧本/分镜/提取）→ `run_skill`
+
+- **医生 Skill**（三个 luoshui-*-doctor-v1）→ `skill_view` + 读写工作区；批次审核默认 **review 不改正文**
+
+- rewrite 后更新 `.luoshui/batch/rewrite_manifest.json`（见各医生 `references/rewrite-writeback.md`）
+
+- 不要跳过审核步骤；不要一次生成多集分镜（除非用户明确要求）
+

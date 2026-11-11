@@ -1,5 +1,5 @@
 import { Dropdown } from 'antd';
-import { ChevronDown, Library, ListTodo, PanelsTopLeft, Pencil, Workflow } from 'lucide-react';
+import { Bot, ChevronDown, Library, ListTodo, PanelsTopLeft, Pencil, Workflow } from 'lucide-react';
 import { BrandLogo } from '../../shared/components/BrandLogo';
 
 export function AgentWorkspaceHeader({
@@ -16,7 +16,8 @@ export function AgentWorkspaceHeader({
   onCreateProject,
   onDeleteProject,
   onViewChange,
-  onRetrySync
+  onRetrySync,
+  onOpenProxy
 }) {
   const projectMenu = {
     items: [
@@ -58,6 +59,12 @@ export function AgentWorkspaceHeader({
       </div>
 
       <div className="agent-canvas-toolbar__status">
+        {onOpenProxy ? (
+          <button className="agent-proxy-entry-btn" type="button" onClick={onOpenProxy} title="打开 Agent 代理工作区">
+            <Bot size={13} />
+            <span>Agent 代理</span>
+          </button>
+        ) : null}
         {isRunning ? <span className="agent-canvas-save-status is-running">正在执行…</span> : null}
         {!isRunning && saveStatus === 'error' ? <button className="agent-canvas-save-status is-error" type="button" onClick={onRetrySync}>内容已暂存在本机，重试同步</button> : null}
         <span className="agent-canvas-workspace-counts">{nodeCount} 个节点 · {materialCount} 项素材</span>

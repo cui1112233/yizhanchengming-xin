@@ -5,14 +5,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/safehttp"
 )
 
 // registerConfiguredImageGenerationRoute keeps the legacy Batch Factory
@@ -97,6 +100,16 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 	if credential == "" {
 		return nil, http.StatusServiceUnavailable, withErrorCode(fmt.Errorf("图片模型凭据未配置；%s", setupHintImage), ErrorCodeImageModelNotConfigured)
 	}
+	// 旧批量出图与 Agent 出图此前绕过出图信号量直接打上游，一个用户连续点击
+	// 就能把整机图片并发打满。这里复用漫画出图的同一套进程/任务名额；拿不到
+	// 名额按“队列繁忙”返回，由调用方稍后重试，绝不静默直连。
+	queueCtx, cancelQueue := context.WithTimeout(ctx, shuihuoImageQueueWaitTimeout)
+	releaseImageSlot, slotErr := acquireShuihuoGPTImageGenerationSlot(queueCtx, modelString(model, "modelId"))
+	cancelQueue()
+	if slotErr != nil {
+		return nil, http.StatusServiceUnavailable, withErrorCode(shuihuoImageQueueError(ctx, slotErr), automationCodeImageQueueBusy)
+	}
+	defer releaseImageSlot()
 	payload := map[string]any{"model": modelString(model, "modelId"), "prompt": prompt}
 	if input.Count > 0 {
 		payload["n"] = input.Count
@@ -117,14 +130,28 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+credential)
-	response, err := (&http.Client{Timeout: 120 * time.Second}).Do(request)
+	response, err := safehttp.NewClientWithTimeout(120 * time.Second).Do(request)
 	if err != nil {
-		return nil, http.StatusBadGateway, fmt.Errorf("图片模型请求失败: %v", err)
+		// 传输层错误不能把 “Post ...: dial tcp ...” 直接抛给界面：主文案只给
+		// 中文结论，原始错误放到「上游原文」后面给展开区查看。
+		message := "图片通道网络不可达，请检查网络或代理设置"
+		var netErr net.Error
+		if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
+			message = "图片通道连接超时，请稍后重试"
+		}
+		return nil, http.StatusBadGateway, fmt.Errorf("%s", appendShuihuoUpstreamRaw(message, err.Error()))
 	}
 	defer response.Body.Close()
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
-	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, http.StatusBadGateway, fmt.Errorf("图片模型请求失败（HTTP %d）", response.StatusCode)
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, http.StatusBadGateway, shuihuoImageUpstreamError{
+			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode),
+			Raw:        string(raw),
+			StatusCode: response.StatusCode,
+		}
+	}
+	if readErr != nil {
+		return nil, http.StatusBadGateway, fmt.Errorf("%s", appendShuihuoUpstreamRaw("图片通道响应读取中断，请稍后重试", readErr.Error()))
 	}
 	var decoded struct {
 		Data []struct {

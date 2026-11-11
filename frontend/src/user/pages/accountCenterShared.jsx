@@ -8,7 +8,7 @@ export const ROLE_META = {
 };
 
 export const FEATURE_LABELS = {
-  agent: 'Agent 工作区',
+  agent: 'CM 画布',
   chat: '对话生成',
   script: '私人定制',
   image: '生图工具',

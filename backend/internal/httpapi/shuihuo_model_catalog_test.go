@@ -40,6 +40,55 @@ func TestLoadShuihuoOwnerConfigUsesManagedModelCatalog(t *testing.T) {
 	}
 }
 
+func TestRuntimeModelCatalogStoreUsesResolvedManagerOwner(t *testing.T) {
+	catalogStore := novelfetchworkshop.NewMemoryStore()
+	if err := catalogStore.PutConfig(context.Background(), "manager", map[string]any{
+		"modelCatalog": []any{map[string]any{
+			"id": "manager-image", "kind": "image", "enabled": true,
+			"modelId": "gpt-image-2", "baseUrl": "https://images.example/v1", "credential": "secret",
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := catalogStore.PutConfig(context.Background(), "member", map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+
+	runtimeStore := runtimeModelCatalogStore(catalogStore, func(owner string) string {
+		if owner == "member" {
+			return "manager"
+		}
+		return owner
+	})
+	config, err := runtimeStore.GetConfig(context.Background(), "member")
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := modelCatalog(config)
+	if len(models) != 1 || modelString(models[0], "id") != "manager-image" {
+		t.Fatalf("member runtime should use manager catalog, got %#v", models)
+	}
+}
+
+func TestRuntimeTextProviderResolverUsesResolvedManagerOwner(t *testing.T) {
+	resolvedOwner := ""
+	resolver := managedTextProviderResolver(func(_ context.Context, owner, _ string) (batchfactoryv11.DirectorProvider, error) {
+		resolvedOwner = owner
+		return nil, nil
+	}, func(owner string) string {
+		if owner == "member" {
+			return "manager"
+		}
+		return owner
+	})
+	if _, err := resolver(context.Background(), "member", "manager-text"); err != nil {
+		t.Fatal(err)
+	}
+	if resolvedOwner != "manager" {
+		t.Fatalf("member text model should resolve through manager, got %q", resolvedOwner)
+	}
+}
+
 func TestLoadShuihuoOwnerConfigMigratesLegacyPersonalImageConfig(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	if err := store.SaveShuihuoConfig(context.Background(), "tester", map[string]any{
@@ -186,5 +235,45 @@ func TestPatchShuihuoModelAcceptsSharedCatalogDisplayName(t *testing.T) {
 	updated, err := patchShuihuoModel(current, map[string]any{"enabled": false})
 	if err != nil || updated["enabled"] != false {
 		t.Fatalf("shared catalog status-only patch should be accepted: %#v, %v", updated, err)
+	}
+}
+
+func TestPatchShuihuoModelUpdatesVoiceCloneConfiguration(t *testing.T) {
+	current := map[string]any{"modelId": "audio-main", "name": "声音克隆", "kind": "audio", "capabilities": map[string]any{}}
+	updated, err := patchShuihuoModel(current, map[string]any{
+		"capabilities":              map[string]any{"supportsVoiceClone": true},
+		"voiceCloneRequestTemplate": `{"body":{"reference":"{{reference_audio_base64}}"}}`,
+		"voiceCloneResponseMapping": `{"resultUrl":"data.url"}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities, _ := updated["capabilities"].(map[string]any)
+	if capabilities["supportsVoiceClone"] != true || modelString(updated, "voiceCloneRequestTemplate") == "" || modelString(updated, "voiceCloneResponseMapping") == "" {
+		t.Fatalf("voice clone patch was dropped: %+v", updated)
+	}
+}
+
+func TestSafeShuihuoModelsKeepsVoiceCloneTemplatesServerSide(t *testing.T) {
+	model := map[string]any{
+		"id": "audio-main", "modelId": "audio-main", "name": "声音克隆", "kind": "audio", "enabled": true,
+		"endpoint": "https://audio.example/clone", "credentialRef": "VOICE_CLONE_KEY", "credential": "secret",
+		"requestTemplate": `{}`, "responseMapping": `{}`,
+		"voiceCloneRequestTemplate": `{"body":{"reference":"{{reference_audio_base64}}"}}`,
+		"voiceCloneResponseMapping": `{"resultUrl":"data.url"}`,
+		"capabilities":              map[string]any{"supportsVoiceClone": true},
+	}
+	public := safeShuihuoModels([]map[string]any{model}, false)[0]
+	for _, key := range []string{"endpoint", "credentialRef", "credential", "requestTemplate", "responseMapping", "voiceCloneRequestTemplate", "voiceCloneResponseMapping"} {
+		if _, exists := public[key]; exists {
+			t.Fatalf("public model leaked %s: %+v", key, public)
+		}
+	}
+	admin := safeShuihuoAdminModels([]map[string]any{model})[0]
+	if modelString(admin, "voiceCloneRequestTemplate") == "" || modelString(admin, "endpoint") == "" {
+		t.Fatalf("admin model lost server configuration: %+v", admin)
+	}
+	if _, exists := admin["credential"]; exists {
+		t.Fatalf("admin model leaked credential: %+v", admin)
 	}
 }

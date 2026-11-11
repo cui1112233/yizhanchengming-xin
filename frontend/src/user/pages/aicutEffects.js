@@ -61,6 +61,18 @@ const presets = {
   breathe: { preset: 'breathe', brightness: 0, contrast: 1, saturation: 1, blur: 0, grayscale: false, intensity: .35, speed: 1 },
   flash: { preset: 'flash', brightness: .08, contrast: 1, saturation: 1, blur: 0, grayscale: false, intensity: .45, speed: 1 },
   mosaic: { preset: 'mosaic', brightness: 0, contrast: 1, saturation: 1, blur: 0, grayscale: false, intensity: .5, speed: 1 },
+  'golden-hour': { preset: 'golden-hour', brightness: .08, contrast: 1.08, saturation: 1.22, blur: 0, grayscale: false },
+  noir: { preset: 'noir', brightness: -.03, contrast: 1.35, saturation: 0, blur: 0, grayscale: true },
+  vintage: { preset: 'vintage', brightness: .04, contrast: .92, saturation: .78, blur: 0, grayscale: false },
+  cyberpunk: { preset: 'cyberpunk', brightness: .02, contrast: 1.30, saturation: 1.65, blur: 0, grayscale: false },
+  vaporwave: { preset: 'vaporwave', brightness: .08, contrast: 1.08, saturation: 1.55, blur: 0, grayscale: false },
+  'mint-haze': { preset: 'mint-haze', brightness: .10, contrast: .90, saturation: .92, blur: 0, grayscale: false },
+  'bleach-bypass': { preset: 'bleach-bypass', brightness: -.02, contrast: 1.40, saturation: .55, blur: 0, grayscale: false },
+  'winter-cool': { preset: 'winter-cool', brightness: .02, contrast: 1.12, saturation: .82, blur: 0, grayscale: false },
+  rosy: { preset: 'rosy', brightness: .07, contrast: 1.05, saturation: 1.30, blur: 0, grayscale: false },
+  film: { preset: 'film', brightness: -.01, contrast: 1.18, saturation: .90, blur: 0, grayscale: false },
+  'super-8': { preset: 'super-8', brightness: .03, contrast: 1.24, saturation: 1.12, blur: 0, grayscale: false },
+  'instant-print': { preset: 'instant-print', brightness: .12, contrast: .88, saturation: .86, blur: 0, grayscale: false },
 };
 
 function finite(value, fallback) {

@@ -11,7 +11,7 @@ import {
 } from './imageAspectRatios.js';
 
 test('image aspect ratio list keeps the legacy values and adds four new ratios', () => {
-  assert.deepEqual(IMAGE_ASPECT_RATIOS, ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3']);
+  assert.deepEqual(IMAGE_ASPECT_RATIOS, ['16:9', '9:16', '21:9', '1:1', '4:3', '3:4', '3:2', '2:3']);
   for (const legacy of ['16:9', '9:16', '1:1']) {
     assert.equal(isSupportedImageAspectRatio(legacy), true);
   }
@@ -33,7 +33,7 @@ test('portrait and landscape ratios stay distinct', () => {
     assert.equal(isPortraitImageAspectRatio(ratio), true);
     assert.equal(imageAspectRatioOrientation(ratio), '竖幅构图');
   }
-  for (const ratio of ['4:3', '3:2', '16:9']) {
+  for (const ratio of ['4:3', '3:2', '16:9', '21:9']) {
     assert.equal(isPortraitImageAspectRatio(ratio), false);
     assert.equal(imageAspectRatioOrientation(ratio), '横幅构图');
   }

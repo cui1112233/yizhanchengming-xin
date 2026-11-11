@@ -98,6 +98,18 @@ if ([string]::IsNullOrWhiteSpace($n8ComicOpenAPIKey)) {
   $env:QIANTIE_N8_COMIC_OPEN_API_KEY = $n8ComicOpenAPIKey
   Write-Output 'N8 comic publishing key loaded.'
 }
+# AI-Upscale 的火山 MediaKit 凭证只进入服务端环境，不落盘、不回显到前端。
+$volcanoMediaKitAPIKey = Read-ReviewValue 'QIANTIE_V88_VOLCANO_MEDIAKIT_API_KEY'
+if ([string]::IsNullOrWhiteSpace($volcanoMediaKitAPIKey)) {
+  $volcanoMediaKitAPIKey = $env:QIANTIE_VOLCANO_MEDIAKIT_API_KEY
+}
+if ([string]::IsNullOrWhiteSpace($volcanoMediaKitAPIKey)) {
+  Remove-Item Env:QIANTIE_VOLCANO_MEDIAKIT_API_KEY -ErrorAction SilentlyContinue
+  Write-Output 'Volcano AI MediaKit upscale is not configured.'
+} else {
+  $env:QIANTIE_VOLCANO_MEDIAKIT_API_KEY = $volcanoMediaKitAPIKey
+  Write-Output 'Volcano AI MediaKit upscale key loaded.'
+}
 # Keep the normal local review runtime read-only for video submission. When
 # the caller explicitly requests it, slice 4 uses the saved account video
 # model configuration (for example MiniMax H3) rather than a launcher key.

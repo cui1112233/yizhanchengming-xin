@@ -1339,3 +1339,25 @@ func TestFinalPromptOpeningVariantFollowsAssetTextSwitch(t *testing.T) {
 		t.Fatalf("text fallback must merge stored asset descriptions:\n%s", disabled.CompiledPrompt)
 	}
 }
+
+func TestCompileWithoutDirectorRevisionReturnsActionableError(t *testing.T) {
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{
+		Title: "无导演分镜",
+		Books: []CreateBookInput{{Title: "书", Videos: []CreateVideoInput{{Label: "v"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, video := batch.Books[0], batch.Books[0].Videos[0]
+	_, err = (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, video.ID)
+	if !errors.Is(err, ErrDirectorRevisionRequired) {
+		t.Fatalf("err=%v, want ErrDirectorRevisionRequired", err)
+	}
+	if errors.Is(err, ErrConflict) {
+		t.Fatalf("missing director revision must not be reported as a revision conflict: %v", err)
+	}
+	if !strings.Contains(err.Error(), DirectorRevisionRequiredMessage) {
+		t.Fatalf("err=%q, want actionable message %q", err.Error(), DirectorRevisionRequiredMessage)
+	}
+}

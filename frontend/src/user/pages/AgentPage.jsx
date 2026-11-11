@@ -161,7 +161,7 @@ export function AgentPage() {
     let cancelled = false;
     const initializationRequestId = ++initializationRequestRef.current;
     const initialTaskRequestId = taskRequestRef.current;
-    dispatchPetContext({ page: 'Agent 工作区' });
+    dispatchPetContext({ page: 'CM 画布' });
     Promise.all([refreshTasks(), loadSkills()])
       .then(([nextTasks]) => {
         if (cancelled
@@ -176,7 +176,7 @@ export function AgentPage() {
       })
       .catch(error => {
         if (!cancelled && initializationRequestRef.current === initializationRequestId) {
-          message.error(error.message || '读取 Agent 工作区失败');
+          message.error(error.message || '读取 CM 画布失败');
         }
       })
       .finally(() => {
@@ -295,7 +295,7 @@ export function AgentPage() {
         taskId: task.id,
         prompt,
         context: {
-          page: 'Agent 工作区',
+          page: 'CM 画布',
           mode: selectedMode,
           expert: selectedExpert,
           attachment: attachedFile ? { name: attachedFile.name, content: attachedFile.content } : undefined

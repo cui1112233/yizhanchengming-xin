@@ -168,7 +168,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
 		options.AutomationCoordinator.SetSourceFetcher(options.NovelFetchFetcher)
 		options.AutomationCoordinator.SetGiantMaterialResolver(options.GiantMaterialResolver)
-		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: runtimeCatalogStore, userConfig: options.UserConfigStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, imageCache: options.ImageGenerationCache, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: runtimeCatalogStore, userConfig: options.UserConfigStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, imageCache: options.ImageGenerationCache, resolveModelOwner: resolveRuntimeModelOwner, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
 			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
 			if provider == nil {
 				return "", batchfactoryv11.ErrUnavailable
@@ -228,7 +228,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerConfiguredImageGenerationRoute(v11, options.Store, runtimeCatalogStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, runtimeCatalogStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
-		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog, runtimeCatalogStore, options.UserConfigStore, func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner, func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
 			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
 			if provider == nil {
 				return "", batchfactoryv11.ErrUnavailable
@@ -279,7 +279,7 @@ func NewRouter(options RouterOptions) http.Handler {
 				return err
 			}
 		}
-		retryComicPages := (comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: runtimeCatalogStore, userConfig: options.UserConfigStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, imageCache: options.ImageGenerationCache, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+		retryComicPages := (comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: runtimeCatalogStore, userConfig: options.UserConfigStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, imageCache: options.ImageGenerationCache, resolveModelOwner: resolveRuntimeModelOwner, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
 			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
 			if provider == nil {
 				return "", batchfactoryv11.ErrUnavailable

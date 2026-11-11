@@ -119,6 +119,9 @@ func AppMigrations() []Migration {
 	out = append(out, GiantMaterialExecutorMigrations()...)
 	out = append(out, AuthMigrations()...)
 	out = append(out, AgentWorkspaceMigrations()...)
+	out = append(out, AICutMigrations()...)
 	out = append(out, AutomationMigrations()...)
+	out = append(out, ScreenplayMigrations()...)
+	out = append(out, NovelCreationMigrations()...)
 	return out
 }

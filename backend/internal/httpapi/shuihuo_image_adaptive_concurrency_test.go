@@ -2,11 +2,11 @@ package httpapi
 
 import "testing"
 
-func TestAdaptiveImageConcurrencyDropsToTwoAfterTransportFailures(t *testing.T) {
+func TestAdaptiveImageConcurrencyStartsAtStableTwo(t *testing.T) {
 	controller := newShuihuoAdaptiveImageConcurrency()
 	host := "images.example.com"
-	if got := controller.limit(host, 4); got != 4 {
-		t.Fatalf("initial limit=%d, want 4", got)
+	if got := controller.limit(host, 4); got != 2 {
+		t.Fatalf("initial limit=%d, want stable limit 2", got)
 	}
 	controller.report(host, 4, "reset")
 	controller.report(host, 4, "body_stalled")
@@ -18,8 +18,6 @@ func TestAdaptiveImageConcurrencyDropsToTwoAfterTransportFailures(t *testing.T) 
 func TestAdaptiveImageConcurrencyRecoversAfterConsecutiveSuccesses(t *testing.T) {
 	controller := newShuihuoAdaptiveImageConcurrency()
 	host := "images.example.com"
-	controller.report(host, 4, "reset")
-	controller.report(host, 4, "reset")
 	for index := 0; index < shuihuoAdaptiveRecoverySuccesses; index++ {
 		controller.report(host, 4, "ok")
 	}

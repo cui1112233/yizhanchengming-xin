@@ -94,6 +94,8 @@ export default function AICutAutoEditDrawer({ open, projectId, revision = 0, ass
     try {
       const enabledOperationIds = enabledIds;
       const result = await applyAICutEditPlan(projectId, plan.id, enabledOperationIds);
+      // 应用成功后立刻锁成已应用，避免同一份草案被重复写入时间线。
+      setPlan(current => (current ? { ...current, state: 'applied' } : current));
       onApplied?.(result);
     } catch (error) {
       const text = error?.message || '剪辑草案应用失败';
@@ -128,7 +130,7 @@ export default function AICutAutoEditDrawer({ open, projectId, revision = 0, ass
       </> : null}
       <Space className="aicut-auto-edit-actions">
         <Button icon={<XCircle size={15} />} disabled={busy === 'applying' || ['applied', 'canceled', 'failed', 'stale'].includes(plan.state)} loading={busy === 'canceling'} onClick={cancelDraft}>取消草案</Button>
-        <Button type="primary" disabled={plan?.state !== 'ready' || !enabledIds.length} loading={busy === 'applying'} onClick={applyDraft}>应用到时间线</Button>
+        <Button type="primary" disabled={plan?.state !== 'ready' || !enabledIds.length} loading={busy === 'applying'} onClick={applyDraft}>{plan?.state === 'applied' ? '已应用到时间线' : '应用到时间线'}</Button>
       </Space>
     </div>}
   </Drawer>;

@@ -180,6 +180,10 @@ func removeMemberAvatars(dir, username string) {
 	if strings.TrimSpace(dir) == "" {
 		return
 	}
+	username, err := SafeUsername(username)
+	if err != nil {
+		return
+	}
 	for _, ext := range []string{"png", "jpg", "webp"} {
 		_ = os.Remove(filepath.Join(dir, username+"."+ext))
 	}

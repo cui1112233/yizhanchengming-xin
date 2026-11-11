@@ -1,0 +1,95 @@
+/* AI改文：对齐洛水 v2.9.0 的页面级面板——单栏全宽、结果区在下方。
+   这套骨架（面包屑 + 标题 + 内容 + 结果）由 PluginPanelShell 复用。
+   配色只做变量映射，继承 documentElement 上 data-theme 对应的 13 个色板。 */
+.plugin-panel-page {
+  --pp-page: var(--surface-base);
+  --pp-card: var(--surface-panel);
+  --pp-border: var(--border-default);
+  --pp-border-strong: var(--border-strong);
+  --pp-text: var(--text-primary);
+  --pp-dim: var(--text-tertiary);
+  --pp-input: var(--surface-input);
+  --pp-primary: var(--theme-primary);
+  --pp-primary-hover: var(--theme-primary-hover);
+  height: 100%;
+  min-height: 0;
+  padding: 20px 32px 36px;
+  overflow-y: auto;
+  color: var(--pp-text);
+  background: var(--pp-page);
+}
+
+.plugin-panel-inner { display: grid; gap: 16px; width: 100%; }
+
+.plugin-panel-crumb { display: flex; align-items: center; gap: 8px; color: var(--pp-dim); font-size: 13px; }
+.plugin-panel-crumb button { padding: 0; border: 0; color: var(--pp-dim); background: none; font: inherit; cursor: pointer; }
+.plugin-panel-crumb button:hover { color: var(--pp-primary); }
+.plugin-panel-crumb .plugin-panel-back { display: inline-flex; align-items: center; gap: 4px; color: var(--pp-text); font-weight: 500; }
+.plugin-panel-crumb .plugin-panel-current { color: var(--pp-dim); }
+
+/* 标题行：彩色小图标 + H1 + 授权标记 + 右侧关闭，与洛水 bundle 一致。 */
+.plugin-panel-titlebar { display: flex; align-items: center; gap: 8px; }
+.plugin-panel-title-icon { display: inline-flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border-radius: 12px; }
+.plugin-panel-title { margin: 0; color: var(--pp-text); font-size: 20px; font-weight: 700; line-height: 1.3; }
+.plugin-panel-authorized { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 4px; color: var(--text-success); background: color-mix(in srgb, var(--text-success) 14%, transparent); font-size: 11px; font-weight: 500; line-height: 15px; }
+.plugin-panel-close { display: inline-flex; width: 26px; height: 26px; margin-left: auto; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; color: var(--pp-dim); background: none; cursor: pointer; }
+.plugin-panel-close:hover { color: var(--pp-text); background: var(--pp-input); }
+.plugin-panel-subtitle { margin: -8px 0 0; color: var(--pp-dim); font-size: 13px; line-height: 1.6; }
+
+/* 内容区：默认单栏上下排布；两栏的条目用 data-layout="split" 覆盖。 */
+.plugin-panel-body { display: grid; gap: 14px; }
+.plugin-panel-body[data-layout='split'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 16px; }
+.plugin-panel-body[data-layout='stack'] { grid-template-columns: minmax(0, 1fr); }
+
+.plugin-panel-card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--pp-border); border-radius: 12px; background: var(--pp-card); }
+.plugin-panel-field { display: grid; gap: 6px; }
+.plugin-panel-field > label { color: var(--pp-dim); font-size: 12px; }
+.plugin-panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.plugin-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.plugin-panel-hint { margin: 0; color: var(--pp-dim); font-size: 12px; line-height: 1.6; }
+
+/* 主按钮改用站点主题主色，整宽，高度按洛水实测 45。 */
+.plugin-panel-page .plugin-panel-submit.ant-btn-primary,
+.plugin-panel-page .plugin-panel-submit.ant-btn { width: 100%; height: 45px; border: 0; border-radius: 8px; color: var(--text-on-accent); background: var(--pp-primary); font-size: 14px; font-weight: 600; box-shadow: none; }
+.plugin-panel-page .plugin-panel-submit.ant-btn:hover:not(:disabled) { background: var(--pp-primary-hover); }
+.plugin-panel-page .plugin-panel-submit.ant-btn:disabled { color: var(--text-on-accent); background: color-mix(in srgb, var(--pp-primary) 55%, var(--surface-base)); }
+
+/* 结果区：在下方，不是右侧。标题左侧，4 个图标按钮在右侧。 */
+.plugin-panel-result { display: grid; gap: 8px; }
+.plugin-panel-result-head { display: flex; align-items: center; gap: 8px; color: var(--pp-text); font-size: 14px; }
+.plugin-panel-result-head span { color: var(--pp-dim); font-size: 12px; }
+.plugin-panel-result-tools { display: flex; margin-left: auto; align-items: center; gap: 2px; }
+.plugin-panel-result-tools .ant-btn { width: 26px; height: 26px; padding: 0; color: var(--pp-dim); }
+.plugin-panel-result-tools .ant-btn:hover:not(:disabled) { color: var(--pp-text); }
+.plugin-panel-result-tools .ant-btn:disabled { color: var(--pp-dim); opacity: 0.45; }
+
+/* 输入区上方的「上传文档」，位置照洛水放在文本域左上角外侧。 */
+.plugin-panel-page .plugin-panel-upload-inline.ant-btn { width: auto; height: 28px; padding: 0 10px; border: 1px solid var(--pp-border) !important; border-radius: 6px; color: var(--pp-text) !important; background: var(--pp-card) !important; font-size: 12px; box-shadow: none; }
+.plugin-panel-page .plugin-panel-upload-inline.ant-btn:hover { border-color: var(--pp-border-strong) !important; }
+
+/* 小说转剧的「并发生成」：开关在右，文案固定不随状态变化。 */
+.plugin-panel-concurrent { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plugin-panel-concurrent > span { display: inline-flex; align-items: baseline; gap: 8px; }
+.plugin-panel-concurrent strong { color: var(--pp-text); font-size: 13px; font-weight: 600; }
+.plugin-panel-concurrent em { color: var(--pp-dim); font-size: 12px; font-style: normal; }
+
+/* 文本域右上角的「上传文档」。 */
+.plugin-panel-textarea-wrap { position: relative; }
+.plugin-panel-textarea-wrap .plugin-panel-upload { position: absolute; top: 8px; right: 8px; z-index: 2; border: 1px solid var(--pp-border) !important; border-radius: 6px !important; color: var(--pp-text) !important; background: var(--pp-card) !important; font-size: 12px; box-shadow: none !important; }
+
+/* 全局 Ant 样式带 !important，这里按页面配色覆盖。 */
+.plugin-panel-page .ant-input,
+.plugin-panel-page textarea.ant-input { color: var(--pp-text) !important; background: var(--pp-input) !important; border-color: var(--pp-border) !important; font-size: 13px; }
+.plugin-panel-page textarea.ant-input::placeholder { color: var(--pp-dim) !important; }
+.plugin-panel-page .ant-select .ant-select-selector { color: var(--pp-text) !important; background: var(--pp-input) !important; border-color: var(--pp-border) !important; }
+.plugin-panel-page .ant-select-focused .ant-select-selector,
+.plugin-panel-page .ant-select:hover .ant-select-selector { border-color: var(--pp-border-strong) !important; box-shadow: none !important; }
+.plugin-panel-page .ant-select-selection-item { color: var(--pp-text) !important; }
+.plugin-panel-page .ant-select-selection-placeholder { color: var(--pp-dim) !important; }
+.plugin-panel-page .ant-select-arrow { color: var(--pp-dim); }
+
+@media (max-width: 900px) {
+  .plugin-panel-page { padding: 16px; }
+  .plugin-panel-body[data-layout='split'] { grid-template-columns: minmax(0, 1fr); }
+  .plugin-panel-row { grid-template-columns: minmax(0, 1fr); }
+}

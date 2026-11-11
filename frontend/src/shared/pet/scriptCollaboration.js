@@ -13,7 +13,16 @@ export function classifyPetRequestError(error) {
   const status = Number(error?.status || error?.response?.status || 0);
   const source = String(error?.source || '');
   const detail = String(error?.message || error || '');
-  if (status === 401 || status === 403 || status === 422 || /(?:base url|model|api key) is required|api.?key|unauthori[sz]ed|forbidden|密钥|鉴权/i.test(detail)) {
+  // 登录态失效按状态码判定：此时响应体里也可能出现 key/鉴权字样，
+  // 不能因此把「会话过期」误报成模型配置问题。
+  if (status === 401 || status === 403) {
+    return { message: '登录已过期，请重新登录后再试。', action: 'login' };
+  }
+  // 422 是后端业务校验，直接把校验文案交还给用户，不做二次翻译。
+  if (status === 422) {
+    return { message: detail || '提交内容未通过校验，请按提示修改后重试。', action: 'retry' };
+  }
+  if (/(?:base url|model|api key) is required|api.?key|unauthori[sz]ed|forbidden|密钥|鉴权/i.test(detail)) {
     return { message: '模型配置无法使用，请检查接口、模型名或密钥。', action: 'settings' };
   }
   if (status === 504 || /timeout|超时/i.test(detail)) {

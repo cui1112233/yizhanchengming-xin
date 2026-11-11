@@ -1,0 +1,97 @@
+/* 工作模式下拉：触发器沿用品牌行的排版，展开层跟随 V88 主题令牌。 */
+.work-mode-trigger {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--legacy-radius-sm, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.work-mode-trigger:hover,
+.work-mode-trigger[aria-expanded='true'] {
+  background: var(--legacy-card-hover, rgba(255, 255, 255, 0.08));
+}
+
+.work-mode-trigger:focus-visible {
+  outline: 2px solid var(--legacy-accent, currentColor);
+  outline-offset: 2px;
+}
+
+.work-mode-chevron {
+  flex: 0 0 auto;
+  color: var(--legacy-muted, currentColor);
+  transition: transform 0.16s ease;
+}
+
+.work-mode-trigger[aria-expanded='true'] .work-mode-chevron {
+  transform: rotate(180deg);
+}
+
+/* 折叠态沿用原来的“隐藏 Logo 与标题”，只保留一个可点图标作为模式入口。 */
+.work-mode-collapsed-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--legacy-muted, currentColor);
+}
+
+.legacy-sidebar.collapsed .work-mode-trigger {
+  gap: 0;
+  padding: 6px;
+}
+
+.legacy-sidebar.collapsed .work-mode-collapsed-icon {
+  display: inline-flex;
+}
+
+.legacy-sidebar.collapsed .work-mode-chevron {
+  display: none;
+}
+
+.work-mode-dropdown .ant-dropdown-menu {
+  min-width: 172px;
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.work-mode-dropdown .ant-dropdown-menu-item {
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.work-mode-item-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.work-mode-item-name {
+  white-space: nowrap;
+}
+
+.work-mode-dropdown .ant-dropdown-menu-item.is-current {
+  font-weight: 600;
+}
+
+.work-mode-dropdown .ant-dropdown-menu-item.is-unavailable {
+  opacity: 0.45;
+}
+
+.work-mode-badge {
+  padding: 0 6px;
+  border: 1px solid var(--legacy-border, rgba(148, 163, 184, 0.35));
+  border-radius: 999px;
+  color: var(--legacy-muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 18px;
+  white-space: nowrap;
+}

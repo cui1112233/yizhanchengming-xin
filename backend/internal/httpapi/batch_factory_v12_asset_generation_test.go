@@ -35,6 +35,17 @@ func TestAssetImageGenerationTasksMarkInterruptedTasksFailed(t *testing.T) {
 	}
 }
 
+func TestAssetImageGenerationTaskResponseStripsEnglishSentinel(t *testing.T) {
+	response := assetImageGenerationTaskResponse(assetImageGenerationTask{
+		ID: "task-3", Status: "failed",
+		Error: "temporary upstream failure: 图片通道请求失败：Post \"https://example.com\": EOF",
+	})
+	message, _ := response["error"].(string)
+	if message != "图片通道请求失败：Post \"https://example.com\": EOF" {
+		t.Fatalf("任务错误应去掉英文哨兵：%q", message)
+	}
+}
+
 func TestAssetImageGenerationTasksPersistFinishedStatus(t *testing.T) {
 	first := newTestAssetImageTasks(t)
 	first.put(assetImageGenerationTask{

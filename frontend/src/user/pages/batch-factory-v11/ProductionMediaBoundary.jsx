@@ -1,5 +1,5 @@
 import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from 'react';
-import { LoadingOutlined } from '@ant-design/icons';
+import { CmLoader } from '../shuihuo/CmLoader.jsx';
 import {
   getMergeMediaPlaybackURL,
   getProductionMediaBlob,
@@ -141,7 +141,7 @@ export function ProductionMediaBoundary({ children, showDownload = true }) {
   return <>
     {renderedChildren}
     {showOverlay ? <span className="batch-factory-media-overlay" data-bf-media-state={timedOut ? 'timeout' : 'loading'}>
-      <LoadingOutlined spin />
+      <CmLoader size={40} title={overlayText} />
       <small>{overlayText}</small>
     </span> : null}
     {error ? <small data-bf-media-state="error">视频加载失败：{error}</small> : null}

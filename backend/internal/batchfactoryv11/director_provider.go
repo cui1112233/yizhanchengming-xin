@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 // DirectorHTTPError keeps the upstream response body so a 400/403 is never
@@ -24,47 +26,85 @@ type DirectorHTTPError struct {
 	Body       string
 }
 
+// errDirectorOutputTruncated 标识模型因输出长度上限被截断，调用方据此改用
+// 更紧凑的提示词重试。用哨兵而不是英文文案匹配，避免界面被迫展示英文。
+var errDirectorOutputTruncated = fmt.Errorf("文本模型输出被长度截断，请重试或增大输出上限")
+
+// Error 只把中文结论交给界面；状态码、模型名、上游 JSON 与 request id 全部
+// 放到第二行「上游原文」里，由前端折叠到「展开原始信息」。
 func (e *DirectorHTTPError) Error() string {
 	body := directorHTTPBodySnippet([]byte(e.Body), 400)
-	model := strings.TrimSpace(e.Model)
 	if body == "" {
 		body = http.StatusText(e.StatusCode)
 	}
-	if model != "" {
-		return fmt.Sprintf("文本模型请求失败（%s，HTTP %d，model=%s）：%s", directorHTTPFailureKind(e.StatusCode, e.Body), e.StatusCode, model, body)
+	raw := fmt.Sprintf("HTTP %d", e.StatusCode)
+	if model := strings.TrimSpace(e.Model); model != "" {
+		raw += " · model=" + model
 	}
-	return fmt.Sprintf("文本模型请求失败（%s，HTTP %d）：%s", directorHTTPFailureKind(e.StatusCode, e.Body), e.StatusCode, body)
+	if body != "" {
+		raw += " · " + body
+	}
+	return directorHTTPFailureHeadline(e.StatusCode, e.Body) + "\n上游原文：" + raw
 }
 
-// directorHTTPFailureKind turns the upstream body into a human category so a
-// 400 is not reported as a generic outage. The raw body is still appended by
-// Error(), which keeps the exact model-side wording available for diagnosis.
-func directorHTTPFailureKind(status int, body string) string {
+// directorHTTPFailureHeadline turns the upstream body into one actionable
+// Chinese conclusion. The raw body (including request id and model name) is
+// appended by Error() on its own line, never as the headline.
+func directorHTTPFailureHeadline(status int, body string) string {
 	lower := strings.ToLower(body)
 	switch {
+	case strings.Contains(lower, "prohibited_content") || strings.Contains(lower, "prohibited content") ||
+		strings.Contains(body, "成人内容"):
+		return "上游模型以成人内容为由拒绝了本次请求。系统已自动执行两轮安全修复，仍未通过审核；本页已停止继续调用，避免重复扣费。请调整这一页的描述，或更换文本模型。"
+	case strings.Contains(lower, "content_policy") || strings.Contains(lower, "content policy") ||
+		strings.Contains(lower, "content filter") || strings.Contains(lower, "moderation") ||
+		strings.Contains(lower, "safety") || strings.Contains(body, "审核") || strings.Contains(body, "违规"):
+		return "上游模型以内容审核为由拒绝了本次请求。系统已自动执行两轮安全修复，仍未通过审核；本页已停止继续调用，避免重复扣费。请调整这一页的描述，或更换文本模型。"
 	case status == http.StatusTooManyRequests:
-		return "上游限流"
+		return "上游文本模型触发限流，请稍后重试。"
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return "鉴权失败"
+		return "文本模型鉴权失败，请检查模型密钥后重试。"
 	case status == http.StatusRequestEntityTooLarge ||
 		strings.Contains(lower, "context length") || strings.Contains(lower, "context_length") ||
 		strings.Contains(lower, "maximum context") || strings.Contains(lower, "max_tokens") ||
 		strings.Contains(lower, "token limit") || strings.Contains(lower, "too long") ||
-		strings.Contains(lower, "超长") || strings.Contains(lower, "过长"):
-		return "请求超长"
-	case strings.Contains(lower, "content_policy") || strings.Contains(lower, "content policy") ||
-		strings.Contains(lower, "content filter") || strings.Contains(lower, "moderation") ||
-		strings.Contains(lower, "safety") || strings.Contains(lower, "审核") || strings.Contains(lower, "违规"):
-		return "内容审核拒绝"
+		strings.Contains(body, "超长") || strings.Contains(body, "过长"):
+		return "本次请求超出模型上下文长度，请缩短这一页的描述或更换模型。"
 	case status == http.StatusNotFound || strings.Contains(lower, "model not found") ||
 		strings.Contains(lower, "unknown model") || strings.Contains(lower, "invalid model"):
-		return "模型不存在或不支持"
+		return "文本模型不存在或当前账号不支持，请更换模型。"
 	case status >= 500:
-		return "上游通道错误"
+		return "文本模型通道暂时不可用，请稍后重试。"
 	default:
-		return "参数或请求格式不合法"
+		// 状态码属于参数细节，只放在第二行「上游原文」，主文案不再罗列。
+		return "文本模型拒绝了本次请求，请展开原始信息查看上游原因。"
 	}
 }
+
+// directorTransportError 处理网络层失败：主文案给中文结论，原始 net/http
+// 错误放到「上游原文」行，避免把 "Post ...: dial tcp ..." 顶给用户。
+type directorTransportError struct{ err error }
+
+func (e *directorTransportError) Error() string {
+	headline := "文本模型请求没有完成，请稍后重试。"
+	switch {
+	case errors.Is(e.err, context.DeadlineExceeded):
+		headline = "文本模型请求超时，请稍后重试。"
+	case errors.Is(e.err, context.Canceled):
+		headline = "文本模型请求已取消。"
+	default:
+		lower := strings.ToLower(e.err.Error())
+		for _, hint := range []string{"connection", "dial ", "eof", "tls", "x509", "no such host", "timeout", "broken pipe"} {
+			if strings.Contains(lower, hint) {
+				headline = "文本模型通道连接失败，请检查网络或模型地址后重试。"
+				break
+			}
+		}
+	}
+	return headline + "\n上游原文：" + e.err.Error()
+}
+
+func (e *directorTransportError) Unwrap() error { return e.err }
 
 // Unwrap separates retryable channel failures from user-fixable model/key
 // configuration problems. 400/401/403/404/422 must not be advertised as a
@@ -117,10 +157,10 @@ const directorProviderRequestTimeout = 300 * time.Second
 func (p *OpenAICompatibleProvider) Validate() error {
 	u, err := url.Parse(strings.TrimSpace(p.Endpoint))
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" {
-		return fmt.Errorf("director provider endpoint must be an absolute https URL")
+		return fmt.Errorf("文本模型接口地址无效，请在模型设置中改为完整的 https 地址")
 	}
 	if strings.TrimSpace(p.APIKey) == "" || strings.TrimSpace(p.Model) == "" {
-		return fmt.Errorf("director provider API key and model are required")
+		return fmt.Errorf("文本模型缺少密钥或模型名，请在模型设置中补全")
 	}
 	return nil
 }
@@ -158,10 +198,10 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		resp, reqErr := p.do(ctx, body)
 		if reqErr != nil {
 			if !directorProviderRetryableTransportError(reqErr) || attempt == maxAttempts {
-				return "", reqErr
+				return "", &directorTransportError{err: reqErr}
 			}
 			if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
-				return "", reqErr
+				return "", &directorTransportError{err: reqErr}
 			}
 			continue
 		}
@@ -170,10 +210,10 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		statusCode = resp.StatusCode
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || attempt == maxAttempts {
-				return "", err
+				return "", &directorTransportError{err: err}
 			}
 			if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
-				return "", err
+				return "", &directorTransportError{err: err}
 			}
 			continue
 		}
@@ -203,7 +243,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(raw, &decoded); err != nil || len(decoded.Choices) == 0 {
-		return "", fmt.Errorf("director provider returned an invalid response")
+		return "", fmt.Errorf("文本模型返回的响应格式无效，请重试或更换模型")
 	}
 	choice := decoded.Choices[0]
 	// A partial JSON response must never reach the H3 parser as a generic
@@ -211,14 +251,14 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	// finish_reason=length; make it retryable and tell the caller to use a
 	// model/output budget that can complete the frozen director contract.
 	if strings.EqualFold(strings.TrimSpace(choice.FinishReason), "length") {
-		return "", fmt.Errorf("director provider output truncated (finish_reason=length)")
+		return "", errDirectorOutputTruncated
 	}
 	content := strings.TrimSpace(choice.Message.Content)
 	if content == "" {
 		content = strings.TrimSpace(choice.Text)
 	}
 	if content == "" {
-		return "", fmt.Errorf("director provider returned empty content")
+		return "", fmt.Errorf("文本模型返回了空内容，请重试或更换模型")
 	}
 	return content, nil
 }
@@ -318,7 +358,7 @@ func openAICompatibleHTTPClientForHosts(endpoint string, legacyHTTP1 map[string]
 		transport.ForceAttemptHTTP2 = true
 		transport.TLSNextProto = nil
 	}
-	return &http.Client{Timeout: directorProviderRequestTimeout, Transport: transport}
+	return safehttp.NewClientWithTransport(directorProviderRequestTimeout, transport)
 }
 
 // openAICompatibleHostPrefersHTTP1 只对反向例外表内的旧网关返回 true。
@@ -339,7 +379,7 @@ func openAICompatibleHTTP2Client(endpoint string) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ForceAttemptHTTP2 = true
 	transport.TLSNextProto = nil
-	return &http.Client{Timeout: directorProviderRequestTimeout, Transport: transport}
+	return safehttp.NewClientWithTransport(directorProviderRequestTimeout, transport)
 }
 
 // directorProtocolMismatchError 识别“服务端按 HTTP/2 回帧、客户端却按 H1 解析”

@@ -7,7 +7,8 @@ const modules = [
   { label: '私人定制', value: 'script' },
   { label: '小说获取', value: 'novel-fetch' },
   { label: '水货生产', value: 'shuihuo-production' },
-  { label: '批量工厂', value: 'batch-factory' }
+  { label: '批量工厂', value: 'batch-factory' },
+  { label: 'CM 插件', value: 'luoshui-plugin' }
 ];
 
 const batchFactoryGenerationModes = [
@@ -311,7 +312,9 @@ export function PresetLibraryPage() {
       if (extraPresetResult) {
         allPresets.push(...(extraPresetResult.presets || []));
       }
-      setPresets(sortPresets(allPresets));
+      // CM 插件分区按语料清单顺序展示；插件运行时也按同一顺序引用，
+      // 不能被其它模块的 formatPriority 排序打乱。
+      setPresets(module === 'luoshui-plugin' ? allPresets : sortPresets(allPresets));
       setSlots(slotResult.slots || []);
     } catch (requestError) {
       setPresets([]);
@@ -503,8 +506,13 @@ export function PresetLibraryPage() {
 			return <ComicMaterialPreview preset={preset} />;
 		}
 	},
-    { title: '名称', dataIndex: 'name', width: 170 },
-    { title: '预设词 ID', dataIndex: 'id', width: 190, ellipsis: true },
+    {
+      title: '名称', dataIndex: 'name', width: 170,
+      render: (name, row) => row.current.builtin
+        ? <Space size={4}><span>{name}</span><Tag color="blue">内置</Tag></Space>
+        : name
+    },
+    ...(module === 'luoshui-plugin' ? [] : [{ title: '预设词 ID', dataIndex: 'id', width: 190, ellipsis: true }]),
     { title: '说明', dataIndex: 'description', ellipsis: true },
     {
       title: '归属', dataIndex: 'slot', width: 150,
@@ -590,11 +598,16 @@ export function PresetLibraryPage() {
   // “添加预设词”都会直接写入当前分区对应的归属，不需要再二次选择。
   const librarySections = useMemo(() => {
     const knownSlots = new Set(slots.map(slot => slot.id));
+    const cmModule = module === 'luoshui-plugin';
     const sections = slots.map(slot => ({
       key: slot.id,
       title: slot.label,
-      description: '此处新增的预设词会直接归入该调用位置。',
-      createSlot: slot.id,
+      description: cmModule
+        ? (slot.id === 'plugin.unassigned'
+            ? '这些条目不被 5 个插件功能引用；批量链路条目编辑发布后生效，历史存档条目不受影响。'
+            : '条目与顺序由插件代码固定；编辑并发布正文后生效。')
+        : '此处新增的预设词会直接归入该调用位置。',
+      createSlot: cmModule ? '' : slot.id,
       items: grouped.filter(item => item.slot === slot.id)
     }));
     const unassigned = grouped.filter(item => !knownSlots.has(item.slot));
@@ -607,7 +620,7 @@ export function PresetLibraryPage() {
       });
     }
     return sections;
-  }, [grouped, slots]);
+  }, [grouped, slots, module]);
 
   const batchFactorySections = useMemo(() => {
     const remaining = new Set(grouped.map(item => item.id));

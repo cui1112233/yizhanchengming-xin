@@ -212,6 +212,37 @@ func TestAutomationPreflightPeekActiveJobWritesNothing(t *testing.T) {
 	}
 }
 
+func TestAutomationPreflightAllowsSelectedBooksToQueueBehindActiveJob(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch := preflightComicBatch(t, store, 1, 0)
+	batch = savePreflightBatchSettings(t, store, batch, preflightComicSettingsPatch(t, "整本漫画页规则", "提取漫画资产"))
+	stateStore := &memoryAutomationStateStore{found: true, state: automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-active": {
+			"id": "job-active", "owner": "alice", "batchId": batch.ID, "state": "running",
+			"startedAt": "2026-11-05T09:58:00Z", "updatedAt": "2026-11-05T10:00:00Z",
+		},
+	}}}
+	coordinator := preflightCoordinator(t, store, preflightReadyStages(store))
+	coordinator.SetAutomationStateStore(stateStore)
+
+	result, err := coordinator.Preflight(ctx, "alice", batch.ID, map[string]any{
+		"runMode": "full_submit", "queueIfActive": true, "bookIds": []any{batch.Books[0].ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, blocked := preflightIssueCodes(result.BatchIssues)["automation_job_active"]; blocked {
+		t.Fatalf("batch issues=%#v, selected books should be allowed to queue", result.BatchIssues)
+	}
+	if !result.OK || len(result.RunnableBookIDs) != 1 {
+		t.Fatalf("ok=%v runnable=%v issues=%#v", result.OK, result.RunnableBookIDs, result.BatchIssues)
+	}
+	if result.TaskState != "running" || result.RunningJobID != "job-active" {
+		t.Fatalf("taskState=%q runningJobId=%q, want visible active task", result.TaskState, result.RunningJobID)
+	}
+}
+
 func TestAutomationPreflightBlocksMissingComicPublishProfile(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	batch := preflightComicBatch(t, store, 1, 0)

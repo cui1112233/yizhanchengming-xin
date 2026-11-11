@@ -30,7 +30,13 @@ func (c *shuihuoAdaptiveImageConcurrency) state(host string, configured int) *sh
 	host = strings.ToLower(strings.TrimSpace(host))
 	state := c.hosts[host]
 	if state == nil {
-		state = &shuihuoAdaptiveHostState{limit: configured, semaphore: newShuihuoImageSemaphore(configured)}
+		// 图片网关在冷启动时直接压 4 路，实测会出现四条连接一起不返回。
+		// 每个域名先从稳定的 2 路开始，连续成功后再逐级升到用户配置值。
+		initial := configured
+		if initial > shuihuoImageConcurrencyDefault {
+			initial = shuihuoImageConcurrencyDefault
+		}
+		state = &shuihuoAdaptiveHostState{limit: initial, semaphore: newShuihuoImageSemaphore(initial)}
 		c.hosts[host] = state
 	}
 	if state.limit > configured {

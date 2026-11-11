@@ -10,17 +10,7 @@ const agentCSS = fs.readFileSync(path.join(dirname, 'agent-workspace.css'), 'utf
 
 const themeSelectors = {
   dark: ':root',
-  light: "[data-theme='light']",
-  graywhite: "[data-theme='graywhite']",
-  mint: "[data-theme='mint']",
-  snow: "[data-theme='snow']",
-  vanilla: "[data-theme='vanilla']",
-  sakura: "[data-theme='sakura']",
-  pureblack: "[data-theme='pureblack']",
-  purple: "[data-theme='purple']",
-  willow: "[data-theme='willow']",
-  ivory: "[data-theme='ivory']",
-  lotus: "[data-theme='lotus']"
+  light: "[data-theme='light']"
 };
 
 const requiredVariables = [
@@ -41,6 +31,7 @@ const requiredVariables = [
   '--theme-primary',
   '--theme-primary-hover',
   '--theme-primary-active',
+  '--text-on-accent',
   '--canvas-background',
   '--canvas-grid',
   '--node-surface',
@@ -64,6 +55,11 @@ for (const [id, selector] of Object.entries(themeSelectors)) {
     }
   });
 }
+
+test('global stylesheet ships exactly the dark default and the light palette', () => {
+  const declared = [...globalCSS.matchAll(/\[data-theme='([^']+)'\]\s*\{/g)].map(match => match[1]);
+  assert.deepEqual([...new Set(declared)], ['light']);
+});
 
 test('Agent canvas and Director Desk consume semantic theme surfaces', () => {
   assert.match(agentCSS, /--agent-canvas:\s*var\(--surface-base\)/);

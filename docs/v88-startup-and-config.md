@@ -532,6 +532,18 @@ Relay 不是网页里的第三个下拉项，而是本地执行器通道的服�
   - 可选覆盖 `QIANTIE_N8_COMIC_BASE_URL`（默认 `https://n8-view.hnqingyuwen.top/center-api`）
 - 没配 N8 密钥时，页面会显示“N8 漫画发布未配置”，但不影响本地生成漫画。
 
+### 8.4 AI-Upscale（火山 MediaKit 超分）
+
+插件市场的 AI-Upscale 走火山引擎 AI MediaKit 画质增强（大模型版），服务端异步提交并轮询：
+
+- 本地 `.env.v88-review` 写法：`QIANTIE_V88_VOLCANO_MEDIAKIT_API_KEY`
+- 服务器或直接运行 Go 的写法：`QIANTIE_VOLCANO_MEDIAKIT_API_KEY`
+- 可选覆盖 `QIANTIE_VOLCANO_MEDIAKIT_BASE_URL`（默认 `https://mediakit.cn-beijing.volces.com`）
+
+密钥只进入服务端环境，不下发前端、不写日志。没配密钥时插件页会明确提示“未配置火山凭证”，提交按钮不可用；不会静默失败。
+
+调用的是官方接口：`POST /api/v1/tools/enhance-video-generative` 提交、`GET /api/v1/tasks/{task_id}` 查询、`POST /api/v1/tasks/terminate` 取消、`POST /api/v1/tools-sync/request-media-upload-url` 申请本地上传地址，鉴权统一为 `Authorization: Bearer {API Key}`。上游只返回 `running/completed/failed`，不返回百分比，页面在运行阶段显示不定长进度条与已等待时间。
+
 ---
 
 ## 9. 四类错误码

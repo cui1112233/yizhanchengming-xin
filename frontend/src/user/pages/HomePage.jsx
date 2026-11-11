@@ -5,6 +5,7 @@ import { BrandLogo } from '../../shared/components/BrandLogo';
 import { GradientButton } from '../../shared/components/GradientButton';
 import { Link } from '../../shared/components/Link';
 import { V88Button } from '../../shared/components/V88Button';
+import WorkModeMenu from '../../shared/layouts/WorkModeMenu';
 import { createV88AntTheme } from '../../shared/styles/theme';
 import HomeSplashCursor from '../components/HomeSplashCursor';
 import './home-v88.css';
@@ -21,12 +22,14 @@ const navItems = [
   { href: '/script', label: '私人定制' },
   { href: '/novel-fetch', label: '小说获取' },
   { href: '/batch-factory', label: '水货生产' },
-  { href: '/agent', label: 'Agent 工作区' },
+  { href: '/agent', label: 'CM 画布' },
   { href: '/tts', label: '配音' },
   { href: '/settings', label: '设置' }
 ];
 
 export function HomePage({ isLoggedIn, onOpenLogin, theme = 'dark' }) {
+  const pathname = window.location.pathname;
+
   function requireLogin(event) {
     if (isLoggedIn) return;
     event.preventDefault();
@@ -52,7 +55,7 @@ export function HomePage({ isLoggedIn, onOpenLogin, theme = 'dark' }) {
         <HomeSplashCursor />
 
         <nav className="home-hero-nav">
-          <Link href="/" className="home-hero-brand"><BrandLogo className="home-brand-logo" /><span className="shine">一战晟铭</span></Link>
+          <WorkModeMenu pathname={pathname} className="home-hero-brand"><BrandLogo className="home-brand-logo" /><span className="shine">一战晟铭</span></WorkModeMenu>
           <div className="home-hero-links">
             {navItems.map(item => <Link key={item.href} href={item.href} onClick={item.href === '/' ? undefined : requireLogin}>{item.label}</Link>)}
           </div>

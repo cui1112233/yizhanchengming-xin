@@ -3,12 +3,14 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -64,6 +66,52 @@ func TestModelCatalogCRUDHidesCredential(t *testing.T) {
 	}
 	if len(payload.Models) != 1 || payload.Models[0]["hasCredential"] != true {
 		t.Fatalf("unexpected public catalog: %#v", payload.Models)
+	}
+}
+
+func TestMemberModelCatalogUsesBoundManagerWithoutLeakingCredential(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	accounts := &applicationTestStore{accounts: map[string]auth.Account{
+		"manager": {Username: "manager", Active: true},
+		"member":  {Username: "member", Active: true},
+	}}
+	profiles := NewMemberProfileStore(t.TempDir())
+	if err := profiles.writeArray("member-profiles.json", []map[string]any{
+		{"username": "manager", "role": "manager"},
+		{"username": "member", "role": "member", "boundTo": "manager"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "manager", map[string]any{"modelCatalog": []any{map[string]any{
+		"id": "manager-image", "kind": "image", "displayName": "组长图片模型", "modelId": "gpt-image-2", "baseUrl": "https://image.example/v1", "credential": "manager-secret", "enabled": true,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := NewRouter(RouterOptions{
+		BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: catalog,
+		AuthStore: accounts, MemberProfileStore: profiles, UserConfigStore: NewUserConfigStore(t.TempDir()),
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/models?kind=image", nil)
+	signNovelFetchRequest(req, "member", false, now, secret)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Models) != 1 || payload.Models[0]["id"] != "manager-image" {
+		t.Fatalf("组员应读取绑定组长的模型目录，got %#v", payload.Models)
+	}
+	if strings.Contains(response.Body.String(), "manager-secret") {
+		t.Fatalf("组长密钥不能返回给组员：%s", response.Body.String())
 	}
 }
 
@@ -237,6 +285,119 @@ func TestModelCatalogAcceptsManagedAudioFields(t *testing.T) {
 		if model[key] != want {
 			t.Fatalf("%s=%#v, want %q", key, model[key], want)
 		}
+	}
+}
+
+func TestModelCatalogAcceptsVoiceCloneAudioFields(t *testing.T) {
+	model, err := normalizeManagedModel(map[string]any{
+		"id": "voice-clone-main", "kind": "audio", "displayName": "声音克隆", "enabled": true,
+		"capabilities":              map[string]any{"supportsVoiceClone": true},
+		"voiceCloneRequestTemplate": `{"body":{"reference":"{{reference_audio_base64}}"}}`,
+		"voiceCloneResponseMapping": `{"resultUrl":"data.url"}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities, _ := model["capabilities"].(map[string]any)
+	if capabilities["supportsVoiceClone"] != true || modelString(model, "voiceCloneRequestTemplate") == "" || modelString(model, "voiceCloneResponseMapping") == "" {
+		t.Fatalf("voice clone configuration was dropped: %+v", model)
+	}
+}
+
+func TestModelCatalogAcceptsASRModelWithoutExposingCredential(t *testing.T) {
+	model, err := normalizeManagedModel(map[string]any{"id": "asr-main", "kind": "asr", "displayName": "语音识别", "baseUrl": "https://api.example.test/v1", "modelId": "whisper-large-v3", "credential": "secret", "enabled": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if model["kind"] != "asr" || model["modelId"] != "whisper-large-v3" {
+		t.Fatalf("model=%#v", model)
+	}
+	public := publicManagedModel(model)
+	if _, ok := public["credential"]; ok {
+		t.Fatalf("credential leaked: %#v", public)
+	}
+	if public["hasCredential"] != true {
+		t.Fatalf("hasCredential=%#v", public["hasCredential"])
+	}
+}
+
+func TestModelCatalogPatchKeepsAdminExtensionFields(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"modelCatalog": []any{map[string]any{
+		"id": "yd2-mini-video", "kind": "video", "displayName": "YD2.0 Mini（图生）",
+		"name": "YD2 Mini", "adapterKind": "vidu", "credentialRef": "env:YD2", "enabled": false,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	// 个人中心平台预设卡只改 Key：不能丢管理端写入的 name / adapterKind / credentialRef。
+	response := doNovelFetchRequest(t, handler, http.MethodPatch, "/api/config/models/yd2-mini-video", map[string]any{
+		"credential": "sk-new",
+	}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("patch status=%d body=%s", response.Code, response.Body.String())
+	}
+	settings, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := modelCatalog(settings)[0]
+	for key, want := range map[string]any{"name": "YD2 Mini", "adapterKind": "vidu", "credentialRef": "env:YD2", "credential": "sk-new"} {
+		if model[key] != want {
+			t.Fatalf("%s=%#v, want %#v (model=%#v)", key, model[key], want, model)
+		}
+	}
+}
+
+func TestModelCatalogListsEnabledIntegrationChannels(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	userConfig := NewUserConfigStore(t.TempDir())
+	if err := userConfig.write("tester", map[string]any{
+		apiIntegrationsSettingKey: map[string]any{
+			"values": map[string]any{
+				"deepseekOfficialApiKey": "sk-demo",
+				"kimiApiKey":             "",
+			},
+			"channelSelection": map[string]any{
+				"text": map[string]any{"enabled": []any{"deepseek", "kimi"}},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, UserConfigStore: userConfig})
+
+	list := doNovelFetchRequest(t, handler, http.MethodGet, "/api/models?kind=text", nil, now, secret)
+	if list.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", list.Code, list.Body.String())
+	}
+	var payload struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(list.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, model := range payload.Models {
+		found[fmt.Sprint(model["id"])] = true
+	}
+	if !found["channel:deepseek"] {
+		t.Fatalf("enabled channel with key must be selectable: %#v", payload.Models)
+	}
+	if found["channel:kimi"] {
+		t.Fatalf("channel without key must stay hidden: %#v", payload.Models)
+	}
+
+	managed := doNovelFetchRequest(t, handler, http.MethodGet, "/api/config/models?kind=text", nil, now, secret)
+	if managed.Code != http.StatusOK {
+		t.Fatalf("managed list status=%d body=%s", managed.Code, managed.Body.String())
+	}
+	if strings.Contains(managed.Body.String(), "channel:deepseek") {
+		t.Fatalf("channel candidates must not leak into the managed catalog: %s", managed.Body.String())
 	}
 }
 

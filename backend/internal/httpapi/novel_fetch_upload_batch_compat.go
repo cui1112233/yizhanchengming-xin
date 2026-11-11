@@ -7,7 +7,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -95,7 +94,12 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 					meta = document.Meta
 				}
 			} else {
-				textPath := filepath.Join(usersDir, identity.Username, "novel-fetch", bookID+".txt")
+				textPath, pathErr := UserScopedPath(usersDir, identity.Username, "novel-fetch", bookID+".txt")
+				if pathErr != nil {
+					result["error"] = "用户名不合法"
+					results = append(results, result)
+					continue
+				}
 				content, _ = os.ReadFile(textPath)
 				if len(content) == 0 {
 					result["error"] = "未找到已保存的正文"
@@ -134,7 +138,10 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 }
 
 func readUploadTargetSession(usersDir, username string) map[string]any {
-	path := filepath.Join(usersDir, username, "upload-target.json")
+	path, err := UserScopedPath(usersDir, username, "upload-target.json")
+	if err != nil {
+		return map[string]any{}
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return map[string]any{}
@@ -147,7 +154,10 @@ func readUploadTargetSession(usersDir, username string) map[string]any {
 }
 
 func readUploadMeta(usersDir, username, bookID string) map[string]any {
-	path := filepath.Join(usersDir, username, "novel-fetch", bookID+".meta.json")
+	path, err := UserScopedPath(usersDir, username, "novel-fetch", bookID+".meta.json")
+	if err != nil {
+		return map[string]any{}
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return map[string]any{}

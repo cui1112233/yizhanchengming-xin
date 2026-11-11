@@ -49,10 +49,16 @@ test('P3 批次表操作列右侧固定且背景遮挡滚动内容', () => {
   assert.match(css, /box-shadow:\s*-10px 0 14px -10px/);
 });
 
-test('自动化失败提示移出“编辑内容”列，改到整行底部通栏', () => {
-  assert.match(list, /batch-factory-book-row-error-strip/);
-  assert.match(list, /<BatchFactoryErrorNotice[\s\S]{0,1600}?重试失败小说/);
-  assert.doesNotMatch(list, /message=\{\`\$\{automationBook\.stale ? '历史自动生产失败'/);
+test('主表不重复展示自动化失败通栏，错误只保留在任务日志和单本详情', () => {
+  assert.doesNotMatch(list, /batch-factory-book-row-error-strip/);
+  assert.match(list, /function BatchLogs[\s\S]*?<BatchFactoryErrorNotice compact title="自动生产失败"[\s\S]*?function UploadNetwork/);
+  assert.match(list, /state\.failedStage\?\.errorMessage[\s\S]{0,500}?<BatchFactoryErrorNotice/);
+});
+
+test('漫画合集已经发布后不再展示之前补图阶段的旧失败', () => {
+  assert.match(list, /const visibleAutomationError = published \? '' : String\(book\.error \|\| ''\);/);
+  assert.match(list, /visibleAutomationError \? ` · \$\{batchFactoryVisibleError\(visibleAutomationError\)\}` : ''/);
+  assert.match(list, /visibleAutomationError \? <BatchFactoryErrorNotice compact title="自动生产失败"/);
 });
 
 test('统一错误组件：人话摘要、折叠原文、复制按钮、可换行', () => {
@@ -63,23 +69,12 @@ test('统一错误组件：人话摘要、折叠原文、复制按钮、可换�
   assert.match(css, /\.batch-factory-error-notice-summary\s*\{[^}]*white-space:\s*normal;[^}]*overflow-wrap:\s*anywhere;[^}]*word-break:\s*break-word/s);
 });
 
-test('失败提示两段式：新失败只弹 4.5 秒 toast，持久记录压成默认收起的 28px 单行', () => {
-  // 瞬时提示：只在新失败签名变化时弹，带“查看详情”，4.5 秒后自动消失。
-  assert.match(list, /duration:\s*4\.5/);
-  assert.match(list, /视频生成失败 · 参考图缺失/);
+test('新失败只弹临时提醒，查看详情直接打开任务日志', () => {
+  assert.match(list, /duration:\s*3/);
   assert.match(list, /查看详情/);
   assert.match(list, /notifiedAutomationFailureRef/);
-  // 持久记录：默认收起、一句话 + 详情按钮，展开后才出现原始信息与重试入口。
-  assert.match(list, /<div className="batch-factory-book-row-error-strip">[\s\S]{0,600}?lineMode/);
-  assert.match(notice, /const canExpand = lineMode/);
-  assert.match(notice, /batch-factory-error-notice-line-text/);
-  assert.match(notice, /\{expanded \? '收起' : '详情'\}/);
-  assert.match(notice, /const \[expanded, setExpanded\] = useState\(false\)/);
-  // 视觉：左侧 3px 状态色 + 单行 28px，不再是整块面板。
-  assert.match(css, /\.batch-factory-error-notice\.is-line\s*\{[^}]*min-height:\s*28px/s);
-  assert.match(css, /border-left:\s*3px solid/s);
-  // 敏感词提示不能被一起压扁。
-  assert.doesNotMatch(list, /batch-factory-sensitive-review[\s\S]{0,80}?lineMode/);
+  assert.match(list, /onClick=\{\(\) => setLogsOpen\(true\)\}/);
+  assert.doesNotMatch(list, /scrollIntoView/);
 });
 
 test('敏感内容提示在窄书籍卡片中保持正文可读，操作按钮另起一行', () => {

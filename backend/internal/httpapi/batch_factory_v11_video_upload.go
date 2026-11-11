@@ -27,7 +27,14 @@ func registerVideoUploadRoutes(mux *http.ServeMux, service *batchfactoryv11.Prod
 			writeStoreError(w, batchfactoryv11.ErrUnavailable)
 			return
 		}
+		if !limitRequestBody(w, r, maxVideoUploadBodyBytes+maxMultipartOverheadBytes) {
+			return
+		}
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			if isBodyTooLarge(err) {
+				writePayloadTooLarge(w, maxVideoUploadBodyBytes+maxMultipartOverheadBytes)
+				return
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid video upload"})
 			return
 		}
@@ -76,7 +83,14 @@ func registerVideoUploadRoutes(mux *http.ServeMux, service *batchfactoryv11.Prod
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}
+			if !limitRequestBody(w, r, maxVideoUploadBodyBytes+maxMultipartOverheadBytes) {
+				return
+			}
 			if err := r.ParseMultipartForm(32 << 20); err != nil {
+				if isBodyTooLarge(err) {
+					writePayloadTooLarge(w, maxVideoUploadBodyBytes+maxMultipartOverheadBytes)
+					return
+				}
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid video upload"})
 				return
 			}

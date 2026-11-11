@@ -69,6 +69,10 @@ func RegisterAgentAssetRoutes(root *http.ServeMux, middleware BridgeAuth, projec
 		}
 		req.Body = http.MaxBytesReader(w, req.Body, agentAssetUploadMaxBytes+(1<<20))
 		if err := req.ParseMultipartForm(agentAssetUploadMaxBytes); err != nil {
+			if isBodyTooLarge(err) {
+				writePayloadTooLarge(w, agentAssetUploadMaxBytes+(1<<20))
+				return
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "素材文件无效或超过大小限制"})
 			return
 		}

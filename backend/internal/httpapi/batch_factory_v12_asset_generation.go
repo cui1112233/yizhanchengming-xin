@@ -213,7 +213,7 @@ func assetImageGenerationContext(parent context.Context) (context.Context, conte
 // store/provider boundary as the Shuihuo project page. The old Node handler
 // used to receive this one action even when every other batch operation was on
 // Go, which made the asset step the last hidden runtime split.
-func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, rewrite comicPromptRewriter) {
+func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, resolveModelOwner func(string) string, rewrite comicPromptRewriter) {
 	if mux == nil || store == nil || files == nil {
 		return
 	}
@@ -255,11 +255,11 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 			return
 		}
 		var input struct {
-			AssetIDs      []string `json:"assetIds"`
-			ModelID       string   `json:"modelId"`
-			Provider      string   `json:"provider"`
-			AspectRatio   string   `json:"imageAspectRatio"`
-			UseThreeView  *bool    `json:"useThreeView"`
+			AssetIDs     []string `json:"assetIds"`
+			ModelID      string   `json:"modelId"`
+			Provider     string   `json:"provider"`
+			AspectRatio  string   `json:"imageAspectRatio"`
+			UseThreeView *bool    `json:"useThreeView"`
 		}
 		if !decodeJSON(w, r, &input) {
 			return
@@ -284,11 +284,17 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 			images []batchfactoryv11.BookAssetImage
 			err    error
 		}, 1)
+		modelConfigOwner := owner
+		if resolveModelOwner != nil {
+			if resolved := strings.TrimSpace(resolveModelOwner(owner)); resolved != "" {
+				modelConfigOwner = resolved
+			}
+		}
 		go func() {
 			generationCtx, cancel := assetImageGenerationContext(context.Background())
 			defer cancel()
 			generationCtx = withShuihuoAssetThreeView(generationCtx, threeView)
-			images, generationErr := generateShuihuoAssetImagesWithRepair(generationCtx, store, files, owner, selectedBatch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, rewrite, userConfig, catalogStore)
+			images, generationErr := generateShuihuoAssetImagesWithRepair(generationCtx, store, files, owner, selectedBatch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, rewrite, userConfig, modelConfigOwner, catalogStore)
 			if generationErr != nil {
 				log.Printf("batch factory asset image generation failed batch=%s book=%s assets=%v model=%s provider=%s: %v", batchID, bookID, assetIDs, modelID, provider, generationErr)
 			}

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { splitBatchFactoryError } from './batchFactoryErrorParse.js';
+import { batchFactoryVisibleError } from './batchFactoryBookState.js';
 
 const H3_REJECTION = 'capability unavailable: 视频模型提交失败（video_85472c44367867d248c865aacf AutoDL H3 rejected submission: code=RequestParametersWrong message=缺少必填参数: ref_image_0 request_id=req-123';
 
@@ -48,4 +49,18 @@ test('capability unavailable 里的缺配置原因不再显示为“未开通”
 test('其它 capability unavailable 业务原因优先展示原因本身', () => {
   const parts = splitBatchFactoryError('capability unavailable: 文本模型请求失败：未配置可用文本模型');
   assert.equal(parts.summary, '文本模型请求失败：未配置可用文本模型');
+});
+
+test('上游原文只留在展开信息里，主文案只取中文结论', () => {
+  const message =
+    '图片通道拒绝了本次请求（HTTP 400），当前配置的模型可能不支持出图\n' +
+    '上游原文：目前无法在此聊天中直接生成图片，但可以帮你整理提示词';
+  const parts = splitBatchFactoryError(message);
+  assert.equal(parts.summary, '图片通道拒绝了本次请求（HTTP 400），当前配置的模型可能不支持出图');
+  assert.doesNotMatch(parts.summary, /目前无法在此聊天中直接生成图片/);
+  assert.match(parts.raw, /上游原文：目前无法在此聊天中直接生成图片/);
+  assert.equal(
+    batchFactoryVisibleError(message),
+    '图片通道拒绝了本次请求（HTTP 400），当前配置的模型可能不支持出图'
+  );
 });

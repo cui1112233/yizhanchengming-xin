@@ -109,8 +109,7 @@ func textPatch(value any, fallback string, max int) (string, error) {
 }
 
 var memberThemeIDs = map[string]struct{}{
-	"system": {}, "dark": {}, "light": {}, "graywhite": {}, "mint": {}, "snow": {},
-	"vanilla": {}, "sakura": {}, "pureblack": {}, "purple": {}, "willow": {}, "ivory": {}, "lotus": {},
+	"system": {}, "dark": {}, "light": {},
 }
 
 var memberWindowBackgroundIDs = map[string]struct{}{
@@ -336,6 +335,10 @@ func memberAvatarURL(profile map[string]any) any {
 
 func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, accounts auth.Store) (map[string]any, error) {
 	const maxBytes = 2 * 1024 * 1024
+	username, usernameErr := SafeUsername(username)
+	if usernameErr != nil {
+		return nil, ErrInvalidUsername
+	}
 	value := strings.TrimSpace(dataURL)
 	prefix, encoded, ok := strings.Cut(value, ",")
 	if !ok || !strings.HasPrefix(prefix, "data:image/") || !strings.HasSuffix(prefix, ";base64") {
@@ -405,6 +408,10 @@ func windowBackgroundDir(avatarDir string) string {
 
 func (s *MemberProfileStore) updateWindowBackground(username, dataURL, avatarDir string, accounts auth.Store) (map[string]any, error) {
 	const maxBytes = 10 * 1024 * 1024
+	username, usernameErr := SafeUsername(username)
+	if usernameErr != nil {
+		return nil, ErrInvalidUsername
+	}
 	value := strings.TrimSpace(dataURL)
 	prefix, encoded, ok := strings.Cut(value, ",")
 	if !ok || !strings.HasPrefix(prefix, "data:image/") || !strings.HasSuffix(prefix, ";base64") {

@@ -460,9 +460,21 @@ export function BatchFactoryV11UiPage({ initialBatchId = '' } = {}) {
     try {
       const result = await runtime.runBatchDirector({ batchId: targetBatch.id });
       if (!result.ok) { message.error(result.message); return false; }
+      const raw = result.raw && typeof result.raw === 'object' ? result.raw : {};
+      const failures = Array.isArray(raw.failures) ? raw.failures : [];
+      const revisions = Array.isArray(raw.directorRevisions) ? raw.directorRevisions : [];
+      const bookNames = new Map(books.map(book => [book.id, book.title || book.id]));
+      const failedNames = failures.map(item => bookNames.get(item?.bookId) || item?.bookId || '未知书籍');
+      const listed = failedNames.slice(0, 3).join('、') + (failedNames.length > 3 ? ' 等' : '');
       const next = await runtime.load({ ...requestParams, batchId: targetBatch.id });
       setRuntimeState(next);
-      message.success('批量 Director 已完成；失败项会保留在返回状态中。');
+      if (!failures.length && raw.error) { message.error(raw.error); return false; }
+      if (!revisions.length && failures.length) { message.error(`批量 Director 全部失败：${failures.length} 本未生成（${listed}）`); return false; }
+      if (failures.length) {
+        message.warning(`批量 Director 完成 ${revisions.length} 本；${failures.length} 本失败：${listed}`);
+        return true;
+      }
+      message.success('批量 Director 已完成。');
       return true;
     } finally {
       setDirectorAction({ type: '', bookId: '' });

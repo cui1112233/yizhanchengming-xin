@@ -151,6 +151,46 @@ func resolveIntegrationImageCatalogEntry(ctx context.Context, userConfig *UserCo
 	return entry, true, nil
 }
 
+// resolveLegacyIntegrationImageCatalogEntry keeps old Batch Factory pages
+// executable after API channels switched from custom-<model> to
+// custom:<channel-id>. Only an exact image-model match is accepted, so a stale
+// text/video channel can never be selected by accident.
+func resolveLegacyIntegrationImageCatalogEntry(ctx context.Context, userConfig *UserConfigStore, owner, modelID string) (map[string]any, bool, error) {
+	modelID = strings.TrimSpace(modelID)
+	if userConfig == nil || !strings.HasPrefix(modelID, "custom-") || strings.HasPrefix(modelID, integrationModelPrefixCustom) {
+		return nil, false, nil
+	}
+	wantedModel := strings.TrimSpace(strings.TrimPrefix(modelID, "custom-"))
+	if wantedModel == "" {
+		return nil, false, nil
+	}
+	config, err := userConfig.GetConfig(ctx, owner)
+	if err != nil {
+		return nil, true, fmt.Errorf("读取 API 接口配置失败: %w", err)
+	}
+	stored := apiIntegrationStoredMap(config)
+	selection := apiIntegrationChannelSelection(stored)
+	for _, raw := range apiIntegrationChannels(stored) {
+		channel, ok := raw.(map[string]any)
+		if !ok || !strings.EqualFold(strings.TrimSpace(fmt.Sprint(channel["model"])), wantedModel) {
+			continue
+		}
+		if integrationChannelGroup(channel, selection) != "image" {
+			continue
+		}
+		channelID := strings.TrimSpace(fmt.Sprint(channel["id"]))
+		if channelID == "" || channelID == "<nil>" {
+			continue
+		}
+		entry, _, resolveErr := resolveIntegrationImageCatalogEntry(ctx, userConfig, owner, integrationModelPrefixCustom+channelID)
+		if entry != nil {
+			entry["id"] = modelID
+		}
+		return entry, true, resolveErr
+	}
+	return nil, false, nil
+}
+
 // integrationTextProvider 是渠道候选项专用的 OpenAI 兼容 provider。
 // 与目录模型不同，渠道允许 http 地址（本地 Grok / 大香蕉等），因此不复用
 // batchfactoryv11.OpenAICompatibleProvider 的 https 强校验。

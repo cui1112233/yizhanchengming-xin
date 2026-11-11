@@ -83,6 +83,13 @@ test('AI-CUT使用57201原始顶栏和编辑器语义结构而不是AntD近似�
   assert.match(page, /aicut-reference-timeline/);
 });
 
+test('AI自动剪辑入口保留在原顶栏且草案抽屉不改变四区骨架', () => {
+  assert.match(page, /aicut-reference-actions[\s\S]{0,1800}AI 自动剪辑/);
+  assert.match(page, /AICutAutoEditDrawer/);
+  assert.match(page, /setAutoEditOpen/);
+  assert.match(editorShell, /aicut-reference-editor/);
+});
+
 test('AI-CUT播放器和真实轨道时间线保留完整可见控制', () => {
   for (const label of ['适应', '安全框', '全屏预览', '轨道菜单', '字幕 1', '特效 1', '视频 1', '音频 1']) assert.match(page, new RegExp(label));
   assert.doesNotMatch(page, /多时间线/);
@@ -90,15 +97,25 @@ test('AI-CUT播放器和真实轨道时间线保留完整可见控制', () => {
   assert.match(page, /aicut-reference-tracks/);
   assert.match(pageCSS, /height:45px/);
   assert.match(pageCSS, /height:52px/);
-  assert.match(pageCSS, /min-width:950px/);
+  assert.match(pageCSS, /aicut-reference-tracks\{min-width:100%/);
+  assert.match(page, /width: `max\(100%, \$\{canvasWidth\}px\)`/);
 });
 
 test('AI-CUT时间线提供真实剃刀与联动模式并把转场显示在连接处', () => {
   assert.match(page, /setBladeMode/);
-  assert.match(page, />剃刀</);
+  assert.match(page, />\s*剃刀\s*</);
   assert.match(page, /setLinkedMove/);
-  assert.match(page, />联动</);
+  assert.match(page, />\s*联动\s*</);
   assert.match(page, /aicut-transition-chip/);
+});
+
+test('AI-CUT选中片段两侧提供真实裁剪手柄而不是固定按钮演示', () => {
+  assert.match(page, /function beginClipTrim/);
+  assert.match(page, /type: 'clip\.resize'/);
+  assert.match(page, /runTimelineCommand/);
+  assert.match(page, /event\.clientX - rect\.left <= 8/);
+  assert.match(pageCSS, /aicut-clip\.selected:before/);
+  assert.match(pageCSS, /cursor:ew-resize/);
 });
 
 test('AI-CUT专业编辑器使用57201的紧凑字号和低对比表面系统', () => {
@@ -108,7 +125,7 @@ test('AI-CUT专业编辑器使用57201的紧凑字号和低对比表面系统', 
   assert.match(pageCSS, /\.aicut-reference-editor\{[^}]*font-size:12px/);
   assert.match(pageCSS, /\.aicut-feature-card\{[^}]*background:var\(--acr-panel-2\)/);
   assert.match(pageCSS, /\.aicut-reference-timeline\{[^}]*background:var\(--acr-panel\)/);
-  assert.match(page, /<ConfigProvider theme=/);
+  assert.match(page, /<ConfigProvider\s+theme=/);
   assert.match(pageCSS, /--acr-accent:var\(--accent-primary/);
 });
 
@@ -165,12 +182,18 @@ test('AI-CUT保存后的撤销重做由服务端历史恢复', () => {
   assert.match(page, /serverHistory/);
 });
 
-test('AI-CUT成片导出显示后台任务进度并可取消', () => {
+test('AI-CUT本地修改停止一段时间后自动保存且不弹成功提示', () => {
+  assert.match(page, /saveState !== 'dirty'/);
+  assert.match(page, /setTimeout\(\(\) => saveTimeline\(\{ silent: true \}\), 1500\)/);
+  assert.match(page, /if \(!options\.silent\) message\.success\('时间线已保存'\)/);
+});
+
+test('AI-CUT成片导出显示持久后台队列并可取消', () => {
   assert.match(page, /createAICutExportJob/);
-  assert.match(page, /getAICutExportJob/);
+  assert.match(page, /listAICutExportJobs/);
   assert.match(page, /cancelAICutExportJob/);
   assert.match(page, /downloadAICutExportJob/);
-  assert.match(page, /exportJob\.progress/);
+  assert.match(page, /<ExportQueuePanel jobs=\{exportJobs\}/);
 });
 
 test('AI-CUT预览由时间线播放头驱动而不是仅预览选中素材', () => {
@@ -240,7 +263,10 @@ test('AI-CUT工作台提供素材区和时间线上下拖动、收起状态', ()
 test('AI-CUT右侧属性栏和时间线只显示真实操作', () => {
   for (const label of ['基础', '速度']) assert.match(page, new RegExp(label));
   for (const label of ['轨道', '分割', '复制', '删除', '吸附']) assert.match(page, new RegExp(label));
-  for (const label of ['关键帧', '定格', '多时间线', '需要配置对应的在线处理服务']) assert.doesNotMatch(page, new RegExp(label));
+	for (const label of ['多时间线', '需要配置对应的在线处理服务']) assert.doesNotMatch(page, new RegExp(label));
+	assert.match(page, /clip\.freeze_set/);
+	assert.match(page, /clip\.reverse_set/);
+  assert.match(page, /clip\.keyframe_upsert/);
   assert.match(page, /aicut-inspector/);
   assert.match(page, /aicut-tool-rail/);
 });
@@ -258,4 +284,9 @@ test('AI-CUT顶栏可新建项目且快捷键按钮打开真实面板', () => {
   assert.match(page, /shortcutOpen/);
   assert.match(page, /resolveAICutShortcut/);
   assert.match(page, /title="键盘快捷键"/);
+});
+
+test('播放器把混合限制在画布内并保持每个画面层透明', () => {
+  assert.match(pageCSS, /\.aicut-preview-stage\{[^}]*isolation:isolate/);
+  assert.match(pageCSS, /\.aicut-preview-visual\{[^}]*background:transparent/);
 });

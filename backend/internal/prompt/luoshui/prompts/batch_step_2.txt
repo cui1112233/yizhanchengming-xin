@@ -1,0 +1,4 @@
+【批次 step 2/8 · 剧本审核 · mode=review】
+`skill_view(luoshui-screenplay-doctor-v1)` + review-output-schema。
+写 `screenplay_doctor_report.md` 与 `.luoshui/batch/reviews/screenplay_review.json`。
+不要改剧本正文。

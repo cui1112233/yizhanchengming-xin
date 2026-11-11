@@ -1,12 +1,12 @@
 // Single source of truth for still-image aspect ratios in the web client.
 // Backend mirror: backend/internal/batchfactoryv11/image_aspect_ratios.go
 // (SupportedImageAspectRatios). Keep both lists identical.
-export const IMAGE_ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4', '3:2', '2:3'];
+export const IMAGE_ASPECT_RATIOS = ['16:9', '9:16', '21:9', '1:1', '4:3', '3:4', '3:2', '2:3'];
 
 export const IMAGE_ASPECT_RATIO_OPTIONS = IMAGE_ASPECT_RATIOS.map((value) => ({ value, label: value }));
 
 export const PORTRAIT_IMAGE_ASPECT_RATIOS = ['9:16', '3:4', '2:3'];
-export const LANDSCAPE_IMAGE_ASPECT_RATIOS = ['16:9', '4:3', '3:2'];
+export const LANDSCAPE_IMAGE_ASPECT_RATIOS = ['16:9', '21:9', '4:3', '3:2'];
 
 export function isSupportedImageAspectRatio(value) {
   return IMAGE_ASPECT_RATIOS.includes(String(value || '').trim());

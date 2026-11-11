@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -27,15 +28,16 @@ type goChatRequest struct {
 	Messages     []map[string]any `json:"messages"`
 	MaxTokens    int              `json:"max_tokens"`
 	Temperature  float64          `json:"temperature"`
+	TextModelID  string           `json:"textModelId"`
 }
 
-func registerChatRoute(root *http.ServeMux, auth BridgeAuth, provider batchfactoryv11.DirectorProvider, catalog *prompt.Catalog, personal *prompt.PersonalStore) {
+func registerChatRoute(root *http.ServeMux, auth BridgeAuth, provider batchfactoryv11.DirectorProvider, resolveProvider func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), catalog *prompt.Catalog, personal *prompt.PersonalStore) {
 	root.Handle("/api/chat", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 			return
 		}
-		if provider == nil {
+		if provider == nil && resolveProvider == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "文本模型服务暂不可用"})
 			return
 		}
@@ -45,6 +47,24 @@ func registerChatRoute(root *http.ServeMux, auth BridgeAuth, provider batchfacto
 			return
 		}
 		identity, _ := BridgeIdentityFromContext(r.Context())
+		// 用户在选择模型下拉里指定了模型（含 channel:/custom: 渠道）时，按该模型构造 provider。
+		requestProvider := provider
+		if resolver := resolveProvider; resolver != nil && strings.TrimSpace(body.TextModelID) != "" {
+			resolved, resolveErr := resolver(r.Context(), identity.Username, strings.TrimSpace(body.TextModelID))
+			if resolveErr != nil {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "所选文本模型不可用：" + resolveErr.Error()})
+				return
+			}
+			if resolved == nil {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "所选文本模型不可用"})
+				return
+			}
+			requestProvider = resolved
+		}
+		if requestProvider == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "文本模型服务暂不可用"})
+			return
+		}
 		system, user, disableJSON, err := buildGoChatMessages(body, identity.Username, catalog, personal)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -61,7 +81,7 @@ func registerChatRoute(root *http.ServeMux, auth BridgeAuth, provider batchfacto
 		if temperature < 0 || temperature > 2 {
 			temperature = 0.7
 		}
-		content, err := provider.Complete(r.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: system, UserPrompt: user, MaxTokens: maxTokens, Temperature: temperature, DisableJSONResponse: disableJSON})
+		content, err := requestProvider.Complete(r.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: system, UserPrompt: user, MaxTokens: maxTokens, Temperature: temperature, DisableJSONResponse: disableJSON})
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": "文本模型请求失败", "type": "upstream_error"})
 			return

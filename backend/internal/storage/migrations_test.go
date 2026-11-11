@@ -63,7 +63,16 @@ func TestChecksumStableAcrossWhitespace(t *testing.T) {
 
 func TestAppMigrationsIncludesV11AndV12Migrations(t *testing.T) {
 	migrations := AppMigrations()
-	want := append(append(append(append(append(append(append([]Migration(nil), V11Migrations()...), V12Migrations()...), LocalExecutorMigrations()...), GiantMaterialExecutorMigrations()...), AuthMigrations()...), AgentWorkspaceMigrations()...), AutomationMigrations()...)
+	want := append([]Migration(nil), V11Migrations()...)
+	want = append(want, V12Migrations()...)
+	want = append(want, LocalExecutorMigrations()...)
+	want = append(want, GiantMaterialExecutorMigrations()...)
+	want = append(want, AuthMigrations()...)
+	want = append(want, AgentWorkspaceMigrations()...)
+	want = append(want, AICutMigrations()...)
+	want = append(want, AutomationMigrations()...)
+	want = append(want, ScreenplayMigrations()...)
+	want = append(want, NovelCreationMigrations()...)
 	if len(migrations) != len(want) {
 		t.Fatalf("AppMigrations length=%d, want %d", len(migrations), len(want))
 	}

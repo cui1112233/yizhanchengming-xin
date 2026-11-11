@@ -14,14 +14,23 @@ import (
 // RegisterApplicationsCompat replaces the small public account-application
 // API that used to live only in Express. It deliberately shares the same
 // applications.json file consumed by the Go admin review handlers.
-func RegisterApplicationsCompat(root *http.ServeMux, accounts auth.Store, profiles *MemberProfileStore, now func() time.Time) {
+func RegisterApplicationsCompat(root *http.ServeMux, accounts auth.Store, profiles *MemberProfileStore, now func() time.Time, limiters ...*authRateLimiter) {
 	if root == nil || accounts == nil || profiles == nil {
 		return
 	}
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
+	var limiter *authRateLimiter
+	if len(limiters) > 0 {
+		limiter = limiters[0]
+	}
 	root.Handle("POST /api/applications", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ipKey := authRateLimitIPDimension(req)
+		if retryAfter, allowed := limiter.allow(authRateScopeRegister, ipKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
 		var input struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
@@ -29,10 +38,18 @@ func RegisterApplicationsCompat(root *http.ServeMux, accounts auth.Store, profil
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 32<<10)).Decode(&input) != nil ||
 			!managedUsernamePattern.MatchString(strings.TrimSpace(input.Username)) || len(input.Password) < 8 || strings.TrimSpace(input.Reason) == "" {
+			limiter.record(authRateScopeRegister, ipKey)
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 			return
 		}
 		username := strings.TrimSpace(input.Username)
+		userKey := authRateLimitUserDimension(username)
+		if retryAfter, allowed := limiter.allow(authRateScopeRegister, userKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
+		limiter.record(authRateScopeRegister, ipKey)
+		limiter.record(authRateScopeRegister, userKey)
 		if _, err := accounts.FindAccount(req.Context(), username); err == nil {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "Username is unavailable"})
 			return

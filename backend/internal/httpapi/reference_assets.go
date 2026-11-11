@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 var referenceAssetFolders = map[string]string{"character": "characters", "scene": "scenes", "prop": "props"}
@@ -40,12 +42,15 @@ func validReferenceAssetVariant(value string) bool {
 	return strings.HasPrefix(value, "source_") || strings.HasPrefix(value, "candidate_")
 }
 
-func referenceAssetDir(usersDir, username, assetType string) string {
+func referenceAssetDir(usersDir, username, assetType string) (string, error) {
 	// Keep the existing on-disk location readable after removing the workbench.
-	return filepath.Join(usersDir, username, "novel-panel", "reference_assets", referenceAssetFolders[assetType])
+	return UserScopedPath(usersDir, username, "novel-panel", "reference_assets", referenceAssetFolders[assetType])
 }
 func referenceAssetPath(usersDir, username, assetType, assetID, variant string) string {
-	dir := referenceAssetDir(usersDir, username, assetType)
+	dir, err := referenceAssetDir(usersDir, username, assetType)
+	if err != nil {
+		return ""
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return ""
@@ -119,7 +124,10 @@ func referenceAssetRevision(prefix string) string {
 }
 
 func writeReferenceAsset(usersDir, username, assetType, assetID, variant string, payload []byte, mime string) (string, error) {
-	dir := referenceAssetDir(usersDir, username, assetType)
+	dir, err := referenceAssetDir(usersDir, username, assetType)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
@@ -201,7 +209,12 @@ func RegisterReferenceAssetRoutes(root *http.ServeMux, middleware BridgeAuth, us
 				return
 			}
 			revision := referenceAssetRevision("source")
-			path := filepath.Join(referenceAssetDir(usersDir, identity.Username, assetType), assetID+"_"+revision+referenceAssetImageExtension(mime))
+			dir, dirErr := referenceAssetDir(usersDir, identity.Username, assetType)
+			if dirErr != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "用户名不合法"})
+				return
+			}
+			path := filepath.Join(dir, assetID+"_"+revision+referenceAssetImageExtension(mime))
 			if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存参考图失败"})
 				return
@@ -267,7 +280,7 @@ func RegisterReferenceAssetRoutes(root *http.ServeMux, middleware BridgeAuth, us
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "旧图片无法读取，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_NOT_FOUND"})
 			return
 		}
-		response, err := (&http.Client{Timeout: 15 * time.Second}).Do(request)
+		response, err := safehttp.NewClientWithTimeout(15 * time.Second).Do(request)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "旧图片无法读取，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_NOT_FOUND"})
 			return

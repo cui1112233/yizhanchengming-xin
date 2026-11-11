@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const (
@@ -110,7 +112,7 @@ func (e *APIError) Error() string {
 func NewClient(config Config) *Client {
 	httpClient := config.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 2 * time.Minute}
+		httpClient = safehttp.NewClientWithTimeout(2 * time.Minute)
 	}
 	now := config.Now
 	if now == nil {

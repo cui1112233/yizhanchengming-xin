@@ -72,6 +72,8 @@ type Config struct {
 	GiantMaterialPluginToken      string
 	N8ComicBaseURL                string
 	N8ComicOpenAPIKey             string
+	VolcanoMediaKitBaseURL        string
+	VolcanoMediaKitAPIKey         string
 	N8AdminBaseURL                string
 	N8ComicProducerAccounts       []string
 	LegacyAccountsPath            string
@@ -82,6 +84,25 @@ type Config struct {
 	ScriptHistoryDir              string
 	MemberSystemDir               string
 	MemberAvatarDir               string
+
+	// Auth rate limits. The zero value means "use the default documented in
+	// FromEnv"; callers should normally leave these untouched.
+	//
+	// Login defaults: 10 failures inside 10 minutes locks the IP/username pair
+	// for 15 minutes (QIANTIE_AUTH_RATE_LOGIN_*_SECONDS / _MAX_FAILURES).
+	AuthRateLimitLoginWindow      time.Duration
+	AuthRateLimitLoginMaxFailures int
+	AuthRateLimitLoginLockout     time.Duration
+	// Registration application defaults: 5 attempts inside 10 minutes locks the
+	// IP/username pair for 15 minutes (QIANTIE_AUTH_RATE_REGISTER_*).
+	AuthRateLimitRegisterWindow  time.Duration
+	AuthRateLimitRegisterMax     int
+	AuthRateLimitRegisterLockout time.Duration
+	// Password reset defaults: 5 attempts inside 60 seconds locks the IP/account
+	// pair for 15 minutes (QIANTIE_AUTH_RATE_PASSWORD_RESET_*).
+	AuthRateLimitPasswordResetWindow  time.Duration
+	AuthRateLimitPasswordResetMax     int
+	AuthRateLimitPasswordResetLockout time.Duration
 }
 
 func FromEnv() (Config, error) {
@@ -95,6 +116,8 @@ func FromEnv() (Config, error) {
 	cfg.GiantMaterialPluginToken = strings.TrimSpace(os.Getenv("QIANTIE_GIANT_MATERIAL_PLUGIN_TOKEN"))
 	cfg.N8ComicBaseURL = strings.TrimRight(envOr("QIANTIE_N8_COMIC_BASE_URL", "https://n8-view.hnqingyuwen.top/center-api"), "/")
 	cfg.N8ComicOpenAPIKey = strings.TrimSpace(os.Getenv("QIANTIE_N8_COMIC_OPEN_API_KEY"))
+	cfg.VolcanoMediaKitBaseURL = envOr("QIANTIE_VOLCANO_MEDIAKIT_BASE_URL", "https://mediakit.cn-beijing.volces.com")
+	cfg.VolcanoMediaKitAPIKey = strings.TrimSpace(os.Getenv("QIANTIE_VOLCANO_MEDIAKIT_API_KEY"))
 	cfg.N8AdminBaseURL = strings.TrimRight(envOr("QIANTIE_N8_ADMIN_BASE_URL", "https://n8-view.hnqingyuwen.top/center-api/auth"), "/")
 	cfg.N8ComicProducerAccounts = uniqueEnvValues(os.Getenv("QIANTIE_N8_COMIC_PRODUCER_ACCOUNTS"))
 	cfg.LocalExecutorDownloadsDir = envOr("QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR", "data/downloads")
@@ -107,6 +130,20 @@ func FromEnv() (Config, error) {
 	cfg.ScriptHistoryDir = envOr("QIANTIE_SCRIPT_HISTORY_DIR", "data/users")
 	cfg.MemberSystemDir = envOr("QIANTIE_MEMBER_SYSTEM_DIR", "data/system")
 	cfg.MemberAvatarDir = envOr("QIANTIE_MEMBER_AVATAR_DIR", "data/avatars")
+	// Auth rate limiting. Defaults are intentionally conservative but generous
+	// enough for normal use; every value can be overridden per deployment.
+	// Login: 10 failures / 10 minutes, then a 15 minute lock.
+	cfg.AuthRateLimitLoginWindow = envPositiveSeconds("QIANTIE_AUTH_RATE_LOGIN_WINDOW_SECONDS", 10*time.Minute)
+	cfg.AuthRateLimitLoginMaxFailures = envPositiveInt("QIANTIE_AUTH_RATE_LOGIN_MAX_FAILURES", 10)
+	cfg.AuthRateLimitLoginLockout = envPositiveSeconds("QIANTIE_AUTH_RATE_LOGIN_LOCKOUT_SECONDS", 15*time.Minute)
+	// Registration applications: 5 attempts / 10 minutes, then a 15 minute lock.
+	cfg.AuthRateLimitRegisterWindow = envPositiveSeconds("QIANTIE_AUTH_RATE_REGISTER_WINDOW_SECONDS", 10*time.Minute)
+	cfg.AuthRateLimitRegisterMax = envPositiveInt("QIANTIE_AUTH_RATE_REGISTER_MAX_ATTEMPTS", 5)
+	cfg.AuthRateLimitRegisterLockout = envPositiveSeconds("QIANTIE_AUTH_RATE_REGISTER_LOCKOUT_SECONDS", 15*time.Minute)
+	// Password reset: 5 attempts / 60 seconds, then a 15 minute lock.
+	cfg.AuthRateLimitPasswordResetWindow = envPositiveSeconds("QIANTIE_AUTH_RATE_PASSWORD_RESET_WINDOW_SECONDS", 60*time.Second)
+	cfg.AuthRateLimitPasswordResetMax = envPositiveInt("QIANTIE_AUTH_RATE_PASSWORD_RESET_MAX_ATTEMPTS", 5)
+	cfg.AuthRateLimitPasswordResetLockout = envPositiveSeconds("QIANTIE_AUTH_RATE_PASSWORD_RESET_LOCKOUT_SECONDS", 15*time.Minute)
 	cfg.RedisURL = strings.TrimSpace(os.Getenv("QIANTIE_REDIS_URL"))
 	cfg.NovelFetchTOSEndpoint = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT"))
 	cfg.NovelFetchTOSRegion = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_REGION"))
@@ -290,4 +327,28 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envPositiveSeconds(key string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func envPositiveInt(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
 }

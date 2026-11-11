@@ -94,12 +94,20 @@ export function batchFactoryAutomationRetryAction(status) {
 // Provider responses are retained by the server for diagnosis, but raw HTTP
 // responses are not useful instructions for a production user.
 export function batchFactoryVisibleError(error) {
-  const raw = String(error || '').trim();
+  const full = String(error || '').trim();
+  if (!full) return '';
+  // 后端把上游原文放在第二行（“上游原文：...”），主文案只显示中文结论，
+  // 原文留给 BatchFactoryErrorNotice 的「展开原始信息」。
+  const marker = full.indexOf('\n上游原文：');
+  const raw = marker >= 0 ? full.slice(0, marker).trim() : full;
   if (!raw) return '';
   if (/\b402\b|insufficient[_\s-]?funds|payment required/i.test(raw)) {
     return '当前视频模型的账户额度或权限不足，请更换视频模型，或检查该模型账户的额度与权限。';
   }
   if (/\b40[13]\b|invalid[_\s-]?api[_\s-]?key|unauthori[sz]ed|密钥无效|无权限/i.test(raw)) {
+    if (/文本模型|text[_\s-]?model/i.test(raw)) {
+      return '文本模型的 API Key 无效或无权限，请检查当前选中的文本模型。';
+    }
     return '视频模型的 API Key 无效或无权限，请到「API 配置」检查或重建密钥。';
   }
   if (/\b429\b|too many requests|rate limit|限流/i.test(raw)) {

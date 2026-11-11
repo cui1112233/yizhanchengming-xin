@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 // HTTPVideoAdapter is the one server-side video provider adapter used by V11.
@@ -181,7 +183,7 @@ func (a *HTTPVideoAdapter) Poll(ctx context.Context, _ FrozenVideoModel, task Pr
 func (a *HTTPVideoAdapter) doJSON(request *http.Request) ([]byte, error) {
 	client := a.Client
 	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
+		client = safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	response, err := client.Do(request)
 	if err != nil {

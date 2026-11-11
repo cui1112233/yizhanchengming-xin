@@ -8,11 +8,11 @@ import {
 } from './editorCatalog.js';
 
 test('资源目录提供约定数量的四类中文资源', () => {
-  assert.equal(catalogForTab('filter').length, 16);
+  assert.equal(catalogForTab('filter').length, 28);
   assert.equal(catalogForTab('effect').length, 12);
   assert.equal(catalogForTab('transition').length, 16);
   assert.equal(catalogForTab('text').length, 12);
-  assert.equal(editorCatalog.length, 56);
+  assert.equal(editorCatalog.length, 68);
 });
 
 test('每项资源都有唯一 ID、中文名称和浏览器与导出映射', () => {
@@ -30,6 +30,8 @@ test('每项资源都有唯一 ID、中文名称和浏览器与导出映射', ()
 test('参数声明包含有效边界且查找未知资源返回空值', () => {
   assert.equal(catalogById('not-exists'), null);
   assert.equal(catalogById('filter-warm-sun')?.labelZh, '暖阳');
+  assert.equal(catalogById('filter-golden-hour')?.labelZh, '黄金时刻');
+  assert.equal(catalogById('filter-cyberpunk')?.labelZh, '赛博朋克');
   for (const item of editorCatalog) {
     for (const parameter of item.parameters) {
       assert.ok(parameter.key);

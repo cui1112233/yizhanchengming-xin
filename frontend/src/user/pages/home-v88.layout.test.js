@@ -29,7 +29,7 @@ test('首页卡片与联系区接入 V88 圆角、表面色与动效', () => {
 });
 
 test('首页原有入口一个不少', () => {
-  ['私人定制', '水货生产', 'AI 智能 Agent', '声音配音工坊', '小说获取', 'Agent 工作区', '配音', '设置', '开始生成', '进入配音', '联系', '打开设置'].forEach(label => {
+  ['私人定制', '水货生产', 'AI 智能 Agent', '声音配音工坊', '小说获取', 'CM 画布', '配音', '设置', '开始生成', '进入配音', '联系', '打开设置'].forEach(label => {
     assert.ok(source.includes(label), `缺少入口：${label}`);
   });
   assert.match(source, /<GradientButton as="a" href="#contact">联系<\/GradientButton>/);

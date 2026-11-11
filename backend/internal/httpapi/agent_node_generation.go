@@ -51,7 +51,10 @@ type AgentNodeGenerationServices struct {
 	Now         func() time.Time
 }
 
-func resolveAgentTextModel(ctx context.Context, store novelfetchworkshop.Store, owner, modelID string) (batchfactoryv11.DirectorProvider, error) {
+func resolveAgentTextModel(ctx context.Context, store novelfetchworkshop.Store, userConfig *UserConfigStore, owner, modelID string) (batchfactoryv11.DirectorProvider, error) {
+	if provider, matched, err := ResolveIntegrationTextProvider(ctx, userConfig, owner, modelID); matched {
+		return provider, err
+	}
 	if store == nil {
 		return nil, fmt.Errorf("text model catalog is unavailable")
 	}
@@ -606,9 +609,9 @@ func normalizeAgentImageGenerationInput(input agentImageGenerationRequest) (Agen
 		return AgentImageGenerationInput{}, fmt.Errorf("图片数量必须为 1 到 4 张")
 	}
 	sizes := map[string]map[string]string{
-		"1K": {"16:9": "1024x576", "9:16": "576x1024", "1:1": "1024x1024", "3:4": "768x1024", "4:3": "1024x768", "2:3": "768x1152", "3:2": "1152x768"},
-		"2K": {"16:9": "2048x1152", "9:16": "1152x2048", "1:1": "2048x2048", "3:4": "1536x2048", "4:3": "2048x1536", "2:3": "1536x2304", "3:2": "2304x1536"},
-		"4K": {"16:9": "4096x2304", "9:16": "2304x4096", "1:1": "4096x4096", "3:4": "3072x4096", "4:3": "4096x3072", "2:3": "3072x4608", "3:2": "4608x3072"},
+		"1K": {"16:9": "1024x576", "9:16": "576x1024", "21:9": "1344x576", "1:1": "1024x1024", "3:4": "768x1024", "4:3": "1024x768", "2:3": "768x1152", "3:2": "1152x768"},
+		"2K": {"16:9": "2048x1152", "9:16": "1152x2048", "21:9": "2688x1152", "1:1": "2048x2048", "3:4": "1536x2048", "4:3": "2048x1536", "2:3": "1536x2304", "3:2": "2304x1536"},
+		"4K": {"16:9": "4096x2304", "9:16": "2304x4096", "21:9": "5376x2304", "1:1": "4096x4096", "3:4": "3072x4096", "4:3": "4096x3072", "2:3": "3072x4608", "3:2": "4608x3072"},
 	}
 	return AgentImageGenerationInput{Provider: input.Provider, ModelID: input.ModelID, Mode: input.Mode, Prompt: input.Prompt, Size: sizes[resolution][ratio], AspectRatio: ratio, Quality: quality, Resolution: resolution, Count: count, Advanced: cloneAgentSettings(input.Advanced)}, nil
 }

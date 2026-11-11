@@ -1,0 +1,25 @@
+/* 角色三视图沿用资产参考页的布局类，这里只修正参考图列表里的“添加参考图”按钮定位。 */
+.asset-reference-reference-list > .asset-reference-reference-add {
+  position: static;
+  flex: 0 0 auto;
+  width: auto;
+  height: 72px;
+  display: flex;
+  align-items: center;
+}
+
+.asset-reference-reference-list > .asset-reference-reference-add button {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color, #d8dde6);
+  border-radius: 8px;
+  background: var(--surface-color, #fff);
+  color: var(--text-primary, #182033);
+  font-size: 12px;
+  white-space: nowrap;
+}

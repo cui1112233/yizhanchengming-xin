@@ -1,0 +1,8 @@
+【批次 step 7/8 · 批量出视频】
+0. 可选 `video_batch_detect_providers` 查看 auto 将选用的 CLI。
+1. `video_batch_from_storyboard`（video_provider=auto 或 dreamina|pippit|higgsfield）。
+2. `skill_view` 读取对应 CLI Skill 说明书（如 dreamina-cli / xyq-nest-skill / higgsfield-cli-skill）。
+3. `video_batch_submit` poll_seconds=0 快速提交。
+4. `video_batch_poll` 轮询下载到 `assets/video_batch/分镜_XX`。
+5. 配置：`.luoshui/batch/video_config.json` 的 `video_provider`。
+（dreamina_* 工具为兼容别名，固定即梦。）

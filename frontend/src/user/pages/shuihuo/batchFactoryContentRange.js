@@ -8,6 +8,21 @@ export function contentCaptureCharactersForBook(book) {
   return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : 4000;
 }
 
+export function inheritedContentSettingsForNewBook(books, fallbackRangeLines = 5, fallbackCaptureCharacters = 4000) {
+  const existing = Array.isArray(books) ? books.find(book => book && typeof book === 'object') : null;
+  const fallbackBook = {
+    sourceMetadata: {
+      contentRangeLines: fallbackRangeLines,
+      contentCaptureCharacters: fallbackCaptureCharacters
+    }
+  };
+  const source = existing || fallbackBook;
+  return {
+    contentRangeLines: contentRangeLinesForBook(source),
+    contentCaptureCharacters: contentCaptureCharactersForBook(source)
+  };
+}
+
 function comicAnalysisTargetCharactersForBook(book) {
   const value = Number(book?.sourceMetadata?.comicAnalysisCharacters);
   return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : 2000;

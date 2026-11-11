@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as contentRange from './batchFactoryContentRange.js';
-import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, comicAnalysisCharactersForBook, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange.js';
+import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, comicAnalysisCharactersForBook, contentCaptureCharactersForBook, contentRangeLinesForBook, inheritedContentSettingsForNewBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange.js';
+
+test('new books inherit the active batch content range instead of falling back to five lines', () => {
+  const existingBooks = [
+    { sourceMetadata: { contentRangeLines: 8, contentCaptureCharacters: 8000 } }
+  ];
+
+  assert.deepEqual(inheritedContentSettingsForNewBook(existingBooks, 5, 4000), {
+    contentRangeLines: 8,
+    contentCaptureCharacters: 8000
+  });
+  assert.deepEqual(inheritedContentSettingsForNewBook([], 6, 6000), {
+    contentRangeLines: 6,
+    contentCaptureCharacters: 6000
+  });
+});
 
 test('uses the saved per-book content range as the work-text boundary', () => {
   const book = { sourceMetadata: { contentRangeLines: 5 } };

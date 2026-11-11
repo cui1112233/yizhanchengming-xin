@@ -1,0 +1,16 @@
+AI-CUT bundled person segmentation assets
+
+MediaPipe Tasks Vision Web 0.10.17
+Copyright Google LLC
+License: Apache License 2.0
+Source: https://www.npmjs.com/package/@mediapipe/tasks-vision/v/0.10.17
+
+MediaPipe Selfie Segmentation model (float16, revision 1)
+Copyright Google LLC
+License: Apache License 2.0
+Source: https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite
+Model card: https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Selfie%20Segmentation.pdf
+SHA-256: 191AC9529AE506EE0BEEFA6B2C945A172DAB9D07D1E802A290A4E4038226658B
+
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+The assets are redistributed unmodified. The application implementation is independent and does not copy proprietary application code, keys, private APIs, or proprietary resources.

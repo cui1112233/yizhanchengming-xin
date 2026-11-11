@@ -52,11 +52,20 @@ func TestV12H3KernelSchemaPersistsTimelineCompilationAndProductionTrace(t *testi
 
 func TestV12MigrationsRegisterH3KernelAfterUpgradeAudit(t *testing.T) {
 	migrations := V12Migrations()
-	if len(migrations) != 9 {
-		t.Fatalf("V12 migration count=%d, want 9: %+v", len(migrations), migrations)
+	if len(migrations) != 10 {
+		t.Fatalf("V12 migration count=%d, want 10: %+v", len(migrations), migrations)
 	}
-	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 || migrations[5].Version != 1200106 || migrations[6].Version != 1200107 || migrations[7].Version != 1200108 || migrations[8].Version != 1200109 {
+	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 || migrations[5].Version != 1200106 || migrations[6].Version != 1200107 || migrations[7].Version != 1200108 || migrations[8].Version != 1200109 || migrations[9].Version != 1200110 {
 		t.Fatalf("V12 migration order=%+v", migrations)
+	}
+}
+
+func TestV12ComicPageLastErrorMigrationAddsTextColumn(t *testing.T) {
+	joined := strings.ToLower(strings.Join(V12ComicPageLastErrorStatements(), "\n"))
+	for _, required := range []string{"alter table batch_factory_v12_comic_pages", "add column last_error text null", "after status"} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("missing %q in comic page last_error migration:\n%s", required, joined)
+		}
 	}
 }
 

@@ -93,6 +93,42 @@ func TestFileAutomationStatusReaderHidesRetryAtAfterTerminalFailure(t *testing.T
 	}
 }
 
+func TestReconcileTerminalAutomationJobClosesFalseRunningState(t *testing.T) {
+	now := time.Date(2026, 11, 11, 19, 0, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "running",
+		"books": map[string]any{
+			"book-1": map[string]any{"status": "failed", "stage": "comic_images", "needsManual": true},
+		},
+		"counts": map[string]any{"total": 1, "running": 0, "failed": 1},
+	}
+	if !reconcileTerminalAutomationJob(job, now) {
+		t.Fatal("expected impossible running state to be reconciled")
+	}
+	if got := automationStringValue(job["state"], ""); got != "failed" {
+		t.Fatalf("state = %q, want failed", got)
+	}
+	if _, ok := job["completedAt"]; !ok {
+		t.Fatal("terminal job did not receive completedAt")
+	}
+}
+
+func TestReconcileTerminalAutomationJobKeepsDueRetryRunning(t *testing.T) {
+	now := time.Date(2026, 11, 11, 19, 0, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "running",
+		"books": map[string]any{
+			"book-1": map[string]any{"status": "failed", "retryRequested": true, "retryAt": now.Add(time.Minute)},
+		},
+	}
+	if reconcileTerminalAutomationJob(job, now) {
+		t.Fatal("job with an automatic continuation was closed")
+	}
+	if got := automationStringValue(job["state"], ""); got != "running" {
+		t.Fatalf("state = %q, want running", got)
+	}
+}
+
 func TestFileAutomationStatusReaderRepairsN8AlreadyUploadedImages(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "automation.json")
 	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"failed","books":{"book-1":{"bookId":"book-1","status":"failed","stage":"comic_publish","error":"N8接口返回错误：IMAGE_ALREADY_IN_CAROUSEL","retryRequested":true,"retryAt":"2026-10-30T13:30:00Z"}}}}}`
@@ -243,5 +279,25 @@ func TestPublicAutomationJobDerivesCountsFromBooks(t *testing.T) {
 	counts, _ := public["counts"].(map[string]any)
 	if counts["ready"] != 1 || counts["failed"] != 1 || counts["queued"] != 1 || counts["running"] != 0 {
 		t.Fatalf("derived counts = %#v, want ready=1 failed=1 queued=1 running=0", counts)
+	}
+}
+
+func TestPublicAutomationJobHidesHistoricalFailureAfterPublishCompleted(t *testing.T) {
+	job := map[string]any{
+		"id": "job-1", "batchId": "batch-1", "state": "failed",
+		"books": map[string]any{
+			"book-1": map[string]any{
+				"bookId": "book-1", "status": "completed", "stage": "published",
+				"message": "漫画合集已发布", "error": "已生成 18/28 页，10 页失败",
+				"retryRequested": true, "retryAt": time.Now(), "batchRetryCount": 2,
+			},
+		},
+	}
+
+	public := publicAutomationJob(job)
+	books := public["books"].([]any)
+	book := books[0].(map[string]any)
+	if book["error"] != "" || book["publishError"] != "" || book["retryRequested"] != nil || book["retryAt"] != nil || book["batchRetryCount"] != nil {
+		t.Fatalf("completed published book leaked stale failure state: %#v", book)
 	}
 }

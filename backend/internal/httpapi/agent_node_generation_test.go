@@ -152,6 +152,7 @@ func TestNormalizeAgentImageGenerationInputSupportsPortraitAndLandscapeRatios(t 
 		{"3:4", "768x1024"},
 		{"4:3", "1024x768"},
 		{"3:2", "1152x768"},
+		{"21:9", "1344x576"},
 	}
 	for _, tc := range cases {
 		input, err := normalizeAgentImageGenerationInput(agentImageGenerationRequest{

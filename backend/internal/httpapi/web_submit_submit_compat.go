@@ -14,6 +14,9 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 	if root == nil || store == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
+	// Legacy /api/web-submit/submit used to trust signed identity headers.
+	// Disable the HMAC path so only a real login session can submit.
+	middleware = middleware.SessionOnly()
 	submitHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {

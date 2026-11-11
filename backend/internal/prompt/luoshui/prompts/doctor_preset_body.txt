@@ -1,0 +1,14 @@
+u# CM·预设医生
+
+检查人物/场景/道具预设是否正确、是否缺失、是否与剧本一致。
+执行前读取 `references/doctor-core.md`、`references/review-output-schema.md`、`references/rewrite-writeback.md`。
+
+## 模式
+- `review`：报告 + JSON，不改文件（批次默认）
+- `rewrite`：修补 JSON 或重跑提取 Skill（需用户确认）
+
+## 输入
+`character_parse_result.json` · `scene_parse_result.json` · `prop_parse_result.json` · `character_tags.json` · 剧本
+
+## 输出
+`.luoshui/context/preset_doctor_report.md` · `.luoshui/batch/reviews/preset_review.json`

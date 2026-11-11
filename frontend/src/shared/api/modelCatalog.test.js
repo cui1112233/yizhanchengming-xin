@@ -32,6 +32,11 @@ test('treats audio as a supported managed model kind', () => {
   assert.equal(modelKindLabel('audio'), '音频');
 });
 
+test('treats ASR as a separate managed model kind', () => {
+  assert.equal(isModelKind('asr'), true);
+  assert.equal(modelKindLabel('asr'), '语音识别');
+});
+
 test('one shared catalog keeps successful model kinds and is reused by every dropdown', async () => {
   assert.equal(typeof modelCatalogModule.getAvailableModelCatalog, 'function');
   assert.equal(typeof modelCatalogModule.invalidateAvailableModelCatalog, 'function');
@@ -42,12 +47,12 @@ test('one shared catalog keeps successful model kinds and is reused by every dro
     if (kind === 'video') throw new Error('video temporarily unavailable');
     return [{ id: `${kind}-configured`, kind, enabled: true }];
   } });
-  assert.deepEqual(first.models.map(model => model.id), ['text-configured', 'image-configured']);
+  assert.deepEqual(first.models.map(model => model.id), ['text-configured', 'image-configured', 'asr-configured']);
   assert.deepEqual(first.failedKinds, ['video']);
 
   const second = await modelCatalogModule.getAvailableModelCatalog({ loadKind: async () => {
     throw new Error('the shared result should have been reused');
   } });
   assert.strictEqual(second, first);
-  assert.deepEqual(calls, ['text', 'image', 'video']);
+  assert.deepEqual(calls, ['text', 'image', 'video', 'asr']);
 });

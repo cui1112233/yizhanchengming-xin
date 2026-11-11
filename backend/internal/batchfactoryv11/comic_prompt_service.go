@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"qiantie/backend/internal/prompt"
 )
 
 const (
@@ -369,7 +371,7 @@ type ComicPromptExtractionFailure struct {
 
 // ComicPromptExtractionResult 同时返回已成功落库的页与失败明细。
 type ComicPromptExtractionResult struct {
-	Updated []Video                       `json:"updated"`
+	Updated []Video                        `json:"updated"`
 	Failed  []ComicPromptExtractionFailure `json:"failed,omitempty"`
 }
 
@@ -386,7 +388,7 @@ func (e *ComicPromptPartialError) Error() string {
 	}
 	total := len(e.Result.Updated) + len(e.Result.Failed)
 	if e.Cause != nil {
-		return fmt.Sprintf("漫画页提示词 %d/%d 张失败：%v", len(e.Result.Failed), total, e.Cause)
+		return fmt.Sprintf("漫画页提示词 %d/%d 张失败：%s", len(e.Result.Failed), total, UserFacingErrorText(e.Cause.Error()))
 	}
 	return fmt.Sprintf("漫画页提示词 %d/%d 张失败", len(e.Result.Failed), total)
 }
@@ -502,7 +504,7 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 			VideoID: target.ID,
 			Label:   target.Label,
 			Code:    comicPromptFailureCode(err),
-			Message: err.Error(),
+			Message: UserFacingErrorText(err.Error()),
 		})
 		if firstErr == nil {
 			firstErr = err
@@ -525,6 +527,18 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 		contract, err := BuildComicPromptContract(book, book.Videos, pageIndex, snapshot)
 		if err == nil {
 			completion, completionErr := s.Provider.Complete(workCtx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens})
+			var safetyPlan prompt.ComicVisualSafetyPlan
+			safetyApplied := false
+			for round := 1; round <= 2 && isDirectorContentPolicyError(completionErr); round++ {
+				safetyPlan = prompt.ComicVisualSafetyRetryPlan(contract.SystemPrompt, contract.UserPrompt, round)
+				completion, completionErr = s.Provider.Complete(workCtx, TextCompletionRequest{
+					SystemPrompt: safetyPlan.SystemPrompt,
+					UserPrompt:   safetyPlan.UserPrompt,
+					Temperature:  0.2,
+					MaxTokens:    contract.MaxTokens,
+				})
+				safetyApplied = completionErr == nil
+			}
 			if isTruncatedDirectorOutput(completionErr) {
 				completion, completionErr = s.Provider.Complete(workCtx, TextCompletionRequest{
 					SystemPrompt:        contract.SystemPrompt + "\n上一轮输出因长度截断。保留当前页必要的分格、人物、动作、场景和关键文字；使用更紧凑的短语，screen_prompt 与 image_prompt 都不要重复描述；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
@@ -539,6 +553,12 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 				var parsed map[string]comicPromptResult
 				parsed, err = parseComicBookPromptResults(completion, []Video{target}, snapshot)
 				if err == nil {
+					if safetyApplied {
+						for videoID, result := range parsed {
+							result.ScreenPrompt = safetyPlan.RestoreScreenPrompt(result.ScreenPrompt)
+							parsed[videoID] = result
+						}
+					}
 					var page []Video
 					page, err = s.persistComicPromptResults(workCtx, owner, batchID, bookID, []Video{target}, parsed)
 					if err == nil {
@@ -615,6 +635,23 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 		return out, err
 	}
 	return out, nil
+}
+
+func isDirectorContentPolicyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var upstream *DirectorHTTPError
+	if !errors.As(err, &upstream) {
+		return false
+	}
+	detail := strings.ToLower(upstream.Body)
+	for _, marker := range []string{"prohibited_content", "prohibited content", "content_policy", "content policy", "content filter", "moderation", "safety", "成人内容", "内容审核", "违规"} {
+		if strings.Contains(detail, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func missingComicPromptVideos(videos []Video, snapshot DirectorSnapshot) []Video {
@@ -770,7 +807,8 @@ func (e *comicPageCountError) Error() string {
 	if len(e.Extra) > 0 {
 		extra = strings.Join(e.Extra, "、")
 	}
-	return fmt.Sprintf("%v: 漫画页数量与分页不一致（期望 %d 页，实际 %d 页；缺失：%s；多出：%s）", ErrInvalid, e.Expected, e.Actual, missing, extra)
+	// 界面直接展示这条文案，不能带 ErrInvalid 这类英文哨兵前缀。
+	return fmt.Sprintf("漫画页数量与分页不一致（期望 %d 页，实际 %d 页；缺失：%s；多出：%s）", e.Expected, e.Actual, missing, extra)
 }
 
 func (e *comicPageCountError) Unwrap() error { return ErrInvalid }

@@ -6,6 +6,7 @@ import { windowBackgrounds } from '../styles/window-background.js';
 export function WindowBackgroundPicker({ value = 'none', customUrl = '', onChange, onUpload }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [fileName, setFileName] = useState('');
 
   async function uploadFile(event) {
     const file = event.target.files?.[0];
@@ -22,6 +23,7 @@ export function WindowBackgroundPicker({ value = 'none', customUrl = '', onChang
         reader.readAsDataURL(file);
       });
       await onUpload?.(dataUrl);
+      setFileName(file.name);
       message.success('背景图片已保存并启用');
     } catch (error) {
       message.error(error.message || '上传背景图片失败');
@@ -33,8 +35,11 @@ export function WindowBackgroundPicker({ value = 'none', customUrl = '', onChang
     <section className="window-background-picker" aria-labelledby="window-background-title">
       <div className="window-background-heading">
         <div><h2 id="window-background-title">窗口背景</h2><p>预设图片随账号同步，自定义图片保存到服务器用户资源。</p></div>
-        <Button icon={<Upload size={16} />} loading={uploading} onClick={() => inputRef.current?.click()}>上传图片</Button>
-        <input ref={inputRef} className="window-background-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadFile} />
+        <div className="window-background-actions">
+          <Button icon={<Upload size={16} />} loading={uploading} onClick={() => inputRef.current?.click()}>上传图片</Button>
+          {fileName ? <span className="window-background-filename" title={fileName}>{fileName}</span> : null}
+          <input ref={inputRef} className="window-background-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadFile} hidden tabIndex={-1} />
+        </div>
       </div>
       <div className="window-background-grid" role="listbox" aria-label="窗口背景">
         {choices.map(item => {

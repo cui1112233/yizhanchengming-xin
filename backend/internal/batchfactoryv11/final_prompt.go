@@ -747,7 +747,7 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		return FinalPrompt{}, err
 	}
 	if effective.DirectorRevisionID == "" || book.DirectorRevision == nil || ordinal >= len(book.DirectorRevision.Output.Storyboard) {
-		return FinalPrompt{}, fmt.Errorf("%w: active Director revision is required", ErrConflict)
+		return FinalPrompt{}, fmt.Errorf("%w: %s", ErrDirectorRevisionRequired, DirectorRevisionRequiredMessage)
 	}
 	if strict {
 		for _, notice := range effective.Compatibility {

@@ -51,12 +51,12 @@ func TestWebSubmitStatusAndSyncShareExpiredCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := novelfetchworkshop.NewMemoryStore()
-	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}
 	mux := http.NewServeMux()
 	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, usersDir, &staleCredentialConnector{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/web-submit/environment", nil)
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -78,7 +78,7 @@ func TestWebSubmitStatusAndSyncShareExpiredCredential(t *testing.T) {
 	}
 
 	req = httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/sync-styles", strings.NewReader(`{"persist":false}`))
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res = httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized {
@@ -106,10 +106,10 @@ func TestWebSubmitStatusDistinguishesIncompleteCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}
 	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
 	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/web-submit/environment", nil)
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	var env struct {
@@ -203,10 +203,10 @@ func TestBatchRewriteWebSubmitHistoryReadsGoDocumentLogs(t *testing.T) {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}
 	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, filepath.Join(t.TempDir(), "users"))
 	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/web-submit/history", nil)
-	SignBridgeRequest(req, "tester", false, now, "secret")
+	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -236,8 +236,17 @@ func TestCanonicalNovelFetchWebSubmitConfigUsesTheSharedGoHandler(t *testing.T) 
 	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true}}}); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
-	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/web-submit/config", nil, now, secret)
+	accounts := &authTestStore{
+		account: auth.Account{Username: "tester", Active: true},
+		session: auth.Session{Username: "tester", Token: "canonical-session", ExpiresAt: now.Add(time.Hour)},
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, AuthStore: accounts})
+	// The canonical web-submit alias only accepts a real Bearer session; signed
+	// headers are no longer honoured on that hop.
+	req := httptest.NewRequest(http.MethodGet, "/api/novel-fetch-workshop/web-submit/config", nil)
+	req.Header.Set("Authorization", "Bearer canonical-session")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, req)
 	if response.Code != http.StatusOK {
 		t.Fatalf("canonical config status=%d body=%s", response.Code, response.Body.String())
 	}

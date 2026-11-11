@@ -532,9 +532,10 @@ test('defers compiled prompt reads until the user opens the prompt editor', () =
   const inlineStart = source.indexOf('function InlineBookPrompts(');
   const inlineEnd = source.indexOf('\nfunction StoryboardVideoNavigator(', inlineStart);
   const inline = inlineStart >= 0 && inlineEnd > inlineStart ? source.slice(inlineStart, inlineEnd) : '';
-  assert.match(inline, /useCompiledVideoPrompt\(batchId, book, video, settingsRevision, \{ enabled: true \}\)/);
+  assert.match(inline, /const finalPromptEnabled = productionMode !== 'comic'/);
+  assert.match(inline, /useCompiledVideoPrompt\(batchId, book, video, settingsRevision, \{ enabled: finalPromptEnabled \}\)/);
 
-  assert.match(source, /useCompiledVideoPrompt\(batchId, book, selectedVideo, settingsRevision\)/);
+  assert.match(source, /useCompiledVideoPrompt\(batchId, book, selectedVideo, settingsRevision, \{ enabled: productionMode !== 'comic' \}\)/);
 });
 
 test('opens a modal from the whole stacked-card prompt entry and edits only the selected storyboard', () => {

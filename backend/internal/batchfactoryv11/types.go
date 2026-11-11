@@ -22,7 +22,16 @@ var (
 	// from ErrConflict so a missing setting is never reported as a stale
 	// revision, and a stale revision is never reported as a missing setting.
 	ErrConfigRequired = errors.New("configuration required")
+	// ErrDirectorRevisionRequired marks an operation that needs an active
+	// Director storyboard the book does not have yet. It is deliberately
+	// distinct from ErrConflict so a missing storyboard is never reported as a
+	// stale revision conflict.
+	ErrDirectorRevisionRequired = errors.New("director revision required")
 )
+
+// DirectorRevisionRequiredMessage is the actionable text for
+// ErrDirectorRevisionRequired. The API layer returns it verbatim.
+const DirectorRevisionRequiredMessage = "当前书籍还没有导演分镜，请先生成导演分镜后再试（漫画模式无需视频提示词）"
 
 // ConfigRequiredError carries the plain action text the user can follow. It
 // unwraps to ErrConfigRequired without prefixing that sentinel onto the text.
@@ -329,8 +338,11 @@ type ComicPage struct {
 	ModelID            string   `json:"modelId,omitempty"`
 	AspectRatio        string   `json:"aspectRatio"`
 	Status             string   `json:"status"`
-	SnapshotHash       string   `json:"snapshotHash,omitempty"`
-	ConfigStale        bool     `json:"configStale,omitempty"`
+	// GenerationError 是最近一次页级生成失败的可展示文案：第一行中文主文案，
+	// 原始信息拼在 "\n上游原文：" 之后。成功出图或重新认领时清空。
+	GenerationError string `json:"generationError,omitempty"`
+	SnapshotHash    string `json:"snapshotHash,omitempty"`
+	ConfigStale     bool   `json:"configStale,omitempty"`
 	// 以下三个字段由 HTTP 读接口派生，不落库；前端只渲染，不再自行重算。
 	PromptStatus    string           `json:"promptStatus,omitempty"`
 	ImageStatus     string           `json:"imageStatus,omitempty"`
@@ -351,6 +363,8 @@ type UpsertComicPageInput struct {
 	AspectRatio        string   `json:"aspectRatio"`
 	Status             string   `json:"status,omitempty"`
 	SnapshotHash       string   `json:"-"`
+	// GenerationError 由服务端在失败写回时填写，客户端不能通过请求体注入。
+	GenerationError string `json:"-"`
 	// ExpectedRevision 是内部条件写回版本号。大于 0 时只有当前行 revision
 	// 与之相同才会更新，用于避免两个生成任务把同一页互相覆盖；HTTP 请求
 	// 不读取该字段，因此保持 json:"-"。
@@ -430,6 +444,24 @@ type ComicPageStore interface {
 	ApplyComicPageReferenceImages(context.Context, string, string, string, string) (int, error)
 	CreateComicCollection(context.Context, string, string, string, ...[]string) (ComicCollection, []string, error)
 	ListComicCollections(context.Context, string, string, string) ([]ComicCollection, error)
+}
+
+// StaleComicPage 是“停在 generating 且长时间没有更新”的页定位信息。
+// 只用于启动/定时回收，不参与正常读写。
+type StaleComicPage struct {
+	Owner     string
+	BatchID   string
+	BookID    string
+	VideoID   string
+	Revision  int64
+	UpdatedAt time.Time
+}
+
+// StaleComicPageStore 是可选能力：实现它的存储层支持跨用户扫描并回收
+// 过期 generating 页。未实现的存储层会被回收任务跳过。
+type StaleComicPageStore interface {
+	ListStaleGeneratingComicPages(context.Context, time.Time, int) ([]StaleComicPage, error)
+	ExpireStaleGeneratingComicPage(context.Context, StaleComicPage, time.Time) (bool, error)
 }
 
 // ComicSourceIndex is the minimal source data needed to decide whether a comic

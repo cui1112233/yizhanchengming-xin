@@ -115,13 +115,15 @@ func (c *BatchAutomationCoordinator) Preflight(ctx context.Context, owner, batch
 		result.RunningJobID = peek.JobID
 		result.RunningSince = peek.Since
 		result.TaskPaused = peek.State == "paused"
-		result.BatchIssues = append(result.BatchIssues, automationPreflightIssue{
-			Code: "automation_job_active",
-			Message: fmt.Sprintf(
-				"当前批次已有自动生产任务在进行（%s%s）；请先停止当前任务后再重试",
-				automationTaskStateLabel(peek.State), automationTaskSinceText(peek.Since),
-			),
-		})
+		if !automationBoolValue(input["queueIfActive"]) {
+			result.BatchIssues = append(result.BatchIssues, automationPreflightIssue{
+				Code: "automation_job_active",
+				Message: fmt.Sprintf(
+					"当前批次已有自动生产任务在进行（%s%s）；请先停止当前任务后再重试",
+					automationTaskStateLabel(peek.State), automationTaskSinceText(peek.Since),
+				),
+			})
+		}
 	}
 
 	// 预设：和 Start 一样“预设只是默认值，批次统一配置优先”。只在内存里

@@ -18,22 +18,26 @@ export function batchFactoryErrorProvider(raw) {
 
 export function splitBatchFactoryError(error) {
   const raw = String(error || '').trim();
-  const provider = batchFactoryErrorProvider(raw);
-  const code = (raw.match(/code\s*=\s*([A-Za-z0-9_.-]+)/i) || [])[1] || '';
-  const messageText = (raw.match(/message\s*=\s*([\s\S]*?)(?=\s+request_id\s*=|\s*$)/i) || [])[1]?.trim() || '';
-  const requestId = (raw.match(/request_id\s*=\s*([A-Za-z0-9_\-]+)/i) || [])[1] || '';
-  const upstreamRejected = looksLikeUpstreamRejection(raw);
-  const capabilityGate = !upstreamRejected && /capability unavailable|CAPABILITY_NOT_ENABLED|Slice 门控/i.test(raw);
+  // 后端把上游原文放在第二行（“上游原文：...”）。分类和摘要只看第一行，
+  // 原文整段留在「展开原始信息」里，避免上游聊天回复被当成主文案。
+  const upstreamRawIndex = raw.indexOf('\n上游原文：');
+  const headline = upstreamRawIndex >= 0 ? raw.slice(0, upstreamRawIndex).trim() : raw;
+  const provider = batchFactoryErrorProvider(headline);
+  const code = (headline.match(/code\s*=\s*([A-Za-z0-9_.-]+)/i) || [])[1] || '';
+  const messageText = (headline.match(/message\s*=\s*([\s\S]*?)(?=\s+request_id\s*=|\s*$)/i) || [])[1]?.trim() || '';
+  const requestId = (headline.match(/request_id\s*=\s*([A-Za-z0-9_\-]+)/i) || [])[1] || '';
+  const upstreamRejected = looksLikeUpstreamRejection(headline);
+  const capabilityGate = !upstreamRejected && /capability unavailable|CAPABILITY_NOT_ENABLED|Slice 门控/i.test(headline);
   // capability unavailable 后面经常跟的是真实业务原因（例如“文本模型请求失败：
   // 请在资产设置中选择漫画资产提示词”），只有裸的 Slice 门控才是“能力未开通”。
   // 之前统一渲染成“能力尚未开通”，把可自助修复的原因吞掉了。
   const capabilityReason = capabilityGate
-    ? (raw.match(/capability unavailable\s*[:：]\s*([\s\S]+)$/i) || [])[1]?.trim() || ''
+    ? (headline.match(/capability unavailable\s*[:：]\s*([\s\S]+)$/i) || [])[1]?.trim() || ''
     : '';
   // 后端历史记录可能把业务校验包在 ErrConflict 里，渲染成
   // “revision conflict: 请在资产设置中选择漫画资产提示词”。
   // 这里拆开：真正的版本冲突给重试动作，其它业务原因只显示原因本身。
-  const revisionConflict = /^revision conflict(?::\s*([\s\S]*))?$/i.exec(raw);
+  const revisionConflict = /^revision conflict(?::\s*([\s\S]*))?$/i.exec(headline);
 
   let summary = '';
   if (revisionConflict) {

@@ -159,3 +159,21 @@ func BridgeIdentityFromContext(ctx context.Context) (BridgeIdentity, bool) {
 	identity, ok := ctx.Value(bridgeIdentityKey{}).(BridgeIdentity)
 	return identity, ok
 }
+
+// SessionOnly returns a copy of the bridge auth that never accepts signed
+// X-Qiantie-* headers. Only a real login session (Bearer token) can pass.
+func (a BridgeAuth) SessionOnly() BridgeAuth {
+	a.Secret = ""
+	return a
+}
+
+// stripBridgeIdentityHeaders removes caller-supplied identity headers before
+// forwarding a request to an internal hop that authenticates again.
+func stripBridgeIdentityHeaders(req *http.Request) {
+	if req == nil {
+		return
+	}
+	for _, header := range []string{HeaderUsername, HeaderIsOwner, HeaderIssuedAt, HeaderSignature} {
+		req.Header.Del(header)
+	}
+}

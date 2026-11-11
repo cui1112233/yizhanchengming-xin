@@ -609,6 +609,8 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const scheduleInputRef = useRef(null);
   const [globalLogs, setGlobalLogs] = useState([]);
   const [processing, setProcessing] = useState(false);
+  // 处理等待的取消标记：只停止前端等待，后台任务照常跑，界面不再假装失败。
+  const processCancelRef = useRef(false);
   // 单个操作的真实忙碌态：按钮 loading 只跟当前动作绑定，避免整页按钮一起转圈。
   const [taskActionBusy, setTaskActionBusy] = useState('');
   const [tasks, setTasks] = useState([]);
@@ -1108,14 +1110,21 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     const normalizedInputText = serializeNovelFetchRows(parsed.rows);
     return { inputText: normalizedInputText, parsed, metadata: { input_format: inputFormat, column_preset: inputFormatLabel, column_order: inputColumnOrder } };
   }
+  function handleCancelProcess() {
+    if (!processing) return;
+    processCancelRef.current = true;
+    message.info('正在停止等待，后台任务不会中断');
+  }
   async function handleProcess() {
     const values = await processForm.validateFields();
     const resolvedInput = prepareInput(values);
     if (!resolvedInput) return;
     const { inputText, parsed, metadata } = resolvedInput;
     const bookIds = parsed.rows.map(row => row.bookId).filter(Boolean);
+    processCancelRef.current = false;
     setProcessing(true);
     setProcessRows(bookIds.map(bookId => ({ bookId, status: 'loading' })));
+    let startedJobId = '';
     try {
       // The Go provider resolver reads the account's selected model. Persist the
       // visible choice before starting so a local draft cannot silently use a
@@ -1133,17 +1142,31 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       });
       setProcessJob(started);
       setProcessJobs([started]);
+      startedJobId = started?.id || '';
       let data = started;
       const deadline = Date.now() + 30 * 60 * 1000;
       while (data?.id && !['done', 'failed'].includes(String(data.status || '').toLowerCase()) && Date.now() < deadline) {
         await new Promise(resolve => setTimeout(resolve, 1000));
+        if (processCancelRef.current) break;
         data = await getWorkshopJob(data.id);
         setProcessJob(data);
         setProcessJobs([data]);
-        await Promise.all([loadTasks(), loadCurrentBatch()]);
+        // 等待期间静默刷新，避免表格每秒闪一次加载态。
+        await Promise.all([loadTasks({ silent: true }), loadCurrentBatch()]);
+      }
+      if (processCancelRef.current) {
+        setProcessRows(current => current.map(row => (row.status === 'loading' ? { ...row, status: 'pending' } : row)));
+        message.info('已停止等待，后台任务仍在处理，请到任务列表查看进度');
+        loadTasks({ silent: true });
+        return;
       }
       if (String(data?.status || '').toLowerCase() === 'failed') throw new Error(data.error || '后台处理失败');
-      if (Date.now() >= deadline) throw new Error('后台处理超时，请稍后在任务列表查看进度');
+      if (Date.now() >= deadline) {
+        setProcessRows(current => current.map(row => (row.status === 'loading' ? { ...row, status: 'pending' } : row)));
+        message.warning('后台处理已超过等待上限，仍在后台处理，请到任务列表查看进度');
+        loadTasks({ silent: true });
+        return;
+      }
       const results = data.result?.tasks || data.tasks || [];
       setProcessRows(results.length
         ? results.map(row => ({ ...row, bookId: row.bookId || row.book_id, status: row.status === 'ok' || row.originalStatus === 'done' ? 'done' : (row.status || 'failed') }))
@@ -1151,8 +1174,14 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       await loadTasks();
       await Promise.all([loadCurrentBatch(), loadHistoryBatches()]);
     } catch (error) {
-      setProcessRows(bookIds.map(bookId => ({ bookId, status: 'failed', error: error.message })));
-      message.error(error.message || '处理失败');
+      // 任务已提交成功时，失败只代表等待中断，后台可能仍在跑，不能把整批行标成失败。
+      if (startedJobId) {
+        setProcessRows(current => current.map(row => (row.status === 'loading' ? { ...row, status: 'pending' } : row)));
+        message.error(`${error.message || '等待状态失败'}（任务已提交，请到任务列表查看进度）`);
+      } else {
+        setProcessRows(bookIds.map(bookId => ({ bookId, status: 'failed', error: error.message })));
+        message.error(error.message || '处理失败');
+      }
     } finally { setProcessing(false); }
   }
   async function handleScheduleProcess() {
@@ -1815,7 +1844,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className={`novel-fetch-public-input ${String(bookIdsValue).trim() ? 'has-content' : ''}`} rows={5} placeholder={inputFormatOption.description} /></Form.Item>
         <section className="novel-fetch-public-section novel-fetch-settings-row"><div className="novel-fetch-settings-col"><span className="novel-fetch-settings-label">本次处理设置</span><div className="novel-fetch-content-limit"><span className="novel-fetch-limit-chip"><span>截取字数：</span><InputNumber min={100} max={100000} value={processForm.getFieldValue('maxTxt') || 4000} onChange={value => processForm.setFieldValue('maxTxt', value || 4000)} /></span></div></div><div className="novel-fetch-settings-col"><span className="novel-fetch-settings-label">AI 文案版本</span><div className="novel-fetch-version-grid">{AI_VERSIONS.map(version => <label key={version} className={`novel-fetch-version-option ${selectedVersions.includes(version) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedVersions.includes(version)} onChange={event => setSelectedVersions(current => event.target.checked ? [...current, version] : current.filter(item => item !== version))} /><span>{AI_VERSION_LABELS[version]}</span></label>)}</div></div></section>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--two novel-fetch-process-policy-row"><label className="novel-fetch-field"><span>改文方式</span><div className="novel-fetch-readonly-field">AI1 自动轮换 <span aria-hidden="true">⌄</span></div></label><label className="novel-fetch-field novel-fetch-sensitive-field"><span>敏感处理</span><span className="novel-fetch-check-line"><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</span></label></div>
-        <div className="novel-fetch-public-actions"><V88Button variant="primary" loading={processing} onClick={handleProcess}>开始处理</V88Button><V88Button variant="secondary" onClick={() => openScheduleDialog()}>开始定时</V88Button><V88Button variant="secondary" onClick={() => openScheduleDialog(true)}>定时任务</V88Button><V88Button variant="secondary" loading={taskActionBusy === 'sensitive-repair'} onClick={handleSensitiveRepair}>敏感词 AI 修复</V88Button><V88Button variant="ghost" icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</V88Button></div>
+        <div className="novel-fetch-public-actions"><V88Button variant="primary" loading={processing} onClick={handleProcess}>开始处理</V88Button>{processing ? <V88Button variant="danger" onClick={handleCancelProcess}>停止等待</V88Button> : null}<V88Button variant="secondary" onClick={() => openScheduleDialog()}>开始定时</V88Button><V88Button variant="secondary" onClick={() => openScheduleDialog(true)}>定时任务</V88Button><V88Button variant="secondary" loading={taskActionBusy === 'sensitive-repair'} onClick={handleSensitiveRepair}>敏感词 AI 修复</V88Button><V88Button variant="ghost" icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</V88Button></div>
       </Form>
       <Modal className="novel-fetch-schedule-modal" open={scheduleModalOpen} width={640} title={<div className="novel-fetch-schedule-title"><span className="novel-fetch-schedule-icon"><CalendarClock size={18} /></span><div><strong>定时任务</strong><small>一次性任务 · 由 Go 后端统一调度</small></div></div>} okText={editingScheduleId ? '保存调整' : '保存定时任务'} cancelText="取消" confirmLoading={scheduleSaving} onCancel={() => { setEditingScheduleId(''); setScheduleModalOpen(false); }} onOk={handleScheduleProcess}>
         <div className="novel-fetch-schedule-note"><strong>保存后不会立即执行</strong><span>到达设定时间后加入处理队列，处理完成会默认自动上传到视频管理系统。</span></div>

@@ -5,46 +5,34 @@ import { getPresetCardState, hasPresetConfiguration } from './api-config-preset-
 const ordinaryPreset = { id: 'yd2-mini-video', credentialMode: 'apiKey' };
 const h3Preset = { id: 'minimax-h3-video', credentialMode: 'apiKey' };
 
-test('an unconfigured preset is editable and waits for confirmation', () => {
+test('an unconfigured preset stays editable so a key can be filled in', () => {
   assert.equal(hasPresetConfiguration(ordinaryPreset, null), false);
   assert.deepEqual(getPresetCardState(ordinaryPreset, null, false), {
     configured: false,
-    active: false,
-    editable: true,
-    buttonText: '确定配置',
-    buttonDisabled: false
+    editable: true
   });
 });
 
 test('only the current preset enters the saving state', () => {
   assert.deepEqual(getPresetCardState(ordinaryPreset, null, true), {
     configured: false,
-    active: false,
-    editable: false,
-    buttonText: '保存中',
-    buttonDisabled: true
+    editable: false
   });
 });
 
-test('an enabled configured preset locks fields and reports saved', () => {
+test('a configured preset stays editable: clearing the key is the way to turn it off', () => {
   const model = { enabled: true, hasCredential: true };
   assert.deepEqual(getPresetCardState(ordinaryPreset, model, false), {
     configured: true,
-    active: true,
-    editable: false,
-    buttonText: '配置已保存',
-    buttonDisabled: true
+    editable: true
   });
 });
 
-test('a disabled configured preset is editable and can be confirmed again', () => {
+test('the legacy enabled flag no longer affects editability', () => {
   const model = { enabled: false, hasCredential: true };
   assert.deepEqual(getPresetCardState(ordinaryPreset, model, false), {
     configured: true,
-    active: false,
-    editable: true,
-    buttonText: '确定配置',
-    buttonDisabled: false
+    editable: true
   });
 });
 

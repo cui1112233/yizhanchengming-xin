@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const DefaultUpstreamEndpoint = "https://txt.121w.com/api.php"
@@ -95,7 +97,7 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 	}
 	client := f.Client
 	if client == nil {
-		client = &http.Client{Timeout: 20 * time.Second}
+		client = safehttp.NewClientWithTimeout(20 * time.Second)
 	}
 	response, err := client.Do(request)
 	if err != nil {

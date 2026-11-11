@@ -1,6 +1,6 @@
 import { apiRequest } from './client.js';
 
-const AVAILABLE_MODEL_KINDS = Object.freeze(['text', 'image', 'video']);
+const AVAILABLE_MODEL_KINDS = Object.freeze(['text', 'image', 'video', 'asr']);
 const AVAILABLE_MODEL_TIMEOUT_MS = 8000;
 let availableModelCatalogResult = null;
 let availableModelCatalogPromise = null;
@@ -9,7 +9,8 @@ const MODEL_KIND_LABELS = Object.freeze({
   text: '文本',
   video: '视频',
   image: '图片',
-  audio: '音频'
+  audio: '音频',
+  asr: '语音识别'
 });
 
 export function isModelKind(kind) {
@@ -103,7 +104,7 @@ export async function refreshAvailableModels(kind, request = apiRequest) {
 }
 
 export async function listManagedModels() {
-  const groups = await Promise.all(['text', 'video', 'image', 'audio'].map(kind => listManagedModelsByKind(kind)));
+  const groups = await Promise.all(['text', 'video', 'image', 'audio', 'asr'].map(kind => listManagedModelsByKind(kind)));
   return groups.flat();
 }
 

@@ -64,6 +64,7 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 	input.AspectRatio = strings.TrimSpace(input.AspectRatio)
 	input.Status = strings.TrimSpace(input.Status)
 	input.SnapshotHash = strings.TrimSpace(input.SnapshotHash)
+	input.GenerationError = strings.TrimSpace(input.GenerationError)
 	input.ReferenceImageURLs = normalizeComicReferenceURLs(input.ReferenceImageURLs)
 	if input.ComicPrompt == "" || input.ImagePrompt == "" {
 		return UpsertComicPageInput{}, ErrInvalid
@@ -152,7 +153,7 @@ func (s *MemoryStore) UpsertComicPage(_ context.Context, owner, batchID, bookID,
 				return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
 			}
 			page.ComicPrompt, page.ImagePrompt, page.ModelID = input.ComicPrompt, input.ImagePrompt, input.ModelID
-			page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt, page.Revision = input.AspectRatio, input.Status, input.SnapshotHash, input.ReferenceImageURLs, now, page.Revision+1
+			page.AspectRatio, page.Status, page.GenerationError, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt, page.Revision = input.AspectRatio, input.Status, input.GenerationError, input.SnapshotHash, input.ReferenceImageURLs, now, page.Revision+1
 			s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 			return cloneComicPage(page), nil
 		}
@@ -163,7 +164,7 @@ func (s *MemoryStore) UpsertComicPage(_ context.Context, owner, batchID, bookID,
 		return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
 	}
 	s.seq++
-	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID, AspectRatio: input.AspectRatio, Status: input.Status, SnapshotHash: input.SnapshotHash, ReferenceImageURLs: input.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID, AspectRatio: input.AspectRatio, Status: input.Status, GenerationError: input.GenerationError, SnapshotHash: input.SnapshotHash, ReferenceImageURLs: input.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.comicPages[page.ID] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 	return cloneComicPage(page), nil
 }
@@ -194,12 +195,13 @@ func (s *MemoryStore) PatchComicPage(_ context.Context, owner, batchID, bookID, 
 		merged, mergeErr := applyComicPagePatch(UpsertComicPageInput{
 			ComicPrompt: page.ComicPrompt, ImagePrompt: page.ImagePrompt, ReferenceImageURLs: page.ReferenceImageURLs,
 			ModelID: page.ModelID, AspectRatio: page.AspectRatio, Status: page.Status, SnapshotHash: page.SnapshotHash,
+			GenerationError: page.GenerationError,
 		}, patch)
 		if mergeErr != nil {
 			return ComicPage{}, mergeErr
 		}
 		page.ComicPrompt, page.ImagePrompt, page.ModelID = merged.ComicPrompt, merged.ImagePrompt, merged.ModelID
-		page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs = merged.AspectRatio, merged.Status, merged.SnapshotHash, merged.ReferenceImageURLs
+		page.AspectRatio, page.Status, page.GenerationError, page.SnapshotHash, page.ReferenceImageURLs = merged.AspectRatio, merged.Status, merged.GenerationError, merged.SnapshotHash, merged.ReferenceImageURLs
 		page.UpdatedAt, page.Revision = now, page.Revision+1
 		s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 		return cloneComicPage(page), nil
@@ -209,7 +211,7 @@ func (s *MemoryStore) PatchComicPage(_ context.Context, owner, batchID, bookID, 
 		return ComicPage{}, err
 	}
 	s.seq++
-	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: merged.ComicPrompt, ImagePrompt: merged.ImagePrompt, ModelID: merged.ModelID, AspectRatio: merged.AspectRatio, Status: merged.Status, SnapshotHash: merged.SnapshotHash, ReferenceImageURLs: merged.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: merged.ComicPrompt, ImagePrompt: merged.ImagePrompt, ModelID: merged.ModelID, AspectRatio: merged.AspectRatio, Status: merged.Status, GenerationError: merged.GenerationError, SnapshotHash: merged.SnapshotHash, ReferenceImageURLs: merged.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.comicPages[page.ID] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 	return cloneComicPage(page), nil
 }
@@ -296,6 +298,55 @@ func (s *MemoryStore) ListComicPages(_ context.Context, owner, batchID, bookID s
 	return pages, nil
 }
 
+// ListStaleGeneratingComicPages 返回停在 generating 且 updated_at 早于 before
+// 的页，供启动/定时回收任务使用。
+func (s *MemoryStore) ListStaleGeneratingComicPages(_ context.Context, before time.Time, limit int) ([]StaleComicPage, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pages := make([]StaleComicPage, 0, limit)
+	for _, entry := range s.comicPages {
+		page := entry.Value
+		if page.Status != "generating" || !page.UpdatedAt.Before(before) {
+			continue
+		}
+		pages = append(pages, StaleComicPage{
+			Owner: entry.Owner, BatchID: page.BatchID, BookID: page.BookID,
+			VideoID: page.VideoID, Revision: page.Revision, UpdatedAt: page.UpdatedAt,
+		})
+	}
+	sort.Slice(pages, func(i, j int) bool { return pages[i].UpdatedAt.Before(pages[j].UpdatedAt) })
+	if len(pages) > limit {
+		pages = pages[:limit]
+	}
+	return pages, nil
+}
+
+// ExpireStaleGeneratingComicPage 用 revision 做乐观锁，扫描后刚被重新认领的页
+// 不会被误伤。
+func (s *MemoryStore) ExpireStaleGeneratingComicPage(_ context.Context, stale StaleComicPage, before time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, entry := range s.comicPages {
+		page := entry.Value
+		if entry.Owner != stale.Owner || page.BatchID != stale.BatchID || page.BookID != stale.BookID || page.VideoID != stale.VideoID {
+			continue
+		}
+		if page.Status != "generating" || page.Revision != stale.Revision || !page.UpdatedAt.Before(before) {
+			return false, nil
+		}
+		page.Status = "generation_failed"
+		page.GenerationError = "漫画页生成超时，请重试"
+		page.Revision++
+		page.UpdatedAt = time.Now().UTC()
+		s.comicPages[id] = memoryOwned[ComicPage]{Owner: entry.Owner, Value: page}
+		return true, nil
+	}
+	return false, nil
+}
+
 func (s *MemoryStore) CreateComicPageImage(_ context.Context, owner, batchID, bookID, pageID string, input CreateComicPageImageInput) (ComicPageImage, error) {
 	input, err := normalizeComicPageImageInput(input)
 	if err != nil {
@@ -319,6 +370,8 @@ func (s *MemoryStore) CreateComicPageImage(_ context.Context, owner, batchID, bo
 	image := ComicPageImage{ID: "comic-image-" + strconv.FormatInt(s.seq, 10), ComicPageID: pageID, URL: input.URL, StorageRef: input.StorageRef, MediaType: input.MediaType, Source: input.Source, IsPrimary: isPrimary, Revision: 1, CreatedAt: now}
 	s.comicPageImages[image.ID] = memoryOwned[ComicPageImage]{Owner: owner, Value: image}
 	pageEntry.Value.Status = "image_ready"
+	// 成功出图后清掉上一轮的失败原因，避免旧错误一直挂在已完成的页上。
+	pageEntry.Value.GenerationError = ""
 	pageEntry.Value.Revision++
 	pageEntry.Value.UpdatedAt = now
 	s.comicPages[pageID] = pageEntry

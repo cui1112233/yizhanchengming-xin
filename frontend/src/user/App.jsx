@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { UserLayout } from '../shared/layouts/UserLayout';
 import { HomeRoute } from './pages/HomeRoute';
 import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
+import { PLUGIN_CATALOG } from './pages/pluginCatalog.js';
 import { preloadRoute as preloadWorkbenchRoute } from './workbenchPreload.js';
 
 export function preloadRoute(href) {
@@ -12,10 +13,16 @@ const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
 const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ default: module.AgentPageV2 })));
+const AgentChatPage = lazy(() => import('./pages/AgentChatPage'));
 const ShuihuoProductionPage = lazy(() => import('./pages/BatchFactoryPageV30'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const PluginCenterPage = lazy(() => import('./pages/PluginCenterPage'));
+const AICutPage = lazy(() => import('./pages/AICutPage'));
+const ComicScreenplayPage = lazy(() => import('./pages/ComicScreenplayPage'));
+const PluginRewritePage = lazy(() => import('./pages/PluginRewritePage'));
+const PluginToolPage = lazy(() => import('./pages/PluginToolPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage'));
@@ -53,6 +60,13 @@ function usePathname() {
   return pathname;
 }
 
+// 提示词工具的整页面板路由从插件目录 launch.href 派生，不在这里逐条登记。
+const pluginToolRoutes = Object.fromEntries(
+  PLUGIN_CATALOG
+    .filter(plugin => plugin.launch.kind === 'prompt-tool' && plugin.launch.href)
+    .map(plugin => [plugin.launch.href, PluginToolPage])
+);
+
 function getPage(pathname) {
   const routes = {
     '/script': ScriptPage,
@@ -65,12 +79,18 @@ function getPage(pathname) {
     '/batch-factory': ShuihuoProductionPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
+    // 工作区 → 会话 → 消息 的对话式 Agent（四栏布局的其余三栏）。
+    '/agent/chat': AgentChatPage,
     // Keep historical addresses as redirects so they cannot open a second
     // Batch Factory implementation.
     '/shuihuo-production': CanonicalBatchFactoryRedirect,
     '/shuihuo-production/creative': CanonicalBatchFactoryRedirect,
     '/tts': TtsPage,
     '/settings': SettingsPage,
+    '/plugins': PluginCenterPage,
+    '/ai-cut': AICutPage,
+    '/comic-screenplay': ComicScreenplayPage,
+    '/plugins/ai-rewrite': PluginRewritePage,
     '/api-config': ApiConfigPage,
     '/usage': UsageStatsPage,
     '/history': HistoryPage,
@@ -82,9 +102,10 @@ function getPage(pathname) {
     '/advanced-team-admin': AdvancedTeamAdminPage,
     '/accounts': AccountRolePage,
   };
-  const Page = routes[pathname];
+  const Page = routes[pathname] || pluginToolRoutes[pathname];
   if (Page) {
-    return <Suspense fallback={<div className="route-loading" role="status">正在加载工作台</div>}><Page /></Suspense>;
+    // 同一组件承担多个插件面板地址时，按路径重建实例，避免沿用上一条的输入和结果。
+    return <Suspense fallback={<div className="route-loading" role="status">正在加载工作台</div>}><Page key={pathname} /></Suspense>;
   }
   return <HomeRoute />;
 }
@@ -110,6 +131,9 @@ export function UserApp() {
   }
   if (pathname === '/recover') {
     return <Suspense fallback={<div className="route-loading" role="status">正在加载账号恢复</div>}><RecoveryPage /></Suspense>;
+  }
+  if (pathname === '/ai-cut') {
+    return <Suspense fallback={<div className="route-loading" role="status">正在加载 AI-CUT</div>}><AICutPage /></Suspense>;
   }
   return <UserLayout>{getPage(pathname)}</UserLayout>;
 }

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log"
@@ -15,7 +16,61 @@ import (
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/safehttp"
 )
+
+// 上游返回响应头后，生成阶段已经结束，必须把生图槽交给下一页；慢正文由
+// 独立的传输槽控制，不能继续堵住整个生成队列。
+func TestShuihuoImageGenerationSlotIsReleasedAfterResponseHeaders(t *testing.T) {
+	original := shuihuoProcessImageGenerationSemaphore
+	shuihuoProcessImageGenerationSemaphore = newShuihuoImageSemaphoreRaw(1)
+	t.Cleanup(func() { shuihuoProcessImageGenerationSemaphore = original })
+
+	headersSent := make(chan struct{})
+	allowBody := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		close(headersSent)
+		<-allowBody
+		encoded := base64.StdEncoding.EncodeToString([]byte("test-image"))
+		_, _ = io.WriteString(w, `{"data":[{"b64_json":"`+encoded+`"}]}`)
+	}))
+	defer server.Close()
+
+	target := testShuihuoImageTarget(server.URL + "/v1/images/generations")
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	finished := make(chan error, 1)
+	go func() {
+		_, _, err := requestShuihuoProviderImage(context.Background(), files, target, target.CatalogModel, target.CatalogModel["endpoint"].(string), "test-secret", "test prompt", nil)
+		finished <- err
+	}()
+
+	select {
+	case <-headersSent:
+	case <-time.After(2 * time.Second):
+		t.Fatal("provider response headers were not received")
+	}
+
+	secondCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	secondRelease, err := acquireShuihuoGPTImageGenerationSlot(secondCtx, "gpt-image-2")
+	if err != nil {
+		close(allowBody)
+		<-finished
+		t.Fatalf("next image stayed blocked after response headers: %v", err)
+	}
+	secondRelease()
+
+	close(allowBody)
+	if err := <-finished; err == nil {
+		// test-image is intentionally not a valid image; persistence may reject it.
+		// The assertion above is only about the slot lifetime.
+	}
+}
 
 func testShuihuoImageTarget(endpoint string) shuihuoAssetImageTarget {
 	return shuihuoAssetImageTarget{
@@ -119,6 +174,20 @@ func TestShuihuoImageAttemptErrorKindClassification(t *testing.T) {
 	}
 }
 
+func TestShuihuoImageSlowBodyBudgetCanReceiveLargeGeneratedImages(t *testing.T) {
+	// HTTP 200 后供应商已经可能计费。只要正文还在持续返回，就不能因为
+	// 任意的「总耗时」把已付费图片丢掉；只由无数据进展的 stall 窗口断流。
+	if shuihuoImageBodyTotalTimeoutURL != 0 {
+		t.Fatalf("URL body total timeout=%s, want disabled", shuihuoImageBodyTotalTimeoutURL)
+	}
+	if shuihuoImageBodyTotalTimeoutBase64 != 0 {
+		t.Fatalf("base64 body total timeout=%s, want disabled", shuihuoImageBodyTotalTimeoutBase64)
+	}
+	if shuihuoImageRequestTimeout != 0 {
+		t.Fatalf("request timeout=%s, want disabled after layered timeouts", shuihuoImageRequestTimeout)
+	}
+}
+
 // 第 2 项：发了头却不回 body 时，停滞计时必须在阈值内失败，而不是等到整请求超时。
 func TestRequestBodyStallsWithoutWaitingClientTimeout(t *testing.T) {
 	previous := shuihuoImageBodyStallTimeoutURL
@@ -143,8 +212,8 @@ func TestRequestBodyStallsWithoutWaitingClientTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected a body stalled error")
 	}
-	if !strings.Contains(err.Error(), "response body read failed") {
-		t.Fatalf("error must keep the existing body-read string: %v", err)
+	if !strings.Contains(err.Error(), "图片通道响应读取中断") {
+		t.Fatalf("error must keep the Chinese body-read headline: %v", err)
 	}
 	if !strings.Contains(err.Error(), "response body stalled after=200ms without new bytes received=0 mode=url") {
 		t.Fatalf("error must report the stalled timeout: %v", err)
@@ -207,20 +276,43 @@ func TestImageBodyTimeoutAligned(t *testing.T) {
 	}
 }
 
-// 线上供应商会先返回 200，再用一到两分钟准备/传输图片正文；默认停滞窗口
-// 必须覆盖这段真实等待，不能在 30 秒时主动掐断一个仍会返回结果的请求。
+// 线上供应商会先返回 200，再持续传输较大的图片正文；默认停滞窗口负责识别
+// 真正断流，总上限则必须覆盖慢速但仍在前进的大图响应。
 func TestImageRequestDefaultsAllowSlowProviderBody(t *testing.T) {
-	if shuihuoImageResponseHeaderTimeout != 0 {
-		t.Fatalf("response header timeout=%s, want 0 (old version behavior)", shuihuoImageResponseHeaderTimeout)
+	if shuihuoImageResponseHeaderTimeout != 3*time.Minute {
+		t.Fatalf("response header timeout=%s, want 3m", shuihuoImageResponseHeaderTimeout)
 	}
-	if shuihuoImageRequestTimeout != 360*time.Second {
-		t.Fatalf("request timeout=%s, want 360s", shuihuoImageRequestTimeout)
+	if shuihuoImageRequestTimeout != 0 {
+		t.Fatalf("request timeout=%s, want disabled", shuihuoImageRequestTimeout)
 	}
 	if shuihuoImageBodyStallTimeoutURL != 180*time.Second || shuihuoImageBodyStallTimeoutBase64 != 180*time.Second {
 		t.Fatalf("body stall timeouts=%s/%s, want 180s/180s", shuihuoImageBodyStallTimeoutURL, shuihuoImageBodyStallTimeoutBase64)
 	}
-	if shuihuoImageBodyTotalTimeoutURL != 300*time.Second || shuihuoImageBodyTotalTimeoutBase64 != 300*time.Second {
-		t.Fatalf("body total timeouts=%s/%s, want 300s/300s", shuihuoImageBodyTotalTimeoutURL, shuihuoImageBodyTotalTimeoutBase64)
+	if shuihuoImageBodyTotalTimeoutURL != 0 || shuihuoImageBodyTotalTimeoutBase64 != 0 {
+		t.Fatalf("body total timeouts=%s/%s, want disabled", shuihuoImageBodyTotalTimeoutURL, shuihuoImageBodyTotalTimeoutBase64)
+	}
+}
+
+func TestBodyReaderDoesNotDropContinuouslyArrivingPaidImage(t *testing.T) {
+	chunks := make([][]byte, 10)
+	for index := range chunks {
+		chunks[index] = []byte("paid-image-chunk")
+	}
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(&pacedBodyReader{chunks: chunks, interval: 20 * time.Millisecond}),
+	}
+
+	started := time.Now()
+	raw, err := readShuihuoImageResponseBody(response, "base64", 80*time.Millisecond, 0)
+	if err != nil {
+		t.Fatalf("continuously arriving paid image must not be cut off: %v", err)
+	}
+	if len(raw) != len(chunks)*len(chunks[0]) {
+		t.Fatalf("received=%d bytes, want %d", len(raw), len(chunks)*len(chunks[0]))
+	}
+	if elapsed := time.Since(started); elapsed < 150*time.Millisecond {
+		t.Fatalf("elapsed=%s, test did not cross the old total-timeout shape", elapsed)
 	}
 }
 
@@ -237,7 +329,7 @@ func TestResponseHeaderTimeoutFailsFast(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Cleanup(func() { close(release) })
 
-	client := &http.Client{Timeout: shuihuoImageRequestTimeout, Transport: newShuihuoImageTransport(true)}
+	client := safehttp.NewClientWithTransportWithoutTimeout(newShuihuoImageTransport(true))
 	started := time.Now()
 	response, err := client.Post(server.URL, "application/json", strings.NewReader("{}"))
 	if response != nil {
@@ -266,7 +358,7 @@ func TestRequestBodyEmpty200FailsFast(t *testing.T) {
 	target := testShuihuoImageTarget(endpoint)
 	started := time.Now()
 	_, _, err := requestShuihuoProviderImage(context.Background(), nil, target, target.CatalogModel, endpoint, "test-secret", "test prompt", nil)
-	if err == nil || !strings.Contains(err.Error(), "response is invalid") {
+	if err == nil || !strings.Contains(err.Error(), "图片通道返回的内容不是有效图片数据") {
 		t.Fatalf("want invalid response error, got %v", err)
 	}
 	if elapsed := time.Since(started); elapsed > 5*time.Second {
@@ -285,8 +377,8 @@ func TestImageGenerationClientIsSharedPerProtocol(t *testing.T) {
 		t.Fatal("shared client must reuse the same Transport")
 	}
 	transport := first.Transport.(*http.Transport)
-	if transport.ResponseHeaderTimeout != 0 {
-		t.Fatalf("response header timeout=%s, want 0 (old version behavior)", transport.ResponseHeaderTimeout)
+	if transport.ResponseHeaderTimeout != shuihuoImageResponseHeaderTimeout {
+		t.Fatalf("response header timeout=%s, want %s", transport.ResponseHeaderTimeout, shuihuoImageResponseHeaderTimeout)
 	}
 	if first.Timeout != shuihuoImageRequestTimeout {
 		t.Fatalf("client timeout=%s, want %s", first.Timeout, shuihuoImageRequestTimeout)
@@ -331,8 +423,8 @@ func TestBilledReadFailureIsNotRetried(t *testing.T) {
 	if !errors.As(err, &billed) {
 		t.Fatalf("want billed read failure, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "response body read failed") {
-		t.Fatalf("error text must stay compatible: %v", err)
+	if !strings.Contains(err.Error(), "图片通道响应读取中断") {
+		t.Fatalf("error text must keep the Chinese body-read headline: %v", err)
 	}
 	if got := requests.Load(); got != 1 {
 		t.Fatalf("provider requests=%d, want exactly 1 (no billed resend)", got)

@@ -46,9 +46,9 @@ func TestModerationRetryRequiresModerationKeyword(t *testing.T) {
 
 func TestStripReferenceImagesClearsEveryCarrier(t *testing.T) {
 	prompt := FinalPrompt{
-		CompiledPrompt:      "frozen prompt",
-		ReferenceImageURLs:  []string{"https://cdn.example.com/hero.png"},
-		DowngradedAssetIDs:  []string{"asset-1"},
+		CompiledPrompt:     "frozen prompt",
+		ReferenceImageURLs: []string{"https://cdn.example.com/hero.png"},
+		DowngradedAssetIDs: []string{"asset-1"},
 		EffectiveSettings: EffectiveSettings{Values: SettingsPatch{
 			"imageUrls":       json.RawMessage(`["https://cdn.example.com/hero.png"]`),
 			"referenceImages": json.RawMessage(`[{"url":"https://cdn.example.com/hero.png"}]`),

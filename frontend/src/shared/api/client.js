@@ -84,6 +84,17 @@ function createTimeoutError({ path, method, timeoutMs }) {
   return error;
 }
 
+// 调用方主动 abort：请求已经中止，不需要按失败上报，也不能弹全局错误提示。
+function createCancelledError({ path, method }) {
+  const error = new Error('已取消');
+  error.name = 'AbortError';
+  error.aborted = true;
+  error.status = 0;
+  error.source = path;
+  error.method = method;
+  return error;
+}
+
 function reportTimeoutFailure({ path, method, timeoutMs }, options) {
   const error = createTimeoutError({ path, method, timeoutMs });
   reportClientError({ kind: 'api-timeout', message: error.message, source: path, method, timeoutMs });
@@ -138,6 +149,10 @@ export async function apiRequest(path, options = {}) {
       // fetch 挂住被超时中止：给出可识别的 TimeoutError，而不是把 AbortError
       // 当成普通网络错误，方便上层区分「超时」与「业务失败」。
       if (timedOut) throw reportTimeoutFailure({ path, method, timeoutMs }, options);
+      // 用户主动取消（关闭面板、切换路由、点取消）：真实 abort，不按网络失败处理。
+      if (externalSignal?.aborted || error?.name === 'AbortError') {
+        throw createCancelledError({ path, method });
+      }
       const failure = { kind: 'api-network', message: error?.message || 'Network request failed', stack: error?.stack, source: path, method };
       reportClientError(failure);
       if (!options.silent && !options.suppressGlobalError) notifyApiFailure({ ...failure, path });
@@ -189,6 +204,9 @@ export async function apiRequest(path, options = {}) {
     // 响应体读取阶段被超时中止（不是上方 fetch 阶段），同样转成可识别的超时错误。
     if (timedOut && error?.name === 'AbortError') {
       throw reportTimeoutFailure({ path, method, timeoutMs }, options);
+    }
+    if (!timedOut && (externalSignal?.aborted || error?.name === 'AbortError')) {
+      throw createCancelledError({ path, method });
     }
     throw error;
   } finally {

@@ -556,7 +556,7 @@ export function StackyPet({ username, accountSessionKey }) {
               <button className="stacky-agent-icon" type="button" title="分析当前页面" aria-label="分析当前页面" onClick={analyzeCurrentPage} disabled={asking}>
                 <ScanSearch size={16} aria-hidden="true" />
               </button>
-              <button className="stacky-agent-icon" type="button" title="在 Agent 工作区继续" aria-label="在 Agent 工作区继续" onClick={openInAgentWorkspace} disabled={!petTaskId}>
+              <button className="stacky-agent-icon" type="button" title="在 CM 画布继续" aria-label="在 CM 画布继续" onClick={openInAgentWorkspace} disabled={!petTaskId}>
                 <ExternalLink size={16} aria-hidden="true" />
               </button>
               <button className="stacky-agent-close" type="button" aria-label="关闭 CM 对话" title="关闭对话" onClick={closeChat}>

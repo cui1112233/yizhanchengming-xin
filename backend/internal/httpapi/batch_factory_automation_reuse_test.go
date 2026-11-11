@@ -92,9 +92,9 @@ func TestAutomationSucceededProductionRequiresEveryOrdinal(t *testing.T) {
 	}
 }
 
-// 缺换开头变体只是可重试的单步缺口，不能把整本视频阶段锁死；但只要某个变体
-// 确实生成成功，就必须为它补一条成片，否则视频阶段继续显示未完成。
-func TestAutomationSucceededProductionRequiresOnlyGeneratedOpeningVariants(t *testing.T) {
+// 开启换开头后，即使原版分镜视频都已存在，只要配置要求的换开头提示词还没生成，
+// 自动化就不能把视频阶段当成可复用完成，否则会跳过换开头直接合成并在上传时失败。
+func TestAutomationSucceededProductionWaitsForConfiguredOpeningVariants(t *testing.T) {
 	batch := batchfactoryv11.Batch{ID: "batch-1", SettingsState: batchfactoryv11.SettingsState{Patch: automationSettings(map[string]any{"openingEnabled": true, "openingCount": 2})}}
 	book := batchfactoryv11.Book{
 		ID:           "book-1",
@@ -107,8 +107,8 @@ func TestAutomationSucceededProductionRequiresOnlyGeneratedOpeningVariants(t *te
 			automationTask("task-1", "video-1", 0, batchfactoryv11.ProductionSucceeded, "https://media.example/1.mp4", time.Unix(20, 0)),
 		}},
 	}
-	if _, complete := automationSucceededProduction(jobs, batch, book); !complete {
-		t.Fatal("a missing opening variant is retryable and must not lock the video stage")
+	if _, complete := automationSucceededProduction(jobs, batch, book); complete {
+		t.Fatal("configured opening variant must be generated before completed base videos can be reused")
 	}
 	variants, err := json.Marshal([]batchfactoryv11.OpeningVariant{{Index: 1, Label: "换开头1", Status: "success", Prompt: "雨夜推门而入。"}})
 	if err != nil {
@@ -121,6 +121,24 @@ func TestAutomationSucceededProductionRequiresOnlyGeneratedOpeningVariants(t *te
 	jobs[0].Tasks = append(jobs[0].Tasks, automationTask("task-opening-1", "video-old-0", 1, batchfactoryv11.ProductionSucceeded, "https://media.example/opening-1.mp4", time.Unix(30, 0)))
 	if _, complete := automationSucceededProduction(jobs, batch, book); !complete {
 		t.Fatal("a generated opening variant with a succeeded video must complete the video stage")
+	}
+}
+
+func TestAutomationResumeStageReopensMissingOpeningBeforeVideo(t *testing.T) {
+	batch := batchfactoryv11.Batch{ID: "batch-1", SettingsState: batchfactoryv11.SettingsState{Patch: automationSettings(map[string]any{"openingEnabled": true, "openingCount": 2})}}
+	book := batchfactoryv11.Book{ID: "book-1", Videos: []batchfactoryv11.Video{{ID: "video-0", Ordinal: 0}, {ID: "video-1", Ordinal: 1}}}
+
+	if got := automationResumeStageForBook("video", batch, book); got != "opening" {
+		t.Fatalf("resume stage = %q, want opening so the missing opening prompt is generated first", got)
+	}
+
+	variants, err := json.Marshal([]batchfactoryv11.OpeningVariant{{Index: 1, Label: "换开头1", Status: "success", Prompt: "雨夜推门而入。"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book.Videos[0].SettingsState.Patch = batchfactoryv11.SettingsPatch{"openingVariants": variants}
+	if got := automationResumeStageForBook("video", batch, book); got != "video" {
+		t.Fatalf("resume stage = %q, want video after opening prompts are complete", got)
 	}
 }
 

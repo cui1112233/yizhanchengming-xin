@@ -60,10 +60,10 @@ func (s *H3KernelService) Compile(ctx context.Context, owner, batchID, bookID st
 		return H3KernelCompileResult{}, err
 	}
 	if book.DirectorRevision == nil || book.DirectorRevision.ID != strings.TrimSpace(request.DirectorRevisionID) {
-		return H3KernelCompileResult{}, fmt.Errorf("%w: active H3 director revision does not match request", ErrConflict)
+		return H3KernelCompileResult{}, fmt.Errorf("%w: 当前导演分镜与请求不一致，请刷新后重试", ErrConflict)
 	}
 	if book.DirectorRevision.Output.H3Director == nil {
-		return H3KernelCompileResult{}, fmt.Errorf("%w: active Director revision is legacy-only and has no H3 document", ErrConflict)
+		return H3KernelCompileResult{}, fmt.Errorf("%w: 当前导演分镜是旧版格式（缺少 H3 分镜文档），请重新生成导演分镜", ErrConflict)
 	}
 	document := *book.DirectorRevision.Output.H3Director
 	previous, previousErr := repository.LatestH3VideoCompilation(ctx, owner, batchID, bookID, book.DirectorRevision.ID)

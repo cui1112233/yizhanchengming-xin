@@ -626,7 +626,10 @@ function Invoke-LocalPreflight {
   $failed = @()
   $instancePid = 0
   $launchOutput = ''
-  $launcher = Join-Path $PSScriptRoot 'start-local-go.ps1'
+  # 候选程序必须和日常 4001 使用同一套本地评审配置。直接调用基础启动器
+  # 不会装载 MySQL/Redis/桥接密钥，结果只是候选进程立即退出，门禁误报
+  # “/health 未就绪”。评审启动器只从本机配置装载凭证，不会把凭证打包。
+  $launcher = Join-Path $PSScriptRoot 'start-local-go-review.ps1'
 
   try {
     # 用 Start-Process + 文件重定向启动候选实例，再用 Process.WaitForExit 等
@@ -638,7 +641,7 @@ function Invoke-LocalPreflight {
       -RedirectStandardOutput $launchLog -RedirectStandardError $launchErrLog `
       -ArgumentList @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $launcher,
-        '-SkipBuild', '-NoBuildCheck', '-Detached',
+        '-SkipBuild', '-Detached',
         '-ListenAddr', "127.0.0.1:$Port",
         '-BinaryPath', $WindowsBinary, '-ManifestPath', $manifestPath
       )

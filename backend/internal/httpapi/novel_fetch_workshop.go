@@ -19,6 +19,7 @@ import (
 
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/safehttp"
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
@@ -1547,6 +1548,31 @@ func processWorkshopConfiguredText(ctx context.Context, store novelfetchworkshop
 		}
 		trace = append(trace, map[string]any{"stage": "sensitive_ai", "title": "敏感词 AI 修复", "changed": before != processed, "chars": len([]rune(processed)), "failed": failed})
 		if failed > 0 {
+			resolved := 0
+			masked := 0
+			for _, item := range sensitiveItems {
+				if !strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "failed") {
+					continue
+				}
+				keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
+				if keyword == "" || keyword == "<nil>" {
+					continue
+				}
+				if strings.Contains(processed, keyword) {
+					processed = strings.ReplaceAll(processed, keyword, strings.Repeat("＊", len([]rune(keyword))))
+					item["source"] = "mask"
+					item["masked"] = true
+					masked++
+				} else {
+					item["source"] = "fallback"
+				}
+				item["status"] = "done"
+				resolved++
+			}
+			if resolved == failed {
+				trace = append(trace, map[string]any{"stage": "sensitive_fallback", "title": "敏感词自动兜底", "changed": true, "chars": len([]rune(processed)), "resolved": resolved, "masked": masked})
+				return processed, trace, sensitiveItems, nil
+			}
 			return processed, trace, sensitiveItems, fmt.Errorf("敏感词 AI 修复失败 %d 处，已停止后续处理", failed)
 		}
 	}
@@ -1654,7 +1680,7 @@ func fetchNovelWithSettings(ctx context.Context, store novelfetchworkshop.Store,
 		if seconds := intValue(fetchConfig["timeout_seconds"]); seconds > 0 {
 			base := configured.Client
 			if base == nil {
-				base = &http.Client{}
+				base = safehttp.NewClient(safehttp.Options{})
 			}
 			client := *base
 			client.Timeout = time.Duration(seconds) * time.Second
@@ -2353,7 +2379,15 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				document.Meta["sensitiveReplaced"] = sensitiveCount
 				document.Meta["rulesTrace"] = rulesTrace
 				document.Meta["rulesTraceByVersion"] = map[string]any{"original": rulesTrace}
+				document.Meta["status"] = novelfetchworkshop.TaskStatusInputReady
+				document.Meta["queueState"] = novelfetchworkshop.TaskStatusInputReady
+				delete(document.Meta, "error")
 				setSensitiveDetails(document.Meta, sensitiveItems, sensitiveCount)
+				recoveryDetail := "原文重新获取和处理完成，等待下一步提交"
+				if hasStoredRaw {
+					recoveryDetail = "已使用保存的原文完成敏感词处理，无需重新抓取；等待下一步提交"
+				}
+				appendNovelFetchDocumentLog(&document, "process_input_ready", recoveryDetail, time.Now().UTC())
 				if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, processedText); err != nil {
 					failed++
 					retryStages["fetch"]++

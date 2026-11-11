@@ -9,13 +9,13 @@ import (
 
 func AuthMigrations() []Migration {
 	return []Migration{{
-		Version: 7802004,
-		SQL: AuthSchemaStatements(),
+		Version:          7802004,
+		SQL:              AuthSchemaStatements(),
 		CallbackChecksum: "go-auth-mysql-schema-v1",
 		// The public database already contains this verified auth schema from
 		// the first Go-compatible release, which used the SQL-era checksum.
 		LegacyChecksums: []string{"bb76069aedb05e6ee9ff9e887edda99b349fdecc5bc2fbdc56400b94cb8375e1"},
-		Adopt: adoptAuthSchemaLedger,
+		Adopt:           adoptAuthSchemaLedger,
 	}}
 }
 

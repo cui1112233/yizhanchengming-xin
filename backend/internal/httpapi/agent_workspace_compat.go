@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -34,10 +33,19 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return "", false
 		}
-		owner := strings.TrimSpace(identity.Username)
+		owner, ownerErr := SafeUsername(identity.Username)
+		if ownerErr != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "用户名不合法"})
+			return "", false
+		}
 		if strings.TrimSpace(legacyRoot) != "" {
+			legacyPath, pathErr := UserScopedPath(legacyRoot, owner, "agent-tasks.json")
+			if pathErr != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "用户名不合法"})
+				return "", false
+			}
 			importMu.Lock()
-			_, err := agentworkspace.ImportLegacyFile(req.Context(), store, owner, filepath.Join(legacyRoot, owner, "agent-tasks.json"), clock().UTC())
+			_, err := agentworkspace.ImportLegacyFile(req.Context(), store, owner, legacyPath, clock().UTC())
 			importMu.Unlock()
 			if err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "导入旧 Agent 项目失败"})

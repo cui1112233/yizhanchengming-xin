@@ -85,9 +85,13 @@ test('puts a plus row below each slot-bound prompt table', () => {
 
 test('uses the same slot-bound plus row for every non-batch prompt library', () => {
   assert.match(source, /const librarySections = useMemo/);
-  assert.match(source, /createSlot: slot\.id/);
+  assert.match(source, /createSlot: cmModule \? '' : slot\.id/);
   assert.match(source, /module !== 'batch-factory'/);
   assert.match(source, /children: presetTable\(section\.items, section\.createSlot\)/);
+});
+
+test('hides the internal preset ID column only for the CM plugin module', () => {
+  assert.match(source, /module === 'luoshui-plugin' \? \[\] : \[\{ title: '预设词 ID'/);
 });
 
 test('puts comic child-section plus rows below their own prompt tables', () => {

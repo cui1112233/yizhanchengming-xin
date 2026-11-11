@@ -60,6 +60,50 @@ func TestUserConfigReportsModelManagementForOwner(t *testing.T) {
 	}
 }
 
+func TestMemberUserConfigUsesBoundManagerModelCatalog(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	accounts := &applicationTestStore{accounts: map[string]auth.Account{
+		"manager": {Username: "manager", Active: true},
+		"member":  {Username: "member", Active: true},
+	}}
+	profiles := NewMemberProfileStore(t.TempDir())
+	if err := profiles.writeArray("member-profiles.json", []map[string]any{
+		{"username": "manager", "role": "manager"},
+		{"username": "member", "role": "member", "boundTo": "manager"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	catalogStore := novelfetchworkshop.NewMemoryStore()
+	if err := catalogStore.PutConfig(context.Background(), "manager", map[string]any{
+		"modelCatalog": []any{map[string]any{"id": "image-primary", "kind": "image", "enabled": true, "modelId": "gpt-image-2", "credential": "manager-secret"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	registerUserConfigRoutes(mux, BridgeAuth{Secret: "test-secret", Now: func() time.Time { return now }, AuthStore: accounts}, NewUserConfigStore(t.TempDir()), accounts, catalogStore, profiles)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	SignBridgeRequest(req, "member", false, now, "test-secret")
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, req)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	catalog, _ := payload["modelCatalog"].([]any)
+	if len(catalog) != 1 || catalog[0].(map[string]any)["id"] != "image-primary" {
+		t.Fatalf("组员配置应继承绑定组长的模型目录：%#v", payload["modelCatalog"])
+	}
+	if payload["canManageApi"] != false || payload["managedBy"] != "manager" {
+		t.Fatalf("组员只能使用、不能管理组长模型：%#v", payload)
+	}
+	if strings.Contains(response.Body.String(), "manager-secret") {
+		t.Fatalf("组长密钥不能返回给组员：%s", response.Body.String())
+	}
+}
+
 func TestUserConfigSeedsImportedWorkshopCatalog(t *testing.T) {
 	store := NewUserConfigStore(t.TempDir())
 	settings, err := store.GetConfig(context.Background(), "new-user")

@@ -5,6 +5,7 @@ export const defaultEditorLayout = Object.freeze({
   resourceCollapsed: false,
   inspectorCollapsed: false,
   timelineCollapsed: false,
+  playheadFollow: true,
 });
 
 function dimension(value, total, fallbackRatio, minimum, maximum) {
@@ -24,6 +25,7 @@ export function normalizeEditorLayout(layout = {}, viewport = {}) {
     resourceCollapsed: Boolean(layout.resourceCollapsed),
     inspectorCollapsed: Boolean(layout.inspectorCollapsed),
     timelineCollapsed: Boolean(layout.timelineCollapsed),
+    playheadFollow: layout.playheadFollow !== false,
     inspectorMode: width < 1180 ? 'drawer' : 'panel',
   };
 }

@@ -151,6 +151,13 @@ func TestWriteStoreErrorKeepsMissingConfigAndRevisionConflictApart(t *testing.T)
 		{"bare revision conflict", batchfactoryv11.ErrConflict, "数据版本冲突，请重试"},
 		// 历史记录里业务校验被 ErrConflict 包住时，返回原因本身，不再带前缀。
 		{"legacy wrapped business reason", fmt.Errorf("%w: 请在资产设置中选择漫画资产提示词", batchfactoryv11.ErrConflict), "请在资产设置中选择漫画资产提示词"},
+		// 缺导演分镜是业务前置条件，必须给出可执行文案，不能伪装成版本冲突。
+		{"missing director revision", fmt.Errorf("%w: %s", batchfactoryv11.ErrDirectorRevisionRequired, batchfactoryv11.DirectorRevisionRequiredMessage), batchfactoryv11.DirectorRevisionRequiredMessage},
+		{"bare director revision required", batchfactoryv11.ErrDirectorRevisionRequired, batchfactoryv11.DirectorRevisionRequiredMessage},
+		// 真正的版本冲突仍然返回版本冲突文案。
+		{"wrapped bare revision conflict", fmt.Errorf("%w: ", batchfactoryv11.ErrConflict), "数据版本冲突，请重试"},
+		// 带具体原因的冲突原样返回，即使原因里出现 revision 字样也不改写。
+		{"business conflict mentioning revision", fmt.Errorf("%w: director revision rev-9 还没有编译结果", batchfactoryv11.ErrConflict), "director revision rev-9 还没有编译结果"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -165,6 +172,34 @@ func TestWriteStoreErrorKeepsMissingConfigAndRevisionConflictApart(t *testing.T)
 			}
 			if strings.Contains(body["error"], batchfactoryv11.ErrConflict.Error()) {
 				t.Fatalf("user-facing error must not contain the raw conflict prefix: %q", body["error"])
+			}
+		})
+	}
+}
+
+func TestWriteStoreErrorFallbacksAreChineseAndActionable(t *testing.T) {
+	cases := []struct {
+		name    string
+		err     error
+		status  int
+		message string
+	}{
+		{"bare not found", batchfactoryv11.ErrNotFound, http.StatusNotFound, "目标数据不存在，请刷新列表后重试"},
+		{"bare invalid", batchfactoryv11.ErrInvalid, http.StatusBadRequest, "请求参数无效，请检查后重试"},
+		{"bare unavailable", batchfactoryv11.ErrUnavailable, http.StatusServiceUnavailable, "当前能力暂不可用，请检查相关配置后重试"},
+		{"bare upstream", batchfactoryv11.ErrUpstream, http.StatusServiceUnavailable, "上游服务暂时不可用，请稍后重试"},
+		{"unknown store error", fmt.Errorf("dial tcp 127.0.0.1:3306: connect: connection refused"), http.StatusInternalServerError, "服务内部错误，请稍后重试"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			writeStoreError(rec, tc.err)
+			if rec.Code != tc.status {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			body := decodeBody[map[string]string](t, rec)
+			if body["error"] != tc.message {
+				t.Fatalf("error=%q, want %q", body["error"], tc.message)
 			}
 		})
 	}

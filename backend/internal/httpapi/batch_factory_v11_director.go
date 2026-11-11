@@ -252,24 +252,27 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			revisions = append(revisions, revision)
 		}
 		status := http.StatusCreated
+		payload := map[string]any{"directorRevisions": revisions, "failures": failures}
 		if len(revisions) == 0 && len(failures) > 0 {
 			status = http.StatusConflict
+			payload["error"] = "全部书籍的导演分镜生成失败"
 		}
-		writeJSON(w, status, map[string]any{"directorRevisions": revisions, "failures": failures})
+		writeJSON(w, status, payload)
 	})
 }
 
 func safeDirectorError(err error) string {
+	// 这里的文案会直接进批量结果列表展示给用户，必须是中文可执行文案。
 	switch {
 	case errors.Is(err, batchfactoryv11.ErrNotFound):
-		return "not found"
+		return "书籍不存在或已被删除"
 	case errors.Is(err, batchfactoryv11.ErrConflict):
-		return "director prerequisites not satisfied"
+		return "导演分镜前置条件不满足，请先补齐 Hook 与分镜设置"
 	case errors.Is(err, batchfactoryv11.ErrInvalid):
-		return "invalid director input or output"
+		return "导演输入或输出格式无效，请检查提示词与文本模型配置"
 	case errors.Is(err, batchfactoryv11.ErrUnavailable):
-		return "director unavailable"
+		return "导演服务暂不可用，请检查文本模型配置"
 	default:
-		return "director failed"
+		return "导演分镜生成失败，请查看该书的阶段日志"
 	}
 }

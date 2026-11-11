@@ -1,0 +1,7 @@
+【批次 step 3/8 · 资产提取】
+依次 `run_skill`：
+- luoshui-character-parse-v1 → character_parse_result.json
+- luoshui-scene-parse-v1 → scene_parse_result.json
+- luoshui-prop-parse-v1 → prop_parse_result.json
+完成后调用 `merge_character_tags` 合并 character_tags.json。
+名称须与剧本一致。

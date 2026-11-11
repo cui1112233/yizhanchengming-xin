@@ -7,35 +7,28 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'ApiConfigPage.jsx'), 'utf8');
 
-test('平台预设模型统一使用确定配置并在保存成功后自动启用', () => {
-  assert.match(source, /enabled:\s*true/);
-  assert.match(source, /message\.success\('配置已保存'\)/);
-  assert.match(source, /presetSavingId === preset\.id/);
-  assert.match(source, /cardState\.buttonText/);
-  assert.doesNotMatch(source, />保存配置</);
+test('平台预设卡没有启用开关：填了 Key 就按生效处理', () => {
+  assert.match(source, /enabled: !clearing/);
+  assert.match(source, /else if \(clearing\) payload\.clearCredential = true/);
+  assert.doesNotMatch(source, /togglePreset\(/);
+  assert.doesNotMatch(source, /<Switch/);
 });
 
-test('H3 确定配置必须校验 key，并和 workflow 一起提交', () => {
-  assert.ok(source.includes("if (preset.id === 'minimax-h3-video' && !key && existing?.hasCredential !== true)"));
-  assert.ok(source.includes('payload.workflowId = workflowId || DEFAULT_H3_WORKFLOW_ID'));
+test('预设卡不再有锁定遮罩与“先关闭开关”提示', () => {
+  assert.doesNotMatch(source, /ac-platform-preset-lock/);
+  assert.doesNotMatch(source, /请先关闭开关/);
 });
 
-test('未配置直接点击开关只提示填写 API Key', () => {
-  assert.match(source, /message\.warning\('请输入 API Key'\)/);
-  assert.match(source, /onChange=\{enabled => togglePreset\(preset, enabled\)\}/);
-});
-
-test('启用后锁定所有预设配置并提示先关闭开关', () => {
-  assert.match(source, /message\.info\('请先关闭开关，再修改配置'\)/);
-  assert.match(source, /disabled=\{!cardState\.editable\}/);
-  assert.match(source, /ac-platform-preset-lock/);
-});
-
-test('已保存 H3 凭据后允许不重复填写 Key 直接启用', () => {
-  assert.match(source, /preset\.id === 'minimax-h3-video' && !key && existing\?\.hasCredential !== true/);
-});
-
-test('does not show a video model as enabled until its required configuration is complete', () => {
+test('未保存时输入框保持可编辑，保存中才禁用', () => {
   assert.match(source, /getPresetCardState\(preset, model, presetSavingId === preset\.id\)/);
-  assert.match(source, /checked=\{cardState\.active\}/);
+  assert.match(source, /disabled=\{!cardState\.editable\}/);
+});
+
+test('文案明确说明清空 Key 等于停用，不依赖额外开关', () => {
+  assert.match(source, /填好 API Key 后立即生效/);
+  assert.match(source, /清空 Key 即从下拉移除/);
+});
+
+test('目录模型不再向三组传启用回调', () => {
+  assert.doesNotMatch(source, /onToggleModelEnabled|modelTogglingId/);
 });

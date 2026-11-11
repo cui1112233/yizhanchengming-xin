@@ -299,7 +299,7 @@ func TestNovelFetchProcessStartRunsFetchAndSensitiveAIRepair(t *testing.T) {
 	}
 }
 
-func TestNovelFetchProcessStartPersistsRawBeforeSensitiveAIFailure(t *testing.T) {
+func TestNovelFetchProcessStartPersistsRawAndContinuesAfterSensitiveAIFailure(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -321,13 +321,40 @@ func TestNovelFetchProcessStartPersistsRawBeforeSensitiveAIFailure(t *testing.T)
 		t.Fatalf("process start status=%d body=%s", response.Code, response.Body.String())
 	}
 	document := waitForNovelFetchDocument(t, store, "12345678901", func(document novelfetchworkshop.Document) bool {
-		return document.Meta["status"] == "waiting_retry" || document.Meta["status"] == "failed"
+		return document.Meta["originalStatus"] == "done"
 	})
 	if document.OriginalRaw != "他说他出轨了" {
 		t.Fatalf("raw original was lost after sensitive AI failure: raw=%q meta=%#v", document.OriginalRaw, document.Meta)
 	}
-	if document.Meta["originalStatus"] != "waiting_sensitive_ai" {
-		t.Fatalf("original status=%#v, want waiting_sensitive_ai", document.Meta["originalStatus"])
+	if document.Meta["originalStatus"] != "done" {
+		t.Fatalf("original status=%#v, want done", document.Meta["originalStatus"])
+	}
+}
+
+func TestProcessWorkshopConfiguredTextContinuesWithSafeFallbackByDefault(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{
+		"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
+			map[string]any{"find": "出轨", "replace": "出轨", "enabled": true},
+		}}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+		return "", errors.New("敏感词模型暂时不可用")
+	})
+
+	processed, _, items, err := processWorkshopConfiguredText(
+		context.Background(), store, "tester", "12345678901", "他说他出轨了", "original", true, provider,
+	)
+	if err != nil {
+		t.Fatalf("automation should mask failed sensitive hits and continue: %v", err)
+	}
+	if processed != "他说他关系越界了" {
+		t.Fatalf("processed=%q, want safe deterministic fallback", processed)
+	}
+	if len(items) != 1 || items[0]["status"] != "done" || items[0]["source"] != "fallback" {
+		t.Fatalf("resolved hit should remain visible in logs as a fallback: %#v", items)
 	}
 }
 

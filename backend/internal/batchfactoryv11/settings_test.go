@@ -106,10 +106,10 @@ func TestResolveSettingsGivesBookOverridesPriorityOverBatchUnifiedConfiguration(
 		"publishSettings":         raw(map[string]any{"websiteProfileId": "unified-profile"}),
 	}
 	book := SettingsPatch{
-		"videoProvider":    raw("yfai"),
-		"videoModelId":     raw("seedance-2"),
+		"videoProvider":           raw("yfai"),
+		"videoModelId":            raw("seedance-2"),
 		"storyboardDurationLimit": raw(5),
-		"videoResolution":  raw("720p"),
+		"videoResolution":         raw("720p"),
 	}
 
 	effective := ResolveSettings(batch, book)
@@ -271,7 +271,7 @@ func TestNormalizeLegacyNestedPatchRestoresTheSavedUnifiedConfiguration(t *testi
 				},
 			},
 		}),
-		"aiPromptConfig":    raw(map[string]any{"video": map[string]any{"presetId": "h3-director"}}),
+		"aiPromptConfig":   raw(map[string]any{"video": map[string]any{"presetId": "h3-director"}}),
 		"expectedRevision": raw(3),
 	}
 

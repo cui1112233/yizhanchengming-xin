@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 type YFAISeedanceAdapter struct {
@@ -142,7 +144,7 @@ func (a *YFAISeedanceAdapter) do(ctx context.Context, method, endpoint string, p
 	}
 	client := a.Client
 	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
+		client = safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	resp, err := client.Do(req)
 	if err != nil {

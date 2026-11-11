@@ -600,3 +600,69 @@ func TestRetriedVideoUsesTheBookEngineInsteadOfTheStoredProvider(t *testing.T) {
 			registry.requested[0], VideoProviderYFAISeedance, VideoProviderAutoDLH3)
 	}
 }
+
+func TestUserFacingErrorTextRewritesLegacyTextModelFailure(t *testing.T) {
+	message := `漫画页提示词 1/1 张失败: 文本模型请求失败（参数或请求格式不合法，HTTP 400, model=[anti-2]gemini-3-8-flash): {"error":{"message":"PROHIBITED_CONTENT/成人内容拒绝，请修改提示词后重试 (request id: 20261111095229058933748268d9d6d705sP3)","type":"invalid_request_error","param":"","code":null}}`
+	got := UserFacingErrorText(message)
+	headline, raw, found := strings.Cut(got, "\n上游原文：")
+	if !found {
+		t.Fatalf("legacy message must be rewritten with a raw section: %q", got)
+	}
+	for _, part := range []string{"漫画页提示词 1/1 张失败", "成人内容", "自动执行两轮安全修复", "停止继续调用"} {
+		if !strings.Contains(headline, part) {
+			t.Fatalf("headline misses %q: %s", part, headline)
+		}
+	}
+	for _, banned := range []string{"HTTP 400", "model=", "PROHIBITED_CONTENT", "invalid_request_error"} {
+		if strings.Contains(headline, banned) {
+			t.Fatalf("headline must not expose %q: %s", banned, headline)
+		}
+	}
+	for _, part := range []string{"HTTP 400", "model=[anti-2]gemini-3-8-flash", "request id: 2026"} {
+		if !strings.Contains(raw, part) {
+			t.Fatalf("raw misses %q: %s", part, raw)
+		}
+	}
+}
+
+func TestUserFacingErrorTextDropsEnglishSentinelsAnywhereInMessage(t *testing.T) {
+	cases := []struct {
+		name    string
+		message string
+		want    string
+	}{
+		{
+			name:    "前置哨兵",
+			message: "invalid input: 漫画页数量与分页不一致（期望 1 页，实际 0 页）",
+			want:    "漫画页数量与分页不一致（期望 1 页，实际 0 页）",
+		},
+		{
+			name:    "句中哨兵",
+			message: "漫画页提示词 4/29 张失败: invalid input: 漫画页数量与分页不一致（期望 1 页，实际 0 页）",
+			want:    "漫画页提示词 4/29 张失败: 漫画页数量与分页不一致（期望 1 页，实际 0 页）",
+		},
+		{
+			name:    "旧记录英文状态码直译",
+			message: "temporary upstream failure: image provider returned HTTP 400: 目前无法在此聊天中直接生成图片",
+			want:    "图片通道拒绝了本次请求（HTTP 400）：目前无法在此聊天中直接生成图片",
+		},
+		{
+			name:    "裸哨兵",
+			message: "invalid input",
+			want:    "请求参数无效，请检查后重试",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := UserFacingErrorText(tc.message)
+			if got != tc.want {
+				t.Fatalf("got=%q want=%q", got, tc.want)
+			}
+			for _, english := range []string{"invalid input", "temporary upstream failure", "image provider returned"} {
+				if strings.Contains(got, english) {
+					t.Fatalf("user facing text leaks %q: %q", english, got)
+				}
+			}
+		})
+	}
+}

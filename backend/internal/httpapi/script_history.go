@@ -24,14 +24,10 @@ func NewScriptHistoryStore(root string) *ScriptHistoryStore {
 }
 
 func (s *ScriptHistoryStore) userDir(username string) (string, error) {
-	username = strings.TrimSpace(username)
-	if username == "" || strings.ContainsAny(username, `/\\`) || username == "." || username == ".." {
-		return "", fmt.Errorf("invalid user")
-	}
 	if s == nil || s.Root == "" {
 		return "", fmt.Errorf("script history store is not configured")
 	}
-	return filepath.Join(s.Root, username, "outputs"), nil
+	return UserScopedPath(s.Root, username, "outputs")
 }
 
 func validScriptHistoryID(id string) bool {
@@ -200,7 +196,14 @@ func RegisterScriptHistoryRoutes(root *http.ServeMux, auth BridgeAuth, store *Sc
 				return
 			}
 			var patch map[string]any
-			if json.NewDecoder(req.Body).Decode(&patch) != nil {
+			if !limitRequestBody(w, req, maxJSONBodyBytes) {
+				return
+			}
+			if err := json.NewDecoder(req.Body).Decode(&patch); err != nil {
+				if isBodyTooLarge(err) {
+					writePayloadTooLarge(w, maxJSONBodyBytes)
+					return
+				}
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 				return
 			}

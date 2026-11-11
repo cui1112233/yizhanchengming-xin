@@ -239,7 +239,6 @@ func TestPersistDirectorRevisionKeepsUnchangedSlots(t *testing.T) {
 	}
 }
 
-
 // 输入 digest 变化时必须走原有轮换：旧槽位 orphaned，新槽位重建。
 func TestPersistDirectorRevisionRotatesSlotsWhenDigestChanges(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -362,4 +361,3 @@ func TestPersistDirectorRevisionKeepsSlotsAcrossConsecutiveRetries(t *testing.T)
 		t.Fatalf("consecutive identical retries must not rotate slots: %v", err)
 	}
 }
-

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { comicImageLoadPlan, comicInlinePresentation, nextComicOutputVisibleCount, resolveComicImageSources } from './batchFactoryComicStatus.js';
+import { comicImageLoadPlan, comicInlinePresentation, comicPageErrorHeadline, nextComicOutputVisibleCount, resolveComicImageSources } from './batchFactoryComicStatus.js';
 
 test('已选主图时优先显示图片，不被历史失败状态覆盖', () => {
   const result = comicInlinePresentation({
@@ -51,6 +51,25 @@ test('生成失败与尚未创建可区分', () => {
     hasPrimary: false
   });
   assert.equal(noPrompt.placeholder, '尚未提取漫画提示词');
+});
+
+test('分页失败时列表行显示落库的中文主文案，原文不顶到第一行', () => {
+  const result = comicInlinePresentation({
+    page: {
+      generationState: 'failed',
+      promptStatus: 'ready',
+      imageStatus: 'none',
+      images: [],
+      generationError: '图片通道拒绝了本次请求（HTTP 400）：提示词包含敏感内容\n上游原文：HTTP 400 · content policy violation'
+    },
+    selectedVideo: { comicPrompt: 'prompt' },
+    loading: false,
+    error: '',
+    hasPrimary: false
+  });
+  assert.equal(result.placeholder, '图片通道拒绝了本次请求（HTTP 400）：提示词包含敏感内容');
+  assert.equal(comicPageErrorHeadline({}), '');
+  assert.equal(comicPageErrorHeadline({ generationError: '纯中文原因' }), '纯中文原因');
 });
 
 test('请求失败只显示读取失败并允许重试', () => {

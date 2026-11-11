@@ -352,7 +352,14 @@ func persistBatchFetchFailure(ctx context.Context, store batchfactoryv11.Store, 
 	metadata["originalRawStatus"] = "failed"
 	metadata["queueStage"] = "original"
 	metadata["fetchError"] = err.Error()
-	metadata["fetchRetryable"] = retryableBatchFetchError(err)
+	technicalErr := errors.Unwrap(err)
+	if technicalErr != nil {
+		metadata["fetchTechnicalError"] = technicalErr.Error()
+	} else {
+		delete(metadata, "fetchTechnicalError")
+		technicalErr = err
+	}
+	metadata["fetchRetryable"] = retryableBatchFetchError(technicalErr)
 	metadata["fetchAttempts"] = attempts
 	metadata["fetchFailedAt"] = time.Now().UTC()
 	// 失败登记本身也可能因为重试期间 revision 已变化而写不进去；先回读最新
@@ -382,6 +389,35 @@ func persistBatchFetchFailure(ctx context.Context, store batchfactoryv11.Store, 
 				break
 			}
 		}
+	}
+}
+
+type batchFetchUserError struct {
+	message string
+	cause   error
+}
+
+func (e *batchFetchUserError) Error() string { return e.message }
+func (e *batchFetchUserError) Unwrap() error { return e.cause }
+
+// batchFetchDisplayError turns the upstream's technical 400 into an action the
+// user can actually take. A missing book-info record is deterministic: retrying
+// the same book ID and platform cannot repair it.
+func batchFetchDisplayError(err error, book batchfactoryv11.Book) error {
+	if err == nil || !strings.Contains(err.Error(), "获取书籍信息失败") {
+		return err
+	}
+	bookID := strings.TrimSpace(book.BookID)
+	if bookID == "" {
+		bookID = strings.TrimSpace(book.ID)
+	}
+	platformName := firstMetadataString(book.SourceMetadata, "platformName")
+	if platformName == "" {
+		platformName = strings.TrimSpace(book.Platform)
+	}
+	return &batchFetchUserError{
+		message: fmt.Sprintf("书号 %s 在%s无法读取：书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试", bookID, platformName),
+		cause:   err,
 	}
 }
 
@@ -671,8 +707,9 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 			var fetchErr error
 			result, resolvedBookID, fallbackFrom, fetchErr, attempts = fetchBatchSourceWithGiantCandidate(r.Context(), fetcher, giantResolver, *book, bookID, platform, maxTxt)
 			if fetchErr != nil {
-				persistBatchFetchFailure(r.Context(), store, owner, batch.ID, *book, fetchErr, attempts)
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": fetchErr.Error()})
+				displayErr := batchFetchDisplayError(fetchErr, *book)
+				persistBatchFetchFailure(r.Context(), store, owner, batch.ID, *book, displayErr, attempts)
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": displayErr.Error()})
 				return
 			}
 			bookID = resolvedBookID

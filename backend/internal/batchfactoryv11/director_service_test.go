@@ -13,6 +13,25 @@ import (
 	"qiantie/backend/internal/prompt"
 )
 
+func TestRetryableModelOutputErrorKeepsEnglishParserDetailOffHeadline(t *testing.T) {
+	err := retryableModelOutputError(fmt.Errorf("invalid character 'x' looking for beginning of value"))
+	headline, raw, found := strings.Cut(err.Error(), "\n上游原文：")
+	if !found {
+		t.Fatalf("parser detail must be on the raw line: %q", err.Error())
+	}
+	if !strings.Contains(headline, "文本模型输出不符合当前格式要求") || strings.Contains(headline, "invalid character") {
+		t.Fatalf("headline=%q must stay Chinese", headline)
+	}
+	if !strings.Contains(raw, "invalid character") {
+		t.Fatalf("raw=%q must keep parser detail", raw)
+	}
+	// 已经是中文的业务原因保持在主文案里，不该被当成上游原文。
+	business := retryableModelOutputError(fmt.Errorf("换开头变体未全部生成；第 1 个变体缺少画面描述"))
+	if !strings.Contains(business.Error(), "：换开头变体未全部生成") || strings.Contains(business.Error(), "上游原文") {
+		t.Fatalf("business reason should stay inline: %q", business.Error())
+	}
+}
+
 type queuedDirectorProvider struct {
 	values []string
 	calls  []TextCompletionRequest

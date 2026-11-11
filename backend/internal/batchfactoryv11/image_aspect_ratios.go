@@ -10,7 +10,7 @@ import "strings"
 // the same values. The Doubao relay whitelist (executors/doubao-relay/
 // src-tauri/src/tasks/validate.rs IMAGE_RATIOS) is the upstream evidence that
 // 2:3, 3:4, 4:3 and 3:2 are native options on the live Doubao image page.
-var SupportedImageAspectRatios = []string{"9:16", "16:9", "1:1", "3:4", "4:3", "2:3", "3:2"}
+var SupportedImageAspectRatios = []string{"9:16", "16:9", "21:9", "1:1", "3:4", "4:3", "2:3", "3:2"}
 
 // IsSupportedImageAspectRatio reports whether ratio belongs to the maintained
 // image ratio set. An empty value is treated as "not set" and is not supported
@@ -42,7 +42,7 @@ func ImageAspectRatioOrientation(ratio string) string {
 	switch strings.TrimSpace(ratio) {
 	case "9:16", "3:4", "2:3":
 		return "竖幅构图"
-	case "16:9", "4:3", "3:2":
+	case "16:9", "21:9", "4:3", "3:2":
 		return "横幅构图"
 	case "1:1":
 		return "方形构图"

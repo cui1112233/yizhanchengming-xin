@@ -109,6 +109,24 @@ test('OpenAI compatible catalog models belong to the personal API channel', () =
   assert.deepEqual(modelOptionsForProvider([textModel], 'text', 'personal_api').map(item => item.value), ['custom-text']);
 });
 
+test('API integration custom image models stay in the personal API dropdown', () => {
+  const customImage = {
+    id: 'custom:ch_local_image2k',
+    kind: 'image',
+    displayName: '[0.035]gpt-image-2-2k',
+    provider: 'api_integrations'
+  };
+  assert.equal(providerForCatalogModel(customImage, 'personal_api'), 'personal_api');
+  assert.deepEqual(
+    modelOptionsForProvider([customImage], 'image', 'personal_api').map(item => item.value),
+    ['custom:ch_local_image2k']
+  );
+  assert.deepEqual(
+    providerOptionsForModels([customImage], 'image').map(item => item.value),
+    ['personal_api', 'doubao_local_executor', 'autodl_comfyui']
+  );
+});
+
 test('FanKe video expands the six configured models even without a catalog record', () => {
   const options = modelOptionsForProvider(catalog, 'video', 'yfai_seedance', '', { expandFanKeModels: true });
   const fanKeOptions = options.filter(item => item.value.startsWith('fanke-video-api::'));

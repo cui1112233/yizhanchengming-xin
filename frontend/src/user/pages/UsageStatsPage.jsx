@@ -1,4 +1,4 @@
-import { Progress, Skeleton, Tag, message } from 'antd';
+import { Alert, Button, Progress, Skeleton, Tag, message } from 'antd';
 import { Activity, Coins, Layers3, Sparkles, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getMemberCenter, getTeamMembers } from '../../shared/api/member';
@@ -29,19 +29,28 @@ export default function UsageStatsPage() {
   const [loading, setLoading] = useState(true);
   const [center, setCenter] = useState(null);
   const [team, setTeam] = useState([]);
+  const [teamError, setTeamError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    Promise.all([getMemberCenter(), getTeamMembers().catch(() => ({ members: [] }))])
+    setLoading(true);
+    setTeamError('');
+    Promise.all([getMemberCenter(), getTeamMembers().then(data => ({ data })).catch(error => ({ error }))])
       .then(([nextCenter, teamResult]) => {
         if (!alive) return;
         setCenter(nextCenter);
-        setTeam(teamResult.members || []);
+        if (teamResult.error) {
+          // 团队数据读取失败不能当成“没有组员”，否则页面会显示 0 和「暂无团队用量」。
+          setTeamError(teamResult.error.message || '团队成员用量读取失败');
+        } else {
+          setTeam(teamResult.data?.members || []);
+        }
       })
       .catch(error => message.error(error.message || '用量统计加载失败'))
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, []);
+  }, [reloadKey]);
 
   const self = center?.member;
   const day = center?.usage?.day || {};
@@ -102,6 +111,14 @@ export default function UsageStatsPage() {
       </Panel>
 
       {isAdmin ? <Panel title="团队成员用量 TOP6" eyebrow="TEAM RANKING">
+        {teamError ? <Alert
+          type="error"
+          showIcon
+          message="团队成员用量读取失败"
+          description={teamError}
+          action={<Button size="small" onClick={() => setReloadKey(key => key + 1)}>重试</Button>}
+          style={{ marginBottom: 12 }}
+        /> : null}
         <div className="ac-ranking-list usage-ranking">
           {ranking.map((member, index) => {
             const percent = teamMonth ? Math.round((Number(member.usage?.month?.totalTokens || 0) / teamMonth) * 100) : 0;
@@ -112,9 +129,9 @@ export default function UsageStatsPage() {
               <div className="ac-ranking-value"><strong>{formatTokens(member.usage?.month?.totalTokens)}</strong><small>{contentProductionCalls(member.usage?.month)} 次制作 · {member.usage?.month?.costCurrency ? `${member.usage.month.costCurrency} ${Number(member.usage.month.estimatedCost || 0).toFixed(4)}` : `${percent}%`}</small></div>
             </div>;
           })}
-          {!ranking.length ? <div className="ac-empty">暂无团队用量</div> : null}
+          {!ranking.length && !teamError ? <div className="ac-empty">暂无团队用量</div> : null}
         </div>
-        <div className="ac-side-summary"><span>团队本月合计</span><strong>{formatTokens(teamMonth)} Tokens · {teamCalls} 次调用 · {teamProductionCalls} 次制作{teamCurrency ? ` · 估算 ${teamCurrency} ${teamCost.toFixed(4)}` : ''}</strong></div>
+        <div className="ac-side-summary"><span>团队本月合计</span><strong>{teamError ? '读取失败，暂不展示合计' : `${formatTokens(teamMonth)} Tokens · ${teamCalls} 次调用 · ${teamProductionCalls} 次制作${teamCurrency ? ` · 估算 ${teamCurrency} ${teamCost.toFixed(4)}` : ''}`}</strong></div>
       </Panel> : null}
     </div>
 

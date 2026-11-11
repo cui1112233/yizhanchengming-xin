@@ -209,3 +209,84 @@ func TestComicCollectionListKeepsOnlyLatestMatchingPrimaryImages(t *testing.T) {
 		t.Fatalf("collections=%#v err=%v, want only latest duplicate", collections, err)
 	}
 }
+
+func TestComicPageGenerationErrorPersistedAndCleared(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	video := book.Videos[0]
+	ctx := context.Background()
+	message := "图片通道拒绝了本次请求（HTTP 400）：提示词包含敏感内容\n上游原文：HTTP 400 · content policy violation"
+	if _, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "漫画页图片", Status: "generation_failed", GenerationError: message,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pages, err := store.ListComicPages(ctx, "alice", batch.ID, book.ID)
+	if err != nil || len(pages) != 1 || pages[0].GenerationError != message {
+		t.Fatalf("pages=%#v err=%v, want persisted generationError", pages, err)
+	}
+	// 重新认领（status=generating 且不带错误）必须清掉上一轮的失败原因。
+	if _, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "漫画页图片", Status: "generating",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pages, err = store.ListComicPages(ctx, "alice", batch.ID, book.ID)
+	if err != nil || len(pages) != 1 || pages[0].GenerationError != "" {
+		t.Fatalf("pages=%#v err=%v, want cleared generationError on re-claim", pages, err)
+	}
+	// 成功出图同样要清空失败原因。
+	if _, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "漫画页图片", Status: "generation_failed", GenerationError: message,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page := pages[0]
+	if _, err := store.CreateComicPageImage(ctx, "alice", batch.ID, book.ID, page.ID, CreateComicPageImageInput{
+		StorageRef: "primary.png", MediaType: "image/png", Source: "doubao_local_executor",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pages, err = store.ListComicPages(ctx, "alice", batch.ID, book.ID)
+	if err != nil || len(pages) != 1 || pages[0].GenerationError != "" {
+		t.Fatalf("pages=%#v err=%v, want cleared generationError after image ready", pages, err)
+	}
+}
+
+func TestStaleGeneratingComicPagesReclaimedByLease(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	video := book.Videos[0]
+	_, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "漫画页图片",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	generating := "generating"
+	if _, err := store.PatchComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, PatchComicPageInput{Status: &generating}); err != nil {
+		t.Fatal(err)
+	}
+	// 刚更新过的页不能被回收。
+	fresh, err := store.ListStaleGeneratingComicPages(context.Background(), time.Now().Add(-time.Hour), 10)
+	if err != nil || len(fresh) != 0 {
+		t.Fatalf("fresh=%#v err=%v, 刚更新的页不应命中回收", fresh, err)
+	}
+	// 截止时间之后，停在 generating 的页应被扫出并回收。
+	before := time.Now().Add(time.Minute)
+	stale, err := store.ListStaleGeneratingComicPages(context.Background(), before, 10)
+	if err != nil || len(stale) != 1 {
+		t.Fatalf("stale=%#v err=%v, want one stale page", stale, err)
+	}
+	expired, err := store.ExpireStaleGeneratingComicPage(context.Background(), stale[0], before)
+	if err != nil || !expired {
+		t.Fatalf("expired=%t err=%v, want true", expired, err)
+	}
+	reloaded, err := store.ListComicPages(context.Background(), "alice", batch.ID, book.ID)
+	if err != nil || len(reloaded) != 1 || reloaded[0].Status != "generation_failed" {
+		t.Fatalf("pages=%#v err=%v, want generation_failed", reloaded, err)
+	}
+	// 已回收的页不会再次命中。
+	again, err := store.ListStaleGeneratingComicPages(context.Background(), before, 10)
+	if err != nil || len(again) != 0 {
+		t.Fatalf("again=%#v err=%v, want empty", again, err)
+	}
+}

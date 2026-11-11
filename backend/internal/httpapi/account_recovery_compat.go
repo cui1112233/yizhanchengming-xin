@@ -22,9 +22,13 @@ import (
 // RegisterAccountRecoveryStatusCompat serves the harmless read-only portion of
 // the recovery contract from the Go-owned profile files. Mail delivery,
 // password reset, and passkey operations remain on their existing service.
-func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeAuth, systemDir string) {
+func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeAuth, systemDir string, limiters ...*authRateLimiter) {
 	if root == nil || middleware.AuthStore == nil || systemDir == "" {
 		return
+	}
+	var limiter *authRateLimiter
+	if len(limiters) > 0 {
+		limiter = limiters[0]
 	}
 	root.Handle("GET /api/account-recovery/email/status", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
@@ -56,6 +60,18 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
+		ipKey := authRateLimitIPDimension(req)
+		userKey := authRateLimitUserDimension(identity.Username)
+		if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, ipKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
+		if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, userKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
+		limiter.record(authRateScopePasswordReset, ipKey)
+		limiter.record(authRateScopePasswordReset, userKey)
 		endpoint := strings.TrimSpace(os.Getenv("QIANTIE_MAIL_ENDPOINT"))
 		from := strings.TrimSpace(os.Getenv("QIANTIE_MAIL_FROM"))
 		if endpoint == "" || from == "" {
@@ -72,7 +88,7 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "验证链接生成失败"})
 			return
 		}
-		verifyURL := recoveryAbsoluteURL(req, "/recover?verify="+url.QueryEscape(token))
+		verifyURL := recoveryAbsoluteURL("/recover?verify=" + url.QueryEscape(token))
 		if err := sendRecoveryMail(req.Context(), endpoint, os.Getenv("QIANTIE_MAIL_TOKEN"), from, email, "验证你的一战晟铭邮箱", "请在 30 分钟内打开以下链接完成邮箱验证：\n"+verifyURL+"\n\n如果不是你本人操作，请忽略此邮件。", ""); err != nil {
 			_, _ = revokeRecoveryToken(filepath.Join(systemDir, "account-recovery.json"), "email", identity.Username)
 			status := http.StatusBadGateway
@@ -85,6 +101,11 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 		writeJSON(w, http.StatusOK, map[string]any{"sent": true, "email": email, "expiresAt": expiresAt})
 	})))
 	root.Handle("POST /api/account-recovery/password/request", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ipKey := authRateLimitIPDimension(req)
+		if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, ipKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
 		endpoint := strings.TrimSpace(os.Getenv("QIANTIE_MAIL_ENDPOINT"))
 		from := strings.TrimSpace(os.Getenv("QIANTIE_MAIL_FROM"))
 		if endpoint == "" || from == "" {
@@ -95,10 +116,22 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 			Email string `json:"email"`
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+			limiter.record(authRateScopePasswordReset, ipKey)
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
 		}
 		email := strings.TrimSpace(strings.ToLower(input.Email))
+		emailKey := "email:" + email
+		if email != "" {
+			if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, emailKey); !allowed {
+				writeAuthRateLimited(w, retryAfter)
+				return
+			}
+		}
+		limiter.record(authRateScopePasswordReset, ipKey)
+		if email != "" {
+			limiter.record(authRateScopePasswordReset, emailKey)
+		}
 		if email == "" {
 			writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true, "message": "如果该邮箱已验证并绑定账号，重置邮件将会发送。"})
 			return
@@ -117,6 +150,12 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 			}
 		}
 		if username != "" {
+			userKey := authRateLimitUserDimension(username)
+			if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, userKey); !allowed {
+				writeAuthRateLimited(w, retryAfter)
+				return
+			}
+			limiter.record(authRateScopePasswordReset, userKey)
 			account, accountErr := middleware.AuthStore.FindAccount(req.Context(), username)
 			if accountErr == nil && account.Active && recoveryProfileEmail(systemDir, username) == email {
 				token, _, issueErr := issueRecoveryToken(path, "password", username, email)
@@ -124,7 +163,7 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "重置链接生成失败"})
 					return
 				}
-				resetURL := recoveryAbsoluteURL(req, "/recover?reset="+url.QueryEscape(token))
+				resetURL := recoveryAbsoluteURL("/recover?reset=" + url.QueryEscape(token))
 				if err := sendRecoveryMail(req.Context(), endpoint, os.Getenv("QIANTIE_MAIL_TOKEN"), from, email, "重置你的一战晟铭密码", "请在 30 分钟内打开以下链接设置新密码：\n"+resetURL+"\n\n该链接只能使用一次。如果不是你本人申请，请忽略此邮件。", ""); err != nil {
 					_, _ = revokeRecoveryToken(path, "password", username)
 					writeJSON(w, http.StatusBadGateway, map[string]string{"error": "邮件服务请求失败", "code": "MAIL_DELIVERY_FAILED"})
@@ -194,13 +233,32 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 		writeJSON(w, http.StatusOK, map[string]any{"verified": true, "email": email, "verifiedAt": now.Format(time.RFC3339)})
 	}))
 	root.Handle("POST /api/account-recovery/password/reset", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ipKey := authRateLimitIPDimension(req)
+		if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, ipKey); !allowed {
+			writeAuthRateLimited(w, retryAfter)
+			return
+		}
 		var input struct {
 			Token    string `json:"token"`
 			Password string `json:"password"`
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+			limiter.record(authRateScopePasswordReset, ipKey)
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
+		}
+		tokenKey := ""
+		if token := strings.TrimSpace(input.Token); token != "" {
+			tokenDigest := sha256.Sum256([]byte(token))
+			tokenKey = "token:" + hex.EncodeToString(tokenDigest[:])
+			if retryAfter, allowed := limiter.allow(authRateScopePasswordReset, tokenKey); !allowed {
+				writeAuthRateLimited(w, retryAfter)
+				return
+			}
+		}
+		limiter.record(authRateScopePasswordReset, ipKey)
+		if tokenKey != "" {
+			limiter.record(authRateScopePasswordReset, tokenKey)
 		}
 		if len(input.Password) < 8 {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "新密码至少需要 8 位"})
@@ -287,12 +345,28 @@ func recoveryProfileEmail(systemDir, username string) string {
 	return ""
 }
 
-func recoveryAbsoluteURL(req *http.Request, path string) string {
-	scheme := strings.TrimSpace(req.Header.Get("X-Forwarded-Proto"))
-	if scheme != "http" && scheme != "https" {
-		scheme = "http"
+// defaultRecoveryPublicBaseURL is used when the deployment does not configure
+// QIANTIE_PUBLIC_BASE_URL.
+const defaultRecoveryPublicBaseURL = "https://yzcm.site"
+
+// recoveryPublicBaseURL returns the server-configured site origin used in
+// recovery links. It must never be derived from the request: Host and
+// X-Forwarded-Proto are client-controlled and would let an attacker rewrite
+// password-reset links to their own domain.
+func recoveryPublicBaseURL() string {
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_PUBLIC_BASE_URL"))
+	if raw == "" {
+		return defaultRecoveryPublicBaseURL
 	}
-	return scheme + "://" + req.Host + path
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || parsed.User != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return defaultRecoveryPublicBaseURL
+	}
+	return strings.TrimRight(parsed.Scheme+"://"+parsed.Host+strings.TrimRight(parsed.Path, "/"), "/")
+}
+
+func recoveryAbsoluteURL(path string) string {
+	return recoveryPublicBaseURL() + path
 }
 
 func issueRecoveryToken(path, kind, username, email string) (string, string, error) {

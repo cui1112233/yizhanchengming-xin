@@ -1,0 +1,52 @@
+u# 医生审核输出规范（review 模式 · 机器可读）
+
+每次 **review** 模式执行完毕，除人可读 Markdown 报告外，**必须**将下列 JSON 写入工作区（路径见各医生 SKILL.md）。
+
+## 通用字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `doctor` | string | `screenplay` / `preset` / `storyboard` |
+| `mode` | string | 固定 `review` |
+| `pass` | boolean | 是否通过闸门 |
+| `block_next_step` | boolean | `pass=false` 且存在 blocker 时为 true |
+| `reviewed_at` | string | ISO 8601 或 `YYYY-MM-DD HH:mm` |
+| `scope` | object | 审核范围（集数、是否全本等） |
+| `issues` | array | 问题列表 |
+| `suggested_actions` | array | 建议动作 id 列表 |
+| `summary` | string | 一句话结论 |
+
+## issue 对象
+
+```json
+{
+  "id": "唯一问题 id，如 ep1_opening_weak",
+  "severity": "blocker | major | minor",
+  "episode": 1,
+  "location": "1-1 或 shot_id=3 或 资产名",
+  "dimension": "分类标签",
+  "problem": "问题描述",
+  "suggestion": "可落地修改建议",
+  "evidence": "可选，引用原文/字段片段"
+}
+```
+
+## severity 约定
+
+- **blocker**：必须修完才能进批次下一步（缺集、名称对不上、分镜凭空新增角色等）
+- **major**：强烈建议修，但不强制停批次（爽点弱、格式不规范）
+- **minor**：优化项
+
+## suggested_actions 枚举（按医生选用）
+
+**剧本医生**：`rewrite_episode_N` · `rewrite_all` · `discuss_with_user`
+
+**预设医生**：`rerun_character_parse` · `rerun_scene_parse` · `rerun_prop_parse` · `patch_character` · `patch_scene` · `patch_prop` · `merge_character_tags`
+
+**分镜词医生**：`rewrite_storyboard_episode_N` · `patch_shot_field` · `regenerate_storyboard_episode_N`
+
+## pass 判定
+
+- `issues` 中无 `severity=blocker` → `pass: true`，`block_next_step: false`
+- 存在任一 blocker → `pass: false`，`block_next_step: true`
+- 仅有 major/minor → `pass: true`，`block_next_step: false`（报告中仍列出问题）

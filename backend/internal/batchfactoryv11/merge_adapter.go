@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 // HTTPMergeAdapter speaks the provider-neutral merge contract used by V11.
@@ -158,7 +160,7 @@ func (a *HTTPMergeAdapter) Poll(ctx context.Context, batchID string, job MergeJo
 func (a *HTTPMergeAdapter) doJSON(request *http.Request) ([]byte, error) {
 	client := a.Client
 	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
+		client = safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	response, err := client.Do(request)
 	if err != nil {

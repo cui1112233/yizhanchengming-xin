@@ -1,0 +1,26 @@
+u# 短剧批次 8 步
+
+| key | 标签 | 主要产物 | 校验 |
+|-----|------|----------|------|
+| 0_ingest | 整理原文 | `.luoshui/context/novel.md` | novel.md 存在 |
+| 1_screenplay | 生成剧本 | `screenplay.db`, `context/screenplay.md` | DB + md |
+| 2_screenplay_doctor | 剧本审核 | `screenplay_review.json` | review pass 或 blocked |
+| 3_assets | 资产提取 | 三份 parse JSON + `character_tags.json` | 文件齐全 + merge |
+| 4_preset_doctor | 预设质检 | `preset_review.json` | review |
+| 5_storyboard | 按集分镜 | `chapter_{N}_storyboard.json` | 按集 |
+| 6_storyboard_doctor | 分镜审核 | `storyboard_review_ep{N}.json` | 按集 review |
+| 7_video | 批量出视频 | `video_batch_report.md` 或 assets 视频 | 报告或 mp4 |
+| 8_finalize | 收尾编号 | `finalize_report.md` | 报告 |
+
+## 医生闸门 JSON（共用字段）
+
+```json
+{
+  "pass": true,
+  "block_next_step": false,
+  "summary": "...",
+  "issues": []
+}
+```
+
+`pass: false` 且 `block_next_step: true` → `state.status = waiting_user`。

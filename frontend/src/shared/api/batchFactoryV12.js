@@ -692,7 +692,9 @@ export function refreshBookSmartUnified(batchId, bookId, payload = {}) {
 }
 
 export function runBatchDirector(batchId, payload = {}) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/director`), { method: 'POST', body: body(payload) });
+  // 409 表示「全部书都失败」但响应体仍带逐书 reasons；放行状态码让调用方
+  // 能列出失败书名，而不是只拿到一句通用错误。
+  return apiRequest(bf11Path(`batches/${id(batchId)}/director`), { method: 'POST', body: body(payload), allowStatuses: [409] });
 }
 
 export function getEffectiveSettings(batchId, bookId, videoId) {

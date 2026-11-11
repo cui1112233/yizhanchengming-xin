@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const DefaultBaseURL = "https://n8.hnqingyuwen.top/center-api/auth"
@@ -111,7 +113,7 @@ func (e *DirectoryError) Error() string {
 
 func NewClient(httpClient *http.Client, baseURL, adminToken string) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 20 * time.Second}
+		httpClient = safehttp.NewClientWithTimeout(20 * time.Second)
 	}
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = DefaultBaseURL
@@ -132,7 +134,7 @@ func NewWorksClient(httpClient *http.Client, baseURL, adminToken string) *WorksC
 // defaultN8WorksPath，便于 N8 调整接口后只改配置而不改代码。
 func NewWorksClientWithPath(httpClient *http.Client, baseURL, adminToken, worksPath string) *WorksClient {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 20 * time.Second}
+		httpClient = safehttp.NewClientWithTimeout(20 * time.Second)
 	}
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if strings.HasSuffix(baseURL, "/center-api") {

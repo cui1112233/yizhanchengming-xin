@@ -58,7 +58,11 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	if err != nil {
 		return nil, err
 	}
-	if normalizeAlreadyUploadedAutomationState(&state) {
+	repaired := normalizeAlreadyUploadedAutomationState(&state)
+	if reconcileTerminalAutomationJobs(&state, time.Now()) {
+		repaired = true
+	}
+	if repaired {
 		var writeErr error
 		if r.stateStore != nil {
 			writeErr = r.stateStore.Save(context.Background(), state)
@@ -93,6 +97,47 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		return publicAutomationJob(matched[0]), nil
 	}
 	return idle, nil
+}
+
+// reconcileTerminalAutomationJobs repairs an impossible aggregate state left
+// by an interrupted/stalled coordinator: every tracked book has already
+// reached a terminal state, no delayed retry exists, yet the parent job still
+// says running. The parent must never block Start/Retry after all child work is
+// finished.
+func reconcileTerminalAutomationJobs(state *automationStateFile, now time.Time) bool {
+	if state == nil {
+		return false
+	}
+	changed := false
+	for _, job := range state.Jobs {
+		if reconcileTerminalAutomationJob(job, now) {
+			changed = true
+		}
+	}
+	return changed
+}
+
+func reconcileTerminalAutomationJob(job map[string]any, now time.Time) bool {
+	if job == nil || automationStringValue(job["state"], "") != "running" {
+		return false
+	}
+	books, _ := job["books"].(map[string]any)
+	if len(books) == 0 || automationPendingBookRetry(books) {
+		return false
+	}
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if !automationEntryTerminal(entry) {
+			return false
+		}
+	}
+	normalizeAutomationJobCounts(job, books)
+	state := automationStringValue(job["state"], "")
+	if state == "failed" || state == "completed" {
+		job["completedAt"] = now
+	}
+	job["updatedAt"] = now
+	return true
 }
 
 // readAutomationState supports both the legacy single JSON file and the
@@ -359,18 +404,39 @@ func publicAutomationJob(job map[string]any) map[string]any {
 			}
 			status := strings.TrimSpace(toString(book["status"]))
 			retryAt := book["retryAt"]
+			errorValue := book["error"]
+			retryRequested := book["retryRequested"]
+			batchRetryPending := book["batchRetryPending"]
+			batchRetryCount := book["batchRetryCount"]
+			publishError := book["publishError"]
+			// Old jobs may have reached published/completed after a successful
+			// continuation but still carry the previous partial-run error. The
+			// completed state is authoritative; expose no live failure/retry badge.
+			if status == "completed" {
+				errorValue = ""
+				publishError = ""
+				retryRequested = nil
+				retryAt = nil
+				batchRetryPending = nil
+				batchRetryCount = nil
+			}
 			// retryAt is meaningful only while this book is still running.
 			// Older failed jobs may retain the marker from their last attempt;
 			// do not expose that stale timestamp as a future automatic retry.
 			if status != "running" && !automationBoolValue(book["retryRequested"]) {
 				retryAt = nil
 			}
+			// 历史状态里可能残留英文哨兵前缀；在返回给界面之前统一清掉。
+			messageValue := batchfactoryv11.UserFacingErrorText(automationStringValue(book["message"], ""))
+			if text, ok := errorValue.(string); ok && text != "" {
+				errorValue = batchfactoryv11.UserFacingErrorText(text)
+			}
 			books = append(books, map[string]any{
 				"bookId": book["bookId"], "title": book["title"], "status": book["status"], "stage": book["stage"],
-				"message": book["message"], "error": book["error"], "publishError": book["publishError"], "updatedAt": book["updatedAt"],
+				"message": messageValue, "error": errorValue, "publishError": publishError, "updatedAt": book["updatedAt"],
 				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": retryAt,
-				"retryRequested": book["retryRequested"], "logs": publicAutomationBookLogs(book["logs"], 50),
-				"batchRetryPending": book["batchRetryPending"], "batchRetryCount": book["batchRetryCount"],
+				"retryRequested": retryRequested, "logs": publicAutomationBookLogs(book["logs"], 50),
+				"batchRetryPending": batchRetryPending, "batchRetryCount": batchRetryCount,
 				"needsManualPages": automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book}),
 				"autoContinue":     automationBookAutoContinue(book),
 			})

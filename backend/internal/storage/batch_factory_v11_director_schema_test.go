@@ -17,7 +17,9 @@ func TestV11DirectorMigrationIsAdditiveAndOrdered(t *testing.T) {
 		"batch_factory_v11_director_video_links",
 		"batch_factory_v11_orphaned_overrides",
 	} {
-		if !strings.Contains(joined, table) { t.Fatalf("missing %s", table) }
+		if !strings.Contains(joined, table) {
+			t.Fatalf("missing %s", table)
+		}
 	}
 	if strings.Contains(joined, "drop table") || strings.Contains(joined, "delete from") {
 		t.Fatal("Director migration must be additive")

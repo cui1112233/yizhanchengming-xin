@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 // HTTPProvider is deliberately provider-neutral: the deployment supplies the
@@ -22,14 +24,22 @@ type HTTPProvider struct {
 }
 
 func (p *HTTPProvider) Validate() error {
-	if _, err := safeEndpoint(p.Endpoint); err != nil { return fmt.Errorf("external provider endpoint: %w", err) }
-	if strings.TrimSpace(p.APIKey) == "" { return fmt.Errorf("external provider API key is required") }
-	if p.Provider != Provider121 && p.Provider != ProviderYadi { return ErrInvalid }
+	if _, err := safeEndpoint(p.Endpoint); err != nil {
+		return fmt.Errorf("external provider endpoint: %w", err)
+	}
+	if strings.TrimSpace(p.APIKey) == "" {
+		return fmt.Errorf("external provider API key is required")
+	}
+	if p.Provider != Provider121 && p.Provider != ProviderYadi {
+		return ErrInvalid
+	}
 	return nil
 }
 
 func (p *HTTPProvider) Submit(ctx context.Context, credential CredentialInput, intent SubmissionIntent) (ProviderReference, error) {
-	if err := p.Validate(); err != nil { return ProviderReference{}, err }
+	if err := p.Validate(); err != nil {
+		return ProviderReference{}, err
+	}
 	endpoint, _ := safeEndpoint(p.Endpoint)
 	payload := map[string]any{
 		"provider": string(p.Provider), "intentId": intent.ID, "batchId": intent.BatchID, "bookId": intent.BookID,
@@ -37,25 +47,43 @@ func (p *HTTPProvider) Submit(ctx context.Context, credential CredentialInput, i
 		"credential": credential,
 	}
 	body, err := json.Marshal(payload)
-	if err != nil { return ProviderReference{}, err }
+	if err != nil {
+		return ProviderReference{}, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
-	if err != nil { return ProviderReference{}, err }
+	if err != nil {
+		return ProviderReference{}, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	client := p.Client
-	if client == nil { client = &http.Client{Timeout: 60 * time.Second} }
+	if client == nil {
+		client = safehttp.NewClientWithTimeout(60 * time.Second)
+	}
 	resp, err := client.Do(req)
-	if err != nil { return ProviderReference{}, fmt.Errorf("external provider request failed") }
+	if err != nil {
+		return ProviderReference{}, fmt.Errorf("external provider request failed")
+	}
 	defer resp.Body.Close()
 	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-	if err != nil { return ProviderReference{}, fmt.Errorf("read external provider response: %w", err) }
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return ProviderReference{}, fmt.Errorf("external provider returned HTTP %d", resp.StatusCode) }
+	if err != nil {
+		return ProviderReference{}, fmt.Errorf("read external provider response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ProviderReference{}, fmt.Errorf("external provider returned HTTP %d", resp.StatusCode)
+	}
 	var value map[string]any
-	if err := json.Unmarshal(responseBody, &value); err != nil { return ProviderReference{}, fmt.Errorf("invalid external provider response") }
+	if err := json.Unmarshal(responseBody, &value); err != nil {
+		return ProviderReference{}, fmt.Errorf("invalid external provider response")
+	}
 	reference := firstString(value, "reference", "providerReference", "provider_reference", "id", "taskId", "task_id")
-	if reference == "" { return ProviderReference{}, fmt.Errorf("external provider response did not contain a reference") }
+	if reference == "" {
+		return ProviderReference{}, fmt.Errorf("external provider response did not contain a reference")
+	}
 	status := firstString(value, "status", "state")
-	if status == "" { status = "submitted" }
+	if status == "" {
+		status = "submitted"
+	}
 	return ProviderReference{Provider: p.Provider, Reference: boundedMessage(reference), Status: boundedMessage(status)}, nil
 }
 
@@ -69,8 +97,12 @@ func safeEndpoint(raw string) (*url.URL, error) {
 
 func firstString(value map[string]any, keys ...string) string {
 	for _, key := range keys {
-		if text, ok := value[key].(string); ok && strings.TrimSpace(text) != "" { return strings.TrimSpace(text) }
-		if number, ok := value[key].(float64); ok { return fmt.Sprintf("%.0f", number) }
+		if text, ok := value[key].(string); ok && strings.TrimSpace(text) != "" {
+			return strings.TrimSpace(text)
+		}
+		if number, ok := value[key].(float64); ok {
+			return fmt.Sprintf("%.0f", number)
+		}
 	}
 	return ""
 }

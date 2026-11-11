@@ -6,6 +6,7 @@ import '../shared/styles/global.css';
 import '../shared/styles/v88-tokens.css';
 import '../shared/styles/v88-ui.css';
 import '../shared/styles/agent-workspace.css';
+import '../shared/styles/agent-chat.css';
 import '../shared/styles/member-center.css';
 import '../shared/styles/team-governance.css';
 import '../shared/styles/team-collaboration.css';

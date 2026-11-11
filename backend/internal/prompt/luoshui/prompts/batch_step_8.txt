@@ -1,0 +1,4 @@
+【批次 step 8/8 · 收尾】
+1. `video_batch_finalize` 归档为 `assets/分镜_01.mp4`… 并写 `finalize_report.md`。
+2. 缺失分镜可 `video_batch_poll` 后重试 finalize。
+3. 汇报 provider、已归档数量与缺失列表。

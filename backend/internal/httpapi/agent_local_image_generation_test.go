@@ -92,7 +92,7 @@ func TestAgentImageGeneratorUsesOnlineLocalDoubaoExecutor(t *testing.T) {
 		done <- executors.CompleteJob(context.Background(), paired.Token, claim.Job.ID, lease, localexecutor.ResultInput{ArtifactID: artifact.ID})
 	}()
 
-	generator := newAgentImageGenerator(nil, nil, executors, files, assets, nil)
+	generator := newAgentImageGenerator(nil, nil, nil, executors, files, assets, nil)
 	results, status, err := generator(context.Background(), "alice", AgentImageGenerationInput{ModelID: agentLocalDoubaoImageModelID, Prompt: "一只蓝色小鸟", Size: "1024x1536", AspectRatio: "9:16", Quality: "standard", Resolution: "1K", Count: 1, ProjectID: "agent-1", ReferenceAssetIDs: []string{"reference-1"}})
 	if err != nil || status != 200 || len(results) != 1 || !strings.HasPrefix(results[0], "data:image/png;base64,") {
 		t.Fatalf("status=%d results=%q err=%v", status, results, err)

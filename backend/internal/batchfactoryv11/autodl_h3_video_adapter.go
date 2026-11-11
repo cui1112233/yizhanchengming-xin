@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/safehttp"
 )
 
 const (
@@ -346,7 +348,7 @@ func autoDLH3MediaURL(raw []byte) string {
 func (a *AutoDLH3VideoAdapter) doJSON(request *http.Request) ([]byte, error) {
 	client := a.Client
 	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
+		client = safehttp.NewClientWithTimeout(120 * time.Second)
 	}
 	response, err := client.Do(request)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/mergeworker"
+	"qiantie/backend/internal/safehttp"
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
@@ -24,11 +26,35 @@ var publish121BookID = regexp.MustCompile(`^(?:\d{1,20}|[0-9a-f]{8}-[0-9a-f]{4}-
 // It deliberately consumes the persisted merge artifact and upload-target
 // session; browser supplied media URLs are never trusted.
 type BatchFactory121Publisher struct {
-	Store       batchfactoryv11.Store
-	UsersDir    string
-	LocalFiles  *localartifact.Store
-	MergedFiles mergeworker.ObjectReader
-	Connector   videomanagementconnector.Service
+	Store            batchfactoryv11.Store
+	UsersDir         string
+	LocalFiles       *localartifact.Store
+	MergedFiles      mergeworker.ObjectReader
+	Connector        videomanagementconnector.Service
+	CredentialSecret string
+}
+
+func (p *BatchFactory121Publisher) refreshTargetSession(ctx context.Context, owner string) (videomanagementconnector.Session, error) {
+	secret := strings.TrimSpace(p.CredentialSecret)
+	if secret == "" {
+		secret = strings.TrimSpace(os.Getenv("QIANTIE_121_CREDENTIAL_SECRET"))
+	}
+	credential, err := load121Credential(p.UsersDir, owner, secret)
+	if err != nil {
+		return videomanagementconnector.Session{}, err
+	}
+	connected, err := p.Connector.Login(ctx, videomanagementconnector.LoginInput{Username: credential.TargetUsername, Password: credential.Password})
+	if err != nil || strings.TrimSpace(connected.Cookie) == "" {
+		return videomanagementconnector.Session{}, fmt.Errorf("自动重新登录视频管理系统失败")
+	}
+	if err := saveUploadTargetSession(p.UsersDir, owner, map[string]any{
+		"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie,
+		"targetUsername": connected.TargetUsername, "baseUrl": credential.BaseURL,
+		"status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339),
+	}); err != nil {
+		return videomanagementconnector.Session{}, fmt.Errorf("自动登录成功，但保存新会话失败")
+	}
+	return connected, nil
 }
 
 func selectPublishMergeJobs(batch batchfactoryv11.Batch, book batchfactoryv11.Book, jobs []batchfactoryv11.MergeJob) ([]batchfactoryv11.MergeJob, error) {
@@ -282,8 +308,18 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 		// 上一轮已上传成功、只是回读失败：直接复用持久化的 heads，不重复上传。
 		heads = append(heads, pendingHeads...)
 	} else {
+		refreshedSession := false
 		for _, video := range videos {
 			head, uploadErr := videoUploader.UploadVideo(ctx, targetSession, video.filename, video.content)
+			if errors.Is(uploadErr, videomanagementconnector.ErrSessionExpired) && !refreshedSession {
+				fresh, refreshErr := p.refreshTargetSession(ctx, owner)
+				if refreshErr != nil {
+					return nil, fmt.Errorf("视频管理系统登录已失效，%w", refreshErr)
+				}
+				targetSession = fresh
+				refreshedSession = true
+				head, uploadErr = videoUploader.UploadVideo(ctx, targetSession, video.filename, video.content)
+			}
 			if uploadErr != nil {
 				return nil, uploadErr
 			}
@@ -504,21 +540,25 @@ func selectedPublishProfile(publish map[string]any) map[string]any {
 	id := strings.TrimSpace(toString(publish["websiteProfileId"]))
 	name := strings.TrimSpace(toString(publish["versionProfile"]))
 	profiles, _ := publish["websiteProfiles"].([]any)
-	for _, raw := range profiles {
-		profile := mapOrEmpty(raw)
-		if profile == nil {
-			continue
-		}
-		profileID := strings.TrimSpace(toString(profile["id"]))
-		configID := strings.TrimSpace(toString(profile["config_id"]))
-		profileName := strings.TrimSpace(toString(profile["name"]))
-		if id != "" {
+	if id != "" {
+		for _, raw := range profiles {
+			profile := mapOrEmpty(raw)
+			if profile == nil {
+				continue
+			}
+			profileID := strings.TrimSpace(toString(profile["id"]))
+			configID := strings.TrimSpace(toString(profile["config_id"]))
 			if id == profileID || id == configID || strings.TrimPrefix(id, "121-") == configID {
 				return profile
 			}
-			continue
 		}
-		if name != "" && name == profileName {
+	}
+	// The target site can recreate a profile under a different numeric id.
+	// A batch still carries the human-selected profile name, so fall back to
+	// that stable name instead of blocking every upload until a manual resync.
+	for _, raw := range profiles {
+		profile := mapOrEmpty(raw)
+		if profile != nil && name != "" && name == strings.TrimSpace(toString(profile["name"])) {
 			return profile
 		}
 	}
@@ -635,7 +675,7 @@ func publishOrganization(input map[string]any, settings map[string]json.RawMessa
 func (p *BatchFactory121Publisher) readMerge(ctx context.Context, output string) (io.ReadCloser, error) {
 	output = strings.TrimSpace(output)
 	if strings.HasPrefix(output, "http://") || strings.HasPrefix(output, "https://") {
-		response, err := (&http.Client{Timeout: 120 * time.Second}).Get(output)
+		response, err := safehttp.NewClientWithTimeout(120 * time.Second).Get(output)
 		if err != nil {
 			return nil, err
 		}

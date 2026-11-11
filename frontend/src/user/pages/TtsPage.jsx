@@ -63,6 +63,8 @@ export function TtsPage({ theme = 'dark' }) {
   const [nowMs, setNowMs] = useState(0);
   const audioUrlsRef = useRef(new Set());
   const cardRequestRef = useRef(new Map());
+  // 每张卡片当前在飞的合成请求，删除/卸载/替换时真正中止，而不是只丢弃结果。
+  const cardAbortRef = useRef(new Map());
   const cardsRef = useRef([]);
   const mountedRef = useRef(true);
 
@@ -86,9 +88,18 @@ export function TtsPage({ theme = 'dark' }) {
     return cardsRef.current.some(card => card.id === id);
   }
 
+  function abortCard(id) {
+    const controller = cardAbortRef.current.get(id);
+    if (!controller) return;
+    cardAbortRef.current.delete(id);
+    controller.abort();
+  }
+
   useEffect(() => () => {
     mountedRef.current = false;
     cardRequestRef.current.clear();
+    cardAbortRef.current.forEach(controller => controller.abort());
+    cardAbortRef.current.clear();
     audioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
     audioUrlsRef.current.clear();
   }, []);
@@ -162,7 +173,9 @@ export function TtsPage({ theme = 'dark' }) {
   }
 
   function removeCard(id) {
+    // 生成中删除 = 取消本次合成，先真正中止请求再移除卡片。
     nextCardRequest(id);
+    abortCard(id);
     setCards(current => {
       const card = current.find(item => item.id === id);
       if (card?.audioUrl) {
@@ -175,17 +188,22 @@ export function TtsPage({ theme = 'dark' }) {
   }
 
   async function generateCard(id) {
-    const card = cards.find(item => item.id === id);
+    const card = cardsRef.current.find(item => item.id === id);
+    // 同一张卡片已经有请求在飞时直接拒绝，避免连点/批量重复合成。
+    if (card?.loading) return;
     if (!card?.input?.trim()) {
       message.warning('请先输入要转换的文本');
       return;
     }
 
     const requestId = nextCardRequest(id);
+    const controller = new AbortController();
+    abortCard(id);
+    cardAbortRef.current.set(id, controller);
     updateCard(id, { loading: true, startedAt: Date.now() });
     dispatchPetState('working', { title: '配音正在生成' });
     try {
-      const blob = await textToSpeech(card);
+      const blob = await textToSpeech({ ...card, signal: controller.signal });
       if (!blob || blob.size === 0) throw new Error('TTS 服务返回空音频');
       if (!isCurrentCardRequest(id, requestId) || !cardStillExists(id)) return;
       if (card.audioUrl) {
@@ -208,19 +226,30 @@ export function TtsPage({ theme = 'dark' }) {
       message.success('语音生成成功');
       dispatchPetState('success', { title: '配音生成完成', detail: '音频已经可以播放和下载。' });
     } catch (error) {
+      if (controller.signal.aborted) {
+        if (cardStillExists(id) && isCurrentCardRequest(id, requestId)) {
+          updateCard(id, { loading: false, startedAt: 0 });
+        }
+        return;
+      }
       if (!isCurrentCardRequest(id, requestId) || !cardStillExists(id)) return;
-      updateCard(id, { loading: false, startedAt: 0, audioUrl: '', audioBlob: null });
+      // 生成失败保留上一版可用音频，避免一次重试失败把成品清空。
+      updateCard(id, { loading: false, startedAt: 0 });
       message.error(error.message || '生成失败');
       dispatchPetState('error', { title: '配音生成失败', detail: error.message || '请检查配音模型配置后重试。' });
+    } finally {
+      if (cardAbortRef.current.get(id) === controller) cardAbortRef.current.delete(id);
     }
   }
 
   async function generateAll() {
+    if (bulkGenerating) return;
     if (!hasCards) {
       message.warning('先添加卡片再生成');
       return;
     }
-    const targets = cards.filter(card => card.input.trim());
+    // 正在生成的卡片由它自己的请求负责，不再重复排队。
+    const targets = cardsRef.current.filter(card => card.input.trim() && !card.loading);
     if (!targets.length) {
       message.warning('没有可生成的文本');
       return;
@@ -370,7 +399,7 @@ function TtsCard({ card, index, nowMs, onChange, onGenerate, onDownload, onRemov
           variant="danger"
           size="small"
           icon={<Trash2 size={15} strokeWidth={1.8} aria-hidden="true" />}
-          disabled={card.loading}
+          title={card.loading ? '本次合成进行中，删除会中止请求' : '删除这张卡片'}
           onClick={onRemove}
         >
           删除

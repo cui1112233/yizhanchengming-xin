@@ -13,6 +13,90 @@ import (
 	"testing"
 )
 
+func TestDirectorHTTPErrorKeepsRawOnSecondLine(t *testing.T) {
+	body := `{"error":{"message":"PROHIBITED_CONTENT/成人内容拒绝，请修改提示词后重试 (request id: 20261111095229058933748268d9d6d705sP3)","type":"invalid_request_error","param":"","code":null}}`
+	err := &DirectorHTTPError{StatusCode: http.StatusBadRequest, Model: "[anti-2]gemini-3-8-flash", Body: body}
+	headline, raw, found := strings.Cut(err.Error(), "\n上游原文：")
+	if !found {
+		t.Fatalf("raw upstream must be on its own line: %q", err.Error())
+	}
+	for _, part := range []string{"成人内容", "自动执行两轮安全修复", "停止继续调用", "更换文本模型"} {
+		if !strings.Contains(headline, part) {
+			t.Fatalf("headline misses %q: %s", part, headline)
+		}
+	}
+	for _, banned := range []string{"HTTP 400", "model=", "PROHIBITED_CONTENT", "invalid_request_error", "request id"} {
+		if strings.Contains(headline, banned) {
+			t.Fatalf("headline must not expose %q: %s", banned, headline)
+		}
+	}
+	for _, part := range []string{"HTTP 400", "model=[anti-2]gemini-3-8-flash", "PROHIBITED_CONTENT", "request id: 2026"} {
+		if !strings.Contains(raw, part) {
+			t.Fatalf("raw misses %q: %s", part, raw)
+		}
+	}
+	if !errors.Is(err, ErrConfigRequired) {
+		t.Fatalf("400 must stay a configuration-class error: %v", err)
+	}
+}
+
+func TestDirectorHTTPFailureHeadlineMapsCommonRejections(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   string
+	}{
+		{"成人内容", 400, `{"error":{"message":"PROHIBITED_CONTENT"}}`, "成人内容"},
+		{"通用审核", 400, `{"error":{"message":"content_policy violation"}}`, "内容审核"},
+		{"限流", 429, "", "限流"},
+		{"鉴权", 401, "", "鉴权失败"},
+		{"模型不存在", 404, "", "不存在"},
+		{"上游错误", 502, "", "暂时不可用"},
+		{"未知 400", 400, `{"error":{"message":"bad shape"}}`, "文本模型拒绝了本次请求"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := directorHTTPFailureHeadline(tc.status, tc.body)
+			if !strings.Contains(got, tc.want) {
+				t.Fatalf("headline=%q want contains %q", got, tc.want)
+			}
+			if tc.name == "未知 400" && strings.Contains(got, "参数或请求格式不合法") {
+				t.Fatalf("unknown 400 must not be reported as a malformed request: %q", got)
+			}
+		})
+	}
+}
+
+type directorFailingTransport struct{ err error }
+
+func (s directorFailingTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, s.err }
+
+func TestDirectorTransportErrorKeepsRawOnSecondLine(t *testing.T) {
+	provider := OpenAICompatibleProvider{
+		Endpoint: "https://text.example.test/v1/chat/completions",
+		APIKey:   "test-key",
+		Model:    "test-model",
+		Client: &http.Client{Transport: directorFailingTransport{
+			err: fmt.Errorf(`Post "https://text.example.test/v1/chat/completions": dial tcp 10.0.0.1:443: connect: connection refused`),
+		}},
+	}
+	_, err := provider.Complete(context.Background(), TextCompletionRequest{SystemPrompt: "s", UserPrompt: "u"})
+	if err == nil {
+		t.Fatal("expected transport failure")
+	}
+	headline, raw, found := strings.Cut(err.Error(), "\n上游原文：")
+	if !found {
+		t.Fatalf("raw upstream must be on its own line: %q", err.Error())
+	}
+	if !strings.Contains(headline, "文本模型通道连接失败") || strings.Contains(headline, "dial tcp") {
+		t.Fatalf("headline=%q want Chinese conclusion without net/http details", headline)
+	}
+	if !strings.Contains(raw, "connection refused") {
+		t.Fatalf("raw=%q want original net/http error", raw)
+	}
+}
+
 func TestOpenAICompatibleHTTPClientUsesHTTP2ForGGWKEndpoint(t *testing.T) {
 	client := openAICompatibleHTTPClient("https://www.ggwk1.online/v1/chat/completions")
 	transport, ok := client.Transport.(*http.Transport)
@@ -163,8 +247,11 @@ func TestOpenAICompatibleProviderReportsTruncatedStructuredOutput(t *testing.T) 
 		Client:   server.Client(),
 	}
 	_, err := provider.Complete(context.Background(), TextCompletionRequest{})
-	if err == nil || !strings.Contains(err.Error(), "finish_reason=length") {
-		t.Fatalf("error=%v, want explicit truncation diagnostic", err)
+	if !errors.Is(err, errDirectorOutputTruncated) {
+		t.Fatalf("error=%v, want explicit truncation sentinel", err)
+	}
+	if !strings.Contains(err.Error(), "文本模型输出被长度截断") {
+		t.Fatalf("error=%v, want a Chinese truncation diagnostic", err)
 	}
 }
 

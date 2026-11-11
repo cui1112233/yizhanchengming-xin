@@ -27,6 +27,7 @@ import { normalizeWorkspaceView, workspaceViewForActiveView, workspaceViewPatch,
 import { batchFactoryGroupLabel, refreshBatchFactoryBookCanvas, syncBookThenLoadCanvas } from './agent-canvas-batch-factory';
 import { agentProjectCapabilities, agentProjectTypeLabel, agentProjectTypeOptions, normalizeAgentProjectType } from './agent-project-type';
 import { generationPresentation, generationTaskActions } from './agent-generation-state';
+import { AgentProxyWorkspace } from './AgentProxyWorkspace';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -133,6 +134,7 @@ export function AgentPageV2({ theme = 'dark' }) {
   const [workflowFocusRequest, setWorkflowFocusRequest] = useState(0);
   const [storyboardDirectorResizing, setStoryboardDirectorResizing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [proxyOpen, setProxyOpen] = useState(false);
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [canvas, setCanvas] = useState({ version: 1, revision: 0, nodes: [], edges: [] });
   const [canvasSaveStatus, setCanvasSaveStatus] = useState('idle');
@@ -613,7 +615,7 @@ export function AgentPageV2({ theme = 'dark' }) {
     let cancelled = false;
     const initializationRequestId = ++initializationRequestRef.current;
     const initialTaskRequestId = taskRequestRef.current;
-    dispatchPetContext({ page: 'Agent 工作区' });
+    dispatchPetContext({ page: 'CM 画布' });
     Promise.all([refreshTasks(), loadSkills()])
       .then(([nextTasks]) => {
         if (cancelled || initializationRequestRef.current !== initializationRequestId || taskRequestRef.current !== initialTaskRequestId) return undefined;
@@ -639,7 +641,7 @@ export function AgentPageV2({ theme = 'dark' }) {
         return undefined;
       })
       .catch(error => {
-        if (!cancelled && initializationRequestRef.current === initializationRequestId) message.error(error.message || '读取 Agent 工作区失败');
+        if (!cancelled && initializationRequestRef.current === initializationRequestId) message.error(error.message || '读取 CM 画布失败');
       })
       .finally(() => {
         if (!cancelled && initializationRequestRef.current === initializationRequestId) setLoading(false);
@@ -1074,7 +1076,7 @@ export function AgentPageV2({ theme = 'dark' }) {
         taskId: task.id,
         prompt,
         context: {
-          page: 'Agent 工作区',
+          page: 'CM 画布',
           mode: problemSearch ? '分析拆解' : selectedMode,
           expert: selectedExpert,
           intent: problemSearch ? 'find-problems' : 'chat',
@@ -1304,6 +1306,7 @@ export function AgentPageV2({ theme = 'dark' }) {
             updateWorkspaceView({ activeView: nextView.activeView, drawerOpen: nextView.drawerOpen, conversationOpen: nextView.conversationOpen });
           }}
           onRetrySync={() => void canvasSaveQueueRef.current?.retry()}
+          onOpenProxy={() => setProxyOpen(true)}
         />
 
         <AgentWorkspaceDrawer
@@ -1593,6 +1596,13 @@ export function AgentPageV2({ theme = 'dark' }) {
             {composerPanel === 'skill' ? <div className="agent-skill-panel"><Segmented value={source} onChange={setSource} options={[{ label: '全部', value: 'all' }, { label: '平台自带', value: 'system' }, { label: '我的技能', value: 'user' }]} /><div className="agent-skill-list">{visibleSkills.map(skill => <article className={`agent-skill-card${selectedSkillIds.includes(skill.id) ? ' selected' : ''}`} key={skill.id}><strong>{skill.name}</strong><p>{skill.description || '未填写说明'}</p><Button size="small" type={selectedSkillIds.includes(skill.id) ? 'primary' : 'default'} onClick={() => toggleSkill(skill.id)}>{selectedSkillIds.includes(skill.id) ? '已选用' : '选用'}</Button></article>)}</div></div> : null}
           </div>
           <section className="agent-recent-projects" aria-label="最近项目"><div className="agent-project-list-head"><h3>最近项目</h3><Segmented size="small" value={projectFilter} onChange={setProjectFilter} options={[{ label: '全部', value: 'all' }, { label: '视频', value: 'video' }, { label: '漫画', value: 'comic' }]} /></div>{loading ? <span>正在读取项目…</span> : visibleProjects.slice(0, 6).map(task => <button type="button" key={task.id} onClick={() => { window.history.pushState({}, '', `/agent/canvas?taskId=${encodeURIComponent(task.id)}`); window.dispatchEvent(new PopStateEvent('popstate')); }}><strong>{task.title}<Tag>{agentProjectTypeLabel(task.projectType)}</Tag></strong><span>{task.preview || '尚未开始对话'}</span></button>)}</section>
+          <section className="agent-proxy-home-entry" aria-label="Agent 代理入口">
+            <div className="agent-proxy-home-entry__text">
+              <strong>Agent 代理</strong>
+              <span>工作区 → 会话 → 消息的独立代理界面，与创作画布互不影响。</span>
+            </div>
+            <Button onClick={() => setProxyOpen(true)}>进入 Agent 代理</Button>
+          </section>
         </div>
       </section>}
       <Modal title={editingSkillId ? '编辑我的技能' : '新建我的技能'} open={skillEditorOpen} onCancel={() => setSkillEditorOpen(false)} footer={null} destroyOnClose>
@@ -1609,6 +1619,8 @@ export function AgentPageV2({ theme = 'dark' }) {
       <Modal title="重命名任务" open={renameOpen} onCancel={() => setRenameOpen(false)} onOk={saveRename} okText="保存" cancelText="取消" confirmLoading={renaming} destroyOnClose>
         <Input aria-label="任务名称" autoFocus value={renameValue} maxLength={80} onChange={event => setRenameValue(event.target.value)} onPressEnter={saveRename} />
       </Modal>
+
+      <AgentProxyWorkspace open={proxyOpen} onClose={() => setProxyOpen(false)} />
     </div>
     </ConfigProvider>
   );

@@ -159,7 +159,7 @@ func (s *H3KernelService) MeasureAudio(ctx context.Context, owner, batchID, book
 		return H3AudioMeasurementRevision{}, err
 	}
 	if book.DirectorRevision == nil || book.DirectorRevision.Output.H3Director == nil {
-		return H3AudioMeasurementRevision{}, fmt.Errorf("%w: active H3 director revision is required", ErrConflict)
+		return H3AudioMeasurementRevision{}, fmt.Errorf("%w: 当前书籍还没有 H3 导演分镜，请先生成导演分镜后再读取配音时长", ErrDirectorRevisionRequired)
 	}
 	probe := s.AudioProbe
 	if probe == nil {

@@ -20,8 +20,12 @@ func TestAutoDLH3VideoAdapterUsesConfiguredWorkflowWhenNoReferenceImages(t *test
 	defer server.Close()
 	adapter := &AutoDLH3VideoAdapter{CreateURL: server.URL + "/{workflow}", TasksURL: server.URL + "/result/{id}", APIKey: "fake-key", Model: AutoDLH3Model, WorkflowID: workflowID, ValidateURL: func(raw string) (*url.URL, error) { return url.Parse(raw) }}
 	_, err := adapter.Submit(context.Background(), FrozenVideoModel{ID: AutoDLH3Model, MaxDuration: 15}, FinalPrompt{CompiledPrompt: "prompt"})
-	if err != nil { t.Fatal(err) }
-	if !strings.Contains(gotPath, workflowID) { t.Fatalf("workflow path=%q", gotPath) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotPath, workflowID) {
+		t.Fatalf("workflow path=%q", gotPath)
+	}
 }
 
 func TestAutoDLH3VideoAdapterAlwaysIncludesFallbackReferenceImage(t *testing.T) {

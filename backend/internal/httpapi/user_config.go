@@ -53,10 +53,12 @@ var defaultUserConfig = func() map[string]any {
 type UserConfigStore struct {
 	BaseDir string
 	mu      sync.Mutex
+	secrets *configSecretProvider
 }
 
 func NewUserConfigStore(baseDir string) *UserConfigStore {
-	return &UserConfigStore{BaseDir: strings.TrimSpace(baseDir)}
+	trimmed := strings.TrimSpace(baseDir)
+	return &UserConfigStore{BaseDir: trimmed, secrets: newConfigSecretProvider(trimmed)}
 }
 
 func cloneConfigMap(source map[string]any) map[string]any {
@@ -89,8 +91,11 @@ func mergeConfigMap(base, patch map[string]any) map[string]any {
 	return result
 }
 
-func (s *UserConfigStore) configPath(username string) string {
-	return filepath.Join(s.BaseDir, username, "api-config.json")
+func (s *UserConfigStore) configPath(username string) (string, error) {
+	if s == nil || strings.TrimSpace(s.BaseDir) == "" {
+		return "", fmt.Errorf("用户配置存储未配置")
+	}
+	return UserScopedPath(s.BaseDir, username, "api-config.json")
 }
 
 func (s *UserConfigStore) read(username string) map[string]any {
@@ -98,7 +103,11 @@ func (s *UserConfigStore) read(username string) map[string]any {
 	if s == nil || s.BaseDir == "" {
 		return config
 	}
-	raw, err := os.ReadFile(s.configPath(username))
+	path, err := s.configPath(username)
+	if err != nil {
+		return config
+	}
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return config
 	}
@@ -106,7 +115,10 @@ func (s *UserConfigStore) read(username string) map[string]any {
 	if json.Unmarshal(raw, &saved) != nil {
 		return config
 	}
-	return mergeConfigMap(config, saved)
+	merged := mergeConfigMap(config, saved)
+	// 兼容读取：历史明文原样可用，密文在这里还原成明文，调用方无需感知。
+	s.secrets.decrypt(merged)
+	return merged
 }
 
 // GetConfig exposes the same owner-scoped effective configuration used by the
@@ -120,23 +132,37 @@ func (s *UserConfigStore) write(username string, config map[string]any) error {
 	if s == nil || s.BaseDir == "" {
 		return fmt.Errorf("用户配置存储未配置")
 	}
-	dir := filepath.Dir(s.configPath(username))
+	path, err := s.configPath(username)
+	if err != nil {
+		return fmt.Errorf("用户名不合法")
+	}
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	raw, err := json.MarshalIndent(config, "", "  ")
+	// 落盘加密：在深拷贝上转换，避免把调用方内存里的明文替换成密文。
+	persisted := config
+	if cloned, ok := deepCloneConfigValue(config).(map[string]any); ok {
+		s.secrets.encrypt(cloned)
+		persisted = cloned
+	}
+	raw, err := json.MarshalIndent(persisted, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := s.configPath(username) + ".tmp"
+	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, s.configPath(username))
+	return os.Rename(tmp, path)
 }
 
 func publicUserConfig(config map[string]any) map[string]any {
 	result := cloneConfigMap(config)
+	// 接口配置只暴露「已配置/未配置」，密钥（含自定义渠道 apiKey）永不下发。
+	if stored, ok := result[apiIntegrationsSettingKey].(map[string]any); ok {
+		result[apiIntegrationsSettingKey] = apiIntegrationsView(stored)
+	}
 	apiKey, _ := result["apiKey"].(string)
 	delete(result, "apiKey")
 	result["hasApiKey"] = strings.TrimSpace(apiKey) != ""
@@ -282,8 +308,9 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 		store.mu.Lock()
 		config := store.read(identity.Username)
 		store.mu.Unlock()
-		mergeManagedModelCatalog(req.Context(), config, catalogStore, identity.Username)
 		canManageAPI, managedBy := configManagementState(identity, profileStore, accounts)
+		modelOwner := effectiveModelCatalogOwner(identity, profileStore, accounts)
+		mergeManagedModelCatalog(req.Context(), config, catalogStore, modelOwner)
 		if !canManageAPI {
 			writeJSON(w, http.StatusOK, managedPublicUserConfig(config, managedBy))
 			return
@@ -318,6 +345,8 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 			return
 		}
 		if !canManageAPI {
+			modelOwner := effectiveModelCatalogOwner(identity, profileStore, accounts)
+			mergeManagedModelCatalog(req.Context(), config, catalogStore, modelOwner)
 			writeJSON(w, http.StatusOK, managedPublicUserConfig(config, managedBy))
 			return
 		}

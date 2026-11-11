@@ -24,6 +24,9 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	if root == nil || store == nil {
 		return
 	}
+	// Web-submit endpoints must not accept self-signed identity headers: only a
+	// real login session is trustworthy for these aliases.
+	webSubmitAuth := middleware.SessionOnly()
 	read := func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -243,7 +246,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "state": body.State})
 	}))
 	root.Handle("POST /api/batch-rewrite/work-form", workFormHandler)
-	webSubmitConfigGetHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	webSubmitConfigGetHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -268,7 +271,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"settings": webSubmit})
 	}))
 	root.Handle("GET /api/batch-rewrite/web-submit/config", webSubmitConfigGetHandler)
-	webSubmitConfigPostHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	webSubmitConfigPostHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -321,7 +324,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": body.Settings, "tasks": []any{}})
 	}))
 	root.Handle("POST /api/batch-rewrite/web-submit/config", webSubmitConfigPostHandler)
-	webSubmitEnvironmentHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	webSubmitEnvironmentHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -337,7 +340,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "credential": credential, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": credential.Message}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
 	}))
 	root.Handle("GET /api/batch-rewrite/web-submit/environment", webSubmitEnvironmentHandler)
-	webSubmitHistoryHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	webSubmitHistoryHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -399,7 +402,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"records": records, "groups": groups})
 	}))
 	root.Handle("GET /api/batch-rewrite/web-submit/history", webSubmitHistoryHandler)
-	webSubmitSyncStylesHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	webSubmitSyncStylesHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -466,7 +469,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "styles": newNames, "style_sync": map[string]any{"old_count": len(old), "new_count": len(styles), "added": styleNameDiff(newNames, old), "removed": styleNameDiff(old, newNames)}, "output": []string{"已从视频管理系统同步风格目录"}})
 	}))
 	root.Handle("POST /api/batch-rewrite/web-submit/sync-styles", webSubmitSyncStylesHandler)
-	webSubmitSyncConfigsHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	webSubmitSyncConfigsHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})

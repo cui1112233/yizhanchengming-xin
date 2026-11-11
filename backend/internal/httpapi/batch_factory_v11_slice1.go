@@ -663,8 +663,15 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 	if r.Body == nil {
 		return true
 	}
+	if !limitRequestBody(w, r, maxJSONBodyBytes) {
+		return false
+	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(target); err != nil {
+		if isBodyTooLarge(err) {
+			writePayloadTooLarge(w, maxJSONBodyBytes)
+			return false
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 		return false
 	}
@@ -674,7 +681,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 func writeStoreError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, batchfactoryv11.ErrNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "目标数据不存在，请刷新列表后重试"})
 	case errors.Is(err, batchfactoryv11.ErrConfigRequired):
 		// Missing, user-fixable selection: return the plain action text without
 		// the sentinel prefix so the UI never shows a fake revision conflict.
@@ -683,19 +690,26 @@ func writeStoreError(w http.ResponseWriter, err error) {
 			message = "请先在设置中完成所需配置后重试"
 		}
 		writeJSON(w, http.StatusConflict, map[string]string{"error": message})
+	case errors.Is(err, batchfactoryv11.ErrDirectorRevisionRequired):
+		// 缺导演分镜是可执行的业务前置条件，不是版本冲突：原样返回动作文案。
+		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrDirectorRevisionRequired.Error()+": "))
+		if message == "" || message == batchfactoryv11.ErrDirectorRevisionRequired.Error() {
+			message = batchfactoryv11.DirectorRevisionRequiredMessage
+		}
+		writeJSON(w, http.StatusConflict, map[string]string{"error": message})
 	case errors.Is(err, batchfactoryv11.ErrConflict):
 		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrConflict.Error()+": "))
-		// ErrConflict is only a revision/lock conflict. A specific business
-		// reason keeps its own text; a bare or version-specific conflict gets
-		// the retry action instead of the raw sentinel string.
-		if message == "" || message == batchfactoryv11.ErrConflict.Error() || strings.Contains(message, "版本已变化") || strings.Contains(strings.ToLower(message), "revision") {
+		// ErrConflict 只表示真正的版本/并发冲突：裸哨兵（没有具体原因）回退到
+		// 通用重试文案，带原因的消息一律原样返回。不能按关键词（例如消息里是否
+		// 含 revision）改写，否则业务前置条件会被误报成版本冲突。
+		if message == "" || message == batchfactoryv11.ErrConflict.Error() {
 			message = "数据版本冲突，请重试"
 		}
 		writeJSON(w, http.StatusConflict, map[string]string{"error": message})
 	case errors.Is(err, batchfactoryv11.ErrInvalid):
 		message := strings.TrimSpace(err.Error())
 		if message == "" || message == batchfactoryv11.ErrInvalid.Error() {
-			message = "invalid input"
+			message = "请求参数无效，请检查后重试"
 		}
 		// Keep validation failures actionable without returning an unbounded
 		// provider/config payload to the browser.
@@ -707,7 +721,7 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	case errors.Is(err, batchfactoryv11.ErrUnavailable):
 		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrUnavailable.Error()+": "))
 		if message == "" || message == batchfactoryv11.ErrUnavailable.Error() {
-			message = "capability unavailable"
+			message = "当前能力暂不可用，请检查相关配置后重试"
 		}
 		// code 是新增字段：前端据此显示“缺什么 → 去哪配 → 怎么开”，
 		// error 文案保持原样以兼容旧调用方。
@@ -719,7 +733,7 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	case errors.Is(err, batchfactoryv11.ErrUpstream):
 		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrUpstream.Error()+": "))
 		if message == "" || message == batchfactoryv11.ErrUpstream.Error() {
-			message = "temporary upstream failure"
+			message = "上游服务暂时不可用，请稍后重试"
 		}
 		payload := map[string]string{"error": message}
 		if code := errorCodeOf(err); code != "" {
@@ -729,6 +743,6 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	default:
 		// 未知错误必须留下可检索的日志，否则线上只能看到 500 而无法定位来源。
 		log.Printf("store error: %v", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "服务内部错误，请稍后重试", "code": "INTERNAL"})
 	}
 }

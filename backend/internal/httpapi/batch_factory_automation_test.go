@@ -977,6 +977,61 @@ func TestActiveAutomationJobFindsOnlyLiveBatchRuns(t *testing.T) {
 	}
 }
 
+func TestStartQueuesNewBooksBehindActiveAutomationWithoutRestartingTrackedBooks(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "运行中追加小说",
+		Books: []batchfactoryv11.CreateBookInput{
+			{Title: "正在生成", SourceText: "第一本正文"},
+			{Title: "随后生成", SourceText: "第二本正文"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 10, 8, 0, 0, 0, time.UTC)
+	stateStore := &memoryAutomationStateStore{found: true, state: automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-active": {
+			"id": "job-active", "owner": "alice", "batchId": batch.ID, "state": "running",
+			"runMode": "full_submit", "autoPublish": true,
+			"preset":    map[string]any{"id": "preset-comic", "name": "漫画预设", "version": 1},
+			"createdAt": now.Add(-time.Minute), "updatedAt": now,
+			"books": map[string]any{
+				batch.Books[0].ID: map[string]any{"bookId": batch.Books[0].ID, "title": batch.Books[0].Title, "status": "running", "stage": "comic_images"},
+			},
+		},
+	}}}
+	coordinator := NewBatchAutomationCoordinator(store, nil, &batchfactoryv11.BookStageService{Store: store}, nil, nil, nil, nil, nil, func() time.Time { return now })
+	coordinator.SetAutomationStateStore(stateStore)
+
+	job, err := coordinator.Start(ctx, "alice", batch.ID, map[string]any{
+		"presetId": "preset-comic", "runMode": "full_submit", "queueIfActive": true,
+		"bookIds": []any{batch.Books[1].ID},
+	})
+	if err != nil {
+		t.Fatalf("queue selected book behind active automation: %v", err)
+	}
+	if job["id"] != "job-active" || job["state"] != "running" {
+		t.Fatalf("job=%#v, want the existing active job", job)
+	}
+	books, _ := job["books"].([]any)
+	if len(books) != 2 {
+		t.Fatalf("public books=%#v, want active and queued books", job["books"])
+	}
+	statuses := map[string]string{}
+	for _, raw := range books {
+		book, _ := raw.(map[string]any)
+		statuses[automationStringValue(book["bookId"], "")] = automationStringValue(book["status"], "")
+	}
+	if statuses[batch.Books[0].ID] != "running" || statuses[batch.Books[1].ID] != "queued" {
+		t.Fatalf("statuses=%#v, want existing running and new queued", statuses)
+	}
+	if stateStore.saves != 1 {
+		t.Fatalf("state saves=%d, want exactly one durable queue update", stateStore.saves)
+	}
+}
+
 func TestStartPersistsScheduledExecutionWithoutLaunchingBeforeDueTime(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
@@ -1196,6 +1251,48 @@ func TestResetRetryableAutomationBooksRestartsOnlyFailedEntries(t *testing.T) {
 	hold, _ := books["hold"].(map[string]any)
 	if hold["status"] != "failed" {
 		t.Fatalf("unselected failed entry should stay failed: %#v", hold)
+	}
+}
+
+func TestResetRetryableAutomationBooksReauthorizesManualPageRetryBudget(t *testing.T) {
+	now := time.Date(2026, 11, 11, 10, 45, 0, 0, time.UTC)
+	books := map[string]any{
+		"book-1": map[string]any{
+			"status":      "failed",
+			"stage":       "comic_images",
+			"needsManual": true,
+			"nodes": map[string]any{
+				"comic_images": map[string]any{
+					"pageLedger": map[string]any{
+						"video-missing": map[string]any{
+							"attempts":    8,
+							"needsManual": true,
+							"retryQueued": true,
+							"state":       "manual",
+							"cost":        0.24,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resetRetryableAutomationBooks(books, map[string]bool{"book-1": true}, now)
+
+	entry := books["book-1"].(map[string]any)
+	if automationBoolValue(entry["needsManual"]) {
+		t.Fatalf("manual retry must clear the book-level manual gate: %#v", entry)
+	}
+	ledger := entry["nodes"].(map[string]any)["comic_images"].(map[string]any)["pageLedger"].(map[string]any)
+	page := ledger["video-missing"].(map[string]any)
+	if attempts, ok := page["attempts"].(int); !ok || attempts != 0 || automationBoolValue(page["needsManual"]) || automationBoolValue(page["retryQueued"]) {
+		t.Fatalf("manual retry must reauthorize the page retry budget: %#v", page)
+	}
+	if page["state"] != "retrying" {
+		t.Fatalf("manual retry page state=%v, want retrying", page["state"])
+	}
+	if cost, _ := page["cost"].(float64); cost != 0.24 {
+		t.Fatalf("historical provider cost must remain auditable: %#v", page)
 	}
 }
 
@@ -1744,6 +1841,33 @@ func TestEnsureAutomationSourceFallsBackToReadableGiantMaterialCandidate(t *test
 	}
 }
 
+func TestBatchFetchDisplayErrorExplainsMissingOrMismatchedBookID(t *testing.T) {
+	err := fmt.Errorf("121 upstream business error 400: 获取书籍信息失败（bookid=10816851 platform=4）")
+
+	got := batchFetchDisplayError(err, batchfactoryv11.Book{BookID: "10816851", Platform: "4", SourceMetadata: map[string]any{"platformName": "点众付费"}})
+
+	if got == nil || got.Error() != "书号 10816851 在点众付费无法读取：书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试" {
+		t.Fatalf("display error = %v", got)
+	}
+}
+
+func TestClearAutomationFailureAfterComicImagesComplete(t *testing.T) {
+	entry := map[string]any{
+		"error":          "已生成 18/28 页，10 页失败",
+		"retryRequested": true,
+		"retryAt":        time.Now(),
+		"retryReason":    "comic_images",
+	}
+
+	clearAutomationFailure(entry)
+
+	for _, key := range []string{"error", "retryRequested", "retryAt", "retryReason"} {
+		if _, exists := entry[key]; exists {
+			t.Fatalf("%s was not cleared: %#v", key, entry)
+		}
+	}
+}
+
 func TestAutomationStateStoreMigration(t *testing.T) {
 	dir := t.TempDir()
 	legacy := filepath.Join(dir, "automation-state.json")
@@ -1997,6 +2121,10 @@ func TestDeterministicAutomationFailureSkipsBatchRetry(t *testing.T) {
 	if deterministicAutomationFailure(batchfactoryv11.ErrConflict) {
 		t.Fatal("ErrConflict must remain retryable")
 	}
+	missingBook := batchFetchDisplayError(errors.New("121 upstream business error 400: 获取书籍信息失败"), batchfactoryv11.Book{BookID: "10816851", Platform: "4"})
+	if !deterministicAutomationFailure(missingBook) {
+		t.Fatal("a missing upstream book record must not enter the batch retry queue")
+	}
 }
 
 func TestAutomationBookQueueTransitionIsExplicit(t *testing.T) {
@@ -2177,6 +2305,18 @@ func TestAutomationRetryScopesTheVideoRequestID(t *testing.T) {
 		if other == first {
 			t.Fatal("重试/回补 requestID 必须与首次运行不同，否则会命中旧失败任务")
 		}
+	}
+}
+
+// 合成同样按 requestID 幂等；网络中断后的回补或人工重试不能再次命中
+// 上一轮已经 failed 的合成记录，否则看起来在重试，实际没有重新合成。
+func TestAutomationRetryScopesTheMergeRequestID(t *testing.T) {
+	const jobID, bookID = "job_0a9b", "book_411df5a5"
+	first := automationMergeRequestID(jobID, bookID, 0, 0)
+	backfill := automationMergeRequestID(jobID, bookID, 0, 1)
+	retried := automationMergeRequestID(jobID, bookID, 2, 0)
+	if first == backfill || first == retried || backfill == retried {
+		t.Fatalf("合成 requestID 必须随回补/重试变化: first=%q backfill=%q retried=%q", first, backfill, retried)
 	}
 }
 

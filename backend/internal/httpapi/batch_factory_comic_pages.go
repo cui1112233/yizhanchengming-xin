@@ -38,9 +38,22 @@ type comicPageGenerator struct {
 	presetCatalog  *prompt.Catalog
 	generationGate *comicPageGenerationGate
 	imageCache     imagegenerationcache.Repository
+	// resolveModelOwner makes members execute with the manager's model/API
+	// channels while all batch rows and generated media remain owned by the
+	// member. This mirrors the model dropdown shown to the member.
+	resolveModelOwner func(string) string
 	// rewritePrompt 接统一文本模型，用于内容审核拒绝后重写该页提示词。
 	// 未配置时为 nil，退回本地暴力合规改写。
 	rewritePrompt func(context.Context, string, novelfetchworkshop.RewriteRequest) (string, error)
+}
+
+func (g comicPageGenerator) modelOwner(owner string) string {
+	if g.resolveModelOwner != nil {
+		if resolved := strings.TrimSpace(g.resolveModelOwner(owner)); resolved != "" {
+			return resolved
+		}
+	}
+	return owner
 }
 
 const comicPageGenerationLimit = 35
@@ -1013,7 +1026,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
-	target, err := resolveShuihuoImageTargetWithChannels(ctx, g.userConfig, owner, createdPage.ModelID, createdPage.ModelID, createdPage.AspectRatio, input.Provider, shuihuoCollection(config, "modelCatalog", nil))
+	target, err := resolveShuihuoImageTargetWithChannels(ctx, g.userConfig, g.modelOwner(owner), createdPage.ModelID, createdPage.ModelID, createdPage.AspectRatio, input.Provider, shuihuoCollection(config, "modelCatalog", nil))
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
@@ -1288,7 +1301,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		}
 		assetBatch := batch
 		assetBatch.Books = []batchfactoryv11.Book{*book}
-		_, assetErr := generateShuihuoAssetImagesWithRepair(ctx, g.store, g.files, owner, assetBatch, missingAssetIDs, modelID, "16:9", provider, g.localExecutors, g.presetCatalog, g.rewritePrompt, g.userConfig, g.catalogStore)
+		_, assetErr := generateShuihuoAssetImagesWithRepair(ctx, g.store, g.files, owner, assetBatch, missingAssetIDs, modelID, "16:9", provider, g.localExecutors, g.presetCatalog, g.rewritePrompt, g.userConfig, g.modelOwner(owner), g.catalogStore)
 		remainingAssetIDs, verifyErr := missingComicAssetImageIDs(ctx, g.store, owner, batchID, *book)
 		if verifyErr != nil {
 			return batchfactoryv11.ComicCollection{}, verifyErr
@@ -1700,7 +1713,9 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
 	const collectionDownload = collections + "/{collectionId}/download"
-	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, userConfig: userConfig, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache}
+	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, userConfig: userConfig, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache, resolveModelOwner: func(owner string) string {
+		return effectiveModelCatalogOwner(BridgeIdentity{Username: owner}, profiles, accounts)
+	}}
 
 	mux.HandleFunc("GET "+pages, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)

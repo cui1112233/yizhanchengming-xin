@@ -26,6 +26,7 @@ export function ShuihuoModelCatalogPage() {
   const [testingId, setTestingId] = useState('');
   const [form] = Form.useForm();
   const adapterKind = Form.useWatch('adapterKind', form);
+  const supportsVoiceClone = Form.useWatch('supportsVoiceClone', form);
   const isGenericAdapter = adapterKind === 'generic_http';
   const isYDVideoAdapter = adapterKind === 'yd_video';
   const isLocalExecutorAdapter = adapterKind === 'local_executor_video';
@@ -49,7 +50,7 @@ export function ShuihuoModelCatalogPage() {
 
   function openEdit(model) {
     setEditingModel(model);
-    form.setFieldsValue({ ...model, modelId: model.modelId || model.id, endpoint: model.endpoint || model.baseUrl || '', credentialRef: '' });
+    form.setFieldsValue({ ...model, modelId: model.modelId || model.id, endpoint: model.endpoint || model.baseUrl || '', credentialRef: '', supportsVoiceClone: model.capabilities?.supportsVoiceClone === true });
     setOpen(true);
   }
 
@@ -63,7 +64,10 @@ export function ShuihuoModelCatalogPage() {
         credentialRef: values.credentialRef || '',
         endpoint: values.endpoint || '',
         requestTemplate: values.requestTemplate || '',
-        responseMapping: values.responseMapping || ''
+        responseMapping: values.responseMapping || '',
+        voiceCloneRequestTemplate: values.voiceCloneRequestTemplate || '',
+        voiceCloneResponseMapping: values.voiceCloneResponseMapping || '',
+        capabilities: { ...(editingModel?.capabilities || {}), supportsVoiceClone: Boolean(values.supportsVoiceClone) }
       };
       if (editingModel) {
         if (!payload.credentialRef) delete payload.credentialRef;
@@ -131,7 +135,7 @@ export function ShuihuoModelCatalogPage() {
       { title: '操作', key: 'actions', render: (_, model) => <><Button type="link" loading={testingId === (model.modelId || model.id)} onClick={() => test(model)}>测试连接</Button><Button type="link" onClick={() => openEdit(model)}>编辑</Button><Popconfirm title={model.enabled ? '确认停用这个模型？' : '确认启用这个模型？'} onConfirm={() => setEnabled(model, !model.enabled)}><Button type="link">{model.enabled ? '停用' : '启用'}</Button></Popconfirm><Popconfirm title="确认移除这个模型？" onConfirm={() => remove(model)}><Button type="link" danger>移除</Button></Popconfirm></> }
     ]} />
     <Drawer title={editingModel ? '编辑模型' : '新增模型'} open={open} onClose={() => { setOpen(false); setEditingModel(null); }} width={560} extra={<Button type="primary" loading={saving} onClick={submit}>保存</Button>}>
-      <Form form={form} layout="vertical" initialValues={{ kind: 'image', adapterKind: 'jimeng_image', enabled: false, parameterSchema: '{}' }}>
+      <Form form={form} layout="vertical" initialValues={{ kind: 'image', adapterKind: 'jimeng_image', enabled: false, parameterSchema: '{}', supportsVoiceClone: false }}>
         <Form.Item label="模型标识" name="modelId" rules={[{ required: true, message: '请填写模型标识' }, { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: '请使用小写 kebab-case，例如 video-vidu-admin' }]}><Input placeholder="例如 video-vidu-admin" /></Form.Item>
         <Form.Item label="名称" name="name" rules={[{ required: true, message: '请填写模型名称' }]}><Input /></Form.Item>
         <Form.Item label="适配器" name="adapterKind"><Select options={adapters} onChange={nextAdapterKind => form.setFieldValue('kind', adapters.find(item => item.value === nextAdapterKind)?.kind)} /></Form.Item>
@@ -148,6 +152,11 @@ export function ShuihuoModelCatalogPage() {
           <Form.Item label="服务端请求地址" name="endpoint" rules={[{ required: true, message: '请填写 HTTPS 配音接口地址' }]}><Input placeholder="https://provider.example.com/v1/audio/speech" /></Form.Item>
           <Form.Item label="请求模板" name="requestTemplate" rules={[{ required: true, message: '请填写请求模板 JSON' }]} extra="可用占位符：{{prompt}}、{{voice}}、{{speech_rate}}、{{pitch}}、{{credential}}"><Input.TextArea rows={7} placeholder={'{"method":"POST","headers":{"Authorization":"Bearer {{credential}}"},"body":{"text":"{{prompt}}","voice":"{{voice}}","rate":"{{speech_rate}}","pitch":"{{pitch}}"}}'} /></Form.Item>
           <Form.Item label="返回映射" name="responseMapping" rules={[{ required: true, message: '请填写返回映射 JSON' }]} extra={'填写音频 URL 的 JSON 路径，例如 {"resultUrl":"data.url"}'}><Input.TextArea rows={3} placeholder={'{"resultUrl":"data.url"}'} /></Form.Item>
+          <Form.Item label="支持声音克隆" name="supportsVoiceClone" valuePropName="checked" extra="参考音频只由后端读取并传给已配置服务，不把密钥或服务端模板下发到用户工作台。"><Switch /></Form.Item>
+          {supportsVoiceClone ? <>
+            <Form.Item label="声音克隆请求模板" name="voiceCloneRequestTemplate" rules={[{ required: true, message: '请填写声音克隆请求模板 JSON' }]} extra="除配音占位符外，可使用 {{reference_audio_base64}}、{{reference_audio_media_type}}。"><Input.TextArea rows={7} placeholder={'{"method":"POST","headers":{"Authorization":"Bearer {{credential}}"},"body":{"text":"{{input}}","reference":"{{reference_audio_base64}}","mediaType":"{{reference_audio_media_type}}"}}'} /></Form.Item>
+            <Form.Item label="声音克隆返回映射" name="voiceCloneResponseMapping" rules={[{ required: true, message: '请填写声音克隆返回映射 JSON' }]}><Input.TextArea rows={3} placeholder={'{"resultUrl":"data.url"}'} /></Form.Item>
+          </> : null}
         </> : null}
       </Form>
     </Drawer>

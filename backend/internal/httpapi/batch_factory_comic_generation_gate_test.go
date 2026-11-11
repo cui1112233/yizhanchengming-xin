@@ -23,6 +23,22 @@ func TestComicPageGenerationContextSurvivesRequestCancellation(t *testing.T) {
 	}
 }
 
+func TestComicPageGenerationContextDoesNotInheritShortParentDeadline(t *testing.T) {
+	parent, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	ctx, stop := comicPageGenerationContext(parent)
+	defer stop()
+
+	time.Sleep(30 * time.Millisecond)
+	if err := ctx.Err(); err != nil {
+		t.Fatalf("page generation inherited the short parent deadline: %v", err)
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || time.Until(deadline) < 5*time.Hour {
+		t.Fatalf("page generation deadline=%v ok=%t, want its own long bounded lifetime", deadline, ok)
+	}
+}
+
 func TestComicPageGenerationGateRejectsDuplicatePage(t *testing.T) {
 	gate := newComicPageGenerationGate()
 	release, acquired := gate.tryAcquire("alice/batch/book/video-1")

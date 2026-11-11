@@ -224,7 +224,14 @@ func V12Migrations() []Migration {
 		{Version: 1200107, SQL: V12ImageGenerationCacheStatements(), CallbackChecksum: "batch-factory-v12-image-generation-cache-v1"},
 		{Version: 1200108, SQL: V12SlotDigestStatements(), CallbackChecksum: "batch-factory-v12-slot-digest-v1"},
 		{Version: 1200109, SQL: V12AutomationPresetStatements(), CallbackChecksum: "batch-factory-v12-automation-presets-v1"},
+		{Version: 1200110, SQL: V12ComicPageLastErrorStatements(), CallbackChecksum: "batch-factory-v12-comic-page-last-error-v1"},
 	}
+}
+
+// V12ComicPageLastErrorStatements 只给漫画页补一列可展示的失败原因。上游原文
+// 可能带较长的网关片段，用 TEXT 避免被 VARCHAR 截断；页表其它字段不变。
+func V12ComicPageLastErrorStatements() []string {
+	return []string{`ALTER TABLE batch_factory_v12_comic_pages ADD COLUMN last_error TEXT NULL AFTER status`}
 }
 
 // V12CanonicalTableRenameStatements performs the one-way physical cutover of

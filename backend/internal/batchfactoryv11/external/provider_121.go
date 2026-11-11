@@ -5,4 +5,3 @@ package external
 func New121Provider(endpoint, apiKey string) *HTTPProvider {
 	return &HTTPProvider{Provider: Provider121, Endpoint: endpoint, APIKey: apiKey}
 }
-

@@ -28,11 +28,27 @@ func retryableModelOutputError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%w: 文本模型输出不符合当前格式要求，可重试：%v", ErrUnavailable, err)
+	// 解析器报错（如 JSON 语法错误）是英文原文，不能顶在主文案里；业务原因
+	// 已经是中文，仍然直接跟在冒号后面展示。
+	if hasCJK(err.Error()) {
+		return fmt.Errorf("%w: 文本模型输出不符合当前格式要求，可重试：%v", ErrUnavailable, err)
+	}
+	return fmt.Errorf("%w: 文本模型输出不符合当前格式要求，可重试\n上游原文：%v", ErrUnavailable, err)
+}
+
+func hasCJK(text string) bool {
+	for _, r := range text {
+		if r >= 0x4E00 && r <= 0x9FFF {
+			return true
+		}
+	}
+	return false
 }
 
 func isTruncatedDirectorOutput(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "director provider output truncated (finish_reason=length)")
+	return err != nil && (errors.Is(err, errDirectorOutputTruncated) ||
+		// 兼容历史记录与测试替身使用的旧英文标记。
+		strings.Contains(err.Error(), "director provider output truncated (finish_reason=length)"))
 }
 
 func sourceDigest(source string) string {

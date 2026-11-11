@@ -7,10 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"qiantie/backend/internal/safepath"
 )
 
 type MySQLStore struct {
@@ -288,7 +289,10 @@ func (s *MySQLStore) readLegacyConfigFile(owner string) map[string]any {
 	if s == nil || strings.TrimSpace(s.LegacyConfigDir) == "" {
 		return nil
 	}
-	path := filepath.Join(s.LegacyConfigDir, owner, "api-config.json")
+	path, pathErr := safepath.UserPath(s.LegacyConfigDir, owner, "api-config.json")
+	if pathErr != nil {
+		return nil
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil
