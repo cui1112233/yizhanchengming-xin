@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -282,9 +283,11 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, 
 		return nil, err
 	}
 	bookTitle := ""
-	for _, book := range batch.Books {
-		if book.ID == bookID {
-			bookTitle = strings.TrimSpace(book.Title)
+	var book batchfactoryv11.Book
+	for _, candidate := range batch.Books {
+		if candidate.ID == bookID {
+			book = candidate
+			bookTitle = strings.TrimSpace(candidate.Title)
 			break
 		}
 	}
@@ -296,6 +299,18 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, 
 	// 已经匹配过的书。
 	if cached := p.workTitleMap().lookup(target); len(cached) > 0 {
 		return cached, nil
+	}
+	// 书城导入的书名常是「小说 <id>」这类占位名，按名称永远匹配不上；
+	// 优先用来源书城 ID 反查 N8 保留的 cp_work_id。
+	if isPlaceholderComicBookTitle(bookTitle) {
+		matched, err := p.resolveComicWorkIDsBySource(ctx, book)
+		if err != nil {
+			return nil, err
+		}
+		if len(matched) > 0 {
+			p.workTitleMap().store(target, matched)
+			return matched, nil
+		}
 	}
 	works, err := p.WorksDirectory.SearchWorks(ctx, bookTitle)
 	if err != nil {
@@ -314,11 +329,77 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, 
 		matched = append(matched, works[0].ID)
 	}
 	if len(matched) == 0 {
+		// 书名可能是真实书名但和漫画后台写法不同，再用来源 ID 兜底一次。
+		matched, err = p.resolveComicWorkIDsBySource(ctx, book)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(matched) == 0 {
 		return nil, fmt.Errorf("漫画后台未找到与“%s”完全同名的作品，请先在漫画合集里确认关联作品", bookTitle)
 	}
 	// 匹配成功后写入本地缓存，下一次发布会直接命中。
 	p.workTitleMap().store(target, matched)
 	return matched, nil
+}
+
+var placeholderComicTitlePattern = regexp.MustCompile(`^小说\s*[_-]?\s*(\d{3,})$`)
+
+func isPlaceholderComicBookTitle(title string) bool {
+	return placeholderComicTitlePattern.MatchString(strings.TrimSpace(title))
+}
+
+// resolveComicWorkIDsBySource 用来源书城 ID 反查 N8 作品的 cp_work_id。
+// 占位书名「小说 793433」里的数字就是七猫作品 ID，漫画后台创建作品时
+// 会把它记在 cp_work_id 上，据此可以唯一确定作品。
+func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDsBySource(ctx context.Context, book batchfactoryv11.Book) ([]int64, error) {
+	directory, ok := p.WorksDirectory.(interface {
+		SearchWorksByCPWorkID(context.Context, string) ([]n8catalog.Work, error)
+	})
+	if !ok {
+		return nil, nil
+	}
+	for _, sourceID := range comicSourceBookIDs(book) {
+		works, err := directory.SearchWorksByCPWorkID(ctx, sourceID)
+		if err != nil {
+			return nil, n8DirectoryError(fmt.Errorf("按来源作品 ID 查询漫画后台作品失败：%w", err))
+		}
+		matched := make([]int64, 0, 1)
+		for _, work := range works {
+			if work.ID > 0 && strings.EqualFold(strings.TrimSpace(work.CPWorkID), sourceID) {
+				matched = append(matched, work.ID)
+			}
+		}
+		if len(matched) == 1 {
+			return matched, nil
+		}
+		if len(matched) > 1 {
+			return nil, fmt.Errorf("漫画后台有 %d 个作品使用来源 ID %s，请先在漫画合集里确认关联作品", len(matched), sourceID)
+		}
+	}
+	return nil, nil
+}
+
+func comicSourceBookIDs(book batchfactoryv11.Book) []string {
+	candidates := make([]string, 0, 4)
+	if match := placeholderComicTitlePattern.FindStringSubmatch(strings.TrimSpace(book.Title)); len(match) == 2 {
+		candidates = append(candidates, match[1])
+	}
+	for _, key := range []string{"sourceLine", "paidBookId", "freeBookId", "sourceBookId"} {
+		if value, ok := book.SourceMetadata[key].(string); ok && strings.TrimSpace(value) != "" {
+			candidates = append(candidates, strings.TrimSpace(value))
+		}
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	unique := candidates[:0]
+	for _, value := range candidates {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		unique = append(unique, value)
+	}
+	return unique
 }
 
 func normalizeComicWorkTitle(value string) string {

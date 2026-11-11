@@ -195,12 +195,27 @@ func (c *WorksClient) SearchWorks(ctx context.Context, query string) ([]Work, er
 }
 
 func (c *WorksClient) searchWorksOnce(ctx context.Context, query string) ([]Work, error) {
+	return c.searchWorksByField(ctx, "name", query)
+}
+
+// SearchWorksByCPWorkID 按版权方作品 ID（七猫/番茄等来源书城 ID）反查 N8 作品。
+// 书城导入的书名常常是「小说 <id>」这类占位名，无法按名称匹配；
+// cp_work_id 是漫画后台保留的来源作品 ID，可以直接对上。
+func (c *WorksClient) SearchWorksByCPWorkID(ctx context.Context, cpWorkID string) ([]Work, error) {
+	cpWorkID = strings.TrimSpace(cpWorkID)
+	if cpWorkID == "" {
+		return nil, nil
+	}
+	return c.searchWorksByField(ctx, "cp_work_id", cpWorkID)
+}
+
+func (c *WorksClient) searchWorksByField(ctx context.Context, field, value string) ([]Work, error) {
 	// N8 作品目录只支持 filtering 条件；传 keyword 会被忽略并返回整库数据，
-	// 因此这里固定使用 name LIKE 精确到书名。
+	// 因此这里固定使用 name LIKE 精确到书名（cp_work_id 同样用 LIKE）。
 	payload := map[string]any{
 		"page_size": 100,
 		"filtering": []map[string]any{
-			{"field": "name", "operator": "LIKE", "value": query},
+			{"field": field, "operator": "LIKE", "value": value},
 		},
 	}
 	encoded, err := json.Marshal(payload)

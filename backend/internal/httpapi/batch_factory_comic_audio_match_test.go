@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -49,6 +50,61 @@ func TestComicPublishPreflightRejectsUnmatchedPlaceholderTitle(t *testing.T) {
 	if err := publisher.ValidateBookSettings(context.Background(), "alice", batch.ID, batch.Books[0].ID, explicit); err != nil {
 		t.Fatalf("explicit work id preflight error=%v", err)
 	}
+}
+
+// 占位书名「小说 793433」无法按名称匹配，但可以用来源书城 ID 反查
+// N8 作品的 cp_work_id，发布预检同样要能通过。
+func TestComicPublishMatchesWorkBySourceBookIDForPlaceholderTitle(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{
+			Title:          "小说 793433",
+			SourceMetadata: map[string]any{"sourceLine": "793433"},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store: store,
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{{ID: 9, Name: "现代通用", Status: "ENABLE"}},
+			audios:     []n8catalog.Audio{{ID: 91, Name: "通用音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE"}},
+		},
+		WorksDirectory: fakeN8ComicSourceDirectory{works: []n8catalog.Work{
+			{ID: 1046266, Name: "她为发小有求必应，我转身离开", CPWorkID: "793433", CPType: "QM"},
+		}},
+		WorkTitleMapPath: filepath.Join(t.TempDir(), "n8-work-title-map.json"),
+	}
+	ids, err := publisher.resolveComicWorkIDs(context.Background(), "alice", batch.ID, batch.Books[0].ID)
+	if err != nil || !reflect.DeepEqual(ids, []int64{1046266}) {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+	settings := batchfactoryv11.SettingsPatch{
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","audioCategoryId":9,"audioCategoryName":"现代通用","audioCategorySelectionMode":"manual","specifiedAudioId":91}`),
+	}
+	if err := publisher.ValidateBookSettings(context.Background(), "alice", batch.ID, batch.Books[0].ID, settings); err != nil {
+		t.Fatalf("preflight error=%v", err)
+	}
+}
+
+type fakeN8ComicSourceDirectory struct {
+	works []n8catalog.Work
+}
+
+func (f fakeN8ComicSourceDirectory) Configured() bool { return true }
+func (f fakeN8ComicSourceDirectory) SearchWorks(context.Context, string) ([]n8catalog.Work, error) {
+	return nil, nil
+}
+func (f fakeN8ComicSourceDirectory) SearchWorksByCPWorkID(_ context.Context, sourceID string) ([]n8catalog.Work, error) {
+	matched := make([]n8catalog.Work, 0, 1)
+	for _, work := range f.works {
+		if work.CPWorkID == sourceID {
+			matched = append(matched, work)
+		}
+	}
+	return matched, nil
 }
 
 func TestComicAudioCategoryMapsNovelStyleAndGender(t *testing.T) {

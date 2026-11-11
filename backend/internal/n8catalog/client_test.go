@@ -236,6 +236,33 @@ func TestWorksClientUsesConfiguredWorksPath(t *testing.T) {
 	}
 }
 
+func TestWorksClientSearchesByCPWorkID(t *testing.T) {
+	var payload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "data": map[string]any{"list": []map[string]any{
+			{"id": 1046266, "name": "她为发小有求必应，我转身离开", "cp_work_id": "793433", "cp_type": "QM"},
+		}}})
+	}))
+	defer server.Close()
+	client := NewWorksClientWithPath(server.Client(), server.URL, "token", "/works/select")
+	works, err := client.SearchWorksByCPWorkID(context.Background(), "793433")
+	if err != nil {
+		t.Fatal(err)
+	}
+	filters, _ := payload["filtering"].([]any)
+	if len(filters) != 1 {
+		t.Fatalf("payload=%v", payload)
+	}
+	filter, _ := filters[0].(map[string]any)
+	if filter["field"] != "cp_work_id" || filter["value"] != "793433" {
+		t.Fatalf("filter=%v", filter)
+	}
+	if len(works) != 1 || works[0].ID != 1046266 || works[0].CPWorkID != "793433" {
+		t.Fatalf("works=%+v", works)
+	}
+}
+
 func TestClientListsOrganizationsFromNestedTree(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/center-api/auth/organization/tree" {
