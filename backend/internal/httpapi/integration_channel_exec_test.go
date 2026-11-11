@@ -306,3 +306,51 @@ func TestResolveShuihuoImageTargetKeepsLegacyCatalog(t *testing.T) {
 		t.Fatalf("ModelID=%q, want legacy model", target.ModelID)
 	}
 }
+
+func TestShuihuoImageReadinessAcceptsCustomImageChannel(t *testing.T) {
+	ctx := context.Background()
+	userConfig := newIntegrationTestUserConfig(t, map[string]any{
+		"values": map[string]any{},
+		"customChannels": []any{
+			map[string]any{
+				"id": "ch_image", "name": "图片渠道", "group": "image",
+				"baseUrl": "https://image.example.test/v1", "model": "gpt-image-2", "apiKey": "sk-image", "enabled": true,
+			},
+			map[string]any{
+				"id": "ch_video", "name": "视频渠道", "group": "video",
+				"baseUrl": "https://video.example.test/v1", "model": "video-model", "apiKey": "sk-video", "enabled": true,
+			},
+		},
+		"channelSelection": map[string]any{
+			"image": map[string]any{"enabled": []any{"ch_image"}},
+			"video": map[string]any{"enabled": []any{"ch_video"}},
+		},
+	})
+	if !shuihuoImageChannelReady(ctx, userConfig, "tester") {
+		t.Fatal("configured custom image channel must make image readiness pass")
+	}
+
+	missingKey := newIntegrationTestUserConfig(t, map[string]any{
+		"values": map[string]any{},
+		"customChannels": []any{map[string]any{
+			"id": "ch_image", "name": "图片渠道", "group": "image",
+			"baseUrl": "https://image.example.test/v1", "model": "gpt-image-2", "apiKey": "", "enabled": true,
+		}},
+		"channelSelection": map[string]any{"image": map[string]any{"enabled": []any{"ch_image"}}},
+	})
+	if shuihuoImageChannelReady(ctx, missingKey, "tester") {
+		t.Fatal("image channel without api key must not pass readiness")
+	}
+
+	videoOnly := newIntegrationTestUserConfig(t, map[string]any{
+		"values": map[string]any{},
+		"customChannels": []any{map[string]any{
+			"id": "ch_video", "name": "视频渠道", "group": "video",
+			"baseUrl": "https://video.example.test/v1", "model": "video-model", "apiKey": "sk-video", "enabled": true,
+		}},
+		"channelSelection": map[string]any{"video": map[string]any{"enabled": []any{"ch_video"}}},
+	})
+	if shuihuoImageChannelReady(ctx, videoOnly, "tester") {
+		t.Fatal("video-only channel must not satisfy image readiness")
+	}
+}

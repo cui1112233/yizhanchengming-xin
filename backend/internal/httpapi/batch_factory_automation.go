@@ -470,6 +470,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 			}
 		}
 		if validationErr := c.validateAutomationGlobalPreflight(ctx, item.owner, batch, automationStringValue(item.job["runMode"], "full_submit")); validationErr != nil {
+			c.blockAutomationBooksForJob(item.job, validationErr.Error(), c.now())
 			item.job["state"], item.job["lastError"], item.job["updatedAt"] = "failed", validationErr.Error(), c.now()
 			_ = c.setJob(item.owner, item.batchID, item.jobID, item.job)
 			continue
@@ -1331,6 +1332,29 @@ func (c *BatchAutomationCoordinator) applyResumePreflight(ctx context.Context, o
 	job["counts"] = automationCounts(len(books), running, failed, ready)
 }
 
+// blockAutomationBooksForJob 在整批预检失败时把仍有运行标记的书改为 blocked。
+// 没有可用执行器时它们不可能继续推进；若继续保留 running，线上会出现
+// “任务已 failed、书还在跑”的假状态。
+func (c *BatchAutomationCoordinator) blockAutomationBooksForJob(job map[string]any, reason string, now time.Time) {
+	if job == nil || strings.TrimSpace(reason) == "" {
+		return
+	}
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "completed", "failed", "blocked", "stopped":
+			continue
+		}
+		entry["status"], entry["error"], entry["message"], entry["updatedAt"] = "blocked", "", reason, now
+		entry["retryRequested"] = false
+		appendAutomationBookLog(entry, now, "preflight", reason)
+	}
+}
+
 // automationResumeOnBootEnabled 控制服务启动时是否自动恢复被重启打断的自动化
 // 任务。默认关闭：重启后不自动把书重新置为 running。
 func automationResumeOnBootEnabled() bool {
@@ -1404,6 +1428,7 @@ func (c *BatchAutomationCoordinator) ResumeInterruptedJobs(ctx context.Context) 
 		// 自动恢复与正常派发共用同一套全局预检，避免重启后在没有执行器的
 		// 情况下把整批书重新置为 running。
 		if validationErr := c.validateAutomationGlobalPreflight(ctx, item.owner, batch, automationStringValue(item.job["runMode"], "full_submit")); validationErr != nil {
+			c.blockAutomationBooksForJob(item.job, validationErr.Error(), c.now())
 			item.job["state"], item.job["lastError"], item.job["updatedAt"] = "failed", validationErr.Error(), c.now()
 			_ = c.setJob(item.owner, item.batchID, item.jobID, item.job)
 			continue

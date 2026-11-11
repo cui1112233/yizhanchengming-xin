@@ -434,3 +434,34 @@ func TestV12AutomationPreflightRouteIsReadOnly(t *testing.T) {
 		t.Fatalf("preflight route wrote settings: revision=%d want %d", latest.Revision, batch.Revision)
 	}
 }
+
+func TestGlobalPreflightFailureBlocksRunningBooks(t *testing.T) {
+	coordinator := &BatchAutomationCoordinator{}
+	now := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+	job := map[string]any{"books": map[string]any{
+		"book_running": map[string]any{"status": "running", "stage": "comic_images", "message": "正在生成漫画第 24/28 张"},
+		"book_queued":  map[string]any{"status": "queued", "stage": "queued", "message": "排队中"},
+		"book_done":    map[string]any{"status": "completed", "stage": "published"},
+		"book_failed":  map[string]any{"status": "failed", "stage": "comic_images"},
+	}}
+	coordinator.blockAutomationBooksForJob(job, "invalid input: 自动生产前检查失败：图片模型或图片生成服务未配置", now)
+	books := job["books"].(map[string]any)
+	for _, id := range []string{"book_running", "book_queued"} {
+		entry := books[id].(map[string]any)
+		if entry["status"] != "blocked" {
+			t.Fatalf("%s status=%v, want blocked", id, entry["status"])
+		}
+		if entry["message"] != "invalid input: 自动生产前检查失败：图片模型或图片生成服务未配置" {
+			t.Fatalf("%s message=%v", id, entry["message"])
+		}
+		if retry, _ := entry["retryRequested"].(bool); retry {
+			t.Fatalf("%s must not keep retryRequested", id)
+		}
+	}
+	if books["book_done"].(map[string]any)["status"] != "completed" {
+		t.Fatal("completed book must stay completed")
+	}
+	if books["book_failed"].(map[string]any)["status"] != "failed" {
+		t.Fatal("failed book must stay failed")
+	}
+}

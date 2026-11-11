@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -160,7 +161,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		}
 		automationStages := &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
-			ImageReady:           shuihuoImageReadyChecker(options.Store, runtimeCatalogStore),
+			ImageReady:           shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore),
 			VideoReady:           shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production),
 			TextProviderResolver: runtimeTextProviderResolver,
 		}
@@ -253,7 +254,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerDirectorRoutes(v11, options.Director, options.Store)
 		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, TextProviderResolver: runtimeTextProviderResolver}
 		if options.LocalArtifacts != nil {
-			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, runtimeCatalogStore)
+			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore)
 			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)
 			stageService.ImageGenerator = func(ctx context.Context, owner, batchID, bookID string) error {
 				batch, err := options.Store.GetBatch(ctx, owner, batchID)
@@ -424,7 +425,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, videoProviderRegistry, options.Store, "v12", runtimeCatalogStore)
 	if options.Store != nil {
-		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)}
+		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)}
 		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
@@ -910,19 +911,67 @@ func shuihuoImageModelReady(model map[string]any) bool {
 	return shuihuoModelCredential(model) != ""
 }
 
-func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store) func(context.Context, string) (bool, string) {
+func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore) func(context.Context, string) (bool, string) {
 	return func(ctx context.Context, owner string) (bool, string) {
 		config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStore)
+		if err == nil {
+			for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
+				if shuihuoImageModelReady(model) {
+					return true, ""
+				}
+			}
+		}
+		// 出图既可能走旧 modelCatalog，也可能走 API 接口配置里的 custom:/channel:
+		// 渠道。预检必须与真实出图同口径，否则已选可用渠道的组织会被整批判为
+		// “图片模型或图片生成服务未配置”。
+		if shuihuoImageChannelReady(ctx, userConfig, owner) {
+			return true, ""
+		}
 		if err != nil {
 			return false, "图片模型配置读取失败"
 		}
-		for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
-			if shuihuoImageModelReady(model) {
-				return true, ""
-			}
-		}
 		return false, "图片模型或图片生成服务未配置"
 	}
+}
+
+// shuihuoImageChannelReady 判断 API 接口配置里是否已有可用的图片渠道：
+// 预置图片渠道填了 Key，或自定义渠道分到 image 组且地址与 Key 都齐全。
+func shuihuoImageChannelReady(ctx context.Context, userConfig *UserConfigStore, owner string) bool {
+	if userConfig == nil {
+		return false
+	}
+	config, err := userConfig.GetConfig(ctx, owner)
+	if err != nil {
+		return false
+	}
+	stored := apiIntegrationStoredMap(config)
+	values := apiIntegrationValues(stored)
+	selection := apiIntegrationChannelSelection(stored)
+	for _, preset := range integrationChannelPresets {
+		if preset.Group != "image" {
+			continue
+		}
+		credential := strings.TrimSpace(fmt.Sprint(values[preset.KeyField]))
+		if credential == "" || credential == "<nil>" {
+			continue
+		}
+		if strings.TrimSpace(integrationChannelBaseURL(preset, values)) != "" {
+			return true
+		}
+	}
+	for _, raw := range apiIntegrationChannels(stored) {
+		channel, ok := raw.(map[string]any)
+		if !ok || integrationChannelGroup(channel, selection) != "image" {
+			continue
+		}
+		credential := strings.TrimSpace(fmt.Sprint(channel["apiKey"]))
+		baseURL := strings.TrimSpace(fmt.Sprint(channel["baseUrl"]))
+		if credential == "" || credential == "<nil>" || baseURL == "" || baseURL == "<nil>" {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func shuihuoVideoReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, production *batchfactoryv11.ProductionService) func(context.Context, string) (bool, string) {
