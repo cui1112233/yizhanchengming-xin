@@ -33,6 +33,8 @@ type comicPageGenerator struct {
 	files          *localartifact.Store
 	localExecutors *localexecutor.Service
 	catalogStore   novelfetchworkshop.Store
+	// userConfig 保存 API 接口配置，用于解析 custom:/channel: 图片渠道。
+	userConfig     *UserConfigStore
 	presetCatalog  *prompt.Catalog
 	generationGate *comicPageGenerationGate
 	imageCache     imagegenerationcache.Repository
@@ -64,6 +66,29 @@ func (f comicPageFailure) Message() string {
 	return f.Err.Error()
 }
 
+// comicPageBusinessError 只把中文业务原因交给界面，同时保留 errors.Is 分类。
+type comicPageBusinessError struct {
+	message string
+	cause   error
+}
+
+func (e comicPageBusinessError) Error() string { return e.message }
+
+func (e comicPageBusinessError) Unwrap() error { return e.cause }
+
+// comicPageFailureMessage 保证每条页失败都带页标签，但不会重复拼两遍。
+func comicPageFailureMessage(f comicPageFailure) string {
+	if f.Err == nil {
+		return ""
+	}
+	message := batchfactoryv11.UserFacingErrorText(f.Err.Error())
+	label := strings.TrimSpace(f.Label)
+	if label != "" && !strings.HasPrefix(message, label) {
+		message = label + "：" + message
+	}
+	return message
+}
+
 // comicPageWorkError 聚合本轮所有页级失败。调用方据此写 pageLedger，
 // 而不是只看第一条错误。
 type comicPageWorkError struct {
@@ -75,10 +100,9 @@ func (e *comicPageWorkError) Error() string {
 		return ""
 	}
 	if len(e.Failures) == 1 {
-		return fmt.Sprintf("%s 生成失败: %v", e.Failures[0].Label, e.Failures[0].Err)
+		return comicPageFailureMessage(e.Failures[0])
 	}
-	return fmt.Sprintf("%d 个漫画页生成失败（首个：%s: %v）",
-		len(e.Failures), e.Failures[0].Label, e.Failures[0].Err)
+	return fmt.Sprintf("%d 个漫画页生成失败（首个：%s）", len(e.Failures), comicPageFailureMessage(e.Failures[0]))
 }
 
 func (e *comicPageWorkError) Unwrap() error {
@@ -115,7 +139,7 @@ func (e *comicPagePartialError) Error() string {
 	if e.comicPageWorkError != nil {
 		failed = len(e.Failures)
 		if failed > 0 {
-			first = fmt.Sprintf("（首个：%s: %v）", e.Failures[0].Label, e.Failures[0].Err)
+			first = fmt.Sprintf("（首个：%s）", comicPageFailureMessage(e.Failures[0]))
 		}
 	}
 	if total <= 0 {
@@ -273,22 +297,26 @@ func runComicPageWork(ctx context.Context, work []comicPageWorkItem, concurrency
 // page status instead of waiting on this request forever.
 const comicPageHTTPFastPathWait = 500 * time.Millisecond
 
-const comicBookDetachedGenerationTimeout = 60 * time.Minute
+const comicBookDetachedGenerationTimeout = 6 * time.Hour
 
 // Comic generation must not be cancelled merely because the browser tab,
 // fetch request, or reverse proxy connection went away. The relay can finish
 // successfully after that disconnect, and the finished image still needs to
 // be written into the comic page record. Keep a bounded lifetime so a lost
 // request cannot leave a worker running forever.
-const comicPageDetachedGenerationTimeout = 15 * time.Minute
+// 页级任务包含“等待整机出图名额 + 上游生成 + 大图正文回传”。线上一次正文
+// 回传就可能接近 5 分钟；多批次同时生成时，旧的 15 分钟会让已经排在 FIFO
+// 队列里的老页面提前退出，下一轮又回到队尾，形成永久饥饿。和整本任务统一为
+// 6 小时有界上限，和自动化整本任务的 hard cap 对齐。它只延长等待队列的
+// 生命周期，真正占用上游连接的并发数仍由整机闸门限制，不会放大并发或费用。
+const comicPageDetachedGenerationTimeout = 6 * time.Hour
 
 func detachedGenerationContext(parent context.Context, max time.Duration) (context.Context, context.CancelFunc) {
 	base := context.WithoutCancel(parent)
-	deadline := time.Now().Add(max)
-	if parentDeadline, ok := parent.Deadline(); ok && parentDeadline.Before(deadline) {
-		deadline = parentDeadline
-	}
-	return context.WithDeadline(base, deadline)
+	// 既然已经明确脱离浏览器/上层阶段，就不能只忽略 Cancel 却继续继承它的
+	// 短 Deadline；否则到点后页面仍会退出 FIFO 队列，稍后重试又回到队尾。
+	// 用本阶段自己的有界上限收口，防止后台任务无限驻留。
+	return context.WithTimeout(base, max)
 }
 
 func comicPageGenerationContext(parent context.Context) (context.Context, context.CancelFunc) {
@@ -823,7 +851,7 @@ func comicPagePromptContent(comicPrompt, imagePrompt string) string {
 	return "【分格导演描述】\n" + comicPrompt + "\n\n【本页基础出图描述】\n" + imagePrompt
 }
 
-func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bookID, videoID string, input batchfactoryv11.UpsertComicPageInput) (batchfactoryv11.ComicPage, batchfactoryv11.ComicPageImage, error) {
+func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bookID, videoID string, input batchfactoryv11.UpsertComicPageInput) (page batchfactoryv11.ComicPage, image batchfactoryv11.ComicPageImage, err error) {
 	log.Printf("comic page start batch=%s book=%s video=%s provider=%s model=%s", batchID, bookID, videoID, input.Provider, input.ModelID)
 	comicStore, ok := g.store.(batchfactoryv11.ComicPageStore)
 	if !ok || g.files == nil || g.catalogStore == nil {
@@ -973,6 +1001,9 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 		}
 		failedInput := input
 		failedInput.Status = "generation_failed"
+		// 失败原因按“中文主文案 + \n上游原文：”落库，前端按分隔符切第一行做展示，
+		// 与书籍级/自动化级 BatchFactoryErrorNotice 保持同一格式。
+		failedInput.GenerationError = comicPagePersistedError(err)
 		// 失败写回同样按 owner/revision 条件更新，避免把另一轮已经写好的
 		// 页面（或新租约）覆盖成 generation_failed。
 		failedInput.ExpectedRevision = createdPage.Revision
@@ -982,7 +1013,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
-	target, err := resolveShuihuoImageTarget(createdPage.ModelID, createdPage.ModelID, createdPage.AspectRatio, input.Provider, shuihuoCollection(config, "modelCatalog", nil))
+	target, err := resolveShuihuoImageTargetWithChannels(ctx, g.userConfig, owner, createdPage.ModelID, createdPage.ModelID, createdPage.AspectRatio, input.Provider, shuihuoCollection(config, "modelCatalog", nil))
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
@@ -1099,6 +1130,33 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	createdPage.Images = append(createdPage.Images, createdImage)
 	generationFailed = false
 	return createdPage, createdImage, nil
+}
+
+// comicPagePersistedError 把页级失败整理成可持久化的两段式文案：第一行中文主文案，
+// 原始信息放在 "\n上游原文：" 之后，与书籍级/自动化级错误保持同一格式。
+func comicPagePersistedError(err error) string {
+	const fallback = "漫画页生成失败，请重试"
+	if err == nil {
+		return fallback
+	}
+	text := strings.TrimSpace(err.Error())
+	if text == "" {
+		return fallback
+	}
+	headline, raw, found := strings.Cut(text, "\n上游原文：")
+	headline = batchfactoryv11.UserFacingErrorText(strings.TrimSpace(headline))
+	if headline == "" {
+		headline = fallback
+	}
+	raw = strings.TrimSpace(raw)
+	if !found && text != headline {
+		// 原始错误没有标准分隔符时，把完整原文放到第二段，主文案只留业务结论。
+		raw = text
+	}
+	if raw == "" || raw == headline {
+		return headline
+	}
+	return headline + "\n上游原文：" + raw
 }
 
 func comicPageAssetLookupText(page batchfactoryv11.Video, imagePrompt string) string {
@@ -1230,7 +1288,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		}
 		assetBatch := batch
 		assetBatch.Books = []batchfactoryv11.Book{*book}
-		_, assetErr := generateShuihuoAssetImagesWithRepair(ctx, g.store, g.files, owner, assetBatch, missingAssetIDs, modelID, "16:9", provider, g.localExecutors, g.presetCatalog, g.rewritePrompt, g.catalogStore)
+		_, assetErr := generateShuihuoAssetImagesWithRepair(ctx, g.store, g.files, owner, assetBatch, missingAssetIDs, modelID, "16:9", provider, g.localExecutors, g.presetCatalog, g.rewritePrompt, g.userConfig, g.catalogStore)
 		remainingAssetIDs, verifyErr := missingComicAssetImageIDs(ctx, g.store, owner, batchID, *book)
 		if verifyErr != nil {
 			return batchfactoryv11.ComicCollection{}, verifyErr
@@ -1309,7 +1367,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 				VideoID: page.ID,
 				Label:   page.Label,
 				Code:    automationCodePromptMissing,
-				Err:     fmt.Errorf("%w: %s", batchfactoryv11.ErrConflict, message),
+				Err:     comicPageBusinessError{message: message, cause: batchfactoryv11.ErrConflict},
 			})
 			failedPageIDs[page.ID] = struct{}{}
 			continue
@@ -1629,7 +1687,7 @@ func comicPromptPreviewDeveloper(ctx context.Context, owner string, accounts aut
 	return toString(authAccountPayload(account, profiles)["role"]) == "dev"
 }
 
-func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate, imageCache imagegenerationcache.Repository) {
+func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate, imageCache imagegenerationcache.Repository) {
 	registerComicSourceSegmentRoutes(mux, store, director)
 	comicStore, ok := store.(batchfactoryv11.ComicPageStore)
 	if mux == nil || !ok {
@@ -1642,7 +1700,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
 	const collectionDownload = collections + "/{collectionId}/download"
-	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache}
+	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, userConfig: userConfig, presetCatalog: presetCatalog, generationGate: generationGate, imageCache: imageCache}
 
 	mux.HandleFunc("GET "+pages, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -2124,7 +2182,14 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			VideoIDs []string `json:"videoIds"`
 		}
 		if r.Body != nil {
+			if !limitRequestBody(w, r, maxJSONBodyBytes) {
+				return
+			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && !errors.Is(err, io.EOF) {
+				if isBodyTooLarge(err) {
+					writePayloadTooLarge(w, maxJSONBodyBytes)
+					return
+				}
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "合集页码选择格式不正确"})
 				return
 			}

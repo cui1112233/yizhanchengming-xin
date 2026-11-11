@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
 )
 
 func TestClassifyFailureTable(t *testing.T) {
@@ -32,6 +34,9 @@ func TestClassifyFailureTable(t *testing.T) {
 		// 耗尽后由 errComicPromptRepairExhausted 转 needs_manual。
 		{"content policy", errShuihuoImageContentPolicy, "comic_images", automationCodeContentPolicy, automationFailureTransient, true, false, comicPromptRepairMaxRounds},
 		{"insufficient balance", errors.New("余额不足，请充值"), "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
+		// 上游文案中文化后不能再靠英文关键词；结构化 401/402/403 必须直接判定为确定性失败。
+		{"typed provider 402", shuihuoImageUpstreamError{StatusCode: http.StatusPaymentRequired, Message: "上游拒绝了本次请求"}, "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
+		{"typed provider 401", shuihuoImageUpstreamError{StatusCode: http.StatusUnauthorized, Message: "上游拒绝了本次请求"}, "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
 		{"page not found", batchfactoryv11.ErrNotFound, "comic_images", automationCodePageNotFound, automationFailureDeterministic, false, false, 1},
 		{"page in flight", errors.New("该页正在生成，请勿重复提交"), "comic_images", automationCodePageInFlight, automationFailureTransient, false, false, 0},
 	}
@@ -158,7 +163,17 @@ func TestBilledReadFailureRecordedInPageLedger(t *testing.T) {
 		t.Fatalf("billedNotRetrievedCount=%d, want 1", got)
 	}
 	if retryableComicAutomationError(pageErr) {
-		t.Fatal("已计费未取回不得在原地重发，必须交给下一轮回补")
+		t.Fatal("已计费未取回不得在原地重发")
+	}
+	// 已计费未取回不允许自动续跑：必须直接落成人工处理，并给出明确文案。
+	if record["state"] != "needs_manual" || !automationBoolValue(record["needsManual"]) {
+		t.Fatalf("已计费未取回必须转人工处理: %+v", record)
+	}
+	if record["lastError"] != automationBilledNotRetrievedMessage {
+		t.Fatalf("文案=%v, want %q", record["lastError"], automationBilledNotRetrievedMessage)
+	}
+	if automationBoolValue(record["retryQueued"]) {
+		t.Fatalf("已计费未取回不得进入自动续跑队列: %+v", record)
 	}
 
 	// 图成功取回后，账本与计数都应清零。
@@ -479,5 +494,75 @@ func TestReapZombieJobsIgnoresDispatchNextCheck(t *testing.T) {
 	}
 	if automationStringValue(got.Jobs["job-zombie"]["state"], "") != "failed" {
 		t.Fatalf("reaper 未回收僵尸 job: %#v", got.Jobs["job-zombie"])
+	}
+}
+
+func TestRecordAutomationPageLedgerQueueBusyDoesNotConsumePaidRetryBudget(t *testing.T) {
+	now := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
+	entry := map[string]any{}
+	failure := comicPageFailure{
+		VideoID: "video-4",
+		Label:   "漫画页 04",
+		Err:     fmt.Errorf("page generation failed: %w", errShuihuoImageQueueBusy),
+	}
+	err := &comicPagePartialError{
+		comicPageWorkError: &comicPageWorkError{Failures: []comicPageFailure{failure}},
+		Completed:          22,
+		Total:              26,
+	}
+
+	outcome := recordAutomationPageLedger(entry, err, "comic_images", now)
+	if !outcome.HasFailures || outcome.NeedsManual || outcome.RetryQueued {
+		t.Fatalf("queue wait must remain resumable without manual escalation: %#v", outcome)
+	}
+	nodes := entry["nodes"].(map[string]any)
+	ledger := nodes["comic_images"].(map[string]any)["pageLedger"].(map[string]any)
+	record := ledger["video-4"].(map[string]any)
+	if automationNumberValue(record["attempts"], 0) != 0 {
+		t.Fatalf("queue wait must not consume provider attempts: %#v", record)
+	}
+	if cost, _ := record["cost"].(float64); cost != 0 {
+		t.Fatalf("queue wait never reached the provider and must cost zero: %#v", record)
+	}
+	if automationStringValue(record["state"], "") != "waiting" || automationNumberValue(record["queueWaits"], 0) != 1 {
+		t.Fatalf("queue wait must be recorded as waiting: %#v", record)
+	}
+	if automationStringValue(record["lastErrorCode"], "") != automationCodeImageQueueBusy {
+		t.Fatalf("queue wait needs a stable error code: %#v", record)
+	}
+}
+
+// 上游已出图计费但本地磁盘写满：不得自动重跑，必须转人工并记入已计费未取回。
+func TestBilledSaveFailureNeverRetriesAndNeedsManual(t *testing.T) {
+	now := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	saveErr := &shuihuoImageBilledSaveFailure{
+		message: automationBilledNotRetrievedSaveMessage,
+		cause:   fmt.Errorf("%w: 94.0%% used", localartifact.ErrDiskPressure),
+	}
+	pageErr := &comicPageWorkError{Failures: []comicPageFailure{
+		{VideoID: "p-disk", Label: "漫画页 01", Err: fmt.Errorf("页图生成失败: %w", saveErr)},
+	}}
+	if retryableComicAutomationError(pageErr) {
+		t.Fatal("磁盘落盘失败不得自动重跑，否则会重复扣费")
+	}
+	disp := classifyAutomationFailure(saveErr, "comic_images")
+	if disp.Class != automationFailureManual || disp.MaxAttempts != 1 || disp.CountsTowardRetryBudget {
+		t.Fatalf("disk pressure disposition=%#v, want manual/1/no-budget", disp)
+	}
+
+	entry := map[string]any{}
+	recordAutomationPageLedger(entry, pageErr, "comic_images", now)
+	record, _ := automationFailureLedger(entry, "comic_images")["p-disk"].(map[string]any)
+	if record == nil {
+		t.Fatalf("页级账本缺少 p-disk: %+v", entry["nodes"])
+	}
+	if billed, _ := record["billedNotRetrieved"].(bool); !billed {
+		t.Fatalf("必须记入已计费未取回: %#v", record)
+	}
+	if needsManual, _ := record["needsManual"].(bool); !needsManual {
+		t.Fatalf("磁盘写满必须转人工: %#v", record)
+	}
+	if got := automationStringValue(record["lastError"], ""); got != automationBilledNotRetrievedSaveMessage {
+		t.Fatalf("lastError=%q, want disk save message", got)
 	}
 }

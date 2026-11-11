@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
 )
 
 // 失败分类。分类结果决定三件事：本次是否计入重试预算、是否需要人工介入、
@@ -43,6 +45,7 @@ const (
 	automationCodeRateLimited     = "RATE_LIMITED"
 	automationCodeNetwork         = "NETWORK_ERROR"
 	automationCodeProviderTimeout = "PROVIDER_TIMEOUT"
+	automationCodeImageQueueBusy  = "IMAGE_QUEUE_BUSY"
 	automationCodePageInFlight    = "PAGE_IN_FLIGHT"
 	automationCodeInfrastructure  = "INFRASTRUCTURE"
 	automationCodeAuthQuota       = "AUTH_OR_QUOTA"
@@ -59,13 +62,50 @@ const (
 	automationCodePageShortage       = "PAGE_SHORTAGE"
 	automationCodeDeterministic      = "DETERMINISTIC_FAILURE"
 	// automationCodeBilledNotRetrieved 表示上游已按 HTTP 200 计费，但响应体
-	// 读取失败、图没有取回。默认不重发（避免重复扣费），但必须可观测、可回补。
+	// 读取失败、图没有取回。这类页不再自动重发（避免同一页反复扣费），
+	// 只落成 needs_manual 等人工处理，必须可观测。
 	automationCodeBilledNotRetrieved = "IMAGE_BILLED_NOT_RETRIEVED"
 	// BODY_STALLED：连续停滞没有新字节，真断流；已计费，不自动重发。
 	// BODY_SLOW：一直有数据但到总上限仍未读完，只记录慢，不算已计费未取回。
 	automationCodeImageBodyStalled = "BODY_STALLED"
 	automationCodeImageBodySlow    = "BODY_SLOW"
 )
+
+// automationBilledNotRetrievedMessage 是「上游已计费但图没取回」的唯一对外文案。
+// 这类页不再自动续跑，只允许用户手动重试，避免同一页反复扣费。
+const automationBilledNotRetrievedMessage = "上游已出图但我们没收到，不会自动重跑，可手动重试"
+
+// automationBilledNotRetrievedSaveMessage 是「上游已出图并计费，但本地磁盘
+// 写满导致落盘失败」的唯一对外文案。它和读失败一样禁止自动续跑。
+const automationBilledNotRetrievedSaveMessage = "上游已出图并计费，但服务器磁盘空间不足无法保存；为避免重复扣费不会自动重跑，请清理磁盘后手动重试"
+
+// automationBilledNotRetrievedDisposition 把已计费未取回固定为人工处理：
+// 不消耗自动重试预算（CountsTowardRetryBudget=false、Repairable=false），
+// applyAutomationPageFailure 会直接落成 needs_manual。
+func automationBilledNotRetrievedDisposition(budgetKey string) automationFailureDisposition {
+	return automationFailureDisposition{
+		Code:                    automationCodeBilledNotRetrieved,
+		Class:                   automationFailureManual,
+		CountsTowardRetryBudget: false,
+		MaxAttempts:             1,
+		BudgetKey:               budgetKey,
+	}
+}
+
+// automationProviderAuthFailure 用结构化状态码识别凭据/余额类确定性失败。
+// 上游错误文案已经中文化，不能再依赖 “unauthorized / insufficient balance”
+// 这类英文关键词；拿不到状态码的旧错误仍由调用处保留文字兜底。
+func automationProviderAuthFailure(err error) bool {
+	status, ok := automationErrorHTTPStatus(err)
+	if !ok {
+		return false
+	}
+	switch status {
+	case http.StatusUnauthorized, http.StatusPaymentRequired, http.StatusForbidden:
+		return true
+	}
+	return false
+}
 
 type automationFailureDisposition struct {
 	Code                    string
@@ -124,6 +164,22 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 	msg := strings.ToLower(err.Error())
 
 	switch {
+	case errors.Is(err, errShuihuoImageQueueBusy):
+		// 本机图片名额排队超时，没有向供应商发请求、没有计费，也不是页面本身
+		// 生成失败。保持可续跑，不消耗页级失败次数，更不能升级成人工处理。
+		return automationFailureDisposition{
+			Code: automationCodeImageQueueBusy, Class: automationFailureTransient,
+			Repairable: true, CountsTowardRetryBudget: false,
+			MaxAttempts: 0, BaseBackoff: 30 * time.Second,
+			MaxBackoff: 5 * time.Minute, BudgetKey: budget,
+		}
+	case errors.Is(err, localartifact.ErrDiskPressure):
+		// 磁盘写满时上游可能已经出图计费，重试只会重复扣费；固定为人工处理，
+		// 等磁盘清理后由用户手动重试。
+		return automationFailureDisposition{
+			Code: automationCodeInfrastructure, Class: automationFailureManual,
+			MaxAttempts: 1, BudgetKey: budget,
+		}
 	case errors.Is(err, errComicPromptRepairExhausted):
 		// 自动改写轮次用尽：只把这一页转人工，不再调用上游。
 		return automationFailureDisposition{
@@ -157,7 +213,7 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 			Code: automationCodePublishUnconfirmed, Class: automationFailureManual,
 			MaxAttempts: 1, AbortBook: true, BudgetKey: budget,
 		}
-	case strings.Contains(msg, "余额不足"), strings.Contains(msg, "insufficient balance"),
+	case automationProviderAuthFailure(err), strings.Contains(msg, "余额不足"), strings.Contains(msg, "insufficient balance"),
 		strings.Contains(msg, "payment required"), strings.Contains(msg, "unauthorized"),
 		strings.Contains(msg, "forbidden"), strings.Contains(msg, "http 401"),
 		strings.Contains(msg, "http 402"), strings.Contains(msg, "http 403"),
@@ -307,6 +363,24 @@ func comicBilledReadFailure(err error) bool {
 	if errors.As(err, &pageErr) {
 		for _, failure := range pageErr.Failures {
 			if errors.As(failure.Err, &billed) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// comicBilledSaveFailure 判断错误链里是否存在「上游已计费但本地落盘失败」。
+// 这类失败不能自动重跑：重跑会让上游再生成一张并再次计费。
+func comicBilledSaveFailure(err error) bool {
+	var billedSave *shuihuoImageBilledSaveFailure
+	if errors.As(err, &billedSave) {
+		return true
+	}
+	var pageErr *comicPageWorkError
+	if errors.As(err, &pageErr) {
+		for _, failure := range pageErr.Failures {
+			if errors.As(failure.Err, &billedSave) {
 				return true
 			}
 		}
@@ -477,13 +551,43 @@ func recordAutomationPageLedger(entry map[string]any, err error, stage string, n
 	var pageErr *comicPageWorkError
 	if errors.As(err, &pageErr) {
 		for _, failure := range pageErr.Failures {
+			if errors.Is(failure.Err, errShuihuoImageQueueBusy) {
+				record, _ := ledger[failure.VideoID].(map[string]any)
+				if record == nil {
+					record = map[string]any{}
+					ledger[failure.VideoID] = record
+				}
+				record["videoId"] = failure.VideoID
+				record["label"] = failure.Label
+				record["stage"] = stage
+				record["state"] = "waiting"
+				record["queueWaits"] = automationNumberValue(record["queueWaits"], 0) + 1
+				record["lastError"] = failure.Message()
+				record["lastErrorCode"] = automationCodeImageQueueBusy
+				record["lastErrorAt"] = now.UTC().Format(time.RFC3339)
+				record["retryQueued"] = false
+				record["needsManual"] = false
+				record["countsTowardRetryBudget"] = false
+				// 排队阶段没有调用上游，因此没有图片费用，也没有供应商尝试次数。
+				record["cost"] = 0.0
+				outcome.HasFailures = true
+				if outcome.MaxAttempts < 1 {
+					outcome.MaxAttempts = 1
+				}
+				continue
+			}
 			itemDisposition := classifyAutomationFailure(failure.Err, stage)
 			code := itemDisposition.Code
 			var billedErr *shuihuoImageBilledReadFailure
 			billed := errors.As(failure.Err, &billedErr)
+			var billedSaveErr *shuihuoImageBilledSaveFailure
+			billedSave := errors.As(failure.Err, &billedSaveErr)
 			billedStalled := billed && billedErr.kind == shuihuoImageBodyFailureStalled
 			billedSlow := billed && billedErr.kind == shuihuoImageBodyFailureSlow
 			switch {
+			case billedSave:
+				// 上游已出图计费，但本地磁盘写满导致落盘失败。
+				code = automationCodeBilledNotRetrieved
 			case billedStalled:
 				// 真断流：已计费但图没取回，单独记账并计入补偿统计。
 				code = automationCodeImageBodyStalled
@@ -493,9 +597,27 @@ func recordAutomationPageLedger(entry map[string]any, err error, stage string, n
 			case billed:
 				code = automationCodeBilledNotRetrieved
 			}
+			message := failure.Message()
+			if billedSave {
+				// 磁盘写满时自动续跑只会让同一页反复扣费；直接转人工，
+				// 等磁盘清理后由用户手动重试。
+				itemDisposition = automationBilledNotRetrievedDisposition(itemDisposition.BudgetKey)
+				message = automationBilledNotRetrievedSaveMessage
+			} else if billed {
+				// 上游已按 HTTP 200 计费，图却没落到本地：自动续跑只会让同一页
+				// 反复付费。这里直接定论为人工处理，仅保留“可手动重试”的入口。
+				itemDisposition = automationBilledNotRetrievedDisposition(itemDisposition.BudgetKey)
+				message = automationBilledNotRetrievedMessage
+			}
 			recordOne(ledger, failure.VideoID, failure.Label, stage, itemDisposition,
-				code, failure.Message(), automationPageImageUnitCost)
+				code, message, automationPageImageUnitCost)
 			if record, _ := ledger[failure.VideoID].(map[string]any); record != nil {
+				if billedSave {
+					record["billedNotRetrieved"] = true
+					record["billedAt"] = now.UTC().Format(time.RFC3339)
+					record["billedSaveBlocked"] = "disk_pressure"
+					log.Printf("automation: image billed but save blocked by disk pressure page=%s label=%s stage=%s", failure.VideoID, failure.Label, stage)
+				}
 				// BODY_SLOW 是「在传但慢」，不算已计费未取回；其余 200 后读失败
 				// （BODY_STALLED 或截断/连接重置等）都必须记入补偿统计。
 				if billed && !billedSlow {
@@ -557,12 +679,15 @@ func recordComicAssetShortfall(entry map[string]any, shortfall comicAssetShortfa
 		MaxBackoff: 5 * time.Minute, BudgetKey: "assets",
 	}
 	code := disposition.Code
-	if shortfall.Billed {
-		code = automationCodeBilledNotRetrieved
-	}
 	message := "资产参考图未写回"
 	if shortfall.Err != nil {
 		message = shortfall.Err.Error()
+	}
+	if shortfall.Billed {
+		// 资产图同样不允许「已计费未取回」自动回补，否则每轮都会重复付费。
+		code = automationCodeBilledNotRetrieved
+		disposition = automationBilledNotRetrievedDisposition(disposition.BudgetKey)
+		message = automationBilledNotRetrievedMessage
 	}
 	ledger := automationFailureLedger(entry, "comic_asset_images")
 	for _, assetID := range shortfall.MissingAssetIDs {
@@ -658,7 +783,7 @@ func automationNeedsManualPages(books map[string]any) []map[string]any {
 					"videoId":        videoID,
 					"label":          automationStringValue(page["label"], ""),
 					"code":           automationStringValue(page["code"], ""),
-					"message":        automationStringValue(page["message"], ""),
+					"message":        batchfactoryv11.UserFacingErrorText(automationStringValue(page["message"], "")),
 					"repairAttempts": automationNumberValue(page["repairAttempts"], 0),
 					"lastRefusalRaw": automationStringValue(page["lastRefusalRaw"], ""),
 				}

@@ -191,6 +191,56 @@ func TestProviderImageUsesCompleteJSONBeforeResetWithoutResubmitting(t *testing.
 	}
 }
 
+// 上游已返回图片（HTTP 200，按次计费）但本地磁盘写满时，必须返回「已计费
+// 未落盘」错误，且资产级重试不得再次请求上游。
+func TestProviderImageDiskPressureDoesNotResubmitAfterBilling(t *testing.T) {
+	const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="
+	png, err := base64.StdEncoding.DecodeString(tinyPNG)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var requests int32
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/images/generations":
+			atomic.AddInt32(&requests, 1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"url":"` + serverURL + `/result.png"}]}`))
+		case "/result.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(png)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	files.SetWriteGuard(func() error {
+		return fmt.Errorf("%w: 94.0%% used", localartifact.ErrDiskPressure)
+	})
+	target := shuihuoAssetImageTarget{Provider: "personal_api", ModelID: "gpt-image-2", AspectRatio: "1:1", CatalogModel: map[string]any{}}
+	_, _, err = requestShuihuoProviderImage(context.Background(), files, target, target.CatalogModel, serverURL+"/v1/images/generations", "test-secret", "test prompt", nil)
+	if err == nil {
+		t.Fatal("磁盘保护拒绝落盘时必须返回失败")
+	}
+	var billed *shuihuoImageBilledSaveFailure
+	if !errors.As(err, &billed) {
+		t.Fatalf("err=%v, want shuihuoImageBilledSaveFailure", err)
+	}
+	if !errors.Is(err, localartifact.ErrDiskPressure) {
+		t.Fatalf("错误链丢失磁盘压力语义: %v", err)
+	}
+	if retryableShuihuoAssetImageError(err) {
+		t.Fatal("已计费未落盘不得自动重发")
+	}
+	if got := atomic.LoadInt32(&requests); got != 1 {
+		t.Fatalf("upstream requests=%d, want 1", got)
+	}
+}
+
 func TestProviderImageResponseFormatRejectionDetection(t *testing.T) {
 	if !shuihuoImageResponseRejectsResponseFormat([]byte(`{"error":{"message":"unknown parameter: response_format"}}`)) {
 		t.Fatal("response_format rejection was not detected")
@@ -476,7 +526,7 @@ func TestGPTImageGenerationRequestsHonorConfiguredConcurrency(t *testing.T) {
 	}
 }
 
-func TestGPTImageConcurrencyIsPerTaskNotProcessWide(t *testing.T) {
+func TestGPTImageConcurrencyIsProcessWideAcrossTasks(t *testing.T) {
 	var active atomic.Int32
 	var maximum atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -503,7 +553,14 @@ func TestGPTImageConcurrencyIsPerTaskNotProcessWide(t *testing.T) {
 			"credential": "test-secret",
 		},
 	}
-	// 两本书并行、各自配置 2 路时，全进程应有 4 个请求在跑，而不是共用 2 路。
+	// 设计意图：出图并发是「进程级 + 按图片域名共享」的，不是每本书各算一份。
+	// 同一图片域名冷启动只放 shuihuoImageConcurrencyDefault（当前 2）路，连续成功
+	// 后才按自适应阶梯升到调用方配置值；所以两本书各自配置 2 路时，同一域名
+	// 同时最多仍是 2 个请求，而不是 4 个，避免多个批次把慢速 Base64 响应压垮。
+	// 以后要调整并发策略，改 backend/internal/httpapi/shuihuo_image_adaptive_concurrency.go
+	// 的冷启动初值，以及 backend/internal/httpapi/shuihuo_projects.go 里的
+	// shuihuoImageConcurrencyDefault，并同步更新本用例断言；只调大调用方的
+	// withShuihuoImageConcurrency 不会突破这里的进程级上限。
 	taskCtxs := []context.Context{
 		withShuihuoImageConcurrency(context.Background(), 2),
 		withShuihuoImageConcurrency(context.Background(), 2),
@@ -527,8 +584,8 @@ func TestGPTImageConcurrencyIsPerTaskNotProcessWide(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := maximum.Load(); got != 4 {
-		t.Fatalf("maximum simultaneous gpt-image requests=%d, want 4", got)
+	if got := maximum.Load(); got != shuihuoImageConcurrencyDefault {
+		t.Fatalf("maximum simultaneous gpt-image requests=%d, want process-safe %d", got, shuihuoImageConcurrencyDefault)
 	}
 }
 
@@ -608,18 +665,22 @@ func TestGPTImageGenerationSlotIsReleasedBeforeImageDownload(t *testing.T) {
 	}
 }
 
-func TestRetryableImageTransportErrorCoversBodyReadFailure(t *testing.T) {
-	// 上游已返回 200，但响应体在传输中断：必须重试，不能把已生成的图丢掉。
-	for _, message := range []string{
-		"image provider response body read failed status=200 refs=3: unexpected EOF",
-		"image provider response body read failed status=200 refs=0: context deadline exceeded",
-	} {
-		if !retryableShuihuoAssetImageTransportError(errors.New(message)) {
-			t.Fatalf("expected retryable transport error for %q", message)
-		}
+func TestRetryableImageTransportErrorUsesTypesNotMessageText(t *testing.T) {
+	// 上游已返回 200，但响应体在传输中断：底层类型必须被判为可重试，
+	// 不能再依赖错误文案（文案已中文化，关键词会漏判）。
+	if !retryableShuihuoAssetImageTransportError(fmt.Errorf("图片通道响应读取中断（HTTP 200）：%w", io.ErrUnexpectedEOF)) {
+		t.Fatal("unexpected EOF 类型必须可重试")
 	}
-	if retryableShuihuoAssetImageTransportError(errors.New("image provider returned HTTP 400: 参考图无法读取")) {
-		t.Fatal("non-transport provider error must not be retried")
+	if !retryableShuihuoAssetImageTransportError(fmt.Errorf("图片通道请求失败：%w", context.DeadlineExceeded)) {
+		t.Fatal("deadline exceeded 类型必须可重试")
+	}
+	// 只有文案、没有传输层类型时不再重试（旧实现靠英文关键词，会误判）。
+	if retryableShuihuoAssetImageTransportError(errors.New("image provider response body read failed status=200: unexpected EOF")) {
+		t.Fatal("纯文案错误不应再被判定为可重试")
+	}
+	// 业务拒绝带明确 HTTP 状态但没有传输层类型：不重试。
+	if retryableShuihuoAssetImageTransportError(shuihuoImageUpstreamError{Message: "图片通道拒绝了本次请求（HTTP 400）", StatusCode: http.StatusBadRequest}) {
+		t.Fatal("4xx 业务拒绝必须不可重试")
 	}
 }
 

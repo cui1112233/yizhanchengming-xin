@@ -199,8 +199,9 @@ func assetImageGenerationTaskResponse(task assetImageGenerationTask) map[string]
 		"bookId":     task.BookID,
 		"assetIds":   task.AssetIDs,
 		"imageCount": task.ImageCount,
-		"error":      task.Error,
-		"updatedAt":  task.UpdatedAt,
+		// 任务里存的是原始错误串，返回前去掉英文哨兵前缀，界面只展示中文结论。
+		"error":     batchfactoryv11.UserFacingErrorText(task.Error),
+		"updatedAt": task.UpdatedAt,
 	}
 }
 
@@ -212,7 +213,7 @@ func assetImageGenerationContext(parent context.Context) (context.Context, conte
 // store/provider boundary as the Shuihuo project page. The old Node handler
 // used to receive this one action even when every other batch operation was on
 // Go, which made the asset step the last hidden runtime split.
-func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStore novelfetchworkshop.Store, rewrite comicPromptRewriter) {
+func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, rewrite comicPromptRewriter) {
 	if mux == nil || store == nil || files == nil {
 		return
 	}
@@ -287,7 +288,7 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 			generationCtx, cancel := assetImageGenerationContext(context.Background())
 			defer cancel()
 			generationCtx = withShuihuoAssetThreeView(generationCtx, threeView)
-			images, generationErr := generateShuihuoAssetImagesWithRepair(generationCtx, store, files, owner, selectedBatch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, rewrite, catalogStore)
+			images, generationErr := generateShuihuoAssetImagesWithRepair(generationCtx, store, files, owner, selectedBatch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, rewrite, userConfig, catalogStore)
 			if generationErr != nil {
 				log.Printf("batch factory asset image generation failed batch=%s book=%s assets=%v model=%s provider=%s: %v", batchID, bookID, assetIDs, modelID, provider, generationErr)
 			}
@@ -309,7 +310,7 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 			status := http.StatusCreated
 			response := map[string]any{"images": result.images}
 			if result.err != nil {
-				response["warning"] = result.err.Error()
+				response["warning"] = batchfactoryv11.UserFacingErrorText(result.err.Error())
 			}
 			writeJSON(w, status, response)
 		case <-time.After(assetImageHTTPFastPathWait):
