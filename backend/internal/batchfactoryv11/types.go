@@ -571,8 +571,11 @@ type DirectorSnapshot struct {
 }
 
 type UpdateBookMetadataInput struct {
-	Metadata         map[string]any `json:"metadata"`
-	ExpectedRevision int64          `json:"expectedRevision"`
+	Metadata map[string]any `json:"metadata"`
+	// Title 非空时覆盖书名。发布按书名匹配漫画作品，占位书名或抓取书名有误时
+	// 需要用户手工纠正，所以元数据更新必须能改标题。
+	Title            string `json:"title,omitempty"`
+	ExpectedRevision int64  `json:"expectedRevision"`
 }
 
 // CaptureBookSourceInput is deliberately fill-only. It repairs legacy/manual

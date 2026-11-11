@@ -349,7 +349,11 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	}
 	// MySQL JSON rejects driver-bound []byte as _binary. Bind JSON as UTF-8 text
 	// so metadata updates (including direct-read and OCR state) are durable.
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=? WHERE book_id=?`, string(metadata), bookID); err != nil {
+	if title := strings.TrimSpace(input.Title); title != "" {
+		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_metadata_json=? WHERE book_id=?`, title, string(metadata), bookID); err != nil {
+			return Book{}, err
+		}
+	} else if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=? WHERE book_id=?`, string(metadata), bookID); err != nil {
 		return Book{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {

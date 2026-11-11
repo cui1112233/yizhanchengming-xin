@@ -6,6 +6,46 @@ import (
 	"testing"
 )
 
+func TestUpdateBookMetadataCanRenameBook(t *testing.T) {
+	ctx := context.Background()
+	s := NewMemoryStore()
+	batch, err := s.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批量", Books: []CreateBookInput{{
+		Title: "小说 793433",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	updated, err := s.UpdateBookMetadata(ctx, "alice", batch.ID, book.ID, UpdateBookMetadataInput{
+		Title:            "她为发小有求必应，我转身离开",
+		Metadata:         map[string]any{"sourceBookTitle": "她为发小有求必应，我转身离开"},
+		ExpectedRevision: book.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Title != "她为发小有求必应，我转身离开" {
+		t.Fatalf("title=%q", updated.Title)
+	}
+	stale, err := s.UpdateBookMetadata(ctx, "alice", batch.ID, book.ID, UpdateBookMetadataInput{
+		Title:            "另一个书名",
+		ExpectedRevision: book.Revision,
+	})
+	if err != ErrConflict {
+		t.Fatalf("stale revision should conflict: book=%+v err=%v", stale, err)
+	}
+	kept, err := s.UpdateBookMetadata(ctx, "alice", batch.ID, book.ID, UpdateBookMetadataInput{
+		Metadata:         map[string]any{"style": "悬疑"},
+		ExpectedRevision: updated.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kept.Title != "她为发小有求必应，我转身离开" {
+		t.Fatalf("empty title should keep current title: %q", kept.Title)
+	}
+}
+
 func TestCaptureBookSourceReplacesOnlyGeneratedTitle(t *testing.T) {
 	ctx := context.Background()
 	s := NewMemoryStore()

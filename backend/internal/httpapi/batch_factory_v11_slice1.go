@@ -353,6 +353,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		var input struct {
 			Metadata         map[string]any `json:"metadata"`
 			MetadataPatch    map[string]any `json:"metadataPatch,omitempty"`
+			Title            string         `json:"title,omitempty"`
 			ExpectedRevision int64          `json:"expectedRevision"`
 		}
 		if !decodeJSON(w, r, &input) {
@@ -385,6 +386,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		}
 		book, err := store.UpdateBookMetadata(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), batchfactoryv11.UpdateBookMetadataInput{
 			Metadata:         input.Metadata,
+			Title:            input.Title,
 			ExpectedRevision: input.ExpectedRevision,
 		})
 		if err != nil {

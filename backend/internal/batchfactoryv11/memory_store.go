@@ -687,6 +687,9 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 		if book.Revision != input.ExpectedRevision {
 			return Book{}, ErrConflict
 		}
+		if title := strings.TrimSpace(input.Title); title != "" {
+			book.Title = title
+		}
 		book.SourceMetadata = map[string]any{}
 		for key, value := range input.Metadata {
 			book.SourceMetadata[key] = value
