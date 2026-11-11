@@ -202,15 +202,41 @@ func (p *BatchFactoryN8ComicPublisher) ValidateBookSettings(ctx context.Context,
 		return err
 	}
 	if manualAudioID > 0 {
-		_, err = enabledComicAudio(audios, manualAudioID)
-		return err
-	}
-	for _, audio := range audios {
-		if audio.ID > 0 && strings.EqualFold(strings.TrimSpace(audio.Status), "ENABLE") {
-			return nil
+		if _, err = enabledComicAudio(audios, manualAudioID); err != nil {
+			return err
+		}
+	} else {
+		available := false
+		for _, audio := range audios {
+			if audio.ID > 0 && strings.EqualFold(strings.TrimSpace(audio.Status), "ENABLE") {
+				available = true
+				break
+			}
+		}
+		if !available {
+			return fmt.Errorf("当前组织的“%s”分类没有可用音频", category.Name)
 		}
 	}
-	return fmt.Errorf("当前组织的“%s”分类没有可用音频", category.Name)
+	// 书名 → 作品 ID 的匹配也放进预检：书名对不上时要在生成前拦住，
+	// 不能等整本图片都出完、上传完才在发布阶段失败。
+	if !comicPublishHasExplicitWorkIDs(config) && comicPublishUsesTitleMatch(config.WorkMatchMode) {
+		if _, err := p.resolveComicWorkIDs(ctx, owner, batchID, bookID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func comicPublishHasExplicitWorkIDs(config n8ComicPublishSettings) bool {
+	if len(config.WorkIDs) > 0 {
+		return true
+	}
+	return strings.TrimSpace(config.WorkIDsText) != ""
+}
+
+func comicPublishUsesTitleMatch(mode string) bool {
+	mode = strings.TrimSpace(mode)
+	return mode == "" || mode == "title_auto"
 }
 
 func (p *BatchFactoryN8ComicPublisher) resolveComicPublishAudio(ctx context.Context, categoryID, audioID int64, organizationID string) (int64, int64, error) {

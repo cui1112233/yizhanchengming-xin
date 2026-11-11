@@ -23,6 +23,7 @@ import (
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
+	"qiantie/backend/internal/novelcreation"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/releasenotes"
@@ -103,6 +104,8 @@ type RouterOptions struct {
 	AgentProxy                agentproxy.Store
 	AICut                     aicut.Store
 	Screenplay                screenplay.Store
+	NovelCreation             *novelcreation.Service
+	NovelCreationRunStarter   NovelCreationRunStarter
 	AICutASR                  *aicut.ASRService
 	AICutExport               *AICutExportService
 	AICutAgentStore           aicut.AgentStore
@@ -580,7 +583,22 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterAgentChatRoutes(root, auth, options.UserConfigStore.BaseDir, systemDir, runtimeCatalogStore, options.UserConfigStore, textModels, options.Now)
 	}
 	RegisterAICutRoutes(root, auth, options.AICut, options.Now)
-	RegisterScreenplayRoutes(root, auth, options.Screenplay, runtimeTextProviderResolver, options.Now)
+	var screenplayMedia screenplay.BatchMediaRunner
+	if options.UserConfigStore != nil {
+		videoResolver := func(ctx context.Context, owner, modelKey string) (batchfactoryv11.VideoProviderConfig, error) {
+			config, err := options.UserConfigStore.GetConfig(ctx, owner)
+			if err != nil {
+				return batchfactoryv11.VideoProviderConfig{}, err
+			}
+			return scriptVideoModelConfig(ctx, options.Store, owner, config, modelKey)
+		}
+		screenplayMedia = &screenplayVideoRunner{
+			service: &scriptVideoService{resolver: videoResolver, localExecutor: options.LocalExecutors},
+			configs: options.UserConfigStore,
+		}
+	}
+	RegisterScreenplayRoutes(root, auth, options.Screenplay, runtimeTextProviderResolver, options.Now, screenplayMedia)
+	RegisterNovelCreationRoutes(root, auth, options.NovelCreation, options.NovelCreationRunStarter)
 	RegisterAICutAssetRoutes(root, auth, options.AICut, options.AgentAssetObjects, options.Now)
 	RegisterAICutTTSRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, options.Now)
 	RegisterAICutBackgroundRemovalRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, nil, options.Now)
@@ -624,7 +642,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}
-	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, runtimeCatalogStore, options.PresetCatalog, options.RedisURL, options.LocalExecutors)
+	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, runtimeCatalogStore, options.PresetCatalog, options.RedisURL, options.LocalExecutors, options.UserConfigStore)
 	RegisterBatchComicReferenceRoutes(root, auth, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog)
 	registerTTSRoute(root, auth, runtimeCatalogStore)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)

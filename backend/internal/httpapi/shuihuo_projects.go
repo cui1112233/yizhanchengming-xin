@@ -597,7 +597,7 @@ func shuihuoRedisHealth(ctx context.Context, rawURL string) (bool, string) {
 	return false, "Redis 未返回 PONG"
 }
 
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, redisURL string, localExecutors *localexecutor.Service) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, redisURL string, localExecutors *localexecutor.Service, userConfig *UserConfigStore) {
 	if store == nil {
 		return
 	}
@@ -622,7 +622,9 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if production != nil && production.Enabled {
 			enabledKinds = append(enabledKinds, "video")
 		}
-		if ownerConfig != nil && shuihuoModelKindConfigured(ownerConfig, "image") {
+		// 出图既可能来自旧 modelCatalog，也可能来自 API 接口配置里的渠道；
+		// 顶部能力条必须与真实出图同口径，否则会误报“图片模型未配置”。
+		if (ownerConfig != nil && shuihuoModelKindConfigured(ownerConfig, "image")) || shuihuoImageChannelReady(r.Context(), userConfig, owner) {
 			enabledKinds = append(enabledKinds, "image")
 		}
 		if shuihuoAudioModelConfigured(ownerConfig) {

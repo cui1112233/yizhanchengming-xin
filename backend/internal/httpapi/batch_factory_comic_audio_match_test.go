@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,45 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/n8catalog"
 )
+
+// 书名匹配必须放在预检：占位书名对不上漫画后台作品时，要在出图前拦住，
+// 而不是等整本图片生成、上传完才在发布阶段失败。
+func TestComicPublishPreflightRejectsUnmatchedPlaceholderTitle(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "小说 793433"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store: store,
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{{ID: 9, Name: "现代通用", Status: "ENABLE"}},
+			audios:     []n8catalog.Audio{{ID: 91, Name: "通用音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE"}},
+		},
+		WorksDirectory: fakeN8ComicWorkDirectory{configured: true, works: []n8catalog.Work{
+			{ID: 9001, Name: "真实书名一"},
+			{ID: 9002, Name: "真实书名二"},
+		}},
+		WorkTitleMapPath: filepath.Join(t.TempDir(), "n8-work-title-map.json"),
+	}
+	settings := batchfactoryv11.SettingsPatch{
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","audioCategoryId":9,"audioCategoryName":"现代通用","audioCategorySelectionMode":"manual","specifiedAudioId":91}`),
+	}
+	err = publisher.ValidateBookSettings(context.Background(), "alice", batch.ID, batch.Books[0].ID, settings)
+	if err == nil || !strings.Contains(err.Error(), "未找到") {
+		t.Fatalf("error=%v, want unmatched work title", err)
+	}
+	// 显式填了作品 ID 时不再依赖书名匹配。
+	explicit := batchfactoryv11.SettingsPatch{
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","audioCategoryId":9,"audioCategoryName":"现代通用","audioCategorySelectionMode":"manual","specifiedAudioId":91,"workIdsText":"9001"}`),
+	}
+	if err := publisher.ValidateBookSettings(context.Background(), "alice", batch.ID, batch.Books[0].ID, explicit); err != nil {
+		t.Fatalf("explicit work id preflight error=%v", err)
+	}
+}
 
 func TestComicAudioCategoryMapsNovelStyleAndGender(t *testing.T) {
 	tests := []struct {
