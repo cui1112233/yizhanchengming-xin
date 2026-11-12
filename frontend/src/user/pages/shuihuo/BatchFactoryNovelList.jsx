@@ -222,6 +222,38 @@ const BATCH_FACTORY_TABLE_COLUMNS = [
 
 
 
+// 行内“当前阶段”徽标：把运行时汇总收敛成一句中文状态。
+// 优先级：失败 > 已发布 > 提交中 > 漫画出图 > 已完成 > 生成阶段 > 排队中。
+function batchFactoryBookStageBadge(book, { productionStatus, stageSummary, automationRunning } = {}) {
+  if (!book) return null;
+  const summary = stageSummary || {};
+  const runs = Array.isArray(summary.runs) ? summary.runs : [];
+  const stageActive = (stage) => runs.some(run => (
+    String(run?.stage || '').trim() === stage
+    && ['running', 'queued'].includes(String(run?.status || '').trim().toLowerCase())
+  ));
+  if (summary.lastFailed) return { label: '失败', tone: 'failed', detail: '本书当前阶段执行失败' };
+  if (Number(summary.comicPublishedCollectionCount || 0) > 0) return { label: '已发布', tone: 'done', detail: '漫画合集已发布' };
+  const bookID = String(book?.id || '');
+  const submitting = (Array.isArray(productionStatus?.jobs) ? productionStatus.jobs : []).some(job => (
+    String(job?.bookId || '') === bookID
+    && ['running', 'queued'].includes(String(job?.status || '').trim().toLowerCase())
+  ));
+  if (submitting) return { label: '提交中', tone: 'running', detail: '生产任务已提交，等待上游返回' };
+  const imageReady = Number(summary.comicImageReadyCount || 0);
+  const imageTotal = Number(summary.comicImageTotalCount || 0);
+  if (imageTotal > 0 && imageReady < imageTotal) {
+    return { label: `漫画生成中 ${imageReady}/${imageTotal}`, tone: 'running', detail: `漫画页已生成 ${imageReady}/${imageTotal}` };
+  }
+  if (summary.comicCollectionReady === true || summary.comicImageReady === true) {
+    return { label: '已完成', tone: 'done', detail: '本书当前阶段已产出结果' };
+  }
+  if (stageActive('assets')) return { label: '资产生成中', tone: 'running', detail: '正在生成人物/场景/道具资产' };
+  if (stageActive('director') || stageActive('comic')) return { label: '提示词生产中', tone: 'running', detail: '正在生成分镜与提示词' };
+  if (imageTotal === 0 && automationRunning) return { label: '排队中', tone: 'queued', detail: '已进入批次任务队列，等待开始' };
+  return null;
+}
+
 function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, onRunBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks }) {
   const selected = new Set(selectedBookIds);
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
@@ -5546,6 +5578,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             const sourceStatus = batchFactorySourceStatus(book);
             const videos = book.videos || [];
             const lastFailedStage = stageSummary?.lastFailed;
+            const stageBadge = batchFactoryBookStageBadge(book, {
+              productionStatus,
+              stageSummary,
+              automationRunning: automationState === 'running',
+            });
             // 自动生产正在执行时给整行加流动光边：阶段不同颜色不同，
             // 用户在长列表里也能直接看到“这本文在跑什么”。
             const automationRunningStage = String(automationBook?.status || '').toLowerCase() === 'running'
@@ -5607,6 +5644,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                       </i>
                     </span>
                     <span className={`batch-factory-source-kind is-${sourceStatus.tone}`} title={sourceStatus.detail}>{batchFactorySourceKind(book)}</span>
+                    {stageBadge ? (
+                      <span className={`batch-factory-stage-badge is-${stageBadge.tone}`} title={stageBadge.detail}>{stageBadge.label}</span>
+                    ) : null}
                   </div>
                   <span>
                     bookId：{book.bookId || "—"} · 书城：
