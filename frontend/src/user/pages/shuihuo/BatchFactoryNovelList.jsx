@@ -4830,6 +4830,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       const values = await loadAutomationPresets();
       setAutomationPresetID(current => current || values[0]?.id || '');
       setAutomationScheduledAt(current => current || formatBeijingDatetimeLocal(new Date(Date.now() + 10 * 60 * 1000).toISOString()));
+      // 列表里已经勾选了书就默认按勾选执行：否则弹窗默认“全部小说”，
+      // 用户只勾 1 本却会预检/执行整批，误伤面太大。
+      setAutomationBookScope(selectedBookIds.length ? 'selected' : 'all');
       setAutomationStartOpen(true);
     } catch (error) { message.error(error?.message || '读取自动化预设失败'); }
   }
