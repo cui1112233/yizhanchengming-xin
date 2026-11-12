@@ -42,7 +42,8 @@ test('字幕识别入口始终可见，缺少模型时在弹窗引导配置', ()
 
 test('AI-CUT Agent统一承载自动成片且没有顶栏重复入口', () => {
   assert.doesNotMatch(page, /title="AI 自动剪辑"/);
-  assert.match(page, /className="aicut-agent-fab"/);
+  assert.match(page, /registerPetPageService/);
+  assert.match(page, /<AICutPetHost/);
   assert.match(page, /timelineRevision=\{timeline\.revision\}/);
   assert.match(page, /assets=\{assets\}/);
   assert.match(page, /models=\{agentModels\}/);

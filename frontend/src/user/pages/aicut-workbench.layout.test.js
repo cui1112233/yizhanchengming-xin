@@ -83,9 +83,11 @@ test('AI-CUT使用57201原始顶栏和编辑器语义结构而不是AntD近似�
   assert.match(page, /aicut-reference-timeline/);
 });
 
-test('AI-CUT Agent保留唯一浮动入口且不改变四区骨架', () => {
+test('AI-CUT Agent由宠物唯一承载且不改变四区骨架', () => {
   assert.doesNotMatch(page, /title="AI 自动剪辑"/);
-  assert.match(page, /className="aicut-agent-fab"/);
+  assert.match(page, /registerPetPageService/);
+  assert.match(page, /<AICutPetHost/);
+  assert.equal((page.match(/<AICutAgentPanel\b/g) || []).length, 1);
   assert.match(agentPanel, /AICutAutoEditDrawer embedded/);
   assert.match(page, /setAutoEditOpen/);
   assert.match(editorShell, /aicut-reference-editor/);
@@ -237,11 +239,11 @@ test('AI-CUT建议卡依据实际能力填入剪辑要求', () => {
   assert.match(agentPanel, /sendAgentPrompt/);
 });
 
-test('AI-CUT Agent以浮动入口打开独立抽屉，不占用素材栏', () => {
+test('AI-CUT Agent使用当前页面宠物服务，不占用素材栏', () => {
   assert.match(page, /AICutAgentPanel/);
   assert.match(page, /onTimelineChanged/);
-  assert.match(page, /aicut-agent-fab/);
-  assert.match(page, /aicut-agent-drawer/);
+  assert.match(page, /openPetPageService\('aicut-agent'\)/);
+  assert.doesNotMatch(page, /className="aicut-agent-(fab|drawer)"/);
   assert.match(page, /setAgentDrawerOpen/);
   assert.match(pageCSS, /aicut-agent-drawer/);
 });

@@ -1,6 +1,6 @@
 import { Button, Checkbox, ConfigProvider, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag, Upload, message } from 'antd';
 import { Bot, ClipboardPaste, MoreHorizontal, LockKeyhole, UnlockKeyhole, Volume2, VolumeX, SkipBack, SkipForward, Maximize2, Captions, Clapperboard, CloudUpload, Copy, Film, ImageIcon, Keyboard, Magnet, Music, Palette, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, Redo2, Save, Scissors, Sparkles, Star, Trash2, Type, Undo2, Upload as UploadIcon, WandSparkles, X } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PlayerViewControls from './aicut/PlayerViewControls.jsx';
 import PreviewViewport from './aicut/PreviewViewport.jsx';
 import { previewSource } from './aicut/playerView.js';
@@ -20,6 +20,9 @@ import { getConfig } from '../../shared/api/config.js';
 import { alignAICutMultiCamAudio } from '../../shared/api/aicut.js';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
 import AICutAgentPanel from '../components/AICutAgentPanel.jsx';
+import AICutPetHost from '../components/AICutPetHost.jsx';
+import { getCurrentUsername } from '../../shared/api/auth.js';
+import { registerPetPageService, openPetPageService } from '../../shared/pet/pageService.js';
 const AICutCreativeCanvas = lazy(() => import('../components/AICutCreativeCanvas.jsx'));
 import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, normalizeSubtitleRhythm, orderedTimelineTracks, removeTimelineTrack, renameTimelineTrack, setTimelineClipText, subtitleRhythmLabel, timelinePixelDeltaToTime, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, updateTimelineTrackSettings } from './aicutTimeline.js';
 import { createAICutClipboard, executeAICutCommand, findTimelineEditPoint, reconcileTimelineSave, restoreTimelineSnapshot } from './aicutCommands.js';
@@ -42,7 +45,7 @@ import { hasColorGradeAdjustments } from './aicut/colorGrade.js';
 import { projectTemplateCatalog } from './aicut/projectTemplates.js';
 import MediaArtwork from './aicut/MediaArtwork.jsx';
 import { timelineRulerTicks } from './aicut/timelineRuler.js';
-import { buildTimelineAdvancedItems } from './aicut/timelineTools.js';
+import { buildTimelineAdvancedItems, buildTimelinePrimaryActions } from './aicut/timelineTools.js';
 import ResourceLibrary from './aicut/ResourceLibrary.jsx';
 import PreviewCanvas from './aicut/PreviewCanvas.jsx';
 import TrackingRegionOverlay from './aicut/TrackingRegionOverlay.jsx';
@@ -508,8 +511,8 @@ export default function AICutPage() {
   const [inspectorTab, setInspectorTab] = useState('基础');
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
-  const [agentDrawerMounted, setAgentDrawerMounted] = useState(false);
-  useEffect(() => { if (agentDrawerOpen) setAgentDrawerMounted(true); }, [agentDrawerOpen]);
+  const petPageServiceCleanup = useRef(null);
+  const petPageRuntime = useRef(null);
   const [autoEditOpen, setAutoEditOpen] = useState(false);
   const autoEditScopeRef = useRef('');
   const [assetSearch, setAssetSearch] = useState('');
@@ -2893,6 +2896,7 @@ export default function AICutPage() {
     const capturedScope = `${projectId}:${activeTimelineId}`;
     if (saveInFlightRef.current) {
       const saved = await saveInFlightRef.current;
+      if (activeTimelineScopeRef.current !== capturedScope) return null;
       if (options.requireLatest && lastPersistedEditSequenceRef.current < editSequenceRef.current) {
         saveInFlightRef.current = null;
         return saveTimeline(options);
@@ -2915,7 +2919,9 @@ export default function AICutPage() {
         setSaveState(reconciliation.dirty ? 'dirty' : 'saved');
         if (!reconciliation.dirty) lastPersistedEditSequenceRef.current = editSequenceRef.current;
       } while (options.requireLatest && reconciliation?.dirty);
-      setServerHistory(await getAICutTimelineHistory(projectId));
+      const savedHistory = await getAICutTimelineHistory(projectId);
+      if (activeTimelineScopeRef.current !== capturedScope) return saved;
+      setServerHistory(savedHistory);
       setHistoryVersion((value) => value + 1);
       if (!options.silent) message.success('时间线已保存');
       return saved;
@@ -2931,7 +2937,7 @@ export default function AICutPage() {
       return null;
     } finally {
       if (saveInFlightRef.current === operation) saveInFlightRef.current = null;
-      setSaving(false);
+      if (activeTimelineScopeRef.current === capturedScope) setSaving(false);
     }
   }
 
@@ -3321,11 +3327,21 @@ export default function AICutPage() {
     setAgentDrawerOpen(true);
   }
   async function handleAutoEditApplied(result) {
-    if (autoEditScopeRef.current !== activeTimelineScopeRef.current) return;
+    const operationScope = `${projectId}:${activeTimelineId}`;
+    const capturedEditSequence = editSequenceRef.current;
+    if (operationScope !== activeTimelineScopeRef.current) return;
     if (!result?.timeline) return;
+    let history;
+    try { history = await getAICutTimelineHistory(projectId); }
+    catch (error) { if (operationScope === activeTimelineScopeRef.current) message.warning(error?.message || '剪辑已应用，撤销记录读取失败，请刷新工程'); return; }
+    if (operationScope !== activeTimelineScopeRef.current) return;
+    if (capturedEditSequence !== editSequenceRef.current || lastPersistedEditSequenceRef.current < editSequenceRef.current) {
+      setConflictRecovery({ scope: operationScope, copyId: '' });
+      return;
+    }
     setTimeline(result.timeline);
     setSaveState('saved');
-    setServerHistory(await getAICutTimelineHistory(projectId));
+    setServerHistory(history);
     undoRef.current = [];
     redoRef.current = [];
     setHistoryVersion((value) => value + 1);
@@ -4471,7 +4487,7 @@ export default function AICutPage() {
               prompt: '按短剧AI剪辑流程检查当前工程：读取剧本和字幕，先说明缺少的信息，再对照剧本纠错'
             },
             {
-              title: '技能创作器',
+              title: '整理剪辑流程',
               detail: '把一段固定剪辑流程整理成可复制的操作说明。',
               prompt: '把我接下来描述的剪辑流程整理成可复制的操作说明'
             }
@@ -4833,6 +4849,69 @@ export default function AICutPage() {
   }
 
   const timelineNetworkBusy = Boolean(importingSRT || correctingCaptions || trimmingFillers || mediaToolBusy || consolidateBusy || asrBusy || ttsBusy || voiceCloneBusy || backgroundRemovalBusyId || personSegmentationBusy || regionTrackingBusy || uploading);
+  petPageRuntime.current = { loading, busy: timelineBusy || timelineNetworkBusy, saveTimeline };
+  const petServiceScope = `${getCurrentUsername()}:${projectId}:${activeTimelineId}`;
+  const refreshPetTimeline = useCallback(() => refreshTimelineFromAgent(), [projectId, activeTimelineId]);
+  const preparePetAgentRun = useCallback(async () => {
+    const scope = `${projectId}:${activeTimelineId}`;
+    const runtime = petPageRuntime.current;
+    if (activeTimelineScopeRef.current !== scope || runtime.loading || runtime.busy) throw new Error('当前工程正在处理，请稍后再发送剪辑要求');
+    if (saveInFlightRef.current || lastPersistedEditSequenceRef.current < editSequenceRef.current) {
+      const saved = await runtime.saveTimeline({ silent: true, requireLatest: true });
+      if (!saved) throw new Error('当前时间线保存失败，请重试后再发送');
+    }
+    if (activeTimelineScopeRef.current !== scope) throw new Error('工程或时间线已切换，请重新发送');
+    return { revision: timelineRef.current.revision };
+  }, [projectId, activeTimelineId]);
+  useEffect(() => () => {
+    petPageServiceCleanup.current?.();
+    petPageServiceCleanup.current = null;
+  }, [petServiceScope]);
+  useEffect(() => {
+    if (!projectId) return;
+    petPageServiceCleanup.current = registerPetPageService({
+      id: 'aicut-agent', scope: petServiceScope,
+      label: `AI-CUT 剪辑 · ${currentProject?.title || '当前工程'}`,
+      render: () => <AICutAgentPanel
+        key={petServiceScope} embedded projectId={projectId} timelineRevision={timeline.revision}
+        models={agentModels} assets={assets} activeSkill={activeAgentSkill} draft={agentDraft}
+        uiContext={{ selectedClipKeys, playheadMs: Math.round(previewTimeMs) }}
+        autoEditOpen={autoEditOpen}
+        onBeforeRun={preparePetAgentRun}
+        onSectionChange={value => { autoEditScopeRef.current = `${projectId}:${activeTimelineId}`; setAutoEditOpen(value); }}
+        onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshPetTimeline}
+      />
+    });
+  }, [petServiceScope, projectId, activeTimelineId, timeline.revision, currentProject?.title, agentModels, assets, activeAgentSkill, agentDraft, autoEditOpen, selectedClipKeys, previewTimeMs]);
+  useEffect(() => {
+    if (agentDrawerOpen && projectId) {
+      openPetPageService('aicut-agent');
+      setAgentDrawerOpen(false);
+    }
+  }, [agentDrawerOpen, projectId, petServiceScope]);
+  const selectedTimelineEntries = timeline.tracks.flatMap(track => (track.clips || []).filter(clip => selectedClipKeys.includes(`${track.id}::${clip.id}`)).map(clip => ({ track, clip })));
+  const playheadInsideSelection = Boolean(selectedClipEntry && previewTimeMs > selectedClipEntry.clip.startMs && previewTimeMs < selectedClipEntry.clip.startMs + selectedClipEntry.clip.durationMs);
+  const toolbarState = {
+    hasSelection: Boolean(selectedClipEntry), selectionCount: selectedTimelineEntries.length,
+    selectionLocked: selectedTimelineEntries.some(entry => entry.track.locked),
+    busy: loading || saving || timelineBusy || timelineNetworkBusy,
+    canUndo: Boolean(undoRef.current.length || serverHistory.canUndo),
+    canRedo: Boolean(redoRef.current.length || serverHistory.canRedo),
+    canSplit: timeline.tracks.some(track => !track.locked && (track.clips || []).some(clip => previewTimeMs > clip.startMs && previewTimeMs < clip.startMs + clip.durationMs)),
+    canTrimLeft: playheadInsideSelection, canTrimRight: playheadInsideSelection,
+    canAddKeyframe: Boolean(selectedClipEntry && previewTimeMs >= selectedClipEntry.clip.startMs && previewTimeMs <= selectedClipEntry.clip.startMs + selectedClipEntry.clip.durationMs),
+    hasLink: Boolean(selectedClipEntry?.clip?.linkGroupId), hasCompound: Boolean(selectedClipEntry?.clip?.compoundId), consolidateBusy
+  };
+  const toolbarPrimaryActions = buildTimelinePrimaryActions(toolbarState, {
+    undo: undoTimeline, redo: redoTimeline, split: splitAtPlayhead, delete: deleteSelectedClips,
+    trimLeft: () => trimSelectedAtPlayhead('left'), trimRight: () => trimSelectedAtPlayhead('right'),
+    addKeyframe: addKeyframeAtPlayhead, addMarker: addMarkerAtPlayhead
+  });
+  function trimSelectedAtPlayhead(edge) {
+    try {
+      if (selectedClipEntry) runTimelineCommand({ type: 'clip.trim_to_playhead', trackId: selectedClipEntry.track.id, clipId: selectedClipEntry.clip.id, timeMs: previewTimeMs, edge });
+    } catch (error) { message.warning(error.message); }
+  }
   return (
     <ConfigProvider
       theme={{
@@ -5454,22 +5533,13 @@ export default function AICutPage() {
                   />
                   <TimelineToolbar
                     primary={<>
-                      <Dropdown trigger={['click']} menu={{ items: [{key:'video',label:'新增视频轨'},{key:'audio',label:'新增音频轨'},{key:'subtitle',label:'新增字幕轨'}], onClick:({key})=>addTrack(key) }}><Button size="small" aria-label="新增轨道" title="新增轨道" icon={<Plus size={15}/>} /></Dropdown>
+                      <Dropdown disabled={toolbarState.busy} trigger={['click']} menu={{ items: [{key:'video',label:'新增视频轨'},{key:'audio',label:'新增音频轨'},{key:'subtitle',label:'新增字幕轨'}], onClick:({key})=>addTrack(key) }}><Button disabled={toolbarState.busy} size="small" aria-label="新增轨道" title="新增轨道" icon={<Plus size={15}/>} /></Dropdown>
                       <Button size="small" aria-label="选择模式" title="选择模式" aria-pressed={!bladeMode} type={!bladeMode ? 'primary' : 'default'} onClick={() => setBladeMode(false)} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m5 3 14 11-7 1-3 6z"/></svg>} />
                       <span className="aicut-toolbar-divider" aria-hidden="true" />
-                      <Button size="small" aria-label="时间线撤销" title="撤销 Ctrl+Z" icon={<Undo2 size={15} />} onClick={undoTimeline} disabled={!undoRef.current.length && !serverHistory.canUndo} />
-                      <Button size="small" aria-label="时间线重做" title="重做 Ctrl+Shift+Z" icon={<Redo2 size={15} />} onClick={redoTimeline} disabled={!redoRef.current.length && !serverHistory.canRedo} />
-                      <span className="aicut-toolbar-divider" aria-hidden="true" />
-                      <Button size="small" type={bladeMode ? 'primary' : 'default'} aria-label="剃刀模式" aria-pressed={bladeMode} title="剃刀模式" icon={<Scissors size={15} />} onClick={() => setBladeMode(value => !value)} />
-                      <Button size="small" title="在播放头处分割" aria-label="播放头分割" disabled={!timeline.tracks.some(track => !track.locked && track.clips?.length)} icon={<Clapperboard size={15} />} onClick={splitAtPlayhead} />
-                      <Button size="small" aria-label="向左裁到播放头" title="删除所选片段在播放头左侧的部分" disabled={!selectedClipEntry || selectedClipEntry.track.locked} icon={<SkipBack size={15} />} onClick={() => { try { if (selectedClipEntry) runTimelineCommand({ type: 'clip.trim_to_playhead', trackId: selectedClipEntry.track.id, clipId: selectedClipEntry.clip.id, timeMs: previewTimeMs, edge: 'left' }); } catch (error) { message.warning(error.message); } }} />
-                      <Button size="small" aria-label="向右裁到播放头" title="删除所选片段在播放头右侧的部分" disabled={!selectedClipEntry || selectedClipEntry.track.locked} icon={<SkipForward size={15} />} onClick={() => { try { if (selectedClipEntry) runTimelineCommand({ type: 'clip.trim_to_playhead', trackId: selectedClipEntry.track.id, clipId: selectedClipEntry.clip.id, timeMs: previewTimeMs, edge: 'right' }); } catch (error) { message.warning(error.message); } }} />
-                      <Button size="small" danger title="删除所选片段" aria-label="删除" icon={<Trash2 size={15} />} disabled={!selectedClipKeys.length} onClick={deleteSelectedClips} />
+                      <Button size="small" type={bladeMode ? 'primary' : 'default'} aria-label="剃刀模式" aria-pressed={bladeMode} title="剃刀模式" disabled={toolbarState.busy} icon={<Scissors size={15} />} onClick={() => setBladeMode(value => !value)} />
                     </>}
-                    advancedItems={[{ key:'clipboard-actions',type:'group',label:'剪贴板',children:[{key:'copy',label:'复制',disabled:!selectedClipKeys.length,onClick:copySelectedClips},{key:'paste',label:'粘贴',disabled:!clipboardCount,onClick:pasteClips}] }, ...buildTimelineAdvancedItems({
-                      hasSelection: Boolean(selectedClipEntry), selectionCount: selectedClipKeys.length,
-                      hasLink: Boolean(selectedClipEntry?.clip?.linkGroupId), hasCompound: Boolean(selectedClipEntry?.clip?.compoundId), consolidateBusy
-                    }, {
+                    primaryActions={toolbarPrimaryActions}
+                    advancedItems={[{ key:'clipboard-actions',type:'group',label:'剪贴板',children:[{key:'copy',label:'复制',disabled:!selectedClipKeys.length || toolbarState.busy,onClick:copySelectedClips},{key:'paste',label:'粘贴',disabled:!clipboardCount || toolbarState.busy,onClick:pasteClips}] }, ...buildTimelineAdvancedItems(toolbarState, {
                       cut: cutSelectedClips, duplicate: duplicateSelectedClip, consolidate: consolidateSelectedClips,
                       previousEdit: () => jumpEditPoint('previous'), nextEdit: () => jumpEditPoint('next'),
                       nudgeBack: () => nudgeSelectedClip(-1), nudgeForward: () => nudgeSelectedClip(1),
@@ -5479,7 +5549,7 @@ export default function AICutPage() {
                       expandCompound: expandSelectedCompound,
                       openCompound: () => selectedClipEntry?.clip?.compoundId && setActiveCompoundId(selectedClipEntry.clip.compoundId),
                       dissolveCompound: dissolveSelectedCompound
-                    }, (selectedClipEntry?.track || timeline.tracks[0]) ? trackMenuItems(selectedClipEntry?.track || timeline.tracks[0]) : [])]}
+                    }, (selectedClipEntry?.track || timeline.tracks[0]) ? trackMenuItems(selectedClipEntry?.track || timeline.tracks[0]) : [], toolbarPrimaryActions.map(action => action.key))]}
                     secondary={<>
                       <AudioRecorder key={`timeline-recorder:${projectId}:${activeTimelineId}`} compact onUpload={uploadRecording} />
                       <span className="aicut-toolbar-divider" aria-hidden="true" />
@@ -5536,19 +5606,6 @@ export default function AICutPage() {
               />
             ) : null}
 
-            <button type="button" style={{ display: workspaceMode === 'canvas' ? 'none' : undefined }} className="aicut-agent-fab" aria-label="打开 AI-CUT Agent" title="打开 AI-CUT Agent · 剪已有素材" onClick={() => setAgentDrawerOpen(true)}>
-              <Bot size={18} />
-              <span>AI-CUT Agent</span>
-            </button>
-            {(agentDrawerOpen || agentDrawerMounted) && (
-              <div className="aicut-agent-drawer" style={{ display: agentDrawerOpen && workspaceMode === 'editor' ? 'grid' : 'none' }}>
-                <header>
-                  <strong>AI-CUT Agent</strong>
-                  <Button type="text" aria-label="关闭 Agent" icon={<X size={18} />} onClick={() => setAgentDrawerOpen(false)} />
-                </header>
-                <AICutAgentPanel key={`${projectId}:${activeTimelineId}`} embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} assets={assets} activeSkill={activeAgentSkill} draft={agentDraft} autoEditOpen={autoEditOpen} onSectionChange={value => { autoEditScopeRef.current = `${projectId}:${activeTimelineId}`; setAutoEditOpen(value); }} onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshTimelineFromAgent} />
-              </div>
-            )}
             {asrJobs.length ? (
               <section className="aicut-asr-jobs">
                 <div className="aicut-panel-title">
@@ -5936,6 +5993,7 @@ export default function AICutPage() {
         <Modal title={toolWorkbenchOpen} open={Boolean(toolWorkbenchOpen)} footer={null} width={820} onCancel={() => setToolWorkbenchOpen('')}>
           <div className="aicut-tool-workbench">{renderMaterialBody()}</div>
         </Modal>
+        <AICutPetHost scope={petServiceScope} />
       </main>
     </ConfigProvider>
   );

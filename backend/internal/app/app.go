@@ -435,6 +435,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		return textProviderForModel(ctx, owner, modelID)
 	}
 	agentTools.ConfigureCompositeTools(aicut.AgentCompositeTools{
+		AnalyzeSilence: func(ctx context.Context, owner, projectID, assetID string, options aicut.SilenceOptions) (aicut.SilenceAnalysis, error) {
+			return httpapi.RunAICutAnalyzeSilence(ctx, aiCutStore, agentAssetObjects, owner, projectID, assetID, options)
+		},
 		ListASRModels: func(ctx context.Context, owner string) ([]aicut.AgentASRModel, error) {
 			settings, err := novelFetchStore.GetConfig(ctx, owner)
 			if err != nil {

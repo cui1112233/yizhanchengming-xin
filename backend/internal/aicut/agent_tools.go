@@ -20,6 +20,7 @@ type AgentToolExecutor struct {
 }
 
 type AgentCompositeTools struct {
+	AnalyzeSilence        func(context.Context, string, string, string, SilenceOptions) (SilenceAnalysis, error)
 	ListASRModels         func(context.Context, string) ([]AgentASRModel, error)
 	SmartSplitForTimeline func(context.Context, string, string, string, string, float64, int64, int64) (Timeline, int, string, error)
 	OralCleanForTimeline  func(context.Context, string, string, string, string, int64, int64) (Timeline, FillerTrimSummary, string, error)
@@ -104,6 +105,8 @@ func (e *AgentToolExecutor) Execute(ctx context.Context, run AgentRun, call Tool
 	result := ToolResult{CallID: call.ID, Name: call.Name}
 	var executeErr error
 	switch call.Name {
+	case "analyze_audio_silence", "remove_audio_silence":
+		result = e.audioSilence(ctx, run, call)
 	case "get_transcript", "select_caption_ranges", "compact_caption_gaps", "set_clip_animation", "set_clip_color", "apply_edit_operations":
 		result = e.smartEdit(ctx, run, call)
 	case "move_clip":
@@ -651,7 +654,22 @@ func (e *AgentToolExecutor) projectSnapshot(ctx context.Context, run AgentRun, c
 	if err != nil {
 		return ToolResult{}, err
 	}
-	data, err := json.Marshal(map[string]any{"timeline": timeline, "assets": assets, "currentTextModelId": run.ModelID, "oralCleanDefault": "current_text_model"})
+	snapshot := map[string]any{"timeline": timeline, "assets": assets, "currentTextModelId": run.ModelID, "oralCleanDefault": "current_text_model"}
+	initial, err := loadAgentUIContext(ctx, e.agents, run)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	if initial != nil {
+		selected := make([]AgentSelectedClip, 0, len(initial.SelectedClips))
+		for _, clip := range initial.SelectedClips {
+			if ValidateAgentUIContext(AgentUIContext{SelectedClips: []AgentSelectedClip{clip}}, timeline) == nil {
+				selected = append(selected, clip)
+			}
+		}
+		initial.SelectedClips = selected
+		snapshot["initialUiContext"] = initial
+	}
+	data, err := json.Marshal(snapshot)
 	if err != nil {
 		return ToolResult{}, fmt.Errorf("encode project snapshot: %w", err)
 	}

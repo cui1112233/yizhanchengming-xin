@@ -37,3 +37,23 @@ test('AI-CUT Agent增量事件、消息和取消使用持久接口', async () =>
   assert.equal(calls[0].path, '/api/ai-cut/projects/cut-1/agent-runs/run-1/events?after=1');
   assert.equal(calls[2].options.method, 'POST');
 });
+
+test('AI-CUT Agent传送当前选择和播放位置作为独立数据', async () => {
+ let body;
+ await api.createAICutAgentRun('cut-1', {instruction:'剪选中的这段',uiContext:{selectedClipKeys:['video-1::clip-b'],playheadMs:1234}},async (_,options)=>{body=JSON.parse(options.body);return {run:{id:'run-ui'}}});
+ assert.deepEqual(body.uiContext,{selectedClips:[{trackId:'video-1',clipId:'clip-b'}],playheadMs:1234});
+ assert.equal(body.instruction,'剪选中的这段');
+});
+
+test('AI-CUT Agent拒绝格式错误和越界的页面数据', async () => {
+ for (const uiContext of [
+  {selectedClipKeys:['video-1::clip-b::extra'],playheadMs:10},
+  {selectedClipKeys:[],playheadMs:-1},
+  {selectedClipKeys:[],playheadMs:Infinity},
+  {selectedClipKeys:Array(101).fill('video-1::clip-b'),playheadMs:10}
+ ]) {
+  let called=false;
+  await assert.rejects(api.createAICutAgentRun('cut-1',{instruction:'剪这段',uiContext},async()=>{called=true;return {run:{}}}));
+  assert.equal(called,false);
+ }
+});

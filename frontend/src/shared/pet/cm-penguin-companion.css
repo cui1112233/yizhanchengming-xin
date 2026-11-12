@@ -176,6 +176,31 @@
   border-bottom: 1px solid var(--legacy-border);
 }
 
+.cm-penguin-page-service {
+  position: fixed;
+  right: 24px;
+  bottom: 150px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(740px, calc(100dvh - 174px));
+}
+
+.cm-penguin-page-service[hidden] { display: none; }
+
+.cm-penguin-page-service-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 640px) {
+  .cm-penguin-chat.cm-penguin-page-service {
+    right: 10px;
+    bottom: 140px;
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 160px);
+  }
+}
+
 .cm-penguin-chat-header > div:first-child {
   display: flex;
   min-width: 0;

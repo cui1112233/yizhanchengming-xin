@@ -24,7 +24,7 @@ function modelLabel(model) {
   return model?.displayName || model?.name || model?.modelId || model?.id;
 }
 
-export default function AICutAgentPanel({ projectId, timelineRevision = 0, models = [], assets = [], activeSkill = '', draft, embedded = false, onTimelineChanged, onCollapsedChange, autoEditOpen = false, onSectionChange, onAutoApplied }) {
+export default function AICutAgentPanel({ projectId, timelineRevision = 0, uiContext, models = [], assets = [], activeSkill = '', draft, embedded = false, onTimelineChanged, onCollapsedChange, autoEditOpen = false, onSectionChange, onAutoApplied, onBeforeRun }) {
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem(COLLAPSED_KEY) === '1');
   const [mode, setMode] = useState('agent');
   const [modelId, setModelId] = useState(() => window.localStorage.getItem(MODEL_KEY) || '');
@@ -44,6 +44,7 @@ export default function AICutAgentPanel({ projectId, timelineRevision = 0, model
   const running = Boolean(run && !terminalStates.has(run.state));
   const followup = agentFollowupFromMessages(messages);
   const steps = agentStepRows(events);
+  const modelReady = modelOptions.some(item => item.value === modelId);
   useEffect(() => { setSkill(activeSkill); }, [activeSkill]);
   useEffect(() => { setAnswers({}); }, [followup?.question]);
 
@@ -136,15 +137,17 @@ export default function AICutAgentPanel({ projectId, timelineRevision = 0, model
 
   async function sendAgentPrompt(override) {
     const instruction = (typeof override === 'string' ? override : prompt).trim();
-    if (!instruction || !projectId || sending || running) return;
+    if (!instruction || !projectId || sending || running || !modelReady) return;
     setSending(true);
     try {
+      const prepared = await onBeforeRun?.();
       const created = await createAICutAgentRun(projectId, {
         instruction,
+        uiContext,
         mode,
         modelId,
         activeSkillId: skill,
-        expectedRevision: Number(timelineRevision) || 0,
+        expectedRevision: Number(prepared?.revision ?? timelineRevision) || 0,
         clientRequestId: requestID()
       });
       setRun(created);
@@ -172,10 +175,11 @@ export default function AICutAgentPanel({ projectId, timelineRevision = 0, model
   if (collapsed && !embedded) return <aside className="aicut-agent-panel collapsed"><Button type="text" aria-label="展开 Agent" title="展开 Agent" icon={<ChevronRight size={17} />} onClick={() => setCollapsed(false)} /><Bot size={20} /><span>Agent</span>{running ? <Spin size="small" /> : null}</aside>;
 
   return <aside className={`aicut-agent-panel${embedded ? ' embedded' : ''}`}>
-    <header className="aicut-agent-title"><span><Sparkles size={18} /><strong>AI-CUT Agent</strong><small>● 就绪</small></span>{embedded ? null : <Button type="text" aria-label="收起 Agent" title="收起 Agent" icon={<ChevronLeft size={17} />} onClick={() => setCollapsed(true)} />}</header>
+    <header className="aicut-agent-title"><span><Sparkles size={18} /><strong>AI-CUT Agent</strong><small>● {running ? '执行中' : modelReady ? '可执行' : '请选择可用模型'}</small></span>{embedded ? null : <Button type="text" aria-label="收起 Agent" title="收起 Agent" icon={<ChevronLeft size={17} />} onClick={() => setCollapsed(true)} />}</header>
     <div className="aicut-assistant-tabs"><Segmented block value={autoEditOpen ? 'auto' : 'chat'} disabled={running || autoBusy} onChange={value => onSectionChange?.(value === 'auto')} options={[{ label: '对话剪辑', value: 'chat' }, { label: '自动成片', value: 'auto' }]} /><p>{autoEditOpen ? '剪已有素材 · 选择素材 → 生成草案 → 勾选应用' : '剪已有素材 · 描述目标 → 分步执行 → 随时撤销'}</p></div>
     <div className="aicut-assistant-workflow" style={{ display: autoEditOpen ? 'flex' : 'none' }}><AICutAutoEditDrawer embedded open projectId={projectId} revision={timelineRevision} assets={assets} models={models} selectedModelId={modelId} onModelChange={setModelId} onApplied={onAutoApplied} onBusyChange={setAutoBusy} /></div>
     <div className="aicut-assistant-chat" style={{ display: autoEditOpen ? 'none' : 'contents' }}>
+    {uiContext ? <p className="aicut-agent-page-context" aria-label="当前剪辑上下文">已同步当前时间线 · 选中 {uiContext.selectedClipKeys?.length || 0} 个片段 · 播放头 {(Math.max(0, Number(uiContext.playheadMs) || 0) / 1000).toFixed(2)} 秒</p> : null}
     <div className="aicut-agent-controls"><Segmented value={mode} disabled={running} onChange={setMode} options={[{ label: '执行', value: 'agent' }, { label: '问答', value: 'ask' }]} /><Select value={modelId || undefined} disabled={running} onChange={setModelId} options={modelOptions} placeholder="选择文本模型" /></div>
     <Select className="aicut-agent-skill-select" allowClear value={skill || undefined} disabled={running} onChange={value => setSkill(value || '')} placeholder="选择剪辑技能（可选）" options={['短剧AI剪辑', '字幕选片', '口播精剪', '画面润色', '技能创作器'].map(value => ({ value, label: value === '技能创作器' ? '整理剪辑流程' : value }))} />
     <div className="aicut-agent-conversation">
@@ -186,7 +190,7 @@ export default function AICutAgentPanel({ projectId, timelineRevision = 0, model
     {!messages.length ? <div className="aicut-agent-skills">{suggestions.map(item => { const Icon = item.icon; return <button type="button" key={item.title} onClick={() => chooseAgentSuggestion(item)}><Icon size={15} /><strong>{item.title}</strong><span>{item.text}</span></button>; })}</div> : null}
     </div>
     <div className="aicut-agent-notice"><i />{mode === 'ask' ? '问答模式不会改动时间线' : 'Agent 模式执行工具前会校验工程版本'}</div>
-    <div className="aicut-agent-compose"><Input.TextArea ref={composerRef} value={prompt} onChange={event => setPrompt(event.target.value)} onPressEnter={event => { if (!event.shiftKey) { event.preventDefault(); sendAgentPrompt(); } }} disabled={!projectId || running} autoSize={{ minRows: 2, maxRows: 5 }} placeholder="描述这一集要怎么剪… (Enter 发送，Shift+Enter 换行)" /><div><Tag>{mode === 'ask' ? '问答' : 'Agent'}</Tag>{running ? <Button danger icon={<CircleStop size={14} />} onClick={stopRun}>停止</Button> : <Button type="primary" icon={<Send size={14} />} loading={sending} disabled={!prompt.trim() || !projectId} onClick={sendAgentPrompt}>发送</Button>}</div></div>
+    <div className="aicut-agent-compose"><Input.TextArea ref={composerRef} value={prompt} onChange={event => setPrompt(event.target.value)} onPressEnter={event => { if (!event.shiftKey) { event.preventDefault(); sendAgentPrompt(); } }} disabled={!projectId || running} autoSize={{ minRows: 2, maxRows: 5 }} placeholder="描述这一集要怎么剪… (Enter 发送，Shift+Enter 换行)" /><div><Tag>{mode === 'ask' ? '问答' : 'Agent'}</Tag>{running ? <Button danger icon={<CircleStop size={14} />} onClick={stopRun}>停止</Button> : <Button type="primary" icon={<Send size={14} />} loading={sending} disabled={!prompt.trim() || !projectId || !modelReady} onClick={sendAgentPrompt}>发送</Button>}</div></div>
     <details className="aicut-agent-capabilities"><summary>已接入能力 · {Object.keys(agentToolNames).length} 项</summary><p>{Object.values(agentToolNames).join(' · ')}</p><small>按字幕压缩间隔不能代替真实静音检测；自动成片共用现有剪辑规则。自定义流程目前可整理复制。</small></details>
     </div>
   </aside>;

@@ -43,3 +43,4 @@ html[data-theme=light] .aicut-canvas-agent .aicut-agent-panel.embedded{backgroun
 .aicut-agent-capabilities{flex:none;margin-top:9px}.aicut-agent-capabilities p,.aicut-agent-capabilities small{font-size:11px;line-height:1.8;color:var(--aicut-muted)}
 .aicut-agent-intro small{font-size:11px;line-height:1.6}
 .aicut-agent-panel .aicut-agent-skills button{min-height:0;padding:10px}.aicut-agent-panel .aicut-agent-skills button span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.aicut-agent-page-context{margin:0;padding:7px 10px;border-radius:7px;background:var(--aicut-panel-muted);color:var(--aicut-muted);font-size:11px;line-height:1.6}

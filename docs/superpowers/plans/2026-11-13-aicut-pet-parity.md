@@ -21,3 +21,8 @@
 主执行者在AICutPage通过页面服务注册器暴露现有AICutAgentPanel（相同project/timeline/revision/model/assets/callback）。增加独立宠物宿主小组件复用账号、宠物显示配置；原按钮改为打开宠物当前服务，避免两套Agent。其他页面的CM bridge继续正常。工程变化/时间线变化必须清理旧注册并更新scope；自动成片忙碌与未保存timeline校验保留。
 
 逐任务先测试失败后实现，复查功能与代码质量，再整体检查；浏览器实测宠物进入剪辑服务、切换页面恢复相应能力、实际工具不会仅返回成功文字、截图工具栏操作保存/撤销。构建React和Goembed、验证health/runtime-build-info；仅提交本轮路径，记录仍未实现的差异。
+
+## E 已发现的真实执行缺口
+
+- 选区上下文：请求独立提交选中track/clip与播放头，服务端验证当前时间线归属和revision；入队前通过typed `ui_context` 事件持久化，失败不入队，幂等请求不改写旧上下文。模型读取初始页面上下文，快照只显示仍存在的初始选区，不假称跟踪实时UI。原用户指令保持原文。
+- 真音频静音剪辑：新增流式PCM RMS能量分析及源时间静音区间，使用当前对象存储与FFmpeg。Agent提供 `analyze_audio_silence` 与 `remove_audio_silence`，固定倍速/源裁剪/重复素材实例正确映射，同步各轨裁切、标记与撤销；锁轨/复杂片段/全静音删除明确拒绝。真实tone-silence-tone合成音频验收，不调用模型、不冒充字幕空隙压缩。

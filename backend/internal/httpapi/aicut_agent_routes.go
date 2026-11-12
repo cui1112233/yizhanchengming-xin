@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,12 +33,13 @@ func RegisterAICutAgentRoutes(mux *http.ServeMux, auth BridgeAuth, timelines aic
 
 	handle("POST /api/ai-cut/projects/{id}/agent-runs", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			Instruction      string          `json:"instruction"`
-			Mode             aicut.AgentMode `json:"mode"`
-			ModelID          string          `json:"modelId"`
-			ActiveSkillID    string          `json:"activeSkillId"`
-			ExpectedRevision int64           `json:"expectedRevision"`
-			ClientRequestID  string          `json:"clientRequestId"`
+			Instruction      string                `json:"instruction"`
+			Mode             aicut.AgentMode       `json:"mode"`
+			ModelID          string                `json:"modelId"`
+			ActiveSkillID    string                `json:"activeSkillId"`
+			ExpectedRevision int64                 `json:"expectedRevision"`
+			ClientRequestID  string                `json:"clientRequestId"`
+			UIContext        *aicut.AgentUIContext `json:"uiContext,omitempty"`
 		}
 		if !decodeAICutJSON(w, req, &input) {
 			return
@@ -67,6 +69,12 @@ func RegisterAICutAgentRoutes(mux *http.ServeMux, auth BridgeAuth, timelines aic
 			writeAICutError(w, aicut.ErrRevisionConflict)
 			return
 		}
+		if input.UIContext != nil {
+			if err := aicut.ValidateAgentUIContext(*input.UIContext, current); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "当前选择或播放位置无效，请重新选择"})
+				return
+			}
+		}
 		createdAt := now().UTC()
 		generatedID := newAgentID("aicut-agent")
 		clientRequestID := strings.TrimSpace(input.ClientRequestID)
@@ -79,11 +87,22 @@ func RegisterAICutAgentRoutes(mux *http.ServeMux, auth BridgeAuth, timelines aic
 			writeAICutError(w, err)
 			return
 		}
-		if stored.ID == generatedID && start != nil {
-			if err := start(req.Context(), stored.ID); err != nil {
-				_, _ = agents.UpdateAgentRunState(req.Context(), stored.ID, aicut.AgentFailed, "Agent 队列不可用，请稍后重试", 0, now().UTC())
-				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Agent 队列不可用，请稍后重试"})
-				return
+		if stored.ID == generatedID {
+			if input.UIContext != nil {
+				encoded, _ := json.Marshal(input.UIContext)
+				_, err := agents.AppendAgentEvent(req.Context(), aicut.AgentEvent{RunID: stored.ID, Owner: owner, ProjectID: projectID, Type: aicut.AgentEventUIContext, Message: string(encoded), Revision: input.ExpectedRevision, CreatedAt: createdAt})
+				if err != nil {
+					_, _ = agents.UpdateAgentRunState(context.WithoutCancel(req.Context()), stored.ID, aicut.AgentFailed, "保存当前选择失败，请重试", 0, now().UTC())
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "保存当前选择失败，请重试"})
+					return
+				}
+			}
+			if start != nil {
+				if err := start(req.Context(), stored.ID); err != nil {
+					_, _ = agents.UpdateAgentRunState(req.Context(), stored.ID, aicut.AgentFailed, "Agent 队列不可用，请稍后重试", 0, now().UTC())
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Agent 队列不可用，请稍后重试"})
+					return
+				}
 			}
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"run": stored})

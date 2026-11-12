@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ExternalLink, MessageCircle, ScanSearch, Sparkles, Undo2, X } from 'lucide-react';
 import { askAgent, createAgentTask, getAgentTask } from '../api/agent';
 import { getConfig } from '../api/config';
@@ -38,6 +38,7 @@ import { cmResponseContract, parseCmActionProposal } from './cmActionProposal';
 import './cm-penguin-companion.css';
 import { DEFAULT_PET_ID, PET_SELECTION_EVENT, getPetDefinition, petAnimationDelay } from './petCatalog';
 import { responsiveCompanionPosition } from './companion-position.js';
+import { getPetPageService, subscribePetPageService } from './pageService.js';
 import { LittleCompanionSprite } from './LittleCompanionSprite';
 import {
   littleCompanionChooseAction,
@@ -115,12 +116,14 @@ function actionCandidatePrompt(action) {
 }
 
 export function CmPenguinCompanion({ username, accountSessionKey }) {
+  const pageService = useSyncExternalStore(subscribePetPageService, getPetPageService, getPetPageService);
+  const serviceIdentity = pageService ? JSON.stringify([pageService.id, pageService.scope, username, accountSessionKey]) : '';
   const [pet, setPet] = useState(() => getPetDefinition(DEFAULT_PET_ID));
   const [state, setState] = useState('idle');
   const [frame, setFrame] = useState(0);
   const [lookFrame, setLookFrame] = useState(null);
   const [position, setPosition] = useState(loadPosition);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(() => Boolean(pageService?.openRequest));
   const [isDragging, setIsDragging] = useState(false);
   const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible');
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true);
@@ -189,6 +192,23 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
   const scheduleTimerRef = useRef(null);
   const clickSpeechIndexRef = useRef(-1);
   const requestRef = useRef(0);
+  const serviceOpenRef = useRef({ identity: '', request: 0 });
+
+  useEffect(() => {
+    const previous = serviceOpenRef.current;
+    const request = pageService?.openRequest || 0;
+    if (previous.identity !== serviceIdentity) {
+      requestRef.current += 1;
+      setAsking(false);
+      setReply('');
+      setChatOpen(request > 0);
+      clearCompanionSpeech();
+    } else if (request > previous.request) {
+      setChatOpen(true);
+      clearCompanionSpeech();
+    }
+    serviceOpenRef.current = { identity: serviceIdentity, request };
+  }, [serviceIdentity, pageService?.openRequest]);
 
   useEffect(() => {
     function handleResize() {
@@ -642,6 +662,7 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
   async function openChat() {
     setChatOpen(true);
     clearCompanionSpeech();
+    if (pageService) return;
     if (petTaskIdRef.current) await loadTask(petTaskIdRef.current);
   }
 
@@ -667,6 +688,7 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
   }
 
   async function sendQuestion(prompt) {
+    if (pageService) return;
     const content = String(prompt || '').trim();
     if (!content || asking) return;
     const requestId = ++requestRef.current;
@@ -828,7 +850,23 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
     <div className="cm-penguin-shell" style={shellStyle} aria-live="polite">
       {!chatOpen && visibleBubble ? <div className="cm-penguin-speech">{visibleBubble}</div> : null}
 
-      {chatOpen ? (
+      {pageService ? (
+        <section className="cm-penguin-chat cm-penguin-page-service" role="dialog" aria-label={`${pet.displayName} · ${pageService.label}`} hidden={!chatOpen}>
+          <header className="cm-penguin-chat-header">
+            <div>
+              <span className="cm-penguin-status-dot" aria-hidden="true" />
+              <strong>{pet.displayName}</strong>
+              <span className="cm-penguin-context-chip" title="当前页面服务">{pageService.label}</span>
+            </div>
+            <div className="cm-penguin-header-actions">
+              <button type="button" title="关闭" aria-label={`关闭 ${pet.displayName} 对话`} onClick={closeChat}><X size={16} /></button>
+            </div>
+          </header>
+          <div className="cm-penguin-page-service-body" key={serviceIdentity}>
+            {pageService.render()}
+          </div>
+        </section>
+      ) : chatOpen ? (
         <section className="cm-penguin-chat" role="dialog" aria-label={`和 ${pet.displayName} 对话`}>
           <header className="cm-penguin-chat-header">
             <div>

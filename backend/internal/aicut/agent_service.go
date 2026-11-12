@@ -101,6 +101,14 @@ func (s *AgentService) Run(ctx context.Context, runID string) (AgentRun, error) 
 		return s.fail(ctx, run, 0, "读取历史对话失败", historyErr)
 	}
 	conversation = append(history, conversation...)
+	uiContext, contextErr := s.tools.initialUIContext(ctx, run)
+	if contextErr != nil {
+		return s.fail(ctx, run, 0, "当前选择已失效，请重新选择后重试", contextErr)
+	}
+	if uiContext != nil {
+		encoded, _ := json.Marshal(uiContext)
+		conversation = append(conversation, "initialUiContext="+string(encoded))
+	}
 	systemPrompt := s.buildPrompt(run.Mode)
 	if run.ActiveSkillID != "" {
 		if s.resolveSkill == nil {

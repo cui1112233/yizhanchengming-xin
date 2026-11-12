@@ -12,6 +12,20 @@ function agentPath(projectId, suffix = '') {
   return `/api/ai-cut/projects/${safeID(projectId, 'AI-CUT 项目')}${suffix}`;
 }
 
+function serializeUIContext(value) {
+  const keys = value.selectedClipKeys || [];
+  const playheadMs = Math.round(Number(value.playheadMs));
+  if (!Array.isArray(keys) || keys.length > 100 || !Number.isSafeInteger(playheadMs) || playheadMs < 0 || playheadMs > 604800000) {
+    throw new Error('当前选择或播放位置无效，请重新选择');
+  }
+  const selectedClips = keys.map(key => {
+    const parts = String(key).split('::');
+    if (parts.length !== 2) throw new Error('选中的片段无效');
+    return { trackId: safeID(parts[0], '轨道'), clipId: safeID(parts[1], '片段') };
+  });
+  return { selectedClips, playheadMs };
+}
+
 export async function createAICutAgentRun(projectId, input, request = apiRequest) {
   const instruction = String(input?.instruction || '').trim();
   if (!instruction) throw new Error('请输入剪辑要求');
@@ -19,6 +33,7 @@ export async function createAICutAgentRun(projectId, input, request = apiRequest
     method: 'POST',
     body: JSON.stringify({
       instruction,
+      ...(input?.uiContext == null ? {} : { uiContext: serializeUIContext(input.uiContext) }),
       mode: input?.mode === 'ask' ? 'ask' : 'agent',
       modelId: String(input?.modelId || '').trim(),
       activeSkillId: String(input?.activeSkillId || '').trim(),
