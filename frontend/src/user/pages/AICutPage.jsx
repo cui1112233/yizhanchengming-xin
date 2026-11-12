@@ -5494,6 +5494,7 @@ export default function AICutPage() {
                       <button type="button" className="aicut-timeline-collapse" aria-label={timelineCollapsed ? '展开时间线' : '收起时间线'}
                         onClick={() => setEditorLayout(current => ({ ...current, timelineCollapsed: !current.timelineCollapsed }))}>
                         {timelineCollapsed ? <PanelBottomOpen size={15} /> : <PanelBottomClose size={15} />}
+                        <span>{timelineCollapsed ? '展开时间线' : '收起时间线'}</span>
                       </button>
                     </>}
                   />

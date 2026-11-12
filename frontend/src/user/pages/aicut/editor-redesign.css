@@ -19,7 +19,7 @@ html[data-theme=light] .aicut-fullscreen-editor {
 .aicut-fullscreen-editor .aicut-editor-shell.aicut-editor-v4 {
   height:calc(100svh - 52px); min-height:0; padding:0; gap:0;
   grid-template-columns:0px var(--aicut-resource-width) minmax(320px,1fr) var(--aicut-inspector-width)!important;
-  grid-template-rows:minmax(240px,1fr) var(--aicut-timeline-height)!important;
+  grid-template-rows:minmax(0,1fr) min(var(--aicut-timeline-height),max(40px,calc(100% - 180px)))!important;
 }
 .aicut-editor-v4.media-collapsed { --aicut-resource-width:48px; }
 .aicut-editor-v4 :is(.aicut-resource-library,.aicut-context-inspector,.aicut-caption-workspace) { background:var(--edit-panel)!important; border-color:var(--edit-line); backdrop-filter:blur(18px); }
@@ -219,3 +219,34 @@ html[data-theme=light] .aicut-fullscreen-editor {
 .aicut-timeline-tab>button { border:0; background:transparent; color:var(--text-secondary); cursor:pointer; padding:3px 7px; font-size:11px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aicut-timeline-tab.active>button { color:var(--text-primary); }
 .aicut-timeline-tabs>.ant-btn { color:var(--text-secondary); min-width:25px; }
+
+/* Tabs, toolbar, ruler and tracks are four rows. Keep the reopen control
+   visible when the tracks are collapsed, including after a page refresh. */
+.aicut-fullscreen-editor .aicut-editor-v4 > .aicut-reference-timeline {
+  grid-template-rows:29px 40px 26px minmax(0,1fr);
+}
+.aicut-fullscreen-editor .aicut-editor-v4 > .aicut-reference-timeline > .aicut-timeline-tabs {
+  height:29px; min-height:0; box-sizing:border-box;
+}
+.aicut-fullscreen-editor .aicut-editor-v4 > .aicut-reference-timeline.collapsed {
+  grid-template-rows:40px;
+}
+.aicut-fullscreen-editor .aicut-editor-v4 > .aicut-reference-timeline.collapsed > :not(.aicut-timeline-toolbar) {
+  display:none;
+}
+.aicut-editor-v4 .aicut-reference-timeline.collapsed .aicut-timeline-toolbar-primary {
+  display:none;
+}
+.aicut-editor-v4 .aicut-reference-timeline.collapsed .aicut-timeline-toolbar-secondary {
+  flex:1; justify-content:space-between;
+}
+.aicut-editor-v4 .aicut-reference-timeline.collapsed .aicut-timeline-toolbar-secondary::before {
+  content:'时间线已收起'; color:var(--text-secondary); font-size:12px;
+}
+.aicut-editor-v4 .aicut-reference-timeline.collapsed .aicut-timeline-toolbar-secondary > :not(.aicut-timeline-collapse) {
+  display:none;
+}
+.aicut-editor-v4 .aicut-timeline-toolbar-v4 .aicut-timeline-collapse {
+  width:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; padding:0 8px;
+  white-space:nowrap; color:var(--text-primary);
+}
