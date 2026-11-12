@@ -420,8 +420,8 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 		return Book{}, ErrInvalid
 	}
 	nextTitle := currentTitle.String
-	if shouldReplaceGeneratedBookTitle(nextTitle, sourceBookID.String, input.SourceTitle) {
-		nextTitle = strings.TrimSpace(input.SourceTitle)
+	if title := strings.TrimSpace(input.SourceTitle); title != "" && (input.ReplaceTitle || shouldReplaceGeneratedBookTitle(nextTitle, sourceBookID.String, title)) {
+		nextTitle = title
 	}
 	nextSourceBookID := sourceBookID.String
 	if candidate := strings.TrimSpace(input.SourceBookID); candidate != "" {

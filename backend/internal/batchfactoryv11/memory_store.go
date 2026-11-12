@@ -732,8 +732,8 @@ func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookI
 		if validRawSourceText || validSourceText {
 			book.TxtText = rawSourceText
 		}
-		if shouldReplaceGeneratedBookTitle(book.Title, book.BookID, input.SourceTitle) {
-			book.Title = strings.TrimSpace(input.SourceTitle)
+		if title := strings.TrimSpace(input.SourceTitle); title != "" && (input.ReplaceTitle || shouldReplaceGeneratedBookTitle(book.Title, book.BookID, title)) {
+			book.Title = title
 		}
 		if sourceBookID := strings.TrimSpace(input.SourceBookID); sourceBookID != "" {
 			book.BookID = sourceBookID

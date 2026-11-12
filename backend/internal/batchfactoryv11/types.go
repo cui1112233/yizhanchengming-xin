@@ -582,11 +582,15 @@ type UpdateBookMetadataInput struct {
 // intake records that retained a book ID and platform but never persisted the
 // fetched original; it must never replace an existing source text.
 type CaptureBookSourceInput struct {
-	SourceText       string         `json:"sourceText"`
-	RawSourceText    string         `json:"rawSourceText,omitempty"`
-	ReplaceSource    bool           `json:"replaceSource,omitempty"`
-	SourceBookID     string         `json:"sourceBookId,omitempty"`
-	SourceTitle      string         `json:"sourceTitle,omitempty"`
+	SourceText    string `json:"sourceText"`
+	RawSourceText string `json:"rawSourceText,omitempty"`
+	ReplaceSource bool   `json:"replaceSource,omitempty"`
+	SourceBookID  string `json:"sourceBookId,omitempty"`
+	SourceTitle   string `json:"sourceTitle,omitempty"`
+	// ReplaceTitle 让抓正文成功后的上游书名覆盖当前书名，包括用户粘贴或
+	// 手工改过的书名。只有真实抓取路径会置 true；上传 TXT 等路径保持占位名
+	// 才替换的旧规则。
+	ReplaceTitle     bool           `json:"replaceTitle,omitempty"`
 	SourceMetadata   map[string]any `json:"sourceMetadata,omitempty"`
 	ExpectedRevision int64          `json:"expectedRevision"`
 }

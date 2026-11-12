@@ -741,7 +741,7 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		if processErr != nil {
 			productionText = ""
 		}
-		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceBookID: bookID, SourceTitle: fetchedBookSourceTitle(result, book.Title), SourceMetadata: metadata, ExpectedRevision: book.Revision})
+		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, ReplaceTitle: true, SourceBookID: bookID, SourceTitle: fetchedBookSourceTitle(result, book.Title), SourceMetadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
 			return

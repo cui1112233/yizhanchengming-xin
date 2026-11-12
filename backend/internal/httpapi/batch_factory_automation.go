@@ -2567,7 +2567,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 			productionText = ""
 		}
 		updated, err := c.captureAutomationSource(ctx, owner, batchID, book, batchfactoryv11.CaptureBookSourceInput{
-			SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true,
+			SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true, ReplaceTitle: true,
 			SourceTitle: fetchedBookSourceTitle(fetched, book.Title), SourceMetadata: metadata,
 		})
 		if err != nil {
@@ -2679,7 +2679,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 		productionText = ""
 	}
 	updated, err := c.captureAutomationSource(ctx, owner, batchID, book, batchfactoryv11.CaptureBookSourceInput{
-		SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true, SourceBookID: resolvedBookID, SourceTitle: fetchedBookSourceTitle(fetched, book.Title), SourceMetadata: metadata,
+		SourceText: productionText, RawSourceText: fetched.OriginalRaw, ReplaceSource: true, ReplaceTitle: true, SourceBookID: resolvedBookID, SourceTitle: fetchedBookSourceTitle(fetched, book.Title), SourceMetadata: metadata,
 	})
 	if err != nil {
 		return book, fmt.Errorf("保存自动获取正文失败：%w", err)

@@ -236,6 +236,35 @@ func TestV12SingleFetchMapsLegacyYGAliasAndCapturesFetchedSource(t *testing.T) {
 	}
 }
 
+func TestV12SingleFetchReplacesCustomTitleWithUpstreamBookName(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		Title: "我粘贴的自定义书名", BookID: "11010579999", Platform: "YG",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":200,"msg":"获取章节内容成功","data":"这是测试正文","bookinfo":{"book_id":"11010579999","book_name":"上游真实书名"}}`))
+	}))
+	defer upstream.Close()
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Store: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}})
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + batch.Books[0].ID + "/fetch-original"
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	updated, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Books[0].Title != "上游真实书名" {
+		t.Fatalf("custom title should be replaced by upstream book name: %q", updated.Books[0].Title)
+	}
+}
+
 func TestV12SingleFetchFallsBackToReadableGiantMaterialCandidate(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{

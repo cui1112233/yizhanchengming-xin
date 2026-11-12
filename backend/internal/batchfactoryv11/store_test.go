@@ -98,6 +98,33 @@ func TestCaptureBookSourceReplacesPlaceholderTitleWithSourceBookID(t *testing.T)
 	}
 }
 
+// 抓正文成功后上游书名是权威值，即使用户粘贴或手工改过书名，也要按真实抓取
+// 路径的要求覆盖。
+func TestCaptureBookSourceCanForceReplaceCustomTitle(t *testing.T) {
+	ctx := context.Background()
+	s := NewMemoryStore()
+	batch, err := s.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批量", Books: []CreateBookInput{{
+		BookID: "793433",
+		Title:  "我粘贴的自定义书名",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	updated, err := s.CaptureBookSource(ctx, "alice", batch.ID, book.ID, CaptureBookSourceInput{
+		SourceText:       "第一章 正文",
+		SourceTitle:      "上游真实书名",
+		ReplaceTitle:     true,
+		ExpectedRevision: book.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Title != "上游真实书名" {
+		t.Fatalf("title=%q", updated.Title)
+	}
+}
+
 func TestCaptureBookSourcePreservesUserTitle(t *testing.T) {
 	ctx := context.Background()
 	s := NewMemoryStore()
