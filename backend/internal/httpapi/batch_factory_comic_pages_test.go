@@ -1422,6 +1422,29 @@ func TestComicPagePersistedErrorKeepsChineseHeadlineAndRaw(t *testing.T) {
 	if got := comicPagePersistedError(nil); got != "漫画页生成失败，请重试" {
 		t.Fatalf("unexpected fallback: %q", got)
 	}
+	// 取消/超时必须有可读原因，且不能被包装层吞掉。
+	for _, err := range []error{
+		context.Canceled,
+		context.DeadlineExceeded,
+		fmt.Errorf("漫画页 01 生成失败: %w", context.Canceled),
+	} {
+		if got := comicPagePersistedError(err); got != comicPageInterruptedMessage {
+			t.Fatalf("interrupted err=%v => %q, want %q", err, got, comicPageInterruptedMessage)
+		}
+	}
+}
+
+func TestComicPageCarryAutoRetryMarker(t *testing.T) {
+	if got := comicPageCarryAutoRetryMarker("漫画页生成超时（自动重试 1/2）"); got != "漫画页生成超时（自动重试 1/2）" {
+		t.Fatalf("carry retry marker => %q", got)
+	}
+	// 终态文案不带计数，人工重试后应重新从 1/2 开始。
+	if got := comicPageCarryAutoRetryMarker(batchfactoryv11.ComicPageStaleReclaimFinalMessage); got != "" {
+		t.Fatalf("terminal message must not carry marker: %q", got)
+	}
+	if got := comicPageCarryAutoRetryMarker(""); got != "" {
+		t.Fatalf("empty previous => %q", got)
+	}
 }
 
 func TestSanitizeComicImagePromptForSafety(t *testing.T) {

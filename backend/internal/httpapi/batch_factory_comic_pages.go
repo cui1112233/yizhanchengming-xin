@@ -1016,6 +1016,11 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 		if strings.TrimSpace(input.ImagePrompt) == "" {
 			input.ImagePrompt = storedPage.ImagePrompt
 		}
+		// 超时回收的重试次数存在 last_error 里。重新认领租约时保留带“自动重试”
+		// 的文案，否则每次认领都清零，第二次超时永远回到 1/2。
+		if strings.TrimSpace(input.GenerationError) == "" {
+			input.GenerationError = comicPageCarryAutoRetryMarker(storedPage.GenerationError)
+		}
 	}
 	if strings.TrimSpace(input.ImagePrompt) == "" {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: %s 缺少独立的图片提示词", batchfactoryv11.ErrConflict, selectedPage.Label)
@@ -1064,7 +1069,11 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 		// 失败写回同样按 owner/revision 条件更新，避免把另一轮已经写好的
 		// 页面（或新租约）覆盖成 generation_failed。
 		failedInput.ExpectedRevision = createdPage.Revision
-		_, _ = comicStore.UpsertComicPage(context.Background(), owner, batchID, bookID, videoID, failedInput)
+		// 写回必须脱离已被取消的请求 ctx：浏览器断开或看门狗中止后，
+		// 用原 ctx 写不进去，页面就会一直停在 generating 等 20 分钟回收。
+		writeCtx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), comicPageFailureWritebackTimeout)
+		_, _ = comicStore.UpsertComicPage(writeCtx, owner, batchID, bookID, videoID, failedInput)
+		cancelWrite()
 	}()
 	config, err := loadShuihuoOwnerConfig(ctx, g.store, owner, g.catalogStore)
 	if err != nil {
@@ -1210,12 +1219,31 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	return createdPage, createdImage, nil
 }
 
+// comicPageFailureWritebackTimeout 限制失败状态写回的时长，避免后台写库阻塞。
+const comicPageFailureWritebackTimeout = 15 * time.Second
+
+// comicPageInterruptedMessage 是生成被取消/超时中止时落库的可读原因。
+const comicPageInterruptedMessage = "生成请求被中断，可自动重试"
+
+// comicPageCarryAutoRetryMarker 在重新认领页租约时保留上一轮的自动重试计数，
+// 让超时回收的“自动重试 1/2 → 2/2 → 终态”跨多轮生成持续累加。
+func comicPageCarryAutoRetryMarker(previous string) string {
+	if strings.Contains(previous, batchfactoryv11.ComicPageAutoRetryMarker) {
+		return previous
+	}
+	return ""
+}
+
 // comicPagePersistedError 把页级失败整理成可持久化的两段式文案：第一行中文主文案，
 // 原始信息放在 "\n上游原文：" 之后，与书籍级/自动化级错误保持同一格式。
 func comicPagePersistedError(err error) string {
 	const fallback = "漫画页生成失败，请重试"
 	if err == nil {
 		return fallback
+	}
+	// 取消/超时不是上游内容问题：给出可读原因，并交给页级账本自动重试。
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return comicPageInterruptedMessage
 	}
 	text := strings.TrimSpace(err.Error())
 	if text == "" {

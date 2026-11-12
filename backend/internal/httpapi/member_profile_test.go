@@ -60,14 +60,23 @@ func TestMemberProfileThemePreferenceDefaultsPersistsAndValidates(t *testing.T) 
 	if got := store.member("alice", accounts)["themeId"]; got != "dark" {
 		t.Fatalf("persisted themeId=%v, want dark", got)
 	}
+	if _, err := store.update("alice", map[string]any{"themeId": "ocean-dark"}, accounts); err != nil {
+		t.Fatalf("scheme themeId ocean-dark should be accepted: %v", err)
+	}
+	if got := store.member("alice", accounts)["themeId"]; got != "ocean-dark" {
+		t.Fatalf("scheme themeId=%v, want ocean-dark", got)
+	}
+	if _, err := store.update("alice", map[string]any{"themeId": "coral-dark"}, accounts); err != nil {
+		t.Fatalf("scheme themeId coral-dark should be accepted: %v", err)
+	}
 	if _, err := store.update("alice", map[string]any{"themeId": "unknown-theme"}, accounts); err == nil {
 		t.Fatal("unsupported themeId should be rejected")
 	}
 	if _, err := store.update("alice", map[string]any{"themeId": "mint"}, accounts); err == nil {
 		t.Fatal("retired themeId mint should be rejected")
 	}
-	if got := store.member("alice", accounts)["themeId"]; got != "dark" {
-		t.Fatalf("rejected update changed themeId=%v, want dark", got)
+	if got := store.member("alice", accounts)["themeId"]; got != "coral-dark" {
+		t.Fatalf("rejected update changed themeId=%v, want coral-dark", got)
 	}
 }
 
@@ -84,8 +93,28 @@ func TestMemberProfileWindowBackgroundPreference(t *testing.T) {
 	if got := updated["windowBackgroundId"]; got != "preset3" {
 		t.Fatalf("windowBackgroundId=%v, want preset3", got)
 	}
+	if _, err := store.update("alice", map[string]any{"windowBackgroundId": "preset9"}, accounts); err != nil {
+		t.Fatalf("preset9 should be accepted: %v", err)
+	}
 	if _, err := store.update("alice", map[string]any{"windowBackgroundId": "unknown"}, accounts); err == nil {
 		t.Fatal("unsupported windowBackgroundId should be rejected")
+	}
+}
+
+func TestCinematicGlassThemeAndVideoWallpaperPersistIndependently(t *testing.T) {
+	store := NewMemberProfileStore(t.TempDir())
+	accounts := &authTestStore{account: auth.Account{Username: "alice", Active: true}}
+	for _, background := range []string{"cinema-auto", "cinema-0", "cinema-1", "cinema-2", "cinema-3"} {
+		if _, err := store.update("alice", map[string]any{"themeId": "glass-dark", "windowBackgroundId": background}, accounts); err != nil {
+			t.Fatal(err)
+		}
+		updated, err := store.update("alice", map[string]any{"themeId": "glass-light"}, accounts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if updated["windowBackgroundId"] != background {
+			t.Fatal("changing theme overwrote wallpaper")
+		}
 	}
 }
 

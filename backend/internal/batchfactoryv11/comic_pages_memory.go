@@ -9,6 +9,27 @@ import (
 	"time"
 )
 
+const (
+	// ComicPageStaleReclaimFinalMessage 是超时页自动重试耗尽后的终态文案。
+	ComicPageStaleReclaimFinalMessage = "漫画页生成超时，请重试"
+	// ComicPageAutoRetryMarker 出现在 last_error 里表示这一页还有自动重试机会。
+	// 页级失败分类和重新认领租约都依赖它，不能随意改字。
+	ComicPageAutoRetryMarker = "自动重试"
+)
+
+// ComicPageStaleReclaimMessage 依据回收前的 last_error 计算本次超时回收文案：
+// 第一次写“自动重试 1/2”，第二次写“自动重试 2/2”，第三次才落终态转人工。
+func ComicPageStaleReclaimMessage(previous string) string {
+	switch {
+	case strings.Contains(previous, ComicPageAutoRetryMarker+" 2/2"):
+		return ComicPageStaleReclaimFinalMessage
+	case strings.Contains(previous, ComicPageAutoRetryMarker+" 1/2"):
+		return "漫画页生成超时（" + ComicPageAutoRetryMarker + " 2/2）"
+	default:
+		return "漫画页生成超时（" + ComicPageAutoRetryMarker + " 1/2）"
+	}
+}
+
 // applyComicPagePatch merges a client patch into an existing page row. Only
 // fields that were actually provided are replaced; the final row still has to
 // satisfy the comic page invariant (both prompts non-empty).
@@ -314,7 +335,7 @@ func (s *MemoryStore) ListStaleGeneratingComicPages(_ context.Context, before ti
 		}
 		pages = append(pages, StaleComicPage{
 			Owner: entry.Owner, BatchID: page.BatchID, BookID: page.BookID,
-			VideoID: page.VideoID, Revision: page.Revision, UpdatedAt: page.UpdatedAt,
+			VideoID: page.VideoID, Revision: page.Revision, LastError: page.GenerationError, UpdatedAt: page.UpdatedAt,
 		})
 	}
 	sort.Slice(pages, func(i, j int) bool { return pages[i].UpdatedAt.Before(pages[j].UpdatedAt) })
@@ -338,7 +359,8 @@ func (s *MemoryStore) ExpireStaleGeneratingComicPage(_ context.Context, stale St
 			return false, nil
 		}
 		page.Status = "generation_failed"
-		page.GenerationError = "漫画页生成超时，请重试"
+		// 前两次超时先自动重试，第三次才转人工；计数标记保存在 last_error 里。
+		page.GenerationError = ComicPageStaleReclaimMessage(page.GenerationError)
 		page.Revision++
 		page.UpdatedAt = time.Now().UTC()
 		s.comicPages[id] = memoryOwned[ComicPage]{Owner: entry.Owner, Value: page}

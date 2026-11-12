@@ -49,6 +49,10 @@ func TestScreenplayRoutesProjectGenerateAndWorkspace(t *testing.T) {
 	if started.Code != http.StatusCreated || !containsText(started.Body.String(), `"status":"running"`) {
 		t.Fatalf("batch start=%d %s", started.Code, started.Body.String())
 	}
+	ran := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/comic-screenplays/projects/test-project/batch/run-next", map[string]any{})
+	if ran.Code != http.StatusOK || !containsText(ran.Body.String(), `"step_key":"0_ingest"`) || !containsText(ran.Body.String(), `"status":"done"`) {
+		t.Fatalf("batch run-next=%d %s", ran.Code, ran.Body.String())
+	}
 	paused := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/comic-screenplays/projects/test-project/batch/cancel", map[string]any{})
 	if paused.Code != http.StatusOK || !containsText(paused.Body.String(), `"status":"paused"`) {
 		t.Fatalf("batch pause=%d %s", paused.Code, paused.Body.String())
@@ -147,6 +151,68 @@ func TestScreenplayRoutesShotCreateUpdateMoveDelete(t *testing.T) {
 	empty := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/comic-screenplays/projects/shot-project/shots", map[string]any{"episodeNo": 1, "heading": " ", "scriptText": " "})
 	if empty.Code != http.StatusBadRequest {
 		t.Fatalf("empty shot=%d %s", empty.Code, empty.Body.String())
+	}
+}
+
+func TestScreenplayRoutesStoryboardShotCreateUpdateSplitMergeDelete(t *testing.T) {
+	now := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	store := screenplay.NewMemoryStore()
+	if _, err := store.CreateProject(context.Background(), screenplay.Project{ID: "storyboard-project", OwnerUsername: "alice", Title: "分镜编辑"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveStoryboard(context.Background(), screenplay.Storyboard{
+		ProjectID: "storyboard-project", OwnerUsername: "alice", EpisodeNo: 1, Engine: screenplay.EngineXiaoluoV7,
+		Shots: []screenplay.StoryboardShot{
+			{ID: "sb-shot-1", Seq: 1, Duration: 2, Scene: "客厅", VideoDesc: "第一条"},
+			{ID: "sb-shot-2", Seq: 2, Duration: 4, Scene: "走廊", VideoDesc: "第二条"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterScreenplayRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, store, nil, func() time.Time { return now })
+	base := "/api/comic-screenplays/projects/storyboard-project/storyboards/xiaoluo_v7_15s/1/shots"
+
+	created := signedJSONRequest(t, mux, now, "alice", http.MethodPost, base, map[string]any{
+		"afterShotId": "sb-shot-1", "durationSec": 3, "characters": "小Y", "scene": "门口", "props": "钥匙", "videoDesc": "新增分镜",
+	})
+	if created.Code != http.StatusCreated || !containsText(created.Body.String(), "新增分镜") || !containsText(created.Body.String(), `"shot_count":3`) {
+		t.Fatalf("create storyboard shot=%d %s", created.Code, created.Body.String())
+	}
+	var createdPayload struct {
+		Storyboard screenplay.Storyboard `json:"storyboard"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &createdPayload); err != nil {
+		t.Fatal(err)
+	}
+	createdID := createdPayload.Storyboard.Shots[1].ID
+
+	updated := signedJSONRequest(t, mux, now, "alice", http.MethodPatch, base+"/"+createdID, map[string]any{
+		"durationSec": 5, "characters": "CM", "scene": "玄关", "props": "雨伞", "videoDesc": "编辑后的分镜",
+	})
+	if updated.Code != http.StatusOK || !containsText(updated.Body.String(), "编辑后的分镜") {
+		t.Fatalf("update storyboard shot=%d %s", updated.Code, updated.Body.String())
+	}
+
+	split := signedJSONRequest(t, mux, now, "alice", http.MethodPost, base+"/"+createdID+"/split", map[string]any{})
+	if split.Code != http.StatusOK || !containsText(split.Body.String(), `"shot_count":4`) {
+		t.Fatalf("split storyboard shot=%d %s", split.Code, split.Body.String())
+	}
+	merged := signedJSONRequest(t, mux, now, "alice", http.MethodPost, base+"/"+createdID+"/merge-next", map[string]any{})
+	if merged.Code != http.StatusOK || !containsText(merged.Body.String(), `"shot_count":3`) {
+		t.Fatalf("merge storyboard shot=%d %s", merged.Code, merged.Body.String())
+	}
+	deleted := signedJSONRequest(t, mux, now, "alice", http.MethodDelete, base+"/"+createdID, nil)
+	if deleted.Code != http.StatusOK || !containsText(deleted.Body.String(), `"shot_count":2`) {
+		t.Fatalf("delete storyboard shot=%d %s", deleted.Code, deleted.Body.String())
+	}
+	repeated := signedJSONRequest(t, mux, now, "alice", http.MethodDelete, base+"/"+createdID, nil)
+	if repeated.Code != http.StatusNotFound {
+		t.Fatalf("repeat delete=%d %s", repeated.Code, repeated.Body.String())
+	}
+	foreign := signedJSONRequest(t, mux, now, "bob", http.MethodPatch, base+"/sb-shot-1", map[string]any{"durationSec": 1, "videoDesc": "越权"})
+	if foreign.Code != http.StatusNotFound {
+		t.Fatalf("foreign update=%d %s", foreign.Code, foreign.Body.String())
 	}
 }
 

@@ -450,11 +450,14 @@ type ComicPageStore interface {
 // StaleComicPage 是“停在 generating 且长时间没有更新”的页定位信息。
 // 只用于启动/定时回收，不参与正常读写。
 type StaleComicPage struct {
-	Owner     string
-	BatchID   string
-	BookID    string
-	VideoID   string
-	Revision  int64
+	Owner    string
+	BatchID  string
+	BookID   string
+	VideoID  string
+	Revision int64
+	// LastError 是回收前该页的 last_error，回收任务据此累加“自动重试 N/2”
+	// 计数；重新认领页租约时也会把带计数的文案原样带回去。
+	LastError string
 	UpdatedAt time.Time
 }
 

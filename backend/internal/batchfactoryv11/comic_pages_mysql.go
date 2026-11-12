@@ -229,7 +229,7 @@ func (s *MySQLStore) ListStaleGeneratingComicPages(ctx context.Context, before t
 	if limit <= 0 {
 		limit = 200
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT owner_username,batch_id,book_id,video_id,revision,updated_at FROM batch_factory_v12_comic_pages WHERE status='generating' AND updated_at < ? ORDER BY updated_at LIMIT ?`, before, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT owner_username,batch_id,book_id,video_id,revision,COALESCE(last_error,''),updated_at FROM batch_factory_v12_comic_pages WHERE status='generating' AND updated_at < ? ORDER BY updated_at LIMIT ?`, before, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (s *MySQLStore) ListStaleGeneratingComicPages(ctx context.Context, before t
 	pages := make([]StaleComicPage, 0, limit)
 	for rows.Next() {
 		var page StaleComicPage
-		if err := rows.Scan(&page.Owner, &page.BatchID, &page.BookID, &page.VideoID, &page.Revision, &page.UpdatedAt); err != nil {
+		if err := rows.Scan(&page.Owner, &page.BatchID, &page.BookID, &page.VideoID, &page.Revision, &page.LastError, &page.UpdatedAt); err != nil {
 			return nil, err
 		}
 		pages = append(pages, page)
@@ -248,7 +248,8 @@ func (s *MySQLStore) ListStaleGeneratingComicPages(ctx context.Context, before t
 // ExpireStaleGeneratingComicPage 用 revision 做乐观锁：扫描之后如果该页刚被
 // 重新认领、或已经不再是 generating，条件不成立，不会误伤正在跑的页。
 func (s *MySQLStore) ExpireStaleGeneratingComicPage(ctx context.Context, page StaleComicPage, before time.Time) (bool, error) {
-	result, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET status='generation_failed',last_error='漫画页生成超时，请重试',revision=revision+1,updated_at=? WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? AND revision=? AND status='generating' AND updated_at < ?`, time.Now().UTC(), page.Owner, page.BatchID, page.BookID, page.VideoID, page.Revision, before)
+	// 前两次超时先自动重试，第三次才转人工；计数标记保存在 last_error 里。
+	result, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET status='generation_failed',last_error=?,revision=revision+1,updated_at=? WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? AND revision=? AND status='generating' AND updated_at < ?`, ComicPageStaleReclaimMessage(page.LastError), time.Now().UTC(), page.Owner, page.BatchID, page.BookID, page.VideoID, page.Revision, before)
 	if err != nil {
 		return false, err
 	}

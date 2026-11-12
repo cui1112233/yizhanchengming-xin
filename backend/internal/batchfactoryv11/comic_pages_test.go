@@ -290,3 +290,44 @@ func TestStaleGeneratingComicPagesReclaimedByLease(t *testing.T) {
 		t.Fatalf("again=%#v err=%v, want empty", again, err)
 	}
 }
+
+// 超时回收先自动重试两次，第三次才转人工；计数写在 last_error 里。
+func TestStaleGeneratingComicPageReclaimAutoRetryCounts(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book := seedDirectorBook(t, "original", false)
+	video := book.Videos[0]
+	if _, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "漫画页图片",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	generating := "generating"
+	before := time.Now().Add(time.Minute)
+	wantMessages := []string{
+		"漫画页生成超时（自动重试 1/2）",
+		"漫画页生成超时（自动重试 2/2）",
+		ComicPageStaleReclaimFinalMessage,
+	}
+	for round, want := range wantMessages {
+		// 模拟再次认领租约：状态回到 generating，last_error 保留计数。
+		if _, err := store.PatchComicPage(ctx, "alice", batch.ID, book.ID, video.ID, PatchComicPageInput{Status: &generating}); err != nil {
+			t.Fatalf("round %d re-claim: %v", round+1, err)
+		}
+		stale, err := store.ListStaleGeneratingComicPages(ctx, before, 10)
+		if err != nil || len(stale) != 1 {
+			t.Fatalf("round %d stale=%#v err=%v, want one stale page", round+1, stale, err)
+		}
+		expired, err := store.ExpireStaleGeneratingComicPage(ctx, stale[0], before)
+		if err != nil || !expired {
+			t.Fatalf("round %d expired=%t err=%v, want true", round+1, expired, err)
+		}
+		pages, err := store.ListComicPages(ctx, "alice", batch.ID, book.ID)
+		if err != nil || len(pages) != 1 {
+			t.Fatalf("round %d pages=%#v err=%v", round+1, pages, err)
+		}
+		if pages[0].Status != "generation_failed" || pages[0].GenerationError != want {
+			t.Fatalf("round %d status=%q last_error=%q, want generation_failed / %q",
+				round+1, pages[0].Status, pages[0].GenerationError, want)
+		}
+	}
+}
