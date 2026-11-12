@@ -165,16 +165,52 @@ func TestRepairStaleRunningBooksMakesInterruptedBookRetryable(t *testing.T) {
 	}
 }
 
-func TestRepairStaleRunningBooksSkipsActiveRun(t *testing.T) {
-	now := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+func TestRepairInterruptedRunningJobBecomesRetryableAfterRestart(t *testing.T) {
+	now := time.Now().UTC()
 	job := map[string]any{
-		"state": "running",
+		"state":     "running",
+		"updatedAt": now.Add(-time.Hour).Format(time.RFC3339Nano),
 		"books": map[string]any{
 			"book-1": map[string]any{"status": "running", "stage": "comic_images", "updatedAt": now.Add(-time.Hour).Format(time.RFC3339Nano)},
+			"book-2": map[string]any{"status": "queued", "stage": "preflight"},
+			"book-3": map[string]any{"status": "completed", "stage": "published"},
+		},
+	}
+	if !repairStaleRunningAutomationBooks(&automationStateFile{Jobs: map[string]map[string]any{"job-1": job}}, now) {
+		t.Fatal("job running from a previous process must be reclaimed")
+	}
+	if got := automationStringValue(job["state"], ""); got != "failed" {
+		t.Fatalf("job state = %q, want failed", got)
+	}
+	books := job["books"].(map[string]any)
+	for _, id := range []string{"book-1", "book-2"} {
+		entry := books[id].(map[string]any)
+		if got := automationStringValue(entry["status"], ""); got != "failed" {
+			t.Fatalf("%s status = %q, want failed", id, got)
+		}
+		if !automationBookRetryable(entry) {
+			t.Fatalf("%s must be retryable after restart", id)
+		}
+	}
+	if got := automationStringValue(books["book-3"].(map[string]any)["status"], ""); got != "completed" {
+		t.Fatalf("completed book must stay completed, got %q", got)
+	}
+}
+
+func TestRepairStaleRunningBooksSkipsActiveRun(t *testing.T) {
+	now := time.Now().UTC()
+	job := map[string]any{
+		"state":     "running",
+		"updatedAt": now.Format(time.RFC3339Nano),
+		"books": map[string]any{
+			"book-1": map[string]any{"status": "running", "stage": "comic_images", "updatedAt": now.Format(time.RFC3339Nano)},
 		},
 	}
 	if repairStaleRunningAutomationJob(job, now) {
 		t.Fatal("active run must be left to the stall watchdog")
+	}
+	if repairInterruptedRunningAutomationJob(job, now) {
+		t.Fatal("job heartbeating in this process must not be reclaimed")
 	}
 }
 

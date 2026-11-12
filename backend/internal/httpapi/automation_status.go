@@ -107,21 +107,64 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 // 只可能是上次执行被中断留下的假状态。
 const automationStaleBookTimeout = 5 * time.Minute
 
+// automationProcessStartedAt 记录进程启动时间。任务心跳早于该时间，说明那
+// 是上一次进程留下的 running 状态：重启后执行协程已不存在，不可能再继续，
+// 必须立刻改判为 failed，否则重试会把它们当成“正在执行”跳过。
+var automationProcessStartedAt = time.Now().UTC()
+
 // repairStaleRunningAutomationBooks 把已终止任务（失败/完成/停止/暂停）里
-// 遗留的 running 书改判为 failed。重试逻辑会把 running 当成“正在执行”而
-// 跳过，界面上的“重试失败小说”也会按 failed 计数显示 0，导致用户点了也
-// 没有任何效果。任务仍在 running 时不动，交给看门狗判断。
+// 遗留的 running 书改判为 failed，并回收重启前遗留的 running 任务。
+// 重试逻辑会把 running 当成“正在执行”而跳过，界面上的“重试失败小说”也会
+// 按 failed 计数显示 0，导致用户点了也没有任何效果。
 func repairStaleRunningAutomationBooks(state *automationStateFile, now time.Time) bool {
 	if state == nil {
 		return false
 	}
 	changed := false
 	for _, job := range state.Jobs {
+		if repairInterruptedRunningAutomationJob(job, now) {
+			changed = true
+		}
 		if repairStaleRunningAutomationJob(job, now) {
 			changed = true
 		}
 	}
 	return changed
+}
+
+// repairInterruptedRunningAutomationJob 处理“进程重启”这一特定中断：任务
+// 仍是 running，但最后一次心跳早于本进程启动时间，说明执行协程已经随旧
+// 进程消失。直接改判失败，让用户/自动化可以立刻重试。
+func repairInterruptedRunningAutomationJob(job map[string]any, now time.Time) bool {
+	if job == nil || automationStringValue(job["state"], "") != "running" {
+		return false
+	}
+	if updated, ok := automationEntryUpdatedAt(job); ok && !updated.Before(automationProcessStartedAt) {
+		return false
+	}
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "running", "queued":
+			entry["status"] = "failed"
+			entry["message"] = "服务重启导致执行中断，可直接重试"
+			entry["updatedAt"] = now
+			delete(entry, "retryAt")
+			entry["autoContinue"] = map[string]any{"reason": "服务重启导致执行中断，等待重试", "willContinue": false}
+		}
+	}
+	if len(books) > 0 {
+		job["counts"] = automationCountsFromBooks(books)
+	}
+	job["state"] = "failed"
+	job["message"] = "服务重启导致执行中断，可直接重试"
+	job["updatedAt"] = now
+	delete(job, "retryAt")
+	return true
 }
 
 func repairStaleRunningAutomationJob(job map[string]any, now time.Time) bool {
