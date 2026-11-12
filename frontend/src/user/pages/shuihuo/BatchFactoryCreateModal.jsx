@@ -133,6 +133,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   function reset() {
     giantControllerRef.current?.abort();
     giantControllerRef.current = null;
+    // 创建请求被网关中断后 busy 可能停在 true，表单关闭时不清理会让
+    // “立即执行/创建”按钮一直转圈且点不动，只能刷新页面才能恢复。
+    setBusy(false);
     setGiantItems([]);
     setGiantBusy(false);
     setGiantError('');
@@ -819,7 +822,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   <Modal
     title={automationDialogMode === 'scheduled' ? '开始定时' : '立即执行自动生产'}
     open={scheduleDialogOpen}
-    onCancel={() => setScheduleDialogOpen(false)}
+    // 取消必须同时清除 busy：创建请求可能因网关 502/中断一直挂着，
+    // 只关弹窗会让按钮永久停在加载态，重新打开后仍然点不动。
+    onCancel={() => { setBusy(false); setScheduleDialogOpen(false); }}
     confirmLoading={busy}
     okText={automationDialogMode === 'scheduled' ? (automationScheduleMode === 'submit' ? '创建并定时提交' : '创建并定时执行') : '创建并立即执行'}
     cancelText="取消"
