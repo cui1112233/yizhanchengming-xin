@@ -78,10 +78,12 @@ type BatchAutomationCoordinator struct {
 // 排队等待、响应头返回和正文传输都会刷新心跳，正常慢图不会被误判。
 const comicSlotStallTimeout = 10 * time.Minute
 
-// comicBookGenerationConcurrency 默认 1：一本一本地出图并发布。可用
-// QIANTIE_COMIC_BOOK_CONCURRENCY 临时调大，但必须小于通道真实并发能力。
+// comicBookGenerationConcurrency 默认 3：同时在出图的书本数。设成 1 虽然
+// 单本收口最快，但通道经常处于半空转（一本书在跑提示词时没人出图），总吞吐
+// 明显下降；3 本可以填满通道且仍保持“一本一本地完成并发布”。可用
+// QIANTIE_COMIC_BOOK_CONCURRENCY 调整，必须小于通道真实并发能力。
 func comicBookGenerationConcurrency() int {
-	const fallback = 1
+	const fallback = 3
 	raw := strings.TrimSpace(os.Getenv("QIANTIE_COMIC_BOOK_CONCURRENCY"))
 	if raw == "" {
 		return fallback
