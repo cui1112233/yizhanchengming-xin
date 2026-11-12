@@ -412,7 +412,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 			changed = true
 			continue
 		}
-		if automationJobRetryDispatchDue(job, now) {
+		if automationJobRetryDispatchDue(job, now) && !automationJobHasActiveBooks(job) {
 			books, _ := job["books"].(map[string]any)
 			retryDue := false
 			for _, raw := range books {
@@ -644,6 +644,25 @@ func automationJobRetryDispatchDue(job map[string]any, now time.Time) bool {
 	}
 }
 
+// automationJobHasActiveBooks 判断 job 内是否还有正在执行或排队等槽位的书。
+// 有活跃书时不能启动书级续跑：launchRun 会取消当前 run，正在出图/视频的书
+// 会被中断并重新提交，既拖慢其它书也会重复扣费。等这一轮全部收尾后 run()
+// 会保持 job 为 running，再由调度器派发待续跑的书。
+func automationJobHasActiveBooks(job map[string]any) bool {
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "running", "queued":
+			return true
+		}
+	}
+	return false
+}
+
 func shouldScheduleAutomationTimeoutRetry(stage string) bool {
 	switch strings.TrimSpace(stage) {
 	case "comic_images", "comic_asset_images":
@@ -656,8 +675,9 @@ func shouldScheduleAutomationTimeoutRetry(stage string) bool {
 }
 
 // automationBatchRetryRounds 是批次末尾统一回补失败书籍的最大轮次。每一轮都在
-// 整批其余书结束后串行回补，避免失败书一直占着并发槽位。
-const automationBatchRetryRounds = 2
+// 整批其余书结束后串行回补，避免失败书一直占着并发槽位；3 轮仍不成功就停止
+// 自动重试，把是否继续交给用户决定。
+const automationBatchRetryRounds = 3
 
 // automationZombieRunningIdleTimeout 是回收“僵尸 running”job 的空闲阈值。
 // 回收只依赖「job 仍标记 running + 超过该时长没有任何状态写入」，不再要求
@@ -816,6 +836,9 @@ func markDeterministicAutomationFailure(entry map[string]any, stage string, err 
 		return false
 	}
 	entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", stage, err.Error(), message+"：确定性失败，跳过回补", now
+	// 余额不足 / 鉴权失败这类确定性错误只能人工修复后重试，标记为需人工处理，
+	// 防止残留重试标记把同一本书再跑一遍。
+	entry["needsManual"] = true
 	delete(entry, "batchRetryPending")
 	delete(entry, "retryAt")
 	delete(entry, "retryRequested")
@@ -3336,14 +3359,24 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					}
 					entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", stage, err.Error(), message, c.now()
 					appendAutomationBookLog(entry, c.now(), stage, message)
+					scheduledRetry := false
 					if err != nil && shouldScheduleAutomationTimeoutRetry(stage) && (errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "超时") || strings.Contains(strings.ToLower(err.Error()), "deadline")) {
 						retryCount := automationNumberValue(entry["retryCount"], 0)
-						if retryCount < 3 {
+						if retryCount < automationBatchRetryRounds {
 							entry["retryCount"] = retryCount + 1
 							entry["retryRequested"] = true
 							entry["retryAt"] = c.now().Add(30 * time.Second)
-							entry["message"] = fmt.Sprintf("%s，已安排自动重试（%d/3）", message, retryCount+1)
+							entry["message"] = fmt.Sprintf("%s，已安排自动重试（%d/%d）", message, retryCount+1, automationBatchRetryRounds)
+							scheduledRetry = true
 						}
+					}
+					if !scheduledRetry {
+						// 回补预算用尽：本书退出自动调度，其它书继续执行；是否
+						// 再跑由用户点“重试失败小说”决定，避免无限循环烧钱。
+						delete(entry, "retryRequested")
+						delete(entry, "retryAt")
+						entry["needsManual"] = true
+						entry["message"] = fmt.Sprintf("%s；已自动跳过并回补 %d 轮仍未完成，已停止自动重试，请人工处理或手动重试", message, automationBatchRetryRounds)
 					}
 					failed.Add(1)
 					persist()
@@ -4190,7 +4223,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	job["completedAt"], job["updatedAt"] = c.now(), c.now()
 	job["counts"] = automationCounts(totalBooks, 0, failedCount, readyCount)
 	if failedCount > 0 {
+		// 书级失败不阻塞其它书；所有书都收尾后仍有失败，说明已跑满自动回补
+		// 轮次（或遇到确定性错误），任务停止自动调度，把决定权交回用户。
 		job["state"] = "failed"
+		job["lastError"] = fmt.Sprintf("自动调度已停止：仍有 %d 本未完成；请人工处理或点“重试失败小说”继续", failedCount)
 	}
 	_ = c.setJob(owner, batchID, jobID, job)
 }

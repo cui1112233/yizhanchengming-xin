@@ -511,6 +511,72 @@ func TestAutomationRunSkipsBlockedBook(t *testing.T) {
 	}
 }
 
+// 一本书确定性失败（如余额不足）只能结束这本书，不能让同批其它书停下。
+// 全部书收尾后任务标记失败并给出“请人工处理或重试”的结论。
+func TestAutomationRunContinuesAfterDeterministicBookFailure(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{
+		{Title: "余额不足书", SourceText: "林晚走进办公室。"},
+		{Title: "健康书", SourceText: "陆沉抬头看向她。"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig, _ := json.Marshal(map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"id": "batch-comic-assets", "body": "提取漫画人物、场景和道具"}, "imageDerivation": map[string]any{"body": "整理成可直接出图的提示词"}}})
+	mode, _ := json.Marshal("comic")
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`)}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(ctx, "alice", batch.ID)
+	var broken, healthy batchfactoryv11.Book
+	for _, candidate := range batch.Books {
+		if candidate.Title == "余额不足书" {
+			broken = candidate
+		} else {
+			healthy = candidate
+		}
+	}
+	provider := &comicAutomationTextProvider{}
+	coordinator := NewBatchAutomationCoordinator(store, nil, &batchfactoryv11.BookStageService{
+		Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: provider},
+	}, nil, nil, nil, nil, nil, func() time.Time { return time.Unix(1700000000, 0) })
+	coordinator.SetComicBookGenerator(func(_ context.Context, _, _, bookID string) (batchfactoryv11.ComicCollection, error) {
+		if bookID == broken.ID {
+			return batchfactoryv11.ComicCollection{}, errors.New("上游账号余额不足")
+		}
+		latest, getErr := store.GetBatch(ctx, "alice", batch.ID)
+		if getErr != nil {
+			return batchfactoryv11.ComicCollection{}, getErr
+		}
+		for _, candidate := range latest.Books {
+			if candidate.ID == bookID {
+				return batchfactoryv11.ComicCollection{ID: "collection-" + bookID, Items: []batchfactoryv11.ComicCollectionItem{{VideoID: candidate.Videos[0].ID}}}, nil
+			}
+		}
+		return batchfactoryv11.ComicCollection{}, batchfactoryv11.ErrNotFound
+	})
+	entries := map[string]any{}
+	for _, book := range batch.Books {
+		entries[book.ID] = map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
+	}
+	job := map[string]any{"id": "job-failure", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": entries}
+
+	coordinator.run(ctx, 0, "alice", batch.ID, "job-failure", job, batch)
+
+	brokenEntry := entries[broken.ID].(map[string]any)
+	if brokenEntry["status"] != "failed" || !automationBoolValue(brokenEntry["needsManual"]) {
+		t.Fatalf("failed book entry=%#v, want failed + needsManual", brokenEntry)
+	}
+	healthyEntry := entries[healthy.ID].(map[string]any)
+	if healthyEntry["status"] != "completed" {
+		t.Fatalf("healthy entry=%#v, want completed despite a failed neighbour", healthyEntry)
+	}
+	if job["state"] != "failed" || !strings.Contains(fmt.Sprint(job["lastError"]), "仍有 1 本未完成") {
+		t.Fatalf("job=%#v, want failed with manual-handling summary", job)
+	}
+}
+
 func TestComicBootstrapReadyRequiresContentSegmentsAndCompletePrompts(t *testing.T) {
 	effective := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`)}
 	book := batchfactoryv11.Book{
@@ -2581,6 +2647,50 @@ func newDispatchTestCoordinator(path string, now time.Time) *BatchAutomationCoor
 		NewFileAutomationStatusReader(path), func() time.Time { return now })
 }
 
+// 一本失败排了书级续跑时，只要同批还有书在跑，调度器就不能启动续跑：
+// launchRun 会取消当前 run，把正在出图的书打断重来。等这一轮收尾后再派发。
+func TestDispatchDueJobsWaitsForActiveBooksBeforeBookRetry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	now := time.Date(2026, 11, 5, 10, 30, 0, 0, time.UTC)
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-retry": {
+			"id": "job-retry", "owner": "alice", "batchId": "batch-1",
+			"state": "running", "updatedAt": now,
+			"counts": automationCounts(2, 1, 1, 0),
+			"books": map[string]any{
+				"book-1": map[string]any{"bookId": "book-1", "status": "running", "stage": "comic_images"},
+				"book-2": map[string]any{
+					"bookId": "book-2", "status": "failed", "stage": "comic_images",
+					"retryRequested": true, "retryAt": now.Add(-time.Minute),
+				},
+			},
+		},
+	}}
+	writeLegacyAutomationState(t, path, state)
+	coordinator := newDispatchTestCoordinator(path, now)
+
+	if err := coordinator.DispatchDueJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := got.Jobs["job-retry"]
+	if automationStringValue(job["state"], "") != "running" {
+		t.Fatalf("job state=%#v, want running: 还有书在跑时不得启动续跑", job["state"])
+	}
+	books, _ := job["books"].(map[string]any)
+	book, _ := books["book-2"].(map[string]any)
+	if automationStringValue(book["status"], "") != "failed" {
+		t.Fatalf("book-2 status=%#v, want failed（续跑必须等本轮收尾）", book["status"])
+	}
+	if !automationBoolValue(book["retryRequested"]) {
+		t.Fatalf("book-2 必须保留 retryRequested 供收尾后派发")
+	}
+}
+
 // 空闲超过阈值且没有任何 running/queued 书的 running job 必须被回收成 failed，
 // 并清掉残留在 stopped 书上的重试标记。
 func TestDispatchDueJobsReclaimsZombieRunningJobWithoutActiveBooks(t *testing.T) {
@@ -2664,7 +2774,7 @@ func TestDispatchDueJobsReclaimsRunningJobWithActiveBook(t *testing.T) {
 	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
 		"job-active": {
 			"id": "job-active", "owner": "alice", "batchId": "batch-1",
-			"state": "running", "updatedAt": now.Add(-30 * time.Minute),
+			"state": "running", "updatedAt": now.Add(-(automationZombieRunningIdleTimeout + time.Minute)),
 			"counts": automationCounts(2, 1, 0, 1),
 			"books": map[string]any{
 				"book-1": map[string]any{"bookId": "book-1", "status": "running", "stage": "video"},
