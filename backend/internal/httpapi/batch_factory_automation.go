@@ -269,6 +269,12 @@ func (c *BatchAutomationCoordinator) sweepStaleComicPagesOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	before := time.Now().UTC().Add(-comicPageLeaseReclaimAfter)
+	// 重启前留下的 generating 页不可能再有人写回：旧进程的请求已经全部作废，
+	// 回收租约的写回操作本身也随进程结束而丢失。不立刻回收，每本书都要空等
+	// 20 分钟才能补这几页，表现就是“一直缺几页、永远不发布”。
+	if automationProcessStartedAt.After(before) {
+		before = automationProcessStartedAt
+	}
 	pages, err := store.ListStaleGeneratingComicPages(ctx, before, 500)
 	if err != nil {
 		log.Printf("comic page lease sweep list failed: %v", err)
