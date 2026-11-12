@@ -1,5 +1,4 @@
 .aicut-agent-drawer:has(.aicut-assistant-tabs){width:min(460px,calc(100vw - 28px));background:var(--aicut-panel)}
-.aicut-page .aicut-agent-fab{bottom:62px}
 html .aicut-agent-drawer:has(.aicut-assistant-tabs){background:rgba(24,29,36,.91)!important;backdrop-filter:blur(28px) saturate(1.1);isolation:isolate}
 html[data-theme=light] .aicut-agent-drawer:has(.aicut-assistant-tabs){background:rgba(247,249,253,.93)!important}
 html .aicut-agent-drawer .aicut-agent-panel.embedded{background:transparent!important}

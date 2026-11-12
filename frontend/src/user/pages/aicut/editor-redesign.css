@@ -66,7 +66,7 @@ html[data-theme=light] .aicut-fullscreen-editor {
 .aicut-timeline-advanced-menu .ant-dropdown-menu-item-group-title { font-size:11px; letter-spacing:.05em; padding-top:10px; }
 .aicut-timeline-advanced-menu .ant-dropdown-menu .ant-dropdown-menu-item-group-title { color:var(--text-secondary)!important; }
 .aicut-timeline-advanced-menu .ant-dropdown-menu-item-disabled { color:var(--text-secondary)!important; opacity:.48; }
-.aicut-fullscreen-editor .aicut-agent-fab { bottom:16px; right:16px; width:38px; height:38px; border-radius:12px; box-shadow:0 5px 20px #0003; }
+.aicut-fullscreen-editor .aicut-agent-fab { bottom:62px; right:16px; width:38px; height:38px; border-radius:12px; box-shadow:0 5px 20px #0003; }
 @media(max-width:1180px) {
   .aicut-fullscreen-editor .aicut-editor-shell.aicut-editor-v4 { grid-template-columns:0px var(--aicut-resource-width) minmax(320px,1fr) 0px!important; }
   .aicut-editor-v4>.aicut-timeline { grid-column:1/5!important; }
