@@ -215,7 +215,11 @@ func (p *BatchFactoryN8ComicPublisher) ValidateBookSettings(ctx context.Context,
 			}
 		}
 		if !available {
-			return fmt.Errorf("当前组织的“%s”分类没有可用音频", category.Name)
+			// 预检必须和真正的发布解析保持一致：风格分类为空时，发布阶段会
+			// 自动兜底到有音频的通用分类，这里再拦住就等于把兜底作废。
+			if _, _, fallbackErr := p.pickComicAudioFallback(ctx, config.OrganizationID, category, categories); fallbackErr != nil {
+				return fmt.Errorf("当前组织的“%s”分类没有可用音频，且没有其它启用分类可用音频", category.Name)
+			}
 		}
 	}
 	// 书名 → 作品 ID 的匹配也放进预检：书名对不上时要在生成前拦住，

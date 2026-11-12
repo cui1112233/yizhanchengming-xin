@@ -268,6 +268,42 @@ func TestComicAudioReportsWhenNoCategoryHasAudio(t *testing.T) {
 	}
 }
 
+// 预检也要走兜底：否则风格分类为空时，书会在预检被挡住，永远到不了会兜底的发布阶段。
+func TestComicPublishPreflightAllowsAudioFallback(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{
+			Title:          "音频兜底",
+			SourceMetadata: map[string]any{"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified"},
+			Videos:         []batchfactoryv11.CreateVideoInput{{Label: "第一幕"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store: store,
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{
+				{ID: 14, Name: "现代悬疑", Status: "ENABLE"},
+				{ID: 9, Name: "现代通用", Status: "ENABLE"},
+			},
+			audios: []n8catalog.Audio{
+				{ID: 91, Name: "通用音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE"},
+			},
+		},
+		WorksDirectory:   fakeN8ComicWorkDirectory{configured: true, works: []n8catalog.Work{{ID: 9001, Name: "音频兜底"}}},
+		WorkTitleMapPath: filepath.Join(t.TempDir(), "n8-work-title-map.json"),
+	}
+	settings := batchfactoryv11.SettingsPatch{
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","workMatchMode":"title_auto"}`),
+	}
+	if err := publisher.ValidateBookSettings(context.Background(), "alice", batch.ID, batch.Books[0].ID, settings); err != nil {
+		t.Fatalf("preflight error=%v, want audio fallback to pass", err)
+	}
+}
+
 func TestComicAudioSelectionUsesManualAudioWithoutRandomOverride(t *testing.T) {
 	store, batch, book := createComicAudioTestBook(t, map[string]any{
 		"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified",
