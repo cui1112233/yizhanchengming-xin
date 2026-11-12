@@ -2382,6 +2382,12 @@ func retryableComicAutomationError(err error) bool {
 	if status, ok := automationErrorHTTPStatus(err); ok && status >= 400 && status < 500 && status != http.StatusRequestTimeout && status != http.StatusConflict && status != http.StatusTooManyRequests {
 		return false
 	}
+	// 文本模型偶发输出结构不符（例如 characters[0] 缺少提示词）是模型抖动，
+	// 只是因为外层包了 ErrUnavailable 就被判成永久失败，会让整本停摆。错误
+	// 文案本身已经声明“可重试”的，一律按可重试处理。
+	if strings.Contains(message, "文本模型输出不符合当前格式要求") || strings.Contains(message, "可重试：") {
+		return true
+	}
 	for _, permanent := range []error{
 		batchfactoryv11.ErrConflict,
 		batchfactoryv11.ErrInvalid,

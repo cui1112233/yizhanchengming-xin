@@ -2793,3 +2793,15 @@ func TestTerminalJobWriteClearsResidualRetryMarks(t *testing.T) {
 		t.Fatalf("派发后仍残留 retryAt: %#v", persistedEntry)
 	}
 }
+
+func TestRetryableComicAutomationErrorTreatsModelShapeErrorsAsRetryable(t *testing.T) {
+	// 文本模型返回结构不符时外层包的是 ErrUnavailable，但它属于模型抖动，
+	// 必须允许自动重试，否则整本会被判成确定性失败而停摆。
+	err := fmt.Errorf("%w: 文本模型输出不符合当前格式要求，可重试：characters[0] 缺少提示词", batchfactoryv11.ErrUnavailable)
+	if !retryableComicAutomationError(err) {
+		t.Fatal("model shape error must be retryable")
+	}
+	if retryableComicAutomationError(fmt.Errorf("%w: 缺少漫画提示词配置", batchfactoryv11.ErrInvalid)) {
+		t.Fatal("config error must stay permanent")
+	}
+}
