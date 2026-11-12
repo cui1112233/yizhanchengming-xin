@@ -16,15 +16,16 @@ export function privateComicTitle(sourceText = '', title = '') {
   return firstLine ? firstLine.slice(0, 80) : '未命名漫画';
 }
 
-export function buildPrivateComicSettings({ sourceText = '', comic = {}, textModelId = '', imageModelId = '', imageProvider = '' } = {}) {
+export function buildPrivateComicSettings({ sourceText = '', comic = {}, textModelId = '', imageModelId = '', imageProvider = '', assetImages = true } = {}) {
   const normalizedSource = text(sourceText);
   if (!normalizedSource) throw new Error('请先粘贴漫画正文');
   if (Array.from(normalizedSource).length < privateComicMinSourceLength) throw new Error(`漫画正文至少需要 ${privateComicMinSourceLength} 个字`);
   const normalizedComic = comic && typeof comic === 'object' ? { ...comic } : {};
   return {
     productionMode: 'comic',
-    // 单本精致制作始终允许只用资产文字提示词继续；资产图仅作为可选参考图。
-    assetImagesEnabled: false,
+    // 私人定制默认必须生成资产图（角色/场景参考图），否则每一页都没有参考图，角色一致性无从保证。
+    // 仅当调用方显式传 assetImages: false 时才关闭。
+    assetImagesEnabled: assetImages !== false,
     textModelId: text(textModelId),
     imageModelId: text(imageModelId),
     imageProvider: text(imageProvider),

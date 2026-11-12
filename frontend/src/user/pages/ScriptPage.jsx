@@ -1781,6 +1781,32 @@ export function ScriptPage() {
     }
   }
 
+  async function waitForPrivateComicAssetImageTask(batchId, bookId, result) {
+    const images = Array.isArray(result?.images) ? result.images : [];
+    if (images.length || !result?.taskId) return images;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const status = await getBookAssetImageGenerationTask(batchId, bookId, result.taskId);
+      if (status?.status === 'processing' || status?.status === 'pending') continue;
+      if (status?.status === 'failed') throw new Error(status.error || '资产图生成失败');
+      break;
+    }
+    return images;
+  }
+
+  async function readPrivateComicAssetImageCounts(batchId, bookId) {
+    const assetResult = await listBookAssets(batchId, bookId, { suppressGlobalError: true });
+    const assets = Array.isArray(assetResult?.assets) ? assetResult.assets : [];
+    return Promise.all(assets.map(async asset => {
+      try {
+        const imageResult = await listBookAssetImages(batchId, bookId, asset.id, { suppressGlobalError: true });
+        return { asset, count: Array.isArray(imageResult?.images) ? imageResult.images.length : 0 };
+      } catch (_) {
+        return { asset, count: 0 };
+      }
+    }));
+  }
+
   async function runPrivateComicAssetImages(assetId = '', useThreeView = true) {
     const batchId = privateComicTask?.batchId;
     const bookId = privateComicTask?.bookId;
@@ -1800,16 +1826,7 @@ export function ScriptPage() {
         imageAspectRatio: '9:16',
         useThreeView: Boolean(useThreeView)
       });
-      const images = Array.isArray(result?.images) ? result.images : [];
-      if (!images.length && result?.taskId) {
-        for (let attempt = 0; attempt < 40; attempt += 1) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          const status = await getBookAssetImageGenerationTask(batchId, bookId, result.taskId);
-          if (status?.status === 'processing' || status?.status === 'pending') continue;
-          if (status?.status === 'failed') throw new Error(status.error || '资产图生成失败');
-          break;
-        }
-      }
+      const images = await waitForPrivateComicAssetImageTask(batchId, bookId, result);
       if (result?.warning) {
         const finished = new Set(images.map(image => image.assetId || image.assetID));
         const failed = ids.filter(id => !finished.has(id));
@@ -1952,6 +1969,12 @@ export function ScriptPage() {
     const batchId = privateComicTask?.batchId;
     const bookId = privateComicTask?.bookId;
     if (!batchId || !bookId || privateComicAction) return;
+    const hasAssetImage = Object.values(privateComicAssetImages || {})
+      .some(images => Array.isArray(images) && images.length);
+    if (!hasAssetImage) {
+      message.warning('请先生成角色/场景资产图，否则漫画人物无法保持一致');
+      return;
+    }
     const missingPromptPages = privateComicPages.filter(page => page?.videoId && !String(page?.imagePrompt || '').trim());
     if (videoId && missingPromptPages.some(page => page.videoId === videoId)) {
       message.warning('该页缺少图片提示词，请先生成分镜提示词');
@@ -2069,6 +2092,9 @@ export function ScriptPage() {
     if (privateComicBusy) return;
     setPrivateComicError('');
     setPrivateComicBusy(true);
+    // 分阶段失败文案：资产图 / 提示词 / 出图分别提示，便于定位问题。
+    const stageFailures = { assets: '资产图生成失败', prompts: '分镜提示词生成失败', pages: '分镜出图失败' };
+    let stage = '';
     try {
       const ensured = await ensureCurrentPrivateComicTask();
       const snapshot = { ...ensured.task, status: 'running', error: '' };
@@ -2090,6 +2116,7 @@ export function ScriptPage() {
       if (!ensured.created || hadPendingReference) {
         await savePrivateComicSettingsPatch(snapshot.batchId, settingsForStart);
       }
+      stage = 'assets';
       if (ensured.created || !privateComicAssets.length) {
         await runBookStage(snapshot.batchId, snapshot.bookId, 'assets', {
           mode: 'missing',
@@ -2097,9 +2124,31 @@ export function ScriptPage() {
           requestId: privateComicOperationId()
         });
       }
+      // 一键到底：先补齐缺失的资产图（角色/场景参考图），否则漫画页没有参考图可用。
+      const assetImageCountsBefore = await readPrivateComicAssetImageCounts(snapshot.batchId, snapshot.bookId);
+      const missingAssetIds = assetImageCountsBefore.filter(item => !item.count).map(item => item.asset.id);
+      if (missingAssetIds.length) {
+        const generated = await generateBookAssetImages(snapshot.batchId, snapshot.bookId, {
+          assetIds: missingAssetIds,
+          modelId: privateComicDraft.imageModelId || undefined,
+          provider: privateComicDraft.imageProvider || undefined,
+          imageAspectRatio: '9:16',
+          useThreeView: true
+        });
+        await waitForPrivateComicAssetImageTask(snapshot.batchId, snapshot.bookId, generated);
+      }
+      const assetImageCountsAfter = await readPrivateComicAssetImageCounts(snapshot.batchId, snapshot.bookId);
+      if (!assetImageCountsAfter.reduce((total, item) => total + item.count, 0)) {
+        throw new Error('资产参考图未生成，已停止出图：请检查图片模型配置后重试');
+      }
+      stage = 'prompts';
+      // 用最新的页面列表计算模式，避免 useMemo 里的旧 state 在“刚建任务/刚刷新”时
+      // 被当成空列表而误走 bootstrap，覆盖已有人工修改的提示词。
+      const promptPageResult = await listComicPages(snapshot.batchId, snapshot.bookId, { suppressGlobalError: true });
+      const promptPages = Array.isArray(promptPageResult?.pages) ? promptPageResult.pages : [];
       const pageHasPrompt = page => Boolean(String(page?.comicPrompt || '').trim() || String(page?.imagePrompt || '').trim());
-      const promptPageCount = privateComicPages.filter(pageHasPrompt).length;
-      const promptMode = privateComicPages.length && promptPageCount >= privateComicPages.length
+      const promptPageCount = promptPages.filter(pageHasPrompt).length;
+      const promptMode = promptPages.length && promptPageCount >= promptPages.length
         ? 'force'
         : promptPageCount > 0 ? 'missing' : 'bootstrap';
       await runBookStage(snapshot.batchId, snapshot.bookId, 'comic', {
@@ -2107,11 +2156,41 @@ export function ScriptPage() {
         textModelId: privateComicDraft.textModelId || undefined,
         requestId: privateComicOperationId()
       });
+      // 一键到底：提示词就绪后自动为缺少页面图的分镜出图。
+      stage = 'pages';
+      const latestPageResult = await listComicPages(snapshot.batchId, snapshot.bookId, { suppressGlobalError: true });
+      const latestPages = Array.isArray(latestPageResult?.pages) ? latestPageResult.pages : [];
+      const runnablePages = latestPages.filter(page => page?.videoId
+        && String(page?.imagePrompt || '').trim()
+        && !(Array.isArray(page.images) ? page.images : []).length);
+      const submittedPages = [];
+      const conflictPages = [];
+      let firstPageError = null;
+      for (const page of runnablePages) {
+        try {
+          const outcome = await generateComicPageWithConflict(snapshot.batchId, snapshot.bookId, page.videoId, privateComicPagePayload(page));
+          if (outcome?.conflict) conflictPages.push(page);
+          else submittedPages.push(page);
+        } catch (error) {
+          if (!firstPageError) firstPageError = error;
+        }
+      }
+      if (firstPageError) throw firstPageError;
+      const pendingPageIds = submittedPages.concat(conflictPages).map(page => page.videoId);
+      if (pendingPageIds.length) {
+        const completed = await waitForPrivateComicPageImages(snapshot.batchId, snapshot.bookId, pendingPageIds);
+        if (!completed) message.info('分镜生图仍在进行，可稍后点刷新查看结果');
+      }
       setPrivateComicTask(snapshot);
       await refreshPrivateComicTask(snapshot.batchId, { ...snapshot, status: 'running' });
     } catch (error) {
-      setPrivateComicError(error?.message || '漫画任务启动失败');
-      setPrivateComicTask(current => current ? { ...current, status: 'failed', error: error?.message || '漫画任务启动失败' } : current);
+      const detail = String(error?.message || '').trim();
+      const fallback = stageFailures[stage] || '漫画任务启动失败';
+      const errorText = !detail
+        ? fallback
+        : (detail.includes('失败') || detail.includes('已停止出图') ? detail : `${fallback}：${detail}`);
+      setPrivateComicError(errorText);
+      setPrivateComicTask(current => current ? { ...current, status: 'failed', error: errorText } : current);
     } finally {
       setPrivateComicBusy(false);
     }
