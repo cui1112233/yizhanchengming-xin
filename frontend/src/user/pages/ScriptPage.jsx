@@ -34,7 +34,7 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
-import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, setPrimaryBookAssetImage, updateBookAsset, updateComicPage, uploadBookAssetImage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
+import { createPrivateComicTask, downloadComicPageImagesZip, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, setPrimaryBookAssetImage, updateBookAsset, updateComicPage, uploadBookAssetImage, uploadComicGlobalReference, uploadComicPageImage } from '../../shared/api/batchFactory';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 import PrivateComicWorkspace from './PrivateComicWorkspace';
@@ -2075,6 +2075,45 @@ export function ScriptPage() {
     }
   }
 
+  async function uploadPrivateComicPageImage(page, file) {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    const videoId = page?.videoId;
+    if (!batchId || !bookId || !videoId || !file) return;
+    setPrivateComicError('');
+    try {
+      await uploadComicPageImage(batchId, bookId, videoId, await readImageAsDataURL(file));
+      await refreshPrivateComicTask(batchId);
+      message.success('漫画图已替换');
+    } catch (error) {
+      setPrivateComicError(error?.message || '替换漫画图失败');
+    }
+  }
+
+  async function downloadPrivateComicPageImages() {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || privateComicAction) return;
+    setPrivateComicAction('downloadImages');
+    setPrivateComicError('');
+    try {
+      const blob = await downloadComicPageImagesZip(batchId, bookId);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `漫画图片_${privateComicTitle(privateComicDraft.sourceText, privateComicDraft.title) || '漫画'}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      message.success('已开始下载全部漫画图');
+    } catch (error) {
+      setPrivateComicError(error?.message || '漫画图下载失败');
+    } finally {
+      setPrivateComicAction('');
+    }
+  }
+
   async function submitPrivateComic() {
     if (privateComicBusy) return;
     setPrivateComicError('');
@@ -2560,6 +2599,8 @@ export function ScriptPage() {
           onGenerateAllPageImages={() => void runPrivateComicPageImages()}
           onSavePagePrompt={(page, prompts) => savePrivateComicPagePrompts(page, prompts)}
           onDownloadAll={() => void downloadPrivateComicPackage()}
+          onDownloadAllImages={() => void downloadPrivateComicPageImages()}
+          onUploadPageImage={uploadPrivateComicPageImage}
           busy={privateComicBusy}
           error={privateComicError}
           onRefresh={() => void refreshPrivateComicTask()}

@@ -62,8 +62,8 @@ test('comic configuration edits the current comic while script configuration kee
   assert.match(scriptPageSource, /customizationWorkspace !== 'comic' \? <>[\s\S]{0,1800}视频模型/);
 });
 
-test('private comic treats asset images as a required step for character consistency', () => {
-  assert.match(source, /key: 'assetImages', label: '资产图', optional: false/);
+test('asset images are optional and never block the next required step', () => {
+  assert.match(source, /key: 'assetImages', label: '资产图（可选）', optional: true/);
   assert.match(source, /find\(step => !step\.done && !step\.optional\)/);
   assert.match(source, /生成资产图（缺 \$\{missingAssetImages\}）/);
 });
@@ -106,4 +106,23 @@ test('single-book comic assets open the shared asset editor instead of a passive
   assert.match(source, /onSetPrimaryAssetImage/);
   assert.match(source, /onGenerateAssetImage/);
   assert.doesNotMatch(source, /title=\{assetPreview \? `\$\{assetPreview\.title\} · \$\{assetPreview\.items\.length\}` : ''\}/);
+});
+
+test('comic page cards replace one page image and download all page images', () => {
+  const apiSource = fs.readFileSync(path.join(here, '..', '..', 'shared', 'api', 'batchFactoryV12.js'), 'utf8');
+  assert.match(source, /onUploadPageImage/);
+  assert.match(source, /accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(source, /替换图片/);
+  assert.match(source, /onDownloadAllImages/);
+  assert.match(source, /下载全部漫画图/);
+  assert.match(scriptPageSource, /async function uploadPrivateComicPageImage\(page, file\)/);
+  assert.match(scriptPageSource, /await uploadComicPageImage\(batchId, bookId, videoId, await readImageAsDataURL\(file\)\)/);
+  assert.match(scriptPageSource, /await refreshPrivateComicTask\(batchId\)/);
+  assert.match(scriptPageSource, /message\.success\('漫画图已替换'\)/);
+  assert.match(scriptPageSource, /async function downloadPrivateComicPageImages\(\)/);
+  assert.match(scriptPageSource, /onDownloadAllImages=\{\(\) => void downloadPrivateComicPageImages\(\)\}/);
+  assert.match(scriptPageSource, /漫画图片_\$\{privateComicTitle/);
+  assert.match(apiSource, /export function uploadComicPageImage\(batchId, bookId, videoId, dataUrl\)/);
+  assert.match(apiSource, /export function downloadComicPageImagesZip\(batchId, bookId\)/);
+  assert.match(apiSource, /images-zip/);
 });

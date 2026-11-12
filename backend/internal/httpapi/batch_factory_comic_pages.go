@@ -1802,6 +1802,8 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const pages = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-pages"
 	const page = pages + "/{videoId}"
 	const promptZip = pages + "/download-zip"
+	// images-zip 只打包每页主图；提示词与资产图仍走 download-zip。
+	const imagesZip = pages + "/images-zip"
 	const images = pages + "/{pageId}/images"
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
@@ -1869,6 +1871,19 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			return
 		}
 		serveComicZip(w, files, plan, "comic-prompts.zip")
+	})
+	mux.HandleFunc("GET "+imagesZip, func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		plan, err := planComicPageImagesZip(r.Context(), store, comicStore, files, owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		serveComicZip(w, files, plan, "comic-images.zip")
 	})
 	mux.HandleFunc("PUT "+page, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -2163,15 +2178,39 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		var input batchfactoryv11.CreateComicPageImageInput
-		if !decodeJSON(w, r, &input) {
+		// 同一路径承载两种提交：dataUrl 走“上传替换本页主图”，其余字段
+		// 沿用生成候选图的旧语义。20MB 原图 base64 后约 27MB，比通用
+		// JSON 16MB 上限宽；普通候选图请求仍远小于该值。
+		var input struct {
+			DataURL   string `json:"dataUrl"`
+			URL       string `json:"url"`
+			MediaType string `json:"mediaType"`
+			Source    string `json:"source"`
+		}
+		if r.Body == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+			return
+		}
+		if !limitRequestBody(w, r, maxComicPageImageUploadBodyBytes) {
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			if isBodyTooLarge(err) {
+				writePayloadTooLarge(w, maxComicPageImageUploadBodyBytes)
+				return
+			}
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+			return
+		}
+		if strings.TrimSpace(input.DataURL) != "" {
+			uploadComicPageImageDataURL(w, r, owner, comicStore, files, input.DataURL)
 			return
 		}
 		if strings.EqualFold(strings.TrimSpace(input.Source), "upload") {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "uploaded image bytes must use the upload endpoint"})
 			return
 		}
-		created, err := comicStore.CreateComicPageImage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("pageId"), input)
+		created, err := comicStore.CreateComicPageImage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("pageId"), batchfactoryv11.CreateComicPageImageInput{URL: input.URL, MediaType: input.MediaType, Source: input.Source})
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -2378,6 +2417,95 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	})
 }
 
+// 单张漫画页图片上限：解码后 20MB；请求体放宽到 32MB 以容纳 base64 开销。
+const (
+	maxComicPageImageUploadBytes     = 20 << 20
+	maxComicPageImageUploadBodyBytes = 32 << 20
+)
+
+// uploadComicPageImageDataURL 处理「上传替换本页漫画图」。路径参数既接受
+// comic page ID（兼容旧调用），也接受 videoId（与 generate 路由一致）。
+// 新图落盘后创建为候选并立即设为主图，返回结构与单页生成接口一致。
+func uploadComicPageImageDataURL(w http.ResponseWriter, r *http.Request, owner string, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, dataURL string) {
+	if files == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "comic image storage is unavailable"})
+		return
+	}
+	mediaType, payload, err := decodeImageDataURL(dataURL)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid image upload"})
+		return
+	}
+	switch mediaType {
+	case "image/png", "image/jpeg", "image/webp":
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "only png, jpeg and webp images are supported"})
+		return
+	}
+	if len(payload) > maxComicPageImageUploadBytes {
+		writePayloadTooLarge(w, maxComicPageImageUploadBytes)
+		return
+	}
+	batchID, bookID := r.PathValue("batchId"), r.PathValue("bookId")
+	page, err := loadComicPageForUpload(r.Context(), comicStore, owner, batchID, bookID, r.PathValue("pageId"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	artifactID, err := localexecutor.NewArtifactID()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "image id generation failed"})
+		return
+	}
+	saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(payload))
+	if err != nil {
+		writeBookAssetImageStorageError(w, err)
+		return
+	}
+	created, err := comicStore.CreateComicPageImage(r.Context(), owner, batchID, bookID, page.ID, batchfactoryv11.CreateComicPageImageInput{StorageRef: saved.StorageRef, MediaType: saved.MediaType, Source: "upload"})
+	if err != nil {
+		_ = files.Remove(saved.StorageRef)
+		writeStoreError(w, err)
+		return
+	}
+	if _, err := comicStore.SetPrimaryComicPageImage(r.Context(), owner, batchID, bookID, page.ID, created.ID); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	updated, err := loadComicPageForUpload(r.Context(), comicStore, owner, batchID, bookID, page.ID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	image := created
+	for _, candidate := range updated.Images {
+		if candidate.ID == created.ID {
+			image = candidate
+			break
+		}
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"page": comicPageResponse(updated), "image": comicPageImageResponse(image)})
+}
+
+// loadComicPageForUpload 先按 comic page ID 匹配，再按 videoId 匹配。
+func loadComicPageForUpload(ctx context.Context, comicStore batchfactoryv11.ComicPageStore, owner, batchID, bookID, pageOrVideoID string) (batchfactoryv11.ComicPage, error) {
+	pages, err := comicStore.ListComicPages(ctx, owner, batchID, bookID)
+	if err != nil {
+		return batchfactoryv11.ComicPage{}, err
+	}
+	for _, page := range pages {
+		if page.ID == pageOrVideoID {
+			return page, nil
+		}
+	}
+	for _, page := range pages {
+		if page.VideoID == pageOrVideoID {
+			return page, nil
+		}
+	}
+	return batchfactoryv11.ComicPage{}, batchfactoryv11.ErrNotFound
+}
+
 // planComicCollectionImageZip 先解析合集并逐页校验主图文件可打开，再返回
 // 流式打包计划。缺图仍返回「第 N 页…」的可读错误，绝不会写半截 ZIP。
 func planComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, owner, batchID, bookID, collectionID string) (comicZipPlan, error) {
@@ -2436,6 +2564,81 @@ func planComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Stor
 		})
 	}
 	return comicZipPlan{filename: comicDownloadFileStem(title) + ".zip", entries: entries}, nil
+}
+
+type comicPageImagesZipManifest struct {
+	BookTitle string                           `json:"bookTitle"`
+	Pages     []comicPageImagesZipManifestPage `json:"pages"`
+}
+
+type comicPageImagesZipManifestPage struct {
+	PageIndex int    `json:"pageIndex"`
+	VideoID   string `json:"videoId"`
+	FileName  string `json:"fileName"`
+}
+
+// planComicPageImagesZip 只收集每页主图，按 ListComicPages 的页序
+// （video ordinal）打包成 漫画01.png…；没有主图或文件缺失的页跳过，
+// 不因为个别页未出图而阻断整包下载。附 manifest.json 记录页序与文件名。
+func planComicPageImagesZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, owner, batchID, bookID string) (comicZipPlan, error) {
+	if files == nil {
+		return comicZipPlan{}, fmt.Errorf("%w: 漫画图片存储不可用", batchfactoryv11.ErrUnavailable)
+	}
+	batch, err := store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return comicZipPlan{}, err
+	}
+	var title string
+	for _, book := range batch.Books {
+		if book.ID == bookID {
+			title = book.Title
+			break
+		}
+	}
+	if strings.TrimSpace(title) == "" {
+		return comicZipPlan{}, batchfactoryv11.ErrNotFound
+	}
+	pages, err := comicStore.ListComicPages(ctx, owner, batchID, bookID)
+	if err != nil {
+		return comicZipPlan{}, err
+	}
+	entries := make([]comicZipEntry, 0, len(pages))
+	manifest := comicPageImagesZipManifest{BookTitle: title, Pages: make([]comicPageImagesZipManifestPage, 0, len(pages))}
+	for index, page := range pages {
+		primary, ok := primaryComicPageImage(page)
+		if !ok || strings.TrimSpace(primary.StorageRef) == "" {
+			continue
+		}
+		file, openErr := files.Open(primary.StorageRef)
+		if openErr != nil {
+			continue
+		}
+		_ = file.Close()
+		name := fmt.Sprintf("漫画%02d%s", index+1, comicDownloadImageExtension(primary.MediaType, primary.StorageRef))
+		entries = append(entries, comicZipEntry{name: name, storageRef: primary.StorageRef})
+		manifest.Pages = append(manifest.Pages, comicPageImagesZipManifestPage{PageIndex: index + 1, VideoID: page.VideoID, FileName: name})
+	}
+	if len(entries) == 0 {
+		return comicZipPlan{}, fmt.Errorf("%w: 还没有可下载的漫画图片", batchfactoryv11.ErrConflict)
+	}
+	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return comicZipPlan{}, err
+	}
+	return comicZipPlan{filename: comicDownloadFileStem(title) + "_漫画图片.zip", manifest: string(manifestJSON), entries: entries}, nil
+}
+
+// primaryComicPageImage 取页面主图；主图标记缺失时退回第一张候选图。
+func primaryComicPageImage(page batchfactoryv11.ComicPage) (batchfactoryv11.ComicPageImage, bool) {
+	for _, image := range page.Images {
+		if image.IsPrimary {
+			return image, true
+		}
+	}
+	if len(page.Images) > 0 {
+		return page.Images[0], true
+	}
+	return batchfactoryv11.ComicPageImage{}, false
 }
 
 func comicDownloadFileStem(title string) string {
@@ -2636,6 +2839,7 @@ type comicZipEntry struct {
 type comicZipPlan struct {
 	filename string
 	markdown string
+	manifest string
 	entries  []comicZipEntry
 }
 
@@ -2771,6 +2975,12 @@ func writeComicZipStream(w io.Writer, files *localartifact.Store, plan comicZipP
 	writer := zip.NewWriter(w)
 	if plan.markdown != "" {
 		if err := writeComicZipText(writer, "最终完整出图提示词.md", plan.markdown); err != nil {
+			_ = writer.Close()
+			return err
+		}
+	}
+	if plan.manifest != "" {
+		if err := writeComicZipText(writer, "manifest.json", plan.manifest); err != nil {
 			_ = writer.Close()
 			return err
 		}

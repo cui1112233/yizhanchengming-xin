@@ -570,6 +570,14 @@ export function downloadComicPromptZip(batchId, bookId) {
   return apiRequest(comicPagesPath(batchId, bookId, 'download-zip'), { responseType: 'blob' });
 }
 
+export function downloadComicPageImagesZip(batchId, bookId) {
+  return apiRequest(comicPagesPath(batchId, bookId, 'images-zip'), { responseType: 'blob' });
+}
+
+export function uploadComicPageImage(batchId, bookId, videoId, dataUrl) {
+  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/images`), { method: 'POST', body: body({ dataUrl }) });
+}
+
 export function downloadComicCollectionImageZip(batchId, bookId, collectionId) {
   return apiRequest(comicCollectionsPath(batchId, bookId, `${id(collectionId)}/download`), { responseType: 'blob' });
 }

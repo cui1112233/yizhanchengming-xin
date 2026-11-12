@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Dropdown, Image, Input, Modal, Popconfirm, Progress, Select, Space, Switch, Tooltip, Typography, message } from 'antd';
-import { Download, ExternalLink, ImageIcon, MoreHorizontal, Pencil, RefreshCw, Settings2, WandSparkles } from 'lucide-react';
+import { Download, ExternalLink, ImageIcon, MoreHorizontal, Pencil, RefreshCw, Settings2, Upload, WandSparkles } from 'lucide-react';
 
 import { getComicPageImageBlob } from '../../shared/api/batchFactory';
 import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../shared/imageAspectRatios.js';
@@ -108,12 +108,14 @@ function PrivateComicAssetImage({ imageUrl, alt = '', preview = false }) {
     : <img src={display.url} alt={alt} />;
 }
 
-function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt }) {
+function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt, onUploadPageImage }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ comicPrompt: '', imagePrompt: '' });
   const [display, setDisplay] = useState({ url: '', failed: false });
   const [original, setOriginal] = useState({ url: '', loading: false, failed: false });
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const uploadInputRef = useRef(null);
   const originalURLRef = useRef('');
   const images = Array.isArray(page?.images) ? page.images : [];
   const primary = images.find(image => image?.isPrimary) || images[0] || null;
@@ -219,6 +221,22 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
     if (saved) setEditing(false);
   }
 
+  async function uploadImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      message.error('仅支持 PNG、JPG、WEBP 图片。');
+      return;
+    }
+    setUploading(true);
+    try {
+      await onUploadPageImage?.(page, file);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return <div className="shot-output-card">
     <div className="shot-output-card-header">
       <span className="private-comic-page-title">漫画{comicPageNumber(index + 1)} · 第 {index + 1} 页</span>
@@ -234,6 +252,21 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
           title={!taskReady ? '请先提取资产创建任务' : !hasPrompt ? '该页缺少提示词' : busyElsewhere ? '当前有其他操作进行中' : ''}
           onClick={() => onGeneratePage?.(page)}
         >{images.length ? '重新生成图' : '生成图'}</Button>
+        <Button
+          size="small"
+          icon={<Upload size={15} aria-hidden="true" />}
+          loading={uploading}
+          disabled={!taskReady || busyElsewhere || generating || uploading}
+          title={!taskReady ? '请先提取资产创建任务' : busyElsewhere ? '当前有其他操作进行中' : ''}
+          onClick={() => uploadInputRef.current?.click()}
+        >替换图片</Button>
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          style={{ display: 'none' }}
+          onChange={event => void uploadImage(event)}
+        />
         {sources.original ? <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={original.loading} onClick={() => void downloadPage()}>下载本页</Button> : null}
       </Space>
     </div>
@@ -271,7 +304,7 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
   </div>;
 }
 
-function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt, onDownloadAll }) {
+function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt, onDownloadAll, onDownloadAllImages, onUploadPageImage }) {
   const pageList = Array.isArray(pages) ? pages : [];
   const imagedPages = pageList.filter(page => (Array.isArray(page?.images) ? page.images : []).length > 0).length;
   // 首屏只挂 COMIC_OUTPUT_FIRST_SCREEN 张卡片，滚到尾部哨兵再按批追加；
@@ -305,6 +338,7 @@ function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage,
       <span>共 {pageList.length} 页 · 已出图 {imagedPages} 页</span>
       <Space size={8}>
         <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={action === 'download'} disabled={!pageList.length || (action && action !== 'download')} onClick={onDownloadAll}>下载全部</Button>
+        <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={action === 'downloadImages'} disabled={!imagedPages || (action && action !== 'downloadImages')} onClick={onDownloadAllImages}>下载全部漫画图</Button>
       </Space>
     </div>
     {visiblePages.map((page, index) => <ComicPageCard
@@ -316,6 +350,7 @@ function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage,
       actionKey={actionKey}
       onGeneratePage={onGeneratePage}
       onSavePagePrompt={onSavePagePrompt}
+      onUploadPageImage={onUploadPageImage}
     />)}
     {visibleCount < pageList.length ? <div ref={sentinelRef} className="shot-output-cards-more" aria-hidden="true" /> : null}
   </div>;
@@ -344,6 +379,8 @@ export function PrivateComicWorkspace({
   onGenerateAllPageImages,
   onSavePagePrompt,
   onDownloadAll,
+  onDownloadAllImages,
+  onUploadPageImage,
   onDraftChange,
   task,
   busy = false,
@@ -479,7 +516,7 @@ export function PrivateComicWorkspace({
     : assetSections.map(section => ({ key: `placeholder-${section.key}`, label: section.label }));
   const pipelineSteps = [
     { key: 'assets', label: '提取资产', done: assetList.length > 0, detail: assetList.length ? `已完成 ${assetList.length} 项` : '未提取' },
-    { key: 'assetImages', label: '资产图', optional: false, done: assetList.length > 0 && assetsWithImages >= assetList.length, detail: assetList.length ? `必需 · 已生成 ${assetsWithImages}/${assetList.length}` : '必需' },
+    { key: 'assetImages', label: '资产图（可选）', optional: true, done: assetList.length > 0 && assetsWithImages >= assetList.length, detail: assetList.length ? `可选 · 已生成 ${assetsWithImages}/${assetList.length}` : '可选' },
     { key: 'prompts', label: '漫画提示词', done: promptReadyCount > 0, detail: pagesTotal ? `已生成 ${promptReadyCount}/${pagesTotal} 页` : (assetList.length ? '待生成' : '待资产') },
     { key: 'images', label: '漫画图片', done: pagesTotal > 0 && imageReadyCount >= pagesTotal, detail: pagesTotal ? `已出图 ${imageReadyCount}/${pagesTotal}` : '待提示词' }
   ];
@@ -843,6 +880,8 @@ export function PrivateComicWorkspace({
           onGeneratePage={onGeneratePageImage}
           onSavePagePrompt={onSavePagePrompt}
           onDownloadAll={onDownloadAll}
+          onDownloadAllImages={onDownloadAllImages}
+          onUploadPageImage={onUploadPageImage}
         /> : task ? <div className="script-empty legacy-panel-card">
           <div className="script-empty-title">还没有漫画页</div>
           <div className="script-empty-copy">先在左侧提取资产，再点击「生成漫画提示词」；确认提示词后再生成漫画图片。</div>
