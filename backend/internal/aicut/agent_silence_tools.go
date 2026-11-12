@@ -109,7 +109,7 @@ func preflightSilenceCuts(timeline Timeline, cuts []trimInterval) error {
 		for _, clip := range track.Clips {
 			segments := subtractTrimIntervals(clip.StartMS, clip.StartMS+clip.DurationMS, cuts)
 			unchanged := len(segments) == 1 && segments[0].start == clip.StartMS && segments[0].end == clip.StartMS+clip.DurationMS
-			if !unchanged && (clip.FadeInMS > 0 || clip.FadeOutMS > 0 || clip.Animation != nil) {
+			if !unchanged && (clip.FadeInMS > 0 || clip.FadeOutMS > 0 || HasClipAnimation(clip.Animation)) {
 				return fmt.Errorf("片段 %s 含淡入淡出或动画，请先处理后再自动静音剪辑", clip.Name)
 			}
 		}

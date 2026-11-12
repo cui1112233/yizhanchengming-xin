@@ -134,3 +134,10 @@ func TestSilencePreflightAllowsAnimatedWholeClipShift(t *testing.T) {
 		t.Fatalf("whole clip movement rejected: %v", err)
 	}
 }
+
+func TestSilencePreflightAllowsClearedAnimationSettings(t *testing.T) {
+	tl := Timeline{Tracks: []Track{{Clips: []Clip{{ID: "plain", StartMS: 0, DurationMS: 3000, Animation: &ClipAnimation{Entrance: ClipAnimationPhase{Preset: "none"}, Exit: ClipAnimationPhase{Preset: "none"}, Loop: ClipAnimationPhase{Preset: "none"}}}}}}}
+	if err := preflightSilenceCuts(tl, []trimInterval{{1000, 2000}}); err != nil {
+		t.Fatalf("cleared animation is not an active effect: %v", err)
+	}
+}
