@@ -3727,7 +3727,34 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 			}
 			_ = cache.MarkFailed(ctx, owner, fingerprint, openErr)
 		} else if outcome == imagegenerationcache.ClaimBusy {
-			return "", "", "", fmt.Errorf("%w: 相同图片正在生成，请稍后刷新", batchfactoryv11.ErrConflict)
+			// 同一指纹的图片已由另一个请求（常见于超时重试、或同一页被重复调度）
+			// 在上游生成中。这不是失败：等它落盘后直接复用结果。
+			// 之前直接返回 conflict，会让 30 页只差 1 页时整本判失败。
+			waitDeadline := time.Now().Add(shuihuoImageBusyWaitTimeout)
+			for time.Now().Before(waitDeadline) {
+				select {
+				case <-ctx.Done():
+					return "", "", "", ctx.Err()
+				case <-time.After(shuihuoImageBusyPollInterval):
+				}
+				entry, outcome, claimErr = cache.Claim(ctx, owner, fingerprint, target.ModelID, 10*time.Minute)
+				if claimErr != nil {
+					break
+				}
+				if outcome == imagegenerationcache.ClaimReady {
+					if file, openErr := files.Open(entry.StorageRef); openErr == nil {
+						_ = file.Close()
+						return entry.MediaType, entry.StorageRef, "provider", nil
+					}
+				}
+				if outcome == imagegenerationcache.ClaimAcquired {
+					cacheClaimed = true
+					break
+				}
+			}
+			if !cacheClaimed {
+				return "", "", "", fmt.Errorf("%w: 相同图片长时间生成未完成，请稍后重试", batchfactoryv11.ErrConflict)
+			}
 		} else if outcome == imagegenerationcache.ClaimAcquired {
 			cacheClaimed = true
 		}
@@ -4111,6 +4138,10 @@ var (
 	shuihuoImageBodyTotalTimeoutURL    time.Duration
 	shuihuoImageBodyTotalTimeoutBase64 time.Duration
 	shuihuoImageQueueHeartbeatInterval = time.Minute
+	// “相同图片正在生成”是并发/重试造成的瞬时状态，不是失败。
+	// 等上游把那张图落盘后复用结果，避免 29/30 时整本被判失败。
+	shuihuoImageBusyWaitTimeout  = 10 * time.Minute
+	shuihuoImageBusyPollInterval = 10 * time.Second
 )
 
 var errShuihuoImageQueueBusy = fmt.Errorf("%w: 图片队列繁忙", batchfactoryv11.ErrUpstream)
