@@ -29,7 +29,9 @@ test('AI-CUT Agent面板具备独立收起、模式、模型、建议卡和停�
 
 test('建议卡只填入输入框，发送必须经过后端Agent运行', () => {
   assert.match(source, /chooseAgentSuggestion/);
-  assert.match(source, /setPrompt\(text\)/);
+  const suggestionHandler = source.match(/function chooseAgentSuggestion\(item\)\s*\{([\s\S]*?)\n  \}/)?.[1] || '';
+  assert.match(suggestionHandler, /setPrompt\(item.text\)/);
+  assert.doesNotMatch(suggestionHandler, /sendAgentPrompt|createAICutAgentRun/);
   assert.match(source, /sendAgentPrompt/);
   assert.doesNotMatch(source, /resolveAICutAgentTool/);
 });

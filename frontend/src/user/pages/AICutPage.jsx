@@ -1,6 +1,6 @@
 import { Button, Checkbox, ConfigProvider, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag, Upload, message } from 'antd';
 import { Bot, ClipboardPaste, MoreHorizontal, LockKeyhole, UnlockKeyhole, Volume2, VolumeX, SkipBack, SkipForward, Maximize2, Captions, Clapperboard, CloudUpload, Copy, Film, ImageIcon, Keyboard, Magnet, Music, Palette, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, Redo2, Save, Scissors, Sparkles, Star, Trash2, Type, Undo2, Upload as UploadIcon, WandSparkles, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import PlayerViewControls from './aicut/PlayerViewControls.jsx';
 import PreviewViewport from './aicut/PreviewViewport.jsx';
 import { previewSource } from './aicut/playerView.js';
@@ -20,6 +20,7 @@ import { getConfig } from '../../shared/api/config.js';
 import { alignAICutMultiCamAudio } from '../../shared/api/aicut.js';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
 import AICutAgentPanel from '../components/AICutAgentPanel.jsx';
+const AICutCreativeCanvas = lazy(() => import('../components/AICutCreativeCanvas.jsx'));
 import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, normalizeSubtitleRhythm, orderedTimelineTracks, removeTimelineTrack, renameTimelineTrack, setTimelineClipText, subtitleRhythmLabel, timelinePixelDeltaToTime, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, updateTimelineTrackSettings } from './aicutTimeline.js';
 import { createAICutClipboard, executeAICutCommand, findTimelineEditPoint, reconcileTimelineSave, restoreTimelineSnapshot } from './aicutCommands.js';
 import { buildAICutPreviewFrame, getAICutTimelineDuration, nextAICutCanvasFit, seekAICutPreviewTime } from './aicutPreview.js';
@@ -1180,7 +1181,7 @@ export default function AICutPage() {
         setOralOpen(false);
         setAgentDrawerOpen(false);
       } else if (action === 'shortcuts') setShortcutOpen(true);
-      else if (action === 'canvas-view') setWorkspaceMode('canvas');
+      else if (action === 'canvas-view') void openCreativeCanvas();
       else if (action === 'editor-view') setWorkspaceMode('editor');
       else if (action === 'new-project') setCreateOpen(true);
       else if (action === 'save') saveTimeline();
@@ -3287,6 +3288,16 @@ export default function AICutPage() {
     }
   }
 
+  async function openCreativeCanvas() {
+    const scope = activeTimelineScopeRef.current;
+    try {
+      await persistBeforeTimelineChange();
+      if (activeTimelineScopeRef.current === scope) setWorkspaceMode('canvas');
+    } catch (error) {
+      message.error(error?.message || '请先保存当前剪辑后再打开创作画布');
+    }
+  }
+
   async function refreshTimelineFromAgent() {
     const operationScope = `${projectId}:${activeTimelineId}`;
     const capturedEditSequence = editSequenceRef.current;
@@ -4870,7 +4881,7 @@ export default function AICutPage() {
                 ))}
               </select>
               <div className="aicut-reference-modes">
-                <button type="button" className={workspaceMode === 'canvas' ? 'on' : ''} onClick={() => setWorkspaceMode('canvas')}>
+                <button type="button" className={workspaceMode === 'canvas' ? 'on' : ''} onClick={() => void openCreativeCanvas()}>
                   AI 创作画布
                 </button>
                 <button type="button" className={workspaceMode === 'editor' ? 'on' : ''} onClick={() => setWorkspaceMode('editor')}>
@@ -4910,48 +4921,25 @@ export default function AICutPage() {
             </header>
 
             {workspaceMode === 'canvas' ? (
-              <section className="aicut-creative-canvas">
-                <div className="aicut-canvas-heading">
-                  <div>
-                    <Sparkles size={22} />
-                    <h2>AI 创作画布</h2>
-                  </div>
-                  <p>把真实项目素材和时间线交给 Agent 编排；每次工具执行都会校验项目版本。</p>
-                </div>
-                <div className="aicut-canvas-flow">
-                  <article>
-                    <span>1</span>
-                    <strong>导入素材</strong>
-                    <small>{assets.length} 个项目素材</small>
-                    <Button onClick={() => setWorkspaceMode('editor')}>打开媒体区</Button>
-                  </article>
-                  <article>
-                    <span>2</span>
-                    <strong>描述剪辑目标</strong>
-                    <small>粗剪、字幕、去口误、配乐</small>
-                    <Button type="primary" onClick={() => setAgentDrawerOpen(true)}>
-                      打开 Agent
-                    </Button>
-                  </article>
-                  <article>
-                    <span>3</span>
-                    <strong>检查时间线</strong>
-                    <small>
-                      {timeline.tracks.length} 条真实轨道 · 修订 {timeline.revision}
-                    </small>
-                    <Button onClick={() => setWorkspaceMode('editor')}>进入专业剪辑</Button>
-                  </article>
-                  <article>
-                    <span>4</span>
-                    <strong>云端导出</strong>
-                    <small>MP4 / WebM / MP3 / SRT</small>
-                    <Button onClick={openExportPanel}>打开导出</Button>
-                  </article>
-                </div>
-                <div className="aicut-canvas-agent">
-                  <AICutAgentPanel key={`${projectId}:${activeTimelineId}`} embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} assets={assets} activeSkill={activeAgentSkill} draft={agentDraft} autoEditOpen={autoEditOpen} onSectionChange={value => { autoEditScopeRef.current = `${projectId}:${activeTimelineId}`; setAutoEditOpen(value); }} onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshTimelineFromAgent} />
-                </div>
-              </section>
+              <Suspense fallback={<div className="aicut-canvas-loading"><Spin tip="正在打开创作画布…" /></div>}>
+                <AICutCreativeCanvas
+                  key={`${projectId}:${activeTimelineId}`}
+                  projectId={projectId}
+                  projectTitle={currentProject?.title || '当前工程'}
+                  timelineRevision={timeline.revision}
+                  onOpenEditor={() => setWorkspaceMode('editor')}
+                  onTransferred={async (result) => {
+                    const operationScope = `${projectId}:${activeTimelineId}`;
+                    const requestedProjectId = projectId;
+                    const refreshed = await listAICutAssets(requestedProjectId);
+                    if (activeTimelineScopeRef.current !== operationScope) return;
+                    setAssets(refreshed);
+                    if (result?.timeline) await refreshTimelineFromAgent();
+                    if (activeTimelineScopeRef.current !== operationScope) return;
+                    setWorkspaceMode('editor');
+                  }}
+                />
+              </Suspense>
             ) : (
               <EditorShell ref={editorShellRef} layout={editorLayout} inspectorDrawerOpen={inspectorDrawerOpen} hasSelection={Boolean(selectedClipEntry)}>
                 {editorLayout.inspectorMode === 'drawer' || inspectorCollapsed ? (
@@ -5547,12 +5535,12 @@ export default function AICutPage() {
               />
             ) : null}
 
-            <button type="button" className="aicut-agent-fab" aria-label="打开 AI-CUT Agent" title="打开 AI-CUT Agent" onClick={() => setAgentDrawerOpen(true)}>
+            <button type="button" style={{ display: workspaceMode === 'canvas' ? 'none' : undefined }} className="aicut-agent-fab" aria-label="打开 AI-CUT Agent" title="打开 AI-CUT Agent · 剪已有素材" onClick={() => setAgentDrawerOpen(true)}>
               <Bot size={18} />
               <span>AI-CUT Agent</span>
             </button>
             {(agentDrawerOpen || agentDrawerMounted) && (
-              <div className="aicut-agent-drawer" style={{ display: agentDrawerOpen ? 'grid' : 'none' }}>
+              <div className="aicut-agent-drawer" style={{ display: agentDrawerOpen && workspaceMode === 'editor' ? 'grid' : 'none' }}>
                 <header>
                   <strong>AI-CUT Agent</strong>
                   <Button type="text" aria-label="关闭 Agent" icon={<X size={18} />} onClick={() => setAgentDrawerOpen(false)} />

@@ -40,6 +40,8 @@ func withAICutTimelineScope(next http.Handler, auth BridgeAuth) http.Handler {
 				allowed = true
 			case "asset-folders":
 				allowed = true
+			case "creative-canvas":
+				allowed = r.Method == http.MethodPost && (len(suffix) == 1 || (len(suffix) == 2 && (suffix[1] == "assets" || suffix[1] == "script")))
 			case "assets":
 				allowed = (len(suffix) == 3 && suffix[2] == "folder" && r.Method == http.MethodPatch) || r.Method == http.MethodGet || (len(suffix) == 1 && r.Method == http.MethodPost) || (len(suffix) == 3 && suffix[2] == "proxy" && r.Method == http.MethodPost)
 			case "export-jobs", "asr-jobs", "agent-runs", "edit-plans":

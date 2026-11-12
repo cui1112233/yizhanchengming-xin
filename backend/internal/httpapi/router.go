@@ -631,6 +631,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterScreenplayRoutes(root, auth, options.Screenplay, runtimeTextProviderResolver, options.Now, screenplayMedia)
 	RegisterNovelCreationRoutes(root, auth, options.NovelCreation, options.NovelCreationRunStarter)
 	RegisterAICutAssetRoutes(root, auth, options.AICut, options.AgentAssetObjects, options.Now)
+	RegisterAICutCreativeCanvasRoutes(root, auth, scopedTimelineStore, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
 	RegisterAICutTTSRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, options.Now)
 	RegisterAICutBackgroundRemovalRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, nil, options.Now)
 	RegisterAICutVoiceCloneRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, nil, options.Now)

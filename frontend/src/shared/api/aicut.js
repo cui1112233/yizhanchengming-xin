@@ -9,6 +9,27 @@ function projectPath(projectId, suffix = '') {
   return `/api/ai-cut/projects/${id}${suffix}`;
 }
 
+export async function ensureAICutCreativeCanvas(projectId, request = apiRequest) {
+  return request(projectPath(projectId, '/creative-canvas'), { method: 'POST' });
+}
+
+export async function transferAICutCreativeAssets(projectId, assetIds, request = apiRequest) {
+  const ids = [...new Set((Array.isArray(assetIds) ? assetIds : []).map(id => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length || ids.length > 30) throw new Error('每次请选择 1–30 个素材');
+  return request(projectPath(projectId, '/creative-canvas/assets'), {
+    method: 'POST', body: JSON.stringify({ assetIds: ids })
+  });
+}
+
+export async function transferAICutCreativeScript(projectId, nodeIds, expectedRevision, request = apiRequest) {
+  const ids = [...new Set((Array.isArray(nodeIds) ? nodeIds : []).map(id => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length || ids.length > 10) throw new Error('每次请选择 1–10 个故事或分镜节点');
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error('当前时间线版本无效，请刷新后重试');
+  return request(projectPath(projectId, '/creative-canvas/script'), {
+    method: 'POST', body: JSON.stringify({ nodeIds: ids, expectedRevision })
+  });
+}
+
 export async function listAICutProjects(request = apiRequest) {
   const response = await request('/api/ai-cut/projects');
   return Array.isArray(response?.projects) ? response.projects : [];

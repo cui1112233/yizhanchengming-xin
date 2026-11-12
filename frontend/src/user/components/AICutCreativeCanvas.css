@@ -1,0 +1,16 @@
+.agent-page.utility-workbench.aicut-creative-canvas {
+  display: flex; flex-direction: column; width: 100%; height: calc(100% - 48px); min-height: 0;
+  padding: 0; gap: 0; overflow: hidden; border: 1px solid var(--agent-border); border-radius: 12px;
+}
+.aicut-creative-canvas__toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 16px; background: var(--agent-panel); border-bottom: 1px solid var(--agent-border); }
+.aicut-creative-canvas__title { display: grid; gap: 4px; min-width: 0; color: var(--agent-text); }
+.aicut-creative-canvas__title span { color: var(--agent-muted); font-size: 12px; max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aicut-creative-canvas__shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 16px; color: var(--agent-secondary); font-size: 12px; background: var(--agent-panel); border-bottom: 1px solid var(--agent-border); }
+.aicut-creative-canvas__hint { color: var(--agent-muted); margin-left: auto; }
+.aicut-creative-canvas__main { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.aicut-creative-canvas__state { display: grid; place-items: center; height: 100%; padding: 24px; }
+.aicut-creative-canvas__assets { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow: auto; padding: 12px 0; width: 100%; }
+.aicut-creative-canvas__assets .ant-checkbox-wrapper { margin: 0; align-items: flex-start; }
+.aicut-creative-canvas__assets .ant-checkbox-wrapper > span:last-child { display: flex; flex: 1; min-width: 0; justify-content: space-between; gap: 12px; overflow-wrap: anywhere; }
+.aicut-creative-canvas__script-preview { display: block; white-space: pre-wrap; font-size: 12px; opacity: .7; }
+@media (max-width: 720px) { .aicut-creative-canvas__hint { width: 100%; } .aicut-creative-canvas__title span { max-width: 260px; } }

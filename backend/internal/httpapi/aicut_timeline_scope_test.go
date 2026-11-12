@@ -43,6 +43,28 @@ func TestAICutNamedTimelineGuardAllowsExplicitSharedResources(t *testing.T) {
 		}
 	}
 }
+func TestAICutNamedTimelineAllowsCreativeHandoffOnlyAtKnownRoutes(t *testing.T) {
+	now := time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC)
+	h := withAICutTimelineScope(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if aicutTimelineIDFromContext(r.Context()) != "named" {
+			t.Fatal("missing scope")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}), BridgeAuth{Secret: "secret", Now: func() time.Time { return now }})
+	for _, suffix := range []string{"creative-canvas", "creative-canvas/assets", "creative-canvas/script"} {
+		r := signedJSONRequestWithTimeline(t, h, now, "POST", "/api/ai-cut/projects/p/"+suffix, "named", nil)
+		if r.Code != http.StatusNoContent {
+			t.Fatalf("%s: %d", suffix, r.Code)
+		}
+	}
+	for _, suffix := range []string{"creative-canvas/unknown", "creative-canvas/assets/extra"} {
+		r := signedJSONRequestWithTimeline(t, h, now, "POST", "/api/ai-cut/projects/p/"+suffix, "named", nil)
+		if r.Code != http.StatusConflict {
+			t.Fatalf("unsupported %s: %d", suffix, r.Code)
+		}
+	}
+}
+
 func signedJSONRequestWithTimeline(t *testing.T, h http.Handler, now time.Time, method, path, id string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	wrapped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
