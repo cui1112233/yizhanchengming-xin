@@ -65,6 +65,25 @@ type BatchAutomationCoordinator struct {
 	dispatcherOnce       sync.Once
 	reaperOnce           sync.Once
 	sweepOnce            sync.Once
+	// comicRunSlots 限制同时进入“资产+页图”出图的书籍数量。出图是最贵的上游
+	// 环节，多本同时各开多页并发会把请求全堵在队列里，每本都缺几页、谁也无法
+	// 提交。改成按本串行后，一本出完并发布，下一本才开始出图。
+	comicRunSlots chan struct{}
+}
+
+// comicBookGenerationConcurrency 默认 1：一本一本地出图并发布。可用
+// QIANTIE_COMIC_BOOK_CONCURRENCY 临时调大，但必须小于通道真实并发能力。
+func comicBookGenerationConcurrency() int {
+	const fallback = 1
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_COMIC_BOOK_CONCURRENCY"))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 || value > 8 {
+		return fallback
+	}
+	return value
 }
 
 // automationBatchRunLock only serializes lifecycle transitions for one batch.
@@ -169,7 +188,7 @@ func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets Automati
 	if len(providerSync) > 0 {
 		syncProvider = providerSync[0]
 	}
-	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now, providerSync: syncProvider}
+	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now, providerSync: syncProvider, comicRunSlots: make(chan struct{}, comicBookGenerationConcurrency())}
 }
 
 func (c *BatchAutomationCoordinator) SetAutomationStateStore(store AutomationStateStore) {
@@ -3559,6 +3578,28 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							persist()
 							entryLogMu.Unlock()
 						})
+						// 按本串行出图：拿到槽位才真正开始生成资产和页图，出完并发布后
+						// 才释放给下一本。这样一本书几十页可以连续占满上游通道快速收口，
+						// 不会再出现“每本都缺几页、一本也提交不了”。
+						// 等待期间持续刷新整本心跳，避免排队被误判成停滞而取消。
+						if c.comicRunSlots != nil {
+							waitTicker := time.NewTicker(time.Minute)
+							for waiting := true; waiting; {
+								select {
+								case c.comicRunSlots <- struct{}{}:
+									waiting = false
+								case <-waitTicker.C:
+									if generationLease != nil {
+										generationLease.touch(comicGenerationIdleExtend)
+									}
+								case <-generateCtx.Done():
+									waitTicker.Stop()
+									return batchfactoryv11.ComicCollection{}, generateCtx.Err()
+								}
+							}
+							waitTicker.Stop()
+							defer func() { <-c.comicRunSlots }()
+						}
 						return c.comicGenerate(generateCtx, owner, batchID, book.ID)
 					}, nil)
 					generationCancel()
