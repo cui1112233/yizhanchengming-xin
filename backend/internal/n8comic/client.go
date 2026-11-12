@@ -359,13 +359,24 @@ func (c *Client) prepareImageUpload(ctx context.Context, producer string, input 
 	if len(input.Content) == 0 {
 		return pendingImage{}, fmt.Errorf("漫画图片 %s 内容为空", fileName)
 	}
-	width, height, err := imageDimensions(input.Content, mediaType)
+	// 2K 漫画页原图约 5–7MB，超过 N8/巨量单图体积上限会被判“图片过大”。
+	// 只压缩超限的副本，本地保存的原图不动；压缩后同步切换文件名后缀和
+	// media type，保证申请上传时声明的格式与真实内容一致。
+	content, uploadType, err := compressImageForUpload(input.Content, mediaType)
+	if err != nil {
+		return pendingImage{}, fmt.Errorf("漫画图片 %s %w", fileName, err)
+	}
+	if uploadType != mediaType {
+		fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName)) + ".jpg"
+		mediaType = uploadType
+	}
+	width, height, err := imageDimensions(content, mediaType)
 	if err != nil {
 		return pendingImage{}, fmt.Errorf("漫画图片 %s 无效：%w", fileName, err)
 	}
 	// N8 文档示例使用文件内容 MD5 作为 signature；该值同时用于 TOS
 	// 路径和 image/read 查询，必须与回调侧使用的签名完全一致。
-	digest := md5.Sum(input.Content)
+	digest := md5.Sum(content)
 	signature := hex.EncodeToString(digest[:])
 	var upload struct {
 		URL    string            `json:"url"`
@@ -390,7 +401,7 @@ func (c *Client) prepareImageUpload(ctx context.Context, producer string, input 
 	if strings.TrimSpace(upload.URL) == "" {
 		return pendingImage{}, fmt.Errorf("N8 未返回图片 %s 的上传地址", fileName)
 	}
-	if err := c.put(ctx, upload.URL, upload.Header, input.Content); err != nil {
+	if err := c.put(ctx, upload.URL, upload.Header, content); err != nil {
 		return pendingImage{}, fmt.Errorf("上传图片 %s 失败：%w", fileName, err)
 	}
 	return pendingImage{fileName: fileName, signature: signature}, nil
