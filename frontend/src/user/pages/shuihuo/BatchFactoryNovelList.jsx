@@ -222,7 +222,7 @@ const BATCH_FACTORY_TABLE_COLUMNS = [
 
 
 
-function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks }) {
+function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, onRunBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks }) {
   const selected = new Set(selectedBookIds);
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
   const selectedCount = selectedBookIds.length;
@@ -281,7 +281,7 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
         <span>{publicationMetadataValue(metadata, 'style')}</span>
         <span>{publicationMetadataValue(metadata, 'gender')}</span>
         <span className={`batch-factory-source-status is-${sourceStatus.tone} ${row.status === '处理中' ? 'is-scheduled' : ''}`} title={`${sourceStatus.detail}${row.state?.detail ? ` · ${row.state.detail}` : ''}`}><b>{row.state?.published ? '已发布' : sourceStatus.label}</b><small>{row.state?.published ? sourceStatus.label : row.status}{row.state?.manual ? ' · 已手调' : ''}</small></span>
-        <span><Button size="small" onClick={() => onViewBook(book)}>查看</Button></span>
+        <span className="batch-factory-novel-actions"><Button size="small" onClick={() => onViewBook(book)}>查看</Button>{onRunBook ? <Button size="small" type="link" onClick={() => onRunBook(book)}>执行这本</Button> : null}</span>
       </div>;
     })}
     <AddBooksRow books={books} platformOptions={platformOptions} onAddBooks={onAddBooks} />
@@ -4821,7 +4821,15 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     setAutomationPresets(values);
     return values;
   }
-  async function openAutomationStart() {
+  // 行内「执行这本」：把范围锁定到这一本再打开启动弹窗，预检也只查这一本。
+  function runSingleBook(book) {
+    if (!book?.id) return;
+    setSelectedBookIds([book.id]);
+    void openAutomationStart([book.id]);
+  }
+  // explicitBookIds：行内「执行这本」直接指定单本，不依赖列表勾选状态
+  // （用户点行不会勾选复选框，只传 selectedBookIds 会退回“全部小说”）。
+  async function openAutomationStart(explicitBookIds = null) {
     try {
       const firstBook = books[0];
       setContentRangeLines(Number(firstBook?.sourceMetadata?.contentRangeLines || 5));
@@ -4830,9 +4838,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       const values = await loadAutomationPresets();
       setAutomationPresetID(current => current || values[0]?.id || '');
       setAutomationScheduledAt(current => current || formatBeijingDatetimeLocal(new Date(Date.now() + 10 * 60 * 1000).toISOString()));
-      // 列表里已经勾选了书就默认按勾选执行：否则弹窗默认“全部小说”，
-      // 用户只勾 1 本却会预检/执行整批，误伤面太大。
-      setAutomationBookScope(selectedBookIds.length ? 'selected' : 'all');
+      const scopeBookIds = Array.isArray(explicitBookIds) ? explicitBookIds : selectedBookIds;
+      setAutomationBookScope(scopeBookIds.length ? 'selected' : 'all');
       setAutomationStartOpen(true);
     } catch (error) { message.error(error?.message || '读取自动化预设失败'); }
   }
@@ -5391,6 +5398,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             selectedBookIds={selectedBookIds}
             onSelectionChange={setSelectedBookIds}
             onViewBook={setViewingBook}
+            onRunBook={runSingleBook}
             platformNames={platformNames}
             platformOptions={platformOptions}
             productionStatus={productionStatus}
