@@ -4096,11 +4096,17 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         // 503 是“状态服务暂不可用”，不能显示成“暂无任务”，也不该被当成空数据。
         runtimeStatusFailureRef.current = httpStatus === 503 ? (runtimeStatusFailureRef.current || 0) + 1 : 0;
         const timeoutSeconds = Math.max(1, Math.round(Number(error?.timeoutMs || 0) / 1000));
+        // 网关 502/504 返回的是 nginx 的 HTML 错误页，不能原样塞进面板。
+        const rawMessage = String(error?.message || '').trim();
+        const looksLikeHTML = /<html|<!doctype|<head>|<\/body>/i.test(rawMessage);
+        const friendlyMessage = looksLikeHTML || httpStatus >= 500
+          ? '服务暂时不可用（服务重启或网关异常），请稍后点重试'
+          : rawMessage || '读取任务状态失败';
         const text = isApiTimeoutError(error)
           ? [`任务状态读取超时（${timeoutSeconds} 秒），已保留上次结果，可点击重试`, endpoint ? `状态接口：${endpoint}` : ''].filter(Boolean).join(' · ')
           : httpStatus === 503
             ? [ '状态服务暂不可用，请稍后重试', status, endpoint ? `状态接口：${endpoint}` : ''].filter(Boolean).join(' · ')
-            : [error?.message || '读取任务状态失败', status, endpoint ? `状态接口：${endpoint}` : ''].filter(Boolean).join(' · ');
+            : [friendlyMessage, status, endpoint ? `状态接口：${endpoint}` : ''].filter(Boolean).join(' · ');
         setLogsError(text);
         if (!quiet) message.error(text);
         return undefined;
