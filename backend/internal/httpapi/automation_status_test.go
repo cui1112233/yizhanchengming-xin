@@ -386,3 +386,26 @@ func TestPublicAutomationJobHidesHistoricalFailureAfterPublishCompleted(t *testi
 		t.Fatalf("completed published book leaked stale failure state: %#v", book)
 	}
 }
+
+func TestAutomationFailureCategoryClassifiesKnownReasons(t *testing.T) {
+	cases := []struct {
+		name    string
+		status  string
+		message string
+		want    string
+	}{
+		{"completed has no category", "completed", "已生成 29/30 页", ""},
+		{"billed page", "failed", "已生成 29/30 页，1 页需要人工处理；需人工处理（IMAGE_BILLED_NOT_RETRIEVED）", "billed_not_retrieved"},
+		{"upstream timeout", "failed", "图片通道响应读取中断（HTTP 200）：context deadline exceeded", "upstream_timeout"},
+		{"slot stalled", "failed", "出图超过 10m0s 没有任何进展，已释放出图槽位，本书可直接重试", "upstream_timeout"},
+		{"missing work", "failed", "漫画合集里没有同名作品《半生离恨》，请先创建作品", "external_work_missing"},
+		{"missing config", "failed", "图片模型或图片生成服务未配置", "config_missing"},
+		{"audio config", "failed", "当前组织的“现代悬疑”分类没有可用音频", "config_missing"},
+	}
+	for _, tc := range cases {
+		got, _ := automationFailureCategory(tc.status, tc.message, "", "")
+		if got != tc.want {
+			t.Fatalf("%s: category=%q want %q", tc.name, got, tc.want)
+		}
+	}
+}

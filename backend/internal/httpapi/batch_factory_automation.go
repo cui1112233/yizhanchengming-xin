@@ -1682,6 +1682,11 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 		}
 		books[book.ID] = map[string]any{"bookId": book.ID, "title": book.Title, "status": status, "stage": stage, "message": message, "attempts": 0, "retryCount": 0, "updatedAt": c.now()}
 	}
+	// 同一批次只允许一个执行任务：先把旧的 running/scheduled/queued 停掉，
+	// 否则两个任务会同时调度同一本书，重复出图、重复扣费。
+	if err := c.supersedeActiveJobsForBatch(owner, batchID, jobID); err != nil {
+		return nil, err
+	}
 	if err := c.setJob(owner, batchID, jobID, job); err != nil {
 		return nil, err
 	}
@@ -1695,6 +1700,64 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 		c.launchRun(owner, batchID, jobID, job, batch)
 	}
 	return publicAutomationJob(job), nil
+}
+
+// supersedeActiveJobsForBatch 保证同一批次同一时刻只有一个执行任务在跑。
+// 重复点“执行”或前端重试时，旧任务必须立刻停掉，否则两个任务会各自调度
+// 同一本书、各自出图，造成重复扣费。
+func (c *BatchAutomationCoordinator) supersedeActiveJobsForBatch(owner, batchID, keepJobID string) error {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	state, err := c.loadLocked()
+	if err != nil {
+		return err
+	}
+	now := c.now()
+	changed := false
+	for jobID, job := range state.Jobs {
+		if jobID == keepJobID || job == nil {
+			continue
+		}
+		if automationStringValue(job["owner"], "") != owner || automationStringValue(job["batchId"], "") != batchID {
+			continue
+		}
+		switch automationStringValue(job["state"], "") {
+		case "running", "scheduled", "queued":
+		default:
+			continue
+		}
+		job["state"] = "stopped"
+		job["message"] = "已被新的执行任务接管"
+		job["updatedAt"] = now
+		delete(job, "retryAt")
+		if books, ok := job["books"].(map[string]any); ok {
+			for _, raw := range books {
+				entry, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				switch automationStringValue(entry["status"], "") {
+				case "running", "queued", "scheduled":
+					entry["status"] = "stopped"
+					entry["message"] = "已被新的执行任务接管"
+					entry["updatedAt"] = now
+				}
+			}
+		}
+		if cancel, ok := c.runCancels[jobID]; ok && cancel != nil {
+			cancel()
+			delete(c.runCancels, jobID)
+		}
+		c.runEpochs[jobID]++
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return c.saveLocked(state)
 }
 
 const automationFollowUpStage = "waiting_active_run"

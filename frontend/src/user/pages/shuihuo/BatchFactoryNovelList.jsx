@@ -3244,7 +3244,7 @@ function BatchLogs({ automationStatus, productionStatus, mergeStatus, error, boo
 		const expanded = Boolean(expandedBooks[book.bookId]);
 		return <section key={`automation-${book.bookId}`}>
 			<strong>自动生产 · {book.title || book.bookId}</strong>
-			<span>{automationStageLabel(book.stage)} · {retryQueued ? '重试排队中' : automationStatusLabel(book.status)} · 完成率 {percent}% · {book.updatedAt || '—'}</span>
+			<span>{automationStageLabel(book.stage)} · {retryQueued ? '重试排队中' : automationStatusLabel(book.status)}{book.status === 'failed' && book.failureCategoryLabel ? <em style={{ marginLeft: 6, padding: '1px 8px', borderRadius: 10, fontStyle: 'normal', fontSize: 12, border: '1px solid currentColor', color: book.failureCategory === 'billed_not_retrieved' ? '#f59e0b' : book.failureCategory === 'config_missing' || book.failureCategory === 'external_work_missing' ? '#ef4444' : '#38bdf8' }}>{book.failureCategoryLabel}</em> : null} · 完成率 {percent}% · {book.updatedAt || '—'}</span>
 			<p>{retryQueued ? '已接受手动重试，正在等待生产工位；无需再次点击重试。' : automationBookDetail(book) || batchFactoryVisibleError(book.message) || '等待自动生产'}{Number(book.retryCount || 0) > 0 ? ` · 自动重试 ${Math.min(3, Number(book.retryCount || 0))}/3` : ''}{book.retryAt ? ` · 下次重试：北京时间 ${formatBeijingDatetimeLocal(book.retryAt)}` : ''}{visibleAutomationError ? ` · ${batchFactoryVisibleError(visibleAutomationError)}` : ''}</p>
 			{visibleAutomationError ? <BatchFactoryErrorNotice compact title="自动生产失败" stageText={automationStageLabel(book.stage)} error={visibleAutomationError} /> : null}
 			<Button size="small" type="link" onClick={() => setExpandedBooks(current => ({ ...current, [book.bookId]: !current?.[book.bookId] }))}>{expanded ? '收起执行日志' : '展开执行日志'}</Button>

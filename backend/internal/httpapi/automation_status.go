@@ -545,6 +545,7 @@ func publicAutomationJob(job map[string]any) map[string]any {
 			if text, ok := errorValue.(string); ok && text != "" {
 				errorValue = batchfactoryv11.UserFacingErrorText(text)
 			}
+			failureCategory, failureCategoryLabel := automationFailureCategory(status, messageValue, toString(errorValue), toString(publishError))
 			books = append(books, map[string]any{
 				"bookId": book["bookId"], "title": book["title"], "status": book["status"], "stage": book["stage"],
 				"message": messageValue, "error": errorValue, "publishError": publishError, "updatedAt": book["updatedAt"],
@@ -553,11 +554,33 @@ func publicAutomationJob(job map[string]any) map[string]any {
 				"batchRetryPending": batchRetryPending, "batchRetryCount": batchRetryCount,
 				"needsManualPages": automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book}),
 				"autoContinue":     automationBookAutoContinue(book),
+				"failureCategory":  failureCategory, "failureCategoryLabel": failureCategoryLabel,
 			})
 		}
 	}
 	result["books"] = books
 	return result
+}
+
+// automationFailureCategory 把失败原因归成四类，前端据此给出对应操作按钮，
+// 用户不需要从一长串错误文本里自己判断“重试有没有用、会不会再扣费”。
+func automationFailureCategory(status, message, errText, publishError string) (string, string) {
+	if strings.TrimSpace(status) != "failed" {
+		return "", ""
+	}
+	text := strings.Join([]string{message, errText, publishError}, " ")
+	lower := strings.ToUpper(text)
+	switch {
+	case strings.Contains(lower, "IMAGE_BILLED_NOT_RETRIEVED") || (strings.Contains(text, "已生成") && strings.Contains(text, "需人工处理")):
+		return "billed_not_retrieved", "已计费未取回（重试会再扣一次图费）"
+	case strings.Contains(lower, "TIMEOUT") || strings.Contains(lower, "DEADLINE") || strings.Contains(text, "超时") || strings.Contains(text, "没有任何进展"):
+		return "upstream_timeout", "上游超时（可直接重试）"
+	case strings.Contains(text, "没有同名作品") || strings.Contains(text, "漫画合集"):
+		return "external_work_missing", "外部作品缺失（需先建作品或指定关联）"
+	case strings.Contains(text, "未配置") || strings.Contains(text, "尚未完成识别") || strings.Contains(text, "没有可用音频") || strings.Contains(text, "缺少可用于音频"):
+		return "config_missing", "配置缺失（需先补齐设置）"
+	}
+	return "other", "其他失败（可重试）"
 }
 
 func registerAutomationStatusRoute(mux *http.ServeMux, auth BridgeAuth, reader *FileAutomationStatusReader, version string) {
