@@ -8,6 +8,7 @@
 .aicut-creative-canvas__shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 16px; color: var(--agent-secondary); font-size: 12px; background: var(--agent-panel); border-bottom: 1px solid var(--agent-border); }
 .aicut-creative-canvas__hint { color: var(--agent-muted); margin-left: auto; }
 .aicut-creative-canvas__main { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.aicut-creative-canvas .agent-canvas-conversation-toggle { display: none; }
 .aicut-creative-canvas__state { display: grid; place-items: center; height: 100%; padding: 24px; }
 .aicut-creative-canvas__assets { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow: auto; padding: 12px 0; width: 100%; }
 .aicut-creative-canvas__assets .ant-checkbox-wrapper { margin: 0; align-items: flex-start; }

@@ -232,7 +232,7 @@ func aicutCreativeCopy(ctx context.Context, objects agentworkspace.AssetObjectSt
 	return objects.Put(ctx, aicutObjectAsset(target), file)
 }
 func aicutCreativeSeed() agentworkspace.Canvas {
-	canvas := agentworkspace.Canvas{Version: 1, Appearance: agentworkspace.DefaultAppearance(), Nodes: []agentworkspace.Node{}, Edges: []agentworkspace.Edge{}}
+	canvas := agentworkspace.Canvas{Version: 1, Viewport: map[string]any{"x": 36, "y": 16, "zoom": 0.9}, Appearance: agentworkspace.DefaultAppearance(), Nodes: []agentworkspace.Node{}, Edges: []agentworkspace.Edge{}}
 	for index, card := range []struct{ id, title, kind string }{{"story", "故事", "text"}, {"role", "角色", "text"}, {"scene", "场景", "text"}, {"prop", "道具", "text"}, {"storyboard", "分镜", "script"}} {
 		id := "creative-" + card.id
 		config := map[string]any{"prompt": "", "creativeCardKind": card.id}
