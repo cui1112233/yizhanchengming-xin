@@ -14,6 +14,31 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
+func TestIntegrationChannelModelsKeepsTieredChannels(t *testing.T) {
+	userConfig := newIntegrationTestUserConfig(t, map[string]any{
+		"customChannels": []any{
+			map[string]any{
+				"id": "ch_t2k", "name": "【0.019】2K", "group": "image",
+				"baseUrl": "https://yf.test/v1", "model": "gpt-image-2.6-flare", "apiKey": "sk-x", "enabled": true,
+				"params": map[string]any{"resolution": "2K", "quality": "high"},
+			},
+			map[string]any{
+				"id": "ch_t1k", "name": "【0.0064】1K", "group": "image",
+				"baseUrl": "https://yf.test/v1", "model": "gpt-image-2.6-flare", "apiKey": "sk-x", "enabled": true,
+				"params": map[string]any{"resolution": "1K", "quality": "low"},
+			},
+		},
+	})
+	models := integrationChannelModels(context.Background(), "image", userConfig, "tester", nil)
+	ids := map[string]bool{}
+	for _, model := range models {
+		ids[fmt.Sprint(model["id"])] = true
+	}
+	if !ids["custom:ch_t2k"] || !ids["custom:ch_t1k"] {
+		t.Fatalf("同模型不同 params 的渠道被合并了：%v", models)
+	}
+}
+
 func TestModelTestReusesSavedCredentialWhenEditing(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

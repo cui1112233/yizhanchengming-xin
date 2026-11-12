@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -686,10 +687,15 @@ func integrationChannelModels(ctx context.Context, kind string, userConfig *User
 	}
 
 	result := make([]map[string]any, 0)
-	appendModel := func(id, label, modelID, baseURL string) {
+	// params 参与去重键：同一个模型按价格档位拆成多条渠道时（例如 YFAI 的
+	// 2K/high 与 1K/low），地址和模型名完全相同，只有固定参数不同，不能合并。
+	appendModel := func(id, label, modelID, baseURL string, params map[string]any) {
 		baseURL = strings.TrimSpace(baseURL)
 		modelID = strings.TrimSpace(modelID)
 		key := modelIdentityKey(baseURL, modelID)
+		if key != "" && len(params) > 0 {
+			key += "|" + modelParamsFingerprint(params)
+		}
 		if seenID[id] || (key != "" && seenModel[key]) {
 			return
 		}
@@ -717,7 +723,7 @@ func integrationChannelModels(ctx context.Context, kind string, userConfig *User
 		if !ok || isEmptyIntegrationValue(value) {
 			continue
 		}
-		appendModel("channel:"+preset.ID, preset.Label, preset.ModelID, integrationChannelBaseURL(preset, values))
+		appendModel("channel:"+preset.ID, preset.Label, preset.ModelID, integrationChannelBaseURL(preset, values), nil)
 	}
 
 	// 自己新增的渠道：填了 Key 且分组匹配时同样进入候选。
@@ -733,9 +739,28 @@ func integrationChannelModels(ctx context.Context, kind string, userConfig *User
 		if isEmptyIntegrationValue(channel["apiKey"]) {
 			continue
 		}
-		appendModel("custom:"+fmt.Sprint(channel["id"]), fmt.Sprint(channel["name"]), fmt.Sprint(channel["model"]), fmt.Sprint(channel["baseUrl"]))
+		params, _ := channel["params"].(map[string]any)
+		appendModel("custom:"+fmt.Sprint(channel["id"]), fmt.Sprint(channel["name"]), fmt.Sprint(channel["model"]), fmt.Sprint(channel["baseUrl"]), params)
 	}
 	return result
+}
+
+// modelParamsFingerprint 生成渠道固定参数的稳定指纹，用于模型下拉去重。
+// 键按字典序排列，保证同一组参数总是得到同一个键。
+func modelParamsFingerprint(params map[string]any) string {
+	if len(params) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, key+"="+fmt.Sprint(params[key]))
+	}
+	return strings.Join(parts, "&")
 }
 
 // integrationChannelGroup 返回渠道所属分组。旧版把渠道放在独立的“自定义”组里，
