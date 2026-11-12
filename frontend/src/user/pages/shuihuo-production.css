@@ -4257,24 +4257,27 @@ body.shuihuo-reference-shell
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_prompt_recovery']{--bf-flow-color:#a78bfa}
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_images']{--bf-flow-color:#fbbf24}
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_publish']{--bf-flow-color:#34d399}
+/* 执行中的流动光带：用 transform 平移一条渐变光带，只走合成层，
+   避免对整行做 conic-gradient + mask 的逐帧重绘（多行同时执行时会明显掉帧）。*/
 .batch-factory-book-row.is-automation-running::before{
   content:'';
   position:absolute;
-  inset:0;
-  z-index:2;
-  padding:1.5px;
+  left:0;
+  right:0;
+  top:0;
+  height:2px;
   border-radius:inherit;
-  background:conic-gradient(from var(--bf-flow-angle),transparent 0deg,var(--bf-flow-color) 55deg,transparent 150deg,transparent 360deg);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  -webkit-mask-composite:xor;
-  mask-composite:exclude;
-  animation:bf-book-flow 2.6s linear infinite;
+  background:linear-gradient(90deg,transparent 0%,var(--bf-flow-color) 45%,color-mix(in srgb,var(--bf-flow-color) 60%,#fff) 50%,var(--bf-flow-color) 55%,transparent 100%);
+  opacity:.95;
+  transform:translate3d(-100%,0,0);
+  animation:bf-book-flow 2.4s linear infinite;
+  will-change:transform;
   pointer-events:none;
+  contain:paint;
 }
-@keyframes bf-book-flow{to{--bf-flow-angle:360deg}}
+@keyframes bf-book-flow{from{transform:translate3d(-100%,0,0)}to{transform:translate3d(100%,0,0)}}
 @media (prefers-reduced-motion: reduce){
-  .batch-factory-book-row.is-automation-running::before{animation:none}
+  .batch-factory-book-row.is-automation-running::before{animation:none;opacity:.55}
 }
 
 .batch-factory-comic-source{display:grid;gap:7px;padding:9px;border:1px solid var(--sh-line);border-radius:6px;background:var(--sh-panel)}

@@ -4190,6 +4190,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     // 这里只刷新页面索引，不重复提交生成请求；后台已完成的第 N 张
     // 会在几秒内出现在列表和媒体库里，当前未完成页也会继续显示进行中。
     const timer = setInterval(() => {
+      // 页面在后台时不需要刷新：整表重取会让隐藏标签页持续占 CPU，
+      // 切回来时下一次 tick 会自动补上最新数据。
+      if (typeof document !== 'undefined' && document.hidden) return;
       setComicPageRefreshNonce(value => value + 1);
     }, 5000);
     return () => clearInterval(timer);
