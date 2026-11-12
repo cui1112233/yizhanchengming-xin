@@ -389,6 +389,11 @@ func TestShuihuoImageGenerationHTTPClientIsolatesGGWKHTTP2Connections(t *testing
 		if !transport.ForceAttemptHTTP2 || !transport.DisableKeepAlives {
 			t.Fatal("ggwk image requests must use one isolated HTTP/2 connection")
 		}
+		// 该网关常用 200 响应头 + 数分钟慢正文。客户端一旦带 120s 总超时，
+		// 正文会在传输中被掐断，表现为「HTTP 200 但图片取不回」。
+		if client.Timeout != 0 {
+			t.Fatalf("ggwk image client must not carry an absolute timeout, got %s", client.Timeout)
+		}
 	}
 }
 

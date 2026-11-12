@@ -4506,7 +4506,10 @@ func shuihuoImageGenerationHTTPClient(endpoint string) *http.Client {
 		// paid generation its own HTTP/2 connection so failures stay isolated.
 		transport := newShuihuoImageTransport(true)
 		transport.DisableKeepAlives = true
-		return safehttp.NewClientWithTransport(shuihuoImageRequestTimeout, transport)
+		// NewClientWithTransport 在 timeout<=0 时会回落到 DefaultTimeout（120s），
+		// 曾导致这个网关的慢正文在 120 秒被整条请求超时掐断（HTTP 200 已计费但图片
+		// 取不回）。改用显式“不设总超时”的构造，正文仍由 stall/total 分层计时收口。
+		return safehttp.NewClientWithTransportWithoutTimeout(transport)
 	}
 	return shuihuoImageSharedHTTP2Client()
 }
