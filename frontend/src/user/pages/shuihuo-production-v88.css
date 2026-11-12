@@ -2,18 +2,18 @@
  * 只做视觉层：令牌映射、容器内边距、空态/卡片/过渡样式。
  * 不改任何业务逻辑、接口调用、状态徽标与进度条数据来源。 */
 
-/* 1. 颜色令牌映射（仅暗色；浅色主题沿用原有 --sh-* 值，避免变暗） */
-[data-theme='dark'] .shuihuo-production,
-[data-theme='dark'] .shuihuo-theme-active {
-  --sh-bg: var(--v88-color-bg);
-  --sh-panel: var(--v88-color-surface);
-  --sh-panel-strong: var(--v88-color-surface-2);
-  --sh-line: var(--v88-color-border);
-  --sh-text: var(--v88-color-text-1);
-  --sh-muted: var(--v88-color-text-3);
-  --sh-accent: var(--v88-color-primary);
-  --sh-accent-dark: var(--v88-color-primary-active);
-  --sh-danger: var(--v88-color-danger);
+/* 1. 颜色令牌映射：中性色全部指向全局语义变量，深浅主题由 global.css 统一驱动。
+ * --sh-accent / --sh-accent-dark 是水货生产页面专属的青绿品牌色（与外壳珊瑚红区分），
+ * 保留 literal 属于页面真实语义，不并入 --theme-primary。 */
+.shuihuo-production,
+.shuihuo-theme-active {
+  --sh-bg: var(--surface-base);
+  --sh-panel: var(--surface-panel);
+  --sh-panel-strong: var(--surface-2);
+  --sh-line: var(--border-default);
+  --sh-text: var(--text-primary);
+  --sh-muted: var(--text-tertiary);
+  --sh-danger: var(--text-danger);
 }
 
 /* 2. 容器：统一页面内边距，宽度铺满 */

@@ -99,10 +99,17 @@ test('creative-workspace style files use global readable text tokens', () => {
 });
 
 function cssBlock(css, selector) {
-  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 's'));
-  assert.ok(match, `missing CSS block for ${selector}`);
-  return match[1];
+  // 选择器分组（A, B, C { ... }）与同名规则拆块都是主题收敛后的常态：
+  // 按选择器精确匹配，并把命中规则的声明合并后返回。
+  const wanted = selector.split(',').map(item => item.trim()).filter(Boolean);
+  const bodies = [];
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const match of source.matchAll(/([^{}]+)\{([^}]*)\}/gs)) {
+    const selectors = match[1].split(',').map(item => item.trim());
+    if (wanted.every(item => selectors.includes(item))) bodies.push(match[2]);
+  }
+  assert.ok(bodies.length, `missing CSS block for ${selector}`);
+  return bodies.join('\n');
 }
 
 test('agent task drawer surface follows the active theme', () => {
@@ -197,7 +204,13 @@ test('batch factory and shuihuo styles use semantic text tokens for status text'
   for (const file of files) {
     const css = fs.readFileSync(path.join(root, file), 'utf8');
     assert.match(css, /var\(--text-(?:primary|secondary|tertiary|disabled|danger|warning|success)\)/, `${file} must use semantic text tokens`);
-    assert.doesNotMatch(css, /(?:color|-webkit-text-fill-color):\s*transparent/);
+    // 富文本提示词编辑器的透明 textarea 是刻意的输入覆盖层：文字由下层 rich-view 绘制，
+    // 上层只承接光标与选区，不参与可读性判定。
+    const withoutInputOverlay = css
+      .split('\n')
+      .filter(line => !line.includes('.batch-factory-prompt-editor-input-overlay'))
+      .join('\n');
+    assert.doesNotMatch(withoutInputOverlay, /(?<![\w-])(?:color|-webkit-text-fill-color)\s*:\s*transparent/);
   }
 });
 
@@ -214,7 +227,7 @@ test('batch factory v11 workbench covers task, metadata and error text levels', 
   assert.match(cssBlock(css, '.bf11-workbench .ant-typography'), /color:\s*var\(--text-primary\)/);
   assert.match(cssBlock(css, '.bf11-workbench .ant-typography-secondary'), /color:\s*var\(--text-secondary\)/);
   assert.match(cssBlock(css, '.bf11-card-title small'), /color:\s*var\(--text-tertiary\)/);
-  assert.match(cssBlock(css, '.bf11-book-row.is-error'), /color:\s*var\(--text-danger\)/);
+  assert.match(cssBlock(css, '.bf11-book-row.is-error'), /border-inline-start:\s*3px solid var\(--bf11-danger\)/);
 });
 
 test('batch factory v11 settings, detail and manager labels use semantic levels', () => {
@@ -231,18 +244,19 @@ test('batch factory v11 settings, detail and manager labels use semantic levels'
 });
 
 test('light theme primary and disabled buttons keep readable text contrast', () => {
-  assert.match(globalCSS, /\[data-theme='light'\]\s+\.user-theme-active \.ant-btn-primary\s*\{[^}]*color:\s*#ffffff/s);
-  assert.match(globalCSS, /\.user-theme-active \.ant-btn:disabled\s*\{[^}]*color:\s*var\(--legacy-dim\)/s);
-  assert.match(globalCSS, /\.admin-theme-active \.ant-btn:disabled\s*\{[^}]*color:\s*var\(--admin-faint\)/s);
+  // 主按钮文字与底色都跟风格走：底色 = 当前风格主色，文字 = 该主色上的对比色令牌。
+  assert.match(globalCSS, /\[data-theme='light'\]\s+\[data-shell='user'\] \.ant-btn-primary\s*\{[^}]*color:\s*var\(--text-on-accent\)/s);
+  assert.match(globalCSS, /\[data-theme='light'\]\s+\[data-shell='user'\] \.ant-btn-primary\s*\{[^}]*background:\s*var\(--theme-primary\)/s);
+  assert.match(globalCSS, /\[data-shell='user'\] \.ant-btn:disabled\s*\{[^}]*color:\s*var\(--legacy-dim\)/s);
+  assert.match(globalCSS, /\[data-shell='admin'\] \.ant-btn:disabled\s*\{[^}]*color:\s*var\(--admin-faint\)/s);
 });
 
 test('global AntD tags use theme-aware contrast without flattening dark status colors', () => {
-  assert.match(globalCSS, /\.user-theme-active \.ant-tag\s*,\s*\n\.admin-theme-active \.ant-tag\s*\{[^}]*color:\s*var\(--tag-text\)/s);
-  assert.match(globalCSS, /\.user-theme-active \.ant-tag\s*,\s*\n\.admin-theme-active \.ant-tag\s*\{[^}]*background:\s*var\(--tag-bg\)/s);
+  assert.match(globalCSS, /\[data-theme\] \.ant-tag\s*\{[^}]*color:\s*var\(--tag-text\)/s);
+  assert.match(globalCSS, /\[data-theme\] \.ant-tag\s*\{[^}]*background:\s*var\(--tag-bg\)/s);
   for (const color of ['green', 'blue', 'gold', 'purple', 'red']) {
-    assert.match(globalCSS, new RegExp(`\\.user-theme-active \\.ant-tag-${color}[^}]*color:\\s*var\\(--tag-${color}-text\\)`));
-    assert.match(globalCSS, new RegExp(`\\.user-theme-active \\.ant-tag-${color}[^}]*background:\\s*var\\(--tag-${color}-bg\\)`));
+    assert.match(globalCSS, new RegExp(`\\[data-theme\\] \\.ant-tag-${color}[^}]*color:\\s*var\\(--tag-${color}-text\\)`));
+    assert.match(globalCSS, new RegExp(`\\[data-theme\\] \\.ant-tag-${color}[^}]*background:\\s*var\\(--tag-${color}-bg\\)`));
   }
-  assert.doesNotMatch(globalCSS, /\.user-theme-active \.ant-tag\s*\{[^}]*color:\s*#fff\s*!important/s);
-  assert.doesNotMatch(globalCSS, /\.admin-theme-active \.ant-tag\s*\{[^}]*color:\s*#fff\s*!important/s);
+  assert.doesNotMatch(globalCSS, /\[data-theme\] \.ant-tag\s*\{[^}]*color:\s*#fff\s*!important/s);
 });

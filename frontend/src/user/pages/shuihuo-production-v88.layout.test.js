@@ -19,10 +19,11 @@ test('水货生产接入 V88 主题，且项目库容器使用页面间距令牌
   assert.match(css, /\.shuihuo-project-library\s*\{[^}]*min-width:\s*0/s);
 });
 
-test('水货生产颜色令牌映射到 V88，暗色主题生效', () => {
-  assert.match(css, /\[data-theme='dark'\] \.shuihuo-production[\s\S]*?--sh-accent:\s*var\(--v88-color-primary\)/);
-  assert.match(css, /--sh-bg:\s*var\(--v88-color-bg\)/);
-  assert.match(css, /--sh-danger:\s*var\(--v88-color-danger\)/);
+test('水货生产颜色令牌映射到全局语义变量，深浅主题自动生效', () => {
+  assert.match(css, /--sh-bg:\s*var\(--surface-base\)/);
+  assert.match(css, /--sh-panel:\s*var\(--surface-panel\)/);
+  assert.match(css, /--sh-line:\s*var\(--border-default\)/);
+  assert.match(css, /--sh-danger:\s*var\(--text-danger\)/);
   assert.match(css, /\.ant-btn-dangerous:not\(:disabled\)[\s\S]*?var\(--v88-color-danger\)/);
 });
 

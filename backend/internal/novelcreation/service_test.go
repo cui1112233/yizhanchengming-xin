@@ -12,9 +12,9 @@ import (
 )
 
 type stubPipelineRunner struct {
-	mu       sync.Mutex
-	calls    []RunContext
-	run      func(context.Context, RunContext, EventSink) (ChapterBundle, error)
+	mu    sync.Mutex
+	calls []RunContext
+	run   func(context.Context, RunContext, EventSink) (ChapterBundle, error)
 }
 
 func (r *stubPipelineRunner) Run(ctx context.Context, input RunContext, sink EventSink) (ChapterBundle, error) {
@@ -224,6 +224,9 @@ func TestServiceRunUsesServerOwnerAcquiresLockPersistsEventsAndBundle(t *testing
 	snapshot, err := service.GetSnapshot(context.Background(), "alice", run.ID, 0)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(snapshot.Chapters) != 1 || snapshot.Chapters[0].Title == "" || snapshot.Chapters[0].Content == "" {
+		t.Fatalf("snapshot chapters=%+v, want saved chapter body", snapshot.Chapters)
 	}
 	wantSteps := []RunStatus{RunPlanning, RunWriting, RunNormalizing, RunAuditing, RunSettling, RunIndexing}
 	seen := make(map[RunStatus]bool)

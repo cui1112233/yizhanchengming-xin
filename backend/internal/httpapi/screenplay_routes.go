@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,12 +42,16 @@ func (g screenplayTextGenerator) Generate(ctx context.Context, req screenplay.Te
 	return screenplay.TextResponse{Content: content, Model: req.Model}, err
 }
 
-func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time) {
+func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, mediaRunners ...screenplay.BatchMediaRunner) {
 	if mux == nil || store == nil {
 		return
 	}
 	if now == nil {
 		now = time.Now
+	}
+	var mediaRunner screenplay.BatchMediaRunner
+	if len(mediaRunners) > 0 {
+		mediaRunner = mediaRunners[0]
 	}
 	handle := func(pattern string, fn func(http.ResponseWriter, *http.Request, string)) {
 		mux.Handle(pattern, auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -166,6 +171,32 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"project": project})
+	})
+	handle("PUT /api/comic-screenplays/projects/{id}/document", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Content string `json:"content"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		if len([]rune(input.Content)) > screenplay.MaxSingleCallRunes {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "剧本超过 60 万字，请拆分后保存"})
+			return
+		}
+		document, err := screenplay.SaveManualDocument(req.Context(), store, owner, req.PathValue("id"), input.Content)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"document": document})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/documents/{documentID}/restore", func(w http.ResponseWriter, req *http.Request, owner string) {
+		document, err := screenplay.RestoreDocument(req.Context(), store, owner, req.PathValue("id"), req.PathValue("documentID"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"document": document})
 	})
 	handle("DELETE /api/comic-screenplays/projects/{id}", func(w http.ResponseWriter, req *http.Request, owner string) {
 		if err := store.DeleteProject(req.Context(), owner, req.PathValue("id")); err != nil {
@@ -478,6 +509,99 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		second, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoyunqueV3)
 		writeJSON(w, http.StatusOK, map[string]any{"storyboards": append(first, second...)})
 	})
+	type storyboardShotInput struct {
+		AfterShotID string  `json:"afterShotId"`
+		SceneID     int     `json:"sceneId"`
+		Duration    float64 `json:"durationSec"`
+		Characters  string  `json:"characters"`
+		Scene       string  `json:"scene"`
+		Props       string  `json:"props"`
+		VideoDesc   string  `json:"videoDesc"`
+	}
+	storyboardPath := func(w http.ResponseWriter, req *http.Request) (string, int, screenplay.StoryboardEngine, bool) {
+		episode, err := strconv.Atoi(req.PathValue("episode"))
+		if err != nil || episode <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "集数必须是大于 0 的整数"})
+			return "", 0, "", false
+		}
+		engine := screenplay.StoryboardEngine(strings.TrimSpace(req.PathValue("engine")))
+		if engine == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "分镜引擎不能为空"})
+			return "", 0, "", false
+		}
+		return req.PathValue("id"), episode, engine, true
+	}
+	toStoryboardShot := func(input storyboardShotInput) screenplay.StoryboardShot {
+		return screenplay.StoryboardShot{SceneID: input.SceneID, Duration: input.Duration, Characters: input.Characters, Scene: input.Scene, Props: input.Props, VideoDesc: input.VideoDesc}
+	}
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input storyboardShotInput
+		if !decode(w, req, &input) {
+			return
+		}
+		storyboard, err := screenplay.CreateStoryboardShot(req.Context(), store, owner, projectID, episode, engine, input.AfterShotID, toStoryboardShot(input))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"storyboard": storyboard})
+	})
+	handle("PATCH /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots/{shotID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input storyboardShotInput
+		if !decode(w, req, &input) {
+			return
+		}
+		storyboard, err := screenplay.UpdateStoryboardShot(req.Context(), store, owner, projectID, episode, engine, req.PathValue("shotID"), toStoryboardShot(input))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard})
+	})
+	handle("DELETE /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots/{shotID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		storyboard, err := screenplay.DeleteStoryboardShot(req.Context(), store, owner, projectID, episode, engine, req.PathValue("shotID"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots/{shotID}/split", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		storyboard, err := screenplay.SplitStoryboardShot(req.Context(), store, owner, projectID, episode, engine, req.PathValue("shotID"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots/{shotID}/merge-next", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		storyboard, err := screenplay.MergeStoryboardShotWithNext(req.Context(), store, owner, projectID, episode, engine, req.PathValue("shotID"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard})
+	})
 	handle("POST /api/comic-screenplays/projects/{id}/batch", func(w http.ResponseWriter, req *http.Request, owner string) {
 		projectID := req.PathValue("id")
 		project, err := store.GetProject(req.Context(), owner, projectID)
@@ -519,6 +643,19 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		}
 		logs, _ := store.ListBatchLogs(req.Context(), batch.ID, owner, 100)
 		writeJSON(w, http.StatusOK, map[string]any{"batch": batch, "steps": screenplay.StepDefinitions, "logs": logs})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/batch/run-next", func(w http.ResponseWriter, req *http.Request, owner string) {
+		executor := screenplay.BatchExecutor{
+			Store:     store,
+			Generator: screenplayTextGenerator{owner: owner, resolver: resolver},
+			Media:     mediaRunner,
+		}
+		result, err := executor.RunNext(req.Context(), owner, req.PathValue("id"))
+		if err != nil {
+			writeJSON(w, screenplayErrorStatus(err), map[string]any{"error": err.Error(), "batch": result.Batch, "unit": result.Unit})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	})
 	handle("POST /api/comic-screenplays/projects/{id}/batch/cancel", func(w http.ResponseWriter, req *http.Request, owner string) {
 		batch, err := store.MutateBatch(req.Context(), owner, req.PathValue("id"), func(batch *screenplay.Batch) error {
@@ -598,7 +735,7 @@ func readDOCXText(data []byte) (string, error) {
 	return out.String(), nil
 }
 
-func writeScreenplayError(w http.ResponseWriter, err error) {
+func screenplayErrorStatus(err error) int {
 	status := http.StatusInternalServerError
 	switch {
 	case strings.Contains(err.Error(), "已存在"):
@@ -612,5 +749,10 @@ func writeScreenplayError(w http.ResponseWriter, err error) {
 	case errors.Is(err, screenplay.ErrUserCancelled):
 		status = 499
 	}
+	return status
+}
+
+func writeScreenplayError(w http.ResponseWriter, err error) {
+	status := screenplayErrorStatus(err)
 	writeJSON(w, status, map[string]string{"error": strings.TrimSpace(err.Error())})
 }

@@ -154,7 +154,7 @@ test('comic style cover flow keeps every preview at its natural 3:4 height', () 
 
 test('comic style names stay readable on the white preview cards', () => {
   const stylesheet = fs.readFileSync(new URL('../shuihuo-production.css', import.meta.url), 'utf8');
-  assert.match(stylesheet, /\.batch-factory-comic-style-copy b\s*\{[^}]*color:\s*#1f1f1f[^}]*font-size:\s*13px/s);
+  assert.match(stylesheet, /\.batch-factory-comic-style-copy b\s*\{[^}]*color:\s*var\(--text-primary\)[^}]*font-size:\s*13px/s);
 });
 
 test('authenticated preview loader accepts built-in comic scene previews', () => {

@@ -8,9 +8,9 @@
   padding: 0 20px;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 999px;
-  color: #fff;
-  background: linear-gradient(115deg, #f07067, #d65386 50%, #5a8ed0);
-  box-shadow: 0 10px 28px rgba(214, 83, 134, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  color: var(--text-on-accent);
+  background: linear-gradient(115deg, var(--theme-primary), var(--theme-primary-hover));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--theme-primary) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   cursor: pointer;
   isolation: isolate;
   text-decoration: none;
@@ -63,9 +63,9 @@
 .gradient-btn__circle:last-child { right: 6%; bottom: -28px; background: rgba(144, 212, 255, 0.7); }
 
 .gradient-btn:hover {
-  color: #fff;
+  color: var(--text-on-accent);
   filter: brightness(1.1) saturate(1.08);
-  box-shadow: 0 14px 34px rgba(214, 83, 134, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--theme-primary) 42%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.38);
   transform: translateY(-2px);
 }
 
@@ -77,7 +77,7 @@
 .gradient-btn:hover .gradient-btn__circle { opacity: 0.78; transform: translate3d(-50%, -50%, 0) scale(1.2); }
 
 .gradient-btn:active { transform: translateY(0) scale(0.98); }
-.gradient-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.gradient-btn:focus-visible { outline: 2px solid var(--text-on-accent); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   .gradient-btn,

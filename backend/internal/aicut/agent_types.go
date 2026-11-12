@@ -32,6 +32,7 @@ const (
 )
 
 type AgentRun struct {
+	TimelineID        string        `json:"timelineId,omitempty"`
 	ID                string        `json:"id"`
 	ClientRequestID   string        `json:"clientRequestId"`
 	Owner             string        `json:"-"`
@@ -109,6 +110,10 @@ type ToolResult struct {
 }
 
 func normalizeAgentRun(run AgentRun) (AgentRun, error) {
+	run.TimelineID = strings.TrimSpace(run.TimelineID)
+	if run.TimelineID == DefaultTimelineID {
+		run.TimelineID = ""
+	}
 	run.ID = strings.TrimSpace(run.ID)
 	run.ClientRequestID = strings.TrimSpace(run.ClientRequestID)
 	run.Owner = strings.TrimSpace(run.Owner)
@@ -116,7 +121,7 @@ func normalizeAgentRun(run AgentRun) (AgentRun, error) {
 	run.Instruction = strings.TrimSpace(run.Instruction)
 	run.ModelID = strings.TrimSpace(run.ModelID)
 	run.ActiveSkillID = strings.TrimSpace(run.ActiveSkillID)
-	if run.ID == "" || run.ClientRequestID == "" || run.Owner == "" || run.ProjectID == "" || run.Instruction == "" || run.ExpectedRevision < 0 {
+	if run.ID == "" || run.ClientRequestID == "" || run.Owner == "" || run.ProjectID == "" || run.Instruction == "" || run.ExpectedRevision < 0 || len(run.TimelineID) > 64 {
 		return AgentRun{}, ErrInvalidAgentRun
 	}
 	if run.Mode != AgentModeAgent && run.Mode != AgentModeAsk {

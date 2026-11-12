@@ -15,19 +15,24 @@ import (
 )
 
 type AICutExportService struct {
-	store    aicut.Store
-	objects  agentworkspace.AssetObjectStore
-	notifier aicut.ExportNotifier
-	now      func() time.Time
-	mu       sync.Mutex
-	active   map[string]context.CancelFunc
+	store     aicut.Store
+	timelines *aicut.TimelineCollectionStore
+	objects   agentworkspace.AssetObjectStore
+	notifier  aicut.ExportNotifier
+	now       func() time.Time
+	mu        sync.Mutex
+	active    map[string]context.CancelFunc
 }
 
-func NewAICutExportService(store aicut.Store, objects agentworkspace.AssetObjectStore, notifier aicut.ExportNotifier, now func() time.Time) *AICutExportService {
+func NewAICutExportService(store aicut.Store, objects agentworkspace.AssetObjectStore, notifier aicut.ExportNotifier, now func() time.Time, collections ...*aicut.TimelineCollectionStore) *AICutExportService {
 	if now == nil {
 		now = time.Now
 	}
-	return &AICutExportService{store: store, objects: objects, notifier: notifier, now: now, active: map[string]context.CancelFunc{}}
+	var timelines *aicut.TimelineCollectionStore
+	if len(collections) > 0 {
+		timelines = collections[0]
+	}
+	return &AICutExportService{store: store, timelines: timelines, objects: objects, notifier: notifier, now: now, active: map[string]context.CancelFunc{}}
 }
 
 func (s *AICutExportService) Submit(ctx context.Context, owner string, project aicut.Project, timeline aicut.Timeline, format string, options aicut.ExportOptions) (aicut.ExportJob, error) {
@@ -41,6 +46,31 @@ func (s *AICutExportService) Submit(ctx context.Context, owner string, project a
 	options.BackgroundColor = ""
 	if owner == "" || project.ID == "" || timeline.Revision < 0 {
 		return aicut.ExportJob{}, errors.New("导出项目无效")
+	}
+	target := strings.TrimSpace(options.TimelineID)
+	requestTarget := aicutTimelineIDFromContext(ctx)
+	if requestTarget != aicut.DefaultTimelineID {
+		if target != "" && target != requestTarget {
+			return aicut.ExportJob{}, aicut.ErrTimelineJobUnsupported
+		}
+		target = requestTarget
+	}
+	if target == aicut.DefaultTimelineID {
+		target = ""
+	}
+	options.TimelineID = target
+	if target != "" {
+		if s.timelines == nil {
+			return aicut.ExportJob{}, aicut.ErrTimelineJobUnsupported
+		}
+		selected, err := s.timelines.Timeline(ctx, owner, project.ID, target)
+		if err != nil {
+			return aicut.ExportJob{}, err
+		}
+		if selected.Revision != timeline.Revision {
+			return aicut.ExportJob{}, aicut.ErrRevisionConflict
+		}
+		timeline = selected
 	}
 	jobs, err := s.store.ListExportJobs(ctx, owner, project.ID)
 	if err != nil {
@@ -70,14 +100,34 @@ func (s *AICutExportService) Submit(ctx context.Context, owner string, project a
 }
 
 func (s *AICutExportService) Job(ctx context.Context, owner, projectID, jobID string) (aicut.ExportJob, error) {
-	return s.store.ExportJob(ctx, owner, projectID, jobID)
+	job, err := s.store.ExportJob(ctx, owner, projectID, jobID)
+	if err != nil {
+		return aicut.ExportJob{}, err
+	}
+	if exportJobTimelineID(job) != aicutTimelineIDFromContext(ctx) {
+		return aicut.ExportJob{}, aicut.ErrExportJobNotFound
+	}
+	return job, nil
 }
 
 func (s *AICutExportService) List(ctx context.Context, owner, projectID string) ([]aicut.ExportJob, error) {
-	return s.store.ListExportJobs(ctx, owner, projectID)
+	jobs, err := s.store.ListExportJobs(ctx, owner, projectID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]aicut.ExportJob, 0, len(jobs))
+	for _, job := range jobs {
+		if exportJobTimelineID(job) == aicutTimelineIDFromContext(ctx) {
+			out = append(out, job)
+		}
+	}
+	return out, nil
 }
 
 func (s *AICutExportService) Cancel(ctx context.Context, owner, projectID, jobID string) (aicut.ExportJob, error) {
+	if _, err := s.Job(ctx, owner, projectID, jobID); err != nil {
+		return aicut.ExportJob{}, err
+	}
 	job, err := s.store.RequestExportCancel(ctx, owner, projectID, jobID, s.now().UTC())
 	if err != nil {
 		return aicut.ExportJob{}, err
@@ -178,4 +228,11 @@ func exportJobErrorStatus(err error) (int, string) {
 		return 404, "导出任务不存在"
 	}
 	return 500, fmt.Sprintf("导出任务操作失败：%v", err)
+}
+
+func exportJobTimelineID(job aicut.ExportJob) string {
+	if job.Options.TimelineID == "" {
+		return aicut.DefaultTimelineID
+	}
+	return job.Options.TimelineID
 }

@@ -1,19 +1,12 @@
 .bf11-scoped-settings {
-  --bf11-scope-line: var(--legacy-border, rgba(148, 163, 184, .22));
-  --bf11-scope-panel: var(--legacy-card, #101c2d);
-  --bf11-scope-soft: var(--legacy-panel, #152337);
-  --bf11-scope-muted: var(--legacy-muted, #91a1b7);
+  --bf11-scope-line: var(--border-default);
+  --bf11-scope-panel: var(--surface-panel);
+  --bf11-scope-soft: var(--surface-2);
+  --bf11-scope-muted: var(--text-tertiary);
   display: flex;
   flex-direction: column;
   gap: 10px;
   color: var(--text-primary);
-}
-
-[data-theme='light'] .bf11-scoped-settings {
-  --bf11-scope-line: var(--legacy-border, rgba(55, 73, 96, .15));
-  --bf11-scope-panel: var(--legacy-card, #fff);
-  --bf11-scope-soft: var(--legacy-panel, #f7f9fc);
-  --bf11-scope-muted: var(--legacy-muted, #68788d);
 }
 
 .bf11-inheritance-header {

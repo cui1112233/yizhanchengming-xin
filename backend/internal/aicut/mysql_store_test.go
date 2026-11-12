@@ -112,7 +112,7 @@ func TestMySQLStoreClaimsOldestQueuedASRJob(t *testing.T) {
 	now := time.Date(2026, 11, 9, 18, 0, 0, 0, time.UTC)
 	created := now.Add(-time.Minute)
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT id, owner_username, project_id, asset_id, model_id, language, expected_revision, state, progress").WillReturnRows(sqlmock.NewRows([]string{"id", "owner_username", "project_id", "asset_id", "model_id", "language", "expected_revision", "state", "progress", "error_message", "imported_count", "track_id", "created_at", "updated_at"}).AddRow("asr-1", "alice", "cut-1", "asset-1", "asr-main", "zh", 2, ASRQueued, 0, "", 0, "", created, created))
+	mock.ExpectQuery("SELECT id, owner_username, project_id, asset_id, model_id, language, expected_revision, state, progress").WillReturnRows(sqlmock.NewRows([]string{"id", "owner_username", "project_id", "asset_id", "model_id", "language", "expected_revision", "state", "progress", "error_message", "imported_count", "track_id", "created_at", "updated_at", "timeline_id"}).AddRow("asr-1", "alice", "cut-1", "asset-1", "asr-main", "zh", 2, ASRQueued, 0, "", 0, "", created, created, ""))
 	mock.ExpectExec("UPDATE aicut_asr_jobs SET state = \\?, progress = \\?, updated_at = \\?").WithArgs(ASRRunning, 5, now, "asr-1", "cut-1", "alice", ASRQueued).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	job, err := store.ClaimNextASRJob(context.Background(), now)

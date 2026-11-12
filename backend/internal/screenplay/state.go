@@ -292,7 +292,22 @@ func CompleteStep(b *Batch, unit Unit, artifacts []string) {
 		step.Status = StepDone
 		step.FinishedAt = &now
 	}
-	step.Artifacts = append(step.Artifacts, artifacts...)
+	// 重试同一个单元时，服务端可能再次返回已经保存过的产物。
+	// 这里去重，避免导出包和生产页出现重复视频地址。
+	seenArtifacts := make(map[string]struct{}, len(step.Artifacts)+len(artifacts))
+	for _, artifact := range step.Artifacts {
+		seenArtifacts[artifact] = struct{}{}
+	}
+	for _, artifact := range artifacts {
+		if artifact == "" {
+			continue
+		}
+		if _, exists := seenArtifacts[artifact]; exists {
+			continue
+		}
+		step.Artifacts = append(step.Artifacts, artifact)
+		seenArtifacts[artifact] = struct{}{}
+	}
 	step.Error = ""
 	b.Status = aggregateStatus(b)
 	b.CurrentEpisode = 0
@@ -327,6 +342,31 @@ func FailStep(b *Batch, unit Unit, message string) {
 	b.LastError = message
 	b.Status = aggregateStatus(b)
 	b.UpdatedAt = now
+}
+
+// PauseStep 把正在执行的最小单元退回可继续状态，并把批次标为 paused。
+// 已经由外部服务持久化的产物不删除，继续任务时只重跑当前未完成单元。
+func PauseStep(b *Batch, unit Unit) {
+	if b == nil {
+		return
+	}
+	step := b.Step(unit.StepKey)
+	if step != nil {
+		step.Status = StepPending
+		step.Error = ""
+		step.FinishedAt = nil
+		if unit.Episode > 0 && step.Episodes != nil {
+			if episode := step.Episodes[unit.Episode]; episode != nil {
+				episode.Status = StepPending
+				episode.Reason = ""
+				episode.UpdatedAt = nowUTC()
+			}
+		}
+	}
+	b.Status = BatchPaused
+	b.CurrentEpisode = 0
+	b.LastError = ""
+	b.UpdatedAt = nowUTC()
 }
 
 // ApplyDoctorReview 落实医生闸门：只有 pass=false && block_next_step=true 才阻断。

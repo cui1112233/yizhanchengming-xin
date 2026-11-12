@@ -1,32 +1,18 @@
 .bf11-workbench {
-  --bf11-bg: var(--legacy-bg, #0b1421);
-  --bf11-panel: var(--legacy-card, #101c2d);
-  --bf11-soft: var(--legacy-panel, #152337);
-  --bf11-input: var(--legacy-input, #0e1928);
-  --bf11-line: var(--legacy-border, rgba(148, 163, 184, .2));
-  --bf11-line-strong: var(--legacy-border-strong, rgba(148, 163, 184, .34));
-  --bf11-text: var(--legacy-text, #e5edf7);
-  --bf11-muted: var(--legacy-muted, #91a1b7);
-  --bf11-accent: var(--legacy-accent, #7c6cff);
-  --bf11-success: var(--legacy-success, #37c98b);
-  --bf11-danger: var(--legacy-danger, #ee7777);
+  --bf11-bg: var(--surface-base);
+  --bf11-panel: var(--surface-panel);
+  --bf11-soft: var(--surface-2);
+  --bf11-input: var(--surface-input);
+  --bf11-line: var(--border-default);
+  --bf11-line-strong: var(--border-strong);
+  --bf11-text: var(--text-primary);
+  --bf11-muted: var(--text-tertiary);
+  --bf11-accent: var(--theme-primary);
+  --bf11-success: var(--text-success);
+  --bf11-danger: var(--text-danger);
   width: 100%;
   min-width: 0;
   color: var(--bf11-text);
-}
-
-[data-theme='light'] .bf11-workbench {
-  --bf11-bg: var(--legacy-bg, #f4f7fb);
-  --bf11-panel: var(--legacy-card, #fff);
-  --bf11-soft: var(--legacy-panel, #f7f9fc);
-  --bf11-input: var(--legacy-input, #fff);
-  --bf11-line: var(--legacy-border, rgba(55, 73, 96, .15));
-  --bf11-line-strong: var(--legacy-border-strong, rgba(55, 73, 96, .27));
-  --bf11-text: var(--legacy-text, #182333);
-  --bf11-muted: var(--legacy-muted, #68788d);
-  --bf11-accent: var(--legacy-accent, #2563eb);
-  --bf11-success: var(--legacy-success, #168e74);
-  --bf11-danger: var(--legacy-danger, #c2413b);
 }
 
 .bf11-workbench .ant-typography,
@@ -48,7 +34,7 @@
 .bf11-card {
   border: 1px solid var(--bf11-line);
   background: color-mix(in srgb, var(--bf11-panel) 96%, transparent);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+  box-shadow: var(--shadow-1);
 }
 
 .bf11-batch-header {
@@ -180,7 +166,7 @@
 .bf11-card-title > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .bf11-card-title strong,
 .bf11-card-title small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bf11-card-title small { color: var(--bf11-muted); font-size: 11px; }
+.bf11-card-title small { color: var(--text-tertiary); font-size: 11px; }
 .bf11-drag-icon { color: var(--bf11-muted); flex: 0 0 auto; }
 .bf11-card-body { height: calc(100% - 44px); min-height: 0; overflow: auto; padding: 11px; }
 .bf11-resize-handle {
@@ -327,4 +313,5 @@
 .bf11-shot-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
 .bf11-shot-media-slot { display: flex; min-height: 130px; flex-direction: column; justify-content: center; gap: 8px; padding: 8px; border: 1px dashed var(--bf11-line); border-radius: 8px; overflow: hidden; }
 .bf11-shot-media-slot img, .bf11-shot-media-slot video { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 6px; background: #0b1020; }
+/* ^ 媒体预览底：始终深色，避免浅色主题下视频黑边与容器出现亮边。 */
 @media (max-width: 620px) { .bf11-shot-media-grid { grid-template-columns: 1fr; } }

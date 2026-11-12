@@ -108,12 +108,21 @@ func textPatch(value any, fallback string, max int) (string, error) {
 	return text, nil
 }
 
+// 主题偏好是「风格-深浅」组合 id；老值 light/dark/system 继续保留，
+// 让升级前存下的账号资料仍能通过校验，前端统一映射到珊瑚方案。
 var memberThemeIDs = map[string]struct{}{
 	"system": {}, "dark": {}, "light": {},
+	"coral-system": {}, "coral-light": {}, "coral-dark": {},
+	"ocean-system": {}, "ocean-light": {}, "ocean-dark": {},
+	"graphite-system": {}, "graphite-light": {}, "graphite-dark": {},
+	"violet-system": {}, "violet-light": {}, "violet-dark": {},
+	"glass-system": {}, "glass-light": {}, "glass-dark": {},
 }
 
 var memberWindowBackgroundIDs = map[string]struct{}{
-	"none": {}, "default": {}, "preset2": {}, "preset3": {}, "preset4": {}, "preset5": {}, "custom": {},
+	"none": {}, "default": {}, "preset2": {}, "preset3": {}, "preset4": {}, "preset5": {},
+	"preset6": {}, "preset7": {}, "preset8": {}, "preset9": {}, "custom": {},
+	"cinema-auto": {}, "cinema-0": {}, "cinema-1": {}, "cinema-2": {}, "cinema-3": {},
 }
 
 func memberWindowBackgroundPatch(value any) (string, error) {

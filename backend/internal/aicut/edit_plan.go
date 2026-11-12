@@ -41,6 +41,7 @@ const (
 )
 
 type EditPlanRequest struct {
+	TimelineID         string   `json:"timelineId,omitempty"`
 	AssetIDs           []string `json:"assetIds"`
 	Goal               string   `json:"goal"`
 	TargetDurationMS   int64    `json:"targetDurationMs,omitempty"`
@@ -77,6 +78,7 @@ type EditOperation struct {
 }
 
 type EditPlan struct {
+	TimelineID      string          `json:"timelineId,omitempty"`
 	ID              string          `json:"id"`
 	ClientRequestID string          `json:"clientRequestId"`
 	Owner           string          `json:"-"`
@@ -95,6 +97,7 @@ type EditPlan struct {
 }
 
 type EditPlanEnvelope struct {
+	TimelineID      string
 	ID              string
 	ClientRequestID string
 	Owner           string
@@ -239,6 +242,20 @@ func normalizeEditOperation(operation EditOperation) (EditOperation, error) {
 }
 
 func NormalizeEditPlan(plan EditPlan) (EditPlan, error) {
+	plan.TimelineID = strings.TrimSpace(plan.TimelineID)
+	if plan.TimelineID == DefaultTimelineID {
+		plan.TimelineID = ""
+	}
+	if plan.TimelineID == "" {
+		plan.TimelineID = strings.TrimSpace(plan.Request.TimelineID)
+		if plan.TimelineID == DefaultTimelineID {
+			plan.TimelineID = ""
+		}
+	}
+	if len(plan.TimelineID) > 64 || (plan.Request.TimelineID != "" && canonicalASRTimeline(plan.Request.TimelineID) != canonicalASRTimeline(plan.TimelineID)) {
+		return EditPlan{}, ErrInvalidEditPlan
+	}
+	plan.Request.TimelineID = plan.TimelineID
 	plan.ID = strings.TrimSpace(plan.ID)
 	plan.ClientRequestID = strings.TrimSpace(plan.ClientRequestID)
 	plan.Owner = strings.TrimSpace(plan.Owner)
@@ -299,7 +316,7 @@ func ParseEditPlanModelOutput(raw string, envelope EditPlanEnvelope) (EditPlan, 
 		return EditPlan{}, ErrInvalidEditPlan
 	}
 	plan := EditPlan{
-		ID: envelope.ID, ClientRequestID: envelope.ClientRequestID, Owner: envelope.Owner, ProjectID: envelope.ProjectID,
+		TimelineID: envelope.TimelineID, ID: envelope.ID, ClientRequestID: envelope.ClientRequestID, Owner: envelope.Owner, ProjectID: envelope.ProjectID,
 		BaseRevision: envelope.BaseRevision, ModelID: envelope.ModelID, State: EditPlanReady, Request: envelope.Request,
 		Summary: payload.Summary, Operations: payload.Operations, Warnings: payload.Warnings,
 		CreatedAt: envelope.CreatedAt, UpdatedAt: envelope.UpdatedAt,

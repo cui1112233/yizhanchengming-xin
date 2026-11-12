@@ -6,20 +6,26 @@ import { ConfigProvider } from 'antd';
 import 'antd/dist/reset.css';
 import '../shared/styles/global.css';
 import '../shared/styles/v88-tokens.css';
+import '../shared/styles/theme-schemes.css';
 import '../shared/styles/v88-ui.css';
 import '../shared/styles/account-center-visual-rebuild.css';
-import { createAntTheme } from '../shared/styles/theme';
+import { createAntTheme, parseThemeId } from '../shared/styles/theme';
 import { SettingsPage } from './pages/SettingsPage';
 import ApiConfigPage from './pages/ApiConfigPage';
+import { HomePage } from './pages/HomePage';
 import { isCatalogModelAvailable } from './pages/apiConfigCatalogMerge';
 
 const params = new URLSearchParams(window.location.search);
 const theme = params.get('theme') === 'light' ? 'light' : 'dark';
+const scheme = params.get('scheme') || 'coral';
 // ?view=account 渲染个人中心「API 配置」页（渠道密钥 + 模型目录），默认仍是设置页。
 const view = params.get('view');
 const width = Number(params.get('width'));
 
 document.documentElement.dataset.theme = theme;
+document.documentElement.dataset.scheme = scheme;
+// 首页预览按真实布局补上 shell 标记，保证 [data-shell='user'] 下的样式与线上一致。
+if (view === 'home') document.documentElement.dataset.shell = 'user';
 if (Number.isFinite(width) && width > 0) {
   document.documentElement.style.setProperty('--preview-width', `${width}px`);
 }
@@ -193,13 +199,28 @@ window.fetch = (input, init) => {
   return originalFetch(input, init);
 };
 
+// 预览页允许现场切风格：与真实布局一样只改 html[data-scheme] 与 antd token。
+function PreviewRoot() {
+  const [preference, setPreference] = React.useState(`${scheme}-${theme}`);
+  React.useEffect(() => {
+    const parsed = parseThemeId(preference);
+    document.documentElement.dataset.scheme = parsed.scheme;
+    if (parsed.mode !== 'system') document.documentElement.dataset.theme = parsed.mode;
+  }, [preference]);
+  return (
+    <ConfigProvider theme={createAntTheme(preference, theme)}>
+      {view === 'home'
+        ? <HomePage isLoggedIn={false} onOpenLogin={() => {}} theme={parseThemeId(preference).mode === 'light' ? 'light' : 'dark'} />
+        : view === 'account'
+          ? <ApiConfigPage />
+          : <SettingsPage themePreference={preference} onThemeChange={setPreference} />}
+    </ConfigProvider>
+  );
+}
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ConfigProvider theme={createAntTheme(theme, theme)}>
-      {view === 'account'
-        ? <ApiConfigPage />
-        : <SettingsPage themePreference={theme} onThemeChange={() => {}} />}
-    </ConfigProvider>
+    <PreviewRoot />
   </React.StrictMode>
 );
 

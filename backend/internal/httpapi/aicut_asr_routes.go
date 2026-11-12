@@ -32,9 +32,9 @@ func RegisterAICutASRRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.Sto
 		if !decodeAICutJSON(w, req, &input) {
 			return
 		}
-		job, err := service.Submit(req.Context(), owner, aicut.ASRSubmit{ProjectID: req.PathValue("id"), AssetID: input.AssetID, ModelID: input.ModelID, Language: input.Language, ExpectedRevision: input.ExpectedRevision})
+		job, err := service.Submit(req.Context(), owner, aicut.ASRSubmit{ProjectID: req.PathValue("id"), TimelineID: aicutTimelineIDFromContext(req.Context()), AssetID: input.AssetID, ModelID: input.ModelID, Language: input.Language, ExpectedRevision: input.ExpectedRevision})
 		if err != nil {
-			if errors.Is(err, aicut.ErrProjectNotFound) || errors.Is(err, aicut.ErrAssetNotFound) {
+			if errors.Is(err, aicut.ErrProjectNotFound) || errors.Is(err, aicut.ErrAssetNotFound) || errors.Is(err, aicut.ErrTimelineNotFound) || errors.Is(err, aicut.ErrRevisionConflict) {
 				writeAICutError(w, err)
 				return
 			}
@@ -44,7 +44,7 @@ func RegisterAICutASRRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.Sto
 		writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 	})
 	handle("GET /api/ai-cut/projects/{id}/asr-jobs", func(w http.ResponseWriter, req *http.Request, owner string) {
-		jobs, err := store.ListASRJobs(req.Context(), owner, req.PathValue("id"))
+		jobs, err := service.ListForTimeline(req.Context(), owner, req.PathValue("id"), aicutTimelineIDFromContext(req.Context()))
 		if err != nil {
 			writeAICutError(w, err)
 			return
@@ -52,7 +52,7 @@ func RegisterAICutASRRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.Sto
 		writeJSON(w, http.StatusOK, map[string]any{"jobs": jobs})
 	})
 	handle("GET /api/ai-cut/projects/{id}/asr-jobs/{jobID}", func(w http.ResponseWriter, req *http.Request, owner string) {
-		job, err := store.ASRJob(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"))
+		job, err := service.JobForTimeline(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"), aicutTimelineIDFromContext(req.Context()))
 		if err != nil {
 			writeAICutError(w, err)
 			return
@@ -60,7 +60,7 @@ func RegisterAICutASRRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.Sto
 		writeJSON(w, http.StatusOK, map[string]any{"job": job})
 	})
 	handle("POST /api/ai-cut/projects/{id}/asr-jobs/{jobID}/cancel", func(w http.ResponseWriter, req *http.Request, owner string) {
-		job, err := service.Cancel(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"))
+		job, err := service.CancelForTimeline(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"), aicutTimelineIDFromContext(req.Context()))
 		if err != nil {
 			writeAICutError(w, err)
 			return

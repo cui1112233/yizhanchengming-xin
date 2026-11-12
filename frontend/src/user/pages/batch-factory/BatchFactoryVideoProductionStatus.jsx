@@ -512,10 +512,10 @@ export function BatchFactoryBatchProductionStatus({ batch }) {
             <Tag color={selectedMeta.color}>{matchedRows.length} 本</Tag>
             <Button type="link" size="small" onClick={() => setStatusFilter('all')}>清除筛选</Button>
           </Space>
-          {matchedRows.length ? <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid rgba(127,127,127,0.18)', borderRadius: 8 }}>
+          {matchedRows.length ? <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 8 }}>
             {matchedRows.map((row, index) => <div
               key={row.item.id}
-              style={{ padding: '9px 12px', borderBottom: index === matchedRows.length - 1 ? 'none' : '1px solid rgba(127,127,127,0.12)' }}
+              style={{ padding: '9px 12px', borderBottom: index === matchedRows.length - 1 ? 'none' : '1px solid var(--border-default)' }}
             >
               <Space wrap>
                 <Typography.Text strong>{row.item.title}</Typography.Text>

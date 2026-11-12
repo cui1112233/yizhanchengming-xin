@@ -24,6 +24,16 @@ test('标题阴影和背景板生成真实浏览器样式', () => {
   assert.equal(style.padding, '0.18em 0.35em');
 });
 
+test('small preview scales text, spacing, outlines and mixed text runs using the same canvas unit', () => {
+  const unit = 'var(--aicut-preview-px, 1px)';
+  const style = aicutTextPreviewStyle({ fontSize: 54, strokeWidth: 3, letterSpacing: 2, shadowOffsetX: 4, shadowOffsetY: 6, shadowBlur: 8 }, unit);
+  assert.equal(style.fontSize, `calc(54 * ${unit})`);
+  assert.equal(style.letterSpacing, `calc(2 * ${unit})`);
+  assert.ok(style.WebkitTextStroke.startsWith(`calc(3 * ${unit})`));
+  assert.ok(style.textShadow.startsWith(`calc(4 * ${unit}) calc(6 * ${unit}) calc(8 * ${unit})`));
+  assert.equal(aicutTextRunStyleAt({ textRuns: [{ start: 0, end: 2, fontSize: 80 }] }, 1, unit).fontSize, `calc(80 * ${unit})`);
+});
+
 test('打字机和逐字高亮按片段进度逐字推进', () => {
   assert.deepEqual(textAnimationFrame('剪辑开始', 'typewriter', 500, 1000), { visibleText: '剪辑', highlightedCount: 0 });
   assert.deepEqual(textAnimationFrame('剪辑开始', 'word-highlight', 750, 1000), { visibleText: '剪辑开始', highlightedCount: 3 });

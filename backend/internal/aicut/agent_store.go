@@ -46,7 +46,11 @@ func (s *MemoryAgentStore) CreateAgentRun(_ context.Context, run AgentRun) (Agen
 	defer s.mu.Unlock()
 	key := agentRequestKey(normalized.Owner, normalized.ProjectID, normalized.ClientRequestID)
 	if id := s.requests[key]; id != "" {
-		return s.runs[id], nil
+		existing := s.runs[id]
+		if canonicalASRTimeline(existing.TimelineID) != canonicalASRTimeline(normalized.TimelineID) {
+			return AgentRun{}, ErrInvalidAgentRun
+		}
+		return existing, nil
 	}
 	s.runs[normalized.ID] = normalized
 	s.requests[key] = normalized.ID
@@ -188,4 +192,23 @@ func (s *MemoryAgentStore) SaveAgentToolResult(_ context.Context, owner, project
 		s.tools[key] = result
 	}
 	return nil
+}
+
+func (s *MemoryAgentStore) AgentTimelineMessages(_ context.Context, o, p, id string, limit int) ([]AgentMessage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []AgentMessage{}
+	for _, m := range s.messages {
+		run, ok := s.runs[m.RunID]
+		if ok && m.Owner == o && m.ProjectID == p && canonicalASRTimeline(run.TimelineID) == canonicalASRTimeline(id) {
+			out = append(out, m)
+		}
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	if len(out) > limit {
+		out = out[len(out)-limit:]
+	}
+	return out, nil
 }

@@ -100,13 +100,13 @@ export function normalizeAICutTextRuns(value = []) {
 	})).filter((run) => run.end > run.start).sort((left, right) => left.start - right.start || left.end - right.end);
 }
 
-export function aicutTextRunStyleAt(value, index) {
+export function aicutTextRunStyleAt(value, index, previewUnit) {
 	const runs = normalizeAICutTextRuns(value?.textRuns);
 	const run = runs.filter((item) => index >= item.start && index < item.end).at(-1);
 	if (!run) return undefined;
 	return {
 		color: run.textColor,
-		fontSize: `${run.fontSize}px`,
+		fontSize: previewUnit ? `calc(${run.fontSize} * ${previewUnit})` : `${run.fontSize}px`,
 		fontWeight: run.bold ? 700 : 400,
 		fontStyle: run.italic ? 'italic' : 'normal'
 	};
@@ -142,20 +142,21 @@ export function textAnimationFrame(text, animation, elapsedMs, durationMs) {
   return { visibleText: characters.join(''), highlightedCount: 0 };
 }
 
-export function aicutTextPreviewStyle(value = {}) {
+export function aicutTextPreviewStyle(value = {}, previewUnit) {
   const style = normalizeAICutTextStyle(value);
+  const pixels = (value) => previewUnit ? `calc(${value} * ${previewUnit})` : `${value}px`;
   const hasBackground = style.backgroundColor.length === 7 || style.backgroundColor.slice(7) !== '00';
   const hasShadow = style.shadowOffsetX !== 0 || style.shadowOffsetY !== 0 || style.shadowBlur !== 0;
   return {
     fontFamily: style.fontFamily,
-    fontSize: `${style.fontSize}px`,
+    fontSize: pixels(style.fontSize),
     color: style.textColor,
-    WebkitTextStroke: style.strokeWidth ? `${style.strokeWidth}px ${style.strokeColor}` : undefined,
+    WebkitTextStroke: style.strokeWidth ? `${pixels(style.strokeWidth)} ${style.strokeColor}` : undefined,
     backgroundColor: style.backgroundColor,
-    textShadow: hasShadow ? `${style.shadowOffsetX}px ${style.shadowOffsetY}px ${style.shadowBlur}px ${style.shadowColor}` : undefined,
+    textShadow: hasShadow ? `${pixels(style.shadowOffsetX)} ${pixels(style.shadowOffsetY)} ${pixels(style.shadowBlur)} ${style.shadowColor}` : undefined,
     padding: hasBackground ? '0.18em 0.35em' : undefined,
     borderRadius: hasBackground ? '0.12em' : undefined,
-    letterSpacing: `${style.letterSpacing}px`,
+    letterSpacing: pixels(style.letterSpacing),
     lineHeight: style.lineHeight,
     textAlign: style.textAlign
   };

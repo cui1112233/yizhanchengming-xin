@@ -5,7 +5,7 @@ import { Link } from '../components/Link';
 import { ThemePicker } from '../components/ThemePicker';
 import { getCurrentAccount, logout } from '../api/auth';
 import { updateMemberProfile } from '../api/member';
-import { createAntTheme, resolveThemeId } from '../styles/theme';
+import { createAntTheme, resolveSchemeId, resolveThemeId } from '../styles/theme';
 import { loadCachedTheme, persistCachedTheme, selectThemePreference } from '../styles/theme-preference.js';
 
 const navItems = [
@@ -37,6 +37,7 @@ export function AdminLayout({ children }) {
   const [systemMode, setSystemMode] = useState(initialSystemMode);
   const pathname = window.location.pathname;
   const resolvedTheme = resolveThemeId(theme, systemMode);
+  const themeScheme = resolveSchemeId(theme);
 
   useEffect(() => {
     getCurrentAccount().then(nextAccount => {
@@ -58,7 +59,8 @@ export function AdminLayout({ children }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme;
-  }, [resolvedTheme]);
+    document.documentElement.dataset.scheme = themeScheme;
+  }, [resolvedTheme, themeScheme]);
 
   useEffect(() => {
     const query = window.matchMedia?.('(prefers-color-scheme: light)');
@@ -69,8 +71,14 @@ export function AdminLayout({ children }) {
   }, []);
 
   useEffect(() => {
+    document.documentElement.dataset.shell = 'admin';
     document.body.classList.add('admin-theme-active');
-    return () => document.body.classList.remove('admin-theme-active');
+    return () => {
+      document.body.classList.remove('admin-theme-active');
+      delete document.documentElement.dataset.shell;
+      delete document.documentElement.dataset.theme;
+      delete document.documentElement.dataset.scheme;
+    };
   }, []);
 
   async function handleLogout() {

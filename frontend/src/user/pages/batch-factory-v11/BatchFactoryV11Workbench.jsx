@@ -68,18 +68,18 @@ const statusTone = {
 };
 
 const statusColor = {
-  待开始: '#94a3b8',
-  待审核: '#d4a72c',
-  AI处理中: '#7c6cff',
-  待生成: '#8b5cf6',
-  排队中: '#3b82f6',
-  生成中: '#2f9ee8',
-  异常: '#ee7777',
-  待合并: '#22b8cf',
-  已合并: '#37c98b',
-  待上传: '#4f7cff',
-  已发布: '#37c98b',
-  已完成: '#37c98b'
+  待开始: 'var(--text-tertiary)',
+  待审核: 'var(--text-warning)',
+  AI处理中: 'var(--tag-purple-text)',
+  待生成: 'var(--tag-purple-text)',
+  排队中: 'var(--text-link)',
+  生成中: 'var(--text-link)',
+  异常: 'var(--text-danger)',
+  待合并: 'var(--text-link)',
+  已合并: 'var(--text-success)',
+  待上传: 'var(--text-link)',
+  已发布: 'var(--text-success)',
+  已完成: 'var(--text-success)'
 };
 
 function loadStoredLayout() {

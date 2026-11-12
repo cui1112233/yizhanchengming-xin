@@ -1,4 +1,5 @@
 import { reportClientError } from '../error-reporting.js';
+import { ACCOUNT_PREVIEW_KEY } from './account-session-cache.js';
 import { normalizeLocalExecutorsResponse } from './localExecutors.js';
 import { getSelectedNovelFetchAccount, isNovelFetchScopedPath } from './novelFetchAccountScope.js';
 
@@ -9,6 +10,7 @@ export function getToken() {
 }
 
 export function setToken(token) {
+  if (getToken() !== (token || '')) localStorage.removeItem(ACCOUNT_PREVIEW_KEY);
   if (token) {
     localStorage.setItem('auth_token', token);
   } else {

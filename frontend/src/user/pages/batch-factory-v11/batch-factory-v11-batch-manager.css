@@ -1,17 +1,11 @@
 .bf11-batch-manager-pane {
-  --bf11-manager-line: var(--legacy-border, rgba(148, 163, 184, .22));
-  --bf11-manager-panel: var(--legacy-card, #101c2d);
-  --bf11-manager-soft: var(--legacy-panel, #152337);
+  --bf11-manager-line: var(--border-default);
+  --bf11-manager-panel: var(--surface-panel);
+  --bf11-manager-soft: var(--surface-2);
   display: flex;
   flex-direction: column;
   gap: 12px;
   color: var(--text-primary);
-}
-
-[data-theme='light'] .bf11-batch-manager-pane {
-  --bf11-manager-line: var(--legacy-border, rgba(55, 73, 96, .15));
-  --bf11-manager-panel: var(--legacy-card, #fff);
-  --bf11-manager-soft: var(--legacy-panel, #f7f9fc);
 }
 
 .bf11-batch-intake-card,

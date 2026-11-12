@@ -2,9 +2,10 @@ import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal }
 import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Puzzle, Scissors, Settings2 } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
+import { WindowVideoBackground } from '../components/WindowVideoBackground';
 import { Link } from '../components/Link';
 import { ProductUpdateModal } from '../components/ProductUpdateModal';
-import { getCurrentAccount, getCurrentUsername, login, loginWithPasskey, logout } from '../api/auth';
+import { getCachedAccount, getCurrentAccount, getCurrentUsername, login, loginWithPasskey, logout } from '../api/auth';
 import { getToken } from '../api/client';
 import { getConfig } from '../api/config';
 import { updateMemberProfile, uploadMemberWindowBackground } from '../api/member';
@@ -12,10 +13,11 @@ import { avatarDisplay } from '../avatars';
 import { CmPenguinCompanion } from '../pet/CmPenguinCompanion';
 import { dispatchPetContext } from '../pet/stacky';
 import { GLOBAL_STATUS_EVENT, GLOBAL_TASK_NOTIFICATION_EVENT, normalizeGlobalTaskNotification } from '../notifications/globalTaskCenter.js';
-import { createAntTheme, resolveThemeId } from '../styles/theme';
+import { createAntTheme, resolveSchemeId, resolveThemeId } from '../styles/theme';
 import { loadCachedTheme, persistCachedTheme, selectThemePreference } from '../styles/theme-preference.js';
-import { normalizeWindowBackgroundId, windowBackgroundStyle } from '../styles/window-background.js';
+import { applyWindowBackgroundMotion, effectiveWindowBackgroundMotion, normalizeWindowBackgroundId, readWindowBackgroundMotion, windowBackgroundStyle, windowVideoDefinition } from '../styles/window-background.js';
 import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAccess.js';
+import { navigateToHomeLogin } from './loginNavigation.js';
 import { AccountCenterLayout } from './AccountCenterLayout';
 import WorkModeMenu from './WorkModeMenu';
 import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
@@ -31,6 +33,7 @@ const navItems = [
   // Novel Fetch is served as the Go-embedded canonical workbench. Force a
   // document navigation so the SPA cannot swap in a stale React-only page.
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
+  { href: '/novel-creation', icon: FilePenLine, label: '小说创作' },
   { href: '/batch-factory', icon: Clapperboard, label: '水货生产' },
   { href: '/comic-screenplay', icon: FilePenLine, label: '漫剧创作' },
   { href: '/agent', icon: Bot, label: 'CM 画布' },
@@ -75,7 +78,7 @@ function expiringHeaderStatus(text, tone = 'info', durationMs) {
 
 export function UserLayout({ children }) {
   const [username, setUsername] = useState(getCurrentUsername());
-  const [account, setAccount] = useState(null);
+  const [account, setAccount] = useState(getCachedAccount);
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [loginForm] = Form.useForm();
@@ -103,9 +106,11 @@ export function UserLayout({ children }) {
   const accountSessionKey = username || 'anonymous';
   const visibleNavItems = navItems;
   const resolvedTheme = resolveThemeId(theme, systemMode);
+  const themeScheme = resolveSchemeId(theme);
   const windowBackgroundUrl = account?.windowBackgroundUrl || '';
   const windowBackgroundId = normalizeWindowBackgroundId(account?.windowBackgroundId, windowBackgroundUrl);
-  const shellBackgroundStyle = windowBackgroundStyle(windowBackgroundId, windowBackgroundUrl);
+  const shellBackgroundStyle = windowBackgroundStyle(windowBackgroundId, windowBackgroundUrl, resolvedTheme);
+  const videoBackgroundClass = windowVideoDefinition(windowBackgroundId) ? ' has-video-background' : '';
   const content = isValidElement(children)
     ? cloneElement(
       children,
@@ -116,7 +121,19 @@ export function UserLayout({ children }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme;
-  }, [resolvedTheme]);
+    document.documentElement.dataset.scheme = themeScheme;
+  }, [resolvedTheme, themeScheme]);
+
+  useEffect(() => {
+    applyWindowBackgroundMotion(effectiveWindowBackgroundMotion(windowBackgroundId, readWindowBackgroundMotion()));
+  }, [windowBackgroundId]);
+
+  useEffect(() => {
+    const sync = () => document.documentElement.classList.toggle('window-bg-paused', document.hidden);
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia?.('(prefers-color-scheme: light)');
@@ -217,14 +234,20 @@ export function UserLayout({ children }) {
   }, [globalStatus]);
 
   useEffect(() => {
+    document.documentElement.dataset.shell = 'user';
     document.body.classList.add('user-theme-active');
-    return () => document.body.classList.remove('user-theme-active');
+    return () => {
+      document.body.classList.remove('user-theme-active');
+      delete document.documentElement.dataset.shell;
+      delete document.documentElement.dataset.theme;
+      delete document.documentElement.dataset.scheme;
+    };
   }, []);
 
   useEffect(() => {
     if (!isLoggedIn) return undefined;
     const refreshProfile = () => {
-      getCurrentAccount().then(currentAccount => {
+      getCurrentAccount({ force: true }).then(currentAccount => {
         setUsername(currentAccount.username);
         setAccount(currentAccount);
       }).catch(() => {});
@@ -261,7 +284,7 @@ export function UserLayout({ children }) {
         Modal.warning({
           className: 'auth-expired-modal',
           title: '登录已失效',
-          content: '当前登录状态已失效，请重新登录后继续使用。登录后将返回当前页面。',
+          content: '当前登录状态已失效，请在首页重新登录后继续使用。',
           okText: '重新登录',
           onOk: () => { setLoginDialogOpen(true); dialogOpen = false; },
           afterClose: () => { dialogOpen = false; }
@@ -329,7 +352,7 @@ export function UserLayout({ children }) {
       }).catch(error => {
         if (!isCurrentSession()) return;
         if (String(error.message).includes('登录已失效')) showLogin();
-        else setAccount(null);
+        // A transient network failure must not discard an already rendered preview.
       });
     }
     return () => {
@@ -340,8 +363,8 @@ export function UserLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    if (routeAccess.shouldPromptLogin) setLoginDialogOpen(true);
-  }, [routeAccess.shouldPromptLogin]);
+    if (routeAccess.shouldPromptLogin) openLoginDialog();
+  }, [routeAccess.shouldPromptLogin, pathname]);
 
   async function handleLogin(values) {
     accountSessionGenerationRef.current += 1;
@@ -388,7 +411,7 @@ export function UserLayout({ children }) {
   }
 
   function openLoginDialog() {
-    setLoginDialogOpen(true);
+    navigateToHomeLogin(() => setLoginDialogOpen(true));
   }
 
   function updateLoginCardParallax(event) {
@@ -438,11 +461,12 @@ export function UserLayout({ children }) {
     setAccount(current => current ? { ...current, ...result.member } : result.member);
   }
 
-  const showLoginCard = !isLoggedIn && (isHome || loginDialogOpen);
+  const showLoginCard = !isLoggedIn && isHome && loginDialogOpen;
   const pageContent = routeAccess.canRenderPage ? content : null;
   const loginOverlay = showLoginCard ? (
     <div className="legacy-login-overlay nebula-login-overlay">
       <div className="login-modal nebula-login-modal" ref={loginCardRef} onPointerMove={updateLoginCardParallax} onPointerLeave={resetLoginCardParallax}>
+        <button type="button" aria-label="关闭登录窗口" onClick={() => setLoginDialogOpen(false)} style={{ position: 'absolute', top: 12, right: 16, background: 'transparent', border: 0, color: '#fff', fontSize: 24, cursor: 'pointer', zIndex: 2 }}>×</button>
         <div className="nebula-login-brand"><BrandLogo /></div>
         <h1>一战晟铭登录</h1>
         <p className="nebula-login-subtitle">继续你的创作工作流</p>
@@ -473,7 +497,7 @@ export function UserLayout({ children }) {
   if (isHome) {
     return (
       <ConfigProvider theme={createAntTheme(theme, systemMode)}>
-        <div className={`home-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}`} style={shellBackgroundStyle}>
+        <div className={`home-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}${windowBackgroundId === 'custom' ? ' is-custom-window-background' : ''}`} style={shellBackgroundStyle}>
           {isValidElement(children) ? cloneElement(children, { theme, isLoggedIn, onOpenLogin: openLoginDialog }) : content}
           {loginOverlay}
           <ProductUpdateModal enabled={isLoggedIn} />
@@ -485,7 +509,10 @@ export function UserLayout({ children }) {
   if (isAccountCenterRoute) {
     return (
       <ConfigProvider theme={createAntTheme(theme, systemMode)}>
-        <AccountCenterLayout account={account} username={username} avatar={displayAvatar} pathname={pathname} onReturn={returnToWorkbench} onLogout={handleLogout}>{pageContent}</AccountCenterLayout>
+        <div className={`legacy-shell account-center-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}${windowBackgroundId === 'custom' ? ' is-custom-window-background' : ''}${videoBackgroundClass}`} style={shellBackgroundStyle}>
+          <WindowVideoBackground backgroundId={windowBackgroundId} />
+          <AccountCenterLayout account={account} username={username} avatar={displayAvatar} pathname={pathname} onReturn={returnToWorkbench} onLogout={handleLogout}>{pageContent}</AccountCenterLayout>
+        </div>
         {loginOverlay}
         <ProductUpdateModal enabled={isLoggedIn} />
       </ConfigProvider>
@@ -494,7 +521,8 @@ export function UserLayout({ children }) {
 
   return (
     <ConfigProvider theme={createAntTheme(theme, systemMode)}>
-      <div className={`legacy-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}`} style={shellBackgroundStyle}>
+      <div className={`legacy-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}${windowBackgroundId === 'custom' ? ' is-custom-window-background' : ''}${videoBackgroundClass}`} style={shellBackgroundStyle}>
+      <WindowVideoBackground backgroundId={windowBackgroundId} />
       <aside className={`legacy-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="legacy-brand">
           <button
@@ -526,7 +554,7 @@ export function UserLayout({ children }) {
           })}
         </nav>
         <div className="legacy-sidebar-tools">
-          <Link href="/settings" className="legacy-sidebar-tool" title="设置">
+          <Link href="/settings" className={`legacy-sidebar-tool${pathname.startsWith('/settings') ? ' active' : ''}`} title="设置">
             <span className="legacy-nav-icon"><Settings2 size={18} strokeWidth={1.8} aria-hidden="true" /></span>
             <span className="legacy-nav-label">设置</span>
           </Link>

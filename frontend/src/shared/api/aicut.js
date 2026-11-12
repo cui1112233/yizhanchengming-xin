@@ -1,4 +1,7 @@
-import { apiRequest } from './client.js';
+import { apiRequest as baseApiRequest } from './client.js';
+import { scopedAICutOptions } from './aicutTimelineScope.js';
+
+const apiRequest = (path, options = {}) => baseApiRequest(path, scopedAICutOptions(path, options));
 
 function projectPath(projectId, suffix = '') {
   const id = String(projectId || '').trim();
@@ -444,4 +447,18 @@ export async function getAICutAudioAnalysis(projectId, assetId, points = 240, re
   const query = new URLSearchParams({ assetId: id, points: String(pointCount) });
   const response = await request(projectPath(projectId, `/audio-analysis?${query}`), { timeoutMs: 0 });
   return response?.analysis;
+}
+
+export async function alignAICutMultiCamAudio(projectId, input = {}, request = apiRequest) {
+  const assetIds = input.assetIds;
+  const referenceAssetId = input.referenceAssetId;
+  const windowMs = input.windowMs ?? 30000;
+  const maxLagMs = input.maxLagMs ?? 5000;
+  if (!Array.isArray(assetIds) || assetIds.length < 2 || assetIds.length > 9 || assetIds.some(id => typeof id !== 'string' || !id.trim() || id !== id.trim()) || new Set(assetIds).size !== assetIds.length) throw new Error('请选择2到9个不同的自有视频机位');
+  if (!assetIds.includes(referenceAssetId)) throw new Error('参考机位须在所选机位中');
+  if (!Number.isSafeInteger(windowMs) || windowMs < 2000 || windowMs > 60000 || !Number.isSafeInteger(maxLagMs) || maxLagMs < 20 || maxLagMs > 10000) throw new Error('分析时长须为2000到60000毫秒，最大偏移须为20到10000毫秒');
+  return request(projectPath(projectId, '/multicam-sync'), {
+    method: 'POST', timeoutMs: 100000, signal: input.signal, suppressGlobalError: true,
+    body: JSON.stringify({ assetIds, referenceAssetId, windowMs, maxLagMs }),
+  });
 }

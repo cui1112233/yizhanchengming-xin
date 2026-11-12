@@ -1,4 +1,6 @@
-import { apiRequest } from './client.js';
+import { apiRequest as baseApiRequest } from './client.js';
+import { scopedAICutOptions } from './aicutTimelineScope.js';
+const apiRequest = (path, options = {}) => baseApiRequest(path, scopedAICutOptions(path, options));
 
 const safeIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const supportedRatios = new Set(['9:16', '16:9', '1:1']);

@@ -284,3 +284,18 @@ func TestPendingEpisodeInitiallyOne(t *testing.T) {
 		t.Fatalf("nextEpisode = %d, want 3（失败集可重跑）", got)
 	}
 }
+
+func TestCompleteStepDoesNotDuplicateArtifactsOnRetry(t *testing.T) {
+	batch := NewBatch("project-1", "owner", "session-1", "batch-1", PermissionBypass)
+	unit := Unit{StepKey: "0_ingest"}
+	if err := StartStep(batch, unit); err != nil {
+		t.Fatalf("StartStep: %v", err)
+	}
+	CompleteStep(batch, unit, []string{"source://project-1"})
+	CompleteStep(batch, unit, []string{"source://project-1", "document://doc-1"})
+
+	got := batch.Step("0_ingest").Artifacts
+	if len(got) != 2 || got[0] != "source://project-1" || got[1] != "document://doc-1" {
+		t.Fatalf("unexpected deduplicated artifacts: %#v", got)
+	}
+}

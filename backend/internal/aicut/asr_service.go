@@ -13,6 +13,7 @@ import (
 )
 
 type ASRSubmit struct {
+	TimelineID       string
 	ProjectID        string
 	AssetID          string
 	ModelID          string
@@ -28,6 +29,7 @@ type ASRNotifier interface {
 }
 
 type ASRServiceOptions struct {
+	Timelines       *TimelineCollectionStore
 	Store           Store
 	OpenObject      ASRObjectOpenFunc
 	ResolveProvider ASRProviderResolver
@@ -36,6 +38,7 @@ type ASRServiceOptions struct {
 }
 
 type ASRService struct {
+	timelines       *TimelineCollectionStore
 	store           Store
 	openObject      ASRObjectOpenFunc
 	resolveProvider ASRProviderResolver
@@ -49,7 +52,7 @@ func NewASRService(options ASRServiceOptions) *ASRService {
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	return &ASRService{store: options.Store, openObject: options.OpenObject, resolveProvider: options.ResolveProvider, notifier: options.Notifier, now: options.Now, active: map[string]context.CancelFunc{}}
+	return &ASRService{store: options.Store, timelines: options.Timelines, openObject: options.OpenObject, resolveProvider: options.ResolveProvider, notifier: options.Notifier, now: options.Now, active: map[string]context.CancelFunc{}}
 }
 
 func newASRID(prefix string) string {
@@ -68,6 +71,19 @@ func (s *ASRService) Submit(ctx context.Context, owner string, input ASRSubmit) 
 	if owner == "" || input.ProjectID == "" || input.AssetID == "" || input.ModelID == "" || input.ExpectedRevision < 0 {
 		return ASRJob{}, errors.New("请选择语音素材和 ASR 模型")
 	}
+	input.TimelineID = strings.TrimSpace(input.TimelineID)
+	if input.TimelineID == DefaultTimelineID {
+		input.TimelineID = ""
+	}
+	if input.TimelineID != "" {
+		v, err := s.timeline(ctx, owner, input.ProjectID, input.TimelineID)
+		if err != nil {
+			return ASRJob{}, err
+		}
+		if v.Revision != input.ExpectedRevision {
+			return ASRJob{}, ErrRevisionConflict
+		}
+	}
 	asset, err := s.store.Asset(ctx, owner, input.ProjectID, input.AssetID)
 	if err != nil {
 		return ASRJob{}, err
@@ -80,12 +96,12 @@ func (s *ASRService) Submit(ctx context.Context, owner string, input ASRSubmit) 
 		return ASRJob{}, err
 	}
 	for _, existing := range jobs {
-		if existing.AssetID == input.AssetID && (existing.State == ASRQueued || existing.State == ASRRunning || existing.State == ASRCancelRequested) {
+		if existing.AssetID == input.AssetID && canonicalASRTimeline(existing.TimelineID) == canonicalASRTimeline(input.TimelineID) && (existing.State == ASRQueued || existing.State == ASRRunning || existing.State == ASRCancelRequested) {
 			return ASRJob{}, errors.New("该素材正在识别字幕，请等待当前任务完成或先取消")
 		}
 	}
 	now := s.now().UTC()
-	job := ASRJob{ID: newASRID("aicut-asr"), Owner: owner, ProjectID: input.ProjectID, AssetID: input.AssetID, ModelID: input.ModelID, Language: strings.TrimSpace(input.Language), ExpectedRevision: input.ExpectedRevision, State: ASRQueued, Progress: 0, CreatedAt: now, UpdatedAt: now}
+	job := ASRJob{ID: newASRID("aicut-asr"), Owner: owner, ProjectID: input.ProjectID, TimelineID: input.TimelineID, AssetID: input.AssetID, ModelID: input.ModelID, Language: strings.TrimSpace(input.Language), ExpectedRevision: input.ExpectedRevision, State: ASRQueued, Progress: 0, CreatedAt: now, UpdatedAt: now}
 	if err := s.store.CreateASRJob(ctx, owner, job); err != nil {
 		return ASRJob{}, err
 	}
@@ -100,6 +116,12 @@ func (s *ASRService) Submit(ctx context.Context, owner string, input ASRSubmit) 
 }
 
 func (s *ASRService) Cancel(ctx context.Context, owner, projectID, jobID string) (ASRJob, error) {
+	return s.CancelForTimeline(ctx, owner, projectID, jobID, DefaultTimelineID)
+}
+func (s *ASRService) CancelForTimeline(ctx context.Context, owner, projectID, jobID, timelineID string) (ASRJob, error) {
+	if _, err := s.JobForTimeline(ctx, owner, projectID, jobID, timelineID); err != nil {
+		return ASRJob{}, err
+	}
 	job, err := s.store.RequestASRCancel(ctx, owner, projectID, jobID, s.now().UTC())
 	if err != nil {
 		return ASRJob{}, err
@@ -168,7 +190,7 @@ func (s *ASRService) ProcessNext(ctx context.Context) error {
 	if errors.Is(jobCtx.Err(), context.Canceled) || (latestErr == nil && (latest.State == ASRCancelRequested || latest.State == ASRCanceled)) {
 		return fail(context.Canceled)
 	}
-	current, err := s.store.Timeline(jobCtx, job.Owner, job.ProjectID)
+	current, err := s.timeline(jobCtx, job.Owner, job.ProjectID, job.TimelineID)
 	if err != nil {
 		return fail(err)
 	}
@@ -179,10 +201,58 @@ func (s *ASRService) ProcessNext(ctx context.Context) error {
 	if err != nil {
 		return fail(err)
 	}
-	if _, err := s.store.SaveTimeline(jobCtx, job.Owner, job.ProjectID, prepared, job.ExpectedRevision, s.now().UTC()); err != nil {
+	if _, err := s.saveTimeline(jobCtx, job.Owner, job.ProjectID, job.TimelineID, prepared, job.ExpectedRevision, s.now().UTC()); err != nil {
 		return fail(err)
 	}
 	job = job.WithState(ASRSucceeded, 100, "", s.now())
 	job.Imported, job.TrackID = len(cues), trackID
 	return s.store.UpdateASRJob(jobCtx, job)
+}
+
+func canonicalASRTimeline(id string) string {
+	if strings.TrimSpace(id) == "" {
+		return DefaultTimelineID
+	}
+	return strings.TrimSpace(id)
+}
+func (s *ASRService) timeline(ctx context.Context, o, p, id string) (Timeline, error) {
+	if canonicalASRTimeline(id) == DefaultTimelineID {
+		return s.store.Timeline(ctx, o, p)
+	}
+	if s.timelines == nil {
+		return Timeline{}, ErrTimelineJobUnsupported
+	}
+	return s.timelines.Timeline(ctx, o, p, id)
+}
+func (s *ASRService) saveTimeline(ctx context.Context, o, p, id string, v Timeline, rev int64, now time.Time) (Timeline, error) {
+	if canonicalASRTimeline(id) == DefaultTimelineID {
+		return s.store.SaveTimeline(ctx, o, p, v, rev, now)
+	}
+	if s.timelines == nil {
+		return Timeline{}, ErrTimelineJobUnsupported
+	}
+	return s.timelines.Save(ctx, o, p, id, v, rev, now)
+}
+func (s *ASRService) JobForTimeline(ctx context.Context, o, p, jobID, id string) (ASRJob, error) {
+	job, e := s.store.ASRJob(ctx, o, p, jobID)
+	if e != nil {
+		return ASRJob{}, e
+	}
+	if canonicalASRTimeline(job.TimelineID) != canonicalASRTimeline(id) {
+		return ASRJob{}, ErrASRJobNotFound
+	}
+	return job, nil
+}
+func (s *ASRService) ListForTimeline(ctx context.Context, o, p, id string) ([]ASRJob, error) {
+	jobs, e := s.store.ListASRJobs(ctx, o, p)
+	if e != nil {
+		return nil, e
+	}
+	out := make([]ASRJob, 0, len(jobs))
+	for _, job := range jobs {
+		if canonicalASRTimeline(job.TimelineID) == canonicalASRTimeline(id) {
+			out = append(out, job)
+		}
+	}
+	return out, nil
 }

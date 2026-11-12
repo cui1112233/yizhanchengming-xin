@@ -1,7 +1,27 @@
 import { theme as antdTheme } from 'antd';
-import { listThemeDefinitions, normalizeThemeId, resolveThemeId, themeDefinition } from './theme-catalog.js';
+import {
+  composeThemeId,
+  listThemeModes,
+  listThemeSchemes,
+  normalizeThemeId,
+  parseThemeId,
+  resolveSchemeId,
+  resolveThemeId,
+  schemeDefinition,
+  themeDefinition
+} from './theme-catalog.js';
 
-export { listThemeDefinitions, normalizeThemeId, resolveThemeId, themeDefinition };
+export {
+  composeThemeId,
+  listThemeModes,
+  listThemeSchemes,
+  normalizeThemeId,
+  parseThemeId,
+  resolveSchemeId,
+  resolveThemeId,
+  schemeDefinition,
+  themeDefinition
+};
 
 const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif';
 
@@ -10,7 +30,7 @@ export function createAntTheme(mode, systemMode = 'dark') {
   const isDark = resolveThemeId(mode, systemMode) === 'dark';
   // 浮层派生色：统一从语义令牌取，避免 antd 用浅色算法推导深色组件。
   const overlaySurface = tokens.surfaceElevated;
-  const subtleSurface = isDark ? tokens.surfaceElevated : tokens.background;
+  const subtleSurface = tokens.surface2;
   const overlayShadow = isDark
     ? '0 12px 32px rgba(0, 0, 0, 0.55)'
     : '0 12px 32px rgba(23, 32, 51, 0.14)';
@@ -32,7 +52,8 @@ export function createAntTheme(mode, systemMode = 'dark') {
       colorBgLayout: tokens.background,
       colorBgContainerDisabled: tokens.surfaceDisabled,
       colorBgSpotlight: isDark ? tokens.surfaceElevated : tokens.textPrimary,
-      colorTextLightSolid: isDark ? tokens.textPrimary : tokens.surface,
+      // 主色实心上的文字由风格决定（珊瑚用深墨、青/蓝/紫用白），不再一律用近白字。
+      colorTextLightSolid: tokens.textOnAccent,
       colorBorder: tokens.border,
       colorBorderSecondary: tokens.borderStrong,
       colorSplit: tokens.border,
@@ -40,9 +61,9 @@ export function createAntTheme(mode, systemMode = 'dark') {
       colorLink: tokens.info,
       colorSuccess: tokens.success,
       colorWarning: tokens.warning,
-      controlItemBgHover: subtleSurface,
-      controlItemBgActive: subtleSurface,
-      controlItemBgActiveHover: subtleSurface,
+      controlItemBgHover: tokens.surfaceHover,
+      controlItemBgActive: tokens.surfaceActive,
+      controlItemBgActiveHover: tokens.surfaceActive,
       boxShadow: overlayShadow,
       boxShadowSecondary: overlayShadow,
       boxShadowTertiary: overlayShadow,
@@ -63,13 +84,14 @@ export function createAntTheme(mode, systemMode = 'dark') {
       },
       Select: {
         selectorBg: tokens.surface,
-        optionActiveBg: subtleSurface,
-        optionSelectedBg: tokens.nodeSurface
+        optionActiveBg: tokens.surfaceHover,
+        optionSelectedBg: tokens.surfaceActive
       },
       Table: {
         headerBg: subtleSurface,
         headerColor: tokens.textSecondary,
-        rowHoverBg: subtleSurface,
+        rowHoverBg: tokens.surfaceHover,
+        rowSelectedBg: tokens.surfaceActive,
         borderColor: tokens.border,
         headerSplitColor: tokens.border
       },
@@ -97,25 +119,12 @@ export function createAntTheme(mode, systemMode = 'dark') {
   };
 }
 
-// V88 视觉统一：主色改为青绿，珊瑚降级为强调/警示，靛蓝只给信息与链接。
-// 只在启用页面（第一批 /tts）通过 ConfigProvider 局部生效，不改变全站默认主题。
-export const v88Palette = {
-  primary: '#63dfc0',
-  primaryHover: '#7de8cf',
-  primaryActive: '#4fcbb0',
-  emphasis: '#f07167',
-  danger: '#ff9b9d',
-  success: '#75ddb4',
-  warning: '#ffd08a',
-  info: '#9da8ff'
-};
-
-export function createV88AntTheme(mode = 'dark') {
-  const base = createAntTheme(mode);
+// V88 页面只补充自己的圆角与控件高度；颜色、深浅算法、组件皮肤全部继承外层
+// ConfigProvider（UserLayout 的 createAntTheme）。风格切换因此不需要逐页改 JSX，
+// 也不会因为页面 useMemo 依赖没变而拿到过期色板。
+export function createV88AntTheme() {
   return {
-    ...base,
     token: {
-      ...base.token,
       borderRadius: 9,
       controlHeight: 36
     }

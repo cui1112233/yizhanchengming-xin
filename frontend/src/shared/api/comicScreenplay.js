@@ -18,6 +18,31 @@ function assetPath(projectId, assetId) {
   return projectPath(projectId, `/assets/${id}`);
 }
 
+function documentPath(projectId, documentId, suffix = '') {
+  const id = String(documentId || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(id)) throw new Error('剧本版本无效');
+  return projectPath(projectId, `/documents/${id}${suffix}`);
+}
+
+function storyboardShotPath(projectId, engine, episodeNo, shotId = '', suffix = '') {
+  const engineId = String(engine || '').trim();
+  if (!/^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$/.test(engineId)) throw new Error('分镜引擎无效');
+  const episode = Number(episodeNo);
+  if (!Number.isInteger(episode) || episode <= 0) throw new Error('分镜集数无效');
+  let path = projectPath(projectId, `/storyboards/${engineId}/${episode}/shots`);
+  if (shotId !== '') {
+    const id = String(shotId || '').trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(id)) throw new Error('分镜镜头无效');
+    path += `/${id}`;
+  }
+  return path + suffix;
+}
+
+function validateStoryboardShotInput(input) {
+  if (!(Number(input?.durationSec) > 0)) throw new Error('镜头时长必须大于 0 秒');
+  if (![input?.characters, input?.scene, input?.props, input?.videoDesc].some(value => String(value || '').trim())) throw new Error('分镜内容不能为空');
+}
+
 function validateAssetInput(input) {
   if (!['character', 'scene', 'prop'].includes(input?.type)) throw new Error('资产类型无效');
   if (!String(input?.name || '').trim()) throw new Error('资产名称不能为空');
@@ -52,6 +77,18 @@ export async function updateComicScreenplay(projectId, input, request = apiReque
 export async function saveComicScreenplaySource(projectId, content, request = apiRequest) {
   const response = await request(projectPath(projectId, '/source'), { method: 'PUT', body: JSON.stringify({ content: String(content ?? '') }) });
   return response?.project;
+}
+
+export async function saveComicScreenplayDocument(projectId, content, request = apiRequest) {
+  const normalized = String(content ?? '').trim();
+  if (!normalized) throw new Error('剧本内容不能为空');
+  const response = await request(projectPath(projectId, '/document'), { method: 'PUT', body: JSON.stringify({ content: normalized }) });
+  return response?.document;
+}
+
+export async function restoreComicScreenplayDocument(projectId, documentId, request = apiRequest) {
+  const response = await request(documentPath(projectId, documentId, '/restore'), { method: 'POST' });
+  return response?.document;
 }
 
 export async function loadComicScreenplayWorkspace(projectId, request = apiRequest) {
@@ -118,12 +155,43 @@ export async function generateComicStoryboard(projectId, input, request = apiReq
   return request(projectPath(projectId, '/storyboards/generate'), { method: 'POST', timeoutMs: 0, signal: input?.signal, body: JSON.stringify({ ...input, confirmed: true }) });
 }
 
+export async function createComicStoryboardShot(projectId, engine, episodeNo, input, request = apiRequest) {
+  validateStoryboardShotInput(input);
+  const response = await request(storyboardShotPath(projectId, engine, episodeNo), { method: 'POST', body: JSON.stringify(input) });
+  return response?.storyboard;
+}
+
+export async function updateComicStoryboardShot(projectId, engine, episodeNo, shotId, input, request = apiRequest) {
+  validateStoryboardShotInput(input);
+  const response = await request(storyboardShotPath(projectId, engine, episodeNo, shotId), { method: 'PATCH', body: JSON.stringify(input) });
+  return response?.storyboard;
+}
+
+export async function splitComicStoryboardShot(projectId, engine, episodeNo, shotId, request = apiRequest) {
+  const response = await request(storyboardShotPath(projectId, engine, episodeNo, shotId, '/split'), { method: 'POST', body: '{}' });
+  return response?.storyboard;
+}
+
+export async function mergeComicStoryboardShot(projectId, engine, episodeNo, shotId, request = apiRequest) {
+  const response = await request(storyboardShotPath(projectId, engine, episodeNo, shotId, '/merge-next'), { method: 'POST', body: '{}' });
+  return response?.storyboard;
+}
+
+export async function deleteComicStoryboardShot(projectId, engine, episodeNo, shotId, request = apiRequest) {
+  const response = await request(storyboardShotPath(projectId, engine, episodeNo, shotId), { method: 'DELETE' });
+  return response?.storyboard;
+}
+
 export async function startComicScreenplayBatch(projectId, request = apiRequest) {
   return request(projectPath(projectId, '/batch'), { method: 'POST', body: '{}' });
 }
 
 export async function getComicScreenplayBatch(projectId, request = apiRequest) {
   return request(projectPath(projectId, '/batch'));
+}
+
+export async function runComicScreenplayBatchNext(projectId, signal, request = apiRequest) {
+  return request(projectPath(projectId, '/batch/run-next'), { method: 'POST', timeoutMs: 0, signal, body: '{}' });
 }
 
 export async function cancelComicScreenplayBatch(projectId, request = apiRequest) {

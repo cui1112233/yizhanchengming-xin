@@ -566,13 +566,13 @@ func (s *MySQLStore) Asset(ctx context.Context, owner, projectID, id string) (As
 	return asset, err
 }
 
-const asrJobColumns = `id, owner_username, project_id, asset_id, model_id, language, expected_revision, state, progress, COALESCE(error_message, ''), imported_count, track_id, created_at, updated_at`
+const asrJobColumns = `id, owner_username, project_id, asset_id, model_id, language, expected_revision, state, progress, COALESCE(error_message, ''), imported_count, track_id, created_at, updated_at, timeline_id`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanASRJob(row rowScanner) (ASRJob, error) {
 	var job ASRJob
-	err := row.Scan(&job.ID, &job.Owner, &job.ProjectID, &job.AssetID, &job.ModelID, &job.Language, &job.ExpectedRevision, &job.State, &job.Progress, &job.Error, &job.Imported, &job.TrackID, &job.CreatedAt, &job.UpdatedAt)
+	err := row.Scan(&job.ID, &job.Owner, &job.ProjectID, &job.AssetID, &job.ModelID, &job.Language, &job.ExpectedRevision, &job.State, &job.Progress, &job.Error, &job.Imported, &job.TrackID, &job.CreatedAt, &job.UpdatedAt, &job.TimelineID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ASRJob{}, ErrASRJobNotFound
 	}
@@ -586,7 +586,7 @@ func (s *MySQLStore) CreateASRJob(ctx context.Context, owner string, job ASRJob)
 	if _, err := s.Project(ctx, owner, job.ProjectID); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO aicut_asr_jobs (id, project_id, owner_username, asset_id, model_id, language, expected_revision, state, progress, error_message, imported_count, track_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, job.ID, job.ProjectID, owner, job.AssetID, job.ModelID, job.Language, job.ExpectedRevision, job.State, job.Progress, job.Error, job.Imported, job.TrackID, job.CreatedAt, job.UpdatedAt)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO aicut_asr_jobs (id, project_id, owner_username, asset_id, model_id, language, expected_revision, state, progress, error_message, imported_count, track_id, created_at, updated_at, timeline_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, job.ID, job.ProjectID, owner, job.AssetID, job.ModelID, job.Language, job.ExpectedRevision, job.State, job.Progress, job.Error, job.Imported, job.TrackID, job.CreatedAt, job.UpdatedAt, job.TimelineID)
 	return err
 }
 

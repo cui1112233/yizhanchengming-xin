@@ -1,5 +1,7 @@
 package storage
 
+import "qiantie/backend/internal/aicut"
+
 func AICutMigrations() []Migration {
 	return []Migration{{
 		Version: 8800018,
@@ -284,5 +286,17 @@ func AICutMigrations() []Migration {
   KEY idx_aicut_export_project (project_id, owner_username, created_at),
   CONSTRAINT fk_aicut_export_project FOREIGN KEY (project_id, owner_username) REFERENCES aicut_projects(id, owner_username) ON DELETE CASCADE
 ) ENGINE=InnoDB`},
+	}, {
+		Version:          8800030,
+		CallbackChecksum: "aicut-named-timelines-v1",
+		SQL:              aicut.TimelineCollectionSchemaStatements(),
+	}, {
+		Version:          8800031,
+		CallbackChecksum: "aicut-asr-timeline-target-v1",
+		SQL:              []string{`ALTER TABLE aicut_asr_jobs ADD COLUMN timeline_id VARCHAR(64) NOT NULL DEFAULT '' AFTER project_id`},
+	}, {
+		Version:          8800032,
+		CallbackChecksum: "aicut-agent-timeline-target-v1",
+		SQL:              []string{`ALTER TABLE aicut_agent_runs ADD COLUMN timeline_id VARCHAR(64) NOT NULL DEFAULT '' AFTER project_id`},
 	}}
 }

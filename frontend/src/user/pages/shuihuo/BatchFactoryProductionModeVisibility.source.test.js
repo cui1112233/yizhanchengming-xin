@@ -39,9 +39,9 @@ test('unified settings switch production mode beside the title without a media t
 
 test('production mode switch uses distinct visible colors for video and comic', () => {
   assert.match(unifiedSource, /batch-factory-production-mode-switch is-\$\{productionMode\}/);
-  assert.match(stylesheet, /\.batch-factory-production-mode-switch\.is-video[\s\S]*#1677ff/);
-  assert.match(stylesheet, /\.batch-factory-production-mode-switch\.is-comic[\s\S]*#e85d75/);
-  assert.match(stylesheet, /\.ant-segmented-item-selected[\s\S]*color:\s*#fff/);
+  assert.match(stylesheet, /\.batch-factory-production-mode-switch\.is-video[\s\S]*var\(--text-link\)/);
+  assert.match(stylesheet, /\.batch-factory-production-mode-switch\.is-comic[\s\S]*var\(--text-danger\)/);
+  assert.match(stylesheet, /\.ant-segmented-item-selected[\s\S]*color:\s*var\(--surface-base\)/);
 });
 
 test('comic mode owns comic generation prompts inside AI reasoning', () => {

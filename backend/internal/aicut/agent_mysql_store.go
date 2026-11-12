@@ -14,10 +14,17 @@ func (s *MySQLStore) CreateAgentRun(ctx context.Context, run AgentRun) (AgentRun
 	if err != nil {
 		return AgentRun{}, err
 	}
-	_, err = s.db.ExecContext(ctx, `INSERT INTO aicut_agent_runs (id, client_request_id, project_id, owner_username, instruction, mode, model_id, active_skill_id, expected_revision, state, turn_count, error_message, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, normalized.ID, normalized.ClientRequestID, normalized.ProjectID, normalized.Owner, normalized.Instruction, normalized.Mode, normalized.ModelID, normalized.ActiveSkillID, normalized.ExpectedRevision, normalized.State, normalized.TurnCount, normalized.Error, normalized.CreatedAt, normalized.UpdatedAt)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO aicut_agent_runs (id, client_request_id, project_id, owner_username, instruction, mode, model_id, active_skill_id, expected_revision, state, turn_count, error_message, created_at, updated_at, timeline_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, normalized.ID, normalized.ClientRequestID, normalized.ProjectID, normalized.Owner, normalized.Instruction, normalized.Mode, normalized.ModelID, normalized.ActiveSkillID, normalized.ExpectedRevision, normalized.State, normalized.TurnCount, normalized.Error, normalized.CreatedAt, normalized.UpdatedAt, normalized.TimelineID)
 	var mysqlErr *mysql.MySQLError
 	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
-		return s.agentRunByClientRequest(ctx, normalized.Owner, normalized.ProjectID, normalized.ClientRequestID)
+		existing, e := s.agentRunByClientRequest(ctx, normalized.Owner, normalized.ProjectID, normalized.ClientRequestID)
+		if e != nil {
+			return AgentRun{}, e
+		}
+		if canonicalASRTimeline(existing.TimelineID) != canonicalASRTimeline(normalized.TimelineID) {
+			return AgentRun{}, ErrInvalidAgentRun
+		}
+		return existing, nil
 	}
 	if err != nil {
 		return AgentRun{}, err
@@ -30,7 +37,7 @@ type agentRunScanner interface{ Scan(...any) error }
 func scanAgentRun(scanner agentRunScanner) (AgentRun, error) {
 	var run AgentRun
 	var cancelRequested sql.NullTime
-	err := scanner.Scan(&run.ID, &run.ClientRequestID, &run.Owner, &run.ProjectID, &run.Instruction, &run.Mode, &run.ModelID, &run.ActiveSkillID, &run.ExpectedRevision, &run.State, &run.TurnCount, &run.Error, &cancelRequested, &run.CreatedAt, &run.UpdatedAt)
+	err := scanner.Scan(&run.ID, &run.ClientRequestID, &run.Owner, &run.ProjectID, &run.Instruction, &run.Mode, &run.ModelID, &run.ActiveSkillID, &run.ExpectedRevision, &run.State, &run.TurnCount, &run.Error, &cancelRequested, &run.CreatedAt, &run.UpdatedAt, &run.TimelineID)
 	if err != nil {
 		return AgentRun{}, err
 	}
@@ -41,7 +48,7 @@ func scanAgentRun(scanner agentRunScanner) (AgentRun, error) {
 	return run, nil
 }
 
-const agentRunColumns = `id, client_request_id, owner_username, project_id, instruction, mode, model_id, active_skill_id, expected_revision, state, turn_count, COALESCE(error_message, ''), cancel_requested_at, created_at, updated_at`
+const agentRunColumns = `id, client_request_id, owner_username, project_id, instruction, mode, model_id, active_skill_id, expected_revision, state, turn_count, COALESCE(error_message, ''), cancel_requested_at, created_at, updated_at, timeline_id`
 
 func (s *MySQLStore) agentRunByClientRequest(ctx context.Context, owner, projectID, clientRequestID string) (AgentRun, error) {
 	run, err := scanAgentRun(s.db.QueryRowContext(ctx, `SELECT `+agentRunColumns+` FROM aicut_agent_runs WHERE owner_username = ? AND project_id = ? AND client_request_id = ?`, owner, projectID, clientRequestID))
@@ -203,3 +210,29 @@ func (s *MySQLStore) SaveAgentToolResult(ctx context.Context, owner, projectID, 
 }
 
 var _ AgentStore = (*MySQLStore)(nil)
+
+func (s *MySQLStore) AgentTimelineMessages(ctx context.Context, o, p, id string, limit int) ([]AgentMessage, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	if canonicalASRTimeline(id) == DefaultTimelineID {
+		id = ""
+	}
+	rows, e := s.db.QueryContext(ctx, `SELECT m.id, m.run_id, m.project_id, m.owner_username, m.role, m.content, m.tool_name, m.tool_call_id, m.created_at FROM aicut_agent_messages m INNER JOIN aicut_agent_runs r ON r.id = m.run_id AND r.owner_username = m.owner_username AND r.project_id = m.project_id WHERE m.owner_username = ? AND m.project_id = ? AND r.timeline_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT ?`, o, p, id, limit)
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	out := []AgentMessage{}
+	for rows.Next() {
+		var m AgentMessage
+		if e = rows.Scan(&m.ID, &m.RunID, &m.ProjectID, &m.Owner, &m.Role, &m.Content, &m.ToolName, &m.ToolCallID, &m.CreatedAt); e != nil {
+			return nil, e
+		}
+		out = append(out, m)
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, rows.Err()
+}

@@ -47,11 +47,11 @@ test('小说获取浅色主题覆盖旧深色控件和处理面板', () => {
 });
 
 test('任务表选中行在深浅主题下保持可读且固定列颜色一致', () => {
-  assert.match(css, /\[data-theme='dark'\] \.novel-fetch-task-table \.ant-table-tbody > tr\.ant-table-row-selected > td[^{]*\{[^}]*background:\s*rgba\(38,116,191,\.18\)\s*!important[^}]*color:\s*var\(--text-primary\)\s*!important/s);
-  assert.match(css, /\[data-theme='dark'\] \.novel-fetch-task-table \.ant-table-tbody > tr\.ant-table-row-selected:hover > td[^{]*\{[^}]*background:\s*rgba\(38,116,191,\.18\)\s*!important/s);
-  assert.match(css, /\[data-theme='light'\] \.novel-fetch-task-table \.ant-table-tbody > tr\.ant-table-row-selected > td[^{]*\{[^}]*background:\s*rgba\(22,119,255,\.09\)\s*!important[^}]*color:\s*var\(--text-primary\)\s*!important/s);
-  assert.match(css, /\[data-theme='dark'\] \.novel-fetch-task-table \.ant-table-row-selected \.ant-table-cell-fix-(?:left|right)[^{]*\{[^}]*background:\s*#1b2b42\s*!important/s);
-  assert.match(css, /\[data-theme='light'\] \.novel-fetch-task-table \.ant-table-row-selected \.ant-table-cell-fix-(?:left|right)[^{]*\{[^}]*background:\s*#eaf3ff\s*!important/s);
+  assert.match(css, /\[data-theme='dark'\] \.novel-fetch-task-table \.ant-table-tbody > tr\.ant-table-row-selected > td[^{]*\{[^}]*background:\s*var\(--status-info-bg\)\s*!important[^}]*color:\s*var\(--text-primary\)\s*!important/s);
+  assert.match(css, /\[data-theme='dark'\] \.novel-fetch-task-table \.ant-table-tbody > tr\.ant-table-row-selected:hover > td[^{]*\{[^}]*background:\s*var\(--status-info-bg\)\s*!important/s);
+  assert.match(css, /\[data-theme='light'\] \.novel-fetch-task-table \.ant-table-tbody > tr\.ant-table-row-selected > td[^{]*\{[^}]*background:\s*var\(--status-info-bg\)\s*!important[^}]*color:\s*var\(--text-primary\)\s*!important/s);
+  assert.match(css, /\[data-theme='dark'\] \.novel-fetch-task-table \.ant-table-row-selected \.ant-table-cell-fix-(?:left|right)[^{]*\{[^}]*background:\s*var\(--status-info-bg\)\s*!important/s);
+  assert.match(css, /\[data-theme='light'\] \.novel-fetch-task-table \.ant-table-row-selected \.ant-table-cell-fix-(?:left|right)[^{]*\{[^}]*background:\s*var\(--status-info-bg\)\s*!important/s);
   assert.doesNotMatch(css, /\.novel-fetch-task-table \.ant-table-row-selected \.ant-table-cell-fix-(?:left|right)[^{]*\{[^}]*background:\s*(?:rgba|transparent)/s);
   assert.match(css, /\.novel-fetch-task-table \.ant-table-row-selected \.ant-typography[^{]*\{[^}]*color:\s*var\(--text-primary\)\s*!important/s);
 });

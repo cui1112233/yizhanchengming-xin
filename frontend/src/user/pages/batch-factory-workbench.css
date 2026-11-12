@@ -1,33 +1,19 @@
 .batch-factory-workbench {
-  --bf-bg: var(--legacy-bg, var(--legacy-surface, #0b1421));
-  --bf-panel: var(--legacy-card, var(--legacy-panel, #101c2d));
-  --bf-panel-soft: var(--legacy-panel, #152337);
-  --bf-input: var(--legacy-input, #0e1928);
-  --bf-line: var(--legacy-border, rgba(148, 163, 184, .2));
-  --bf-line-strong: var(--legacy-border-strong, rgba(148, 163, 184, .34));
-  --bf-text: var(--legacy-text, #e5edf7);
-  --bf-muted: var(--legacy-muted, #91a1b7);
-  --bf-accent: var(--legacy-accent, #7c6cff);
-  --bf-success: var(--legacy-success, #37c98b);
-  --bf-warning: var(--legacy-warning, #e6ad4f);
-  --bf-danger: var(--legacy-danger, #ee7777);
+  /* 全部指向全局语义变量，深浅主题由 global.css 驱动，不再保留 per-theme 覆写。 */
+  --bf-bg: var(--surface-base);
+  --bf-panel: var(--surface-panel);
+  --bf-panel-soft: var(--surface-2);
+  --bf-input: var(--surface-input);
+  --bf-line: var(--border-default);
+  --bf-line-strong: var(--border-strong);
+  --bf-text: var(--text-primary);
+  --bf-muted: var(--text-tertiary);
+  --bf-accent: var(--sh-accent);
+  --bf-success: var(--text-success);
+  --bf-warning: var(--text-warning);
+  --bf-danger: var(--text-danger);
   width: 100%;
-  color: var(--bf-text);
-}
-
-[data-theme='light'] .batch-factory-workbench {
-  --bf-bg: var(--legacy-bg, #f4f7fb);
-  --bf-panel: var(--legacy-card, #fff);
-  --bf-panel-soft: var(--legacy-panel, #f7f9fc);
-  --bf-input: var(--legacy-input, #fff);
-  --bf-line: var(--legacy-border, rgba(55, 73, 96, .15));
-  --bf-line-strong: var(--legacy-border-strong, rgba(55, 73, 96, .27));
-  --bf-text: var(--legacy-text, #182333);
-  --bf-muted: var(--legacy-muted, #68788d);
-  --bf-accent: var(--legacy-accent, #2563eb);
-  --bf-success: var(--legacy-success, #168e74);
-  --bf-warning: var(--legacy-warning, #a16207);
-  --bf-danger: var(--legacy-danger, #c2413b);
+  color: var(--text-primary);
 }
 
 .batch-factory-workbench .ant-card,
@@ -70,7 +56,7 @@
 
 .batch-factory-status-center { margin-top: 10px; padding: 14px 16px; border-radius: 8px; }
 .batch-factory-status-grid { display: grid; grid-template-columns: repeat(8, minmax(76px, 1fr)); gap: 7px; margin-top: 10px; }
-.batch-factory-status-grid button { min-height: 58px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; border: 1px solid var(--bf-line); border-radius: 6px; padding: 7px 10px; background: transparent; color: var(--bf-muted); cursor: pointer; text-align: left; transition: border-color .15s ease, background .15s ease; }
+.batch-factory-status-grid button { min-height: 58px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; border: 1px solid var(--bf-line); border-radius: 6px; padding: 7px 10px; background: transparent; color: var(--text-secondary); cursor: pointer; text-align: left; transition: border-color .15s ease, background .15s ease; }
 .batch-factory-status-grid button strong { color: var(--bf-text); font-size: 17px; font-variant-numeric: tabular-nums; }
 .batch-factory-status-grid button:hover,
 .batch-factory-status-grid button.is-active { border-color: var(--bf-accent); background: color-mix(in srgb, var(--bf-accent) 14%, transparent); color: var(--bf-text); }
@@ -132,6 +118,5 @@
 .batch-factory-workbench .batch-factory-novel-index,
 .batch-factory-workbench .batch-factory-novel-copy small,
 .batch-factory-workbench .batch-factory-progress-summary span { color: var(--text-secondary) !important; }
-.batch-factory-status-grid button { color: var(--text-secondary); }
 .batch-factory-status-grid button strong { color: var(--text-primary); }
 .batch-factory-abnormal-summary .ant-btn-dangerous { color: var(--text-danger); }

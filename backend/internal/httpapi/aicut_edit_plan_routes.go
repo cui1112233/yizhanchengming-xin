@@ -115,7 +115,7 @@ func RegisterAICutEditPlanRoutes(mux *http.ServeMux, auth BridgeAuth, timelines 
 		}
 		result, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens})
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			_, _ = plans.UpdateEditPlanState(context.Background(), owner, projectID, plan.ID, aicut.EditPlanCanceled, "剪辑草案生成已取消", now().UTC())
+			_, _ = plans.UpdateEditPlanState(context.WithoutCancel(req.Context()), owner, projectID, plan.ID, aicut.EditPlanCanceled, "剪辑草案生成已取消", now().UTC())
 			writeJSON(w, http.StatusRequestTimeout, map[string]string{"error": "剪辑草案生成已取消"})
 			return
 		}
@@ -124,7 +124,7 @@ func RegisterAICutEditPlanRoutes(mux *http.ServeMux, auth BridgeAuth, timelines 
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "剪辑草案生成失败：" + err.Error()})
 			return
 		}
-		ready, err := aicut.ParseEditPlanModelOutput(result, aicut.EditPlanEnvelope{ID: plan.ID, ClientRequestID: plan.ClientRequestID, Owner: owner, ProjectID: projectID, BaseRevision: plan.BaseRevision, ModelID: plan.ModelID, Request: plan.Request, CreatedAt: plan.CreatedAt, UpdatedAt: now().UTC()})
+		ready, err := aicut.ParseEditPlanModelOutput(result, aicut.EditPlanEnvelope{TimelineID: plan.TimelineID, ID: plan.ID, ClientRequestID: plan.ClientRequestID, Owner: owner, ProjectID: projectID, BaseRevision: plan.BaseRevision, ModelID: plan.ModelID, Request: plan.Request, CreatedAt: plan.CreatedAt, UpdatedAt: now().UTC()})
 		if err != nil {
 			_, _ = plans.UpdateEditPlanState(req.Context(), owner, projectID, plan.ID, aicut.EditPlanFailed, "模型返回的剪辑草案格式无效", now().UTC())
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型返回的剪辑草案格式无效"})

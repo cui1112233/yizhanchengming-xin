@@ -103,6 +103,7 @@ type RouterOptions struct {
 	AgentWorkspace            agentworkspace.Store
 	AgentProxy                agentproxy.Store
 	AICut                     aicut.Store
+	AICutTimelines            *aicut.TimelineCollectionStore
 	Screenplay                screenplay.Store
 	NovelCreation             *novelcreation.Service
 	NovelCreationRunStarter   NovelCreationRunStarter
@@ -597,7 +598,16 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterAgentSkillsCompat(root, auth, systemDir, options.UserConfigStore.BaseDir)
 		RegisterAgentChatRoutes(root, auth, options.UserConfigStore.BaseDir, systemDir, runtimeCatalogStore, options.UserConfigStore, textModels, options.Now)
 	}
-	RegisterAICutRoutes(root, auth, options.AICut, options.Now)
+	aiCutTimelines := options.AICutTimelines
+	if aiCutTimelines == nil && options.AICut != nil {
+		aiCutTimelines = aicut.NewMemoryTimelineCollectionStore(options.AICut)
+	}
+	RegisterAICutTimelineCollectionRoutes(root, auth, aiCutTimelines, options.Now)
+	var scopedTimelineStore aicut.Store
+	if options.AICut != nil {
+		scopedTimelineStore = aicutRequestTimelineStore{aicutExportTimelineStore{Store: options.AICut, timelines: aiCutTimelines}}
+	}
+	RegisterAICutRoutes(root, auth, scopedTimelineStore, options.Now)
 	var screenplayMedia screenplay.BatchMediaRunner
 	if options.UserConfigStore != nil {
 		videoResolver := func(ctx context.Context, owner, modelKey string) (batchfactoryv11.VideoProviderConfig, error) {
@@ -618,14 +628,26 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterAICutTTSRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, options.Now)
 	RegisterAICutBackgroundRemovalRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, nil, options.Now)
 	RegisterAICutVoiceCloneRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, nil, options.Now)
-	RegisterAICutExportRoutes(root, auth, options.AICut, options.AgentAssetObjects, options.AICutExport)
-	RegisterAICutMediaToolRoutes(root, auth, options.AICut, options.AgentAssetObjects, options.Now)
-	RegisterAICutAIRoutes(root, auth, options.AICut, runtimeTextProviderResolver, options.Now)
+	if options.AICutExport != nil {
+		options.AICutExport.timelines = aiCutTimelines
+	}
+	var exportStore aicut.Store
+	if options.AICut != nil {
+		exportStore = aicutExportTimelineStore{Store: options.AICut, timelines: aiCutTimelines}
+	}
+	RegisterAICutExportRoutes(root, auth, exportStore, options.AgentAssetObjects, options.AICutExport)
+	RegisterAICutMediaToolRoutes(root, auth, scopedTimelineStore, options.AgentAssetObjects, options.Now)
+	RegisterAICutMultiCamSyncRoutes(root, auth, options.AICut, options.AgentAssetObjects)
+	RegisterAICutAIRoutes(root, auth, scopedTimelineStore, runtimeTextProviderResolver, options.Now)
 	if editPlans, ok := options.AICut.(aicut.EditPlanStore); ok {
-		RegisterAICutEditPlanRoutes(root, auth, options.AICut, editPlans, runtimeTextProviderResolver, options.Now)
+		RegisterAICutEditPlanRoutes(root, auth, scopedTimelineStore, aicutRequestEditPlanStore{EditPlanStore: editPlans, timelines: aiCutTimelines}, runtimeTextProviderResolver, options.Now)
 	}
 	RegisterAICutASRRoutes(root, auth, options.AICut, options.AICutASR)
-	RegisterAICutAgentRoutes(root, auth, options.AICut, options.AICutAgentStore, options.AICutAgentStarter, options.Now)
+	var scopedAgents aicut.AgentStore
+	if options.AICutAgentStore != nil {
+		scopedAgents = aicutRequestAgentStore{AgentStore: options.AICutAgentStore}
+	}
+	RegisterAICutAgentRoutes(root, auth, scopedTimelineStore, scopedAgents, options.AICutAgentStarter, options.Now)
 	RegisterUpscaleRoutes(root, auth, options.Upscale)
 	if options.TextProvider != nil {
 		pluginTextModels := options.AgentTextModelResolver
@@ -887,7 +909,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	// Compress JSON responses at the outermost layer so every registered route
 	// benefits without touching individual handlers. Non-JSON streams (images,
 	// ServeContent Range/304) are passed through untouched.
-	return withJSONCompression(root)
+	return withJSONCompression(withAICutTimelineScope(root, auth))
 }
 
 // registerCanonicalNovelFetchWebSubmitAliases keeps the public workshop

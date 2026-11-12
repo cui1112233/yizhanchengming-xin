@@ -18,9 +18,14 @@ import {
 import { normalizeSpeedCurve, speedCurveAverageRate, speedCurveDurationMs, speedCurveSourceOffsetMs } from './aicutSpeedCurve.js';
 import { applyCompoundPath, clipHasCompound, compoundEntries, compoundPathForClip, compoundRefForClip, outerCompoundRef, removeCompoundRefs, replaceCompoundRef, trackBelongsToCompound } from './aicutCompoundModel.js';
 import { normalizeVisualProcessing, polygonArea, sampleBezierMaskPoints, sampleColorCurve } from './aicutVisualProcessing.js';
+import { HSL_COLOR_BANDS, normalizeHSLAdjustments } from './aicut/hslColor.js';
+import { COLOR_CURVE_CHANNELS, COLOR_WHEEL_RANGES, normalizeRGBColorCurves, normalizeColorWheels } from './aicut/colorGrade.js';
 import { normalizeKeyframeEasing } from './aicutKeyframeEasing.js';
 import { audioEffectValues } from './aicutAudioProcessing.js';
 import { normalizePersonSegmentation } from './aicutPersonSegmentation.js';
+import { applyProjectTemplate } from './aicut/projectTemplates.js';
+import { addStickerLayer } from './aicut/stickerLayer.js';
+import { planMultiCamGroup, applyMultiCamGroup } from './aicut/multicam.js';
 
 function commandResult(timeline, extras = {}) {
   return { timeline, changed: true, selectionKey: '', metadata: {}, ...extras };
@@ -1010,6 +1015,8 @@ function updateVolumeEnvelopePoint(timeline, command, idFactory, mode) {
 }
 
 function normalizedAudioProcessing(value = {}) {
+  const allowed = new Set(['denoise', 'eqLowDB', 'eqMidDB', 'eqHighDB', 'channelMode', 'loudnessEnabled', 'targetLUFS', 'voiceEffect', 'pitchSemitones', 'pan']);
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !allowed.has(key))) throw new Error('音频处理包含未知参数或格式错误');
   const denoise = Number(value.denoise ?? 0);
   const eqLowDB = Number(value.eqLowDB ?? 0);
   const eqMidDB = Number(value.eqMidDB ?? 0);
@@ -1019,13 +1026,15 @@ function normalizedAudioProcessing(value = {}) {
   const targetLUFS = Number(value.targetLUFS ?? -16);
   const voiceEffect = String(value.voiceEffect || 'natural');
   const pitchSemitones = Number(value.pitchSemitones ?? 0);
+  const pan = Number(value.pan ?? 0);
+  if (!Number.isFinite(pan) || pan < -1 || pan > 1) throw new Error('声像必须在 -1 到 1 之间');
   if (!Number.isFinite(denoise) || denoise < 0 || denoise > 1) throw new Error('降噪强度必须在 0 到 1 之间');
   if (![eqLowDB, eqMidDB, eqHighDB].every(item => Number.isFinite(item) && item >= -12 && item <= 12)) throw new Error('均衡器增益必须在 -12 到 12 dB 之间');
   if (!['stereo', 'mono', 'left', 'right', 'swap'].includes(channelMode)) throw new Error('不支持的声道模式');
   if (!Number.isFinite(targetLUFS) || targetLUFS < -24 || targetLUFS > -8) throw new Error('目标响度必须在 -24 到 -8 LUFS 之间');
   if (!audioEffectValues.has(voiceEffect)) throw new Error('不支持的音频效果');
   if (!Number.isFinite(pitchSemitones) || pitchSemitones < -12 || pitchSemitones > 12) throw new Error('音调必须在 -12 到 12 个半音之间');
-  return { denoise, eqLowDB, eqMidDB, eqHighDB, channelMode, loudnessEnabled, targetLUFS, voiceEffect, pitchSemitones };
+  return { denoise, eqLowDB, eqMidDB, eqHighDB, channelMode, loudnessEnabled, targetLUFS, voiceEffect, pitchSemitones, pan };
 }
 
 function setAudioProcessing(timeline, command) {
@@ -1067,6 +1076,47 @@ function setVisualProcessing(timeline, command) {
   if (personSegmentationSource.threshold !== undefined && (!Number.isFinite(Number(personSegmentationSource.threshold)) || Number(personSegmentationSource.threshold) < 0 || Number(personSegmentationSource.threshold) > 1)) throw new Error('人物阈值参数无效');
   if (personSegmentationSource.feather !== undefined && (!Number.isFinite(Number(personSegmentationSource.feather)) || Number(personSegmentationSource.feather) < 0 || Number(personSegmentationSource.feather) > .5)) throw new Error('人物边缘柔化参数无效');
   const color = processing.color || {};
+  const isGradeRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+    && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+  let rgbCurves, wheels;
+  if (Object.hasOwn(color, 'rgbCurves')) {
+    if (!isGradeRecord(color.rgbCurves)) throw new Error('RGB 曲线参数必须是通道对象');
+    for (const [key, points] of Object.entries(color.rgbCurves)) {
+      if (!COLOR_CURVE_CHANNELS.includes(key) || !Array.isArray(points) || points.length < 2 || points.length > 16) throw new Error('RGB 曲线通道或控制点数量无效');
+      if (points.some((point, index) => !isGradeRecord(point) || Object.keys(point).some(key => !['x', 'y'].includes(key))
+        || !['x', 'y'].every(key => typeof point[key] === 'number' && Number.isFinite(point[key]) && point[key] >= 0 && point[key] <= 1)
+        || (index > 0 && point.x <= points[index - 1].x)) || points[0].x !== 0 || points.at(-1).x !== 1) throw new Error('RGB 曲线控制点必须有效且横坐标严格递增，首尾为0和1');
+    }
+    rgbCurves = normalizeRGBColorCurves(color.rgbCurves);
+  }
+  if (Object.hasOwn(color, 'wheels')) {
+    if (!isGradeRecord(color.wheels)) throw new Error('色轮参数必须是明暗范围对象');
+    for (const [key, wheel] of Object.entries(color.wheels)) {
+      if (!COLOR_WHEEL_RANGES.includes(key) || !isGradeRecord(wheel)) throw new Error('色轮明暗范围无效');
+      for (const [channel, amount] of Object.entries(wheel)) {
+        const bounds = { hue: [-180, 180], saturation: [0, 100], luminance: [-100, 100] }[channel];
+        if (!bounds || typeof amount !== 'number' || !Number.isFinite(amount) || amount < bounds[0] || amount > bounds[1]) throw new Error('色轮调节项或数值无效');
+      }
+    }
+    wheels = normalizeColorWheels(color.wheels);
+  }
+  let hsl;
+  if (Object.hasOwn(color, 'hsl')) {
+    const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+      && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+    if (!isRecord(color.hsl)) throw new Error('HSL 调色参数必须是颜色范围对象');
+    const bandNames = new Set(HSL_COLOR_BANDS.map(band => band.key));
+    const channelNames = new Set(['hue', 'saturation', 'luminance']);
+    for (const [band, values] of Object.entries(color.hsl)) {
+      if (!bandNames.has(band)) throw new Error('HSL 包含不支持的颜色范围');
+      if (!isRecord(values)) throw new Error('HSL 颜色范围参数无效');
+      for (const [channel, amount] of Object.entries(values)) {
+        if (!channelNames.has(channel)) throw new Error('HSL 包含不支持的调节项');
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < -100 || amount > 100) throw new Error('HSL 调节值必须是 -100 到 100 之间的数字');
+      }
+    }
+    hsl = normalizeHSLAdjustments(color.hsl);
+  }
   const numeric = (value, minimum, maximum, label, fallback) => {
     const number = value === undefined ? fallback : Number(value);
     if (!Number.isFinite(number) || number < minimum || number > maximum) throw new Error(`${label}参数无效`);
@@ -1143,6 +1193,9 @@ function setVisualProcessing(timeline, command) {
     stabilization,
     personSegmentation,
     color: {
+      ...(hsl === undefined ? {} : { hsl }),
+      ...(rgbCurves === undefined ? {} : { rgbCurves }),
+      ...(wheels === undefined ? {} : { wheels }),
       exposure: numeric(color.exposure, -2, 2, '曝光', 0),
       temperature: numeric(color.temperature, -1, 1, '色温', 0),
       tint: numeric(color.tint, -1, 1, '色调', 0),
@@ -1425,6 +1478,20 @@ export function executeAICutCommand(timeline, command, dependencies = {}) {
 	  return setClipFreeze(timeline, command);
 	case 'clip.blend_mode_set':
 	  return setClipBlendMode(timeline, command);
+    case 'timeline.template_apply': {
+      const result = applyProjectTemplate(timeline, command.templateId, command.assets, command.options, idFactory);
+      return commandResult(result.timeline, { selectionKey: result.selectionKey, metadata: { template: result.summary } });
+    }
+    case 'timeline.sticker_add': {
+      const result = addStickerLayer(timeline, command.asset, command.startMs, command.durationMs, idFactory);
+      return commandResult(result.timeline, { selectionKey: result.selectionKey });
+    }
+    case 'timeline.multicam_apply': {
+      const currentPlan = planMultiCamGroup(command.assets, command.plan?.options);
+      if (JSON.stringify(currentPlan) !== JSON.stringify(command.plan)) throw new Error('多机位素材已变化，请重新检查方案');
+      const result = applyMultiCamGroup(timeline, currentPlan, idFactory);
+      return commandResult(result.timeline, { selectionKey: result.selectionKey, metadata: { multicam: result.summary } });
+    }
     case 'timeline.marker_add':
       return addTimelineMarker(timeline, command, idFactory);
     case 'timeline.marker_remove':

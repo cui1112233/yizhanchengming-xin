@@ -1,17 +1,19 @@
 [data-bf-v11-ui='final'] {
-  --bf11-bg: #0b1220;
-  --bf11-panel: #111827;
-  --bf11-soft: #162033;
-  --bf11-input: #0f172a;
-  --bf11-line: #2b3748;
-  --bf11-line-strong: #3b4a60;
-  --bf11-text: #f3f6fa;
-  --bf11-text-secondary: #c7d0db;
-  --bf11-muted: #98a2b3;
-  --bf11-disabled: #667085;
-  --bf11-accent: #f87171;
-  --bf11-success: #4ade80;
-  --bf11-danger: #fb7185;
+  /* 本地色板全部指向全局语义变量，深浅主题由 global.css 统一提供。 */
+  --bf11-bg: var(--surface-base);
+  --bf11-panel: var(--surface-panel);
+  --bf11-soft: var(--surface-2);
+  --bf11-input: var(--surface-input);
+  --bf11-line: var(--border-default);
+  --bf11-line-strong: var(--border-strong);
+  --bf11-text: var(--text-primary);
+  --bf11-text-secondary: var(--text-secondary);
+  --bf11-muted: var(--text-tertiary);
+  --bf11-disabled: var(--text-disabled);
+  /* 保留页面品牌色：批量工厂 v11 用珊瑚红强调，与外壳主色一致。 */
+  --bf11-accent: var(--theme-primary);
+  --bf11-success: var(--text-success);
+  --bf11-danger: var(--text-danger);
   min-height: 100%;
   box-sizing: border-box;
   padding: 10px;
@@ -21,56 +23,14 @@
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench {
-  --bf11-bg: #0b1220;
-  --bf11-panel: #111827;
-  --bf11-soft: #162033;
-  --bf11-input: #0f172a;
-  --bf11-line: #2b3748;
-  --bf11-line-strong: #3b4a60;
-  --bf11-text: #f3f6fa;
-  --bf11-text-secondary: #c7d0db;
-  --bf11-muted: #98a2b3;
-  --bf11-disabled: #667085;
-  --bf11-accent: #f87171;
-  --bf11-success: #4ade80;
-  --bf11-danger: #fb7185;
   background: var(--bf11-bg);
   color: var(--bf11-text);
 }
 
 [data-theme='light'] [data-bf-v11-ui='final'] {
-  --bf11-bg: #f4f7fb;
-  --bf11-panel: #ffffff;
-  --bf11-soft: #f7f9fc;
-  --bf11-input: #ffffff;
-  --bf11-line: #d8e0ea;
-  --bf11-line-strong: #bcc8d6;
-  --bf11-text: #182333;
-  --bf11-text-secondary: #435166;
-  --bf11-muted: #68788d;
-  --bf11-disabled: #9aa7b7;
-  --bf11-accent: #dc4f58;
-  --bf11-success: #168e74;
-  --bf11-danger: #c2413b;
   background: var(--bf11-bg);
   color: var(--bf11-text);
   color-scheme: light;
-}
-
-[data-theme='light'] [data-bf-v11-ui='final'] .bf11-workbench {
-  --bf11-bg: #f4f7fb;
-  --bf11-panel: #ffffff;
-  --bf11-soft: #f7f9fc;
-  --bf11-input: #ffffff;
-  --bf11-line: #d8e0ea;
-  --bf11-line-strong: #bcc8d6;
-  --bf11-text: #182333;
-  --bf11-text-secondary: #435166;
-  --bf11-muted: #68788d;
-  --bf11-disabled: #9aa7b7;
-  --bf11-accent: #dc4f58;
-  --bf11-success: #168e74;
-  --bf11-danger: #c2413b;
 }
 
 [data-bf-v11-ui='final'] .bf11-status-row,
@@ -163,14 +123,14 @@
 }
 
 [data-bf-v11-ui='final'] .bf11-preview-tabs button.is-active {
-  color: #ffffff !important;
+  color: var(--bf11-text) !important;
   border-color: var(--bf11-accent) !important;
   background: color-mix(in srgb, var(--bf11-accent) 16%, transparent) !important;
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag {
   color: var(--bf11-text-secondary) !important;
-  background: #1b2738 !important;
+  background: var(--tag-bg) !important;
   border-color: var(--bf11-line) !important;
 }
 
@@ -182,35 +142,35 @@
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-purple {
-  color: #e9d5ff !important;
-  background: rgba(192, 132, 252, .14) !important;
-  border-color: rgba(192, 132, 252, .4) !important;
+  color: var(--tag-purple-text) !important;
+  background: var(--tag-purple-bg) !important;
+  border-color: var(--tag-purple-border) !important;
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-green {
   color: var(--text-success) !important;
-  background: rgba(74, 222, 128, .12) !important;
-  border-color: rgba(74, 222, 128, .38) !important;
+  background: var(--status-success-bg) !important;
+  border-color: var(--status-success-border) !important;
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-blue,
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-processing,
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-geekblue {
-  color: #bfdbfe !important;
-  background: rgba(96, 165, 250, .13) !important;
-  border-color: rgba(96, 165, 250, .38) !important;
+  color: var(--tag-blue-text) !important;
+  background: var(--tag-blue-bg) !important;
+  border-color: var(--tag-blue-border) !important;
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-gold {
-  color: #fde68a !important;
-  background: rgba(251, 191, 36, .12) !important;
-  border-color: rgba(251, 191, 36, .38) !important;
+  color: var(--text-warning) !important;
+  background: var(--status-warning-bg) !important;
+  border-color: var(--status-warning-border) !important;
 }
 
 [data-bf-v11-ui='final'] .bf11-workbench .ant-tag-cyan {
-  color: #a5f3fc !important;
-  background: rgba(34, 211, 238, .12) !important;
-  border-color: rgba(34, 211, 238, .36) !important;
+  color: var(--tag-blue-text) !important;
+  background: var(--tag-blue-bg) !important;
+  border-color: var(--tag-blue-border) !important;
 }
 
 [data-bf-v11-ui='final'] .bf11-status-cards button {
@@ -226,6 +186,7 @@
   background: color-mix(in srgb, var(--bf11-accent) 14%, transparent) !important;
 }
 
+/* 视频预览画布固定深色：媒体预览区不随主题翻转，保持画面外框与视频黑边一致。 */
 [data-bf-v11-ui='final'] .bf11-unified-player {
   background: linear-gradient(145deg, #08111f, #0d1726) !important;
 }

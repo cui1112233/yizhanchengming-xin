@@ -97,6 +97,17 @@ func (m *MemoryStore) ActiveDocument(_ context.Context, owner, projectID string)
 	return Document{}, ErrNoActiveScript
 }
 
+func (m *MemoryStore) GetDocument(_ context.Context, owner, projectID, documentID string) (Document, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, document := range m.documents[projectKey(owner, projectID)] {
+		if document.ID == documentID {
+			return document, nil
+		}
+	}
+	return Document{}, fmt.Errorf("%w: 剧本版本 %s", ErrNotFound, documentID)
+}
+
 func (m *MemoryStore) ListDocuments(_ context.Context, owner, projectID string) ([]Document, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

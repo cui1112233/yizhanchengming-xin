@@ -336,6 +336,14 @@ WHERE r.owner_username = ? AND r.idempotency_key = ? AND p.deleted_at IS NULL`, 
 	return run, err == nil, err
 }
 
+func (s *MySQLStore) GetRun(ctx context.Context, owner, runID string) (Run, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Run{}, err
+	}
+	return s.runByID(ctx, owner, strings.TrimSpace(runID))
+}
+
 func (s *MySQLStore) CreateRun(ctx context.Context, owner string, run Run) (Run, error) {
 	owner, err := requiredOwner(owner)
 	if err != nil {
@@ -477,6 +485,36 @@ WHERE e.owner_username = ? AND e.run_id = ? AND e.event_id > ? AND p.deleted_at 
 		return nil, persistenceError(err)
 	}
 	return events, nil
+}
+
+func (s *MySQLStore) ListChapters(ctx context.Context, owner, projectID string) ([]Chapter, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT c.chapter_id, c.project_id, c.volume_id, c.number_no, c.title, c.content, c.word_count, c.audit_status, c.version_no, c.created_at, c.updated_at
+FROM novel_chapters c
+JOIN novel_projects p ON p.owner_username = c.owner_username AND p.project_id = c.project_id
+WHERE c.owner_username = ? AND c.project_id = ? AND p.deleted_at IS NULL
+ORDER BY c.number_no`, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	chapters := make([]Chapter, 0)
+	for rows.Next() {
+		var chapter Chapter
+		var volumeID sql.NullString
+		if err := rows.Scan(&chapter.ID, &chapter.ProjectID, &volumeID, &chapter.Number, &chapter.Title, &chapter.Content, &chapter.WordCount, &chapter.AuditStatus, &chapter.Version, &chapter.CreatedAt, &chapter.UpdatedAt); err != nil {
+			return nil, persistenceError(err)
+		}
+		chapter.VolumeID = volumeID.String
+		chapters = append(chapters, chapter)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return chapters, nil
 }
 
 func (s *MySQLStore) SaveChapterBundle(ctx context.Context, owner string, bundle ChapterBundle) error {

@@ -12,9 +12,9 @@ const agentPanel = fs.readFileSync(new URL('../components/AICutAgentPanel.jsx', 
 test('AI-CUT按确认设计使用独立全屏剪辑器，不再套用全站侧栏', () => {
   assert.match(app, /['"]\/ai-cut['"]:\s*AICutPage/);
   assert.match(layout, /href:\s*['"]\/ai-cut['"][^\n]+label:\s*['"]AI-CUT['"]/);
-  assert.match(app, /if \(pathname === ['"]\/ai-cut['"]\)[\s\S]{0,220}<AICutPage/);
+  assert.match(app, /if \(pathname === ['"]\/ai-cut['"]\)[\s\S]{0,400}<AICutPage/);
   assert.match(page, /aicut-fullscreen-editor/);
-  assert.match(page, /返回一战晟铭/);
+  assert.match(page, /返回作品库/);
   assert.match(page, /AI-CUT Hub · 在线版/);
   assert.match(page, /AI 创作画布/);
   assert.match(page, /专业剪辑/);
@@ -103,7 +103,7 @@ test('AI-CUT播放器和真实轨道时间线保留完整可见控制', () => {
 
 test('AI-CUT时间线提供真实剃刀与联动模式并把转场显示在连接处', () => {
   assert.match(page, /setBladeMode/);
-  assert.match(page, />\s*剃刀\s*</);
+  assert.match(page, /aria-label="剃刀模式"/);
   assert.match(page, /setLinkedMove/);
   assert.match(page, />\s*联动\s*</);
   assert.match(page, /aicut-transition-chip/);

@@ -36,6 +36,7 @@ const (
 )
 
 type ASRJob struct {
+	TimelineID       string      `json:"timelineId,omitempty"`
 	ID               string      `json:"id"`
 	Owner            string      `json:"-"`
 	ProjectID        string      `json:"projectId"`
@@ -59,7 +60,7 @@ func (job ASRJob) WithState(state ASRJobState, progress int, message string, now
 
 func validateASRJob(job ASRJob) error {
 	job.ID, job.ProjectID, job.AssetID, job.ModelID = strings.TrimSpace(job.ID), strings.TrimSpace(job.ProjectID), strings.TrimSpace(job.AssetID), strings.TrimSpace(job.ModelID)
-	if job.ID == "" || job.ProjectID == "" || job.AssetID == "" || job.ModelID == "" || job.ExpectedRevision < 0 || job.Progress < 0 || job.Progress > 100 {
+	if job.ID == "" || job.ProjectID == "" || job.AssetID == "" || job.ModelID == "" || len(job.TimelineID) > 64 || job.ExpectedRevision < 0 || job.Progress < 0 || job.Progress > 100 {
 		return ErrInvalidASRJob
 	}
 	switch job.State {
@@ -215,6 +216,7 @@ type Clip struct {
 }
 
 type AudioProcessing struct {
+	Pan             float64 `json:"pan"`
 	Denoise         float64 `json:"denoise"`
 	EQLowDB         float64 `json:"eqLowDB"`
 	EQMidDB         float64 `json:"eqMidDB"`
@@ -230,7 +232,7 @@ func validAudioProcessing(processing *AudioProcessing) bool {
 	if processing == nil {
 		return true
 	}
-	values := []float64{processing.Denoise, processing.EQLowDB, processing.EQMidDB, processing.EQHighDB, processing.TargetLUFS, processing.PitchSemitones}
+	values := []float64{processing.Denoise, processing.EQLowDB, processing.EQMidDB, processing.EQHighDB, processing.TargetLUFS, processing.PitchSemitones, processing.Pan}
 	for _, value := range values {
 		if math.IsNaN(value) || math.IsInf(value, 0) {
 			return false
@@ -243,6 +245,9 @@ func validAudioProcessing(processing *AudioProcessing) bool {
 		return false
 	}
 	if processing.PitchSemitones < -12 || processing.PitchSemitones > 12 {
+		return false
+	}
+	if processing.Pan < -1 || processing.Pan > 1 {
 		return false
 	}
 	switch processing.ChannelMode {
@@ -322,14 +327,17 @@ type VideoStabilization struct {
 }
 
 type ColorAdjustment struct {
-	Exposure    float64           `json:"exposure"`
-	Temperature float64           `json:"temperature"`
-	Tint        float64           `json:"tint"`
-	Highlights  float64           `json:"highlights"`
-	Shadows     float64           `json:"shadows"`
-	Gamma       float64           `json:"gamma"`
-	Curve       []float64         `json:"curve,omitempty"`
-	CurvePoints []ColorCurvePoint `json:"curvePoints,omitempty"`
+	RGBCurves   map[string][]ColorCurvePoint    `json:"rgbCurves,omitempty"`
+	Wheels      map[string]ColorWheelAdjustment `json:"wheels,omitempty"`
+	HSL         map[string]HSLBandAdjustment    `json:"hsl,omitempty"`
+	Exposure    float64                         `json:"exposure"`
+	Temperature float64                         `json:"temperature"`
+	Tint        float64                         `json:"tint"`
+	Highlights  float64                         `json:"highlights"`
+	Shadows     float64                         `json:"shadows"`
+	Gamma       float64                         `json:"gamma"`
+	Curve       []float64                       `json:"curve,omitempty"`
+	CurvePoints []ColorCurvePoint               `json:"curvePoints,omitempty"`
 }
 
 type ColorCurvePoint struct {
@@ -429,6 +437,12 @@ func validVisualProcessing(processing *VisualProcessing) bool {
 		}
 	}
 	color := processing.Color
+	if !validHSLAdjustments(color.HSL) {
+		return false
+	}
+	if !validColorGrade(color) {
+		return false
+	}
 	if color.Exposure < -2 || color.Exposure > 2 || color.Temperature < -1 || color.Temperature > 1 || color.Tint < -1 || color.Tint > 1 || color.Highlights < -1 || color.Highlights > 1 || color.Shadows < -1 || color.Shadows > 1 || (color.Gamma != 0 && (color.Gamma < .5 || color.Gamma > 2)) {
 		return false
 	}

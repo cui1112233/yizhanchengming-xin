@@ -38,6 +38,7 @@ func readEditPlanSQL(ctx context.Context, reader editPlanSQLReader, owner, proje
 	if err := json.Unmarshal(requestJSON, &plan.Request); err != nil {
 		return EditPlan{}, err
 	}
+	plan.TimelineID = plan.Request.TimelineID
 	if err := json.Unmarshal(summaryJSON, &plan.Summary); err != nil {
 		return EditPlan{}, err
 	}
@@ -70,6 +71,9 @@ func (s *MySQLStore) CreateEditPlan(ctx context.Context, plan EditPlan) (EditPla
 		return EditPlan{}, err
 	}
 	if existing, findErr := s.EditPlanByRequest(ctx, normalized.Owner, normalized.ProjectID, normalized.ClientRequestID); findErr == nil {
+		if canonicalASRTimeline(existing.TimelineID) != canonicalASRTimeline(normalized.TimelineID) {
+			return EditPlan{}, ErrInvalidEditPlan
+		}
 		return existing, nil
 	} else if !errors.Is(findErr, ErrEditPlanNotFound) {
 		return EditPlan{}, findErr
@@ -124,7 +128,7 @@ func (s *MySQLStore) UpdateEditPlan(ctx context.Context, plan EditPlan) (EditPla
 	if err != nil {
 		return EditPlan{}, err
 	}
-	if current.ClientRequestID != normalized.ClientRequestID || !validEditPlanStateTransition(current.State, normalized.State) {
+	if canonicalASRTimeline(current.TimelineID) != canonicalASRTimeline(normalized.TimelineID) || current.ClientRequestID != normalized.ClientRequestID || !validEditPlanStateTransition(current.State, normalized.State) {
 		return EditPlan{}, ErrInvalidEditPlan
 	}
 	requestJSON, _ := json.Marshal(normalized.Request)
@@ -188,6 +192,9 @@ func (s *MySQLStore) ApplyStoredEditPlan(ctx context.Context, owner, projectID, 
 	plan, err := readEditPlanSQL(ctx, tx, owner, projectID, "id", id, true)
 	if err != nil {
 		return EditPlan{}, Timeline{}, EditPlanApplySummary{}, err
+	}
+	if canonicalASRTimeline(plan.TimelineID) != DefaultTimelineID {
+		return EditPlan{}, Timeline{}, EditPlanApplySummary{}, ErrInvalidEditPlan
 	}
 	var currentRevision int64
 	if err := tx.QueryRowContext(ctx, `SELECT revision FROM aicut_projects WHERE id = ? AND owner_username = ? AND deleted_at IS NULL FOR UPDATE`, projectID, owner).Scan(&currentRevision); errors.Is(err, sql.ErrNoRows) {

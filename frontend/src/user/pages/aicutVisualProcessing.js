@@ -1,4 +1,14 @@
 import { normalizePersonSegmentation } from './aicutPersonSegmentation.js';
+import { normalizeHSLAdjustments } from './aicut/hslColor.js';
+import { createColorGradeLUTAtlas, hasColorGradeAdjustments, normalizeRGBColorCurves, normalizeColorWheels } from './aicut/colorGrade.js';
+
+// One bounded cache avoids rebuilding an unchanged LUT when the renderer restarts.
+let lastHSLAtlas = null;
+function hslAtlas(color) {
+  const signature = JSON.stringify({ hsl: normalizeHSLAdjustments(color.hsl), rgbCurves: normalizeRGBColorCurves(color.rgbCurves), wheels: normalizeColorWheels(color.wheels) });
+  if (lastHSLAtlas?.signature !== signature) lastHSLAtlas = { signature, atlas: createColorGradeLUTAtlas(color) };
+  return lastHSLAtlas.atlas;
+}
 
 function clamp(value, minimum, maximum, fallback) {
   const number = Number(value);
@@ -92,6 +102,9 @@ function normalizeColor(value = {}) {
     highlights: clamp(value.highlights, -1, 1, 0),
     shadows: clamp(value.shadows, -1, 1, 0),
     gamma: clamp(value.gamma, .5, 2, 1),
+    hsl: normalizeHSLAdjustments(value.hsl),
+    ...(value.rgbCurves === undefined ? {} : { rgbCurves: normalizeRGBColorCurves(value.rgbCurves) }),
+    ...(value.wheels === undefined ? {} : { wheels: normalizeColorWheels(value.wheels) }),
     curve,
     curvePoints
   };
@@ -406,9 +419,11 @@ export function startVisualProcessingRenderer(canvas, mediaElement, value = {}) 
     void main(){ v_uv=(a_position+1.0)*0.5; gl_Position=vec4(a_position,0.0,1.0); }
   `);
   const fragment = compileShader(gl, gl.FRAGMENT_SHADER, `
-    precision mediump float;
+    precision highp float;
     varying vec2 v_uv;
     uniform sampler2D u_texture;
+    uniform sampler2D u_hsl_lut;
+    uniform float u_hsl_enabled;
     uniform vec3 u_key;
     uniform float u_chroma;
     uniform float u_similarity;
@@ -440,6 +455,15 @@ export function startVisualProcessingRenderer(canvas, mediaElement, value = {}) 
     uniform float u_object_removal;
     uniform vec2 u_object_center;
     uniform vec2 u_object_size;
+    vec3 applyHSL(vec3 value){
+      if(u_hsl_enabled<0.5) return value;
+      vec3 index=clamp(value,0.0,1.0)*32.0;
+      float lower=floor(index.b);
+      float upper=min(32.0,lower+1.0);
+      vec2 uv0=vec2((index.r+lower*33.0+0.5)/1089.0,(index.g+0.5)/33.0);
+      vec2 uv1=vec2((index.r+upper*33.0+0.5)/1089.0,(index.g+0.5)/33.0);
+      return mix(texture2D(u_hsl_lut,uv0).rgb,texture2D(u_hsl_lut,uv1).rgb,index.b-lower);
+    }
     vec2 sourceUV(vec2 viewUV){
       vec2 mapped=(viewUV-vec2(0.5))/max(1.0,u_stabilization_scale)+vec2(0.5)+u_stabilization_offset;
       if(u_flip_horizontal>0.5) mapped.x=1.0-mapped.x;
@@ -514,6 +538,7 @@ export function startVisualProcessingRenderer(canvas, mediaElement, value = {}) 
       color+=u_highlights*0.15*smoothstep(0.45,1.0,luma);
       color=pow(max(color,vec3(0.0)),vec3(1.0/max(0.5,u_gamma)));
       color=vec3(applyCurve(color.r),applyCurve(color.g),applyCurve(color.b));
+      if(pixel.a>0.0) color=applyHSL(color);
       float vignetteDistance=length((v_uv-vec2(0.5))*vec2(1.0,0.78));
       color*=1.0-u_vignette*smoothstep(0.22,0.62,vignetteDistance)*0.82;
       float grainNoise=fract(sin(dot(v_uv*vec2(1733.0,941.0),vec2(12.9898,78.233)))*43758.5453);
@@ -551,6 +576,7 @@ export function startVisualProcessingRenderer(canvas, mediaElement, value = {}) 
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
   const texture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -559,6 +585,28 @@ export function startVisualProcessingRenderer(canvas, mediaElement, value = {}) 
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   const plan = visualProcessingPreviewPlan(value);
   const uniform1 = (name, number) => gl.uniform1f(gl.getUniformLocation(program, name), number);
+  const hslTexture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, hslTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const hslEnabled = hasColorGradeAdjustments(plan);
+  // Typed atlas rows already have their intended orientation; media flips separately.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  if (hslEnabled) {
+    const atlas = hslAtlas(plan);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, atlas.width, atlas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, atlas.pixels);
+  } else {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  }
+  gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_hsl_lut'), 1);
+  uniform1('u_hsl_enabled', hslEnabled ? 1 : 0);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.uniform3fv(gl.getUniformLocation(program, 'u_key'), plan.keyRGB);
   uniform1('u_chroma', plan.chromaKey.enabled || plan.chromaKey.removeBlack ? 1 : 0);
   uniform1('u_similarity', plan.chromaKey.similarity);
@@ -656,5 +704,5 @@ export function startVisualProcessingRenderer(canvas, mediaElement, value = {}) 
     frame = requestAnimationFrame(draw);
   };
   draw();
-  return { stop: () => { stopped = true; cancelAnimationFrame(frame); gl.deleteTexture(texture); gl.deleteBuffer(buffer); gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment); } };
+  return { stop: () => { stopped = true; cancelAnimationFrame(frame); gl.deleteTexture(texture); gl.deleteTexture(hslTexture); gl.deleteBuffer(buffer); gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment); } };
 }

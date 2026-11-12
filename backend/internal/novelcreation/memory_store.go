@@ -272,6 +272,16 @@ func (s *MemoryStore) FindRunByIdempotencyKey(_ context.Context, owner, idempote
 	return cloneRun(s.runs[memoryKey(owner, id)]), true, nil
 }
 
+func (s *MemoryStore) GetRun(_ context.Context, owner, runID string) (Run, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	run, ok := s.runs[memoryKey(owner, strings.TrimSpace(runID))]
+	if !ok {
+		return Run{}, &DomainError{Code: ErrProjectNotFound, Message: "run not found"}
+	}
+	return cloneRun(run), nil
+}
+
 func (s *MemoryStore) CreateRun(_ context.Context, owner string, run Run) (Run, error) {
 	if err := validateRawJSON("run prompt snapshot", run.PromptSnapshot); err != nil {
 		return Run{}, err
@@ -372,6 +382,24 @@ func (s *MemoryStore) ListRunEvents(_ context.Context, owner, runID string, afte
 		}
 	}
 	return events, nil
+}
+
+func (s *MemoryStore) ListChapters(_ context.Context, owner, projectID string) ([]Chapter, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	projectID = strings.TrimSpace(projectID)
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	chapters := make([]Chapter, 0)
+	for key, bundle := range s.chapterBundles {
+		if strings.HasPrefix(key, memoryKey(owner)+"\x00") && bundle.ProjectID == projectID {
+			chapters = append(chapters, bundle.Chapter)
+		}
+	}
+	sort.Slice(chapters, func(i, j int) bool { return chapters[i].Number < chapters[j].Number })
+	return chapters, nil
 }
 
 func (s *MemoryStore) SaveChapterBundle(_ context.Context, owner string, bundle ChapterBundle) error {

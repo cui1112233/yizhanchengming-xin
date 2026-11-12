@@ -1,23 +1,14 @@
 .bf11-settings-drawer {
-  --bf11-settings-line: var(--legacy-border, rgba(148, 163, 184, .22));
-  --bf11-settings-panel: var(--legacy-card, #101c2d);
-  --bf11-settings-soft: var(--legacy-panel, #152337);
-  --bf11-settings-text: var(--legacy-text, #e5edf7);
-  --bf11-settings-muted: var(--legacy-muted, #91a1b7);
-  --bf11-settings-accent: var(--legacy-accent, #7c6cff);
+  --bf11-settings-line: var(--border-default);
+  --bf11-settings-panel: var(--surface-panel);
+  --bf11-settings-soft: var(--surface-2);
+  --bf11-settings-text: var(--text-primary);
+  --bf11-settings-muted: var(--text-tertiary);
+  --bf11-settings-accent: var(--theme-primary);
   display: flex;
   flex-direction: column;
   gap: 4px;
   color: var(--text-primary);
-}
-
-[data-theme='light'] .bf11-settings-drawer {
-  --bf11-settings-line: var(--legacy-border, rgba(55, 73, 96, .15));
-  --bf11-settings-panel: var(--legacy-card, #fff);
-  --bf11-settings-soft: var(--legacy-panel, #f7f9fc);
-  --bf11-settings-text: var(--legacy-text, #182333);
-  --bf11-settings-muted: var(--legacy-muted, #68788d);
-  --bf11-settings-accent: var(--legacy-accent, #2563eb);
 }
 
 .bf11-settings-scope,

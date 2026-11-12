@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, deleteComicScreenplayAsset, deleteComicScreenplayShot, exportComicScreenplay, generateComicScreenplay, listComicScreenplayPrompts, moveComicScreenplayShot, saveComicScreenplaySource, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot } from './comicScreenplay.js';
+import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, generateComicScreenplay, listComicScreenplayPrompts, mergeComicStoryboardShot, moveComicScreenplayShot, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from './comicScreenplay.js';
 
 test('项目设置和原文都调用已有项目接口', async () => {
   const calls = [];
@@ -28,14 +28,16 @@ test('漫剧生成提交真实内容并强制显式确认', async () => {
   assert.equal(captured.body.confirmed, true);
 });
 
-test('生产任务启动、暂停和导出都调用项目专属接口', async () => {
+test('生产任务启动、执行下一步、暂停和导出都调用项目专属接口', async () => {
   const calls = [];
   const request = async (path, options = {}) => { calls.push([path, options.method || 'GET']); return {}; };
   await startComicScreenplayBatch('comic-1', request);
+  await runComicScreenplayBatchNext('comic-1', undefined, request);
   await cancelComicScreenplayBatch('comic-1', request);
   await exportComicScreenplay('comic-1', request);
   assert.deepEqual(calls, [
     ['/api/comic-screenplays/projects/comic-1/batch', 'POST'],
+    ['/api/comic-screenplays/projects/comic-1/batch/run-next', 'POST'],
     ['/api/comic-screenplays/projects/comic-1/batch/cancel', 'POST'],
     ['/api/comic-screenplays/projects/comic-1/export', 'GET'],
   ]);
@@ -92,4 +94,49 @@ test('资产新增、编辑和删除调用真实项目接口', async () => {
 test('资产拒绝空名称和无效类型', async () => {
   await assert.rejects(() => createComicScreenplayAsset('comic-1', { type: 'scene', name: ' ' }, async () => ({})), /名称不能为空/);
   await assert.rejects(() => createComicScreenplayAsset('comic-1', { type: 'video', name: '片段' }, async () => ({})), /类型无效/);
+});
+
+test('剧本手工保存和版本恢复调用真实版本接口', async () => {
+  const calls = [];
+  const request = async (path, options = {}) => {
+    calls.push([path, options.method || 'GET', options.body ? JSON.parse(options.body) : null]);
+    return { document: { id: 'doc-2', version: 2 } };
+  };
+  await saveComicScreenplayDocument('comic-1', '修订后的剧本', request);
+  await restoreComicScreenplayDocument('comic-1', 'doc-1', request);
+  assert.deepEqual(calls, [
+    ['/api/comic-screenplays/projects/comic-1/document', 'PUT', { content: '修订后的剧本' }],
+    ['/api/comic-screenplays/projects/comic-1/documents/doc-1/restore', 'POST', null],
+  ]);
+});
+
+test('剧本手工保存拒绝空内容', async () => {
+  await assert.rejects(() => saveComicScreenplayDocument('comic-1', '  ', async () => ({})), /剧本内容不能为空/);
+});
+
+test('分镜条目新增、编辑、拆分、合并和删除调用真实接口', async () => {
+  const calls = [];
+  const request = async (path, options = {}) => {
+    calls.push([path, options.method || 'GET', options.body ? JSON.parse(options.body) : null]);
+    return { storyboard: { id: 'storyboard-1', shots: [] } };
+  };
+  const input = { afterShotId: 'sb-shot-1', durationSec: 3, characters: '小Y', scene: '门口', props: '钥匙', videoDesc: '新增分镜' };
+  await createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, input, request);
+  await updateComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, 'sb-shot-2', { ...input, videoDesc: '编辑分镜' }, request);
+  await splitComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, 'sb-shot-2', request);
+  await mergeComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, 'sb-shot-2', request);
+  await deleteComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, 'sb-shot-2', request);
+  assert.deepEqual(calls, [
+    ['/api/comic-screenplays/projects/comic-1/storyboards/xiaoluo_v7_15s/1/shots', 'POST', input],
+    ['/api/comic-screenplays/projects/comic-1/storyboards/xiaoluo_v7_15s/1/shots/sb-shot-2', 'PATCH', { ...input, videoDesc: '编辑分镜' }],
+    ['/api/comic-screenplays/projects/comic-1/storyboards/xiaoluo_v7_15s/1/shots/sb-shot-2/split', 'POST', {}],
+    ['/api/comic-screenplays/projects/comic-1/storyboards/xiaoluo_v7_15s/1/shots/sb-shot-2/merge-next', 'POST', {}],
+    ['/api/comic-screenplays/projects/comic-1/storyboards/xiaoluo_v7_15s/1/shots/sb-shot-2', 'DELETE', null],
+  ]);
+});
+
+test('分镜条目拒绝空内容、无效时长和无效路径参数', async () => {
+  await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: 0, videoDesc: '内容' }, async () => ({})), /时长/);
+  await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: 1, videoDesc: ' ' }, async () => ({})), /内容不能为空/);
+  await assert.rejects(() => splitComicStoryboardShot('comic-1', 'bad engine', 1, 'sb-shot-1', async () => ({})), /分镜引擎无效/);
 });

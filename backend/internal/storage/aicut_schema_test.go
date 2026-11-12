@@ -7,8 +7,8 @@ import (
 
 func TestAICutMigrationsCreatePersistedEditingDomain(t *testing.T) {
 	migrations := AICutMigrations()
-	if len(migrations) != 12 {
-		t.Fatalf("migrations=%d, want 12", len(migrations))
+	if len(migrations) != 15 {
+		t.Fatalf("migrations=%d, want 15", len(migrations))
 	}
 	joined := strings.Join(append(append([]string{}, migrations[0].SQL...), migrations[1].SQL...), "\n")
 	for _, table := range []string{"aicut_projects", "aicut_assets", "aicut_tracks", "aicut_clips", "aicut_asr_jobs"} {

@@ -32,6 +32,7 @@ type Store interface {
 	// 同一项目的并发写入由项目行显式锁串行化。
 	SaveScreenplay(ctx context.Context, doc Document, shots []Shot, characters []Character, scenes []Scene) (Document, error)
 	ActiveDocument(ctx context.Context, owner, projectID string) (Document, error)
+	GetDocument(ctx context.Context, owner, projectID, documentID string) (Document, error)
 	ListDocuments(ctx context.Context, owner, projectID string) ([]Document, error)
 	ListShots(ctx context.Context, owner, projectID, documentID string) ([]Shot, error)
 	CreateShot(ctx context.Context, shot Shot) (Shot, error)

@@ -1,4 +1,6 @@
-import { apiRequest } from './client.js';
+import { apiRequest as baseApiRequest } from './client.js';
+import { scopedAICutOptions } from './aicutTimelineScope.js';
+const apiRequest = (path, options = {}) => baseApiRequest(path, scopedAICutOptions(path, options));
 
 function safeID(value, label) {
   const id = String(value || '').trim();

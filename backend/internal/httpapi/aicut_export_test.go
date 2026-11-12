@@ -888,10 +888,13 @@ func TestAICutVisualProcessingFiltersExecuteWithFFmpeg(t *testing.T) {
 		t.Fatal(err)
 	}
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"crop=", "hflip", "vflip", "eq=", "colorbalance=", "curves=all=", "unsharp=", "vignette=", "noise=", "chromakey=0x00ff00", "geq="} {
+	for _, want := range []string{"crop=", "hflip", "vflip", "eq=", "colorbalance=", "curves=all=", "unsharp=", "vignette=", "noise=", "pow(g(X,Y)-255,2)", "alpha(X,Y)*ld(0)*ld(0)*(3-2*ld(0))"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("args missing %q: %s", want, joined)
 		}
+	}
+	if strings.Index(joined, "st(0,clip") > strings.Index(joined, "eq=brightness") {
+		t.Fatal("source-key alpha must be computed before color grading")
 	}
 	if !strings.Contains(joined, "0.370000/0.820000") {
 		t.Fatalf("arbitrary curve point missing from export: %s", joined)
@@ -907,11 +910,11 @@ func TestAICutVisualProcessingFiltersExecuteWithFFmpeg(t *testing.T) {
 	}
 }
 
-func TestAICutRemoveBlackUsesBlackChromakey(t *testing.T) {
+func TestAICutRemoveBlackUsesSourceRGBBlackKey(t *testing.T) {
 	processing := &aicut.VisualProcessing{ChromaKey: aicut.ChromaKey{RemoveBlack: true, Color: "#00ff00", Similarity: .22, Blend: .04}}
 	filters := buildAICutVisualProcessingFilters(processing, true)
 	joined := strings.Join(filters, ",")
-	if !strings.Contains(joined, "chromakey=0x000000:0.220:0.040") {
+	if !strings.Contains(joined, "pow(r(X,Y)-0,2)+pow(g(X,Y)-0,2)+pow(b(X,Y)-0,2)") || !strings.Contains(joined, "-0.220000000)/0.040000000") || !strings.Contains(joined, "alpha(X,Y)*ld(0)*ld(0)*(3-2*ld(0))") {
 		t.Fatalf("remove black filter=%q", joined)
 	}
 }

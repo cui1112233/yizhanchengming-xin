@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-const source = fs.readFileSync(new URL('./ResourceLibrary.jsx', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('./ResourceLibrary.jsx', import.meta.url), 'utf8')
+  + fs.readFileSync(new URL('./resourceLibraryModel.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('./editor.css', import.meta.url), 'utf8');
 
 test('资源库提供八个中文主分类并把文字和字幕分开', () => {

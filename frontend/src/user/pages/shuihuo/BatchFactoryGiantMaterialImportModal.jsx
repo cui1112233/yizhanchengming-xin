@@ -479,12 +479,12 @@ export function BatchFactoryGiantMaterialImportModal({ open, batch, onCancel, on
         const books = item.books || [];
         const selectedBook = selectedBookFor(item);
         const progressPercent = item.progress?.durationSeconds > 0 ? Math.min(100, Math.round((Number(item.progress.seconds || 0) / item.progress.durationSeconds) * 100)) : 0;
-        return <div key={item.id} style={{ border: '1px solid #27384a', borderRadius: 8, padding: 12 }}>
+        return <div key={item.id} style={{ border: '1px solid var(--border-default)', borderRadius: 8, padding: 12 }}>
           <Space wrap><Tag color={tag.color}>{tag.label}</Tag><code>{item.id}</code><span>{queueDetail(item)}</span></Space>
           {item.status === 'running' && progressPercent > 0 ? <Progress percent={progressPercent} size="small" status="active" /> : null}
           {books.length > 1 ? <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 8 }}><span>该素材关联多条平台书籍，请选择登记对象：</span><Select style={{ width: '100%' }} value={item.selectedBookKey || undefined} onChange={value => chooseBook(item.id, value)} disabled={busy} placeholder="选择平台书籍" options={books.map(book => ({ value: giantMaterialBookKey(book), label: `${book.title} · ${book.platformName || '书城'} · ${book.platformBookId}` }))} /></Space> : null}
           {selectedBook && item.material ? <Descriptions size="small" bordered column={1} style={{ marginTop: 8 }} items={[{ key: 'book', label: '登记书籍', children: `${selectedBook.title} · ${selectedBook.platformName || '书城未返回'} · ${selectedBook.platformBookId}` }, { key: 'source', label: '来源', children: giantMaterialSourceLabel(item.id) }]} /> : null}
-          {item.status === 'error' ? <Space style={{ marginTop: 8 }}><span style={{ color: '#ff8f8f' }}>{ERROR_MESSAGES[item.error] || item.error}</span><Button size="small" onClick={() => retryItem(item.id)} disabled={busy}>重试此项</Button></Space> : null}
+          {item.status === 'error' ? <Space style={{ marginTop: 8 }}><span style={{ color: 'var(--text-danger)' }}>{ERROR_MESSAGES[item.error] || item.error}</span><Button size="small" onClick={() => retryItem(item.id)} disabled={busy}>重试此项</Button></Space> : null}
         </div>;
       })}
     </Space>

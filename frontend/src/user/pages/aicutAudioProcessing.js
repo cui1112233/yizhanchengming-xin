@@ -43,6 +43,7 @@ export function normalizeAudioProcessing(value = {}) {
     eqMidDB: clamp(value?.eqMidDB, -12, 12),
     eqHighDB: clamp(value?.eqHighDB, -12, 12),
     channelMode: channelModes.has(channelMode) ? channelMode : 'stereo',
+    pan: clamp(value?.pan, -1, 1),
     loudnessEnabled: Boolean(value?.loudnessEnabled),
     targetLUFS,
     voiceEffect: audioEffectValues.has(requestedVoiceEffect) ? requestedVoiceEffect : 'natural',
@@ -171,6 +172,9 @@ export function audioProcessingPreviewPlan(value = {}) {
     eqMidDB: processing.eqMidDB,
     eqHighDB: processing.eqHighDB,
     channelMode: processing.channelMode,
+    pan: processing.pan,
+    balanceLeftGain: 1 - Math.max(0, processing.pan),
+    balanceRightGain: 1 + Math.min(0, processing.pan),
     loudnessEnabled: processing.loudnessEnabled,
     targetLUFS: processing.targetLUFS,
     compressorThresholdDB: processing.loudnessEnabled ? -24 : (voiceCompressor ? -22 : 0),
@@ -202,9 +206,9 @@ function distortionCurve(amount = 0, samples = 256) {
   return curve;
 }
 
-function connectChannelMode(context, input, mode) {
+function connectChannelMode(context, input, mode, destination = context.destination) {
   if (mode === 'stereo') {
-    input.connect(context.destination);
+    input.connect(destination);
     return [];
   }
   const splitter = context.createChannelSplitter(2);
@@ -221,15 +225,37 @@ function connectChannelMode(context, input, mode) {
     left.connect(merger, 0, 1);
     right.connect(merger, 0, 0);
     right.connect(merger, 0, 1);
-    merger.connect(context.destination);
+    merger.connect(destination);
     return [splitter, left, right, merger];
   }
   const sourceLeft = mode === 'right' || mode === 'swap' ? 1 : 0;
   const sourceRight = mode === 'left' || mode === 'swap' ? 0 : 1;
   splitter.connect(merger, sourceLeft, 0);
   splitter.connect(merger, sourceRight, 1);
-  merger.connect(context.destination);
+  merger.connect(destination);
   return [splitter, merger];
+}
+
+// A stereo balance preserves each channel at center; StereoPannerNode's
+// equal-power crossmix would move material between channels instead.
+function connectStereoBalance(context, plan) {
+  const upmix = context.createGain();
+  upmix.channelCount = 2;
+  upmix.channelCountMode = 'explicit';
+  upmix.channelInterpretation = 'speakers';
+  const splitter = context.createChannelSplitter(2);
+  const left = context.createGain();
+  const right = context.createGain();
+  const merger = context.createChannelMerger(2);
+  left.gain.value = plan.balanceLeftGain;
+  right.gain.value = plan.balanceRightGain;
+  upmix.connect(splitter);
+  splitter.connect(left, 0);
+  splitter.connect(right, 1);
+  left.connect(merger, 0, 0);
+  right.connect(merger, 0, 1);
+  merger.connect(context.destination);
+  return { input: upmix, nodes: [upmix, splitter, left, right, merger] };
 }
 
 export function createAudioProcessingGraph(mediaElement, initialValue = {}) {
@@ -309,7 +335,8 @@ export function createAudioProcessingGraph(mediaElement, initialValue = {}) {
     ambienceWet.gain.value = plan.ambienceWet;
     effectMix.disconnect();
     channelNodes.forEach(node => node.disconnect());
-    channelNodes = connectChannelMode(context, effectMix, plan.channelMode);
+    const balance = connectStereoBalance(context, plan);
+    channelNodes = [...connectChannelMode(context, effectMix, plan.channelMode, balance.input), ...balance.nodes];
   };
   update(initialValue);
   return {

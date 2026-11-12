@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { UserLayout } from '../shared/layouts/UserLayout';
+import { StandaloneThemeWindow } from '../shared/layouts/StandaloneThemeWindow';
 import { HomeRoute } from './pages/HomeRoute';
 import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
 import { PLUGIN_CATALOG } from './pages/pluginCatalog.js';
@@ -20,7 +21,9 @@ const NovelFetchPage = lazy(loadNovelFetchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PluginCenterPage = lazy(() => import('./pages/PluginCenterPage'));
 const AICutPage = lazy(() => import('./pages/AICutPage'));
+const AICutLibraryPage = lazy(() => import('./pages/AICutLibraryPage'));
 const ComicScreenplayPage = lazy(() => import('./pages/ComicScreenplayPage'));
+const NovelCreationPage = lazy(() => import('./pages/NovelCreationPage'));
 const PluginRewritePage = lazy(() => import('./pages/PluginRewritePage'));
 const PluginToolPage = lazy(() => import('./pages/PluginToolPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
@@ -75,6 +78,7 @@ function getPage(pathname) {
     // 迁移调试地址保留同一份 React 页面，避免出现第二套实现。
     '/novel-fetch-react': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchPage,
+    '/novel-creation': NovelCreationPage,
     // The cover-based project library is the only Batch Factory entry.
     '/batch-factory': ShuihuoProductionPage,
     '/agent': AgentPage,
@@ -133,7 +137,7 @@ export function UserApp() {
     return <Suspense fallback={<div className="route-loading" role="status">正在加载账号恢复</div>}><RecoveryPage /></Suspense>;
   }
   if (pathname === '/ai-cut') {
-    return <Suspense fallback={<div className="route-loading" role="status">正在加载 AI-CUT</div>}><AICutPage /></Suspense>;
+    return <StandaloneThemeWindow><Suspense fallback={<div className="route-loading" role="status">正在加载 AI-CUT</div>}>{new URLSearchParams(window.location.search).get('project') ? <AICutPage /> : <AICutLibraryPage />}</Suspense></StandaloneThemeWindow>;
   }
   return <UserLayout>{getPage(pathname)}</UserLayout>;
 }

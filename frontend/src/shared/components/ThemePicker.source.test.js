@@ -6,23 +6,26 @@ import { fileURLToPath } from 'node:url';
 
 const source = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'ThemePicker.jsx'), 'utf8');
 
-test('theme picker renders a segmented control ordered light, dark, system', () => {
-  assert.match(source, /listThemeDefinitions/);
-  assert.match(source, /const segmentOrder = \['light', 'dark', 'system'\]/);
+test('theme picker renders scheme swatch cards plus a depth segmented control', () => {
+  assert.match(source, /listThemeSchemes/);
+  assert.match(source, /listThemeModes/);
+  assert.match(source, /className="theme-scheme-grid" role="radiogroup"/);
+  assert.match(source, /className=\{`theme-scheme-card/);
+  assert.match(source, /className="theme-scheme-swatch"/);
+  assert.match(source, /--swatch-page/);
+  assert.match(source, /--swatch-primary/);
   assert.match(source, /className="theme-segmented" role="radiogroup"/);
   assert.match(source, /className=\{`theme-segmented-option/);
   assert.match(source, /role="radio"/);
   assert.match(source, /aria-checked=\{selected\}/);
-  assert.match(source, /\{theme\.label\}/);
-  // 卡片式预览（四色块 / 色带 / 勾选）必须彻底移除。
-  assert.doesNotMatch(source, /theme-picker-option/);
-  assert.doesNotMatch(source, /theme-picker-preview/);
-  assert.doesNotMatch(source, /theme-picker-name/);
-  assert.doesNotMatch(source, /<Check/);
+  assert.match(source, /\{scheme\.label\}/);
+  assert.match(source, /\{mode\.label\}/);
 });
 
-test('theme picker portals its panel and reports the selected theme id', () => {
+test('theme picker reports a combined scheme-depth id', () => {
   assert.match(source, /<Popover/);
   assert.match(source, /getPopupContainer=\{\(\) => document\.body\}/);
-  assert.match(source, /onChange\?\.\(theme\.id\)/);
+  assert.match(source, /composeThemeId\(scheme\.id, activeMode\)/);
+  assert.match(source, /composeThemeId\(activeScheme, mode\.id\)/);
+  assert.match(source, /parseThemeId\(value\)/);
 });

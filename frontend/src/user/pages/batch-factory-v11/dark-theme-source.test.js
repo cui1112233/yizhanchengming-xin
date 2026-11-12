@@ -9,8 +9,9 @@ const read = name => fs.readFileSync(path.join(here, name), 'utf8');
 
 test('BF11 dark theme owns readable tokens and paints the page gutters', () => {
   const css = read('batch-factory-v11-theme.css');
-  for (const token of ['#0b1220', '#f3f6fa', '#c7d0db', '#98a2b3', '#667085', '#2b3748', '#f87171']) {
-    assert.match(css, new RegExp(token.replace('#', '\\#'), 'i'));
+  // 色板改为引用全局语义变量，深浅两套由 global.css 提供，不再各自写死。
+  for (const token of ['--surface-base', '--surface-panel', '--surface-2', '--border-default', '--text-primary', '--text-secondary', '--text-tertiary', '--theme-primary']) {
+    assert.match(css, new RegExp(`var\\(${token}\\)`), `missing ${token}`);
   }
   assert.match(css, /\[data-bf-v11-ui=['"]final['"]\]/);
   assert.match(css, /background:\s*var\(--bf11-bg\)/);

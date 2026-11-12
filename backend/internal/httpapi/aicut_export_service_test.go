@@ -119,3 +119,48 @@ func TestAICutExportServiceNormalizesSnapshotOnlyBackgroundForDuplicateDetection
 		t.Fatal("same snapshot was accepted twice after option normalization")
 	}
 }
+
+func TestAICutExportServiceNamedTimelineSnapshotAndJobIsolation(t *testing.T) {
+	ctx := context.Background()
+	base := aicut.NewMemoryStore()
+	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
+	project := aicut.Project{ID: "p", Title: "P", CreatedAt: now, UpdatedAt: now}
+	_ = base.CreateProject(ctx, "alice", project)
+	collection := aicut.NewMemoryTimelineCollectionStore(base)
+	a, _ := collection.Create(ctx, "alice", "p", "A")
+	b, _ := collection.Create(ctx, "alice", "p", "B")
+	named, _ := collection.Save(ctx, "alice", "p", a.ID, aicut.Timeline{Script: "named snapshot"}, 0, now)
+	svc := NewAICutExportService(base, exportTestObjects{}, &exportTestNotifier{}, func() time.Time { return now }, collection)
+	job, e := svc.Submit(ctx, "alice", project, named, "mp3", aicut.ExportOptions{TimelineID: a.ID})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if job.Options.TimelineID != a.ID || job.TimelineSnapshot.Script != "named snapshot" {
+		t.Fatalf("job=%+v", job)
+	}
+	_, _ = collection.Save(ctx, "alice", "p", a.ID, aicut.Timeline{Script: "later"}, 1, now)
+	persisted, _ := base.ExportJob(ctx, "alice", "p", job.ID)
+	if persisted.TimelineSnapshot.Script != "named snapshot" {
+		t.Fatal("snapshot mutated")
+	}
+	for _, id := range []string{aicut.DefaultTimelineID, b.ID} {
+		scope := context.WithValue(ctx, aicutTimelineScopeKey{}, id)
+		items, e := svc.List(scope, "alice", "p")
+		if e != nil || len(items) != 0 {
+			t.Fatalf("scope=%s list=%+v %v", id, items, e)
+		}
+		if _, e = svc.Job(scope, "alice", "p", job.ID); !errors.Is(e, aicut.ErrExportJobNotFound) {
+			t.Fatalf("scope=%s job=%v", id, e)
+		}
+		if _, e = svc.Cancel(scope, "alice", "p", job.ID); !errors.Is(e, aicut.ErrExportJobNotFound) {
+			t.Fatalf("scope=%s cancel=%v", id, e)
+		}
+	}
+	scope := context.WithValue(ctx, aicutTimelineScopeKey{}, a.ID)
+	if _, e = svc.Cancel(scope, "alice", "p", job.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = svc.Submit(ctx, "alice", project, named, "mp3", aicut.ExportOptions{TimelineID: a.ID}); !errors.Is(e, aicut.ErrRevisionConflict) {
+		t.Fatalf("stale named=%v", e)
+	}
+}

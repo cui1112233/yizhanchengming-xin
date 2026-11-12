@@ -2,10 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { detectChromaScreenColor, normalizeVisualProcessing, sampleBezierMaskPoints, sampleChromaColorFromPixels, visualProcessingPreviewPlan } from './aicutVisualProcessing.js';
 import * as visualProcessing from './aicutVisualProcessing.js';
+import { normalizeHSLAdjustments } from './aicut/hslColor.js';
+
+test('HSL survives normalization and reaches GPU preview plan', () => {
+  const hsl = { red: { hue: 25, saturation: -40, luminance: 10 } };
+  assert.deepEqual(normalizeVisualProcessing({ color: { hsl } }).color.hsl, normalizeHSLAdjustments(hsl));
+  assert.deepEqual(visualProcessingPreviewPlan({ color: { hsl } }).hsl, normalizeHSLAdjustments(hsl));
+});
 
 test('高级画面参数提供安全默认值并限制边界', () => {
   assert.deepEqual(normalizeVisualProcessing(), {
-    color: { exposure: 0, temperature: 0, tint: 0, highlights: 0, shadows: 0, gamma: 1, curve: [0, .25, .5, .75, 1], curvePoints: [{ x: 0, y: 0 }, { x: .25, y: .25 }, { x: .5, y: .5 }, { x: .75, y: .75 }, { x: 1, y: 1 }] },
+    color: { hsl: normalizeHSLAdjustments(), exposure: 0, temperature: 0, tint: 0, highlights: 0, shadows: 0, gamma: 1, curve: [0, .25, .5, .75, 1], curvePoints: [{ x: 0, y: 0 }, { x: .25, y: .25 }, { x: .5, y: .5 }, { x: .75, y: .75 }, { x: 1, y: 1 }] },
     chromaKey: { enabled: false, removeBlack: false, color: '#00ff00', similarity: .2, blend: .08 },
     mask: { type: 'none', x: .5, y: .5, width: 1, height: 1, feather: 0, invert: false, points: [], bezierPoints: [] },
     geometry: { cropLeft: 0, cropTop: 0, cropRight: 0, cropBottom: 0, flipHorizontal: false, flipVertical: false },
@@ -22,7 +29,7 @@ test('高级画面参数提供安全默认值并限制边界', () => {
     geometry: { cropLeft: -1, cropTop: 2, cropRight: .2, cropBottom: .3, flipHorizontal: true, flipVertical: true },
     details: { sharpen: 4, vignette: -.5, grain: .65 }
   });
-  assert.deepEqual(value.color, { exposure: 2, temperature: -1, tint: 1, highlights: -1, shadows: 1, gamma: 2, curve: [0, .2, 1, .8, 1], curvePoints: [{ x: 0, y: 0 }, { x: .25, y: .2 }, { x: .5, y: 1 }, { x: .75, y: .8 }, { x: 1, y: 1 }] });
+  assert.deepEqual(value.color, { hsl: normalizeHSLAdjustments(), exposure: 2, temperature: -1, tint: 1, highlights: -1, shadows: 1, gamma: 2, curve: [0, .2, 1, .8, 1], curvePoints: [{ x: 0, y: 0 }, { x: .25, y: .2 }, { x: .5, y: 1 }, { x: .75, y: .8 }, { x: 1, y: 1 }] });
   assert.deepEqual(value.chromaKey, { enabled: true, removeBlack: true, color: '#00ff00', similarity: 1, blend: 0 });
   assert.deepEqual(value.mask, { type: 'ellipse', x: 1, y: 0, width: .05, height: 1, feather: .5, invert: true, points: [], bezierPoints: [] });
   assert.deepEqual(value.geometry, { cropLeft: 0, cropTop: .9, cropRight: .2, cropBottom: .3, flipHorizontal: true, flipVertical: true });

@@ -17,9 +17,11 @@ test('batch factory rows and settings cards use shared Shuihuo text and surface 
   assert.match(css, /\.batch-factory-book-config-region small\s*\{[^}]*color:\s*var\(--sh-muted\)/s);
 });
 
-test('light theme variables are applied when the theme attribute is on either document root or body', () => {
-  assert.match(css, /html\[data-theme='light'\] body\.shuihuo-theme-active[\s\S]*--sh-panel-strong:\s*#f8fafc/);
-  assert.match(css, /body\[data-theme='light'\]\.shuihuo-theme-active[\s\S]*--sh-panel-strong:\s*#f8fafc/);
+test('neutral palette resolves through shared semantic tokens instead of per-theme literals', () => {
+  assert.match(css, /\.shuihuo-production\s*\{[^}]*--sh-panel-strong:\s*var\(--surface-2\)/s);
+  assert.match(css, /\.shuihuo-theme-active\s*\{[^}]*--sh-panel-strong:\s*var\(--surface-2\)/s);
+  assert.match(css, /\.shuihuo-production\s*\{[^}]*--sh-line:\s*var\(--border-default\)/s);
+  assert.doesNotMatch(css, /--sh-panel-strong:\s*#f8fafc/);
 });
 
 test('light workbench keeps headers, row numbers, and action controls readable', () => {

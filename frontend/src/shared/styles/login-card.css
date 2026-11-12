@@ -152,9 +152,9 @@
   overflow: hidden;
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(100deg, #ed5966, #ee649d 46%, #6488f4);
-  box-shadow: 0 12px 30px rgba(228, 80, 150, 0.22);
-  color: #fff;
+  background: linear-gradient(100deg, var(--theme-primary), var(--theme-primary-hover));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--theme-primary) 30%, transparent);
+  color: var(--text-on-accent);
   font-weight: 700;
 }
 .nebula-login-modal .nebula-login-form-wrap .ant-btn-primary::after { display: none; }
@@ -169,7 +169,7 @@
 .auth-expired-modal .ant-modal-confirm-content { color: #f7f3ff !important; }
 .auth-expired-modal .ant-modal-confirm-content { margin-top: 10px; color: rgba(234, 231, 247, 0.82) !important; }
 .auth-expired-modal .ant-modal-confirm-title { color: #fff !important; font-size: 18px; font-weight: 750; }
-.auth-expired-modal .ant-modal-confirm-btns .ant-btn-primary { border: 0; background: linear-gradient(100deg, #ef5e71, #786df4); }
+.auth-expired-modal .ant-modal-confirm-btns .ant-btn-primary { border: 0; color: var(--text-on-accent); background: linear-gradient(100deg, var(--theme-primary), var(--theme-primary-hover)); }
 
 @keyframes nebula-login-border-flow { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 @keyframes nebula-login-card-in { from { opacity: 0; transform: translateY(18px) scale(.96); filter: blur(10px); } to { opacity: 1; filter: none; } }

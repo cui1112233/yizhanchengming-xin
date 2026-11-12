@@ -950,7 +950,7 @@ test('音频处理命令统一设置降噪、三段均衡器、声道混音和�
     processing: { denoise: .65, eqLowDB: 3, eqMidDB: -2, eqHighDB: 4, channelMode: 'mono', loudnessEnabled: true, targetLUFS: -14, voiceEffect: 'robot' }
   });
   assert.deepEqual(result.timeline.tracks[0].clips[0].audioProcessing, {
-    denoise: .65, eqLowDB: 3, eqMidDB: -2, eqHighDB: 4, channelMode: 'mono', loudnessEnabled: true, targetLUFS: -14, voiceEffect: 'robot', pitchSemitones: 0
+    denoise: .65, eqLowDB: 3, eqMidDB: -2, eqHighDB: 4, channelMode: 'mono', loudnessEnabled: true, targetLUFS: -14, voiceEffect: 'robot', pitchSemitones: 0, pan: 0
   });
   assert.equal(result.selectionKey, 'a::c');
   assert.equal(timeline.tracks[0].clips[0].audioProcessing, undefined);

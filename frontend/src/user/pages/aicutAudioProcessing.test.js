@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { audioEffectOptions, audioProcessingPreviewPlan, normalizeAudioProcessing } from './aicutAudioProcessing.js';
+import { audioEffectOptions, audioProcessingPreviewPlan, normalizeAudioProcessing, createAudioProcessingGraph } from './aicutAudioProcessing.js';
 
 test('音频处理默认值和边界归一化', () => {
-  assert.deepEqual(normalizeAudioProcessing(), { denoise: 0, eqLowDB: 0, eqMidDB: 0, eqHighDB: 0, channelMode: 'stereo', loudnessEnabled: false, targetLUFS: -16, voiceEffect: 'natural', pitchSemitones: 0 });
+  assert.deepEqual(normalizeAudioProcessing(), { denoise: 0, eqLowDB: 0, eqMidDB: 0, eqHighDB: 0, channelMode: 'stereo', pan: 0, loudnessEnabled: false, targetLUFS: -16, voiceEffect: 'natural', pitchSemitones: 0 });
   assert.deepEqual(normalizeAudioProcessing({ denoise: 2, eqLowDB: -20, eqMidDB: 3, eqHighDB: 99, channelMode: 'bad' }), {
-    denoise: 1, eqLowDB: -12, eqMidDB: 3, eqHighDB: 12, channelMode: 'stereo', loudnessEnabled: false, targetLUFS: -16, voiceEffect: 'natural', pitchSemitones: 0
+    denoise: 1, eqLowDB: -12, eqMidDB: 3, eqHighDB: 12, channelMode: 'stereo', pan: 0, loudnessEnabled: false, targetLUFS: -16, voiceEffect: 'natural', pitchSemitones: 0
   });
   assert.equal(normalizeAudioProcessing({ targetLUFS: 0 }).targetLUFS, -16, '旧工程的零值必须恢复为安全默认值');
   assert.equal(normalizeAudioProcessing({ voiceEffect: 'robot' }).voiceEffect, 'robot');
@@ -49,6 +49,9 @@ test('浏览器试听计划把降噪和响度匹配转换为低耗处理并保�
     eqMidDB: -1,
     eqHighDB: 4,
     channelMode: 'right',
+    pan: 0,
+    balanceLeftGain: 1,
+    balanceRightGain: 1,
     loudnessEnabled: true,
     targetLUFS: -14,
     compressorThresholdDB: -24,
@@ -85,4 +88,60 @@ test('五种人声预设产生稳定且不同的浏览器试听计划', () => {
   const chipmunk = audioProcessingPreviewPlan({ voiceEffect: 'chipmunk' });
   assert.ok(chipmunk.voicePresenceDB > enhance.voicePresenceDB);
   assert.ok(chipmunk.modulationDepthMS > 0);
+});
+
+test('连续声像采用保留独立左右声道的线性平衡', () => {
+  for (const [pan, left, right] of [[0, 1, 1], [-1, 1, 0], [1, 0, 1], [.25, .75, 1], [-.6, 1, .4]]) {
+    const plan = audioProcessingPreviewPlan({ pan });
+    assert.equal(plan.pan, pan);
+    assert.equal(plan.balanceLeftGain, left);
+    assert.equal(plan.balanceRightGain, right);
+  }
+  assert.equal(normalizeAudioProcessing({ pan: Infinity }).pan, 0);
+  assert.equal(normalizeAudioProcessing({ pan: NaN }).pan, 0);
+  assert.equal(normalizeAudioProcessing({ pan: -5 }).pan, -1);
+});
+
+test('浏览器图真实连接独立左右增益并更新、清理声像节点', async () => {
+  const nodes = [];
+  const makeNode = (kind) => {
+    const node = { kind, connections: [], disconnected: false, connect(target, output = 0, input = 0) { this.connections.push({ target, output, input }); return target; }, disconnect() { this.disconnected = true; this.connections = []; }, start() {}, stop() {}, gain: { value: 1 }, frequency: {}, Q: {}, delayTime: {}, threshold: {}, knee: {}, ratio: {}, attack: {}, release: {} };
+    nodes.push(node); return node;
+  };
+  class AudioContextMock {
+    destination = makeNode('destination');
+    createMediaElementSource() { return makeNode('source'); }
+    createBiquadFilter() { return makeNode('filter'); }
+    createWaveShaper() { return makeNode('wave'); }
+    createDelay() { return makeNode('delay'); }
+    createOscillator() { return makeNode('oscillator'); }
+    createGain() { return makeNode('gain'); }
+    createDynamicsCompressor() { return makeNode('compressor'); }
+    createChannelSplitter() { return makeNode('splitter'); }
+    createChannelMerger() { return makeNode('merger'); }
+    close() { return Promise.resolve(); }
+  }
+  const original = globalThis.AudioContext;
+  globalThis.AudioContext = AudioContextMock;
+  try {
+    const graph = createAudioProcessingGraph({}, { pan: .25 });
+    const splitter = nodes.find(node => node.kind === 'splitter');
+    assert.ok(splitter, '声像必须有真实的左右路由');
+    const upmix = nodes.find(node => node.connections.some(connection => connection.target === splitter));
+    assert.equal(upmix.channelCount, 2, '单声道先按扬声器规则复制到左右');
+    assert.equal(upmix.channelCountMode, 'explicit');
+    assert.equal(upmix.channelInterpretation, 'speakers');
+    const left = splitter.connections.find(connection => connection.output === 0).target;
+    const right = splitter.connections.find(connection => connection.output === 1).target;
+    assert.equal(left.gain.value, .75);
+    assert.equal(right.gain.value, 1);
+    assert.equal(left.connections[0].input, 0);
+    assert.equal(right.connections[0].input, 1);
+    graph.update({ pan: -.5 });
+    const current = nodes.filter(node => node.kind === 'splitter' && node.connections.length).at(-1);
+    assert.equal(current.connections[0].target.gain.value, 1);
+    assert.equal(current.connections[1].target.gain.value, .5);
+    await graph.close();
+    assert.ok(current.disconnected);
+  } finally { globalThis.AudioContext = original; }
 });

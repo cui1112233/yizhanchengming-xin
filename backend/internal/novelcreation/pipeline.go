@@ -199,6 +199,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		return ChapterBundle{}, err
 	}
 	foundationPayload := map[string]any{
+		"creation_mode": modeContract(input.Session.Mode),
 		"project_brief": map[string]any{
 			"title": input.Project.Title, "genre": input.Project.Genre,
 			"world": input.Project.World, "protagonist": input.Project.Protagonist,
@@ -225,6 +226,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	planRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 		definition: novelprompt.ChapterPlan, step: RunPlanning,
 		userPayload: map[string]any{
+			"creation_mode":   modeContract(input.Session.Mode),
 			"foundation_plan": foundation,
 			"chapter_number":  chapterNumber,
 			"memory_context":  rawJSONValue(input.PreviousMemory),
@@ -248,6 +250,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	draftRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 		definition: novelprompt.ChapterDraft, step: RunWriting,
 		userPayload: map[string]any{
+			"creation_mode":   modeContract(input.Session.Mode),
 			"foundation_plan": foundation,
 			"chapter_plan":    plan,
 			"memory_context":  rawJSONValue(input.PreviousMemory),
@@ -372,6 +375,22 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble chapter bundle", Cause: err}
 	}
 	return bundle, nil
+}
+
+func modeContract(mode string) map[string]string {
+	normalized := strings.TrimSpace(mode)
+	contracts := map[string]map[string]string{
+		"long_original":   {"id": "long_original", "name": "长篇原创", "rule": "从零建立原创世界、人物弧光与可持续卷章结构；本次输出当前章节，不提前透支后续主线。"},
+		"short_original":  {"id": "short_original", "name": "短篇原创", "rule": "围绕单一核心冲突完成自洽短篇；开端、升级、转折和收束必须在有限篇幅内闭环。"},
+		"long_imitation":  {"id": "long_imitation", "name": "仿写长篇", "rule": "只学习参考文本的节奏、叙述距离和句式特征；人物、世界、事件与表达必须重新创作，禁止复制原句。"},
+		"short_imitation": {"id": "short_imitation", "name": "仿写短篇", "rule": "只迁移参考文本的风格特征，在短篇内完成全新人物、情节和结局，禁止复述原作。"},
+		"fanfiction":      {"id": "fanfiction", "name": "同人创作", "rule": "遵守用户给出的既有人物性格、关系和世界规则；新增事件不得让角色无理由失真。"},
+		"continuation":    {"id": "continuation", "name": "续写", "rule": "紧接用户提供正文的最后有效事件续写，保持人称、时态、叙述语气和已知事实一致，不重写前文。"},
+	}
+	if contract, ok := contracts[normalized]; ok {
+		return contract
+	}
+	return contracts["long_original"]
 }
 
 func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, foundation foundationPlanOutput, plan chapterPlanOutput, content string) (chapterAuditOutput, json.RawMessage, error) {

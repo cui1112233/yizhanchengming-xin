@@ -34,7 +34,7 @@ function executorStatusText(group) {
   return '状态读取中…';
 }
 
-export function SettingsPage({ themePreference = 'system', onThemeChange, windowBackgroundId = 'none', windowBackgroundUrl = '', onWindowBackgroundChange, onWindowBackgroundUpload }) {
+export function SettingsPage({ theme = '', themePreference = 'system', onThemeChange, windowBackgroundId = 'none', windowBackgroundUrl = '', onWindowBackgroundChange, onWindowBackgroundUpload }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [savingSection, setSavingSection] = useState(null);
@@ -319,8 +319,8 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
       <div className="settings-workbench">
         <div className="settings-heading">
           <div>
-            <Typography.Title level={3}>工作台设置</Typography.Title>
-            <Typography.Paragraph>管理前贴桌面宠物、工作提醒、本地视频执行器与服务器归档。模型密钥在个人中心「API 配置」统一配置。</Typography.Paragraph>
+            <Typography.Title level={3}>设置</Typography.Title>
+            <Typography.Paragraph>从界面外观到创作偏好，让工作台更适合你。</Typography.Paragraph>
           </div>
           <span className="settings-status">本账号配置</span>
         </div>
@@ -331,14 +331,18 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
         disabled={loading}
         initialValues={{ storageRoot: '', productionRetentionDays: 7, petId: DEFAULT_PET_ID, soundEnabled: true, soundVolume: 60, petVisible: true }}
       >
-        <section className="settings-section settings-theme-section" aria-labelledby="settings-theme-title">
-          <div>
-            <h2 id="settings-theme-title">外观主题</h2>
-            <p>选择后立即切换。登录账号会自动同步到其他设备。</p>
-          </div>
-          <ThemePicker value={themePreference} onChange={onThemeChange} variant="grid" />
-          <WindowBackgroundPicker value={windowBackgroundId} customUrl={windowBackgroundUrl} onChange={onWindowBackgroundChange} onUpload={onWindowBackgroundUpload} />
-        </section>
+        <div className="settings-top-grid settings-appearance-group">
+          <section className="settings-section settings-theme-section" aria-labelledby="settings-theme-title">
+            <div>
+              <h2 id="settings-theme-title">外观与显示</h2>
+              <p>统一的通透玻璃质感，选择浅色、深色或跟随系统。切换后自动保存。</p>
+            </div>
+            <ThemePicker value={themePreference} onChange={onThemeChange} variant="grid" />
+          </section>
+          <section className="settings-section settings-background-section" aria-labelledby="window-background-title">
+            <WindowBackgroundPicker theme={theme} value={windowBackgroundId} customUrl={windowBackgroundUrl} onChange={onWindowBackgroundChange} onUpload={onWindowBackgroundUpload} />
+          </section>
+        </div>
         <div className="settings-top-grid">
         <section className="settings-section settings-model-section" aria-labelledby="settings-model-title">
           <div>
@@ -447,10 +451,12 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
 
         <section className="settings-section settings-executor-section" aria-labelledby="settings-executor-overview-title">
           <div>
-            <h2 id="settings-executor-overview-title">执行器状态</h2>
+            <h2 id="settings-executor-overview-title">执行器</h2>
             <p>两种执行器都运行在自己的电脑上：豆包负责图片/视频，巨量素材负责 OCR 读取正文。状态口径统一为：未安装、需配对、离线、在线。</p>
           </div>
-          <div className="settings-executor-layout">
+          <div className="settings-executor-block">
+            <h3>运行状态</h3>
+            <div className="settings-executor-layout">
             <div className="settings-executor-status-grid">
               <div className="settings-executor-status">
                 <div className="settings-executor-icon"><Video size={20} /></div>
@@ -468,13 +474,11 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
               </div>
             </div>
           </div>
-        </section>
-
-        <section className="settings-section settings-executor-section" aria-labelledby="settings-executor-title">
-          <div>
-            <h2 id="settings-executor-title">一战晟铭执行器</h2>
-            <p>在自己的电脑上使用豆包生成图片和视频。下载安装后，用一次性配对码连接，之后会自动接收网页任务。</p>
           </div>
+
+        <div className="settings-executor-block">
+          <h3 id="settings-executor-title">一战晟铭执行器（豆包 · 图片/视频）</h3>
+          <p className="settings-block-desc">在自己的电脑上使用豆包生成图片和视频。下载安装后，用一次性配对码连接，之后会自动接收网页任务。</p>
           <div className="settings-executor-layout">
             {pairing ? <p className="settings-executor-pairing">请在一战晟铭执行器中输入配对码：<strong>{pairing.code}</strong>（10 分钟内有效，只能使用一次）</p> : null}
             <div className="settings-executor-actions settings-executor-actions-doubao">
@@ -512,13 +516,11 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
               </div> : null}
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="settings-section settings-executor-section" aria-labelledby="settings-giant-material-executor-title">
-          <div>
-            <h2 id="settings-giant-material-executor-title">巨量素材执行器</h2>
-            <p>Windows 与 macOS 本地 OCR 执行器。首次绑定一次，之后会在后台自动连接，不需要重复配对。</p>
-          </div>
+        <div className="settings-executor-block">
+          <h3 id="settings-giant-material-executor-title">巨量素材执行器（OCR）</h3>
+          <p className="settings-block-desc">Windows 与 macOS 本地 OCR 执行器。首次绑定一次，之后会在后台自动连接，不需要重复配对。</p>
           <div className="settings-executor-layout">
             <div className="settings-giant-preference">
               <span className="settings-giant-preference-label">优先读取平台</span>
@@ -535,11 +537,11 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
                   const outdated = Boolean(latestVersion) && Boolean(item.version) && item.version !== latestVersion;
                   return (
                     <li key={item.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: item.online ? '#52c41a' : '#5b6b79' }} />
+                      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: item.online ? 'var(--text-success)' : 'var(--text-disabled)' }} />
                       <strong>{item.name || '未命名设备'}</strong>
                       <span style={{ color: 'var(--legacy-muted, #9bb1c0)' }}>{item.os === 'darwin' ? 'macOS' : item.os === 'windows' ? 'Windows' : item.os || '未知系统'}</span>
                       <span style={{ color: 'var(--legacy-muted, #9bb1c0)' }}>版本 {item.version || '未知（旧版）'}</span>
-                      {outdated && <span style={{ color: '#d48806' }}>可更新至 {latestVersion}</span>}
+                      {outdated && <span style={{ color: 'var(--text-warning)' }}>可更新至 {latestVersion}</span>}
                       <span style={{ marginLeft: 'auto', color: 'var(--legacy-muted, #9bb1c0)' }}>{item.online ? '在线' : formatLastSeen(item.lastSeenAt)}</span>
                       <Popconfirm title="确定删除这台设备吗？未完成的任务会自动重新排队。"
                         okText="删除" cancelText="取消" onConfirm={() => removeGiantExecutor(item.id)}>
@@ -563,6 +565,7 @@ export function SettingsPage({ themePreference = 'system', onThemeChange, window
             {giantPairing?.code ? <p className="settings-executor-pairing">配对码：<strong>{giantPairing.code}</strong>（10 分钟内有效）。请在执行器首次启动窗口或本机配对页中输入；绑定成功后这里会显示在线状态。</p> : null}
             <p className="settings-executor-pairing">Windows 解压后双击 GiantMaterialExecutor.exe；macOS 解压后打开 GiantMaterialExecutor.app。首次绑定一次后会在后台自动连接；有新版本时，请在本机执行器中点击“立即更新”，不会替其他电脑远程更新。</p>
           </div>
+        </div>
         </section>
 
       </Form>

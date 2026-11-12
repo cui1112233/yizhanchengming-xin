@@ -126,6 +126,19 @@ FROM screenplay_documents WHERE project_id = ? AND owner_username = ? AND status
 	return doc, err
 }
 
+func (s *MySQLStore) GetDocument(ctx context.Context, owner, projectID, documentID string) (Document, error) {
+	var doc Document
+	err := s.db.QueryRowContext(ctx, `SELECT id, project_id, owner_username, source, version, status, content, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
+FROM screenplay_documents WHERE id = ? AND project_id = ? AND owner_username = ?`, documentID, projectID, owner).
+		Scan(&doc.ID, &doc.ProjectID, &doc.OwnerUsername, &doc.Source, &doc.Version, &doc.Status,
+			&doc.Content, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
+			&doc.Revision, &doc.CreatedAt, &doc.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Document{}, fmt.Errorf("%w: 剧本版本 %s", ErrNotFound, documentID)
+	}
+	return doc, err
+}
+
 func (s *MySQLStore) ListDocuments(ctx context.Context, owner, projectID string) ([]Document, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, project_id, owner_username, source, version, status, '' AS content, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
 FROM screenplay_documents WHERE project_id = ? AND owner_username = ? ORDER BY version DESC`, projectID, owner)

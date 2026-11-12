@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createAICutCapabilities } from './aicutCapabilities.js';
 
 const page = fs.readFileSync(new URL('./AICutPage.jsx', import.meta.url), 'utf8');
+const timelineTools = fs.readFileSync(new URL('./aicut/timelineTools.js', import.meta.url), 'utf8');
 const inspector = fs.readFileSync(new URL('./aicut/InspectorPanel.jsx', import.meta.url), 'utf8');
 const audioProcessing = fs.readFileSync(new URL('./aicutAudioProcessing.js', import.meta.url), 'utf8');
 const compoundWorkspace = fs.readFileSync(new URL('./aicut/CompoundTimelineWorkspace.jsx', import.meta.url), 'utf8');
@@ -66,7 +67,8 @@ test('选中视频可真实渲染合并为项目素材并支持取消', () => {
   assert.match(page, /saveTimeline\(\{ silent: true, requireLatest: true \}\)/);
   assert.match(page, /expectedRevision: saved\.revision/);
   assert.match(page, /consolidateAbortRef\.current\?\.abort\(\)/);
-  assert.match(page, />\s*\{consolidateBusy \? '取消合并' : '合并为素材'\}\s*<\/Button>/);
+  assert.match(timelineTools, /action\('consolidate', consolidateBusy \? '取消合并' : '合并为素材'/);
+  assert.match(page, /consolidate: consolidateSelectedClips/);
   assert.match(page, /原片段保持不变/);
 });
 
@@ -94,7 +96,8 @@ test('透明工程提供持久背景设置、棋盘格预览和Alpha导出', () 
 
 test('时间线标记点和关键帧经过统一命令层并提供真实页面入口', () => {
   for (const type of ['timeline.marker_add', 'timeline.marker_remove', 'clip.keyframe_upsert', 'clip.keyframe_remove']) assert.match(page, new RegExp(type.replace('.', '\\.')));
-  for (const label of ['＋关键帧', '−关键帧', '＋标记', '−标记', '时间线标记点']) assert.match(page, new RegExp(label));
+  for (const label of ['添加关键帧', '移除关键帧', '添加标记', '移除标记']) assert.match(timelineTools, new RegExp(label));
+  assert.match(page, /时间线标记点/);
   assert.match(page, /aicut-timeline-marker/);
   assert.match(page, /timelineTimeToPixels\(marker\.timeMs, timelineZoom\)/);
   assert.match(page, /aicut-keyframe-dot/);
@@ -139,14 +142,15 @@ test('复合片段使用统一命令层并能在时间线展开成员和拆散',
   assert.match(page, /type: ['"]clip\.compound_create['"]/);
   assert.match(page, /type: ['"]clip\.compound_dissolve['"]/);
   assert.match(page, /创建复合片段/);
-  assert.match(page, /展开复合成员/);
-  assert.match(page, /拆散复合片段/);
+  assert.match(timelineTools, /展开复合成员/);
+  assert.match(timelineTools, /拆散复合片段/);
   assert.match(page, /aicut-compound-chip/);
 });
 
 test('复合片段可以打开独立内部时间线并用统一命令编辑成员', () => {
   const workspace = fs.readFileSync(new URL('./aicut/CompoundTimelineWorkspace.jsx', import.meta.url), 'utf8');
-  assert.match(page, /打开复合时间线/);
+  assert.match(timelineTools, /打开复合时间线/);
+  assert.match(page, /openCompound:.*setActiveCompoundId/);
   assert.match(page, /activeCompoundId/);
   assert.match(page, /CompoundTimelineWorkspace/);
   assert.match(workspace, /返回主时间线/);

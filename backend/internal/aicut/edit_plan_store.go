@@ -31,7 +31,7 @@ func (s *MemoryStore) UpdateEditPlan(_ context.Context, plan EditPlan) (EditPlan
 	if !ok {
 		return EditPlan{}, ErrEditPlanNotFound
 	}
-	if current.ClientRequestID != normalized.ClientRequestID || !validEditPlanStateTransition(current.State, normalized.State) {
+	if canonicalASRTimeline(current.TimelineID) != canonicalASRTimeline(normalized.TimelineID) || current.ClientRequestID != normalized.ClientRequestID || !validEditPlanStateTransition(current.State, normalized.State) {
 		return EditPlan{}, ErrInvalidEditPlan
 	}
 	s.editPlans[key] = cloneEditPlan(normalized)
@@ -84,7 +84,11 @@ func (s *MemoryStore) CreateEditPlan(_ context.Context, plan EditPlan) (EditPlan
 	}
 	requestKey := editPlanRequestKey(normalized.Owner, normalized.ProjectID, normalized.ClientRequestID)
 	if id := s.editPlanRequests[requestKey]; id != "" {
-		return cloneEditPlan(s.editPlans[editPlanKey(normalized.Owner, normalized.ProjectID, id)]), nil
+		existing := s.editPlans[editPlanKey(normalized.Owner, normalized.ProjectID, id)]
+		if canonicalASRTimeline(existing.TimelineID) != canonicalASRTimeline(normalized.TimelineID) {
+			return EditPlan{}, ErrInvalidEditPlan
+		}
+		return cloneEditPlan(existing), nil
 	}
 	key := editPlanKey(normalized.Owner, normalized.ProjectID, normalized.ID)
 	if _, exists := s.editPlans[key]; exists {
@@ -152,6 +156,9 @@ func (s *MemoryStore) ApplyStoredEditPlan(_ context.Context, owner, projectID, i
 	plan, ok := s.editPlans[key]
 	if !ok {
 		return EditPlan{}, Timeline{}, EditPlanApplySummary{}, ErrEditPlanNotFound
+	}
+	if canonicalASRTimeline(plan.TimelineID) != DefaultTimelineID {
+		return EditPlan{}, Timeline{}, EditPlanApplySummary{}, ErrInvalidEditPlan
 	}
 	projectKey := aicutProjectKey(owner, projectID)
 	item, ok := s.projects[projectKey]

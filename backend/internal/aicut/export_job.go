@@ -24,6 +24,7 @@ const (
 )
 
 type ExportOptions struct {
+	TimelineID           string `json:"timelineId,omitempty"`
 	Resolution           string `json:"resolution,omitempty"`
 	FrameRate            int    `json:"frameRate,omitempty"`
 	Quality              string `json:"quality,omitempty"`

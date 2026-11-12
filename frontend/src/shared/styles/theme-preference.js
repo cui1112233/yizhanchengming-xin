@@ -1,24 +1,19 @@
-import { listThemeDefinitions } from './theme-catalog.js';
+import { parseThemeId } from './theme-catalog.js';
 
 export const THEME_STORAGE_KEY = 'yizhan-theme';
 
-const supportedThemeIds = new Set(listThemeDefinitions().map(theme => theme.id));
-
-function supportedThemeId(value) {
-  const themeId = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  return supportedThemeIds.has(themeId) ? themeId : 'system';
-}
-
+// Retired palettes keep their depth preference while adopting the unified material.
+const currentThemeId = value => `glass-${parseThemeId(value).mode}`;
 export function loadCachedTheme(storage = globalThis.localStorage) {
   try {
-    return supportedThemeId(storage?.getItem(THEME_STORAGE_KEY));
+    return currentThemeId(storage?.getItem(THEME_STORAGE_KEY));
   } catch {
-    return 'system';
+    return currentThemeId('system');
   }
 }
 
 export function persistCachedTheme(themeId, storage = globalThis.localStorage) {
-  const nextThemeId = supportedThemeId(themeId);
+  const nextThemeId = currentThemeId(themeId);
   try {
     storage?.setItem(THEME_STORAGE_KEY, nextThemeId);
   } catch {
@@ -28,5 +23,5 @@ export function persistCachedTheme(themeId, storage = globalThis.localStorage) {
 }
 
 export function selectThemePreference({ loggedIn, accountThemeId, cachedThemeId }) {
-  return supportedThemeId(loggedIn ? accountThemeId : cachedThemeId);
+  return currentThemeId(loggedIn ? accountThemeId : cachedThemeId);
 }

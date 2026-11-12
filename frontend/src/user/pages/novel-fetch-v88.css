@@ -42,14 +42,14 @@
   background: var(--v88-color-primary-hover);
 }
 .novel-fetch-workbench .ant-btn.v88-btn--danger:not(:disabled) {
-  color: var(--v88-color-danger);
-  border-color: var(--v88-color-danger);
-  background: var(--v88-color-danger-soft);
+  color: var(--text-danger);
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
 }
 .novel-fetch-workbench .ant-btn.v88-btn--danger:not(:disabled):hover {
-  color: var(--v88-color-text-1);
-  border-color: var(--v88-color-danger);
-  background: var(--v88-color-danger);
+  color: var(--text-danger);
+  border-color: var(--text-danger);
+  background: var(--status-danger-bg);
 }
 
 /* 3. 卡片与面板：统一底色、边框和圆角（仅暗色主题，浅色主题保持原样） */
@@ -57,22 +57,22 @@
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-public-result,
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-current-batch,
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-automation-bar {
-  border: 1px solid var(--v88-color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--v88-radius-lg);
-  background: var(--v88-color-surface);
-  box-shadow: var(--v88-shadow-card);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-1);
   backdrop-filter: none;
 }
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-stat-card,
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-version-card {
-  border: 1px solid var(--v88-color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--v88-radius-md);
-  background: var(--v88-color-surface-2);
+  background: var(--surface-2);
 }
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-version-option,
 [data-theme='dark'] .novel-fetch-workbench .novel-fetch-content-limit {
   border-radius: var(--v88-radius-md);
-  background: var(--v88-color-input);
+  background: var(--surface-input);
 }
 
 /* 4. 等待态：转圈与文案同行，不靠静态文字冒充进度 */
@@ -80,7 +80,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--v88-space-2);
-  color: var(--v88-color-text-2);
+  color: var(--text-secondary);
   font-size: var(--v88-font-body);
 }
 .novel-fetch-cylinder-empty {

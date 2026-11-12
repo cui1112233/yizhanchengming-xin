@@ -20,7 +20,7 @@ func TestMySQLAgentStorePersistsRunMessageAndOrderedEvent(t *testing.T) {
 	run := AgentRun{ID: "run-1", ClientRequestID: "request-1", Owner: "alice", ProjectID: "cut-1", Instruction: "粗剪", Mode: AgentModeAgent, ModelID: "model-1", ExpectedRevision: 3, State: AgentQueued, CreatedAt: now, UpdatedAt: now}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO aicut_agent_runs")).
-		WithArgs(run.ID, run.ClientRequestID, run.ProjectID, run.Owner, run.Instruction, run.Mode, run.ModelID, run.ActiveSkillID, run.ExpectedRevision, run.State, run.TurnCount, run.Error, run.CreatedAt, run.UpdatedAt).
+		WithArgs(run.ID, run.ClientRequestID, run.ProjectID, run.Owner, run.Instruction, run.Mode, run.ModelID, run.ActiveSkillID, run.ExpectedRevision, run.State, run.TurnCount, run.Error, run.CreatedAt, run.UpdatedAt, run.TimelineID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	created, err := store.CreateAgentRun(context.Background(), run)
 	if err != nil || created.ID != run.ID {

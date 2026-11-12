@@ -11,24 +11,31 @@ import (
 )
 
 type AgentToolExecutor struct {
-	timelines Store
-	agents    AgentStore
-	now       func() time.Time
-	composite AgentCompositeTools
+	collection *TimelineCollectionStore
+	timelines  Store
+	agents     AgentStore
+	now        func() time.Time
+	composite  AgentCompositeTools
 }
 
 type AgentCompositeTools struct {
-	SubmitASR    func(context.Context, string, ASRSubmit) (ASRJob, error)
-	SmartSplit   func(context.Context, string, string, string, float64, int64, int64) (Timeline, int, string, error)
-	ExtractAudio func(context.Context, string, string, string) (Asset, error)
-	OralClean    func(context.Context, string, string, string, int64, int64) (Timeline, FillerTrimSummary, string, error)
+	SmartSplitForTimeline func(context.Context, string, string, string, string, float64, int64, int64) (Timeline, int, string, error)
+	OralCleanForTimeline  func(context.Context, string, string, string, string, int64, int64) (Timeline, FillerTrimSummary, string, error)
+	SubmitASR             func(context.Context, string, ASRSubmit) (ASRJob, error)
+	SmartSplit            func(context.Context, string, string, string, float64, int64, int64) (Timeline, int, string, error)
+	ExtractAudio          func(context.Context, string, string, string) (Asset, error)
+	OralClean             func(context.Context, string, string, string, int64, int64) (Timeline, FillerTrimSummary, string, error)
 }
 
-func NewAgentToolExecutor(timelines Store, agents AgentStore, now func() time.Time) *AgentToolExecutor {
+func NewAgentToolExecutor(timelines Store, agents AgentStore, now func() time.Time, collections ...*TimelineCollectionStore) *AgentToolExecutor {
 	if now == nil {
 		now = time.Now
 	}
-	return &AgentToolExecutor{timelines: timelines, agents: agents, now: now}
+	var collection *TimelineCollectionStore
+	if len(collections) > 0 {
+		collection = collections[0]
+	}
+	return &AgentToolExecutor{timelines: timelines, agents: agents, now: now, collection: collection}
 }
 
 func (e *AgentToolExecutor) ConfigureCompositeTools(tools AgentCompositeTools) {
@@ -50,6 +57,39 @@ func decodeToolArguments(raw json.RawMessage, target any) error {
 }
 
 func (e *AgentToolExecutor) Execute(ctx context.Context, run AgentRun, call ToolCall) (ToolResult, error) {
+	persisted, err := e.agents.AgentRun(ctx, run.Owner, run.ProjectID, run.ID)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	if canonicalASRTimeline(persisted.TimelineID) != canonicalASRTimeline(run.TimelineID) {
+		return ToolResult{}, ErrAgentRunNotFound
+	}
+	if canonicalASRTimeline(run.TimelineID) != DefaultTimelineID {
+		if e.collection == nil {
+			return ToolResult{}, ErrTimelineJobUnsupported
+		}
+		scoped, err := e.collection.ScopedStore(ctx, run.Owner, run.ProjectID, run.TimelineID)
+		if err != nil {
+			return ToolResult{}, err
+		}
+		local := *e
+		local.timelines = scoped
+		if named := e.composite.SmartSplitForTimeline; named != nil {
+			local.composite.SmartSplit = func(ctx context.Context, o, p, asset string, threshold float64, interval, revision int64) (Timeline, int, string, error) {
+				return named(ctx, o, p, run.TimelineID, asset, threshold, interval, revision)
+			}
+		} else {
+			local.composite.SmartSplit = nil
+		}
+		if named := e.composite.OralCleanForTimeline; named != nil {
+			local.composite.OralClean = func(ctx context.Context, o, p, model string, pause, revision int64) (Timeline, FillerTrimSummary, string, error) {
+				return named(ctx, o, p, run.TimelineID, model, pause, revision)
+			}
+		} else {
+			local.composite.OralClean = nil
+		}
+		e = &local
+	}
 	call.ID, call.Name = strings.TrimSpace(call.ID), strings.TrimSpace(call.Name)
 	if call.ID == "" || call.Name == "" {
 		return ToolResult{}, ErrInvalidAgentRun
@@ -120,7 +160,7 @@ func (e *AgentToolExecutor) transcribeAsset(ctx context.Context, run AgentRun, c
 		result.Message = "ASR 服务尚未配置"
 		return result
 	}
-	job, err := e.composite.SubmitASR(ctx, run.Owner, ASRSubmit{ProjectID: run.ProjectID, AssetID: strings.TrimSpace(input.AssetID), ModelID: strings.TrimSpace(input.ModelID), Language: strings.TrimSpace(input.Language), ExpectedRevision: run.ExpectedRevision})
+	job, err := e.composite.SubmitASR(ctx, run.Owner, ASRSubmit{ProjectID: run.ProjectID, TimelineID: run.TimelineID, AssetID: strings.TrimSpace(input.AssetID), ModelID: strings.TrimSpace(input.ModelID), Language: strings.TrimSpace(input.Language), ExpectedRevision: run.ExpectedRevision})
 	if err != nil {
 		result.Message = err.Error()
 		return result

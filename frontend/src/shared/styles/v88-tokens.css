@@ -3,31 +3,31 @@
    本文件只新增 --v88-* 变量，不改写 global.css 里任何既有规则。 */
 
 :root {
-  /* 颜色：暗色基准 */
-  --v88-color-bg: #070b11;
-  --v88-color-surface: #0e1621;
-  --v88-color-surface-2: #111b28;
-  --v88-color-input: #0b111a;
-  --v88-color-border: rgba(151, 168, 190, .22);
-  --v88-color-border-strong: rgba(176, 195, 219, .36);
+  /* 颜色：全部指向语义变量，跟随 data-scheme × data-theme 自动换风格 */
+  --v88-color-bg: var(--surface-base);
+  --v88-color-surface: var(--surface-panel);
+  --v88-color-surface-2: var(--surface-2);
+  --v88-color-input: var(--surface-input);
+  --v88-color-border: var(--border-default);
+  --v88-color-border-strong: var(--border-strong);
 
-  /* 主色 = 青绿；珊瑚降级为强调/警示；靛蓝只做信息与链接 */
-  --v88-color-primary: #63dfc0;
-  --v88-color-primary-hover: #7de8cf;
-  --v88-color-primary-active: #4fcbb0;
-  --v88-color-primary-soft: rgba(99, 223, 192, .12);
-  --v88-color-emphasis: #f07167;
-  --v88-color-danger: #ff9b9d;
-  --v88-color-danger-soft: rgba(255, 155, 157, .12);
-  --v88-color-success: #75ddb4;
-  --v88-color-warning: #ffd08a;
-  --v88-color-info: #9da8ff;
+  /* 主色与功能色由当前风格提供（珊瑚 / 深海青 / 石墨电蓝 / 墨紫） */
+  --v88-color-primary: var(--theme-primary);
+  --v88-color-primary-hover: var(--theme-primary-hover);
+  --v88-color-primary-active: var(--theme-primary-active);
+  --v88-color-primary-soft: color-mix(in srgb, var(--theme-primary) 14%, transparent);
+  --v88-color-emphasis: var(--theme-primary);
+  --v88-color-danger: var(--text-danger);
+  --v88-color-danger-soft: color-mix(in srgb, var(--text-danger) 12%, transparent);
+  --v88-color-success: var(--text-success);
+  --v88-color-warning: var(--text-warning);
+  --v88-color-info: var(--text-link);
 
-  /* 文字三级 + 主色上的反白字 */
-  --v88-color-text-1: #f5f7fb;
-  --v88-color-text-2: #c7d0dd;
-  --v88-color-text-3: #a7b4c5;
-  --v88-color-text-on-primary: #04120f;
+  /* 文字三级 + 主色上的字 */
+  --v88-color-text-1: var(--text-primary);
+  --v88-color-text-2: var(--text-secondary);
+  --v88-color-text-3: var(--text-tertiary);
+  --v88-color-text-on-primary: var(--text-on-accent);
 
   /* 圆角 */
   --v88-radius-sm: 6px;
@@ -60,6 +60,21 @@
   /* 阴影 */
   --v88-shadow-card: 0 8px 32px rgba(0, 0, 0, .22);
   --v88-shadow-raised: 0 18px 48px rgba(0, 0, 0, .28);
+
+  /* 与 global.css 第二批语义变量一一对应；别名直接引用语义变量，深浅两套自动翻转 */
+  --v88-color-surface-hover: var(--surface-hover);
+  --v88-color-overlay-mask: var(--overlay-mask);
+  --v88-color-overlay-highlight: var(--overlay-highlight);
+  --v88-shadow-1: var(--shadow-1);
+  --v88-shadow-2: var(--shadow-2);
+  --v88-color-status-success-bg: var(--status-success-bg);
+  --v88-color-status-success-border: var(--status-success-border);
+  --v88-color-status-warning-bg: var(--status-warning-bg);
+  --v88-color-status-warning-border: var(--status-warning-border);
+  --v88-color-status-danger-bg: var(--status-danger-bg);
+  --v88-color-status-danger-border: var(--status-danger-border);
+  --v88-color-status-info-bg: var(--status-info-bg);
+  --v88-color-status-info-border: var(--status-info-border);
 }
 
 /* 减少动态：三档时长归零，动画类由各页面自行关闭 */

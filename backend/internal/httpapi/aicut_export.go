@@ -35,6 +35,7 @@ type aicutRenderClip struct {
 	mattePath         string
 	matteInputIndex   int
 	stabilizationPath string
+	hslLUTPath        string
 	layerEffects      []aicut.Clip
 }
 
@@ -542,6 +543,10 @@ func renderAICutExportWithOptions(ctx context.Context, owner string, project aic
 		}
 	}
 	if format != "mp3" {
+		if lutErr := prepareAICutHSLLUTs(dir, prepared); lutErr != nil {
+			cleanup()
+			return "", nil, lutErr
+		}
 		if stabilizeErr := prepareAICutStabilizationTransforms(ctx, dir, prepared); stabilizeErr != nil {
 			cleanup()
 			return "", nil, stabilizeErr
@@ -685,6 +690,9 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 				if processing.LoudnessEnabled {
 					chain += fmt.Sprintf(",loudnorm=I=%.1f:TP=-1.5:LRA=11", processing.TargetLUFS)
 				}
+				for _, filter := range buildAICutBalanceFilters(processing.Pan) {
+					chain += "," + filter
+				}
 			}
 			if item.clip.FadeInMS > 0 {
 				chain += fmt.Sprintf(",afade=t=in:st=0:d=%.3f", float64(item.clip.FadeInMS)/1000)
@@ -769,7 +777,10 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 				chain = append(chain, effectFilters...)
 			}
 		}
-		chain = append(chain, buildAICutVisualProcessingFilters(item.clip.VisualProcessing, timelineComposition)...)
+		if item.clip.VisualProcessing != nil && aicut.HasColorGradeAdjustments(item.clip.VisualProcessing.Color) && item.hslLUTPath == "" {
+			return nil, fmt.Errorf("HSL 调色文件尚未准备，无法导出")
+		}
+		chain = append(chain, buildAICutVisualProcessingFilters(item.clip.VisualProcessing, timelineComposition, item.hslLUTPath)...)
 		chain = append(chain, buildAICutStabilizationFilters(item)...)
 		chain = append(chain, buildAICutFrameInterpolationFilters(item.clip.VisualProcessing, options.FrameRate)...)
 		padColor := aicutFFmpegCanvasColor(options.BackgroundColor)
@@ -1013,6 +1024,18 @@ func buildAICutObjectRemovalFilters(processing *aicut.VisualProcessing, width, h
 	x = max(0, min(width-regionWidth, x))
 	y = max(0, min(height-regionHeight, y))
 	return []string{fmt.Sprintf("delogo=x=%d:y=%d:w=%d:h=%d:show=0", x, y, regionWidth, regionHeight)}
+}
+
+// Linear stereo balance: center is unchanged, positive attenuates only left,
+// negative attenuates only right. Mono is first duplicated at unity gain.
+func buildAICutBalanceFilters(pan float64) []string {
+	if pan == 0 {
+		return nil
+	}
+	return []string{
+		"pan=stereo|c0=FL+FC|c1=FR+FC",
+		fmt.Sprintf("pan=stereo|c0=%.9f*c0|c1=%.9f*c1", 1-max(0, pan), 1+min(0, pan)),
+	}
 }
 
 func buildAICutVoiceEffectFilters(effect string) []string {
@@ -1267,7 +1290,7 @@ func buildAICutCatalogResourceFilters(resourceID string, parameters map[string]f
 	}
 }
 
-func buildAICutVisualProcessingFilters(processing *aicut.VisualProcessing, preserveAlpha bool) []string {
+func buildAICutVisualProcessingFilters(processing *aicut.VisualProcessing, preserveAlpha bool, hslLUTPath ...string) []string {
 	if processing == nil {
 		return nil
 	}
@@ -1287,6 +1310,28 @@ func buildAICutVisualProcessingFilters(processing *aicut.VisualProcessing, prese
 	}
 	if geometry.FlipVertical {
 		filters = append(filters, "vflip")
+	}
+	usesAlpha := processing.ChromaKey.Enabled || processing.ChromaKey.RemoveBlack
+	if usesAlpha {
+		key := strings.TrimPrefix(processing.ChromaKey.Color, "#")
+		if processing.ChromaKey.RemoveBlack {
+			key = "000000"
+		}
+		keyRGB, _ := strconv.ParseUint(key, 16, 32)
+		red, green, blue := (keyRGB>>16)&255, (keyRGB>>8)&255, keyRGB&255
+		similarity, blend := processing.ChromaKey.Similarity, processing.ChromaKey.Blend
+		if math.IsNaN(similarity) || math.IsInf(similarity, 0) {
+			similarity = .2
+		}
+		if math.IsNaN(blend) || math.IsInf(blend, 0) {
+			blend = .08
+		}
+		similarity, blend = max(.01, min(1, similarity)), max(.001, min(1, blend))
+		// Match the preview: determine the matte from source RGB before grading,
+		// and multiply existing alpha instead of replacing partially transparent pixels.
+		distance := fmt.Sprintf("sqrt(pow(r(X,Y)-%d,2)+pow(g(X,Y)-%d,2)+pow(b(X,Y)-%d,2))/255", red, green, blue)
+		ratio := fmt.Sprintf("clip(((%s)-%.9f)/%.9f,0,1)", distance, similarity, blend)
+		filters = append(filters, fmt.Sprintf("format=gbrap,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='st(0,%s);alpha(X,Y)*ld(0)*ld(0)*(3-2*ld(0))'", ratio))
 	}
 	color := processing.Color
 	gamma := color.Gamma
@@ -1326,6 +1371,9 @@ func buildAICutVisualProcessingFilters(processing *aicut.VisualProcessing, prese
 			filters = append(filters, fmt.Sprintf("curves=all='0/%.6f .25/%.6f .5/%.6f .75/%.6f 1/%.6f'", color.Curve[0], color.Curve[1], color.Curve[2], color.Curve[3], color.Curve[4]))
 		}
 	}
+	if aicut.HasColorGradeAdjustments(color) && len(hslLUTPath) > 0 && hslLUTPath[0] != "" {
+		filters = append(filters, fmt.Sprintf("lut3d=file='%s':interp=trilinear", escapeAICutFilterPath(hslLUTPath[0])))
+	}
 	details := processing.Details
 	if details.Sharpen > 0 {
 		filters = append(filters, fmt.Sprintf("unsharp=5:5:%.3f:5:5:0", .25+1.25*details.Sharpen))
@@ -1335,15 +1383,6 @@ func buildAICutVisualProcessingFilters(processing *aicut.VisualProcessing, prese
 	}
 	if details.Grain > 0 {
 		filters = append(filters, fmt.Sprintf("noise=alls=%d:allf=t+u", 2+int(math.Round(18*details.Grain))))
-	}
-	usesAlpha := false
-	if processing.ChromaKey.Enabled || processing.ChromaKey.RemoveBlack {
-		key := strings.TrimPrefix(strings.ToLower(processing.ChromaKey.Color), "#")
-		if processing.ChromaKey.RemoveBlack {
-			key = "000000"
-		}
-		filters = append(filters, fmt.Sprintf("format=rgba,chromakey=0x%s:%.3f:%.3f", key, processing.ChromaKey.Similarity, processing.ChromaKey.Blend))
-		usesAlpha = true
 	}
 	mask := processing.Mask
 	if mask.Type == "rectangle" || mask.Type == "ellipse" || mask.Type == "polygon" || mask.Type == "bezier" {

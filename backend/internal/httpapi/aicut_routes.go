@@ -228,6 +228,8 @@ func decodeAICutJSON(w http.ResponseWriter, req *http.Request, target any) bool 
 
 func writeAICutError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, aicut.ErrTimelineNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "时间线不存在"})
 	case errors.Is(err, aicut.ErrProjectNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "剪辑项目不存在"})
 	case errors.Is(err, aicut.ErrProjectExists):

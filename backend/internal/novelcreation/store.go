@@ -19,10 +19,12 @@ type Store interface {
 	AppendMessage(context.Context, string, Message) (Message, error)
 	ListMessages(context.Context, string, string, int64) ([]Message, error)
 	FindRunByIdempotencyKey(context.Context, string, string) (Run, bool, error)
+	GetRun(context.Context, string, string) (Run, error)
 	CreateRun(context.Context, string, Run) (Run, error)
 	UpdateRun(context.Context, string, RunUpdate) (Run, error)
 	AppendRunEvent(context.Context, string, RunEvent) (RunEvent, error)
 	ListRunEvents(context.Context, string, string, int64) ([]RunEvent, error)
+	ListChapters(context.Context, string, string) ([]Chapter, error)
 	SaveChapterBundle(context.Context, string, ChapterBundle) error
 }
 
@@ -31,18 +33,18 @@ type Store interface {
 type TxStore interface{ Store }
 
 type Project struct {
-	ID                 string
-	Title              string
-	Genre              string
-	World              string
-	Protagonist        string
-	CoreConflict       string
-	ModelID            string
-	TargetChapterWords int
-	Status             string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	DeletedAt          *time.Time
+	ID                 string     `json:"id"`
+	Title              string     `json:"title"`
+	Genre              string     `json:"genre"`
+	World              string     `json:"world"`
+	Protagonist        string     `json:"protagonist"`
+	CoreConflict       string     `json:"coreConflict"`
+	ModelID            string     `json:"modelId"`
+	TargetChapterWords int        `json:"targetChapterWords"`
+	Status             string     `json:"status"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	DeletedAt          *time.Time `json:"deletedAt,omitempty"`
 }
 
 type CreateSessionInput struct {
@@ -53,48 +55,48 @@ type CreateSessionInput struct {
 }
 
 type Session struct {
-	ID            string
-	ProjectID     string
-	Mode          string
-	Title         string
-	ContextBudget int
-	MessageCursor int64
-	CurrentRunID  string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            string    `json:"id"`
+	ProjectID     string    `json:"projectId"`
+	Mode          string    `json:"mode"`
+	Title         string    `json:"title"`
+	ContextBudget int       `json:"contextBudget"`
+	MessageCursor int64     `json:"messageCursor"`
+	CurrentRunID  string    `json:"currentRunId,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 type Message struct {
-	ID            string
-	SessionID     string
-	ProjectID     string
-	Role          string
-	Content       string
-	Status        string
-	ModelID       string
-	ThinkingLevel string
-	References    json.RawMessage
-	TokenUsage    json.RawMessage
-	Sequence      int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            string          `json:"id"`
+	SessionID     string          `json:"sessionId"`
+	ProjectID     string          `json:"projectId"`
+	Role          string          `json:"role"`
+	Content       string          `json:"content"`
+	Status        string          `json:"status"`
+	ModelID       string          `json:"modelId"`
+	ThinkingLevel string          `json:"thinkingLevel"`
+	References    json.RawMessage `json:"references,omitempty"`
+	TokenUsage    json.RawMessage `json:"tokenUsage,omitempty"`
+	Sequence      int64           `json:"sequence"`
+	CreatedAt     time.Time       `json:"createdAt"`
+	UpdatedAt     time.Time       `json:"updatedAt"`
 }
 
 type Run struct {
-	ID              string
-	ProjectID       string
-	SessionID       string
-	IdempotencyKey  string
-	Status          RunStatus
-	ModelID         string
-	ThinkingLevel   string
-	PromptSnapshot  json.RawMessage
-	RuntimeSnapshot json.RawMessage
-	ErrorCode       string
-	ErrorMessage    string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	FinishedAt      *time.Time
+	ID              string          `json:"id"`
+	ProjectID       string          `json:"projectId"`
+	SessionID       string          `json:"sessionId"`
+	IdempotencyKey  string          `json:"idempotencyKey"`
+	Status          RunStatus       `json:"status"`
+	ModelID         string          `json:"modelId"`
+	ThinkingLevel   string          `json:"thinkingLevel"`
+	PromptSnapshot  json.RawMessage `json:"-"`
+	RuntimeSnapshot json.RawMessage `json:"runtimeSnapshot,omitempty"`
+	ErrorCode       string          `json:"errorCode,omitempty"`
+	ErrorMessage    string          `json:"errorMessage,omitempty"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	UpdatedAt       time.Time       `json:"updatedAt"`
+	FinishedAt      *time.Time      `json:"finishedAt,omitempty"`
 }
 
 type RunUpdate struct {
@@ -107,17 +109,17 @@ type RunUpdate struct {
 }
 
 type RunEvent struct {
-	EventID   int64
-	RunID     string
-	SessionID string
-	ProjectID string
-	Type      string
-	Step      string
-	Status    RunStatus
-	Message   string
-	Progress  int
-	Payload   json.RawMessage
-	CreatedAt time.Time
+	EventID   int64           `json:"eventId"`
+	RunID     string          `json:"runId"`
+	SessionID string          `json:"sessionId"`
+	ProjectID string          `json:"projectId"`
+	Type      string          `json:"type"`
+	Step      string          `json:"step"`
+	Status    RunStatus       `json:"status"`
+	Message   string          `json:"message"`
+	Progress  int             `json:"progress"`
+	Payload   json.RawMessage `json:"payload,omitempty"`
+	CreatedAt time.Time       `json:"createdAt"`
 }
 
 type Volume struct {
@@ -130,17 +132,17 @@ type Volume struct {
 }
 
 type Chapter struct {
-	ID          string
-	ProjectID   string
-	VolumeID    string
-	Number      int
-	Title       string
-	Content     string
-	WordCount   int
-	AuditStatus string
-	Version     int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"projectId"`
+	VolumeID    string    `json:"volumeId,omitempty"`
+	Number      int       `json:"number"`
+	Title       string    `json:"title"`
+	Content     string    `json:"content"`
+	WordCount   int       `json:"wordCount"`
+	AuditStatus string    `json:"auditStatus"`
+	Version     int       `json:"version"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type ChapterVersion struct {

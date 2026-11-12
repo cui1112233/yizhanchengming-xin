@@ -223,6 +223,9 @@ func (s *MemoryStore) UpdateASRJob(_ context.Context, job ASRJob) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := aicutASRJobKey(job.Owner, job.ProjectID, job.ID)
+	if existing, ok := s.asrJobs[key]; ok && canonicalASRTimeline(existing.TimelineID) != canonicalASRTimeline(job.TimelineID) {
+		return ErrInvalidASRJob
+	}
 	if _, ok := s.asrJobs[key]; !ok {
 		return ErrASRJobNotFound
 	}
