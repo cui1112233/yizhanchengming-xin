@@ -34,6 +34,7 @@ During stages 1-6, apply these additional rules:
 14. **Historical Docker/Node/GHCR workflows are not release entry points.** They are outside the refactored application and must not be selected for ordinary deployment.
 15. **The refactored application runtime is Go-only.** MySQL, Redis, TOS, FFmpeg and external connectors remain infrastructure dependencies, but the application API and embedded frontend are served by the Go binary.
 16. **Before starting a V88 task in any chat, read the current consolidation inventory OBJ and `docs/V88_PROJECT_EXECUTION_MEMORY.md`.** Do not rely on stale `master`, historical production snapshots, or prior-chat assumptions.
+17. **Release order is local-first.** Every change must be rebuilt and restarted on local 4001 and verified there first; only after local verification passes may the same commit be built and deployed to production. Never deploy a commit that has not run locally.
 
 For the full project memory and deployment rationale, read:
 
