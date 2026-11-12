@@ -62,10 +62,10 @@ test('comic configuration edits the current comic while script configuration kee
   assert.match(scriptPageSource, /customizationWorkspace !== 'comic' \? <>[\s\S]{0,1800}视频模型/);
 });
 
-test('asset images are an optional enhancement and never block the next required step', () => {
-  assert.match(source, /key: 'assetImages', label: '资产图（可选）', optional: true/);
+test('private comic treats asset images as a required step for character consistency', () => {
+  assert.match(source, /key: 'assetImages', label: '资产图', optional: false/);
   assert.match(source, /find\(step => !step\.done && !step\.optional\)/);
-  assert.match(source, /生成资产图（可选，缺 \$\{missingAssetImages\}）/);
+  assert.match(source, /生成资产图（缺 \$\{missingAssetImages\}）/);
 });
 
 test('changing the style clears a pre-submit custom reference', () => {

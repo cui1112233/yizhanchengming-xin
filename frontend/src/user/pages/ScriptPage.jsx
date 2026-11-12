@@ -1794,19 +1794,6 @@ export function ScriptPage() {
     return images;
   }
 
-  async function readPrivateComicAssetImageCounts(batchId, bookId) {
-    const assetResult = await listBookAssets(batchId, bookId, { suppressGlobalError: true });
-    const assets = Array.isArray(assetResult?.assets) ? assetResult.assets : [];
-    return Promise.all(assets.map(async asset => {
-      try {
-        const imageResult = await listBookAssetImages(batchId, bookId, asset.id, { suppressGlobalError: true });
-        return { asset, count: Array.isArray(imageResult?.images) ? imageResult.images.length : 0 };
-      } catch (_) {
-        return { asset, count: 0 };
-      }
-    }));
-  }
-
   async function runPrivateComicAssetImages(assetId = '', useThreeView = true) {
     const batchId = privateComicTask?.batchId;
     const bookId = privateComicTask?.bookId;
@@ -2092,8 +2079,9 @@ export function ScriptPage() {
     if (privateComicBusy) return;
     setPrivateComicError('');
     setPrivateComicBusy(true);
-    // 分阶段失败文案：资产图 / 提示词 / 出图分别提示，便于定位问题。
-    const stageFailures = { assets: '资产图生成失败', prompts: '分镜提示词生成失败', pages: '分镜出图失败' };
+    // 私人定制是精细流程：这里只做「资产提取 + 分镜提示词」两步，
+    // 资产图和页面图由用户逐页确认后再单独生成，避免一键跑完覆盖人工调整。
+    const stageFailures = { assets: '资产提取失败', prompts: '分镜提示词生成失败' };
     let stage = '';
     try {
       const ensured = await ensureCurrentPrivateComicTask();
@@ -2124,23 +2112,8 @@ export function ScriptPage() {
           requestId: privateComicOperationId()
         });
       }
-      // 一键到底：先补齐缺失的资产图（角色/场景参考图），否则漫画页没有参考图可用。
-      const assetImageCountsBefore = await readPrivateComicAssetImageCounts(snapshot.batchId, snapshot.bookId);
-      const missingAssetIds = assetImageCountsBefore.filter(item => !item.count).map(item => item.asset.id);
-      if (missingAssetIds.length) {
-        const generated = await generateBookAssetImages(snapshot.batchId, snapshot.bookId, {
-          assetIds: missingAssetIds,
-          modelId: privateComicDraft.imageModelId || undefined,
-          provider: privateComicDraft.imageProvider || undefined,
-          imageAspectRatio: '9:16',
-          useThreeView: true
-        });
-        await waitForPrivateComicAssetImageTask(snapshot.batchId, snapshot.bookId, generated);
-      }
-      const assetImageCountsAfter = await readPrivateComicAssetImageCounts(snapshot.batchId, snapshot.bookId);
-      if (!assetImageCountsAfter.reduce((total, item) => total + item.count, 0)) {
-        throw new Error('资产参考图未生成，已停止出图：请检查图片模型配置后重试');
-      }
+      // 私人定制保持逐步确认：资产图由「生成角色/场景图」按钮单独触发，
+      // 这里不再自动补图，也不会自动出页面图。
       stage = 'prompts';
       // 用最新的页面列表计算模式，避免 useMemo 里的旧 state 在“刚建任务/刚刷新”时
       // 被当成空列表而误走 bootstrap，覆盖已有人工修改的提示词。
@@ -2156,31 +2129,7 @@ export function ScriptPage() {
         textModelId: privateComicDraft.textModelId || undefined,
         requestId: privateComicOperationId()
       });
-      // 一键到底：提示词就绪后自动为缺少页面图的分镜出图。
-      stage = 'pages';
-      const latestPageResult = await listComicPages(snapshot.batchId, snapshot.bookId, { suppressGlobalError: true });
-      const latestPages = Array.isArray(latestPageResult?.pages) ? latestPageResult.pages : [];
-      const runnablePages = latestPages.filter(page => page?.videoId
-        && String(page?.imagePrompt || '').trim()
-        && !(Array.isArray(page.images) ? page.images : []).length);
-      const submittedPages = [];
-      const conflictPages = [];
-      let firstPageError = null;
-      for (const page of runnablePages) {
-        try {
-          const outcome = await generateComicPageWithConflict(snapshot.batchId, snapshot.bookId, page.videoId, privateComicPagePayload(page));
-          if (outcome?.conflict) conflictPages.push(page);
-          else submittedPages.push(page);
-        } catch (error) {
-          if (!firstPageError) firstPageError = error;
-        }
-      }
-      if (firstPageError) throw firstPageError;
-      const pendingPageIds = submittedPages.concat(conflictPages).map(page => page.videoId);
-      if (pendingPageIds.length) {
-        const completed = await waitForPrivateComicPageImages(snapshot.batchId, snapshot.bookId, pendingPageIds);
-        if (!completed) message.info('分镜生图仍在进行，可稍后点刷新查看结果');
-      }
+      // 页面图不在此处自动生成：私人定制由用户逐页确认提示词后再单独出图。
       setPrivateComicTask(snapshot);
       await refreshPrivateComicTask(snapshot.batchId, { ...snapshot, status: 'running' });
     } catch (error) {
