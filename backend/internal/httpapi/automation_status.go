@@ -59,6 +59,9 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		return nil, err
 	}
 	repaired := normalizeAlreadyUploadedAutomationState(&state)
+	if repairStaleRunningAutomationBooks(&state, time.Now()) {
+		repaired = true
+	}
 	if reconcileTerminalAutomationJobs(&state, time.Now()) {
 		repaired = true
 	}
@@ -97,6 +100,74 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		return publicAutomationJob(matched[0]), nil
 	}
 	return idle, nil
+}
+
+// automationStaleBookTimeout 是“任务已终止但书仍显示执行中”的判定阈值。
+// 正常在途的书每分钟都会刷新 updatedAt 心跳，超过该阈值仍停留在 running
+// 只可能是上次执行被中断留下的假状态。
+const automationStaleBookTimeout = 5 * time.Minute
+
+// repairStaleRunningAutomationBooks 把已终止任务（失败/完成/停止/暂停）里
+// 遗留的 running 书改判为 failed。重试逻辑会把 running 当成“正在执行”而
+// 跳过，界面上的“重试失败小说”也会按 failed 计数显示 0，导致用户点了也
+// 没有任何效果。任务仍在 running 时不动，交给看门狗判断。
+func repairStaleRunningAutomationBooks(state *automationStateFile, now time.Time) bool {
+	if state == nil {
+		return false
+	}
+	changed := false
+	for _, job := range state.Jobs {
+		if repairStaleRunningAutomationJob(job, now) {
+			changed = true
+		}
+	}
+	return changed
+}
+
+func repairStaleRunningAutomationJob(job map[string]any, now time.Time) bool {
+	if job == nil || automationStringValue(job["state"], "") == "running" {
+		return false
+	}
+	books, _ := job["books"].(map[string]any)
+	if len(books) == 0 {
+		return false
+	}
+	changed := false
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil || automationStringValue(entry["status"], "") != "running" {
+			continue
+		}
+		if updated, ok := automationEntryUpdatedAt(entry); ok && now.Sub(updated) < automationStaleBookTimeout {
+			continue
+		}
+		entry["status"] = "failed"
+		entry["message"] = "上次执行已中断，可直接重试"
+		entry["updatedAt"] = now
+		delete(entry, "retryAt")
+		entry["autoContinue"] = map[string]any{"reason": "上次执行已中断，等待重试", "willContinue": false}
+		changed = true
+	}
+	if changed {
+		// 只刷新计数，不能调用 normalizeAutomationJobCounts：它会按计数反推
+		// 任务状态，把用户主动暂停的任务改写成 failed。
+		job["counts"] = automationCountsFromBooks(books)
+		job["updatedAt"] = now
+	}
+	return changed
+}
+
+func automationEntryUpdatedAt(entry map[string]any) (time.Time, bool) {
+	value := strings.TrimSpace(toString(entry["updatedAt"]))
+	if value == "" {
+		return time.Time{}, false
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // reconcileTerminalAutomationJobs repairs an impossible aggregate state left

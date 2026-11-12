@@ -4593,6 +4593,11 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 任务正在执行，完成后再重试", batchfactoryv11.ErrConflict)
 	}
+	// 上次执行被中断后，书会停留在 running；选择重试书时会把它们当成
+	// “正在执行”跳过，用户看到的就是“重试失败小说（0）”，点了也没有反应。
+	if repairStaleRunningAutomationJob(target, c.now()) {
+		reopened = true
+	}
 	books, _ := target["books"].(map[string]any)
 	// 重试只调度未成功的书：已完成/已发布、正在执行、等待定时提交或等待人工
 	// 确认的书都不进入新一轮 run。显式传了 bookIds 时先与 job 跟踪的书取交集。

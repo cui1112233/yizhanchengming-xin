@@ -129,6 +129,55 @@ func TestReconcileTerminalAutomationJobKeepsDueRetryRunning(t *testing.T) {
 	}
 }
 
+func TestRepairStaleRunningBooksMakesInterruptedBookRetryable(t *testing.T) {
+	now := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "paused",
+		"books": map[string]any{
+			"book-stale":   map[string]any{"status": "running", "stage": "comic_images", "updatedAt": now.Add(-2 * time.Hour).Format(time.RFC3339Nano)},
+			"book-ready":   map[string]any{"status": "completed", "stage": "published"},
+			"book-running": map[string]any{"status": "running", "stage": "comic_images", "updatedAt": now.Add(-time.Minute).Format(time.RFC3339Nano)},
+		},
+		"counts": map[string]any{"total": 3, "running": 2, "failed": 0, "ready": 1},
+	}
+	if !repairStaleRunningAutomationJob(job, now) {
+		t.Fatal("expected stale running book to be repaired")
+	}
+	books := job["books"].(map[string]any)
+	stale := books["book-stale"].(map[string]any)
+	if got := automationStringValue(stale["status"], ""); got != "failed" {
+		t.Fatalf("stale book status = %q, want failed", got)
+	}
+	if !automationBookRetryable(stale) {
+		t.Fatal("repaired book must be selectable by retry")
+	}
+	// 刚有过心跳的在途书不能误判失败。
+	if got := automationStringValue(books["book-running"].(map[string]any)["status"], ""); got != "running" {
+		t.Fatalf("in-flight book status = %q, want running", got)
+	}
+	counts := job["counts"].(map[string]any)
+	if got := automationNumberValue(counts["failed"], 0); got != 1 {
+		t.Fatalf("counts.failed = %v, want 1", got)
+	}
+	// 用户主动暂停的状态必须保留，不能被计数反推成 failed。
+	if got := automationStringValue(job["state"], ""); got != "paused" {
+		t.Fatalf("job state = %q, want paused", got)
+	}
+}
+
+func TestRepairStaleRunningBooksSkipsActiveRun(t *testing.T) {
+	now := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "running",
+		"books": map[string]any{
+			"book-1": map[string]any{"status": "running", "stage": "comic_images", "updatedAt": now.Add(-time.Hour).Format(time.RFC3339Nano)},
+		},
+	}
+	if repairStaleRunningAutomationJob(job, now) {
+		t.Fatal("active run must be left to the stall watchdog")
+	}
+}
+
 func TestFileAutomationStatusReaderRepairsN8AlreadyUploadedImages(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "automation.json")
 	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"failed","books":{"book-1":{"bookId":"book-1","status":"failed","stage":"comic_publish","error":"N8接口返回错误：IMAGE_ALREADY_IN_CAROUSEL","retryRequested":true,"retryAt":"2026-10-30T13:30:00Z"}}}}}`
