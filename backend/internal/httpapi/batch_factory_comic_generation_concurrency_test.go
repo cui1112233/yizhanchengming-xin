@@ -72,10 +72,12 @@ func TestRecordComicAssetShortfallWritesLedger(t *testing.T) {
 	}
 }
 
-func TestShuihuoImageGenerationConcurrencyMatchesNovember3StableVersion(t *testing.T) {
+// 默认并发从 2 提到 4：按本串行出图后一本书独占通道，4 路能把单本耗时从
+// 约 28 分钟压到约 8 分钟；上限仍是 4，避免 ggwk 长响应被并发拖到断流。
+func TestShuihuoImageGenerationConcurrencyDefaultsToFourLanes(t *testing.T) {
 	t.Setenv(shuihuoImageConcurrencyEnv, "")
-	if got := shuihuoImageGenerationConcurrency(); got != 2 {
-		t.Fatalf("default image concurrency=%d, want 2", got)
+	if got := shuihuoImageGenerationConcurrency(); got != 4 {
+		t.Fatalf("default image concurrency=%d, want 4", got)
 	}
 	if got := shuihuoClampImageConcurrency(99); got != 4 {
 		t.Fatalf("clamped image concurrency=%d, want 4", got)

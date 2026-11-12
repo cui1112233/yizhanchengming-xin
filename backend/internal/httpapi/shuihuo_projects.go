@@ -59,11 +59,14 @@ func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
 
 var shuihuoProductionConfigs sync.Map
 
-// 恢复 11/03 已验证版本的并发边界：单本默认 2 路、最多 4 路。
+// 并发边界：单本默认 4 路、最多 4 路。
 // ggwk 网关的长响应对并发连接敏感，擅自放大到 4/8 路会增加断流和
 // PROTOCOL_ERROR，实际反而更慢。统一配置和环境变量仍可在安全范围内调整。
 const shuihuoImageConcurrencyEnv = "QIANTIE_SHUHUO_IMAGE_CONCURRENCY"
-const shuihuoImageConcurrencyDefault = 2
+// 默认给到上限 4 路：按本串行出图后，一本书独占全部通道，4 路能把
+// 「30 页 × 单张 150~200s」从约 28 分钟压到约 8 分钟；用户仍可在
+// 统一配置里按通道情况下调到 1/2/3 路。
+const shuihuoImageConcurrencyDefault = 4
 const shuihuoImageConcurrencyMax = 4
 
 func shuihuoClampImageConcurrency(value int) int {
