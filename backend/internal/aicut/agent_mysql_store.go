@@ -212,13 +212,23 @@ func (s *MySQLStore) SaveAgentToolResult(ctx context.Context, owner, projectID, 
 var _ AgentStore = (*MySQLStore)(nil)
 
 func (s *MySQLStore) AgentTimelineMessages(ctx context.Context, o, p, id string, limit int) ([]AgentMessage, error) {
+	return s.agentTimelineMessages(ctx, o, p, id, limit, false)
+}
+func (s *MySQLStore) AgentConversationMessages(ctx context.Context, o, p, id string, limit int) ([]AgentMessage, error) {
+	return s.agentTimelineMessages(ctx, o, p, id, limit, true)
+}
+func (s *MySQLStore) agentTimelineMessages(ctx context.Context, o, p, id string, limit int, conversationOnly bool) ([]AgentMessage, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
 	if canonicalASRTimeline(id) == DefaultTimelineID {
 		id = ""
 	}
-	rows, e := s.db.QueryContext(ctx, `SELECT m.id, m.run_id, m.project_id, m.owner_username, m.role, m.content, m.tool_name, m.tool_call_id, m.created_at FROM aicut_agent_messages m INNER JOIN aicut_agent_runs r ON r.id = m.run_id AND r.owner_username = m.owner_username AND r.project_id = m.project_id WHERE m.owner_username = ? AND m.project_id = ? AND r.timeline_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT ?`, o, p, id, limit)
+	roleClause := ""
+	if conversationOnly {
+		roleClause = " AND m.role IN ('user', 'assistant')"
+	}
+	rows, e := s.db.QueryContext(ctx, `SELECT m.id, m.run_id, m.project_id, m.owner_username, m.role, m.content, m.tool_name, m.tool_call_id, m.created_at FROM aicut_agent_messages m INNER JOIN aicut_agent_runs r ON r.id = m.run_id AND r.owner_username = m.owner_username AND r.project_id = m.project_id WHERE m.owner_username = ? AND m.project_id = ? AND r.timeline_id = ?`+roleClause+` ORDER BY m.created_at DESC, m.id DESC LIMIT ?`, o, p, id, limit)
 	if e != nil {
 		return nil, e
 	}

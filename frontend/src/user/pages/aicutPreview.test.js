@@ -45,7 +45,7 @@ test('文字预览读取字体排版并按打字机进度显示字符', () => {
   const item = buildAICutPreviewFrame(styled, [], 500).subtitles[0];
   assert.equal(item.visibleText, '剪辑');
   assert.deepEqual(item.textStyle, {
-	fontFamily: 'KaiTi', fontSize: 72, textCurve: 0, textColor: '#ffcc00', strokeColor: '#112233',
+	fontFamily: 'KaiTi', fontSize: 72, textOpacity: 1, textCurve: 0, textColor: '#ffcc00', strokeColor: '#112233',
     strokeWidth: 3, backgroundColor: '#00000080', shadowColor: '#000000cc', shadowOffsetX: 0,
     shadowOffsetY: 0, shadowBlur: 0, letterSpacing: 4, lineHeight: 1.4, textAlign: 'left'
   });

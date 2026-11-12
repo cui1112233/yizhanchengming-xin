@@ -223,6 +223,9 @@ func (s *MySQLStore) ApplyStoredEditPlan(ctx context.Context, owner, projectID, 
 		return plan, current, EditPlanApplySummary{}, ErrRevisionConflict
 	}
 	selected := enabledEditPlan(plan, enabledIDs)
+	if err := refreshSQLEditPlanAssets(ctx, tx, &selected); err != nil {
+		return plan, current, EditPlanApplySummary{}, err
+	}
 	nextTimeline, summary, err := ApplyEditPlan(current, selected)
 	if err != nil {
 		return plan, current, EditPlanApplySummary{}, err
@@ -251,6 +254,19 @@ func (s *MySQLStore) ApplyStoredEditPlan(ctx context.Context, owner, projectID, 
 			return EditPlan{}, Timeline{}, EditPlanApplySummary{}, err
 		}
 	}
+
+	for ordinal, op := range selected.Operations {
+		raw, _ := json.Marshal(op)
+		if _, err := tx.ExecContext(ctx, `UPDATE aicut_edit_plan_operations SET operation_json = ? WHERE plan_id = ? AND ordinal_no = ?`, string(raw), plan.ID, ordinal); err != nil {
+			return plan, current, EditPlanApplySummary{}, err
+		}
+	}
+	plan.Operations = selected.Operations
+	plan.Summary.EstimatedDurationMS = summary.EstimatedDurationMS
+	rawSummary, _ := json.Marshal(plan.Summary)
+	if _, err := tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET summary_json = ? WHERE id = ?`, string(rawSummary), plan.ID); err != nil {
+		return plan, current, EditPlanApplySummary{}, err
+	}
 	plan.State, plan.Error, plan.AppliedRevision, plan.UpdatedAt = EditPlanApplied, "", nextTimeline.Revision, now.UTC()
 	if _, err := tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET state = ?, error_message = '', applied_revision = ?, updated_at = ? WHERE id = ?`, plan.State, plan.AppliedRevision, plan.UpdatedAt, plan.ID); err != nil {
 		return EditPlan{}, Timeline{}, EditPlanApplySummary{}, err
@@ -259,4 +275,19 @@ func (s *MySQLStore) ApplyStoredEditPlan(ctx context.Context, owner, projectID, 
 		return EditPlan{}, Timeline{}, EditPlanApplySummary{}, err
 	}
 	return plan, nextTimeline, summary, nil
+}
+
+func refreshSQLEditPlanAssets(ctx context.Context, tx *sql.Tx, plan *EditPlan) error {
+	for id := range editPlanPlacedAssets(*plan) {
+		var a Asset
+		err := tx.QueryRowContext(ctx, `SELECT id, kind, name, duration_ms FROM aicut_assets WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`, id, plan.ProjectID, plan.Owner).Scan(&a.ID, &a.Kind, &a.Name, &a.DurationMS)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrAssetNotFound
+		}
+		if err != nil {
+			return err
+		}
+		replaceEditPlanAsset(plan, a)
+	}
+	return nil
 }

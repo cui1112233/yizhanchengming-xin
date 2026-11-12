@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 var ErrEditPlanApply = errors.New("ai-cut edit plan apply failed")
@@ -236,6 +237,8 @@ func ApplyEditPlan(timeline Timeline, plan EditPlan) (Timeline, EditPlanApplySum
 		}
 		var applyErr error
 		switch operation.Type {
+		case EditPlaceAsset:
+			applyErr = editPlanPlaceAsset(&next, normalized, operation, false)
 		case EditTrimClip:
 			var removed int64
 			removed, applyErr = editPlanApplyTrim(&next, operation)
@@ -247,7 +250,19 @@ func ApplyEditPlan(timeline Timeline, plan EditPlan) (Timeline, EditPlanApplySum
 		case EditMoveClip:
 			applyErr = editPlanApplyMove(&next, operation)
 		case EditAddCaption:
-			applyErr = editPlanAddSubtitle(&next, operation, false)
+			original := timeline.Script
+			for _, track := range timeline.Tracks {
+				for _, clip := range track.Clips {
+					if clip.Kind == ClipSubtitle {
+						original += "\n" + clip.Text
+					}
+				}
+			}
+			if !strings.Contains(original, operation.Text) {
+				applyErr = editPlanApplyError(operation, "字幕缺少已有剧本或字幕原文依据，不能编造对白")
+			} else {
+				applyErr = editPlanAddSubtitle(&next, operation, false)
+			}
 		case EditAddTitle:
 			applyErr = editPlanAddSubtitle(&next, operation, true)
 		case EditSetTransition:
@@ -260,6 +275,10 @@ func ApplyEditPlan(timeline Timeline, plan EditPlan) (Timeline, EditPlanApplySum
 				applyErr = editPlanApplyError(operation, "滤镜只能用于画面片段")
 			} else {
 				clip.CatalogResourceID = operation.ResourceID
+				clip.CatalogParameters = make(map[string]float64, len(operation.Parameters))
+				for key, value := range operation.Parameters {
+					clip.CatalogParameters[key] = value
+				}
 			}
 		case EditAddEffectLayer:
 			track, ok := editPlanTrack(&next, operation.TrackID)
@@ -269,14 +288,7 @@ func ApplyEditPlan(timeline Timeline, plan EditPlan) (Timeline, EditPlanApplySum
 				track.Clips = append(track.Clips, Clip{ID: "plan-" + operation.ID, Kind: ClipEffect, Name: operation.ResourceID, StartMS: operation.StartMS, DurationMS: operation.DurationMS, SourceDurationMS: operation.DurationMS, ResourceID: operation.ResourceID, Parameters: operation.Parameters, PlaybackRate: 1, Volume: 1})
 			}
 		case EditAddBGM:
-			track, ok := editPlanTrack(&next, operation.TrackID)
-			if !ok || track.Locked || track.Kind != TrackAudio {
-				applyErr = editPlanApplyError(operation, "音频轨道不可写")
-			} else if !editPlanAssetSelected(normalized, operation.AssetID) {
-				applyErr = editPlanApplyError(operation, "背景音乐不在已选素材中")
-			} else {
-				track.Clips = append(track.Clips, Clip{ID: "plan-" + operation.ID, AssetID: operation.AssetID, Kind: ClipAudio, Name: "背景音乐", StartMS: operation.StartMS, DurationMS: operation.DurationMS, SourceDurationMS: operation.DurationMS, PlaybackRate: 1, Volume: operation.Volume, FadeInMS: operation.FadeInMS, FadeOutMS: operation.FadeOutMS})
-			}
+			applyErr = editPlanPlaceAsset(&next, normalized, operation, true)
 		case EditSetVolumeEnvelope:
 			_, _, clip, clipErr := editPlanWritableClip(&next, operation)
 			if clipErr != nil {
@@ -299,5 +311,78 @@ func ApplyEditPlan(timeline Timeline, plan EditPlan) (Timeline, EditPlanApplySum
 	if err := validateTimeline(next); err != nil {
 		return Timeline{}, EditPlanApplySummary{}, fmt.Errorf("%w: 应用后的时间线无效", ErrEditPlanApply)
 	}
+	summary.EstimatedDurationMS = EditPlanTimelineDuration(next)
 	return next, summary, nil
+}
+
+// EditPlanTimelineDuration measures the result, never the model's estimate.
+func EditPlanTimelineDuration(t Timeline) int64 {
+	var end int64
+	for _, track := range t.Tracks {
+		for _, clip := range track.Clips {
+			if e := clip.StartMS + clip.DurationMS; e > end {
+				end = e
+			}
+		}
+	}
+	return end
+}
+func editPlanPlaceAsset(t *Timeline, plan EditPlan, op EditOperation, audio bool) error {
+	if !editPlanAssetSelected(plan, op.AssetID) {
+		return editPlanApplyError(op, "素材不在已选列表中")
+	}
+	var asset *EditPlanAsset
+	for i := range plan.Request.SelectedAssets {
+		if plan.Request.SelectedAssets[i].ID == op.AssetID {
+			asset = &plan.Request.SelectedAssets[i]
+			break
+		}
+	}
+	if asset == nil {
+		return editPlanApplyError(op, "缺少经过核验的素材信息")
+	}
+	kind := ClipVideo
+	trackKind := TrackVideo
+	if audio {
+		if asset.Kind != "audio" {
+			return editPlanApplyError(op, "背景音乐必须是音频素材")
+		}
+		kind = ClipAudio
+		trackKind = TrackAudio
+	} else if asset.Kind == "image" {
+		kind = ClipImage
+	} else if asset.Kind != "video" {
+		return editPlanApplyError(op, "画面只接受视频或图片")
+	}
+	if asset.Kind == "image" {
+		if op.SourceStartMS != 0 {
+			return editPlanApplyError(op, "图片没有源时间偏移")
+		}
+	} else if asset.DurationMS <= 0 || op.SourceStartMS > asset.DurationMS || op.DurationMS > asset.DurationMS-op.SourceStartMS {
+		return editPlanApplyError(op, "放置范围超过实际素材时长")
+	}
+	track, ok := editPlanTrack(t, op.TrackID)
+	if !ok {
+		t.Tracks = append(t.Tracks, Track{ID: op.TrackID, Kind: trackKind, Name: "自动剪辑", Order: len(t.Tracks), Settings: TrackSettings{PreviewVisible: true}, Clips: []Clip{}})
+		track = &t.Tracks[len(t.Tracks)-1]
+	}
+	if track.Locked || track.Kind != trackKind {
+		return editPlanApplyError(op, "目标轨道类型不符或已锁定")
+	}
+	id := "plan-" + op.ID
+	for _, c := range track.Clips {
+		if c.ID == id || editPlanIntervalsOverlap(op.StartMS, op.DurationMS, c.StartMS, c.DurationMS) {
+			return editPlanApplyError(op, "放置后与现有片段重叠或编号重复")
+		}
+	}
+	duration := asset.DurationMS
+	if kind == ClipImage {
+		duration = op.DurationMS
+	}
+	volume := 1.0
+	if audio {
+		volume = op.Volume
+	}
+	track.Clips = append(track.Clips, Clip{ID: id, AssetID: asset.ID, Kind: kind, Name: asset.Name, StartMS: op.StartMS, DurationMS: op.DurationMS, SourceStartMS: op.SourceStartMS, SourceDurationMS: duration, PlaybackRate: 1, Volume: volume, FadeInMS: op.FadeInMS, FadeOutMS: op.FadeOutMS})
+	return nil
 }

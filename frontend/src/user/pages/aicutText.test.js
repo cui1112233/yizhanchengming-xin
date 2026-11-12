@@ -10,7 +10,7 @@ test('文字样式会清理字体颜色和排版数值', () => {
       shadowColor: '#334455cc', shadowOffsetX: 99, shadowOffsetY: -99, shadowBlur: 99
     }),
     {
-	  fontFamily: 'Microsoft YaHei', fontSize: 240, textCurve: 0, textColor: '#ffcc00', strokeColor: '#000000',
+	  fontFamily: 'Microsoft YaHei', fontSize: 240, textOpacity: 1, textCurve: 0, textColor: '#ffcc00', strokeColor: '#000000',
 	  strokeWidth: 0, backgroundColor: '#11223380', shadowColor: '#334455cc', shadowOffsetX: 40,
       shadowOffsetY: -40, shadowBlur: 20, letterSpacing: 40, lineHeight: .8, textAlign: 'center'
     }

@@ -98,7 +98,7 @@ func TestNormalizeEditPlanRejectsInvalidState(t *testing.T) {
 }
 
 func TestParseEditPlanModelOutputAcceptsMarkdownFenceAndKeepsServerEnvelope(t *testing.T) {
-	envelope := EditPlanEnvelope{ID: "plan-server", ClientRequestID: "request-server", Owner: "alice", ProjectID: "cut-1", BaseRevision: 9, ModelID: "model-7", Request: EditPlanRequest{AssetIDs: []string{"asset-1"}, Goal: "粗剪", AspectRatio: "9:16"}, CreatedAt: time.Unix(100, 0).UTC(), UpdatedAt: time.Unix(100, 0).UTC()}
+	envelope := EditPlanEnvelope{ID: "plan-server", ClientRequestID: "request-server", Owner: "alice", ProjectID: "cut-1", BaseRevision: 9, ModelID: "model-7", Request: EditPlanRequest{AssetIDs: []string{"asset-1"}, Goal: "粗剪", IncludeCaptions:true, AspectRatio: "9:16"}, CreatedAt: time.Unix(100, 0).UTC(), UpdatedAt: time.Unix(100, 0).UTC()}
 	raw := "```json\n{\"summary\":{\"sourceDurationMs\":5000,\"estimatedDurationMs\":3000},\"operations\":[{\"id\":\"op-1\",\"type\":\"add_caption\",\"trackId\":\"subtitle-1\",\"startMs\":0,\"durationMs\":1000,\"text\":\"开场\",\"reason\":\"补充字幕\",\"enabled\":true}],\"warnings\":[\"素材较短\"]}\n```"
 	got, err := ParseEditPlanModelOutput(raw, envelope)
 	if err != nil {
@@ -113,8 +113,37 @@ func TestParseEditPlanModelOutputAcceptsMarkdownFenceAndKeepsServerEnvelope(t *t
 }
 
 func TestParseEditPlanModelOutputRejectsTrailingContent(t *testing.T) {
-	_, err := ParseEditPlanModelOutput(`{"summary":{},"operations":[]} trailing`, EditPlanEnvelope{ID: "plan-1", ClientRequestID: "request-1", Owner: "alice", ProjectID: "cut-1", ModelID: "model-1", Request: EditPlanRequest{AssetIDs: []string{"asset-1"}, Goal: "粗剪", AspectRatio: "9:16"}})
+	_, err := ParseEditPlanModelOutput(`{"summary":{},"operations":[]} trailing`, EditPlanEnvelope{ID: "plan-1", ClientRequestID: "request-1", Owner: "alice", ProjectID: "cut-1", ModelID: "model-1", Request: EditPlanRequest{AssetIDs: []string{"asset-1"}, Goal: "粗剪", IncludeCaptions:true, AspectRatio: "9:16"}})
 	if !errors.Is(err, ErrInvalidEditPlan) {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestEditPlanRejectsDisabledOptions(t *testing.T) {
+	for _, op := range []EditOperation{
+		{ID: "caption", Type: EditAddCaption, TrackID: "sub", Text: "x", DurationMS: 1000, Reason: "r", Enabled: true},
+		{ID: "transition", Type: EditSetTransition, TrackID: "video", ClipID: "clip", ResourceID: "transition-fade", DurationMS: 300, Reason: "r", Enabled: true},
+		{ID: "filter", Type: EditSetFilter, TrackID: "video", ClipID: "clip", ResourceID: "filter-cinema", Reason: "r", Enabled: true},
+		{ID: "bgm", Type: EditAddBGM, TrackID: "audio", AssetID: "asset-1", DurationMS: 1000, Reason: "r", Enabled: true},
+	} {
+		t.Run(string(op.Type), func(t *testing.T) {
+			p := validEditPlanForTest()
+			p.Request.IncludeCaptions = false
+			p.Operations = []EditOperation{op}
+			if _, err := NormalizeEditPlan(p); err == nil {
+				t.Fatal("disabled option accepted")
+			}
+		})
+	}
+}
+func TestEditPlanDurationUsesAppliedTimeline(t *testing.T) {
+	p := editPlanForApply(EditOperation{ID: "move", Type: EditMoveClip, TrackID: "video-1", ClipID: "clip-2", StartMS: 5000, Reason: "r", Enabled: true})
+	p.Summary.EstimatedDurationMS = 999999
+	_, sum, err := ApplyEditPlan(editPlanBaseTimeline(), p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.EstimatedDurationMS != 7000 {
+		t.Fatalf("duration=%d", sum.EstimatedDurationMS)
 	}
 }

@@ -116,8 +116,12 @@ export function planTimelineBGM(timeline, asset, options = {}, idFactory) {
   return { ...timeline, tracks, markers };
 }
 
+function copyClipAnimation(value) {
+  return value ? Object.fromEntries(Object.entries(value).map(([phase, setting]) => [phase, setting ? { ...setting } : setting])) : value;
+}
+
 function copyTracks(timeline) {
-  return (timeline?.tracks || []).map(track => ({ ...track, settings: { ...(track.settings || {}) }, clips: (track.clips || []).map(clip => ({ ...clip })) }));
+  return (timeline?.tracks || []).map(track => ({ ...track, settings: { ...(track.settings || {}) }, clips: (track.clips || []).map(clip => ({ ...clip, ...(clip.animation ? { animation: copyClipAnimation(clip.animation) } : {}) })) }));
 }
 
 function updateClip(timeline, trackId, clipId, updater) {
@@ -183,6 +187,7 @@ export function duplicateTimelineClip(timeline, trackId, clipId, duplicateId) {
     name: `${clip.name || '片段'} 副本`,
     startMs,
     visualEffect: clip.visualEffect ? { ...clip.visualEffect } : clip.visualEffect,
+    ...(clip.animation ? { animation: copyClipAnimation(clip.animation) } : {}),
     canvasTransform: clip.canvasTransform ? { ...clip.canvasTransform } : clip.canvasTransform,
     keyframes: (clip.keyframes || []).map(frame => ({ ...frame, values: { ...(frame.values || {}) } }))
   };
@@ -297,6 +302,7 @@ export function splitTimelineClipAt(timeline, trackId, clipId, offsetMs, idFacto
     };
     const second = {
       ...clip,
+      ...(clip.animation ? { animation: copyClipAnimation(clip.animation) } : {}),
       id: idFactory(),
       name: `${clip.name}（后半段）`,
       startMs: clip.startMs + firstDuration,

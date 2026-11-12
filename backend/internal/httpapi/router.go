@@ -104,6 +104,7 @@ type RouterOptions struct {
 	AgentProxy                agentproxy.Store
 	AICut                     aicut.Store
 	AICutTimelines            *aicut.TimelineCollectionStore
+	AICutPersonalTemplates    *aicut.PersonalTemplateStore
 	Screenplay                screenplay.Store
 	NovelCreation             *novelcreation.Service
 	NovelCreationRunStarter   NovelCreationRunStarter
@@ -608,6 +609,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		scopedTimelineStore = aicutRequestTimelineStore{aicutExportTimelineStore{Store: options.AICut, timelines: aiCutTimelines}}
 	}
 	RegisterAICutRoutes(root, auth, scopedTimelineStore, options.Now)
+	personalTemplates := options.AICutPersonalTemplates
+	if personalTemplates == nil {
+		personalTemplates = aicut.NewMemoryPersonalTemplateStore()
+	}
+	RegisterAICutPersonalTemplateRoutes(root, auth, personalTemplates)
 	var screenplayMedia screenplay.BatchMediaRunner
 	if options.UserConfigStore != nil {
 		videoResolver := func(ctx context.Context, owner, modelKey string) (batchfactoryv11.VideoProviderConfig, error) {

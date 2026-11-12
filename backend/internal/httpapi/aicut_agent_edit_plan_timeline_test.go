@@ -52,12 +52,15 @@ func TestAICutNamedAgentHTTPRunMessagesEventsAndCancelAreScoped(t *testing.T) {
 }
 func TestAICutNamedEditPlanHTTPPlanApplyAndReplayAreScoped(t *testing.T) {
 	_, base, c, now := collectionRouteFixture(t)
+	if err := base.CreateAsset(t.Context(), "alice", aicut.Asset{ID: "asset", ProjectID: "p", Kind: "video", Name: "真实素材.mp4", ContentType: "video/mp4", ObjectKey: "test/video.mp4", ByteSize: 100, DurationMS: 3000, CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
 	a, _ := c.Create(t.Context(), "alice", "p", "A")
-	_, _ = c.Save(t.Context(), "alice", "p", a.ID, aicut.Timeline{Tracks: []aicut.Track{{ID: "subtitle-1", Kind: aicut.TrackSubtitle, Clips: []aicut.Clip{}}}}, 0, now)
+	_, _ = c.Save(t.Context(), "alice", "p", a.ID, aicut.Timeline{Script: "Named planned caption", Tracks: []aicut.Track{{ID: "subtitle-1", Kind: aicut.TrackSubtitle, Clips: []aicut.Clip{}}}}, 0, now)
 	provider := &editPlanTestProvider{result: `{"summary":{"sourceDurationMs":1000,"estimatedDurationMs":1000},"operations":[{"id":"caption","type":"add_caption","trackId":"subtitle-1","startMs":0,"durationMs":1000,"text":"Named planned caption","reason":"Caption","enabled":true}],"warnings":[]}`}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, AICut: base, AICutTimelines: c, TextProviderResolver: func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) { return provider, nil }})
 	root := "/api/ai-cut/projects/p/edit-plans"
-	body := map[string]any{"clientRequestId": "plan-request", "modelId": "model", "expectedRevision": 1, "assetIds": []string{"asset"}, "goal": "Caption", "targetDurationMs": 1000, "aspectRatio": "9:16"}
+	body := map[string]any{"clientRequestId": "plan-request", "modelId": "model", "expectedRevision": 1, "assetIds": []string{"asset"}, "goal": "Caption", "includeCaptions": true, "targetDurationMs": 1000, "aspectRatio": "9:16"}
 	r := signedJSONRequestWithTimeline(t, api, now, "POST", root, a.ID, body)
 	if r.Code != 201 {
 		t.Fatalf("create=%d %s", r.Code, r.Body)

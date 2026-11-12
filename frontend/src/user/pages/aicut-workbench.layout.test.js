@@ -83,15 +83,18 @@ test('AI-CUT使用57201原始顶栏和编辑器语义结构而不是AntD近似�
   assert.match(page, /aicut-reference-timeline/);
 });
 
-test('AI自动剪辑入口保留在原顶栏且草案抽屉不改变四区骨架', () => {
-  assert.match(page, /aicut-reference-actions[\s\S]{0,1800}AI 自动剪辑/);
-  assert.match(page, /AICutAutoEditDrawer/);
+test('AI-CUT Agent保留唯一浮动入口且不改变四区骨架', () => {
+  assert.doesNotMatch(page, /title="AI 自动剪辑"/);
+  assert.match(page, /className="aicut-agent-fab"/);
+  assert.match(agentPanel, /AICutAutoEditDrawer embedded/);
   assert.match(page, /setAutoEditOpen/);
   assert.match(editorShell, /aicut-reference-editor/);
 });
 
 test('AI-CUT播放器和真实轨道时间线保留完整可见控制', () => {
-  for (const label of ['适应', '安全框', '全屏预览', '轨道菜单', '字幕 1', '特效 1', '视频 1', '音频 1']) assert.match(page, new RegExp(label));
+  const controls = fs.readFileSync(new URL('./aicut/PlayerViewControls.jsx', import.meta.url), 'utf8');
+  for (const label of ['适应窗口', '安全框', '全屏预览', '预览画质', '画面比例']) assert.match(controls, new RegExp(label));
+  for (const label of ['轨道菜单', '字幕 1', '特效 1', '视频 1', '音频 1']) assert.match(page, new RegExp(label));
   assert.doesNotMatch(page, /多时间线/);
   assert.match(page, /aicut-reference-labels/);
   assert.match(page, /aicut-reference-tracks/);
@@ -223,13 +226,13 @@ test('AI-CUT去口误停顿使用真实后端操作并支持取消', () => {
   assert.doesNotMatch(page, /title="口误停顿检测链路待接入"/);
 });
 
-test('AI-CUT四张建议卡与原版一致且点击只写入Agent输入框', () => {
-  assert.match(agentPanel, /按剧本把这一集粗剪出来，删掉重复和废镜头/);
-  assert.match(agentPanel, /识别全片字幕，并对照剧本纠正错字/);
-  assert.match(agentPanel, /删掉口误、语气词和超过 1 秒的停顿/);
-  assert.match(agentPanel, /根据情绪给高潮段落配一段合适的背景音乐/);
-  assert.match(agentPanel, /chooseAgentSuggestion\(item\.text\)/);
-  assert.match(agentPanel, /setPrompt\(text\)/);
+test('AI-CUT建议卡依据实际能力填入剪辑要求', () => {
+  assert.match(agentPanel, /根据现有字幕/);
+  assert.match(agentPanel, /再提交转写/);
+  assert.match(agentPanel, /句间间隔缩短到 1 秒/);
+  assert.match(agentPanel, /本工程已上传的音频/);
+  assert.match(agentPanel, /chooseAgentSuggestion\(item\)/);
+  assert.match(agentPanel, /setPrompt\(item\.text\)/);
   assert.match(agentPanel, /composerRef\.current\?\.focus/);
   assert.match(agentPanel, /sendAgentPrompt/);
 });

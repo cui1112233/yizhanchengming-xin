@@ -32,6 +32,7 @@ func RegisterAICutAssetRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.S
 	if mux == nil || store == nil {
 		return
 	}
+	RegisterAICutAssetFolderRoutes(mux, auth, store)
 	if now == nil {
 		now = time.Now
 	}
@@ -52,7 +53,16 @@ func RegisterAICutAssetRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.S
 			writeAICutError(w, err)
 			return
 		}
+		assignments := map[string]string{}
+		if folders := aicutAssetFolders(store); folders != nil {
+			assignments, err = folders.AssetFolderAssignments(req.Context(), owner, req.PathValue("id"))
+			if err != nil {
+				writeAICutAssetFolderError(w, err)
+				return
+			}
+		}
 		for index := range items {
+			items[index].FolderID = assignments[items[index].ID]
 			items[index].URL = aicutSignedAssetContentURL(auth, owner, req.PathValue("id"), items[index].ID, "content", now())
 			if items[index].Kind == "font" && objects != nil {
 				if family, familyErr := aicutFontFamilyForAsset(req.Context(), items[index], objects); familyErr == nil {

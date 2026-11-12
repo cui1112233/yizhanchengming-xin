@@ -19,3 +19,14 @@ test('AI自动剪辑生成和取消不直接修改时间线', () => {
   assert.doesNotMatch(source, /onApplied\?\.\([^)]*created/);
   assert.doesNotMatch(source, /onApplied\?\.\([^)]*cancel/);
 });
+
+test('常驻自动成片面板可以新建草案，保留表单且不触发模型', () => {
+  assert.match(source, /onClick=\{resetDraft\}/);
+  assert.match(source, /disabled=\{Boolean\(busy\)\}[^>]*onClick=\{resetDraft\}/);
+  const reset = source.match(/function resetDraft\(\) \{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(reset, '需要独立重置操作');
+  for (const update of ['setPlan(null)', 'setEnabledIds([])', 'setReviewSummary(null)', "setReviewError('')"]) assert.ok(reset.includes(update));
+  assert.match(reset, /if \(busy\) return/);
+  assert.doesNotMatch(reset, /createAICutEditPlan|generateDraft|setAssetIds|setGoal|setTargetSeconds|setModelId|setOptions|setExtraRequirement/);
+  assert.match(source, /新建草案/);
+});

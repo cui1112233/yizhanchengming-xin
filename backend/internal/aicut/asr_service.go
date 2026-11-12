@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -197,7 +198,11 @@ func (s *ASRService) ProcessNext(ctx context.Context) error {
 	if current.Revision != job.ExpectedRevision {
 		return fail(ErrRevisionConflict)
 	}
-	prepared, trackID, err := ApplySRTCues(current, asset.Name, cues, newASRID)
+	mapped, err := mapASRCuesToTimeline(current, asset.ID, cues)
+	if err != nil {
+		return fail(err)
+	}
+	prepared, trackID, err := ApplySRTCues(current, asset.Name, mapped, newASRID)
 	if err != nil {
 		return fail(err)
 	}
@@ -205,7 +210,7 @@ func (s *ASRService) ProcessNext(ctx context.Context) error {
 		return fail(err)
 	}
 	job = job.WithState(ASRSucceeded, 100, "", s.now())
-	job.Imported, job.TrackID = len(cues), trackID
+	job.Imported, job.TrackID = len(mapped), trackID
 	return s.store.UpdateASRJob(jobCtx, job)
 }
 
@@ -255,4 +260,47 @@ func (s *ASRService) ListForTimeline(ctx context.Context, o, p, id string) ([]AS
 		}
 	}
 	return out, nil
+}
+
+// ASR times refer to the original media. Each placed instance needs its own
+// clipped and speed-adjusted subtitles. Unplaced media retains source-time import.
+func mapASRCuesToTimeline(timeline Timeline, assetID string, cues []SRTCue) ([]SRTCue, error) {
+	mapped := []SRTCue{}
+	matched := false
+	for _, track := range timeline.Tracks {
+		for _, clip := range track.Clips {
+			if clip.AssetID != assetID || (clip.Kind != ClipAudio && clip.Kind != ClipVideo) {
+				continue
+			}
+			matched = true
+			if len(clip.SpeedCurve) > 0 || clip.Reversed || clip.FreezeSourceMS != nil || clip.CompoundID != "" {
+				return nil, fmt.Errorf("片段 %s 含曲线变速、倒放、定格或复合片段，暂不支持自动对齐字幕，请先处理后重试", clip.Name)
+			}
+			rate := clip.PlaybackRate
+			if rate <= 0 {
+				rate = 1
+			}
+			sourceStart := float64(clip.SourceStartMS)
+			sourceEnd := sourceStart + float64(clip.DurationMS)*rate
+			for _, cue := range cues {
+				start := math.Max(float64(cue.StartMS), sourceStart)
+				end := math.Min(float64(cue.EndMS), sourceEnd)
+				if end <= start {
+					continue
+				}
+				a := clip.StartMS + int64(math.Round((start-sourceStart)/rate))
+				b := clip.StartMS + int64(math.Round((end-sourceStart)/rate))
+				if b > a {
+					mapped = append(mapped, SRTCue{StartMS: a, EndMS: b, Text: cue.Text})
+				}
+			}
+		}
+	}
+	if !matched {
+		return cues, nil
+	}
+	if len(mapped) == 0 {
+		return nil, errors.New("识别字幕不在该素材的可见剪辑范围内，未写入时间线")
+	}
+	return mapped, nil
 }

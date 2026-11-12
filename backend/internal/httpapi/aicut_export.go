@@ -543,7 +543,7 @@ func renderAICutExportWithOptions(ctx context.Context, owner string, project aic
 		}
 	}
 	if format != "mp3" {
-		if lutErr := prepareAICutHSLLUTs(dir, prepared); lutErr != nil {
+		if lutErr := prepareAICutColorLUTs(dir, prepared); lutErr != nil {
 			cleanup()
 			return "", nil, lutErr
 		}
@@ -618,6 +618,9 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 	if len(visualClips) > 0 {
 		expectedStart := int64(0)
 		for _, item := range visualClips {
+			if aicut.HasClipAnimation(item.clip.Animation) {
+				timelineComposition = true
+			}
 			if item.clip.StartMS != expectedStart {
 				timelineComposition = true
 				break
@@ -625,6 +628,7 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 			expectedStart = item.clip.StartMS + item.clip.DurationMS
 		}
 	}
+
 	matteCount := 0
 	for index := range clips {
 		if clips[index].clip.VisualProcessing != nil && clips[index].clip.VisualProcessing.PersonSegmentation.Enabled {
@@ -650,14 +654,11 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 			start := float64(item.clip.SourceStartMS) / 1000
 			delay := item.clip.StartMS
 			volume := item.clip.Volume
-			if volume <= 0 {
-				volume = 1
-			}
 			volumeFilter := fmt.Sprintf("volume=%.3f", volume)
 			if expression, ok := buildAICutKeyframeExpression(item.clip, "volume", volume, "t"); ok {
 				volumeFilter = fmt.Sprintf("volume='%s':eval=frame", expression)
 			}
-			chain := fmt.Sprintf("[%d:a]atrim=start=%.3f:duration=%.3f,asetpts=PTS-STARTPTS,%s", i, start, duration, volumeFilter)
+			chain := fmt.Sprintf("[%d:a]atrim=start=%.3f:duration=%.3f,asetpts=PTS-STARTPTS", i, start, duration)
 			if processing := item.clip.AudioProcessing; processing != nil {
 				if processing.Denoise > 0 {
 					chain += fmt.Sprintf(",afftdn=nr=%.2f:nf=-50", 6+processing.Denoise*18)
@@ -694,6 +695,7 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 					chain += "," + filter
 				}
 			}
+			chain += "," + volumeFilter
 			if item.clip.FadeInMS > 0 {
 				chain += fmt.Sprintf(",afade=t=in:st=0:d=%.3f", float64(item.clip.FadeInMS)/1000)
 			}
@@ -721,16 +723,33 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 			for segmentIndex := 0; segmentIndex < len(points)-1; segmentIndex++ {
 				branchLabels = append(branchLabels, fmt.Sprintf("[scsrc%d_%d]", i, segmentIndex))
 			}
-			filters = append(filters, fmt.Sprintf("[%d:v]split=%d%s", i, len(branchLabels), strings.Join(branchLabels, "")))
+			curveInput := fmt.Sprintf("[%d:v]", i)
+			if item.clip.Reversed {
+				sourceSpan := 0.0
+				for j := 1; j < len(points); j++ {
+					sourceSpan += duration * (points[j].Position - points[j-1].Position) * (points[j].Rate + points[j-1].Rate) / 2
+				}
+				curveInput = fmt.Sprintf("[screversed%d]", i)
+				filters = append(filters, fmt.Sprintf("[%d:v]trim=start=%.6f:duration=%.6f,reverse,setpts=PTS-STARTPTS%s", i, start, sourceSpan, curveInput))
+			}
+			filters = append(filters, fmt.Sprintf("%ssplit=%d%s", curveInput, len(branchLabels), strings.Join(branchLabels, "")))
 			segmentLabels := make([]string, 0, len(points)-1)
 			sourceCursor := start
+			if item.clip.Reversed {
+				sourceCursor = 0
+			}
 			for segmentIndex := 0; segmentIndex < len(points)-1; segmentIndex++ {
 				left, right := points[segmentIndex], points[segmentIndex+1]
 				outputDuration := duration * (right.Position - left.Position)
 				segmentRate := (left.Rate + right.Rate) / 2
 				sourceDuration := outputDuration * segmentRate
 				label := fmt.Sprintf("[scv%d_%d]", i, segmentIndex)
-				filters = append(filters, fmt.Sprintf("[scsrc%d_%d]trim=start=%.3f:duration=%.3f,setpts=(PTS-STARTPTS)/%.3f%s", i, segmentIndex, sourceCursor, sourceDuration, segmentRate, label))
+				pts := fmt.Sprintf("(PTS-STARTPTS)/%.9f", left.Rate)
+				slope := (right.Rate - left.Rate) / outputDuration
+				if math.Abs(slope) > 1e-9 {
+					pts = fmt.Sprintf("(2*(PTS-STARTPTS)*TB/(%.9f+sqrt(%.9f+2*%.9f*(PTS-STARTPTS)*TB)))/TB", left.Rate, left.Rate*left.Rate, slope)
+				}
+				filters = append(filters, fmt.Sprintf("[scsrc%d_%d]trim=start=%.6f:duration=%.6f,setpts='%s'%s", i, segmentIndex, sourceCursor, sourceDuration, pts, label))
 				segmentLabels = append(segmentLabels, label)
 				sourceCursor += sourceDuration
 			}
@@ -754,8 +773,6 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 		} else {
 			if len(item.clip.SpeedCurve) < 2 || item.asset.Kind != "video" {
 				chain = append(chain, fmt.Sprintf("%strim=start=%.3f:duration=%.3f", inputLabel, start, duration*rate))
-			} else if item.clip.Reversed {
-				chain = append(chain, inputLabel+"reverse")
 			} else {
 				chain = append(chain, inputLabel+"setpts=PTS")
 			}
@@ -768,16 +785,14 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 			}
 			chain = append(chain, "setpts="+setPTS)
 		}
-		chain = append(chain, buildAICutVisualEffectFilters(item.clip.VisualEffect)...)
-		if catalogFilters, ok := buildAICutCatalogResourceFilters(item.clip.CatalogResourceID, map[string]float64{"intensity": .5}); ok {
+		if item.clip.CatalogResourceID == "" {
+			chain = append(chain, buildAICutVisualEffectFilters(item.clip.VisualEffect)...)
+		}
+		if catalogFilters, ok := buildAICutCatalogResourceFilters(item.clip.CatalogResourceID, item.clip.CatalogParameters); ok {
 			chain = append(chain, catalogFilters...)
 		}
-		for _, effect := range item.layerEffects {
-			if effectFilters, ok := buildAICutCatalogResourceFilters(effect.ResourceID, effect.Parameters); ok {
-				chain = append(chain, effectFilters...)
-			}
-		}
-		if item.clip.VisualProcessing != nil && aicut.HasColorGradeAdjustments(item.clip.VisualProcessing.Color) && item.hslLUTPath == "" {
+
+		if item.clip.VisualProcessing != nil && aicutNeedsColorLUT(item.clip.VisualProcessing.Color) && item.hslLUTPath == "" {
 			return nil, fmt.Errorf("HSL 调色文件尚未准备，无法导出")
 		}
 		chain = append(chain, buildAICutVisualProcessingFilters(item.clip.VisualProcessing, timelineComposition, item.hslLUTPath)...)
@@ -811,7 +826,47 @@ func buildAICutFFmpegArgsWithOptions(aspectRatio string, clips []aicutRenderClip
 			filters = append(filters, fmt.Sprintf("[%d:v]trim=start=0:duration=%.3f,setpts=%s,scale=%d:%d,format=gray,boxblur=luma_radius=%.3f:luma_power=1,%s%s", item.matteInputIndex, duration, maskPTS, width, height, blurRadius, lut, maskLabel))
 			chain = []string{fmt.Sprintf("%s%salphamerge", colorLabel, maskLabel)}
 		}
+		if len(item.layerEffects) > 0 {
+			base := fmt.Sprintf("[effectbase%d]", i)
+			filters = append(filters, strings.Join(chain, ",")+fmt.Sprintf(",fps=%d", options.FrameRate)+base)
+			for j, effect := range item.layerEffects {
+				ef, ok := buildAICutCatalogResourceFilters(effect.ResourceID, effect.Parameters)
+				if !ok || len(ef) == 0 {
+					continue
+				}
+				// Canvas inputs carry absolute PTS; catalog animation phases follow
+				// the same clip-local clock used by preview and sequential rendering.
+				if timelineComposition {
+					localT := fmt.Sprintf("(t-%.6f)", float64(item.clip.StartMS)/1000)
+					for k := range ef {
+						ef[k] = strings.ReplaceAll(strings.ReplaceAll(ef[k], "sin(t*", "sin("+localT+"*"), "cos(t*", "cos("+localT+"*")
+					}
+				}
+				original, altered, out := fmt.Sprintf("[effectoriginal%d_%d]", i, j), fmt.Sprintf("[effectaltered%d_%d]", i, j), fmt.Sprintf("[effectout%d_%d]", i, j)
+				filters = append(filters, base+"split=2"+original+altered)
+				processed := fmt.Sprintf("[effectprocessed%d_%d]", i, j)
+				for k := range ef {
+					if strings.Contains(ef[k], "zoompan=") {
+						ef[k] = strings.ReplaceAll(ef[k], "fps=30", fmt.Sprintf("fps=%d", options.FrameRate))
+						if timelineComposition {
+							ef[k] += fmt.Sprintf(",setpts=PTS+%.6f/TB", float64(item.clip.StartMS)/1000)
+						}
+					}
+				}
+				// Normalize geometry-changing catalog effects before blending.
+				filters = append(filters, altered+strings.Join(ef, ",")+fmt.Sprintf(",scale=%d:%d", width, height)+processed)
+				offset := int64(0)
+				if !timelineComposition {
+					offset = item.clip.StartMS
+				}
+				begin, end := float64(max(item.clip.StartMS, effect.StartMS)-offset)/1000, float64(min(item.clip.StartMS+item.clip.DurationMS, effect.StartMS+effect.DurationMS)-offset)/1000
+				filters = append(filters, original+processed+fmt.Sprintf("blend=all_expr='B':enable='gte(t,%.3f)*lt(t,%.3f)'", begin, end)+out)
+				base = out
+			}
+			chain = []string{base + "null"}
+		}
 		chain = append(chain, buildAICutAnimatedCanvasTransformFilters(width, height, item.clip, timelineComposition)...)
+		chain = append(chain, buildAICutClipAnimationFilters(item.clip, timelineComposition)...)
 		pixelFormat := "format=yuv420p"
 		if options.BitDepth == 10 {
 			pixelFormat = "format=yuv420p10le"
@@ -1190,8 +1245,11 @@ func buildAICutCatalogResourceFilters(resourceID string, parameters map[string]f
 		return nil, false
 	}
 	intensity := parameters["intensity"]
-	if intensity <= 0 {
+	if _, exists := parameters["intensity"]; !exists {
 		intensity = .5
+	}
+	if intensity == 0 {
+		return nil, true
 	}
 	intensity = min(1, intensity)
 	speed := parameters["speed"]
@@ -1334,44 +1392,7 @@ func buildAICutVisualProcessingFilters(processing *aicut.VisualProcessing, prese
 		filters = append(filters, fmt.Sprintf("format=gbrap,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='st(0,%s);alpha(X,Y)*ld(0)*ld(0)*(3-2*ld(0))'", ratio))
 	}
 	color := processing.Color
-	gamma := color.Gamma
-	if gamma == 0 {
-		gamma = 1
-	}
-	if color.Exposure != 0 || gamma != 1 || color.Highlights != 0 || color.Shadows != 0 {
-		brightness := color.Exposure / 4
-		contrast := 1 + color.Highlights*.18 - color.Shadows*.12
-		filters = append(filters, fmt.Sprintf("eq=brightness=%.3f:contrast=%.3f:gamma=%.3f", brightness, contrast, gamma))
-	}
-	if color.Temperature != 0 || color.Tint != 0 || color.Highlights != 0 || color.Shadows != 0 {
-		filters = append(filters, fmt.Sprintf("colorbalance=rs=%.3f:gs=%.3f:bs=%.3f:gm=%.3f:rh=%.3f:gh=%.3f:bh=%.3f", .10*color.Temperature+.05*color.Shadows, .02*color.Temperature, -.10*color.Temperature+.05*color.Shadows, .10*color.Tint, .07*color.Highlights, .04*color.Highlights, -.05*color.Highlights))
-	}
-	if len(color.CurvePoints) >= 2 {
-		custom := len(color.CurvePoints) != 5
-		parts := make([]string, 0, len(color.CurvePoints))
-		for _, point := range color.CurvePoints {
-			if math.Abs(point.X-point.Y) > .000001 {
-				custom = true
-			}
-			parts = append(parts, fmt.Sprintf("%.6f/%.6f", point.X, point.Y))
-		}
-		if custom {
-			filters = append(filters, fmt.Sprintf("curves=all='%s'", strings.Join(parts, " ")))
-		}
-	} else if len(color.Curve) == 5 {
-		defaultCurve := []float64{0, .25, .5, .75, 1}
-		custom := false
-		for index, point := range color.Curve {
-			if math.Abs(point-defaultCurve[index]) > .000001 {
-				custom = true
-				break
-			}
-		}
-		if custom {
-			filters = append(filters, fmt.Sprintf("curves=all='0/%.6f .25/%.6f .5/%.6f .75/%.6f 1/%.6f'", color.Curve[0], color.Curve[1], color.Curve[2], color.Curve[3], color.Curve[4]))
-		}
-	}
-	if aicut.HasColorGradeAdjustments(color) && len(hslLUTPath) > 0 && hslLUTPath[0] != "" {
+	if aicutNeedsColorLUT(color) && len(hslLUTPath) > 0 && hslLUTPath[0] != "" {
 		filters = append(filters, fmt.Sprintf("lut3d=file='%s':interp=trilinear", escapeAICutFilterPath(hslLUTPath[0])))
 	}
 	details := processing.Details
@@ -1901,9 +1922,17 @@ func buildAICutCurvedASSEvents(clip aicut.Clip, settings aicut.TrackSettings, st
 		glyphPrefix := fmt.Sprintf("{\\an5\\pos(%.2f,%.2f)\\frz%.2f}", x, y, rotation)
 		if settings.SubtitleAnimation == "typewriter" {
 			delay := int(math.Round(float64(index) / float64(max(1, len(characters))) * float64(min(1200, int(clip.DurationMS)))))
-			glyphPrefix += fmt.Sprintf("{\\alpha&HFF&\\t(%d,%d,\\alpha&H00&)}", delay, delay+40)
+			finalAlpha := 0
+			if settings.TextOpacity != nil {
+				finalAlpha = int(math.Round((1 - *settings.TextOpacity) * 255))
+			}
+			glyphPrefix += fmt.Sprintf("{\\alpha&HFF&\\t(%d,%d,\\alpha&H%02X&)}", delay, delay+40, finalAlpha)
 		}
-		events = append(events, fmt.Sprintf("Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s%s%s", aicutASSTime(clip.StartMS), aicutASSTime(clip.StartMS+clip.DurationMS), styleName, prefix, glyphPrefix, aicutASSRunTag(settings, index, primary, fontSize), escapeAICutASSText(string(character))))
+		runTag := aicutASSRunTag(settings, index, primary, fontSize)
+		if settings.TextResourceID == "text-gradient-title" {
+			runTag += aicutGradientASSTag(index, len(characters))
+		}
+		events = append(events, fmt.Sprintf("Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s%s%s", aicutASSTime(clip.StartMS), aicutASSTime(clip.StartMS+clip.DurationMS), styleName, prefix, glyphPrefix, runTag, escapeAICutASSText(string(character))))
 	}
 	return events
 }
@@ -2028,6 +2057,9 @@ func buildAICutASS(timeline aicut.Timeline, width, height int) string {
 			if settings.LetterSpacing != 0 {
 				prefix = fmt.Sprintf("{\\fsp%.2f}", settings.LetterSpacing) + prefix
 			}
+			if settings.TextOpacity != nil {
+				prefix = fmt.Sprintf("{\\alpha&H%02X&}", int(math.Round((1-*settings.TextOpacity)*255))) + prefix
+			}
 			if settings.TextCurve != 0 {
 				events = append(events, buildAICutCurvedASSEvents(clip, settings, styleName, prefix, primary, width, height, fontSize)...)
 				continue
@@ -2038,6 +2070,9 @@ func buildAICutASS(timeline aicut.Timeline, width, height int) string {
 					karaokeDuration = clip.DurationMS
 				}
 				renderedText = aicutASSRichText(text, settings, primary, fontSize, karaokeDuration)
+			}
+			if styleID == "text-gradient-title" {
+				renderedText = aicutGradientASSText(text)
 			}
 			events = append(events, fmt.Sprintf("Dialogue: 0,%s,%s,%s,,0,0,0,,%s%s", aicutASSTime(clip.StartMS), aicutASSTime(clip.StartMS+clip.DurationMS), styleName, prefix, renderedText))
 		}

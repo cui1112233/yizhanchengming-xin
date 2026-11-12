@@ -95,6 +95,14 @@ func RegisterAICutEditPlanRoutes(mux *http.ServeMux, auth BridgeAuth, timelines 
 			return
 		}
 		request := aicut.EditPlanRequest{AssetIDs: input.AssetIDs, Goal: input.Goal, TargetDurationMS: input.TargetDurationMS, AspectRatio: input.AspectRatio, IncludeCaptions: input.IncludeCaptions, IncludeTransitions: input.IncludeTransitions, IncludeFilters: input.IncludeFilters, IncludeBGM: input.IncludeBGM, ExtraRequirement: input.ExtraRequirement}
+		for _, id := range request.AssetIDs {
+			asset, assetErr := timelines.Asset(req.Context(), owner, projectID, id)
+			if assetErr != nil {
+				writeAICutError(w, assetErr)
+				return
+			}
+			request.SelectedAssets = append(request.SelectedAssets, aicut.EditPlanAsset{ID: asset.ID, Name: asset.Name, Kind: asset.Kind, DurationMS: asset.DurationMS})
+		}
 		contract, err := prompt.AICutEditPlanContract(timeline, request, editPlanTransitions, editPlanFilters, editPlanTextStyles)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -130,6 +138,15 @@ func RegisterAICutEditPlanRoutes(mux *http.ServeMux, auth BridgeAuth, timelines 
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型返回的剪辑草案格式无效"})
 			return
 		}
+
+		ready.Warnings = append(ready.Warnings, "当前仅使用素材名称、类型、时长及已有剧本/字幕；没有读取画面或转写新对白，无法判断镜头内容。目标时长是尽量接近的目标。")
+		_, simulation, simulationErr := aicut.ApplyEditPlan(timeline, ready)
+		if simulationErr != nil {
+			_, _ = plans.UpdateEditPlanState(req.Context(), owner, projectID, plan.ID, aicut.EditPlanFailed, simulationErr.Error(), now().UTC())
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "草案无法执行：" + simulationErr.Error()})
+			return
+		}
+		ready.Summary = aicut.EditPlanSummary{SourceDurationMS: aicut.EditPlanTimelineDuration(timeline), EstimatedDurationMS: simulation.EstimatedDurationMS}
 		ready, err = plans.UpdateEditPlan(req.Context(), ready)
 		if err != nil {
 			writeEditPlanError(w, err)
@@ -154,6 +171,42 @@ func RegisterAICutEditPlanRoutes(mux *http.ServeMux, auth BridgeAuth, timelines 
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+	})
+
+	handle("POST /api/ai-cut/projects/{id}/edit-plans/{planId}/preview", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			EnabledOperationIDs []string `json:"enabledOperationIds"`
+		}
+		if !decodeAICutJSON(w, req, &input) {
+			return
+		}
+		plan, err := plans.EditPlan(req.Context(), owner, req.PathValue("id"), req.PathValue("planId"))
+		if err != nil {
+			writeEditPlanError(w, err)
+			return
+		}
+		timeline, err := timelines.Timeline(req.Context(), owner, req.PathValue("id"))
+		if err != nil {
+			writeEditPlanError(w, err)
+			return
+		}
+		if plan.State != aicut.EditPlanReady || timeline.Revision != plan.BaseRevision {
+			writeEditPlanError(w, aicut.ErrRevisionConflict)
+			return
+		}
+		enabled := map[string]bool{}
+		for _, id := range input.EnabledOperationIDs {
+			enabled[id] = true
+		}
+		for i := range plan.Operations {
+			plan.Operations[i].Enabled = enabled[plan.Operations[i].ID]
+		}
+		_, summary, err := aicut.ApplyEditPlan(timeline, plan)
+		if err != nil {
+			writeEditPlanError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"summary": summary})
 	})
 
 	handle("POST /api/ai-cut/projects/{id}/edit-plans/{planId}/apply", func(w http.ResponseWriter, req *http.Request, owner string) {

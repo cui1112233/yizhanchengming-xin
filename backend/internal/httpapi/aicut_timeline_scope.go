@@ -38,8 +38,10 @@ func withAICutTimelineScope(next http.Handler, auth BridgeAuth) http.Handler {
 			switch suffix[0] {
 			case "timelines":
 				allowed = true
+			case "asset-folders":
+				allowed = true
 			case "assets":
-				allowed = r.Method == http.MethodGet || (len(suffix) == 1 && r.Method == http.MethodPost) || (len(suffix) == 3 && suffix[2] == "proxy" && r.Method == http.MethodPost)
+				allowed = (len(suffix) == 3 && suffix[2] == "folder" && r.Method == http.MethodPatch) || r.Method == http.MethodGet || (len(suffix) == 1 && r.Method == http.MethodPost) || (len(suffix) == 3 && suffix[2] == "proxy" && r.Method == http.MethodPost)
 			case "export-jobs", "asr-jobs", "agent-runs", "edit-plans":
 				allowed = r.Method == http.MethodGet || r.Method == http.MethodPost
 			case "agent-messages":
@@ -87,6 +89,16 @@ func (s aicutExportTimelineStore) Timeline(ctx context.Context, o, p string) (ai
 // Synchronous tools share project assets but read and save only the immutable
 // timeline ID carried by this request. Agent and saved edit plans are excluded.
 type aicutRequestTimelineStore struct{ aicutExportTimelineStore }
+
+func (s aicutRequestTimelineStore) UpdateProjectRatio(ctx context.Context, o, p, ratio string, now time.Time) (aicut.Project, error) {
+	updater, ok := s.Store.(interface {
+		UpdateProjectRatio(context.Context, string, string, string, time.Time) (aicut.Project, error)
+	})
+	if !ok {
+		return aicut.Project{}, aicut.ErrInvalidProject
+	}
+	return updater.UpdateProjectRatio(ctx, o, p, ratio, now)
+}
 
 func (s aicutRequestTimelineStore) SaveTimeline(ctx context.Context, o, p string, v aicut.Timeline, rev int64, now time.Time) (aicut.Timeline, error) {
 	id := aicutTimelineIDFromContext(ctx)

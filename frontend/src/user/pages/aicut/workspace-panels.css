@@ -1,0 +1,27 @@
+.aicut-workspace-panel { display:flex; flex-direction:column; gap:12px; min-width:0; padding:14px; color:var(--text-primary); font-size:13px; }
+.aicut-workspace-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:28px; }
+.aicut-workspace-heading strong { font-size:14px; }
+.aicut-workspace-heading > span { color:var(--text-secondary); font-size:12px; }
+.aicut-workspace-panel > .ant-upload-wrapper, .aicut-workspace-panel > .ant-upload-wrapper .ant-upload { display:block; width:100%; }
+.aicut-workspace-hint { margin:0; color:var(--text-secondary); font-size:12px; line-height:1.6; }
+.aicut-sticker-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.aicut-sticker-card { display:flex; flex-direction:column; gap:7px; min-width:0; padding:7px; border:1px solid var(--edit-line,var(--border-color)); border-radius:8px; background:var(--edit-soft,var(--bg-secondary)); }
+.aicut-sticker-card.is-selected { border-color:var(--theme-primary); }
+.aicut-sticker-card > strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:500; }
+.aicut-sticker-preview { display:block; position:relative; width:100%; aspect-ratio:1; overflow:hidden; padding:0; border:0; border-radius:5px; background:var(--bg-primary); cursor:pointer; }
+.aicut-sticker-preview .aicut-media-artwork { width:100%; height:100%; }
+.aicut-sticker-preview .aicut-media-frames img { object-fit:contain; }
+.aicut-sticker-preview:focus-visible { outline:2px solid var(--theme-primary); outline-offset:2px; }
+.aicut-workspace-panel .ant-empty { margin:20px 0; }
+.aicut-workspace-panel .ant-empty-description { color:var(--text-secondary); font-size:12px; line-height:1.6; }
+.aicut-adjustment-clip { margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary); font-size:12px; }
+.aicut-adjustment-section { display:flex; flex-direction:column; gap:12px; padding-top:12px; border-top:1px solid var(--edit-line,var(--border-color)); min-width:0; }
+.aicut-adjustment-section h3 { margin:0; font-size:13px; font-weight:600; }
+.aicut-adjustment-control { display:grid; grid-template-columns:minmax(0,1fr) 72px; align-items:center; gap:4px 8px; }
+.aicut-adjustment-control label { font-size:12px; color:var(--text-secondary); }
+.aicut-adjustment-control .ant-input-number { width:100%; font-size:12px; }
+.aicut-adjustment-control .ant-slider { grid-column:1 / -1; margin:7px 5px 4px; }
+.aicut-adjustment-workspace .aicut-hsl-bands { grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
+.aicut-adjustment-workspace .aicut-hsl-band { font-size:12px; }
+.aicut-adjustment-workspace .aicut-hsl-channel { grid-template-columns:36px minmax(35px,1fr) 62px; gap:5px; }
+.aicut-adjustment-workspace .aicut-hsl-actions { flex-wrap:wrap; }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyAICutEditPlan, cancelAICutEditPlan, createAICutEditPlan, getAICutEditPlan } from './aicutEditPlan.js';
+import { applyAICutEditPlan, cancelAICutEditPlan, createAICutEditPlan, getAICutEditPlan, previewAICutEditPlan } from './aicutEditPlan.js';
 
 test('AI自动剪辑发送可重试请求编号和完整审核参数', async () => {
   let received;
@@ -40,4 +40,13 @@ test('AI自动剪辑查询、取消和应用使用同一草案地址', async () 
   assert.deepEqual(calls.map(item => item.path), ['/api/ai-cut/projects/cut-1/edit-plans/plan-1', '/api/ai-cut/projects/cut-1/edit-plans/plan-1/cancel', '/api/ai-cut/projects/cut-1/edit-plans/plan-1/apply']);
   assert.deepEqual(JSON.parse(calls[2].options.body), { enabledOperationIds: ['op-1', 'op-2'] });
   assert.equal(applied.timeline.revision, 4);
+});
+
+test('审核按当前勾选请求后端试算，不使用模型时长', async () => {
+ let called;
+ const summary=await previewAICutEditPlan('p','plan',['move'],async (path,options)=>{called={path,options};return {summary:{estimatedDurationMs:1234}}});
+ assert.equal(summary.estimatedDurationMs,1234);
+ assert.equal(called.path,'/api/ai-cut/projects/p/edit-plans/plan/preview');
+ assert.deepEqual(JSON.parse(called.options.body),{enabledOperationIds:['move']});
+ await assert.rejects(previewAICutEditPlan('p','plan',['../bad'],async()=>{}),/无效/);
 });

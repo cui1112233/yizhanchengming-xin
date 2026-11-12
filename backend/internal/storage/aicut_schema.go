@@ -3,7 +3,7 @@ package storage
 import "qiantie/backend/internal/aicut"
 
 func AICutMigrations() []Migration {
-	return []Migration{{
+	out := []Migration{{
 		Version: 8800018,
 		SQL: []string{
 			`CREATE TABLE IF NOT EXISTS aicut_projects (
@@ -299,4 +299,5 @@ func AICutMigrations() []Migration {
 		CallbackChecksum: "aicut-agent-timeline-target-v1",
 		SQL:              []string{`ALTER TABLE aicut_agent_runs ADD COLUMN timeline_id VARCHAR(64) NOT NULL DEFAULT '' AFTER project_id`},
 	}}
+	return append(append(out, AICutAssetFolderMigrations()...), AICutPersonalTemplateMigrations()...)
 }

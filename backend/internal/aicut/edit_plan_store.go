@@ -177,6 +177,9 @@ func (s *MemoryStore) ApplyStoredEditPlan(_ context.Context, owner, projectID, i
 		return cloneEditPlan(plan), cloneTimeline(item.timeline), EditPlanApplySummary{}, ErrRevisionConflict
 	}
 	selected := enabledEditPlan(cloneEditPlan(plan), enabledIDs)
+	if err := refreshMemoryEditPlanAssets(s, &selected); err != nil {
+		return plan, cloneTimeline(item.timeline), EditPlanApplySummary{}, err
+	}
 	prepared, summary, err := ApplyEditPlan(item.timeline, selected)
 	if err != nil {
 		return cloneEditPlan(plan), cloneTimeline(item.timeline), EditPlanApplySummary{}, err
@@ -194,8 +197,42 @@ func (s *MemoryStore) ApplyStoredEditPlan(_ context.Context, owner, projectID, i
 	}
 	item.project.UpdatedAt = now.UTC()
 	s.projects[projectKey] = item
+	plan.Operations = selected.Operations
+	plan.Summary.EstimatedDurationMS = summary.EstimatedDurationMS
 	plan.State, plan.Error, plan.AppliedRevision, plan.UpdatedAt = EditPlanApplied, "", prepared.Revision, now.UTC()
 	s.editPlans[key] = cloneEditPlan(plan)
 	s.editPlanSummaries[key] = summary
 	return cloneEditPlan(plan), cloneTimeline(prepared), summary, nil
+}
+
+func editPlanPlacedAssets(plan EditPlan) map[string]bool {
+	ids := map[string]bool{}
+	for _, op := range plan.Operations {
+		if op.Enabled && (op.Type == EditPlaceAsset || op.Type == EditAddBGM) {
+			ids[op.AssetID] = true
+		}
+	}
+	return ids
+}
+
+// Caller holds the store mutex; metadata cannot change between validation and commit.
+func refreshMemoryEditPlanAssets(s *MemoryStore, plan *EditPlan) error {
+	for id := range editPlanPlacedAssets(*plan) {
+		a, ok := s.assets[aicutAssetKey(plan.Owner, plan.ProjectID, id)]
+		if !ok {
+			return ErrAssetNotFound
+		}
+		replaceEditPlanAsset(plan, a)
+	}
+	return nil
+}
+func replaceEditPlanAsset(plan *EditPlan, a Asset) {
+	value := EditPlanAsset{ID: a.ID, Name: a.Name, Kind: a.Kind, DurationMS: a.DurationMS}
+	for i := range plan.Request.SelectedAssets {
+		if plan.Request.SelectedAssets[i].ID == a.ID {
+			plan.Request.SelectedAssets[i] = value
+			return
+		}
+	}
+	plan.Request.SelectedAssets = append(plan.Request.SelectedAssets, value)
 }

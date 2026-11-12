@@ -1,0 +1,45 @@
+.aicut-agent-drawer:has(.aicut-assistant-tabs){width:min(460px,calc(100vw - 28px));background:var(--aicut-panel)}
+html .aicut-agent-drawer:has(.aicut-assistant-tabs){background:rgba(24,29,36,.91)!important;backdrop-filter:blur(28px) saturate(1.1);isolation:isolate}
+html[data-theme=light] .aicut-agent-drawer:has(.aicut-assistant-tabs){background:rgba(247,249,253,.93)!important}
+html .aicut-agent-drawer .aicut-agent-panel.embedded{background:transparent!important}
+html .aicut-canvas-agent .aicut-agent-panel.embedded{background:color-mix(in srgb,var(--aicut-panel) 30%,#202630 70%)!important;backdrop-filter:blur(28px)}
+html[data-theme=light] .aicut-canvas-agent .aicut-agent-panel.embedded{background:rgba(247,249,253,.93)!important}
+.aicut-agent-panel .aicut-agent-controls,.aicut-agent-panel .aicut-agent-compose,.aicut-agent-panel .aicut-agent-notice{flex:none}
+.aicut-agent-panel .aicut-agent-conversation{margin-bottom:8px}
+.aicut-agent-panel .aicut-agent-intro{margin:18px 0 12px}
+.aicut-agent-panel .aicut-agent-intro h2{font-size:22px}
+.aicut-agent-panel .aicut-agent-intro p{text-align:center;font-size:13px}
+.aicut-agent-panel .aicut-agent-capabilities{max-height:96px;overflow:auto}
+.aicut-agent-panel .ant-select-selection-placeholder,.aicut-agent-panel .ant-select-arrow,.aicut-agent-panel textarea::placeholder,.aicut-agent-panel input::placeholder{color:var(--aicut-muted)!important;opacity:1!important}
+.aicut-agent-panel .aicut-agent-intro>svg{width:20px;height:20px}.aicut-agent-panel .aicut-agent-intro h2{margin:8px 0 4px}.aicut-agent-panel .aicut-agent-intro p{margin:6px 0}
+.aicut-agent-step pre{max-height:160px;overflow:auto;white-space:pre-wrap;font-size:11px;color:var(--aicut-muted)}
+.aicut-assistant-tabs{flex:none;padding-bottom:10px;border-bottom:1px solid var(--aicut-border)}
+.aicut-assistant-tabs p{margin:7px 0 0;color:var(--aicut-muted);font-size:11px;text-align:center;letter-spacing:.4px}
+.aicut-agent-skill-select{width:100%;margin:0 0 12px;flex:none}
+.aicut-auto-edit-embedded{overflow:auto;min-height:0;flex:1;padding:14px 2px 4px}
+.aicut-assistant-workflow{min-height:0;flex:1;flex-direction:column}
+.aicut-auto-edit-embedded .aicut-auto-edit-form,.aicut-auto-edit-embedded .aicut-auto-edit-review{display:grid;gap:16px}
+.aicut-auto-edit-embedded label{display:grid;gap:7px;color:var(--aicut-text)}
+.aicut-auto-edit-embedded .ant-select,.aicut-auto-edit-embedded .ant-input-number{width:100%}
+.aicut-auto-edit-embedded .aicut-auto-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.aicut-auto-edit-embedded .aicut-auto-edit-switches{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;border:1px solid var(--aicut-border);border-radius:10px}
+.aicut-auto-edit-embedded .aicut-auto-edit-switches label{display:flex;justify-content:space-between;align-items:center}
+.aicut-auto-edit-embedded .aicut-auto-edit-operations{display:grid;gap:8px}
+.aicut-auto-edit-embedded .aicut-auto-edit-operations article{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--aicut-border);border-radius:10px}
+.aicut-auto-edit-embedded .aicut-auto-edit-operations p{margin:6px 0;color:var(--aicut-muted);font-size:12px;line-height:1.6}
+.aicut-auto-edit-embedded .aicut-auto-edit-summary{display:flex;gap:12px;justify-content:space-between}
+.aicut-auto-edit-embedded .aicut-auto-edit-summary>div{display:grid;gap:5px;font-size:12px}
+.aicut-agent-run-details{padding:10px;border:1px solid var(--aicut-border);border-radius:10px;background:var(--aicut-input)}
+.aicut-agent-run-details>summary,.aicut-agent-capabilities>summary{cursor:pointer;font-size:12px;color:var(--aicut-text)}
+.aicut-agent-step{padding:9px 0;border-top:1px solid var(--aicut-border);margin-top:8px;font-size:12px}
+.aicut-agent-step>summary{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--aicut-text)}
+.aicut-agent-step small{color:var(--aicut-muted);margin-left:auto}
+.aicut-agent-step i{width:6px;height:6px;border-radius:50%;background:var(--theme-primary)}
+.aicut-agent-step.failed i{background:#ed8888}.aicut-agent-step.done i{background:#70c7af}
+.aicut-agent-step p{margin:8px 0 4px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}
+.aicut-agent-thinking{display:flex;gap:10px;align-items:center;padding:10px;color:var(--aicut-muted);font-size:12px}
+.aicut-agent-followup{display:grid;gap:12px;padding:14px;border:1px solid color-mix(in srgb,var(--theme-primary) 50%,var(--aicut-border));border-radius:12px;background:var(--aicut-input)}
+.aicut-agent-followup label{display:grid;gap:6px;font-size:12px}.aicut-agent-followup .ant-select{width:100%}
+.aicut-agent-capabilities{flex:none;margin-top:9px}.aicut-agent-capabilities p,.aicut-agent-capabilities small{font-size:11px;line-height:1.8;color:var(--aicut-muted)}
+.aicut-agent-intro small{font-size:11px;line-height:1.6}
+.aicut-agent-panel .aicut-agent-skills button{min-height:0;padding:10px}.aicut-agent-panel .aicut-agent-skills button span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

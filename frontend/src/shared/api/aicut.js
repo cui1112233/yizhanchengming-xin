@@ -24,6 +24,10 @@ export async function createAICutProject({ title, aspectRatio = '9:16' }, reques
 
 export async function updateAICutProject(projectId, value = {}, request = apiRequest) {
   const body = {};
+  if (Object.hasOwn(value, 'aspectRatio')) {
+    if (!['9:16', '16:9', '1:1'].includes(value.aspectRatio)) throw new Error('画面比例仅支持 9:16、16:9 或 1:1');
+    body.aspectRatio = value.aspectRatio;
+  }
   if (Object.hasOwn(value, 'title')) {
     const title = String(value.title || '').trim();
     if (!title) throw new Error('项目名称不能为空');

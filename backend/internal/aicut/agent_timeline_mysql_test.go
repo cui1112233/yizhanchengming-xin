@@ -23,3 +23,19 @@ func TestMySQLAgentRunRetainsNamedTargetAcrossClaim(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestMySQLAgentConversationFiltersBeforeLimit(t *testing.T) {
+	db, m, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	m.ExpectQuery(`SELECT .* AND r.timeline_id = \? AND m.role IN \('user', 'assistant'\) ORDER BY .* LIMIT \?`).WithArgs("alice", "p", "named", 40).WillReturnRows(sqlmock.NewRows([]string{"id", "run_id", "project_id", "owner_username", "role", "content", "tool_name", "tool_call_id", "created_at"}).AddRow("message", "old-run", "p", "alice", "assistant", "保留原始对白", "", "", time.Now()))
+	messages, err := NewMySQLStore(db).AgentConversationMessages(t.Context(), "alice", "p", "named", 40)
+	if err != nil || len(messages) != 1 || messages[0].Content != "保留原始对白" {
+		t.Fatalf("messages=%#v err=%v", messages, err)
+	}
+	if err := m.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

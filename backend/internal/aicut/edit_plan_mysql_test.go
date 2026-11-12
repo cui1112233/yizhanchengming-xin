@@ -75,3 +75,35 @@ func TestMySQLUpdateEditPlanStateRejectsTerminalTransition(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEditPlanSQLRefreshLocksOwnedAssetAndUsesActualMetadata(t *testing.T) {
+	db, m, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	m.ExpectBegin()
+	tx, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := editPlanForApply(EditOperation{ID: "place", Type: EditPlaceAsset, AssetID: "asset-video", TrackID: "new", DurationMS: 1000, Reason: "r", Enabled: true})
+	m.ExpectQuery("SELECT id, kind, name, duration_ms FROM aicut_assets").WithArgs("asset-video", p.ProjectID, p.Owner).WillReturnRows(sqlmock.NewRows([]string{"id", "kind", "name", "duration_ms"}).AddRow("asset-video", "video", "actual.mp4", 2500))
+	if err := refreshSQLEditPlanAssets(t.Context(), tx, &p); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, a := range p.Request.SelectedAssets {
+		if a.ID == "asset-video" {
+			found = a.Name == "actual.mp4" && a.DurationMS == 2500
+		}
+	}
+	if !found {
+		t.Fatal("actual metadata absent")
+	}
+	m.ExpectRollback()
+	_ = tx.Rollback()
+	if err := m.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

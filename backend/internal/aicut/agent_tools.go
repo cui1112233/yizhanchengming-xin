@@ -13,12 +13,14 @@ import (
 type AgentToolExecutor struct {
 	collection *TimelineCollectionStore
 	timelines  Store
+	jobStore   Store
 	agents     AgentStore
 	now        func() time.Time
 	composite  AgentCompositeTools
 }
 
 type AgentCompositeTools struct {
+	ListASRModels         func(context.Context, string) ([]AgentASRModel, error)
 	SmartSplitForTimeline func(context.Context, string, string, string, string, float64, int64, int64) (Timeline, int, string, error)
 	OralCleanForTimeline  func(context.Context, string, string, string, string, int64, int64) (Timeline, FillerTrimSummary, string, error)
 	SubmitASR             func(context.Context, string, ASRSubmit) (ASRJob, error)
@@ -35,7 +37,7 @@ func NewAgentToolExecutor(timelines Store, agents AgentStore, now func() time.Ti
 	if len(collections) > 0 {
 		collection = collections[0]
 	}
-	return &AgentToolExecutor{timelines: timelines, agents: agents, now: now, collection: collection}
+	return &AgentToolExecutor{jobStore: timelines, timelines: timelines, agents: agents, now: now, collection: collection}
 }
 
 func (e *AgentToolExecutor) ConfigureCompositeTools(tools AgentCompositeTools) {
@@ -102,6 +104,8 @@ func (e *AgentToolExecutor) Execute(ctx context.Context, run AgentRun, call Tool
 	result := ToolResult{CallID: call.ID, Name: call.Name}
 	var executeErr error
 	switch call.Name {
+	case "get_transcript", "select_caption_ranges", "compact_caption_gaps", "set_clip_animation", "set_clip_color", "apply_edit_operations":
+		result = e.smartEdit(ctx, run, call)
 	case "move_clip":
 		result = e.moveClip(ctx, run, call)
 	case "delete_clip":
@@ -118,6 +122,8 @@ func (e *AgentToolExecutor) Execute(ctx context.Context, run AgentRun, call Tool
 		result = e.undoRedo(ctx, run, call, false)
 	case "redo_timeline":
 		result = e.undoRedo(ctx, run, call, true)
+	case "list_asr_models", "get_asr_jobs":
+		result = e.asrReadTool(ctx, run, call)
 	case "get_project_snapshot":
 		result, executeErr = e.projectSnapshot(ctx, run, call)
 	case "transcribe_asset":
@@ -232,9 +238,12 @@ func (e *AgentToolExecutor) cleanOralPauses(ctx context.Context, run AgentRun, c
 		ModelID    string `json:"modelId"`
 		MaxPauseMS int64  `json:"maxPauseMs"`
 	}
-	if err := decodeToolArguments(call.Arguments, &input); err != nil || strings.TrimSpace(input.ModelID) == "" {
+	if err := decodeToolArguments(call.Arguments, &input); err != nil {
 		result.Message = "去口误停顿参数无效"
 		return result
+	}
+	if strings.TrimSpace(input.ModelID) == "" {
+		input.ModelID = run.ModelID
 	}
 	if input.MaxPauseMS == 0 {
 		input.MaxPauseMS = 1000
@@ -642,9 +651,91 @@ func (e *AgentToolExecutor) projectSnapshot(ctx context.Context, run AgentRun, c
 	if err != nil {
 		return ToolResult{}, err
 	}
-	data, err := json.Marshal(map[string]any{"timeline": timeline, "assets": assets})
+	data, err := json.Marshal(map[string]any{"timeline": timeline, "assets": assets, "currentTextModelId": run.ModelID, "oralCleanDefault": "current_text_model"})
 	if err != nil {
 		return ToolResult{}, fmt.Errorf("encode project snapshot: %w", err)
 	}
 	return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Message: "项目快照已读取", Revision: timeline.Revision, Data: data}, nil
+}
+
+// AgentASRModel deliberately exposes only selection metadata, never provider secrets.
+type AgentASRModel struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func AgentASRModelsFromCatalog(settings map[string]any) []AgentASRModel {
+	out := []AgentASRModel{}
+	var items []map[string]any
+	switch raw := settings["modelCatalog"].(type) {
+	case []map[string]any:
+		items = raw
+	case []any:
+		for _, v := range raw {
+			if m, ok := v.(map[string]any); ok {
+				items = append(items, m)
+			}
+		}
+	}
+	text := func(v any) string {
+		if v == nil {
+			return ""
+		}
+		return strings.TrimSpace(fmt.Sprint(v))
+	}
+	for _, m := range items {
+		id := text(m["id"])
+		// The same resolver validates enabled status and complete provider configuration;
+		// constructing a provider performs no network requests.
+		if id == "" || text(m["kind"]) != "asr" || text(m["credential"]) == "" || text(m["modelId"]) == "" {
+			continue
+		}
+		if _, err := ASRProviderFromCatalog(settings, id, nil); err != nil {
+			continue
+		}
+		name := text(m["name"])
+		if name == "" {
+			name = text(m["modelId"])
+		}
+		out = append(out, AgentASRModel{ID: id, Name: name})
+	}
+	return out
+}
+func (e *AgentToolExecutor) asrReadTool(ctx context.Context, run AgentRun, call ToolCall) ToolResult {
+	r := ToolResult{CallID: call.ID, Name: call.Name}
+	var args struct{}
+	if err := decodeToolArguments(call.Arguments, &args); err != nil {
+		r.Message = "查询参数无效"
+		return r
+	}
+	if call.Name == "list_asr_models" {
+		if e.composite.ListASRModels == nil {
+			r.Message = "ASR 模型目录尚未配置"
+			return r
+		}
+		models, err := e.composite.ListASRModels(ctx, run.Owner)
+		if err != nil {
+			r.Message = err.Error()
+			return r
+		}
+		r.OK = true
+		r.Message = "已读取可用 ASR 模型"
+		r.Data = toolResultData(map[string]any{"models": models})
+		return r
+	}
+	jobs, err := e.jobStore.ListASRJobs(ctx, run.Owner, run.ProjectID)
+	if err != nil {
+		r.Message = err.Error()
+		return r
+	}
+	scoped := []ASRJob{}
+	for _, job := range jobs {
+		if canonicalASRTimeline(job.TimelineID) == canonicalASRTimeline(run.TimelineID) {
+			scoped = append(scoped, job)
+		}
+	}
+	r.OK = true
+	r.Message = "已读取当前时间线字幕识别任务"
+	r.Data = toolResultData(map[string]any{"jobs": scoped})
+	return r
 }

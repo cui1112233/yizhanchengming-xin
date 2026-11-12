@@ -24,8 +24,11 @@ import { normalizeKeyframeEasing } from './aicutKeyframeEasing.js';
 import { audioEffectValues } from './aicutAudioProcessing.js';
 import { normalizePersonSegmentation } from './aicutPersonSegmentation.js';
 import { applyProjectTemplate } from './aicut/projectTemplates.js';
+import { applyPersonalTemplate } from './aicut/personalTemplates.js';
+import { validateClipAnimation } from './aicutClipAnimation.js';
 import { addStickerLayer } from './aicut/stickerLayer.js';
 import { planMultiCamGroup, applyMultiCamGroup } from './aicut/multicam.js';
+import { trimTimelineClipToPlayhead } from './aicutTrimToPlayhead.js';
 
 function commandResult(timeline, extras = {}) {
   return { timeline, changed: true, selectionKey: '', metadata: {}, ...extras };
@@ -1404,6 +1407,10 @@ export function executeAICutCommand(timeline, command, dependencies = {}) {
         playheadMs: command.playheadMs
       }));
     }
+    case 'clip.trim_to_playhead': {
+      const result = trimTimelineClipToPlayhead(timeline, command);
+      return commandResult(result.timeline, { changed: result.changed, selectionKey: `${command.trackId}::${command.clipId}` });
+    }
     case 'clip.resize': {
       const entry = findClip(timeline, `${command.trackId}::${command.clipId}`);
       if (entry.track.kind === 'transition' || entry.clip.kind === 'transition') {
@@ -1481,6 +1488,17 @@ export function executeAICutCommand(timeline, command, dependencies = {}) {
     case 'timeline.template_apply': {
       const result = applyProjectTemplate(timeline, command.templateId, command.assets, command.options, idFactory);
       return commandResult(result.timeline, { selectionKey: result.selectionKey, metadata: { template: result.summary } });
+    }
+    case 'timeline.personal_template_apply': {
+      const result = applyPersonalTemplate(timeline, command.template, command.assets, command.options, idFactory);
+      return commandResult(result.timeline, { selectionKey: result.selectionKey, metadata: { template: result.summary } });
+    }
+    case 'clip.animation_set': {
+      const entry = findClip(timeline, `${command.trackId}::${command.clipId}`);
+      if (entry.track.locked) throw new Error('请先解锁轨道');
+      if (!['video', 'image'].includes(entry.clip.kind)) throw new Error('请选择视频或图片片段');
+      const animation = validateClipAnimation(command.animation);
+      return commandResult({ ...timeline, tracks: timeline.tracks.map(track => track.id === command.trackId ? { ...track, clips: track.clips.map(clip => clip.id === command.clipId ? { ...clip, animation } : clip) } : track) }, { selectionKey: `${command.trackId}::${command.clipId}` });
     }
     case 'timeline.sticker_add': {
       const result = addStickerLayer(timeline, command.asset, command.startMs, command.durationMs, idFactory);

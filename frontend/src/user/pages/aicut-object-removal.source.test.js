@@ -18,6 +18,7 @@ test('区域物体消除可在播放器框选并通过统一画面命令写入�
 
 test('区域物体消除说明预览和导出的真实边界而不是伪装成AI模型', () => {
   assert.match(inspector, /FFmpeg 周边像素修复/);
-  assert.match(inspector, /适合固定水印/);
-  assert.match(inspector, /移动物体请先使用画面区域跟踪/);
+  assert.match(inspector, /只处理固定水印/);
+  assert.match(inspector, /尚不支持跟随移动目标消除/);
+  assert.doesNotMatch(inspector, /移动物体请先使用画面区域跟踪/);
 });

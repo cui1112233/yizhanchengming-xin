@@ -1,0 +1,7 @@
+.aicut-asset-folders{margin-top:12px;padding-top:10px;border-top:1px solid var(--aicut-border,rgba(128,128,128,.16));min-width:0}
+.aicut-folder-heading{display:flex;align-items:center;justify-content:space-between;gap:3px}
+.aicut-folder-row{display:flex;align-items:center;min-width:0}
+.aicut-resource-directory .aicut-folder-row>button:first-child{display:flex;align-items:center;gap:5px;flex:1;min-width:0}
+.aicut-folder-row>button:first-child span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;text-align:left}
+.aicut-resource-directory .aicut-folder-row .aicut-folder-more{flex:0 0 22px;padding:3px;width:22px;justify-content:center}
+.aicut-asset-folders p[role=alert]{color:#ed6c6c}

@@ -5,6 +5,7 @@ import { catalogForTab, normalizeCatalogParameters } from './editorCatalog.js';
 import { assetDurationLabel, assetToolActions } from './resourceLibraryModel.js';
 import './resource-library-redesign.css';
 import MediaArtwork from './MediaArtwork.jsx';
+import AssetFolderDirectory from './AssetFolderDirectory.jsx';
 import { projectTemplateCatalog } from './projectTemplates.js';
 
 export const resourceTabs = [
@@ -17,7 +18,7 @@ export const resourceTabs = [
 const templates = projectTemplateCatalog.map(template => ({ ...template, parameters: [] }));
 
 function dragPayload(event, type, value) {
-  event.dataTransfer.effectAllowed = 'copy';
+  event.dataTransfer.effectAllowed = type === 'application/x-aicut-asset' ? 'copyMove' : 'copy';
   event.dataTransfer.setData(type, typeof value === 'string' ? value : JSON.stringify(value));
 }
 
@@ -44,8 +45,16 @@ export default function ResourceLibrary({
   usedAssetIds = [],
   activeTab,
   workspaces = {},
+  personalTemplateWorkspace,
   audioRecorder,
   assets = [],
+  assetFolders = [],
+  selectedFolderId = 'all',
+  onSelectFolder,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveAssetFolder,
   favorites = [],
   recent = [],
   uploading = false,
@@ -70,6 +79,7 @@ export default function ResourceLibrary({
   onToggleCollapsed,
 }) {
   const [previewAssetId, setPreviewAssetId] = useState('');
+  const [templateSource, setTemplateSource] = useState('builtin');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('全部');
   const [mediaKind, setMediaKind] = useState('all');
@@ -79,7 +89,7 @@ export default function ResourceLibrary({
   const displayTab = activeTab === '媒体' ? '素材' : activeTab === '文字' ? '文本' : activeTab;
   const tab = resourceTabs.find(([label]) => label === displayTab) || resourceTabs[0];
   const category = tab[1];
-  const customWorkspace = workspaces[category];
+  const customWorkspace = category === 'template' && templateSource === 'personal' ? personalTemplateWorkspace : workspaces[category];
   const resources = useMemo(() => {
     const base = category === 'template' ? templates : catalogForTab(category);
     const keyword = query.trim().toLowerCase();
@@ -90,6 +100,7 @@ export default function ResourceLibrary({
     });
   }, [category, favorites, filter, query, recent]);
 	const visibleAssets = assets.filter((asset) => {
+	  if (category === 'media' && selectedFolderId !== 'all' && (asset.folderId || '') !== selectedFolderId) return false;
 	  if (category === 'media' && (!['video', 'image', 'audio'].includes(asset.kind) || (mediaKind !== 'all' && asset.kind !== mediaKind))) return false;
 	  if (category === 'audio' && asset.kind !== 'audio') return false;
 	  if (category === 'audio' && filter === '收藏' && !favorites.includes(asset.id)) return false;
@@ -108,21 +119,23 @@ export default function ResourceLibrary({
   const previewAsset = (asset) => { setPreviewAssetId(asset.id); setRecentAssetIds(current => [asset.id, ...current.filter(id => id !== asset.id)].slice(0, 50)); onPreviewAsset(asset); };
   const toolHandlers = { asr: onOpenASR, proxy: onGenerateProxy, background: onRemoveBackground, analyze: onAnalyzeAudio, clone: onOpenVoiceClone };
   const assetMenu = (asset) => ({
-    items: [{ key: 'favorite', label: favorites.includes(asset.id) ? '取消收藏素材' : '收藏素材' }, ...assetToolActions(asset, { proxyBusyId, backgroundBusyId }).map((action) => ({
+    items: [...(onMoveAssetFolder ? [{ key: 'move-folder', label: '移动到文件夹', children: [{ key: 'folder:', label: '未分类' }, ...assetFolders.map(folder => ({ key: `folder:${folder.id}`, label: folder.name }))] }] : []), { key: 'favorite', label: favorites.includes(asset.id) ? '取消收藏素材' : '收藏素材' }, ...assetToolActions(asset, { proxyBusyId, backgroundBusyId }).map((action) => ({
       ...action,
       label: action.key === 'analyze' ? <span>分析节拍</span> : action.label,
     }))],
-    onClick: ({ key, domEvent }) => { domEvent.stopPropagation(); if (key === 'favorite') onToggleFavorite(asset.id); else toolHandlers[key]?.(asset); },
+    onClick: ({ key, domEvent }) => { domEvent.stopPropagation(); if (key.startsWith('folder:')) onMoveAssetFolder?.(asset.id, key.slice(7)); else if (key === 'favorite') onToggleFavorite(asset.id); else toolHandlers[key]?.(asset); },
   });
 
   return <div className="aicut-resource-library aicut-library-redesign">
-    <nav className="aicut-resource-tabs" aria-label="资源分类">{resourceTabs.map(([label, , Icon]) => <button type="button" key={label} aria-pressed={displayTab === label} className={displayTab === label ? 'active' : ''} onClick={() => onTabChange(label === '素材' ? '媒体' : label === '文本' ? '文字' : label)}><Icon size={16} /><span>{label}</span></button>)}<button type="button" className="aicut-resource-collapse" aria-label={collapsed ? '展开素材区' : '收起素材区'} title={collapsed ? '展开素材区' : '收起素材区'} onClick={onToggleCollapsed}>{collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}<span>{collapsed ? '展开' : '收起'}</span></button></nav>
+    <nav className="aicut-resource-tabs" aria-label="资源分类"><div className="aicut-resource-tab-scroll">{resourceTabs.map(([label, , Icon]) => <button type="button" key={label} aria-pressed={displayTab === label} className={displayTab === label ? 'active' : ''} onClick={() => onTabChange(label === '素材' ? '媒体' : label === '文本' ? '文字' : label)}><Icon size={16} /><span>{label}</span></button>)}</div><button type="button" className="aicut-resource-collapse" aria-label={collapsed ? '展开素材区' : '收起素材区'} title={collapsed ? '展开素材区' : '收起素材区'} onClick={onToggleCollapsed}>{collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}<span>{collapsed ? '展开' : '收起'}</span></button></nav>
     <div className={`aicut-library-workspace${customWorkspace ? ' aicut-custom-workspace' : ''}`}>
       <nav className="aicut-resource-directory" aria-label="素材目录">
         <strong>{category === 'media' ? '项目素材' : activeTab}</strong>
-        {customWorkspace ? <span className="aicut-directory-note">当前工程</span> : category === 'media' ? [['all', '全部素材'], ['video', '视频'], ['image', '图片'], ['audio', '音频']].map(([kind, label]) => <button type="button" key={kind} aria-pressed={mediaKind === kind} className={mediaKind === kind ? 'active' : ''} onClick={() => setMediaKind(kind)}><span>{label}</span><small>{assets.filter(asset => kind === 'all' ? ['video', 'image', 'audio'].includes(asset.kind) : asset.kind === kind).length}</small></button>) : ['全部', '收藏', '最近使用'].map(item => <button type="button" key={item} aria-pressed={filter === item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}</button>)}
+        {customWorkspace ? <span className="aicut-directory-note">当前工程</span> : category === 'media' ? [['all', '全部素材'], ['video', '视频'], ['image', '图片'], ['audio', '音频']].map(([kind, label]) => <button type="button" key={kind} aria-pressed={mediaKind === kind && selectedFolderId === 'all'} className={mediaKind === kind && selectedFolderId === 'all' ? 'active' : ''} onClick={() => { setMediaKind(kind); onSelectFolder?.('all'); }}><span>{label}</span><small>{assets.filter(asset => kind === 'all' ? ['video', 'image', 'audio'].includes(asset.kind) : asset.kind === kind).length}</small></button>) : ['全部', '收藏', '最近使用'].map(item => <button type="button" key={item} aria-pressed={filter === item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}</button>)}
+        {category === 'media' && !customWorkspace && onCreateFolder ? <AssetFolderDirectory folders={assetFolders} assets={assets.filter(asset => ['video', 'image', 'audio'].includes(asset.kind))} selectedId={selectedFolderId} onSelect={id => { setMediaKind('all'); onSelectFolder?.(id); }} onCreate={onCreateFolder} onRename={onRenameFolder} onDelete={onDeleteFolder} onMove={onMoveAssetFolder} /> : null}
       </nav>
     <section className="aicut-resource-panel" aria-label={`${displayTab || '素材'}资源`}>
+      {category === 'template' && personalTemplateWorkspace ? <div className="aicut-resource-create" aria-label="模板来源"><Button size="small" type={templateSource === 'builtin' ? 'primary' : 'default'} onClick={() => setTemplateSource('builtin')}>内置模板</Button><Button size="small" type={templateSource === 'personal' ? 'primary' : 'default'} onClick={() => setTemplateSource('personal')}>我的模板</Button></div> : null}
       {customWorkspace || <>
       <div className="aicut-resource-search"><Input allowClear prefix={<Search size={14} />} aria-label="搜索资源" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资源" />{category === 'media' || category === 'audio' ? <Upload multiple showUploadList={false} beforeUpload={onUpload} accept={category === 'audio' ? 'audio/*' : 'image/*,video/*,audio/*'}><Button loading={uploading} icon={<Plus size={14} />}>导入</Button></Upload> : null}</div>
       {category === 'audio' || category === 'text' ? <div className="aicut-resource-create">{category === 'audio' ? <><Button size="small" icon={<WandSparkles size={13} />} onClick={onOpenTTS}>文字转语音</Button><Button size="small" icon={<Music size={13} />} onClick={() => onOpenVoiceClone()}>声音克隆</Button>{audioRecorder}</> : <><Upload showUploadList={false} beforeUpload={onUpload} accept=".ttf,.otf"><Button size="small" loading={uploading}>上传字体</Button></Upload><Button size="small" icon={<Plus size={13} />} onClick={onOpenTextEditor}>新建自定义文字</Button></>}</div> : null}

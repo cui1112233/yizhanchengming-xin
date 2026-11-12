@@ -10,7 +10,7 @@ func TestNamedEditPlanApplyIsAtomicIdempotentAndUndoable(t *testing.T) {
 	base, plan, now := createEditPlanStoreFixture(t)
 	collection := NewMemoryTimelineCollectionStore(base)
 	a, _ := collection.Create(t.Context(), "alice", "cut-1", "A")
-	_, _ = collection.Save(t.Context(), "alice", "cut-1", a.ID, Timeline{Tracks: []Track{{ID: "subtitle-1", Kind: TrackSubtitle, Clips: []Clip{}}}}, 0, now)
+	_, _ = collection.Save(t.Context(), "alice", "cut-1", a.ID, Timeline{Script: "自动字幕", Tracks: []Track{{ID: "subtitle-1", Kind: TrackSubtitle, Clips: []Clip{}}}}, 0, now)
 	plan.TimelineID = a.ID
 	plan.BaseRevision = 1
 	if _, e := base.CreateEditPlan(t.Context(), plan); e != nil {

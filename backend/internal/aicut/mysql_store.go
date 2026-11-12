@@ -15,6 +15,7 @@ type clipEditorData struct {
 	CompoundID            string             `json:"compoundId,omitempty"`
 	CompoundName          string             `json:"compoundName,omitempty"`
 	CompoundPath          []CompoundRef      `json:"compoundPath,omitempty"`
+	CatalogParameters     map[string]float64 `json:"catalogParameters,omitempty"`
 	CatalogResourceID     string             `json:"catalogResourceId,omitempty"`
 	TextResourceID        string             `json:"textResourceId,omitempty"`
 	ResourceID            string             `json:"resourceId,omitempty"`
@@ -23,6 +24,7 @@ type clipEditorData struct {
 	TransitionRightClipID string             `json:"transitionRightClipId,omitempty"`
 	Parameters            map[string]float64 `json:"parameters,omitempty"`
 	CanvasTransform       *CanvasTransform   `json:"canvasTransform,omitempty"`
+	Animation             *ClipAnimation     `json:"animation,omitempty"`
 	Keyframes             []ClipKeyframe     `json:"keyframes,omitempty"`
 	SpeedCurve            []SpeedCurvePoint  `json:"speedCurve,omitempty"`
 	AudioProcessing       *AudioProcessing   `json:"audioProcessing,omitempty"`
@@ -38,6 +40,7 @@ func encodeClipEditorJSON(clip Clip) ([]byte, error) {
 		CompoundName:          clip.CompoundName,
 		CompoundPath:          clip.CompoundPath,
 		CatalogResourceID:     clip.CatalogResourceID,
+		CatalogParameters:     clip.CatalogParameters,
 		TextResourceID:        clip.TextResourceID,
 		ResourceID:            clip.ResourceID,
 		TransitionTrackID:     clip.TransitionTrackID,
@@ -45,6 +48,7 @@ func encodeClipEditorJSON(clip Clip) ([]byte, error) {
 		TransitionRightClipID: clip.TransitionRightClipID,
 		Parameters:            clip.Parameters,
 		CanvasTransform:       clip.CanvasTransform,
+		Animation:             clip.Animation,
 		Keyframes:             clip.Keyframes,
 		SpeedCurve:            clip.SpeedCurve,
 		AudioProcessing:       clip.AudioProcessing,
@@ -61,6 +65,7 @@ func decodeClipEditorJSON(data []byte, clip *Clip) error {
 		return err
 	}
 	clip.CatalogResourceID = editor.CatalogResourceID
+	clip.CatalogParameters = editor.CatalogParameters
 	clip.CompoundID = editor.CompoundID
 	clip.CompoundName = editor.CompoundName
 	clip.CompoundPath = editor.CompoundPath
@@ -71,6 +76,7 @@ func decodeClipEditorJSON(data []byte, clip *Clip) error {
 	clip.TransitionRightClipID = editor.TransitionRightClipID
 	clip.Parameters = editor.Parameters
 	clip.CanvasTransform = editor.CanvasTransform
+	clip.Animation = editor.Animation
 	clip.Keyframes = editor.Keyframes
 	clip.SpeedCurve = editor.SpeedCurve
 	clip.AudioProcessing = editor.AudioProcessing
@@ -322,9 +328,6 @@ func replaceTimelineTx(ctx context.Context, tx *sql.Tx, owner, id string, timeli
 				playbackRate = 1
 			}
 			volume := clip.Volume
-			if volume == 0 {
-				volume = 1
-			}
 			var visualEffect any
 			if clip.VisualEffect != nil {
 				encoded, err := json.Marshal(clip.VisualEffect)

@@ -40,13 +40,13 @@ test('字幕识别入口始终可见，缺少模型时在弹窗引导配置', ()
   assert.match(page, /!asrModels\.length[\s\S]{0,500}>\s*前往 API 配置\s*<\/Button>/);
 });
 
-test('AI自动剪辑从顶栏打开草案审核且应用后刷新持久时间线', () => {
-  assert.match(page, /AICutAutoEditDrawer/);
-  assert.match(page, />\s*AI 自动剪辑\s*</);
-  assert.match(page, /revision=\{timeline\.revision\}/);
+test('AI-CUT Agent统一承载自动成片且没有顶栏重复入口', () => {
+  assert.doesNotMatch(page, /title="AI 自动剪辑"/);
+  assert.match(page, /className="aicut-agent-fab"/);
+  assert.match(page, /timelineRevision=\{timeline\.revision\}/);
   assert.match(page, /assets=\{assets\}/);
   assert.match(page, /models=\{agentModels\}/);
-  assert.match(page, /onApplied=\{handleAutoEditApplied\}/);
+  assert.match(page, /onAutoApplied=\{handleAutoEditApplied\}/);
   assert.match(page, /getAICutTimelineHistory/);
   assert.doesNotMatch(page, /你是一战晟铭 AI-CUT 的剪辑方案规划器/);
 });
@@ -353,6 +353,6 @@ test('代理媒体只替换网页预览且素材卡提供真实生成入口', ()
   assert.match(page, /生成代理/);
   assert.match(page, /代理已启用/);
   assert.match(page, /generateAICutProxy/);
-  assert.match(page, /asset\.proxyUrl \|\| item\.asset\.url/);
+  assert.match(page, /previewSource\(item\.asset, quality\)/);
   assert.match(page, /setAssets\(\(current\) => current\.map/);
 });

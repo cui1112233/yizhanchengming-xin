@@ -1,6 +1,14 @@
 import { Button, Checkbox, ConfigProvider, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag, Upload, message } from 'antd';
 import { Bot, ClipboardPaste, MoreHorizontal, LockKeyhole, UnlockKeyhole, Volume2, VolumeX, SkipBack, SkipForward, Maximize2, Captions, Clapperboard, CloudUpload, Copy, Film, ImageIcon, Keyboard, Magnet, Music, Palette, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, Redo2, Save, Scissors, Sparkles, Star, Trash2, Type, Undo2, Upload as UploadIcon, WandSparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import PlayerViewControls from './aicut/PlayerViewControls.jsx';
+import PreviewViewport from './aicut/PreviewViewport.jsx';
+import { previewSource } from './aicut/playerView.js';
+import { listAssetFolders, createAssetFolder, renameAssetFolder, deleteAssetFolder, moveAssetToFolder } from '../../shared/api/aicutAssetFolders.js';
+import { clipAnimationPreviewStyle } from './aicutClipAnimation.js';
+import { catalogTextSettings, gradientGlyphColor, startCatalogPreviewRenderer } from './aicut/catalogPreview.js';
+import PersonalTemplateWorkspace from './aicut/PersonalTemplateWorkspace.jsx';
+import TimelineZoomControls from './aicut/TimelineZoomControls.jsx';
 import { cancelAICutASRJob, cancelAICutExportJob, cleanAICutOralTimeline, cloneAICutVoice, consolidateAICutClips, correctAICutCaptions, createAICutASRJob, createAICutExportJob, createAICutProject, downloadAICutExportJob, extractAICutAudio, extractAICutTrackingFrames, extractAICutVisualFrames, generateAICutProxy, generateAICutSpeech, getAICutAudioAnalysis, getAICutTimelineHistory as getDefaultAICutTimelineHistory, importAICutSRT, listAICutASRJobs, listAICutAssets, listAICutExportJobs, listAICutProjects, loadAICutTimeline as loadDefaultAICutTimeline, redoAICutTimeline as redoDefaultAICutTimeline, removeAICutImageBackground, saveAICutTimeline as saveDefaultAICutTimeline, smartSplitAICutVideo, trimAICutFillers, undoAICutTimeline as undoDefaultAICutTimeline, updateAICutProject, uploadAICutAsset } from '../../shared/api/aicut.js';
 import { listProjectTimelines, createProjectTimeline, renameProjectTimeline, duplicateProjectTimeline, deleteProjectTimeline, reorderProjectTimelines, loadProjectTimeline, saveProjectTimeline, projectTimelineHistory, moveProjectTimelineHistory } from '../../shared/api/aicutTimelines.js';
 import { setAICutTimelineRequestScope } from '../../shared/api/aicutTimelineScope.js';
@@ -12,7 +20,6 @@ import { getConfig } from '../../shared/api/config.js';
 import { alignAICutMultiCamAudio } from '../../shared/api/aicut.js';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
 import AICutAgentPanel from '../components/AICutAgentPanel.jsx';
-import AICutAutoEditDrawer from '../components/AICutAutoEditDrawer.jsx';
 import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, normalizeSubtitleRhythm, orderedTimelineTracks, removeTimelineTrack, renameTimelineTrack, setTimelineClipText, subtitleRhythmLabel, timelinePixelDeltaToTime, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, updateTimelineTrackSettings } from './aicutTimeline.js';
 import { createAICutClipboard, executeAICutCommand, findTimelineEditPoint, reconcileTimelineSave, restoreTimelineSnapshot } from './aicutCommands.js';
 import { buildAICutPreviewFrame, getAICutTimelineDuration, nextAICutCanvasFit, seekAICutPreviewTime } from './aicutPreview.js';
@@ -266,10 +273,10 @@ function applyCanvasTransform(style, canvasTransform) {
   };
 }
 
-function BasicPreviewMedia({ item, playing }) {
+function BasicPreviewMedia({ item, playing, quality = 'original' }) {
   const mediaRef = useRef(null);
   const audioGraphRef = useRef(null);
-	const mediaURL = item.kind === 'video' ? (item.asset.proxyUrl || item.asset.url) : item.asset.url;
+	const mediaURL = previewSource(item.asset, quality);
   useEffect(() => {
     if (item.kind !== 'audio' || !mediaRef.current) return undefined;
     audioGraphRef.current = createAudioProcessingGraph(mediaRef.current, item.audioProcessing);
@@ -337,19 +344,25 @@ function hasAdvancedVisualProcessing(value) {
     || color.gamma !== 1 || hasColorGradeAdjustments(color);
 }
 
-function ProcessedVisualMedia({ item, playing }) {
+function ProcessedVisualMedia({ item, playing, quality = 'original' }) {
   const mediaRef = useRef(null);
   const canvasRef = useRef(null);
   const rendererRef = useRef(null);
+  const catalogCanvasRef = useRef(null);
+  const catalogRendererRef = useRef(null);
 	const matteVideoRef = useRef(null);
 	const matteCanvasRef = useRef(null);
 	const matteRendererRef = useRef(null);
-	const mediaURL = item.kind === 'video' ? (item.asset.proxyUrl || item.asset.url) : item.asset.url;
+	const mediaURL = previewSource(item.asset, quality);
   const personSegmentation = normalizePersonSegmentation(item.visualProcessing?.personSegmentation);
   const matteURL = item.matteAsset?.proxyUrl || item.matteAsset?.url || '';
   const hasPersonMatte = item.kind === 'video' && item.personSegmentationCurrent && Boolean(matteURL);
   const [rendererReady, setRendererReady] = useState(false);
   const processingKey = JSON.stringify(normalizeVisualProcessing(item.visualProcessing));
+  const catalogLayers = [...(item.catalogResourceId ? [{ resourceId:item.catalogResourceId,parameters:item.catalogParameters || {} }] : []), ...(item.layerEffects || [])];
+  const catalogKey = JSON.stringify(catalogLayers);
+  const hasCatalog = catalogLayers.length > 0;
+  const [catalogReady,setCatalogReady] = useState(false);
 
   useEffect(() => {
     const media = mediaRef.current;
@@ -393,23 +406,33 @@ function ProcessedVisualMedia({ item, playing }) {
     };
   }, [hasPersonMatte, matteURL, personSegmentation.threshold, personSegmentation.feather, processingKey]);
 
-  const canvasStyle = applyCanvasTransform(visualEffectPreviewStyle(item.visualEffect, item.sourceTimeMs), item.canvasTransform);
+  useEffect(() => {
+    catalogRendererRef.current?.stop();
+    catalogRendererRef.current = hasCatalog ? startCatalogPreviewRenderer(catalogCanvasRef.current, hasPersonMatte ? matteCanvasRef.current : canvasRef.current,catalogLayers,item.outputOffsetMs) : null;
+    setCatalogReady(Boolean(catalogRendererRef.current));
+    return () => { catalogRendererRef.current?.stop();catalogRendererRef.current=null; };
+  },[hasCatalog,catalogKey,hasPersonMatte,mediaURL,processingKey]);
+  useEffect(() => { catalogRendererRef.current?.update(catalogLayers,item.outputOffsetMs); },[catalogKey,item.outputOffsetMs]);
+
+  const canvasStyle = applyCanvasTransform(visualEffectPreviewStyle(item.catalogResourceId ? null : item.visualEffect, item.sourceTimeMs), item.canvasTransform);
   const source = item.kind === 'image'
     ? <img ref={mediaRef} src={mediaURL} alt="" className="aicut-processed-source" />
     : <video ref={mediaRef} src={mediaURL} preload="auto" muted playsInline className="aicut-processed-source" />;
   return (
     <div className="aicut-processed-wrap">
       {source}
-      <canvas ref={canvasRef} className={`aicut-processed-visual${hasPersonMatte ? ' aicut-person-matte-processor' : ''}`} style={hasPersonMatte ? undefined : canvasStyle} aria-label="GPU高级画面预览" />
-      {hasPersonMatte ? <><video ref={matteVideoRef} src={matteURL} preload="auto" muted playsInline className="aicut-person-matte-source" /><canvas ref={matteCanvasRef} className="aicut-processed-visual aicut-person-matte-output" style={canvasStyle} aria-label="AI人物抠像预览" /></> : null}
+      <canvas ref={canvasRef} className={`aicut-processed-visual${hasPersonMatte ? ' aicut-person-matte-processor' : ''}`} style={{...(hasPersonMatte ? {} : canvasStyle),...(hasCatalog?{position:'absolute',visibility:'hidden'}:{})}} aria-label="GPU高级画面预览" />
+      {hasPersonMatte ? <><video ref={matteVideoRef} src={matteURL} preload="auto" muted playsInline className="aicut-person-matte-source" /><canvas ref={matteCanvasRef} className="aicut-processed-visual aicut-person-matte-output" style={{...canvasStyle,...(hasCatalog?{position:'absolute',visibility:'hidden'}:{})}} aria-label="AI人物抠像预览" /></> : null}
+      {hasCatalog ? <canvas ref={catalogCanvasRef} className="aicut-processed-visual" style={canvasStyle} aria-label="时间线滤镜与特效预览" /> : null}
       {!rendererReady ? <span className="aicut-processed-fallback">正在准备高级画面预览…</span> : null}
+      {hasCatalog && !catalogReady ? <span className="aicut-processed-fallback">当前浏览器无法初始化特效预览，请检查 WebGL 支持。</span> : null}
     </div>
   );
 }
 
 function PreviewMedia(props) {
   const { item } = props;
-  if (['video', 'image'].includes(item.kind) && hasAdvancedVisualProcessing(item.visualProcessing)) {
+  if (['video', 'image'].includes(item.kind) && (hasAdvancedVisualProcessing(item.visualProcessing) || item.catalogResourceId || item.layerEffects?.length)) {
     return <ProcessedVisualMedia {...props} />;
   }
   return <BasicPreviewMedia {...props} />;
@@ -418,7 +441,8 @@ function PreviewMedia(props) {
 function AICutCaptionText({ item }) {
   const curve = Number(item?.textStyle?.textCurve || 0);
   const hasTextRuns = Array.isArray(item?.textStyle?.textRuns) && item.textStyle.textRuns.length > 0;
-  if (!curve && !hasTextRuns) {
+  const gradient = item.styleId === 'text-gradient-title' || item.styleId === 'text-gradient';
+  if (!curve && !hasTextRuns && !gradient) {
     return item.highlightedCount > 0 ? <><span className="aicut-text-highlighted">{Array.from(item.visibleText).slice(0, item.highlightedCount).join('')}</span>{Array.from(item.visibleText).slice(item.highlightedCount).join('')}</> : item.visibleText;
   }
   const glyphs = aicutCurvedTextLayout(item.visibleText, curve, item.textStyle?.fontSize, item.textStyle?.letterSpacing);
@@ -429,7 +453,7 @@ function AICutCaptionText({ item }) {
           aria-hidden="true"
           className={`aicut-curved-glyph${index < item.highlightedCount ? ' aicut-text-highlighted' : ''}`}
           key={`${index}:${glyph.character}`}
-          style={{ ...aicutTextRunStyleAt(item.textStyle, index, 'var(--aicut-preview-px, 1px)'), transform: curve ? `translateY(calc(${glyph.translateY.toFixed(2)} * var(--aicut-preview-px, 1px))) rotate(${glyph.rotate.toFixed(2)}deg)` : undefined }}
+          style={{ ...(gradient ? {color:gradientGlyphColor(index,Array.from(item.text).length),WebkitTextFillColor:gradientGlyphColor(index,Array.from(item.text).length)} : {}),...aicutTextRunStyleAt(item.textStyle, index, 'var(--aicut-preview-px, 1px)'), transform: curve ? `translateY(calc(${glyph.translateY.toFixed(2)} * var(--aicut-preview-px, 1px))) rotate(${glyph.rotate.toFixed(2)}deg)` : undefined }}
         >
           {glyph.character}
         </span>
@@ -441,7 +465,7 @@ function AICutCaptionText({ item }) {
 export default function AICutPage() {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState('');
-  const [activeTimelineId, setActiveTimelineId] = useState('default');
+  const [activeTimelineId, setActiveTimelineId] = useState(() => new URLSearchParams(window.location.search).get('timeline') || 'default');
   const [projectTimelines, setProjectTimelines] = useState([]);
   const [timelineBusy, setTimelineBusy] = useState(false);
   const activeTimelineScopeRef = useRef('');
@@ -477,10 +501,14 @@ export default function AICutPage() {
   const [materialTab, setMaterialTab] = useState('我的素材');
   const [workspaceMode, setWorkspaceMode] = useState('editor');
   const [toolCategory, setToolCategory] = useState('媒体');
+  const [assetFolders, setAssetFolders] = useState([]);
+  const [selectedAssetFolderId, setSelectedAssetFolderId] = useState('all');
   const [previewResource, setPreviewResource] = useState(null);
   const [inspectorTab, setInspectorTab] = useState('基础');
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
+  const [agentDrawerMounted, setAgentDrawerMounted] = useState(false);
+  useEffect(() => { if (agentDrawerOpen) setAgentDrawerMounted(true); }, [agentDrawerOpen]);
   const [autoEditOpen, setAutoEditOpen] = useState(false);
   const autoEditScopeRef = useRef('');
   const [assetSearch, setAssetSearch] = useState('');
@@ -537,6 +565,9 @@ export default function AICutPage() {
   const [magneticSnap, setMagneticSnap] = useState(true);
   const [linkedMove, setLinkedMove] = useState(true);
   const [canvasFit, setCanvasFit] = useState('fit');
+  const [previewQuality, setPreviewQuality] = useState('original');
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [trackEditId, setTrackEditId] = useState('');
   const [trackNameDraft, setTrackNameDraft] = useState('');
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -649,6 +680,14 @@ export default function AICutPage() {
   const layoutDragRef = useRef(null);
   const editorShellRef = useRef(null);
   const previewStageRef = useRef(null);
+  const previewPanelRef = useRef(null);
+  useEffect(() => {
+    const update = () => setPreviewFullscreen(document.fullscreenElement === previewPanelRef.current);
+    const escape = event => { if (event.key === 'Escape') setPreviewExpanded(false); };
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('fullscreenchange', update); document.removeEventListener('keydown', escape); };
+  }, []);
   const clipboardRef = useRef(null);
   const keyframeClipboardRef = useRef(null);
 
@@ -690,12 +729,11 @@ export default function AICutPage() {
   const durationMs = useMemo(() => getAICutTimelineDuration(timeline), [timeline]);
   const previewFrame = useMemo(() => {
     const frame = buildAICutPreviewFrame(timeline, assets, previewTimeMs);
-    const previewEffect = visualEffectForCatalogResource(previewResource);
     const selectedPreviewClipId = selectedClipKey.split('::')[1];
-    if (!previewEffect || !selectedPreviewClipId) return frame;
+    if (!previewResource || !['filter','effect'].includes(previewResource.category) || !selectedPreviewClipId) return frame;
     return {
       ...frame,
-      visuals: frame.visuals.map((item) => (item.clipId === selectedPreviewClipId ? { ...item, visualEffect: previewEffect } : item))
+      visuals: frame.visuals.map((item) => item.clipId !== selectedPreviewClipId ? item : previewResource.category === 'filter' ? { ...item,visualEffect:null,catalogResourceId:previewResource.id,catalogParameters:previewResource.previewParameters || {} } : { ...item,layerEffects:[...(item.layerEffects||[]),{resourceId:previewResource.id,parameters:previewResource.previewParameters||{}}] })
     };
   }, [timeline, assets, previewTimeMs, previewResource, selectedClipKey]);
   const selectedClipEntry = useMemo(() => {
@@ -1190,6 +1228,28 @@ export default function AICutPage() {
   }, [projectId]);
 
   async function refreshTimelineList() { const items = await listProjectTimelines(projectId); setProjectTimelines(items); return items; }
+  useEffect(() => {
+    if (!projectId) return;
+    const params = new URLSearchParams({ project: projectId });
+    if (activeTimelineId !== 'default') params.set('timeline', activeTimelineId);
+    window.history.replaceState(null, '', `/ai-cut?${params}`);
+  }, [projectId, activeTimelineId]);
+  useEffect(() => {
+    let live = true;
+    setAssetFolders([]); setSelectedAssetFolderId('all');
+    if (projectId) listAssetFolders(projectId).then(items => { if (live) setAssetFolders(items); }).catch(error => { if (live) message.error(error.message || '素材文件夹读取失败'); });
+    return () => { live = false; };
+  }, [projectId]);
+  async function manageAssetFolder(action) {
+    const scope = activeTimelineScopeRef.current;
+    try {
+      await action();
+      const [folders, nextAssets] = await Promise.all([listAssetFolders(projectId), listAICutAssets(projectId)]);
+      if (activeTimelineScopeRef.current !== scope) return;
+      setAssetFolders(folders); setAssets(nextAssets);
+      setSelectedAssetFolderId(id => id === 'all' || !id || folders.some(folder => folder.id === id) ? id : '');
+    } catch (error) { message.error(error.message || '文件夹操作失败'); throw error; }
+  }
   async function persistBeforeTimelineChange() {
     if (saveInFlightRef.current || saveState === 'dirty' || saveState === 'failed') {
       const saved = await saveTimeline({ silent: true, requireLatest: true });
@@ -1254,6 +1314,28 @@ export default function AICutPage() {
     }
   }
 
+  async function changeProjectRatio(aspectRatio) {
+    if (!projectId || aspectRatio === currentProject?.aspectRatio) return;
+    const scope = activeTimelineScopeRef.current;
+    try {
+      await persistBeforeTimelineChange();
+      const updated = await updateAICutProject(projectId, { aspectRatio });
+      if (activeTimelineScopeRef.current !== scope) return;
+      setProjects(items => items.map(item => item.id === updated.id ? updated : item));
+      setCanvasFit('fit');
+      message.success(`画面比例已保存为 ${aspectRatio}`);
+    } catch (error) { message.error(error.message || '画面比例保存失败'); }
+  }
+
+  async function togglePreviewFullscreen() {
+    try {
+      if (previewExpanded) { setPreviewExpanded(false); return; }
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (previewPanelRef.current?.requestFullscreen) await previewPanelRef.current.requestFullscreen();
+      else setPreviewExpanded(true);
+    } catch { setPreviewExpanded(true); }
+  }
+
   async function uploadRecording(file) {
     if (!projectId) throw new Error('先创建工程再保存录音');
     const scope = `${projectId}:${activeTimelineId}`;
@@ -1277,9 +1359,16 @@ export default function AICutPage() {
   }
   async function upload(file) {
     if (!projectId) return Upload.LIST_IGNORE;
+    const uploadScope = activeTimelineScopeRef.current;
+    const targetFolder = selectedAssetFolderId && selectedAssetFolderId !== 'all' ? selectedAssetFolderId : '';
     setUploading(true);
     try {
       const asset = await uploadAICutAsset(projectId, file);
+      if (targetFolder) {
+        try { await moveAssetToFolder(projectId, asset.id, targetFolder); asset.folderId = targetFolder; }
+        catch { message.warning('素材已上传到未分类，目标文件夹已变化，请手动移动'); }
+      }
+      if (activeTimelineScopeRef.current !== uploadScope) return Upload.LIST_IGNORE;
       setAssets((current) => [...current, asset]);
       setSelectedAssetId(asset.id);
 	  if (asset.kind === 'font') {
@@ -3218,6 +3307,7 @@ export default function AICutPage() {
   function openAutoEditor() {
     autoEditScopeRef.current = `${projectId}:${activeTimelineId}`;
     setAutoEditOpen(true);
+    setAgentDrawerOpen(true);
   }
   async function handleAutoEditApplied(result) {
     if (autoEditScopeRef.current !== activeTimelineScopeRef.current) return;
@@ -3438,9 +3528,8 @@ export default function AICutPage() {
     if (resource.category === 'filter') {
       if (!targetEntry || !['video', 'image'].includes(targetEntry.clip.kind)) return message.warning('请先选择视频或图片片段');
       if (targetEntry.track.locked) return message.warning('轨道已锁定');
-      const visualEffect = visualEffectForCatalogResource(resource, parameters);
       updateClip(targetEntry.track.id, targetEntry.clip.id, {
-        visualEffect,
+        visualEffect: null,
         catalogResourceId: resource.id,
         catalogParameters: parameters
       });
@@ -3468,7 +3557,7 @@ export default function AICutPage() {
       }
     }
     if (resource.category === 'text') {
-	  const templateStyle = aicutTextResourcePreset(resource.id);
+	  const templateStyle = catalogTextSettings(resource.id,parameters);
 	  if (!templateStyle) return message.warning('这个文字模板还没有可执行样式');
       commitTimeline((current) => {
         const tracks = current.tracks.map((track) => ({
@@ -4367,13 +4456,13 @@ export default function AICutPage() {
           {[
             {
               title: '短剧AI剪辑',
-              detail: '读取已导入剧本，只对缺字幕片段补转写，对照剧本纠错；智能切镜后以红/蓝/绿标记删除、复核、保留建议。保持素材原顺序，不自动换镜或删片。',
-              prompt: '按短剧AI剪辑流程处理当前工程：读取剧本、补转写、纠错、切镜并给出红蓝绿保留建议'
+              detail: '读取已导入剧本和字幕，对照文字纠错，按需补转写、智能切镜。保持素材原顺序，范围不清楚时先追问。',
+              prompt: '按短剧AI剪辑流程检查当前工程：读取剧本和字幕，先说明缺少的信息，再对照剧本纠错'
             },
             {
               title: '技能创作器',
-              detail: '把一段固定剪辑流程整理成可复用技能。',
-              prompt: '把我接下来描述的剪辑流程制作成可复用技能'
+              detail: '把一段固定剪辑流程整理成可复制的操作说明。',
+              prompt: '把我接下来描述的剪辑流程整理成可复制的操作说明'
             }
           ]
             .filter((skill) => !assetSearch.trim() || `${skill.title}${skill.detail}`.toLowerCase().includes(assetSearch.trim().toLowerCase()))
@@ -4384,6 +4473,8 @@ export default function AICutPage() {
                 onClick={() => {
                   setActiveAgentSkill(skill.title);
                   setAgentDraft({ text: skill.prompt, nonce: Date.now() });
+                  setAutoEditOpen(false);
+                  setAgentDrawerOpen(true);
                 }}
               >
                 <strong>{skill.title}</strong>
@@ -4421,6 +4512,7 @@ export default function AICutPage() {
   }
 
   function openAgentWithPrompt(prompt, skill = '') {
+    setAutoEditOpen(false);
     setActiveAgentSkill(skill);
     setAgentDraft({ text: prompt, nonce: Date.now() });
     setAgentDrawerOpen(true);
@@ -4797,10 +4889,6 @@ export default function AICutPage() {
                     }[saveState]
                   }
                 </span>
-                <button type="button" title="AI 自动剪辑" onClick={openAutoEditor}>
-                  <Sparkles size={15} />
-                  AI 自动剪辑
-                </button>
                 <button type="button" aria-label="撤销" title="撤销 Ctrl+Z" onClick={undoTimeline} disabled={!undoRef.current.length && !serverHistory.canUndo}>
                   <Undo2 size={15} />
                 </button>
@@ -4861,7 +4949,7 @@ export default function AICutPage() {
                   </article>
                 </div>
                 <div className="aicut-canvas-agent">
-                  <AICutAgentPanel key={`${projectId}:${activeTimelineId}`} embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} activeSkill={activeAgentSkill} draft={agentDraft} onTimelineChanged={refreshTimelineFromAgent} />
+                  <AICutAgentPanel key={`${projectId}:${activeTimelineId}`} embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} assets={assets} activeSkill={activeAgentSkill} draft={agentDraft} autoEditOpen={autoEditOpen} onSectionChange={value => { autoEditScopeRef.current = `${projectId}:${activeTimelineId}`; setAutoEditOpen(value); }} onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshTimelineFromAgent} />
                 </div>
               </section>
             ) : (
@@ -4885,8 +4973,22 @@ export default function AICutPage() {
                     plugin: <EditorPluginWorkspace tools={capabilities} />,
                   }}
                   audioRecorder={<AudioRecorder onUpload={uploadRecording} />}
+                  personalTemplateWorkspace={<PersonalTemplateWorkspace timeline={timeline} assets={assets} disabled={loading || saving || timelineBusy || timelineNetworkBusy} onApply={command => {
+                    try {
+                      const result = runTimelineCommand({ ...command.payload, type: command.type });
+                      if (result?.selectionKey) { setSelectedClipKey(result.selectionKey); setSelectedClipKeys([result.selectionKey]); }
+                      return result;
+                    } catch (error) { message.error(error.message || '模板应用失败'); throw error; }
+                  }} />}
                   activeTab={toolCategory}
                   assets={assets}
+                  assetFolders={assetFolders}
+                  selectedFolderId={selectedAssetFolderId}
+                  onSelectFolder={setSelectedAssetFolderId}
+                  onCreateFolder={name => manageAssetFolder(() => createAssetFolder(projectId, name))}
+                  onRenameFolder={(id, name) => manageAssetFolder(() => renameAssetFolder(projectId, id, name))}
+                  onDeleteFolder={id => manageAssetFolder(() => deleteAssetFolder(projectId, id))}
+                  onMoveAssetFolder={(id, folderId) => manageAssetFolder(() => moveAssetToFolder(projectId, id, folderId))}
                   favorites={favoriteFeatures}
                   recent={recentFeatures}
                   uploading={uploading}
@@ -4961,6 +5063,7 @@ export default function AICutPage() {
                   onClose={() => setInspectorDrawerOpen(false)}
                   onCollapse={() => setInspectorCollapsed(true)}
                   onPatchClip={(patch) => selectedClipEntry && updateClip(selectedClipEntry.track.id, selectedClipEntry.clip.id, patch)}
+                  onSetAnimation={animation => selectedClipEntry && runTimelineCommand({ type: 'clip.animation_set', trackId: selectedClipEntry.track.id, clipId: selectedClipEntry.clip.id, animation })}
                   onPatchTrack={(patch) => selectedClipEntry && commitTimeline((current) => updateTimelineTrackSettings(current, selectedClipEntry.track.id, patch))}
                   onPatchEffect={(patch) => selectedClipEntry && updateClip(selectedClipEntry.track.id, selectedClipEntry.clip.id, patch)}
                   onPatchTransition={(patch) =>
@@ -5177,7 +5280,7 @@ export default function AICutPage() {
                 {!mediaCollapsed ? <div role="separator" aria-label="调整素材区宽度" className="aicut-resize-handle library-preview" onPointerDown={(event) => beginLayoutResize('media', event)} onPointerMove={updateLayoutResize} onPointerUp={finishLayoutResize} onPointerCancel={finishLayoutResize} /> : null}
                 {!timelineCollapsed ? <div role="separator" aria-label="上下拖动调整时间线高度" className="aicut-resize-handle upper-timeline" onPointerDown={(event) => beginLayoutResize('timeline', event)} onPointerMove={updateLayoutResize} onPointerUp={finishLayoutResize} onPointerCancel={finishLayoutResize} /> : null}
 
-                {sourcePreviewAsset ? <SourcePreviewPanel asset={sourcePreviewAsset} onClose={() => setSourcePreviewAsset(null)} /> : <section className="aicut-preview aicut-reference-stage">
+                {sourcePreviewAsset ? <SourcePreviewPanel asset={sourcePreviewAsset} onClose={() => setSourcePreviewAsset(null)} /> : <section ref={previewPanelRef} className={`aicut-preview aicut-reference-stage${previewExpanded ? ' is-expanded' : ''}`}>
                   <div className="aicut-panel-title">
                     <strong>播放器</strong>
                     <div>
@@ -5185,10 +5288,11 @@ export default function AICutPage() {
                       <Button type="text" size="small" icon={<Palette size={14} />} onClick={openCanvasSettings}>画布背景</Button>
                     </div>
                   </div>
+                  <PreviewViewport ratio={currentProject?.aspectRatio || '9:16'} zoom={canvasFit}>
                   <div
                     ref={previewStageRef}
                     onPointerDown={pickChromaFromPreview}
-                    className={`aicut-preview-stage fit-${canvasFit} ratio-${String(currentProject?.aspectRatio || '9:16').replace(':', '-')}${safeGuide ? ' show-safe-guide' : ''}${currentProject?.backgroundMode === 'transparent' ? ' is-transparent' : ''}${chromaPickerActive ? ' chroma-picker-active' : ''}`}
+                    className={`aicut-preview-stage fit-fit ratio-${String(currentProject?.aspectRatio || '9:16').replace(':', '-')}${safeGuide ? ' show-safe-guide' : ''}${currentProject?.backgroundMode === 'transparent' ? ' is-transparent' : ''}${chromaPickerActive ? ' chroma-picker-active' : ''}`}
                     style={currentProject?.backgroundMode === 'transparent' ? undefined : { backgroundColor: currentProject?.backgroundColor || '#000000' }}
                   >
                     {!previewFrame.visuals.length && !previewFrame.subtitles.length ? (
@@ -5196,15 +5300,15 @@ export default function AICutPage() {
                     ) : (
                       previewFrame.visuals.map((item, index) => (
                         <div className="aicut-preview-visual" data-clip-key={`${item.trackId}::${item.clipId}`} style={{ zIndex: index + 1, mixBlendMode: item.blendMode === 'add' ? 'plus-lighter' : item.blendMode }} key={`${item.trackId}:${item.clipId}`}>
-                          <PreviewMedia item={item} playing={previewPlaying} />
+                          <div className="aicut-animation-layer" style={clipAnimationPreviewStyle(item.animation, item.durationMs, item.outputOffsetMs, { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', overflow: 'hidden' })}><PreviewMedia key={previewQuality} item={item} playing={previewPlaying} quality={previewQuality} /></div>
                         </div>
                       ))
                     )}
                     {previewFrame.subtitles.length ? (
                       <div className="aicut-preview-subtitles">
                         {previewFrame.subtitles.map((item) => (
-                          <div className={`aicut-preview-caption style-${item.styleId} animation-${item.animation || 'none'}`} style={aicutTextPreviewStyle(item.textStyle, 'var(--aicut-preview-px, 1px)')} key={`${item.trackId}:${item.clipId}`}>
-                            <AICutCaptionText item={item} />
+                          <div className="aicut-caption-opacity" style={{opacity:item.textStyle.textOpacity ?? 1,width:'100%',display:'flex',flexDirection:'column',alignItems:'center'}} key={`${item.trackId}:${item.clipId}`}>
+                            <div className={`aicut-preview-caption style-${item.styleId} animation-${item.animation || 'none'}`} style={aicutTextPreviewStyle({...item.textStyle,textOpacity:1}, 'var(--aicut-preview-px, 1px)')}><AICutCaptionText item={item} /></div>
                           </div>
                         ))}
                       </div>
@@ -5234,6 +5338,7 @@ export default function AICutPage() {
                       onCancel={() => setObjectRemovalSelectionActive(false)}
                     />
                   </div>
+                  </PreviewViewport>
                   <div className="aicut-preview-controls aicut-reference-player">
                     <div className="aicut-player-time"><span>{previewClock(previewTimeMs)}</span><span>{previewClock(durationMs)}</span></div>
                     <div className="aicut-player-transport">
@@ -5242,12 +5347,7 @@ export default function AICutPage() {
                       <button type="button" aria-label="预览下一剪辑点" title="下一剪辑点" onClick={() => jumpEditPoint('next')}><SkipForward size={14} /></button>
                     </div>
                     <input className="aicut-preview-seek" aria-label="预览播放头" type="range" min="0" max={Math.max(1, durationMs)} step="10" value={previewTimeMs} onChange={(event) => seekPreview(Number(event.target.value))} />
-                    <div className="aicut-player-options">
-                      <button type="button" title="依次切换完整显示、铺满画布和原始大小" onClick={() => setCanvasFit(value => nextAICutCanvasFit(value))}>{canvasFit === 'fit' ? '适应' : canvasFit === 'fill' ? '填充' : '100%'}</button>
-                      <button type="button" className={safeGuide ? 'active' : ''} onClick={() => setSafeGuide(value => !value)}>安全框</button>
-                      <button type="button" title="画面比例" onClick={() => setCanvasSettingsOpen(true)}>{currentProject?.aspectRatio || '9:16'}</button>
-                      <button type="button" aria-label="全屏预览" title="全屏预览" onClick={() => previewStageRef.current?.requestFullscreen?.()}><Maximize2 size={14} /></button>
-                    </div>
+                    <PlayerViewControls quality={previewQuality} onQuality={value => { setPreviewPlaying(false); setPreviewQuality(value); }} zoom={canvasFit} onZoom={setCanvasFit} ratio={currentProject?.aspectRatio || '9:16'} onRatio={changeProjectRatio} fullscreen={previewFullscreen || previewExpanded} onFullscreen={togglePreviewFullscreen} safeGuide={safeGuide} onSafeGuide={() => setSafeGuide(value => !value)} />
                   </div>
                 </section>}
 
@@ -5366,15 +5466,19 @@ export default function AICutPage() {
                   />
                   <TimelineToolbar
                     primary={<>
-                      <Select size="small" aria-label="新增轨道" placeholder="＋ 轨道" value={undefined} onChange={addTrack} style={{ width: 88 }}
-                        options={[{ value: 'subtitle', label: '新增字幕轨' }, { value: 'video', label: '新增视频轨' }, { value: 'audio', label: '新增音频轨' }]} />
+                      <Dropdown trigger={['click']} menu={{ items: [{key:'video',label:'新增视频轨'},{key:'audio',label:'新增音频轨'},{key:'subtitle',label:'新增字幕轨'}], onClick:({key})=>addTrack(key) }}><Button size="small" aria-label="新增轨道" title="新增轨道" icon={<Plus size={15}/>} /></Dropdown>
+                      <Button size="small" aria-label="选择模式" title="选择模式" aria-pressed={!bladeMode} type={!bladeMode ? 'primary' : 'default'} onClick={() => setBladeMode(false)} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m5 3 14 11-7 1-3 6z"/></svg>} />
+                      <span className="aicut-toolbar-divider" aria-hidden="true" />
+                      <Button size="small" aria-label="时间线撤销" title="撤销 Ctrl+Z" icon={<Undo2 size={15} />} onClick={undoTimeline} disabled={!undoRef.current.length && !serverHistory.canUndo} />
+                      <Button size="small" aria-label="时间线重做" title="重做 Ctrl+Shift+Z" icon={<Redo2 size={15} />} onClick={redoTimeline} disabled={!redoRef.current.length && !serverHistory.canRedo} />
+                      <span className="aicut-toolbar-divider" aria-hidden="true" />
                       <Button size="small" type={bladeMode ? 'primary' : 'default'} aria-label="剃刀模式" aria-pressed={bladeMode} title="剃刀模式" icon={<Scissors size={15} />} onClick={() => setBladeMode(value => !value)} />
                       <Button size="small" title="在播放头处分割" aria-label="播放头分割" disabled={!timeline.tracks.some(track => !track.locked && track.clips?.length)} icon={<Clapperboard size={15} />} onClick={splitAtPlayhead} />
-                      <Button size="small" title="复制所选片段" aria-label="复制" icon={<Copy size={15} />} disabled={!selectedClipKeys.length} onClick={copySelectedClips} />
-                      <Button size="small" title="粘贴片段" aria-label="粘贴" icon={<ClipboardPaste size={15} />} disabled={!clipboardCount} onClick={pasteClips} />
+                      <Button size="small" aria-label="向左裁到播放头" title="删除所选片段在播放头左侧的部分" disabled={!selectedClipEntry || selectedClipEntry.track.locked} icon={<SkipBack size={15} />} onClick={() => { try { if (selectedClipEntry) runTimelineCommand({ type: 'clip.trim_to_playhead', trackId: selectedClipEntry.track.id, clipId: selectedClipEntry.clip.id, timeMs: previewTimeMs, edge: 'left' }); } catch (error) { message.warning(error.message); } }} />
+                      <Button size="small" aria-label="向右裁到播放头" title="删除所选片段在播放头右侧的部分" disabled={!selectedClipEntry || selectedClipEntry.track.locked} icon={<SkipForward size={15} />} onClick={() => { try { if (selectedClipEntry) runTimelineCommand({ type: 'clip.trim_to_playhead', trackId: selectedClipEntry.track.id, clipId: selectedClipEntry.clip.id, timeMs: previewTimeMs, edge: 'right' }); } catch (error) { message.warning(error.message); } }} />
                       <Button size="small" danger title="删除所选片段" aria-label="删除" icon={<Trash2 size={15} />} disabled={!selectedClipKeys.length} onClick={deleteSelectedClips} />
                     </>}
-                    advancedItems={buildTimelineAdvancedItems({
+                    advancedItems={[{ key:'clipboard-actions',type:'group',label:'剪贴板',children:[{key:'copy',label:'复制',disabled:!selectedClipKeys.length,onClick:copySelectedClips},{key:'paste',label:'粘贴',disabled:!clipboardCount,onClick:pasteClips}] }, ...buildTimelineAdvancedItems({
                       hasSelection: Boolean(selectedClipEntry), selectionCount: selectedClipKeys.length,
                       hasLink: Boolean(selectedClipEntry?.clip?.linkGroupId), hasCompound: Boolean(selectedClipEntry?.clip?.compoundId), consolidateBusy
                     }, {
@@ -5387,8 +5491,10 @@ export default function AICutPage() {
                       expandCompound: expandSelectedCompound,
                       openCompound: () => selectedClipEntry?.clip?.compoundId && setActiveCompoundId(selectedClipEntry.clip.compoundId),
                       dissolveCompound: dissolveSelectedCompound
-                    }, (selectedClipEntry?.track || timeline.tracks[0]) ? trackMenuItems(selectedClipEntry?.track || timeline.tracks[0]) : [])}
+                    }, (selectedClipEntry?.track || timeline.tracks[0]) ? trackMenuItems(selectedClipEntry?.track || timeline.tracks[0]) : [])]}
                     secondary={<>
+                      <AudioRecorder key={`timeline-recorder:${projectId}:${activeTimelineId}`} compact onUpload={uploadRecording} />
+                      <span className="aicut-toolbar-divider" aria-hidden="true" />
                       <Button size="small" type={linkedMove ? 'primary' : 'default'} aria-pressed={linkedMove} title="联动：已建立联动的片段整组移动" onClick={() => setLinkedMove(value => !value)}>联动</Button>
                       <Button size="small" type={rippleMode ? 'primary' : 'default'} aria-pressed={rippleMode} title="波纹：删减片段后收紧空隙" onClick={() => setRippleMode(value => !value)}>波纹</Button>
                       <Button size="small" type={magneticSnap ? 'primary' : 'default'} aria-pressed={magneticSnap} title="吸附" aria-label="吸附" icon={<Magnet size={15} />} onClick={() => setMagneticSnap(value => !value)} />
@@ -5396,8 +5502,7 @@ export default function AICutPage() {
                       <Select size="small" aria-label="时间线标记点" placeholder="标记" value={undefined} style={{ width: 76 }}
                         onChange={markerId => { const marker = (timeline.markers || []).find(item => item.id === markerId); if (marker) seekPreview(marker.timeMs); }}
                         options={(timeline.markers || []).map(marker => ({ value: marker.id, label: `${previewClock(marker.timeMs)} ${marker.label}` }))} />
-                      <Select size="small" aria-label="时间线缩放" value={timelineZoom} onChange={setTimelineZoom} style={{ width: 76 }}
-                        options={[{ value: .5, label: '50%' }, { value: 1, label: '100%' }, { value: 2, label: '200%' }, { value: 4, label: '400%' }]} />
+                      <TimelineZoomControls zoom={timelineZoom} onChange={setTimelineZoom} durationMs={durationMs} viewportWidth={timelineScrollRef.current?.clientWidth || 900} />
                       <button type="button" className="aicut-timeline-collapse" aria-label={timelineCollapsed ? '展开时间线' : '收起时间线'}
                         onClick={() => setEditorLayout(current => ({ ...current, timelineCollapsed: !current.timelineCollapsed }))}>
                         {timelineCollapsed ? <PanelBottomOpen size={15} /> : <PanelBottomClose size={15} />}
@@ -5446,13 +5551,13 @@ export default function AICutPage() {
               <Bot size={18} />
               <span>AI-CUT Agent</span>
             </button>
-            {agentDrawerOpen && (
-              <div className="aicut-agent-drawer">
+            {(agentDrawerOpen || agentDrawerMounted) && (
+              <div className="aicut-agent-drawer" style={{ display: agentDrawerOpen ? 'grid' : 'none' }}>
                 <header>
                   <strong>AI-CUT Agent</strong>
                   <Button type="text" aria-label="关闭 Agent" icon={<X size={18} />} onClick={() => setAgentDrawerOpen(false)} />
                 </header>
-                <AICutAgentPanel key={`${projectId}:${activeTimelineId}`} embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} activeSkill={activeAgentSkill} draft={agentDraft} onTimelineChanged={refreshTimelineFromAgent} />
+                <AICutAgentPanel key={`${projectId}:${activeTimelineId}`} embedded projectId={projectId} timelineRevision={timeline.revision} models={agentModels} assets={assets} activeSkill={activeAgentSkill} draft={agentDraft} autoEditOpen={autoEditOpen} onSectionChange={value => { autoEditScopeRef.current = `${projectId}:${activeTimelineId}`; setAutoEditOpen(value); }} onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshTimelineFromAgent} />
               </div>
             )}
             {asrJobs.length ? (
@@ -5586,7 +5691,6 @@ export default function AICutPage() {
             </section>
           </div>
         </Modal>
-        <AICutAutoEditDrawer key={`${projectId}:${activeTimelineId}`} open={autoEditOpen} projectId={projectId} revision={timeline.revision} assets={assets} models={agentModels} onClose={() => setAutoEditOpen(false)} onApplied={handleAutoEditApplied} />
         <Modal title="新建 AI-CUT 项目" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={createProject} okText="创建">
           <div className="aicut-create-form">
             <label>
@@ -5740,6 +5844,7 @@ export default function AICutPage() {
               <label>目标码率<InputNumber aria-label="导出目标码率" min={0} max={100} precision={0} value={exportSettings.bitrateMbps} addonAfter="Mbps" onChange={(bitrateMbps) => setExportSettings((current) => ({ ...current, bitrateMbps: Number(bitrateMbps || 0) }))} /><small>0 表示按质量自动分配</small></label>
               <label className="aicut-export-alpha"><Checkbox checked={Boolean(exportSettings.alpha)} disabled={currentProject?.backgroundMode !== 'transparent' || exportSettings.format === 'mp4' || exportSettings.codec === 'av1'} onChange={(event) => setExportSettings((current) => ({ ...current, alpha: event.target.checked }))}>保留透明通道</Checkbox><small>仅透明工程的 VP9 / ProRes 4444 可用</small></label>
             </div>
+            <p className="aicut-export-depth-note" role="note">色深是输出编码位深。当前效果合成仍以 8-bit 处理，10/12-bit 输出不代表 HDR 或端到端高位深。</p>
             <div className="aicut-export-types">
               <Button type="primary" loading={exportingFormat === exportSettings.format} onClick={() => exportMedia(exportSettings.format)}>
                 成片 · {exportSettings.format.toUpperCase()} 加入队列

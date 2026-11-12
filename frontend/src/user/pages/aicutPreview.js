@@ -84,6 +84,9 @@ function previewMedia(track, clip, asset, timeMs) {
     transition: clip.transition || '',
     transitionMs: Math.max(0, finiteNumber(clip.transitionMs)),
     visualEffect: clip.visualEffect || null,
+    catalogResourceId: clip.catalogResourceId || '',
+    catalogParameters: clip.catalogParameters || {},
+    animation: clip.animation || null,
 	visualProcessing: clip.visualProcessing || null,
 	outputOffsetMs,
 	blendMode: clip.blendMode || 'normal',
@@ -107,6 +110,7 @@ export function buildAICutPreviewFrame(timeline, assets, requestedTimeMs) {
   const timeMs = seekAICutPreviewTime(requestedTimeMs, durationMs);
   const assetMap = new Map((assets || []).map(asset => [asset.id, asset]));
   const frame = { timeMs, visuals: [], audios: [], subtitles: [] };
+  const effects=orderedTracks(timeline).filter(track=>track.kind==='effect'&&!track.muted).flatMap(track=>(track.clips||[]).filter(clip=>isActive(clip,timeMs)).map(clip=>({resourceId:clip.resourceId,parameters:clip.parameters||{},startMs:clip.startMs,durationMs:clip.durationMs})));
 
   for (const track of orderedTracks(timeline)) {
     if (track.muted) continue;
@@ -131,6 +135,7 @@ export function buildAICutPreviewFrame(timeline, assets, requestedTimeMs) {
       const asset = assetMap.get(clip.assetId);
       if (!asset) continue;
       const media = previewMedia(track, clip, asset, timeMs);
+      if(asset.kind==='video'||asset.kind==='image')media.layerEffects=effects;
       if (asset.kind === 'video') {
         const personSegmentation = normalizePersonSegmentation(clip.visualProcessing?.personSegmentation);
         media.personSegmentationCurrent = isPersonSegmentationCurrent(clip, personSegmentation);

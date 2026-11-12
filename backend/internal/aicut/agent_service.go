@@ -32,6 +32,7 @@ type AgentService struct {
 	tools        *AgentToolExecutor
 	resolveModel AgentModelResolver
 	buildPrompt  AgentPromptBuilder
+	resolveSkill func(string) (string, bool)
 	now          func() time.Time
 }
 
@@ -95,6 +96,22 @@ func (s *AgentService) Run(ctx context.Context, runID string) (AgentRun, error) 
 		return s.fail(ctx, run, 0, "保存用户指令失败", err)
 	}
 	conversation := []string{"用户指令：" + run.Instruction}
+	history, historyErr := s.conversationHistory(ctx, run)
+	if historyErr != nil {
+		return s.fail(ctx, run, 0, "读取历史对话失败", historyErr)
+	}
+	conversation = append(history, conversation...)
+	systemPrompt := s.buildPrompt(run.Mode)
+	if run.ActiveSkillID != "" {
+		if s.resolveSkill == nil {
+			return s.fail(ctx, run, 0, "当前技能尚未接入，请重新选择技能", nil)
+		}
+		body, ok := s.resolveSkill(run.ActiveSkillID)
+		if !ok {
+			return s.fail(ctx, run, 0, "当前技能不存在，请重新选择技能", nil)
+		}
+		systemPrompt += "\n当前选用技能：" + run.ActiveSkillID + "\n" + body
+	}
 	for turn := 1; turn <= 30; turn++ {
 		canceled, _, err := s.isCanceled(ctx, run)
 		if err != nil {
@@ -106,7 +123,7 @@ func (s *AgentService) Run(ctx context.Context, runID string) (AgentRun, error) 
 		if err := s.appendEvent(ctx, run, AgentEventThinking, fmt.Sprintf("正在分析第 %d 步", turn), "", "", run.ExpectedRevision); err != nil {
 			return s.fail(ctx, run, turn-1, "保存 Agent 事件失败", err)
 		}
-		request := AgentModelRequest{SystemPrompt: s.buildPrompt(run.Mode), UserPrompt: strings.Join(conversation, "\n")}
+		request := AgentModelRequest{SystemPrompt: systemPrompt, UserPrompt: strings.Join(conversation, "\n")}
 		raw, modelErr := model.Complete(ctx, request)
 		if modelErr != nil {
 			raw, modelErr = model.Complete(ctx, AgentModelRequest{SystemPrompt: request.SystemPrompt, UserPrompt: request.UserPrompt + "\n上一轮模型调用失败，请仅重试一次。"})
@@ -134,6 +151,17 @@ func (s *AgentService) Run(ctx context.Context, runID string) (AgentRun, error) 
 			}
 			return s.finishReply(ctx, run, turn, reply)
 		}
+		if envelope.Followup != nil {
+			question, followErr := normalizeAgentFollowup(envelope.Followup)
+			if followErr != nil {
+				return s.fail(ctx, run, turn, "追问内容无效，请重新描述要求", followErr)
+			}
+			encoded, _ := json.Marshal(question)
+			if err := s.appendEvent(ctx, run, "followup", string(encoded), "", "", run.ExpectedRevision); err != nil {
+				return s.fail(ctx, run, turn, "保存追问失败", err)
+			}
+			return s.finishReply(ctx, run, turn, question.Question+"\n请补充信息后继续。\n"+string(encoded))
+		}
 		if len(envelope.ToolCalls) == 0 {
 			reply := strings.TrimSpace(envelope.Reply)
 			if reply == "" {
@@ -149,7 +177,8 @@ func (s *AgentService) Run(ctx context.Context, runID string) (AgentRun, error) 
 			if canceled {
 				return s.finishCanceled(ctx, run, turn)
 			}
-			if err := s.appendEvent(ctx, run, AgentEventToolStart, "开始执行 "+call.Name, call.Name, call.ID, run.ExpectedRevision); err != nil {
+			callDetails, _ := json.Marshal(call)
+			if err := s.appendEvent(ctx, run, AgentEventToolStart, string(callDetails), call.Name, call.ID, run.ExpectedRevision); err != nil {
 				return s.fail(ctx, run, turn, "保存工具事件失败", err)
 			}
 			result, err := s.tools.Execute(ctx, run, call)

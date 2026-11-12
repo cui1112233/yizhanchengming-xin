@@ -1,0 +1,6 @@
+.aicut-audio-recorder { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; font-size: 13px; line-height: 1.7; }
+.aicut-audio-recorder p { margin: 0; color: var(--ant-color-text-secondary, #8791a6); }
+.aicut-audio-recorder-status { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 16px; padding: 16px; border: 1px solid var(--ant-color-border, #364052); border-radius: 8px; box-sizing: border-box; }
+.aicut-audio-recorder-status time { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.aicut-audio-recorder-status .is-recording { color: #ef6464; }
+.aicut-audio-recorder audio, .aicut-audio-recorder .ant-alert { width: 100%; }

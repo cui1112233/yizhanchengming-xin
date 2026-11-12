@@ -81,6 +81,9 @@ func applyMemoryNamedPlan(base *MemoryStore, repo *memoryCollectionRepository, o
 		return plan, current, EditPlanApplySummary{}, ErrRevisionConflict
 	}
 	selected := enabledEditPlan(cloneEditPlan(plan), enabled)
+	if e := refreshMemoryEditPlanAssets(base, &selected); e != nil {
+		return plan, current, EditPlanApplySummary{}, e
+	}
 	next, summary, e := ApplyEditPlan(current, selected)
 	if e != nil {
 		return plan, current, EditPlanApplySummary{}, e
@@ -104,6 +107,7 @@ func applyMemoryNamedPlan(base *MemoryStore, repo *memoryCollectionRepository, o
 	base.projects[aicutProjectKey(o, p)] = project
 	// Persist exactly the selected operations so replay reports the same summary.
 	plan.Operations = selected.Operations
+	plan.Summary.EstimatedDurationMS = summary.EstimatedDurationMS
 	plan.State, plan.Error, plan.AppliedRevision, plan.UpdatedAt = EditPlanApplied, "", next.Revision, now.UTC()
 	base.editPlans[key] = cloneEditPlan(plan)
 	base.editPlanSummaries[key] = summary
@@ -162,6 +166,9 @@ func applyMySQLNamedPlan(ctx context.Context, db *sql.DB, o, p, id, target strin
 		return plan, current, EditPlanApplySummary{}, ErrRevisionConflict
 	}
 	selected := enabledEditPlan(cloneEditPlan(plan), enabled)
+	if e := refreshSQLEditPlanAssets(ctx, tx, &selected); e != nil {
+		return plan, current, EditPlanApplySummary{}, e
+	}
 	next, summary, e := ApplyEditPlan(current, selected)
 	if e != nil {
 		return plan, current, EditPlanApplySummary{}, e
@@ -202,8 +209,10 @@ func applyMySQLNamedPlan(ctx context.Context, db *sql.DB, o, p, id, target strin
 		}
 	}
 	plan.Operations = selected.Operations
+	plan.Summary.EstimatedDurationMS = summary.EstimatedDurationMS
 	plan.State, plan.Error, plan.AppliedRevision, plan.UpdatedAt = EditPlanApplied, "", next.Revision, now.UTC()
-	if _, e = tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET state = ?, error_message = '', applied_revision = ?, updated_at = ? WHERE id = ?`, plan.State, plan.AppliedRevision, plan.UpdatedAt, plan.ID); e != nil {
+	summaryJSON, _ := json.Marshal(plan.Summary)
+	if _, e = tx.ExecContext(ctx, `UPDATE aicut_edit_plans SET state = ?, error_message = '', applied_revision = ?, updated_at = ?, summary_json = ? WHERE id = ?`, plan.State, plan.AppliedRevision, plan.UpdatedAt, string(summaryJSON), plan.ID); e != nil {
 		return plan, current, EditPlanApplySummary{}, e
 	}
 	if e = tx.Commit(); e != nil {

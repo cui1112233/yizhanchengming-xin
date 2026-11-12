@@ -46,3 +46,25 @@ func prepareAICutHSLLUTs(dir string, clips []aicutRenderClip) error {
 	}
 	return nil
 }
+
+// All color controls share one lattice, preserving preview operation order.
+func prepareAICutColorLUTs(dir string, clips []aicutRenderClip) error {
+	for i := range clips {
+		item := &clips[i]
+		if item.clip.VisualProcessing == nil || !aicutNeedsColorLUT(item.clip.VisualProcessing.Color) {
+			continue
+		}
+		color := item.clip.VisualProcessing.Color
+		data, err := json.Marshal(color)
+		if err != nil {
+			return fmt.Errorf("调色参数无效")
+		}
+		digest := sha256.Sum256(data)
+		target := filepath.Join(dir, "color-"+hex.EncodeToString(digest[:])+".cube")
+		if err := os.WriteFile(target, []byte(aicutCombinedColorCube(color)), 0600); err != nil {
+			return err
+		}
+		item.hslLUTPath = target
+	}
+	return nil
+}

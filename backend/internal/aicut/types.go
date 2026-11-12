@@ -145,6 +145,7 @@ type TextStyleRun struct {
 }
 
 type TrackSettings struct {
+	TextOpacity       *float64       `json:"textOpacity,omitempty"`
 	SubtitleStyleID   string         `json:"subtitleStyleId,omitempty"`
 	SubtitleRhythm    string         `json:"subtitleRhythm,omitempty"`
 	SubtitleAnimation string         `json:"subtitleAnimation,omitempty"`
@@ -204,6 +205,8 @@ type Clip struct {
 	CompoundName          string             `json:"compoundName,omitempty"`
 	CompoundPath          []CompoundRef      `json:"compoundPath,omitempty"`
 	VisualEffect          *VisualEffect      `json:"visualEffect,omitempty"`
+	Animation             *ClipAnimation     `json:"animation,omitempty"`
+	CatalogParameters     map[string]float64 `json:"catalogParameters,omitempty"`
 	CatalogResourceID     string             `json:"catalogResourceId,omitempty"`
 	TextResourceID        string             `json:"textResourceId,omitempty"`
 	ResourceID            string             `json:"resourceId,omitempty"`
@@ -660,6 +663,7 @@ func validTransition(value string) bool {
 }
 
 type Asset struct {
+	FolderID    string    `json:"folderId,omitempty"`
 	ID          string    `json:"id"`
 	ProjectID   string    `json:"projectId"`
 	Kind        string    `json:"kind"`
@@ -751,6 +755,7 @@ func validateTimeline(timeline Timeline) error {
 		if (settings.FontAssetID == "" && settings.FontFamily != "" && !validTextFont(settings.FontFamily)) ||
 			(settings.FontAssetID != "" && (len([]rune(strings.TrimSpace(settings.FontAssetID))) > 96 || strings.TrimSpace(settings.FontAssetID) == "" || len([]rune(strings.TrimSpace(settings.FontFamily))) > 128 || strings.TrimSpace(settings.FontFamily) == "")) ||
 			(settings.FontSize != 0 && (settings.FontSize < 12 || settings.FontSize > 240)) ||
+			(settings.TextOpacity != nil && (math.IsNaN(*settings.TextOpacity) || math.IsInf(*settings.TextOpacity, 0) || *settings.TextOpacity < 0 || *settings.TextOpacity > 1)) ||
 			math.IsNaN(settings.TextCurve) || math.IsInf(settings.TextCurve, 0) || settings.TextCurve < -180 || settings.TextCurve > 180 ||
 			(settings.TextColor != "" && !validTextColor(settings.TextColor)) ||
 			(settings.StrokeColor != "" && !validTextColor(settings.StrokeColor)) ||
@@ -868,6 +873,14 @@ func validateTimeline(timeline Timeline) error {
 			}
 			if !validVisualEffect(clip.VisualEffect) {
 				return ErrInvalidTimeline
+			}
+			if !validClipAnimation(clip.Animation) || (HasClipAnimation(clip.Animation) && clip.Kind != ClipVideo && clip.Kind != ClipImage) {
+				return ErrInvalidTimeline
+			}
+			for key, value := range clip.CatalogParameters {
+				if (key != "intensity" && key != "speed" && key != "radius") || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 100 || (key == "intensity" && value > 1) {
+					return ErrInvalidTimeline
+				}
 			}
 			if clip.CatalogResourceID != "" && !validCatalogVisualResource(clip.CatalogResourceID) {
 				return ErrInvalidTimeline

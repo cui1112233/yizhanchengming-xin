@@ -69,6 +69,7 @@ export function normalizeAICutTextStyle(value = {}) {
 	const style = {
 	fontFamily: fontAssetId && requestedFamily ? requestedFamily : fontFamilies.has(value.fontFamily) ? value.fontFamily : 'Microsoft YaHei',
     fontSize: clamp(finite(value.fontSize, 54), 12, 240),
+    textOpacity: value.textOpacity == null ? 1 : clamp(finite(value.textOpacity, 1),0,1),
 	textCurve: clamp(finite(value.textCurve, 0), -180, 180),
     textColor: color(value.textColor, '#ffffff'),
     strokeColor: color(value.strokeColor, '#000000'),
@@ -149,6 +150,7 @@ export function aicutTextPreviewStyle(value = {}, previewUnit) {
   const hasShadow = style.shadowOffsetX !== 0 || style.shadowOffsetY !== 0 || style.shadowBlur !== 0;
   return {
     fontFamily: style.fontFamily,
+    opacity: style.textOpacity,
     fontSize: pixels(style.fontSize),
     color: style.textColor,
     WebkitTextStroke: style.strokeWidth ? `${pixels(style.strokeWidth)} ${style.strokeColor}` : undefined,

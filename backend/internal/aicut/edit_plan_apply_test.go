@@ -6,7 +6,7 @@ import (
 )
 
 func editPlanBaseTimeline() Timeline {
-	return Timeline{Revision: 7, Tracks: []Track{
+	return Timeline{Revision: 7, Script: "开场对白\n自动字幕", Tracks: []Track{
 		{ID: "video-1", Kind: TrackVideo, Name: "主画面", Order: 0, Clips: []Clip{
 			{ID: "clip-1", AssetID: "asset-video", Kind: ClipVideo, Name: "镜头一", StartMS: 0, DurationMS: 2000, SourceStartMS: 0, SourceDurationMS: 5000, PlaybackRate: 1, Volume: 1},
 			{ID: "clip-2", AssetID: "asset-video", Kind: ClipVideo, Name: "镜头二", StartMS: 2000, DurationMS: 2000, SourceStartMS: 2000, SourceDurationMS: 5000, PlaybackRate: 1, Volume: 1},
@@ -20,6 +20,10 @@ func editPlanBaseTimeline() Timeline {
 func editPlanForApply(operations ...EditOperation) EditPlan {
 	plan := validEditPlanForTest()
 	plan.BaseRevision = 7
+	plan.Request.IncludeTransitions = true
+	plan.Request.IncludeFilters = true
+	plan.Request.IncludeBGM = true
+	plan.Request.SelectedAssets = []EditPlanAsset{{ID: "asset-bgm", Kind: "audio", Name: "背景音乐", DurationMS: 10000}}
 	plan.Request.AssetIDs = []string{"asset-video", "asset-bgm"}
 	plan.Operations = operations
 	return plan
@@ -129,5 +133,65 @@ func TestApplyEditPlanReturnsProjectFormatWithoutDuplicatingItInTimeline(t *test
 	}
 	if summary.AspectRatio != "16:9" || result.Revision != 7 {
 		t.Fatalf("summary=%#v timeline=%#v", summary, result)
+	}
+}
+
+func TestEditPlanPlacesActualAssetsAndRejectsInventedRanges(t *testing.T) {
+	p := editPlanForApply(EditOperation{ID: "v", Type: EditPlaceAsset, TrackID: "main", AssetID: "asset-video", StartMS: 0, SourceStartMS: 500, DurationMS: 1500, Reason: "按素材顺序拼接", Enabled: true}, EditOperation{ID: "i", Type: EditPlaceAsset, TrackID: "main", AssetID: "image", StartMS: 1500, DurationMS: 2500, Reason: "展示图片", Enabled: true})
+	p.Request.AssetIDs = append(p.Request.AssetIDs, "image")
+	p.Request.SelectedAssets = []EditPlanAsset{{ID: "asset-video", Name: "真实视频.mp4", Kind: "video", DurationMS: 3000}, {ID: "image", Name: "真实图片.png", Kind: "image"}}
+	timeline := Timeline{Revision: 7, Tracks: []Track{}}
+	got, sum, err := ApplyEditPlan(timeline, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Tracks) != 1 || len(got.Tracks[0].Clips) != 2 || got.Tracks[0].Clips[0].SourceStartMS != 500 || got.Tracks[0].Clips[0].SourceDurationMS != 3000 || got.Tracks[0].Clips[1].Kind != ClipImage || sum.EstimatedDurationMS != 4000 {
+		t.Fatalf("got=%+v sum=%+v", got, sum)
+	}
+	p.Operations[0].SourceStartMS = 2000
+	if _, _, err := ApplyEditPlan(timeline, p); err == nil {
+		t.Fatal("source overrun accepted")
+	}
+	p.Operations[0].AssetID = "invented"
+	if _, _, err := ApplyEditPlan(timeline, p); err == nil {
+		t.Fatal("invented asset accepted")
+	}
+	if len(timeline.Tracks) != 0 {
+		t.Fatal("input mutated")
+	}
+}
+
+func TestEditPlanDoesNotInventDialogue(t *testing.T) {
+	p := editPlanForApply(EditOperation{ID: "caption", Type: EditAddCaption, TrackID: "subtitle-1", Text: "凭空编造的对白", DurationMS: 1000, Reason: "自动字幕", Enabled: true})
+	if _, _, err := ApplyEditPlan(editPlanBaseTimeline(), p); err == nil {
+		t.Fatal("invented dialogue accepted without transcript")
+	}
+	timeline := editPlanBaseTimeline()
+	timeline.Script = "凭空编造的对白"
+	if _, _, err := ApplyEditPlan(timeline, p); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEditPlanFilterPreservesRequestedIntensity(t *testing.T) {
+	for _, intensity := range []float64{0, .8} {
+		p := editPlanForApply(EditOperation{ID: "filter", Type: EditSetFilter, TrackID: "video-1", ClipID: "clip-1", ResourceID: "filter-cinema", Parameters: map[string]float64{"intensity": intensity}, Reason: "r", Enabled: true})
+		timeline, _, err := ApplyEditPlan(editPlanBaseTimeline(), p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		clip := findClipForEditPlanTest(t, timeline, "video-1", "clip-1")
+		value, exists := clip.CatalogParameters["intensity"]
+		if !exists || value != intensity {
+			t.Fatalf("intensity=%v exists=%v want=%v", value, exists, intensity)
+		}
+	}
+}
+func TestEditPlanFilterRejectsInvalidIntensity(t *testing.T) {
+	for _, intensity := range []float64{-1, 1.1} {
+		p := editPlanForApply(EditOperation{ID: "filter", Type: EditSetFilter, TrackID: "video-1", ClipID: "clip-1", ResourceID: "filter-cinema", Parameters: map[string]float64{"intensity": intensity}, Reason: "r", Enabled: true})
+		if _, _, err := ApplyEditPlan(editPlanBaseTimeline(), p); err == nil {
+			t.Fatalf("accepted intensity=%v", intensity)
+		}
 	}
 }

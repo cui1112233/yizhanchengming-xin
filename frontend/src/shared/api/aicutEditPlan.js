@@ -56,3 +56,9 @@ export async function applyAICutEditPlan(projectId, planId, enabledOperationIds,
   const ids = (Array.isArray(enabledOperationIds) ? enabledOperationIds : []).map(id => safeId(id, '剪辑操作'));
   return request(planPath(projectId, planId, '/apply'), { method: 'POST', body: JSON.stringify({ enabledOperationIds: ids }) });
 }
+
+export async function previewAICutEditPlan(projectId, planId, enabledOperationIds, request = apiRequest) {
+ const ids = (Array.isArray(enabledOperationIds) ? enabledOperationIds : []).map(id => safeId(id, '剪辑操作'));
+ const result = await request(planPath(projectId,planId,'/preview'), { method: 'POST', suppressGlobalError: true, body: JSON.stringify({enabledOperationIds:ids}) });
+ return result?.summary;
+}

@@ -1,0 +1,12 @@
+[
+  {"pixel":[64,100,200,77],"color":{"rgbCurves":{"red":[{"x":0,"y":0},{"x":0.5,"y":1},{"x":1,"y":1}]}},"want":[128,100,200,77]},
+  {"pixel":[128,128,128,77],"color":{"wheels":{"shadows":{"hue":0,"saturation":100}}},"want":[140,125,125,77]},
+  {"pixel":[128,128,128,255],"color":{"wheels":{"shadows":{"hue":180,"saturation":100}}},"want":[116,131,131,255]},
+  {"pixel":[128,128,128,255],"color":{"wheels":{"shadows":{"hue":-180,"saturation":100}}},"want":[116,131,131,255]},
+  {"pixel":[128,128,128,255],"color":{"wheels":{"midtones":{"hue":0,"saturation":100}}},"want":[153,121,121,255]},
+  {"pixel":[255,255,255,255],"color":{"wheels":{"highlights":{"hue":0,"saturation":100}}},"want":[255,241,241,255]},
+  {"pixel":[0,0,0,255],"color":{"wheels":{"shadows":{"hue":0,"saturation":100}}},"want":[50,0,0,255]},
+  {"pixel":[0,0,0,255],"color":{"rgbCurves":{"red":[{"x":0,"y":0.2},{"x":1,"y":1}]}},"want":[51,0,0,255]},
+  {"pixel":[0,0,0,0],"color":{"rgbCurves":{"red":[{"x":0,"y":0.2},{"x":1,"y":1}]}},"want":[0,0,0,0]},
+  {"pixel":[255,0,0,255],"color":{"rgbCurves":{"red":[{"x":0,"y":0},{"x":1,"y":0.5}]},"hsl":{"red":{"luminance":100}}},"want":[255,255,255,255]}
+]

@@ -129,3 +129,31 @@ func TestMemoryEditPlanStoreMarksChangedProjectStale(t *testing.T) {
 		t.Fatalf("timeline changed by stale apply: %#v", after)
 	}
 }
+
+func TestEditPlanRechecksStoredAssetsAtomically(t *testing.T) {
+	store, p, now := createEditPlanStoreFixture(t)
+	p.Request.AssetIDs = []string{"actual"}
+	p.Request.SelectedAssets = []EditPlanAsset{{ID: "actual", Name: "stale", Kind: "video", DurationMS: 999999}}
+	p.Operations = []EditOperation{{ID: "place", Type: EditPlaceAsset, TrackID: "new-video", AssetID: "actual", DurationMS: 4000, Reason: "r", Enabled: true}}
+	if err := store.CreateAsset(t.Context(), "alice", Asset{ID: "actual", ProjectID: "cut-1", Name: "actual.mp4", Kind: "video", ContentType: "video/mp4", ObjectKey: "test/actual.mp4", ByteSize: 100, DurationMS: 3000, CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateEditPlan(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := store.ApplyStoredEditPlan(t.Context(), "alice", "cut-1", p.ID, nil, now); err == nil {
+		t.Fatal("stale invented duration accepted")
+	}
+	current, _ := store.Timeline(t.Context(), "alice", "cut-1")
+	if current.Revision != p.BaseRevision {
+		t.Fatal("partial timeline write")
+	}
+	delete(store.assets, aicutAssetKey("alice", "cut-1", "actual"))
+	if _, _, _, err := store.ApplyStoredEditPlan(t.Context(), "alice", "cut-1", p.ID, nil, now); !errors.Is(err, ErrAssetNotFound) {
+		t.Fatalf("missing asset=%v", err)
+	}
+	stored, _ := store.EditPlan(t.Context(), "alice", "cut-1", p.ID)
+	if stored.State != EditPlanReady {
+		t.Fatal("failed application changed plan state")
+	}
+}

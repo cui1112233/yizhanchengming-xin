@@ -114,7 +114,8 @@ func ApplySRTCues(timeline Timeline, filename string, cues []SRTCue, newID func(
 			DurationMS: cue.EndMS - cue.StartMS, SourceStartMS: 0, SourceDurationMS: cue.EndMS - cue.StartMS, Text: cue.Text,
 		})
 	}
-	result := Timeline{Revision: timeline.Revision, Tracks: tracks}
+	result := timeline
+	result.Tracks = tracks
 	if err := validateTimeline(result); err != nil {
 		return Timeline{}, "", err
 	}

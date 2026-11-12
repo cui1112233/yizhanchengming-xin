@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { executeAICutCommand, restoreTimelineSnapshot } from '../aicutCommands.js';
+import { extractPersonalTemplate } from './personalTemplates.js';
+test('personal template is one reversible command, retains animation and remaps all repeated application IDs', () => {
+ const animation={ entrance:{preset:'fade',durationMs:200},exit:{preset:'none',durationMs:200},loop:{preset:'pulse',durationMs:1000} };
+ const source={revision:9,tracks:[{id:'original',kind:'video',name:'source',order:0,clips:[{id:'old',assetId:'private',kind:'image',name:'图',startMs:100,durationMs:1000,sourceStartMs:0,sourceDurationMs:1000,animation}]}]};
+ const template={id:'saved',title:'我的模板',layout:extractPersonalTemplate(source)};
+ const initial={revision:4,script:'保留原文',markers:[{id:'mark',timeMs:10}],tracks:[{id:'locked',kind:'video',locked:true,order:7,clips:[]}]};
+ const assets=[{id:'newimage',kind:'image',name:'新图',url:'/new.png'}];
+ const command={type:'timeline.personal_template_apply',template,assets,options:{bindings:{'slot-1':'newimage'},startMs:500}};
+ let n=0;const idFactory=()=>`personal-${++n}`;
+ const result=executeAICutCommand(initial,command,{idFactory});
+ assert.equal(result.changed,true);assert.equal(result.timeline.tracks.length,2);assert.equal(result.metadata.template.trackCount,1);
+ assert.strictEqual(result.timeline.tracks[0],initial.tracks[0]);assert.deepEqual(result.timeline.tracks[1].clips[0].animation,animation);
+ assert.equal(result.timeline.tracks[1].clips[0].assetId,'newimage');assert.equal(result.timeline.tracks[1].clips[0].startMs,600);
+ const undo=restoreTimelineSnapshot(initial,5);assert.deepEqual(undo,{...initial,revision:5});
+ const redo=restoreTimelineSnapshot(result.timeline,6);assert.equal(redo.tracks.length,2);assert.deepEqual(redo.tracks[1],result.timeline.tracks[1]);
+ const repeated=executeAICutCommand(redo,command,{idFactory});const ids=repeated.timeline.tracks.flatMap(t=>[t.id,...t.clips.map(c=>c.id)]);assert.equal(new Set(ids).size,ids.length);
+ assert.equal(initial.tracks.length,1);assert.equal(source.tracks[0].clips[0].assetId,'private');
+});

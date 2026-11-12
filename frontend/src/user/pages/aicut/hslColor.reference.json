@@ -1,0 +1,13 @@
+[
+  { "pixel": [255,0,0,77], "settings": {"red":{"hue":100}}, "want": [255,128,0,77] },
+  { "pixel": [0,255,0,43], "settings": {"red":{"hue":100}}, "want": [0,255,0,43] },
+  { "pixel": [255,0,0,255], "settings": {"red":{"saturation":-100}}, "want": [128,128,128,255] },
+  { "pixel": [255,0,0,101], "settings": {"red":{"luminance":50}}, "want": [255,128,128,101] },
+  { "pixel": [255,0,0,255], "settings": {"red":{"luminance":-50}}, "want": [128,0,0,255] },
+  { "pixel": [192,64,64,255], "settings": {"red":{"saturation":100}}, "want": [255,1,1,255] },
+  { "pixel": [83,83,83,177], "settings": {"red":{"hue":100,"luminance":100}}, "want": [83,83,83,177] },
+  { "pixel": [255,0,0,0], "settings": {"red":{"hue":100}}, "want": [255,0,0,0] },
+  { "pixel": [255,0,1,255], "settings": {"red":{"saturation":-100}}, "want": [128,127,127,255] },
+  { "pixel": [255,1,0,255], "settings": {"red":{"saturation":-100}}, "want": [128,127,127,255] },
+  { "pixel": [210,150,110,255], "settings": {"orange":{"saturation":-100}}, "want": [165,159,155,255] }
+]

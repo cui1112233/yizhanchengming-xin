@@ -195,10 +195,19 @@ func (s *MemoryAgentStore) SaveAgentToolResult(_ context.Context, owner, project
 }
 
 func (s *MemoryAgentStore) AgentTimelineMessages(_ context.Context, o, p, id string, limit int) ([]AgentMessage, error) {
+	return s.agentTimelineMessages(o, p, id, limit, false)
+}
+func (s *MemoryAgentStore) AgentConversationMessages(_ context.Context, o, p, id string, limit int) ([]AgentMessage, error) {
+	return s.agentTimelineMessages(o, p, id, limit, true)
+}
+func (s *MemoryAgentStore) agentTimelineMessages(o, p, id string, limit int, conversationOnly bool) ([]AgentMessage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := []AgentMessage{}
 	for _, m := range s.messages {
+		if conversationOnly && m.Role != AgentRoleUser && m.Role != AgentRoleAssistant {
+			continue
+		}
 		run, ok := s.runs[m.RunID]
 		if ok && m.Owner == o && m.ProjectID == p && canonicalASRTimeline(run.TimelineID) == canonicalASRTimeline(id) {
 			out = append(out, m)

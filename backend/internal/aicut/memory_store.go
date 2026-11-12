@@ -17,14 +17,16 @@ type memoryProject struct {
 }
 
 type MemoryStore struct {
-	mu                sync.Mutex
-	projects          map[string]memoryProject
-	assets            map[string]Asset
-	asrJobs           map[string]ASRJob
-	exportJobs        map[string]ExportJob
-	editPlans         map[string]EditPlan
-	editPlanRequests  map[string]string
-	editPlanSummaries map[string]EditPlanApplySummary
+	assetFolders           map[string]AssetFolder
+	assetFolderAssignments map[string]string
+	mu                     sync.Mutex
+	projects               map[string]memoryProject
+	assets                 map[string]Asset
+	asrJobs                map[string]ASRJob
+	exportJobs             map[string]ExportJob
+	editPlans              map[string]EditPlan
+	editPlanRequests       map[string]string
+	editPlanSummaries      map[string]EditPlanApplySummary
 }
 
 func NewMemoryStore() *MemoryStore {

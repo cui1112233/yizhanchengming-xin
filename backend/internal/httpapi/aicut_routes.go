@@ -71,11 +71,12 @@ func RegisterAICutRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.Store,
 			Title           *string `json:"title"`
 			BackgroundMode  *string `json:"backgroundMode"`
 			BackgroundColor *string `json:"backgroundColor"`
+			AspectRatio     *string `json:"aspectRatio"`
 		}
 		if !decodeAICutJSON(w, req, &input) {
 			return
 		}
-		if input.Title == nil && input.BackgroundMode == nil && input.BackgroundColor == nil {
+		if input.Title == nil && input.BackgroundMode == nil && input.BackgroundColor == nil && input.AspectRatio == nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "没有可更新的项目设置"})
 			return
 		}
@@ -84,6 +85,20 @@ func RegisterAICutRoutes(mux *http.ServeMux, auth BridgeAuth, store aicut.Store,
 			return
 		}
 		project, err := store.Project(req.Context(), owner, req.PathValue("id"))
+		if input.AspectRatio != nil && *input.AspectRatio != "9:16" && *input.AspectRatio != "16:9" && *input.AspectRatio != "1:1" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "画面比例仅支持 9:16、16:9 或 1:1"})
+			return
+		}
+		if err == nil && input.AspectRatio != nil {
+			updater, ok := store.(interface {
+				UpdateProjectRatio(context.Context, string, string, string, time.Time) (aicut.Project, error)
+			})
+			if !ok {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "画面比例设置暂不可用"})
+				return
+			}
+			project, err = updater.UpdateProjectRatio(req.Context(), owner, req.PathValue("id"), *input.AspectRatio, now().UTC())
+		}
 		if err == nil && input.Title != nil {
 			project, err = store.RenameProject(req.Context(), owner, req.PathValue("id"), *input.Title, now().UTC())
 		}

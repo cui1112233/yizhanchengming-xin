@@ -27,6 +27,7 @@ const (
 type EditOperationType string
 
 const (
+	EditPlaceAsset        EditOperationType = "place_asset"
 	EditTrimClip          EditOperationType = "trim_clip"
 	EditRemoveRange       EditOperationType = "remove_range"
 	EditMoveClip          EditOperationType = "move_clip"
@@ -40,17 +41,25 @@ const (
 	EditSetProjectFormat  EditOperationType = "set_project_format"
 )
 
+type EditPlanAsset struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Kind       string `json:"kind"`
+	DurationMS int64  `json:"durationMs"`
+}
+
 type EditPlanRequest struct {
-	TimelineID         string   `json:"timelineId,omitempty"`
-	AssetIDs           []string `json:"assetIds"`
-	Goal               string   `json:"goal"`
-	TargetDurationMS   int64    `json:"targetDurationMs,omitempty"`
-	AspectRatio        string   `json:"aspectRatio"`
-	IncludeCaptions    bool     `json:"includeCaptions"`
-	IncludeTransitions bool     `json:"includeTransitions"`
-	IncludeFilters     bool     `json:"includeFilters"`
-	IncludeBGM         bool     `json:"includeBgm"`
-	ExtraRequirement   string   `json:"extraRequirement,omitempty"`
+	SelectedAssets     []EditPlanAsset `json:"selectedAssets,omitempty"`
+	TimelineID         string          `json:"timelineId,omitempty"`
+	AssetIDs           []string        `json:"assetIds"`
+	Goal               string          `json:"goal"`
+	TargetDurationMS   int64           `json:"targetDurationMs,omitempty"`
+	AspectRatio        string          `json:"aspectRatio"`
+	IncludeCaptions    bool            `json:"includeCaptions"`
+	IncludeTransitions bool            `json:"includeTransitions"`
+	IncludeFilters     bool            `json:"includeFilters"`
+	IncludeBGM         bool            `json:"includeBgm"`
+	ExtraRequirement   string          `json:"extraRequirement,omitempty"`
 }
 
 type EditPlanSummary struct {
@@ -59,22 +68,23 @@ type EditPlanSummary struct {
 }
 
 type EditOperation struct {
-	ID         string             `json:"id"`
-	Type       EditOperationType  `json:"type"`
-	TrackID    string             `json:"trackId,omitempty"`
-	ClipID     string             `json:"clipId,omitempty"`
-	AssetID    string             `json:"assetId,omitempty"`
-	ResourceID string             `json:"resourceId,omitempty"`
-	StartMS    int64              `json:"startMs,omitempty"`
-	EndMS      int64              `json:"endMs,omitempty"`
-	DurationMS int64              `json:"durationMs,omitempty"`
-	Text       string             `json:"text,omitempty"`
-	Reason     string             `json:"reason"`
-	Enabled    bool               `json:"enabled"`
-	Volume     float64            `json:"volume,omitempty"`
-	FadeInMS   int64              `json:"fadeInMs,omitempty"`
-	FadeOutMS  int64              `json:"fadeOutMs,omitempty"`
-	Parameters map[string]float64 `json:"parameters,omitempty"`
+	SourceStartMS int64              `json:"sourceStartMs,omitempty"`
+	ID            string             `json:"id"`
+	Type          EditOperationType  `json:"type"`
+	TrackID       string             `json:"trackId,omitempty"`
+	ClipID        string             `json:"clipId,omitempty"`
+	AssetID       string             `json:"assetId,omitempty"`
+	ResourceID    string             `json:"resourceId,omitempty"`
+	StartMS       int64              `json:"startMs,omitempty"`
+	EndMS         int64              `json:"endMs,omitempty"`
+	DurationMS    int64              `json:"durationMs,omitempty"`
+	Text          string             `json:"text,omitempty"`
+	Reason        string             `json:"reason"`
+	Enabled       bool               `json:"enabled"`
+	Volume        float64            `json:"volume,omitempty"`
+	FadeInMS      int64              `json:"fadeInMs,omitempty"`
+	FadeOutMS     int64              `json:"fadeOutMs,omitempty"`
+	Parameters    map[string]float64 `json:"parameters,omitempty"`
 }
 
 type EditPlan struct {
@@ -181,7 +191,7 @@ func normalizeEditOperation(operation EditOperation) (EditOperation, error) {
 	operation.ResourceID = strings.TrimSpace(operation.ResourceID)
 	operation.Text = strings.TrimSpace(operation.Text)
 	operation.Reason = strings.TrimSpace(operation.Reason)
-	if !validEditPlanID(operation.ID, 96) || operation.Reason == "" || len([]rune(operation.Reason)) > 500 || len([]rune(operation.Text)) > 5000 || operation.StartMS < 0 || operation.EndMS < 0 || operation.DurationMS < 0 || operation.FadeInMS < 0 || operation.FadeOutMS < 0 || math.IsNaN(operation.Volume) || math.IsInf(operation.Volume, 0) {
+	if !validEditPlanID(operation.ID, 96) || operation.Reason == "" || len([]rune(operation.Reason)) > 500 || len([]rune(operation.Text)) > 5000 || operation.SourceStartMS < 0 || operation.StartMS < 0 || operation.EndMS < 0 || operation.DurationMS < 0 || operation.FadeInMS < 0 || operation.FadeOutMS < 0 || math.IsNaN(operation.Volume) || math.IsInf(operation.Volume, 0) {
 		return EditOperation{}, ErrInvalidEditPlan
 	}
 	for key, value := range operation.Parameters {
@@ -191,6 +201,10 @@ func normalizeEditOperation(operation EditOperation) (EditOperation, error) {
 	}
 	requireTrackClip := func() bool { return validEditPlanID(operation.TrackID, 128) && validEditPlanID(operation.ClipID, 128) }
 	switch operation.Type {
+	case EditPlaceAsset:
+		if !validEditPlanID(operation.TrackID, 128) || !validEditPlanID(operation.AssetID, 128) || operation.DurationMS <= 0 || operation.DurationMS > 7200000 || operation.StartMS > 7200000 || operation.SourceStartMS > 7200000 {
+			return EditOperation{}, ErrInvalidEditPlan
+		}
 	case EditTrimClip:
 		if !requireTrackClip() || operation.EndMS <= operation.StartMS {
 			return EditOperation{}, ErrInvalidEditPlan
@@ -216,6 +230,11 @@ func normalizeEditOperation(operation EditOperation) (EditOperation, error) {
 			return EditOperation{}, ErrInvalidEditPlan
 		}
 	case EditSetFilter:
+		for key, value := range operation.Parameters {
+			if (key != "intensity" && key != "speed" && key != "radius") || value < 0 || value > 100 || (key == "intensity" && value > 1) {
+				return EditOperation{}, ErrInvalidEditPlan
+			}
+		}
 		if !requireTrackClip() || !validCatalogVisualResource(operation.ResourceID) {
 			return EditOperation{}, ErrInvalidEditPlan
 		}
@@ -272,6 +291,9 @@ func NormalizeEditPlan(plan EditPlan) (EditPlan, error) {
 	plan.Request = request
 	seen := make(map[string]struct{}, len(plan.Operations))
 	for index, operation := range plan.Operations {
+		if (operation.Type == EditAddCaption && !request.IncludeCaptions) || (operation.Type == EditSetTransition && !request.IncludeTransitions) || ((operation.Type == EditSetFilter || operation.Type == EditAddEffectLayer) && !request.IncludeFilters) || (operation.Type == EditAddBGM && !request.IncludeBGM) {
+			return EditPlan{}, ErrInvalidEditPlan
+		}
 		normalized, operationErr := normalizeEditOperation(operation)
 		if operationErr != nil {
 			return EditPlan{}, operationErr

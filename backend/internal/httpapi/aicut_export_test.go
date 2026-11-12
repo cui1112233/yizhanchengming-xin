@@ -190,8 +190,8 @@ func TestBuildAICutFFmpegArgsRendersSpeedCurveAsRealSegments(t *testing.T) {
 	}
 	joined := strings.Join(args, " ")
 	for _, expected := range []string{
-		"split=2", "trim=start=0.500:duration=0.800", "setpts=(PTS-STARTPTS)/1.000",
-		"trim=start=1.300:duration=1.400", "setpts=(PTS-STARTPTS)/1.750", "concat=n=2:v=1:a=0",
+		"split=2", "trim=start=0.500000:duration=0.800000", "sqrt(0.250000000",
+		"trim=start=1.300000:duration=1.400000", "sqrt(2.250000000", "concat=n=2:v=1:a=0",
 	} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("speed curve export missing %q: %s", expected, joined)
@@ -475,6 +475,9 @@ func TestBuildAICutASSMapsChineseEditorTextResources(t *testing.T) {
 		}}}
 		content := buildAICutASS(timeline, 1920, 1080)
 		expectedText := "测试"
+		if id == "text-gradient-title" {
+			expectedText = aicutGradientASSText("测试")
+		}
 		if id == "text-vertical" {
 			expectedText = "测\\N试"
 		}
@@ -883,22 +886,24 @@ func TestAICutVisualProcessingFiltersExecuteWithFFmpeg(t *testing.T) {
 		Geometry: aicut.VisualGeometry{CropLeft: .1, CropTop: .05, CropRight: .1, CropBottom: .05, FlipHorizontal: true, FlipVertical: true},
 		Details:  aicut.VisualDetails{Sharpen: .4, Vignette: .5, Grain: .25},
 	}}
-	args, err := buildAICutFFmpegArgs("1:1", []aicutRenderClip{{path: input, asset: aicut.Asset{Kind: "video"}, clip: clip}}, "mp4", output)
+	clips := []aicutRenderClip{{path: input, asset: aicut.Asset{Kind: "video"}, clip: clip}}
+	if err := prepareAICutColorLUTs(dir, clips); err != nil {
+		t.Fatal(err)
+	}
+	args, err := buildAICutFFmpegArgs("1:1", clips, "mp4", output)
 	if err != nil {
 		t.Fatal(err)
 	}
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"crop=", "hflip", "vflip", "eq=", "colorbalance=", "curves=all=", "unsharp=", "vignette=", "noise=", "pow(g(X,Y)-255,2)", "alpha(X,Y)*ld(0)*ld(0)*(3-2*ld(0))"} {
+	for _, want := range []string{"crop=", "hflip", "vflip", "lut3d=", "unsharp=", "vignette=", "noise=", "pow(g(X,Y)-255,2)", "alpha(X,Y)*ld(0)*ld(0)*(3-2*ld(0))"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("args missing %q: %s", want, joined)
 		}
 	}
-	if strings.Index(joined, "st(0,clip") > strings.Index(joined, "eq=brightness") {
+	if strings.Index(joined, "st(0,clip") > strings.Index(joined, "lut3d=") {
 		t.Fatal("source-key alpha must be computed before color grading")
 	}
-	if !strings.Contains(joined, "0.370000/0.820000") {
-		t.Fatalf("arbitrary curve point missing from export: %s", joined)
-	}
+
 	if !strings.Contains(joined, "0.100000") || !strings.Contains(joined, "0.214815") {
 		t.Fatalf("bezier mask sample points missing from export: %s", joined)
 	}
