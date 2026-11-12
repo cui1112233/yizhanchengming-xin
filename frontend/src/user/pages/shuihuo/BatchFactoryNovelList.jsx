@@ -5490,15 +5490,16 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
               effectiveBookSettings(batch, book).productionMode === "comic"
                 ? "comic"
                 : "video";
+            const automationBook = (() => {
+              const scoped = automationBookForCard(automationStatus, batch.id, book.id);
+              return scoped && !scoped.stale ? scoped : null;
+            })();
             const state = batchFactoryBookState(book, {
               productionStatus,
               mergeStatus,
               stageSummary,
               productionMode,
-              automationBook: (() => {
-                const scoped = automationBookForCard(automationStatus, batch.id, book.id);
-                return scoped && !scoped.stale ? scoped : null;
-              })(),
+              automationBook,
             });
             const rangeLines = contentRangeLinesForBook(book);
             const previewText = batchFactoryProductionText(
