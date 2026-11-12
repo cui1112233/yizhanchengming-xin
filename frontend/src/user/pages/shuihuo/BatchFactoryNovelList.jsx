@@ -5520,9 +5520,15 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             const sourceStatus = batchFactorySourceStatus(book);
             const videos = book.videos || [];
             const lastFailedStage = stageSummary?.lastFailed;
+            // 自动生产正在执行时给整行加流动光边：阶段不同颜色不同，
+            // 用户在长列表里也能直接看到“这本文在跑什么”。
+            const automationRunningStage = String(automationBook?.status || '').toLowerCase() === 'running'
+              ? String(automationBook?.stage || '').trim()
+              : '';
             return (
               <article
-                className="shuihuo-workbench-row batch-factory-book-row"
+                className={`shuihuo-workbench-row batch-factory-book-row${automationRunningStage ? ' is-automation-running' : ''}`}
+                data-automation-stage={automationRunningStage || undefined}
                 key={book.id}
                 role="row"
                 style={
