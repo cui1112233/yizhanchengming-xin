@@ -217,6 +217,20 @@ func NewRouter(options RouterOptions) http.Handler {
 		resumeAutomationOnBoot(options.AutomationCoordinator)
 		options.AutomationCoordinator.StartScheduledDispatcher()
 	}
+	// 生产任务心跳超时兜底：启动时清理历史遗留的 running/queued，
+	// 避免服务中断后父任务永久停在“制作中”。阈值取 30 分钟。
+	if cleaner, ok := options.Store.(batchfactoryv11.StaleProductionJobCleaner); ok {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			cleaned, err := cleaner.FailStaleProductionJobs(ctx, time.Now().Add(-30*time.Minute), "服务中断遗留，任务超时未完成，已自动改判失败")
+			if err != nil {
+				log.Printf("clean stale production jobs: %v", err)
+			} else if cleaned > 0 {
+				log.Printf("clean stale production jobs: %d jobs marked failed", cleaned)
+			}
+		}()
+	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
 	publish121Available := options.VideoManagementConnector != nil || (options.External != nil && options.External.Enabled[external.Provider121])

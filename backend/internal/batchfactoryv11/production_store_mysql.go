@@ -278,3 +278,57 @@ func insertProductionEvent(ctx context.Context, tx *sql.Tx, jobID, taskID, owner
 	}
 	return nil
 }
+
+// StaleProductionJobCleaner 把长时间无心跳的生产任务改判失败，避免父任务
+// 永远停在 running/queued 让书一直显示“制作中”。
+type StaleProductionJobCleaner interface {
+	FailStaleProductionJobs(ctx context.Context, cutoff time.Time, message string) (int64, error)
+}
+
+func (s *MySQLStore) FailStaleProductionJobs(ctx context.Context, cutoff time.Time, message string) (int64, error) {
+	if s == nil || s.db == nil {
+		return 0, nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(ctx, `SELECT j.id, j.owner_username, j.status FROM batch_factory_v12_production_jobs j WHERE j.status IN ('running','queued') AND j.updated_at < ? AND NOT EXISTS (SELECT 1 FROM batch_factory_v12_production_tasks t WHERE t.job_id=j.id AND t.status='running' AND t.updated_at >= ?)`, cutoff, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	type staleJob struct{ id, owner, status string }
+	stale := []staleJob{}
+	for rows.Next() {
+		var item staleJob
+		if err := rows.Scan(&item.id, &item.owner, &item.status); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		stale = append(stale, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, err
+	}
+	rows.Close()
+	now := time.Now().UTC()
+	var cleaned int64
+	for _, item := range stale {
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_production_tasks SET status='failed', updated_at=? WHERE job_id=? AND status IN ('running','queued') AND updated_at < ?`, now, item.id, cutoff); err != nil {
+			return cleaned, err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_production_jobs SET status='failed', updated_at=? WHERE id=? AND status IN ('running','queued')`, now, item.id); err != nil {
+			return cleaned, err
+		}
+		if err := insertProductionEvent(ctx, tx, item.id, "", item.owner, "state_changed", item.status, "failed", message); err != nil {
+			return cleaned, err
+		}
+		cleaned++
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return cleaned, nil
+}
