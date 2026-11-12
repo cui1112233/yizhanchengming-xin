@@ -641,6 +641,71 @@ func TestRunComicPromptExtractionRetriesOneTruncatedPageWithCompactOutput(t *tes
 	}
 }
 
+func TestRunComicPromptExtractionRetriesEmptyPagesBeforeFailing(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	config := map[string]any{"comic": map[string]any{
+		"enabled":         true,
+		"body":            "完整竖版条漫",
+		"imageDerivation": map[string]any{"body": "整理图片提示词"},
+	}}
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": rawSetting(t, config)}, ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+	provider := &queuedDirectorProvider{values: []string{
+		`{"pages":[]}`,
+		`{"pages":[{"screen_prompt":"补回导演说明","image_prompt":"补回图片提示词"}]}`,
+	}}
+
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
+
+	if err != nil {
+		t.Fatalf("empty pages should be retried instead of failing the page: %v", err)
+	}
+	if len(result.Updated) != 1 || result.Updated[0].ComicImagePrompt != "补回图片提示词" {
+		t.Fatalf("retry did not persist the page: %+v", result.Updated)
+	}
+	if len(provider.calls) != 2 || !strings.Contains(provider.calls[1].SystemPrompt, "pages 必须且只能包含这一页") {
+		t.Fatalf("retry must ask for the exact page shape: %#v", provider.calls)
+	}
+}
+
+func TestRunComicPromptExtractionFallsBackWhenPagesStayEmpty(t *testing.T) {
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{Title: "K", SourceText: "女主住院后独自离开。", Videos: []CreateVideoInput{{Label: "漫画页 01", VideoPrompt: "女主坐在病床边，窗外下着雨。"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	config := map[string]any{"comic": map[string]any{
+		"enabled": true,
+		"body":    "整书漫画页提示词",
+	}}
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": rawSetting(t, config)}, ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+	provider := &queuedDirectorProvider{values: []string{`{"pages":[]}`, `{"pages":[]}`, `{"pages":[]}`}}
+
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
+
+	if err != nil {
+		t.Fatalf("a single page must not block the whole book: %v", err)
+	}
+	if len(result.Updated) != 1 || result.Updated[0].ComicPrompt == "" || result.Updated[0].ComicImagePrompt == "" {
+		t.Fatalf("fallback prompt was not persisted: %+v", result.Updated)
+	}
+	if !strings.Contains(result.Updated[0].ComicPrompt, "本页按原文推进") {
+		t.Fatalf("fallback screen prompt = %q", result.Updated[0].ComicPrompt)
+	}
+}
+
 func TestRunComicPromptExtractionCallsTextProviderOncePerPage(t *testing.T) {
 	store := NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{Title: "K", SourceText: "女主住院后独自离开。", Videos: []CreateVideoInput{{Label: "漫画页 01", VideoPrompt: "女主坐在病床边。"}, {Label: "漫画页 02", VideoPrompt: "女主走出病房。"}}}}})

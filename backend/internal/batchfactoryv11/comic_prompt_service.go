@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -525,49 +526,27 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 			return
 		}
 		contract, err := BuildComicPromptContract(book, book.Videos, pageIndex, snapshot)
+		var page []Video
 		if err == nil {
-			completion, completionErr := s.Provider.Complete(workCtx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens})
-			var safetyPlan prompt.ComicVisualSafetyPlan
-			safetyApplied := false
-			for round := 1; round <= 2 && isDirectorContentPolicyError(completionErr); round++ {
-				safetyPlan = prompt.ComicVisualSafetyRetryPlan(contract.SystemPrompt, contract.UserPrompt, round)
-				completion, completionErr = s.Provider.Complete(workCtx, TextCompletionRequest{
-					SystemPrompt: safetyPlan.SystemPrompt,
-					UserPrompt:   safetyPlan.UserPrompt,
-					Temperature:  0.2,
-					MaxTokens:    contract.MaxTokens,
-				})
-				safetyApplied = completionErr == nil
-			}
-			if isTruncatedDirectorOutput(completionErr) {
-				completion, completionErr = s.Provider.Complete(workCtx, TextCompletionRequest{
-					SystemPrompt:        contract.SystemPrompt + "\n上一轮输出因长度截断。保留当前页必要的分格、人物、动作、场景和关键文字；使用更紧凑的短语，screen_prompt 与 image_prompt 都不要重复描述；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
-					UserPrompt:          contract.UserPrompt,
-					Temperature:         0.2,
-					MaxTokens:           contract.MaxTokens,
-					DisableJSONResponse: true,
-				})
-			}
-			err = completionErr
+			var parsed map[string]comicPromptResult
+			parsed, err = s.completeComicPagePrompt(workCtx, contract, target, snapshot)
 			if err == nil {
-				var parsed map[string]comicPromptResult
-				parsed, err = parseComicBookPromptResults(completion, []Video{target}, snapshot)
-				if err == nil {
-					if safetyApplied {
-						for videoID, result := range parsed {
-							result.ScreenPrompt = safetyPlan.RestoreScreenPrompt(result.ScreenPrompt)
-							parsed[videoID] = result
-						}
-					}
-					var page []Video
-					page, err = s.persistComicPromptResults(workCtx, owner, batchID, bookID, []Video{target}, parsed)
-					if err == nil {
-						resultMu.Lock()
-						updated = append(updated, page...)
-						resultMu.Unlock()
-					}
-				}
+				page, err = s.persistComicPromptResults(workCtx, owner, batchID, bookID, []Video{target}, parsed)
 			}
+		}
+		// 模型偶尔会返回空的 pages（常见于自动去敏重试之后）。这类结构性
+		// 失败在重试后仍然存在时，用本页原文生成确定性提示词兜底：一页
+		// 失败不能让整本书（其余几十页已成功）停在提示词阶段。
+		if err != nil && comicPromptShapeFailure(err) {
+			if fallback, ok := fallbackComicPromptResult(target); ok {
+				log.Printf("comic prompt fallback book=%s page=%s reason=%v", bookID, target.Label, err)
+				page, err = s.persistComicPromptResults(workCtx, owner, batchID, bookID, []Video{target}, map[string]comicPromptResult{target.ID: fallback})
+			}
+		}
+		if err == nil {
+			resultMu.Lock()
+			updated = append(updated, page...)
+			resultMu.Unlock()
 		}
 		if err != nil {
 			recordFailure(target, err)
@@ -635,6 +614,93 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 		return out, err
 	}
 	return out, nil
+}
+
+// completeComicPagePrompt 承担单页提示词的完整请求链路：内容审核降级重试、
+// 长度截断压缩重试，以及“返回空 pages / 页数与分页不一致”的结构性重试。
+func (s *DirectorService) completeComicPagePrompt(ctx context.Context, contract PromptContract, target Video, snapshot DirectorSnapshot) (map[string]comicPromptResult, error) {
+	completion, completionErr := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens})
+	var safetyPlan prompt.ComicVisualSafetyPlan
+	safetyApplied := false
+	for round := 1; round <= 2 && isDirectorContentPolicyError(completionErr); round++ {
+		safetyPlan = prompt.ComicVisualSafetyRetryPlan(contract.SystemPrompt, contract.UserPrompt, round)
+		completion, completionErr = s.Provider.Complete(ctx, TextCompletionRequest{
+			SystemPrompt: safetyPlan.SystemPrompt,
+			UserPrompt:   safetyPlan.UserPrompt,
+			Temperature:  0.2,
+			MaxTokens:    contract.MaxTokens,
+		})
+		safetyApplied = completionErr == nil
+	}
+	if isTruncatedDirectorOutput(completionErr) {
+		completion, completionErr = s.Provider.Complete(ctx, TextCompletionRequest{
+			SystemPrompt:        contract.SystemPrompt + "\n上一轮输出因长度截断。保留当前页必要的分格、人物、动作、场景和关键文字；使用更紧凑的短语，screen_prompt 与 image_prompt 都不要重复描述；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
+			UserPrompt:          contract.UserPrompt,
+			Temperature:         0.2,
+			MaxTokens:           contract.MaxTokens,
+			DisableJSONResponse: true,
+		})
+	}
+	if completionErr != nil {
+		return nil, completionErr
+	}
+	parsed, err := parseComicBookPromptResults(completion, []Video{target}, snapshot)
+	// 模型偶尔只返回 {"pages":[]} 或漏掉本页。这里再给两次明确的结构化
+	// 机会，要求原样返回本页 video_id，避免整本书因为一页空白而失败。
+	for attempt := 0; attempt < 2 && err != nil && comicPromptShapeFailure(err); attempt++ {
+		completion, completionErr = s.Provider.Complete(ctx, TextCompletionRequest{
+			SystemPrompt: contract.SystemPrompt + fmt.Sprintf("\n上一轮没有返回本页结果（%v）。现在只输出一个合法 JSON 对象：{\"pages\":[{\"video_id\":%q,\"screen_prompt\":\"...\",\"image_prompt\":\"...\"}]}，video_id 必须原样等于 %q，pages 必须且只能包含这一页。", err, target.ID, target.ID),
+			UserPrompt:   contract.UserPrompt,
+			Temperature:  0.15,
+			MaxTokens:    contract.MaxTokens,
+		})
+		if completionErr != nil {
+			return nil, completionErr
+		}
+		parsed, err = parseComicBookPromptResults(completion, []Video{target}, snapshot)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if safetyApplied {
+		for videoID, result := range parsed {
+			result.ScreenPrompt = safetyPlan.RestoreScreenPrompt(result.ScreenPrompt)
+			parsed[videoID] = result
+		}
+	}
+	return parsed, nil
+}
+
+// comicPromptShapeFailure 只认“结构不对/内容为空”这类可重试的解析问题，
+// 网络超时之类的上游错误仍然按失败处理，不能悄悄降级成兜底提示词。
+func comicPromptShapeFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	var countErr *comicPageCountError
+	if errors.As(err, &countErr) {
+		return true
+	}
+	return strings.Contains(err.Error(), "漫画提示词为空")
+}
+
+// fallbackComicPromptResult 用本页原文生成确定性提示词。它只在模型连续
+// 返回空结果时使用，保证自动化不会因为单页结构异常整本停摆。
+func fallbackComicPromptResult(target Video) (comicPromptResult, bool) {
+	text := strings.TrimSpace(comicPageSourceText(target))
+	if text == "" {
+		return comicPromptResult{}, false
+	}
+	runes := []rune(text)
+	if len(runes) > 600 {
+		runes = runes[:600]
+	}
+	summary := string(runes)
+	return comicPromptResult{
+		VideoID:      target.ID,
+		ScreenPrompt: "本页按原文推进：" + summary,
+		ImagePrompt:  "漫画分镜：竖版条漫构图，画面表现「" + summary + "」，人物造型与已定稿资产保持一致，画面连贯，不出现文字水印。",
+	}, true
 }
 
 func isDirectorContentPolicyError(err error) bool {
