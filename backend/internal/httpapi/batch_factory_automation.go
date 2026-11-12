@@ -3165,7 +3165,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					outcome := recordAutomationPageLedger(entry, err, stage, c.now())
 					if disposition.needsManual() || outcome.NeedsManual {
 						entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", stage, err.Error(), c.now()
-						entry["message"] = fmt.Sprintf("%s；需人工处理（%s）", message, disposition.Code)
+						// 已经落到页级账本时，用真正被转人工的原因码，而不是聚合
+						// 错误的分类，避免“实际是已计费未取回却显示超时”的误导。
+						reason := disposition.Code
+						if len(outcome.ManualCodes) > 0 {
+							reason = strings.Join(outcome.ManualCodes, "/")
+						}
+						entry["message"] = fmt.Sprintf("%s；需人工处理（%s）", message, reason)
 						entry["needsManual"] = true
 						delete(entry, "retryRequested")
 						delete(entry, "retryAt")
@@ -3558,9 +3564,15 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						if errors.As(generateErr, &pagePartial) {
 							outcome := recordAutomationPageLedger(entry, generateErr, failureStage, c.now())
 							if outcome.NeedsManual || outcome.MaxAttempts >= automationPageRetryMaxAttempts {
-								fail(failureStage, generateErr, fmt.Sprintf(
-									"已生成 %d/%d 页，剩余页连续 %d 次未补齐，需人工处理",
-									pagePartial.Completed, pagePartial.Total, outcome.MaxAttempts))
+								detail := fmt.Sprintf(
+									"已生成 %d/%d 页，剩余页连续 %d 次未补齐",
+									pagePartial.Completed, pagePartial.Total, outcome.MaxAttempts)
+								if outcome.NeedsManual {
+									detail = fmt.Sprintf(
+										"已生成 %d/%d 页，%d 页需要人工处理",
+										pagePartial.Completed, pagePartial.Total, outcome.ManualPages)
+								}
+								fail(failureStage, generateErr, detail)
 								continue
 							}
 							backoff := automationContinuationBackoff(outcome.MaxAttempts)

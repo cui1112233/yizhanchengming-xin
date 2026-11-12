@@ -551,7 +551,12 @@ func TestBilledSaveFailureNeverRetriesAndNeedsManual(t *testing.T) {
 	}
 
 	entry := map[string]any{}
-	recordAutomationPageLedger(entry, pageErr, "comic_images", now)
+	outcome := recordAutomationPageLedger(entry, pageErr, "comic_images", now)
+	// 整本失败文案必须能拿到真实的人工原因码，而不是聚合错误的分类。
+	if !outcome.NeedsManual || outcome.ManualPages != 1 ||
+		len(outcome.ManualCodes) != 1 || outcome.ManualCodes[0] != automationCodeBilledNotRetrieved {
+		t.Fatalf("manual outcome=%#v", outcome)
+	}
 	record, _ := automationFailureLedger(entry, "comic_images")["p-disk"].(map[string]any)
 	if record == nil {
 		t.Fatalf("页级账本缺少 p-disk: %+v", entry["nodes"])

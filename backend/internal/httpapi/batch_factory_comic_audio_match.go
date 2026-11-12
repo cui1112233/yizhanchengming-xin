@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -109,6 +110,55 @@ func (p *BatchFactoryN8ComicPublisher) randomAudioIndex(upper int) (int, error) 
 	return int(value.Int64()), nil
 }
 
+// comicAudioFallbackCategories 是自动匹配音频时，按风格映射到的分类没有
+// 可用音频后的兜底顺序。N8 后台常常只给通用分类上传音频，风格分类是空的；
+// 如果直接报错，整本书会永久卡在发布预检里，必须人工换分类才能继续。
+var comicAudioFallbackCategories = []string{"现代通用", "古风通用", "男频都市", "现代虐文", "现代甜文", "古风虐文", "古风甜文"}
+
+func enabledComicAudioCategories(categories []n8catalog.AudioCategory) []n8catalog.AudioCategory {
+	enabled := make([]n8catalog.AudioCategory, 0, len(categories))
+	for _, category := range categories {
+		if category.ID <= 0 || !strings.EqualFold(strings.TrimSpace(category.Status), "ENABLE") {
+			continue
+		}
+		enabled = append(enabled, category)
+	}
+	return enabled
+}
+
+// pickComicAudioFallback 按兜底顺序找一个已启用且确实有音频的分类。
+// used 是刚刚判定为“没有可用音频”的分类，必须排除；单个分类目录请求失败
+// 只代表该分类暂时不可用，继续尝试下一个，不影响整本发布。
+func (p *BatchFactoryN8ComicPublisher) pickComicAudioFallback(ctx context.Context, organizationID string, used n8catalog.AudioCategory, categories []n8catalog.AudioCategory) (n8catalog.AudioCategory, []n8catalog.Audio, error) {
+	enabled := enabledComicAudioCategories(categories)
+	ordered := make([]n8catalog.AudioCategory, 0, len(enabled))
+	seen := map[int64]bool{}
+	for _, name := range comicAudioFallbackCategories {
+		for _, category := range enabled {
+			if category.ID == used.ID || seen[category.ID] || !strings.EqualFold(strings.TrimSpace(category.Name), name) {
+				continue
+			}
+			seen[category.ID] = true
+			ordered = append(ordered, category)
+		}
+	}
+	for _, category := range enabled {
+		if category.ID == used.ID || seen[category.ID] {
+			continue
+		}
+		seen[category.ID] = true
+		ordered = append(ordered, category)
+	}
+	for _, category := range ordered {
+		audios, err := p.audios(ctx, strconv.FormatInt(category.ID, 10), organizationID)
+		if err != nil || len(audios) == 0 {
+			continue
+		}
+		return category, audios, nil
+	}
+	return n8catalog.AudioCategory{}, nil, fmt.Errorf("当前组织所有启用分类都没有可用音频，请先在任意一个分类上传音频")
+}
+
 func enabledComicAudioCategory(categories []n8catalog.AudioCategory, id int64, name string) (n8catalog.AudioCategory, error) {
 	matches := make([]n8catalog.AudioCategory, 0, 1)
 	for _, category := range categories {
@@ -183,13 +233,25 @@ func (p *BatchFactoryN8ComicPublisher) resolveBookComicAudio(ctx context.Context
 		}
 		categoryID = 0
 	}
-	category, err := enabledComicAudioCategory(p.audioCategories(ctx), categoryID, categoryName)
+	categories := p.audioCategories(ctx)
+	category, err := enabledComicAudioCategory(categories, categoryID, categoryName)
 	if err != nil {
 		return comicAudioSelection{}, err
 	}
 	audios, err := p.audios(ctx, strconv.FormatInt(category.ID, 10), config.OrganizationID)
 	if err != nil {
 		return comicAudioSelection{}, err
+	}
+	if manualAudioID <= 0 && len(audios) == 0 {
+		// 按风格映射到的分类是空的（N8 后台没给该分类上传音频）。继续用通用
+		// 分类兜底，避免整本书永久卡在发布预检；选中的分类会写进书设置，
+		// 后续重试沿用同一个音频，不会每轮换 BGM。
+		fallback, fallbackAudios, fallbackErr := p.pickComicAudioFallback(ctx, config.OrganizationID, category, categories)
+		if fallbackErr != nil {
+			return comicAudioSelection{}, fmt.Errorf("当前组织的“%s”分类没有可用音频，且没有其它启用分类可用音频", category.Name)
+		}
+		log.Printf("comic audio fallback book=%s category=%q -> %q", bookID, category.Name, fallback.Name)
+		category, audios = fallback, fallbackAudios
 	}
 	var audio n8catalog.Audio
 	if manualAudioID > 0 {

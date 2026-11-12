@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -523,6 +524,11 @@ type automationPageLedgerOutcome struct {
 	MaxAttempts int
 	RetryQueued bool
 	NeedsManual bool
+	// ManualPages / ManualCodes 记录真正需要人工处理的页数与原因码。
+	// 整本失败的文案必须用它们，而不是聚合错误的分类——聚合错误常常是
+	// 队列繁忙/超时，会让用户以为整本是超时导致，实际是“已计费未取回”等页。
+	ManualPages int
+	ManualCodes []string
 }
 
 // recordAutomationPageLedger 从页级聚合错误中提取失败明细并记账。
@@ -546,6 +552,10 @@ func recordAutomationPageLedger(entry map[string]any, err error, stage string, n
 		}
 		if manual, _ := record["needsManual"].(bool); manual {
 			outcome.NeedsManual = true
+			outcome.ManualPages++
+			if code != "" && !slices.Contains(outcome.ManualCodes, code) {
+				outcome.ManualCodes = append(outcome.ManualCodes, code)
+			}
 		}
 	}
 	var pageErr *comicPageWorkError

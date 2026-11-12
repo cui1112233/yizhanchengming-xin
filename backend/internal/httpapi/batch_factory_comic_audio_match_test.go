@@ -217,6 +217,57 @@ func TestComicAudioSelectionPersistsAndReusesRandomChoice(t *testing.T) {
 	}
 }
 
+// 风格分类没有音频时必须自动兜底到有音频的通用分类，否则整本书会永久卡在
+// 发布预检，只能人工换分类。
+func TestComicAudioFallsBackWhenStyleCategoryHasNoAudio(t *testing.T) {
+	store, batch, book := createComicAudioTestBook(t, map[string]any{
+		"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified",
+	})
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store:       store,
+		Now:         func() time.Time { return time.Date(2026, 11, 12, 11, 0, 0, 0, time.UTC) },
+		RandomIndex: func(int) (int, error) { return 0, nil },
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{
+				{ID: 14, Name: "现代悬疑", Status: "ENABLE"},
+				{ID: 9, Name: "现代通用", Status: "ENABLE"},
+				{ID: 10, Name: "古风通用", Status: "DISABLE"},
+			},
+			audios: []n8catalog.Audio{
+				{ID: 91, Name: "通用音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE"},
+			},
+		},
+	}
+	selection, err := publisher.resolveBookComicAudio(context.Background(), "alice", batch.ID, book.ID, n8ComicPublishSettings{OrganizationID: "1"})
+	if err != nil {
+		t.Fatalf("resolve error=%v", err)
+	}
+	if selection.CategoryID != 9 || selection.CategoryName != "现代通用" || selection.AudioID != 91 {
+		t.Fatalf("selection=%+v, want fallback to 现代通用", selection)
+	}
+}
+
+// 所有分类都没有音频时仍然要给出明确错误，不能静默失败。
+func TestComicAudioReportsWhenNoCategoryHasAudio(t *testing.T) {
+	store, batch, book := createComicAudioTestBook(t, map[string]any{
+		"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified",
+	})
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store: store,
+		Now:   func() time.Time { return time.Date(2026, 11, 12, 11, 0, 0, 0, time.UTC) },
+		ProducerDirectory: fakeN8ComicAudioDirectory{
+			categories: []n8catalog.AudioCategory{
+				{ID: 14, Name: "现代悬疑", Status: "ENABLE"},
+				{ID: 9, Name: "现代通用", Status: "ENABLE"},
+			},
+		},
+	}
+	_, err := publisher.resolveBookComicAudio(context.Background(), "alice", batch.ID, book.ID, n8ComicPublishSettings{OrganizationID: "1"})
+	if err == nil || !strings.Contains(err.Error(), "没有可用音频") {
+		t.Fatalf("error=%v, want clear no-audio message", err)
+	}
+}
+
 func TestComicAudioSelectionUsesManualAudioWithoutRandomOverride(t *testing.T) {
 	store, batch, book := createComicAudioTestBook(t, map[string]any{
 		"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified",
