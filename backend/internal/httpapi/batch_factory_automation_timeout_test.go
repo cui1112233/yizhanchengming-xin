@@ -31,7 +31,7 @@ func TestComicGenerationLeaseTouchExtendsAndClampsToHardCap(t *testing.T) {
 	now := time.Now()
 	lease := &comicGenerationLease{
 		deadline:     now.Add(time.Second),
-		hardDeadline: now.Add(30 * time.Minute),
+		hardDeadline: now.Add(2 * comicGenerationIdleExtend),
 	}
 	lease.touch(comicGenerationIdleExtend)
 	if lease.expired(now) {

@@ -31,10 +31,12 @@ const (
 	automationPageRetryMaxAttempts = 5
 	// automationStallTimeout 超过该时长没有任何进展心跳，按停滞处理。
 	// 20 版的 10min 会掐掉「慢图重试」：单次上游请求上限 180s，外层最多 3 次，
-	// 单页最长约 9min，再加队列/退避就会越过 10min。取 20min，给单页最坏重试
-	// 预算留约 2 倍余量；只要任意页有状态推进、有图落库或上游返回响应，心跳
-	// 就会被刷新（见 reportComicGenerationHeartbeat）。
-	automationStallTimeout = 20 * time.Minute
+	// 单页最长约 9min，再加队列/退避就会越过 10min。这里取 40min：出图并发
+	// 收紧到「一次一本」后，一本书的页图会串行排队，加上合集整理/发布阶段本来
+	// 就没有页级事件，20min 会误判成停滞并触发「自动重试」。只要任意页有状态
+	// 推进、有图落库或上游返回响应，心跳就会被刷新（见
+	// reportComicGenerationHeartbeat），真正卡死仍会在 40min 后收口。
+	automationStallTimeout = 40 * time.Minute
 	// automationPageImageUnitCost 单页出图成本估算（¥/次），用于费用记账。
 	automationPageImageUnitCost = 0.03
 )
