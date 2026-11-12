@@ -40,7 +40,7 @@ function BookRow({ book, onFix }) {
   return (
     <div className={`batch-factory-preflight-book${book.passed ? ' is-passed' : ' is-blocked'}`}>
       <div className="batch-factory-preflight-book-head">
-        {book.passed ? <CheckCircleFilled style={{ color: '#52c41a' }} /> : <StopOutlined style={{ color: '#ff4d4f' }} />}
+        {book.passed ? <CheckCircleFilled style={{ color: 'var(--text-success)' }} /> : <StopOutlined style={{ color: 'var(--text-danger)' }} />}
         <Text strong ellipsis={{ tooltip: title }} style={{ marginLeft: 6 }}>{title}</Text>
         {book.passed ? <Tag color="success" style={{ marginLeft: 8 }}>通过</Tag> : <Tag color="error" style={{ marginLeft: 8 }}>阻断</Tag>}
         {book.overrides?.length ? <Tag color="warning" style={{ marginLeft: 4 }}>有单书覆盖</Tag> : null}
@@ -55,7 +55,7 @@ function BookRow({ book, onFix }) {
       ))}
       {book.warnings?.map((issue, index) => (
         <div className="batch-factory-preflight-issue is-warning" key={`warn-${issue.code}-${index}`}>
-          <WarningOutlined style={{ color: '#faad14', marginRight: 6 }} />
+          <WarningOutlined style={{ color: 'var(--text-warning)', marginRight: 6 }} />
           <Text type="warning">{issue.message}</Text>
           {issue.fixTarget ? (
             <Button size="small" type="link" onClick={() => onFix?.(issue.fixTarget, book.bookId)}>
@@ -82,7 +82,10 @@ export function BatchFactoryPreflightModal({
   const blockedBooks = books.filter(book => !book.passed);
   const passedBooks = books.filter(book => book.passed);
   const batchIssues = Array.isArray(result?.batchIssues) ? result.batchIssues : [];
-  const passedCount = result?.summary?.passed ?? passedBooks.length;
+  const skippedBooks = books.filter(book => book.skipped);
+  const pendingBooks = passedBooks.filter(book => !book.skipped);
+  const skippedCount = result?.summary?.skipped ?? skippedBooks.length;
+  const passedCount = result?.summary?.passed ?? pendingBooks.length;
   const blockedCount = result?.summary?.blocked ?? blockedBooks.length;
   // 服务端只读 peek 会在预检返回体里带 taskState；有活动任务时打开面板就
   // 禁用提交，避免用户点完才收到 409。
@@ -93,7 +96,7 @@ export function BatchFactoryPreflightModal({
   const taskMessage = runningSince
     ? `当前批次已有任务在进行（${taskStateLabel}，开始时间：${runningSince}）`
     : `当前批次已有任务在进行（${taskStateLabel}）`;
-  const canRun = !batchIssues.length && passedBooks.length > 0 && !taskActive;
+  const canRun = !batchIssues.length && pendingBooks.length > 0 && !taskActive;
   const allBlocked = books.length > 0 && passedBooks.length === 0;
   // 全阻断时不允许提交：面板只给「先修这几项」清单和关闭。
   const fixList = [...batchIssues, ...blockedBooks.flatMap(book => book.blocking || [])];
@@ -102,9 +105,11 @@ export function BatchFactoryPreflightModal({
     ? '当前批次任务进行中，请先停止后再执行'
     : batchIssues.length
       ? '先修复整批配置问题'
-      : blockedCount > 0
-        ? `只跑通过的 ${passedCount} 本（${blockedCount} 本不会提交）`
-        : `立即执行（${passedCount} 本）`;
+      : pendingBooks.length === 0 && skippedCount > 0
+        ? `所选小说均已完成，无需执行（${skippedCount} 本会跳过）`
+        : blockedCount > 0
+          ? `只跑通过的 ${passedCount} 本（${blockedCount} 本不会提交）`
+          : `立即执行（${passedCount} 本${skippedCount > 0 ? `，跳过已完成 ${skippedCount} 本` : ''}）`;
 
   return (
     <Modal

@@ -34,18 +34,21 @@ type automationPreflightOverride struct {
 }
 
 type automationPreflightBook struct {
-	BookID    string                        `json:"bookId"`
-	Title     string                        `json:"title"`
-	Passed    bool                          `json:"passed"`
-	Blocking  []automationPreflightIssue    `json:"blocking"`
-	Warnings  []automationPreflightIssue    `json:"warnings"`
-	Overrides []automationPreflightOverride `json:"overrides"`
+	BookID     string                        `json:"bookId"`
+	Title      string                        `json:"title"`
+	Passed     bool                          `json:"passed"`
+	Skipped    bool                          `json:"skipped"`
+	SkipReason string                        `json:"skipReason"`
+	Blocking   []automationPreflightIssue    `json:"blocking"`
+	Warnings   []automationPreflightIssue    `json:"warnings"`
+	Overrides  []automationPreflightOverride `json:"overrides"`
 }
 
 type automationPreflightSummary struct {
 	Total        int `json:"total"`
 	Passed       int `json:"passed"`
 	Blocked      int `json:"blocked"`
+	Skipped      int `json:"skipped"`
 	WarningBooks int `json:"warningBooks"`
 }
 
@@ -110,19 +113,23 @@ func (c *BatchAutomationCoordinator) Preflight(ctx context.Context, owner, batch
 
 	// 活动任务在面板打开时就要可见，而不是等提交后才吃 409。peek 只做
 	// AutomationStateStore.Load（纯 SELECT），不归一化、不 Save、不落盘。
-	if peek := c.peekActiveAutomationJob(ctx, owner, batchID); peek != nil {
-		result.TaskState = peek.State
-		result.RunningJobID = peek.JobID
-		result.RunningSince = peek.Since
-		result.TaskPaused = peek.State == "paused"
-		if !automationBoolValue(input["queueIfActive"]) {
-			result.BatchIssues = append(result.BatchIssues, automationPreflightIssue{
-				Code: "automation_job_active",
-				Message: fmt.Sprintf(
-					"当前批次已有自动生产任务在进行（%s%s）；请先停止当前任务后再重试",
-					automationTaskStateLabel(peek.State), automationTaskSinceText(peek.Since),
-				),
-			})
+	// 状态只读一次，活动任务与已完成书籍共用同一份快照。
+	state, hasState := c.loadAutomationStateReadOnly(ctx)
+	if hasState {
+		if peek := automationPeekActiveJob(state, owner, batchID); peek != nil {
+			result.TaskState = peek.State
+			result.RunningJobID = peek.JobID
+			result.RunningSince = peek.Since
+			result.TaskPaused = peek.State == "paused"
+			if !automationBoolValue(input["queueIfActive"]) {
+				result.BatchIssues = append(result.BatchIssues, automationPreflightIssue{
+					Code: "automation_job_active",
+					Message: fmt.Sprintf(
+						"当前批次已有自动生产任务在进行（%s%s）；请先停止当前任务后再重试",
+						automationTaskStateLabel(peek.State), automationTaskSinceText(peek.Since),
+					),
+				})
+			}
 		}
 	}
 
@@ -140,7 +147,21 @@ func (c *BatchAutomationCoordinator) Preflight(ctx context.Context, owner, batch
 	// 全局执行器缺失属于整批不可执行，单独列出，避免每本书重复同一条原因。
 	result.BatchIssues = append(result.BatchIssues, c.automationGlobalPreflightIssues(ctx, owner, batch, runMode)...)
 
+	completedBooks := automationCompletedBookIDs(state, owner, batchID)
 	for _, book := range books {
+		// 已完成（含已发布）的书在真正执行时会被直接跳过。预检先标出来，
+		// 否则按钮会显示“立即执行（15 本）”，让人以为要整批重做。
+		if completedBooks[book.ID] {
+			result.Books = append(result.Books, automationPreflightBook{
+				BookID:     book.ID,
+				Title:      strings.TrimSpace(book.Title),
+				Passed:     true,
+				Skipped:    true,
+				SkipReason: "该书已完成，本次会跳过",
+				Overrides:  automationBookOverrideKeys(book.SettingsState.Patch),
+			})
+			continue
+		}
 		issues := c.automationBookPreflightIssues(ctx, owner, batch, book, runMode, true)
 		blocking := make([]automationPreflightIssue, 0, len(issues))
 		blocking = append(blocking, issues...)
@@ -162,9 +183,12 @@ func (c *BatchAutomationCoordinator) Preflight(ctx context.Context, owner, batch
 
 	result.Summary.Total = len(result.Books)
 	for _, entry := range result.Books {
-		if entry.Passed {
+		switch {
+		case entry.Skipped:
+			result.Summary.Skipped++
+		case entry.Passed:
 			result.Summary.Passed++
-		} else {
+		default:
 			result.Summary.Blocked++
 		}
 		if len(entry.Warnings) > 0 {
@@ -180,19 +204,33 @@ func (c *BatchAutomationCoordinator) Preflight(ctx context.Context, owner, batch
 // 没有持久化 store 时宁可返回 nil，也不去读文件布局——文件布局的兼容读取
 // 可能触发迁移写盘；生产环境始终走 MySQL 的 AutomationStateStore。
 func (c *BatchAutomationCoordinator) peekActiveAutomationJob(ctx context.Context, owner, batchID string) *automationTaskPeek {
-	if c == nil {
+	state, ok := c.loadAutomationStateReadOnly(ctx)
+	if !ok {
 		return nil
+	}
+	return automationPeekActiveJob(state, owner, batchID)
+}
+
+// loadAutomationStateReadOnly 只读加载一次自动化状态，供预检中的多个只读视图
+// 共用。预检有“只能读一次”的约束，不能在内部重复 SELECT。
+func (c *BatchAutomationCoordinator) loadAutomationStateReadOnly(ctx context.Context) (automationStateFile, bool) {
+	if c == nil {
+		return automationStateFile{}, false
 	}
 	c.mu.Lock()
 	store := c.automationStore
 	c.mu.Unlock()
 	if store == nil {
-		return nil
+		return automationStateFile{}, false
 	}
 	state, found, err := store.Load(ctx)
 	if err != nil || !found {
-		return nil
+		return automationStateFile{}, false
 	}
+	return state, true
+}
+
+func automationPeekActiveJob(state automationStateFile, owner, batchID string) *automationTaskPeek {
 	var picked *automationTaskPeek
 	var pickedUpdated time.Time
 	for jobID, job := range state.Jobs {
@@ -228,6 +266,39 @@ func (c *BatchAutomationCoordinator) peekActiveAutomationJob(ctx context.Context
 		pickedUpdated = updated
 	}
 	return picked
+}
+
+// automationCompletedBookIDs 返回该批次最近一个任务里已完成（含已发布）的书。
+// 执行环节本来就会跳过这些书，预检也必须把它们排除在“本次会执行”的计数之外，
+// 否则面板会显示“立即执行（15 本）”，让用户以为整批要重做。
+func automationCompletedBookIDs(state automationStateFile, owner, batchID string) map[string]bool {
+	completed := map[string]bool{}
+	var picked map[string]any
+	var pickedUpdated time.Time
+	for _, job := range state.Jobs {
+		if job == nil || automationStringValue(job["owner"], "") != owner || automationStringValue(job["batchId"], "") != batchID {
+			continue
+		}
+		updated := automationStoredJobTime(job["updatedAt"])
+		if picked != nil && !updated.After(pickedUpdated) {
+			continue
+		}
+		picked, pickedUpdated = job, updated
+	}
+	if picked == nil {
+		return completed
+	}
+	books, _ := picked["books"].(map[string]any)
+	for bookID, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		if automationStringValue(entry["status"], "") == "completed" {
+			completed[bookID] = true
+		}
+	}
+	return completed
 }
 
 func automationTaskStateLabel(state string) string {
