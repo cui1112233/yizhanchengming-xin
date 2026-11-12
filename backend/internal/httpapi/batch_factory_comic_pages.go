@@ -713,6 +713,43 @@ func reportComicPromptRepair(ctx context.Context, repair comicPromptRepair) {
 	}
 }
 
+// comicImageSafetyReplacements 是本地确定性安全改写表：当文本模型改写没有产生
+// 有效变化时，用它把最容易触发审核的暴力/自残描述替换成象征性表达，保证这一页
+// 还能再试一次，而不是整本直接失败。
+var comicImageSafetyReplacements = []struct{ from, to string }{
+	{"自杀", "独自走向远处"},
+	{"自残", "情绪低落"},
+	{"割腕", "手腕缠着绷带"},
+	{"上吊", "仰头望着横梁"},
+	{"跳楼", "站在高处边缘"},
+	{"服毒", "握着药瓶发呆"},
+	{"溺死", "沉入水中的倒影"},
+	{"尸体", "倒下的身影"},
+	{"鲜血", "暗红色痕迹"},
+	{"血腥", "气氛紧张"},
+	{"刀刺", "争执中的身影"},
+	{"刺死", "倒向一旁"},
+	{"枪杀", "远处闪过的光"},
+	{"血泊", "地面的暗色阴影"},
+}
+
+// sanitizeComicImagePromptForSafety 做一次不依赖模型的安全改写，并在结尾补上
+// 明确的画面安全约束。只在内容审核拒绝后使用，避免影响正常页。
+func sanitizeComicImagePromptForSafety(prompt string) string {
+	value := strings.TrimSpace(prompt)
+	if value == "" {
+		return ""
+	}
+	for _, rule := range comicImageSafetyReplacements {
+		value = strings.ReplaceAll(value, rule.from, rule.to)
+	}
+	const clause = "【画面安全约束】用象征、留白和情绪化的构图表达紧张感，不出现自我伤害、死亡或暴力的直接细节，不出现武器特写。"
+	if !strings.Contains(value, "【画面安全约束】") {
+		value = strings.TrimSpace(value) + "\n" + clause
+	}
+	return value
+}
+
 // comicPromptRefusalSummary 截断上游拒绝原文后写进页级账本。规则：
 // 直接按字节截前 500 字节（上游多半是英文 JSON），再追加原长度；500 字节
 // 足够看清拒绝类型和关键句，又不会把整段网关 HTML 塞进 job_json。
@@ -1092,7 +1129,21 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			progress("comic_images", fmt.Sprintf("%s 被内容审核拒绝，正在第 %d/%d 轮自动改写提示词（含画面构图）", selectedPage.Label, roundsUsed+1, comicPromptRepairMaxRounds))
 		}
 		repaired := g.repairComicPageImagePrompt(generationCtx, owner, generationPrompt, err.Error())
-		repaired, _ = comicPageFinalImagePrompt(repaired, effective, *selectedPage)
+		if batchfactoryv11.ComicPageIllustratedTextPreset(effective) {
+			// 被拒的往往就是原文里的暴力/自残描述；改写后再把原文逐字塞回去，
+			// 等于把刚去掉的违规内容重新放回来，每一轮改写都会白做。
+			log.Printf("comic page literal text suppressed after moderation repair batch=%s book=%s video=%s round=%d", batchID, bookID, videoID, roundsUsed+1)
+		} else {
+			repaired, _ = comicPageFinalImagePrompt(repaired, effective, *selectedPage)
+		}
+		if repaired == "" || repaired == generationPrompt {
+			// 文本模型没有给出有效变化时，退到本地确定性安全改写，保证还能再试
+			// 一次，而不是把整本直接判失败。
+			if safe := sanitizeComicImagePromptForSafety(generationPrompt); safe != "" && safe != generationPrompt {
+				repaired = safe
+				log.Printf("comic page local safety rewrite batch=%s book=%s video=%s round=%d", batchID, bookID, videoID, roundsUsed+1)
+			}
+		}
 		if repaired == "" || repaired == generationPrompt {
 			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
 				"%w: %s 第 %d 轮改写未产生变化（最后拒绝：%s）",

@@ -1423,3 +1423,24 @@ func TestComicPagePersistedErrorKeepsChineseHeadlineAndRaw(t *testing.T) {
 		t.Fatalf("unexpected fallback: %q", got)
 	}
 }
+
+func TestSanitizeComicImagePromptForSafety(t *testing.T) {
+	if got := sanitizeComicImagePromptForSafety("   "); got != "" {
+		t.Fatalf("empty prompt => %q", got)
+	}
+	input := "少女站在天台准备跳楼，地上有鲜血和尸体，画面血腥。"
+	got := sanitizeComicImagePromptForSafety(input)
+	for _, banned := range []string{"跳楼", "鲜血", "尸体", "血腥"} {
+		if strings.Contains(got, banned) {
+			t.Fatalf("sanitized prompt still contains %q: %s", banned, got)
+		}
+	}
+	if !strings.Contains(got, "【画面安全约束】") {
+		t.Fatalf("missing safety clause: %s", got)
+	}
+	// 幂等：已带约束的提示词不会重复追加。
+	again := sanitizeComicImagePromptForSafety(got)
+	if strings.Count(again, "【画面安全约束】") != 1 {
+		t.Fatalf("safety clause duplicated: %s", again)
+	}
+}
