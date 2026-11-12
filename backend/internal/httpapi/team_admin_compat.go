@@ -130,7 +130,9 @@ func RegisterTeamAdminCompat(root *http.ServeMux, middleware BridgeAuth, account
 		teams := make([]map[string]any, 0)
 		for _, team := range readManagedTeams(profiles) {
 			owner := toString(team["managerUsername"])
-			if toString(actor["role"]) != "dev" && owner != manager {
+			// 联合管理员也必须能看到被委派的团队，否则界面无法进入该团队，
+			// “跨团队协作”就只剩后端鉴权、没有任何入口。
+			if toString(actor["role"]) != "dev" && owner != manager && !containsString(team["coManagers"], manager) {
 				continue
 			}
 			ownerProfile := profiles.member(owner, accounts)
@@ -336,7 +338,15 @@ func RegisterTeamAdminCompat(root *http.ServeMux, middleware BridgeAuth, account
 			managedAccountError(w, http.StatusBadRequest, "密码保存失败")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"changed": true, "changedBy": actor["username"]})
+		// 重置密码必须同时作废该成员的全部登录会话，否则旧 token 在过期前
+		// 仍然可用，界面提示的“旧会话已撤销”就是假的。
+		revoked := int64(0)
+		if revoker, ok := accounts.(interface {
+			RevokeOtherSessions(context.Context, string, string) (int64, error)
+		}); ok {
+			revoked, _ = revoker.RevokeOtherSessions(req.Context(), req.PathValue("username"), "")
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"changed": true, "changedBy": actor["username"], "revokedSessions": revoked})
 	})))
 }
 
