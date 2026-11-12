@@ -1,4 +1,4 @@
-package httpapi
+﻿package httpapi
 
 import (
 	"context"
@@ -197,7 +197,7 @@ func TestShuihuoImageQueueBusyHeadlineIsChineseOnly(t *testing.T) {
 	if !found {
 		t.Fatalf("raw upstream must be on its own line: %q", err.Error())
 	}
-	want := "图片队列繁忙，等待 5 分钟后仍没有可用名额，本轮已停止，稍后会自动补齐"
+	want := "图片队列繁忙，等待 15 分钟后仍没有可用名额，本轮已停止，稍后会自动补齐"
 	if headline != want {
 		t.Fatalf("headline=%q, want %q", headline, want)
 	}

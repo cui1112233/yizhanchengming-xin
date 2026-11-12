@@ -386,6 +386,12 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDsBySource(ctx context.C
 
 func comicSourceBookIDs(book batchfactoryv11.Book) []string {
 	candidates := make([]string, 0, 4)
+	// BookID 是从 book_records.source_book_id 读回来的来源书城 ID，也是 N8 作品
+	// 的 cp_work_id。之前只从 metadata 里找，导致书名与漫画后台不一致时明明
+	// 有 ID 却匹配不上。
+	if value := strings.TrimSpace(book.BookID); value != "" {
+		candidates = append(candidates, value)
+	}
 	if match := placeholderComicTitlePattern.FindStringSubmatch(strings.TrimSpace(book.Title)); len(match) == 2 {
 		candidates = append(candidates, match[1])
 	}

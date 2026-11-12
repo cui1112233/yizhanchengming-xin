@@ -389,7 +389,10 @@ func generateIntegrationChannelImage(ctx context.Context, target integrationChan
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+target.Credential)
-	response, err := safehttp.NewClientWithTimeout(120 * time.Second).Do(request)
+	// 图片通道返回 b64 大图时，正文传输可能远超 120 秒。总超时设成 120 秒
+	// 会在 HTTP 200 已经计费后把读取掐断，产生“已计费未取回”。这里放宽到
+	// 10 分钟，慢/断流仍由上层分层超时和停滞检测兜底。
+	response, err := safehttp.NewClientWithTimeout(10 * time.Minute).Do(request)
 	if err != nil {
 		// 传输层错误不能把 “Post ...: dial tcp ...” 直接抛给界面：主文案只给
 		// 中文结论，原始错误放到「上游原文」后面给展开区查看。

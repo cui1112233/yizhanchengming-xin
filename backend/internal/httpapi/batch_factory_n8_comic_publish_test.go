@@ -665,3 +665,12 @@ func TestComicPublishAudioCategoriesSurfacesUpstreamRejectionWarning(t *testing.
 		t.Fatalf("payload=%+v", payload)
 	}
 }
+
+func TestComicSourceBookIDsUsesSourceBookIDColumn(t *testing.T) {
+	// source_book_id 就是 N8 的 cp_work_id；书名不一致时必须靠它匹配。
+	book := batchfactoryv11.Book{ID: "book_x", BookID: "11010580963", Title: "半生离恨", SourceMetadata: map[string]any{}}
+	ids := comicSourceBookIDs(book)
+	if len(ids) == 0 || ids[0] != "11010580963" {
+		t.Fatalf("ids=%v want first 11010580963", ids)
+	}
+}

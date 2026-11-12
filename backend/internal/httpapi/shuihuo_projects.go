@@ -5514,7 +5514,8 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
-	response, err := safehttp.NewClientWithTimeout(120 * time.Second).Do(req)
+	// 同上：b64 大图正文传输可能超过 120 秒，不能在上游已计费后掐断读取。
+	response, err := safehttp.NewClientWithTimeout(10 * time.Minute).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: 图片通道请求失败：%w", batchfactoryv11.ErrUpstream, err)
 	}
