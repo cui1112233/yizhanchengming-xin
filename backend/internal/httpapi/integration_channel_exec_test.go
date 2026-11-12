@@ -120,6 +120,7 @@ func TestAgentImageGeneratorRunsCustomChannel(t *testing.T) {
 		"customChannels": []any{map[string]any{
 			"id": "ch_img", "name": "测试出图", "group": "image",
 			"baseUrl": server.URL + "/v1", "model": "img-model", "apiKey": "sk-img", "enabled": true,
+			"params": map[string]any{"resolution": "2K", "quality": "high"},
 		}},
 		"channelSelection": map[string]any{"image": map[string]any{"enabled": []any{"ch_img"}}},
 	})
@@ -147,6 +148,12 @@ func TestAgentImageGeneratorRunsCustomChannel(t *testing.T) {
 	}
 	if prompt := recorder.body["prompt"]; prompt != "一只猫" {
 		t.Fatalf("prompt=%v", prompt)
+	}
+	if resolution := recorder.body["resolution"]; resolution != "2K" {
+		t.Fatalf("channel params not forwarded, resolution=%v", resolution)
+	}
+	if quality := recorder.body["quality"]; quality != "high" {
+		t.Fatalf("channel params not forwarded, quality=%v", quality)
 	}
 }
 

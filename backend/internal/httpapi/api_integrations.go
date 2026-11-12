@@ -228,7 +228,7 @@ func apiIntegrationsView(stored map[string]any) map[string]any {
 	for _, item := range channels {
 		channel, _ := item.(map[string]any)
 		public := map[string]any{}
-		for _, field := range []string{"id", "name", "baseUrl", "model", "concurrency", "apiFormat", "fullUrl", "enabled", "group"} {
+		for _, field := range []string{"id", "name", "baseUrl", "model", "concurrency", "apiFormat", "fullUrl", "enabled", "group", "params"} {
 			if value, ok := channel[field]; ok {
 				public[field] = value
 			}
@@ -376,6 +376,35 @@ func sanitizeIntegrationChannel(input map[string]any, previous map[string]any) (
 	} else if previous != nil {
 		if previousFullURL, ok := previous["fullUrl"].(bool); ok {
 			channel["fullUrl"] = previousFullURL
+		}
+	}
+
+	// params 是随渠道一起下发的固定请求参数（例如 YFAI 的 resolution/quality
+	// 或 aspect_ratio）。同一个模型按档位拆成多条渠道时，靠它把价格档位固定住，
+	// 不需要每个设置项都单独暴露到界面上。
+	if rawParams, ok := input["params"].(map[string]any); ok {
+		params := map[string]any{}
+		for key, value := range rawParams {
+			key = strings.TrimSpace(key)
+			if key == "" || len(key) > 64 || len(params) >= 30 {
+				continue
+			}
+			switch typed := value.(type) {
+			case string:
+				if len(typed) > 256 {
+					continue
+				}
+				params[key] = strings.TrimSpace(typed)
+			case float64, bool:
+				params[key] = typed
+			}
+		}
+		if len(params) > 0 {
+			channel["params"] = params
+		}
+	} else if previous != nil {
+		if previousParams, ok := previous["params"]; ok {
+			channel["params"] = previousParams
 		}
 	}
 

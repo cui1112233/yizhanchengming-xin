@@ -34,6 +34,9 @@ type integrationChannelTarget struct {
 	Concurrency int
 	// FullURL 为 true 时 BaseURL 就是完整请求地址，不再补齐 /chat/completions。
 	FullURL bool
+	// Params 是渠道级固定参数（如 YFAI 的 resolution/quality），在构造请求体时
+	// 先铺进去；显式的 n/size/quality 仍然覆盖它，保证调用方能临时改尺寸。
+	Params map[string]any
 }
 
 func splitIntegrationModelID(modelID string) (prefix, id string, ok bool) {
@@ -111,6 +114,9 @@ func integrationChannelTargetFor(ctx context.Context, userConfig *UserConfigStor
 			Kind: group, Label: fmt.Sprint(channel["name"]), BaseURL: baseURL,
 			ModelID: modelID, Credential: credential,
 			FullURL: channel["fullUrl"] == true,
+		}
+		if params, ok := channel["params"].(map[string]any); ok && len(params) > 0 {
+			target.Params = params
 		}
 		if concurrency, ok := channel["concurrency"].(float64); ok {
 			target.Concurrency = int(concurrency)
@@ -367,6 +373,12 @@ func generateIntegrationChannelImage(ctx context.Context, target integrationChan
 		endpoint = fullEndpoint
 	}
 	payload := map[string]any{"model": target.ModelID, "prompt": prompt}
+	for key, value := range target.Params {
+		if key == "" || key == "model" || key == "prompt" {
+			continue
+		}
+		payload[key] = value
+	}
 	if input.Count > 0 {
 		payload["n"] = input.Count
 	}
