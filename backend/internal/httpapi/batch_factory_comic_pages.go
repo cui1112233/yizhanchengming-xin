@@ -574,13 +574,20 @@ const shuihuoRepairedPromptTTL = 12 * time.Hour
 // shuihuoRepairedPromptNow 可注入，测试用假时钟验证 TTL，不 sleep。
 var shuihuoRepairedPromptNow = func() time.Time { return time.Now().UTC() }
 
-// comicPromptRepairMaxRounds 是单页自动改写的轮次上限。选 3 的依据：
-// 一轮改对白/文案、一轮改画面构图、一轮改场景与镜头，覆盖线上被拒的
-// 主要形态；再往上继续改写边际收益很低，而且每轮都要真实出图计费。
-const comicPromptRepairMaxRounds = 3
+// comicPromptRepairMaxRounds 只做一次“按上游反馈优化提示词”的自动重试。
+// 再用尽就交给用户：可以自己改这一页提示词，也可以直接再点重试。
+const comicPromptRepairMaxRounds = 1
 
 // errComicPromptRepairExhausted 表示该页自动改写轮次用尽，必须转人工。
 var errComicPromptRepairExhausted = errors.New("comic prompt repair exhausted")
+
+// comicPromptRepairExhaustedError 统一“自动优化用尽”的文案：明确告诉用户
+// 可以直接再试一次，也可以自己改这一页的提示词，而不是只给一句技术错误。
+func comicPromptRepairExhaustedError(label, refusal string, rounds int) error {
+	return fmt.Errorf(
+		"%w: %s 被内容审核拒绝，已按上游反馈自动优化 %d 次提示词仍未通过；可自行修改本页提示词后重试，或直接再次重试。（最后拒绝：%s）",
+		errComicPromptRepairExhausted, label, rounds, refusal)
+}
 
 // shuihuoRepairedPrompts 缓存审核被拒后由文本模型重写过的提示词。
 // 进程内缓存即可：后续整本自动重试直接复用修复版，不再拿原提示词撞审核。
@@ -1086,10 +1093,10 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	}
 	// 轮次用尽后不再调用上游，直接把这一页转 needs_manual，避免继续计费。
 	if hasRepairedCache && repairedCache.RepairCount >= comicPromptRepairMaxRounds {
-		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
-			"%w: %s 已自动改写 %d 轮仍被内容审核拒绝（最后拒绝：%s）",
-			errComicPromptRepairExhausted, selectedPage.Label, repairedCache.RepairCount,
-			comicPromptRefusalSummary(repairedCache.LastRefusalRaw))
+		// 自动优化已经用尽：清掉缓存，用户再点一次重试可以重新获得一次机会。
+		invalidateShuihuoRepairedPrompt(batchID, bookID, videoID)
+		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{},
+			comicPromptRepairExhaustedError(selectedPage.Label, comicPromptRefusalSummary(repairedCache.LastRefusalRaw), repairedCache.RepairCount)
 	}
 	// CM·文字插画版：把本页 current_page 原文逐字拼进最终出图 prompt，不依赖
 	// 文本模型转述。其它预设原样放行。
@@ -1121,9 +1128,9 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			roundsUsed = repairedCache.RepairCount
 		}
 		if roundsUsed >= comicPromptRepairMaxRounds {
-			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
-				"%w: %s 已自动改写 %d 轮仍被内容审核拒绝（最后拒绝：%s）",
-				errComicPromptRepairExhausted, selectedPage.Label, roundsUsed, refusal)
+			invalidateShuihuoRepairedPrompt(batchID, bookID, videoID)
+			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{},
+				comicPromptRepairExhaustedError(selectedPage.Label, refusal, roundsUsed)
 		}
 		if progress := comicGenerationProgressFromContext(ctx); progress != nil {
 			progress("comic_images", fmt.Sprintf("%s 被内容审核拒绝，正在第 %d/%d 轮自动改写提示词（含画面构图）", selectedPage.Label, roundsUsed+1, comicPromptRepairMaxRounds))
@@ -1145,9 +1152,9 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			}
 		}
 		if repaired == "" || repaired == generationPrompt {
-			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf(
-				"%w: %s 第 %d 轮改写未产生变化（最后拒绝：%s）",
-				errComicPromptRepairExhausted, selectedPage.Label, roundsUsed+1, refusal)
+			invalidateShuihuoRepairedPrompt(batchID, bookID, videoID)
+			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{},
+				comicPromptRepairExhaustedError(selectedPage.Label, refusal, roundsUsed+1)
 		}
 		fields := comicPromptRepairFields(generationPrompt, repaired)
 		updatedRevision := promptRevision
@@ -1181,6 +1188,13 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			progress("comic_images", fmt.Sprintf("%s 提示词已改写为合规版本（第 %d 轮），正在重新生成", selectedPage.Label, roundsUsed+1))
 		}
 		mediaType, storageRef, source, err = generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, repaired, contract.ReferenceImageURLs, g.localExecutors)
+		if errors.Is(err, errShuihuoImageContentPolicy) {
+			// 按上游反馈优化过一次仍未通过：不再继续自动撞审核，转给用户处理，
+			// 同时清掉缓存，让“直接再次重试”也能重新获得一次自动优化机会。
+			invalidateShuihuoRepairedPrompt(batchID, bookID, videoID)
+			return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{},
+				comicPromptRepairExhaustedError(selectedPage.Label, comicPromptRefusalSummary(err.Error()), roundsUsed+1)
+		}
 	}
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err

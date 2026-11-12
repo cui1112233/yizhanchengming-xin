@@ -1444,3 +1444,16 @@ func TestSanitizeComicImagePromptForSafety(t *testing.T) {
 		t.Fatalf("safety clause duplicated: %s", again)
 	}
 }
+
+func TestComicPromptRepairExhaustedErrorGuidesUser(t *testing.T) {
+	err := comicPromptRepairExhaustedError("漫画页 08", "审核拒绝", 1)
+	text := err.Error()
+	for _, want := range []string{"可自行修改本页提示词后重试", "或直接再次重试", "自动优化 1 次"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("error text missing %q: %s", want, text)
+		}
+	}
+	if !errors.Is(err, errComicPromptRepairExhausted) {
+		t.Fatal("exhausted error must keep its sentinel")
+	}
+}
