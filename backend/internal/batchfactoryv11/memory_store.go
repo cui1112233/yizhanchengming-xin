@@ -672,6 +672,10 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 	if input.ExpectedRevision < 1 {
 		return Book{}, ErrInvalid
 	}
+	sourceBookID := strings.TrimSpace(input.SourceBookID)
+	if sourceBookID != "" && !validSourceBookID(sourceBookID) {
+		return Book{}, fmt.Errorf("%w：%s", ErrInvalid, SourceBookIDValidationMessage)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	owned, ok := s.batches[batchID]
@@ -693,6 +697,10 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 		book.SourceMetadata = map[string]any{}
 		for key, value := range input.Metadata {
 			book.SourceMetadata[key] = value
+		}
+		if sourceBookID != "" {
+			book.BookID = sourceBookID
+			applySourceBookIDMetadata(book.SourceMetadata, sourceBookID, book.Title)
 		}
 		book.Revision++
 		batch.UpdatedAt = time.Now().UTC()

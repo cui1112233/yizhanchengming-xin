@@ -430,7 +430,7 @@ func batchFetchDisplayError(err error, book batchfactoryv11.Book) error {
 		platformName = strings.TrimSpace(book.Platform)
 	}
 	return &batchFetchUserError{
-		message: fmt.Sprintf("书号 %s 在%s无法读取：书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试", bookID, platformName),
+		message: fmt.Sprintf("书号 %s 在%s无法读取：请检查ID是否正确，可能是书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试", bookID, platformName),
 		cause:   err,
 	}
 }

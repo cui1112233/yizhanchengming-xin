@@ -587,3 +587,94 @@ func TestBookMetadataPatchChangesProductionLinesWithoutReplacingBookMetadata(t *
 		t.Fatalf("metadata=%+v", updated.Books[0].SourceMetadata)
 	}
 }
+
+// 书号填错会让抓取确定性失败。用户必须能在「编辑内容」里改书号，并让这本书
+// 回到待抓取状态，否则只能手工改数据库。
+func TestBookMetadataUpdateCorrectsSourceBookIDAndResetsFetchState(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	metadata := map[string]any{
+		"sourceLine": "111111\t她为发小有求必应", "fetchError": "书号 111111 在七猫付费无法读取",
+		"fetchTechnicalError": "HTTP status 400", "fetchFailedAt": "2026-11-11T10:00:00Z",
+		"fetchRetryable": false, "fetchAttempts": 3,
+		"originalStatus": "failed", "original_status": "failed",
+		"queueStatus": "original_failed", "queueStage": "original", "sourceMode": "novel_fetch",
+	}
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "抓取失败的批次",
+		Books: []batchfactoryv11.CreateBookInput{{
+			BookID: "111111", Title: "她为发小有求必应", Platform: "3", SourceMetadata: metadata,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	path := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + book.ID + "/metadata"
+	response := signedJSONRequest(t, api, now, "alice", http.MethodPut, path, map[string]any{
+		"title":            "她为发小有求必应",
+		"sourceBookId":     "794582",
+		"metadata":         metadata,
+		"expectedRevision": book.Revision,
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	payload := decodeBody[struct {
+		Book         batchfactoryv11.Book `json:"book"`
+		SourceBookID string               `json:"sourceBookId"`
+	}](t, response)
+	updated := payload.Book
+	if payload.SourceBookID != "794582" || updated.BookID != "794582" {
+		t.Fatalf("sourceBookId=%q book.bookId=%q, want 794582", payload.SourceBookID, updated.BookID)
+	}
+	for _, key := range []string{"fetchError", "fetchTechnicalError", "fetchFailedAt"} {
+		if _, exists := updated.SourceMetadata[key]; exists {
+			t.Fatalf("%s should be cleared: %#v", key, updated.SourceMetadata)
+		}
+	}
+	want := map[string]string{
+		"sourceLine": "794582\t她为发小有求必应", "originalStatus": "pending", "original_status": "pending",
+		"queueStatus": "queued", "queueStage": "original", "sourceMode": "manual_original",
+	}
+	for key, value := range want {
+		if got := fmt.Sprint(updated.SourceMetadata[key]); got != value {
+			t.Fatalf("%s=%q, want %q (metadata=%#v)", key, got, value, updated.SourceMetadata)
+		}
+	}
+	if got := fmt.Sprint(updated.SourceMetadata["fetchAttempts"]); got != "0" {
+		t.Fatalf("fetchAttempts=%q, want 0", got)
+	}
+	if updated.SourceMetadata["fetchRetryable"] != true {
+		t.Fatalf("fetchRetryable=%v, want true", updated.SourceMetadata["fetchRetryable"])
+	}
+}
+
+func TestBookMetadataUpdateRejectsInvalidSourceBookID(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	for _, invalid := range []string{"abc123", "12", "123456789012345678901"} {
+		t.Run(invalid, func(t *testing.T) {
+			store := batchfactoryv11.NewMemoryStore()
+			batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+				Title: "书号校验",
+				Books: []batchfactoryv11.CreateBookInput{{BookID: "111111", Title: "第一本书"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			book := batch.Books[0]
+			api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+			path := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + book.ID + "/metadata"
+			response := signedJSONRequest(t, api, now, "alice", http.MethodPut, path, map[string]any{
+				"sourceBookId": invalid, "metadata": map[string]any{}, "expectedRevision": book.Revision,
+			})
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			if !strings.Contains(response.Body.String(), "书号只能填写") {
+				t.Fatalf("body=%s, want 中文书号校验提示", response.Body.String())
+			}
+		})
+	}
+}

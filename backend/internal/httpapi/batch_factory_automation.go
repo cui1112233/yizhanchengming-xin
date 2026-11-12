@@ -4212,30 +4212,88 @@ func automationEntryTerminal(entry map[string]any) bool {
 // automationBookRetryable 判断重试是否应该重新调度这本书。已完成（含已发布）
 // 与正在执行的书必须排除，否则重试会把它们再跑一遍；其余未成功状态
 // （failed/blocked/stopped/paused/queued/等待中/从未执行）都属于可重试范围。
-func automationBookRetryable(entry map[string]any) bool {
+//
+// currentSourceBookID 可选：传入批次记录里的当前 source_book_id。只有「获取原文」
+// 阶段失败时才用它判断书号是否已被用户改过——书号填错导致的失败是确定性的，
+// 同一书号反复重试不会成功，只有书号变化后才值得重新抓取。
+func automationBookRetryable(entry map[string]any, currentSourceBookID ...string) bool {
 	if entry == nil {
 		return false
 	}
 	if automationStringValue(entry["stage"], "") == "published" {
 		return false
 	}
-	switch automationStringValue(entry["status"], "") {
+	status := automationStringValue(entry["status"], "")
+	switch status {
 	case "completed", "running":
 		return false
+	}
+	if automationStringValue(entry["stage"], "") == "fetch_original" && status == "failed" {
+		sourceBookID := ""
+		if len(currentSourceBookID) > 0 {
+			sourceBookID = strings.TrimSpace(currentSourceBookID[0])
+		}
+		if sourceBookID != "" {
+			return automationFetchFailureBookChanged(entry, sourceBookID)
+		}
 	}
 	return true
 }
 
+// automationFetchFailureBookChanged 判断一次「获取原文」失败是否因为用户已经
+// 换过书号：错误文案里出现过书号（如“书号 794582 在七猫无法读取”），且没有
+// 任何一个与批次记录里的当前 source_book_id 相同。文案里没有书号时无法判断，
+// 沿用旧语义允许重试。
+func automationFetchFailureBookChanged(entry map[string]any, currentSourceBookID string) bool {
+	message := automationStringValue(entry["error"], "")
+	bookIDs := automationDigitRuns(message)
+	if len(bookIDs) == 0 {
+		return true
+	}
+	for _, bookID := range bookIDs {
+		if bookID == currentSourceBookID {
+			return false
+		}
+	}
+	return true
+}
+
+// automationDigitRuns 提取文本里长度不少于 3 的数字串，用来识别错误文案中的书号。
+func automationDigitRuns(text string) []string {
+	runs := make([]string, 0, 4)
+	var current strings.Builder
+	flush := func() {
+		if current.Len() >= 3 {
+			runs = append(runs, current.String())
+		}
+		current.Reset()
+	}
+	for _, char := range text {
+		if char >= '0' && char <= '9' {
+			current.WriteRune(char)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return runs
+}
+
 // selectRetryableAutomationBooks 返回本次重试真正要调度的书。
 // requested 为空表示“重试全部未成功的书”；非空时先与 job 实际跟踪的书取交集。
-func selectRetryableAutomationBooks(books map[string]any, requested map[string]bool) map[string]bool {
+// sourceBookIDs 可选：job 里的书 ID 到批次记录当前 source_book_id 的映射。
+func selectRetryableAutomationBooks(books map[string]any, requested map[string]bool, sourceBookIDs ...map[string]string) map[string]bool {
+	currentSourceBookIDs := map[string]string(nil)
+	if len(sourceBookIDs) > 0 {
+		currentSourceBookIDs = sourceBookIDs[0]
+	}
 	selected := make(map[string]bool, len(books))
 	for id, raw := range books {
 		if len(requested) > 0 && !requested[id] {
 			continue
 		}
 		entry, _ := raw.(map[string]any)
-		if !automationBookRetryable(entry) {
+		if !automationBookRetryable(entry, currentSourceBookIDs[id]) {
 			continue
 		}
 		selected[id] = true
@@ -4792,9 +4850,20 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		reopened = true
 	}
 	books, _ := target["books"].(map[string]any)
+	// 书号可能在抓取失败后被用户在「编辑内容」里改过。确定性抓取失败只有换号
+	// 才可能成功，所以按批次记录的当前 source_book_id 判断是否值得重新抓取；
+	// 读不到批次时沿用旧规则，不阻塞重试。
+	currentSourceBookIDs := map[string]string{}
+	if c.store != nil {
+		if currentBatch, readErr := c.store.GetBatch(ctx, owner, batchID); readErr == nil {
+			for _, book := range currentBatch.Books {
+				currentSourceBookIDs[book.ID] = book.BookID
+			}
+		}
+	}
 	// 重试只调度未成功的书：已完成/已发布、正在执行、等待定时提交或等待人工
 	// 确认的书都不进入新一轮 run。显式传了 bookIds 时先与 job 跟踪的书取交集。
-	selected := selectRetryableAutomationBooks(books, set)
+	selected := selectRetryableAutomationBooks(books, set, currentSourceBookIDs)
 	if len(selected) == 0 {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 没有需要重试的书，已完成或正在执行的书不会重复执行", batchfactoryv11.ErrConflict)

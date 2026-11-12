@@ -327,6 +327,10 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 {
 		return Book{}, ErrInvalid
 	}
+	sourceBookID := strings.TrimSpace(input.SourceBookID)
+	if sourceBookID != "" && !validSourceBookID(sourceBookID) {
+		return Book{}, fmt.Errorf("%w：%s", ErrInvalid, SourceBookIDValidationMessage)
+	}
 	metadata, err := json.Marshal(input.Metadata)
 	if err != nil {
 		return Book{}, ErrInvalid
@@ -347,14 +351,47 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	if current != input.ExpectedRevision {
 		return Book{}, ErrConflict
 	}
+	title := strings.TrimSpace(input.Title)
+	if sourceBookID != "" {
+		// sourceLine 需要“书号\t书名”，用户只改书号时书名取记录里的当前值。
+		if title == "" {
+			if err = tx.QueryRowContext(ctx, `SELECT COALESCE(title,'') FROM batch_factory_v12_book_records WHERE book_id=? FOR UPDATE`, bookID).Scan(&title); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return Book{}, ErrNotFound
+				}
+				return Book{}, err
+			}
+		}
+		metadataValues := map[string]any{}
+		if string(metadata) != "null" {
+			if err = json.Unmarshal(metadata, &metadataValues); err != nil {
+				return Book{}, ErrInvalid
+			}
+		}
+		applySourceBookIDMetadata(metadataValues, sourceBookID, title)
+		if metadata, err = json.Marshal(metadataValues); err != nil {
+			return Book{}, ErrInvalid
+		}
+	}
 	// MySQL JSON rejects driver-bound []byte as _binary. Bind JSON as UTF-8 text
 	// so metadata updates (including direct-read and OCR state) are durable.
-	if title := strings.TrimSpace(input.Title); title != "" {
+	switch {
+	case title != "" && sourceBookID != "":
+		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_book_id=?,source_metadata_json=? WHERE book_id=?`, title, sourceBookID, string(metadata), bookID); err != nil {
+			return Book{}, err
+		}
+	case title != "":
 		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_metadata_json=? WHERE book_id=?`, title, string(metadata), bookID); err != nil {
 			return Book{}, err
 		}
-	} else if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=? WHERE book_id=?`, string(metadata), bookID); err != nil {
-		return Book{}, err
+	case sourceBookID != "":
+		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_book_id=?,source_metadata_json=? WHERE book_id=?`, sourceBookID, string(metadata), bookID); err != nil {
+			return Book{}, err
+		}
+	default:
+		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=? WHERE book_id=?`, string(metadata), bookID); err != nil {
+			return Book{}, err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
 		return Book{}, err

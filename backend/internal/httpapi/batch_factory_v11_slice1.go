@@ -28,6 +28,19 @@ type batchSummaryIndexLister interface {
 	ListBatchSummaryIndex(context.Context, string) ([]batchfactoryv11.Batch, error)
 }
 
+// validBatchFactorySourceBookID 校验用户手工修正的外部书城书号：纯数字 3-20 位。
+func validBatchFactorySourceBookID(value string) bool {
+	if len(value) < 3 || len(value) > 20 {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func deleteRetentionDays(r *http.Request) int {
 	value, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("retentionDays")))
 	if err != nil {
@@ -359,9 +372,15 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			Metadata         map[string]any `json:"metadata"`
 			MetadataPatch    map[string]any `json:"metadataPatch,omitempty"`
 			Title            string         `json:"title,omitempty"`
+			SourceBookID     string         `json:"sourceBookId,omitempty"`
 			ExpectedRevision int64          `json:"expectedRevision"`
 		}
 		if !decodeJSON(w, r, &input) {
+			return
+		}
+		sourceBookID := strings.TrimSpace(input.SourceBookID)
+		if sourceBookID != "" && !validBatchFactorySourceBookID(sourceBookID) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": batchfactoryv11.SourceBookIDValidationMessage})
 			return
 		}
 		if input.MetadataPatch != nil {
@@ -392,13 +411,16 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		book, err := store.UpdateBookMetadata(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), batchfactoryv11.UpdateBookMetadataInput{
 			Metadata:         input.Metadata,
 			Title:            input.Title,
+			SourceBookID:     sourceBookID,
 			ExpectedRevision: input.ExpectedRevision,
 		})
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"book": book})
+		// 书信息里的 bookId 就是来源书号；额外返回 sourceBookId，方便调用方
+		// 不用理解旧字段命名也能确认书号已经更新。
+		writeJSON(w, http.StatusOK, map[string]any{"book": book, "sourceBookId": book.BookID})
 	})
 	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/books/{bookId}/source", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)

@@ -574,9 +574,49 @@ type UpdateBookMetadataInput struct {
 	Metadata map[string]any `json:"metadata"`
 	// Title 非空时覆盖书名。发布按书名匹配漫画作品，占位书名或抓取书名有误时
 	// 需要用户手工纠正，所以元数据更新必须能改标题。
-	Title            string `json:"title,omitempty"`
+	Title string `json:"title,omitempty"`
+	// SourceBookID 非空时修正外部书城的来源书号，并把这本书重置为待抓取。
+	// 书号填错会让抓取确定性失败，重试永远不会成功，必须允许用户改书号。
+	SourceBookID     string `json:"sourceBookId,omitempty"`
 	ExpectedRevision int64  `json:"expectedRevision"`
 }
+
+// validSourceBookID 判断用户手工录入的来源书号：外部书城书号都是纯数字，
+// 长度 3-20。非法书号抓取必然失败，必须在写入前拒绝。
+func validSourceBookID(value string) bool {
+	if len(value) < 3 || len(value) > 20 {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// applySourceBookIDMetadata 把修正后的来源书号写进元数据：sourceLine 保持
+// “书号\t书名”格式，并清空旧的抓取失败状态，让这本书重新进入待抓取队列。
+func applySourceBookIDMetadata(metadata map[string]any, sourceBookID, title string) {
+	sourceBookID = strings.TrimSpace(sourceBookID)
+	if metadata == nil || sourceBookID == "" {
+		return
+	}
+	metadata["sourceLine"] = sourceBookID + "\t" + strings.TrimSpace(title)
+	delete(metadata, "fetchError")
+	delete(metadata, "fetchTechnicalError")
+	delete(metadata, "fetchFailedAt")
+	metadata["originalStatus"] = "pending"
+	metadata["original_status"] = "pending"
+	metadata["queueStatus"] = "queued"
+	metadata["queueStage"] = "original"
+	metadata["sourceMode"] = "manual_original"
+	metadata["fetchAttempts"] = 0
+	metadata["fetchRetryable"] = true
+}
+
+// SourceBookIDValidationMessage 是书号校验失败时返回给用户的中文文案。
+const SourceBookIDValidationMessage = "书号只能填写 3-20 位数字，请填写正确的书城书号"
 
 // CaptureBookSourceInput is deliberately fill-only. It repairs legacy/manual
 // intake records that retained a book ID and platform but never persisted the

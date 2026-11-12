@@ -18,3 +18,14 @@ test('production content editor lets the user rename the book before saving', ()
   assert.match(source, /updateBookMetadata\(batch\.id, editingContentBook\.id, \{ title: nextTitle/);
   assert.match(source, /value=\{editingContentTitle\}/);
 });
+
+test('production content editor lets the user correct the source book id', () => {
+  // 书号填错会让正文抓取确定性失败。用户必须能在这里改书号，保存后服务端
+  // 会重置抓取状态，前端只提交纯数字书号。
+  assert.match(source, /const \[editingContentSourceBookId, setEditingContentSourceBookId\] = useState\(''\)/);
+  assert.match(source, /setEditingContentSourceBookId\(String\(currentBook\?\.bookId \|\| ''\)\)/);
+  assert.match(source, /书号只能填写 3-20 位数字/);
+  assert.match(source, /sourceBookId: nextSourceBookId \|\| undefined/);
+  assert.match(source, /value=\{editingContentSourceBookId\}/);
+  assert.match(source, /书号填错会导致正文抓取失败，修改后保存并重试即可重新抓取。/);
+});

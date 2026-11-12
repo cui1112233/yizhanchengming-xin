@@ -1846,7 +1846,7 @@ func TestBatchFetchDisplayErrorExplainsMissingOrMismatchedBookID(t *testing.T) {
 
 	got := batchFetchDisplayError(err, batchfactoryv11.Book{BookID: "10816851", Platform: "4", SourceMetadata: map[string]any{"platformName": "点众付费"}})
 
-	if got == nil || got.Error() != "书号 10816851 在点众付费无法读取：书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试" {
+	if got == nil || got.Error() != "书号 10816851 在点众付费无法读取：请检查ID是否正确，可能是书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试" {
 		t.Fatalf("display error = %v", got)
 	}
 }
@@ -2436,6 +2436,29 @@ func TestSelectRetryableAutomationBooksSkipsSucceededAndRunning(t *testing.T) {
 	requested := selectRetryableAutomationBooks(books, map[string]bool{"ready": true, "failed": true, "not-tracked": true})
 	if len(requested) != 1 || !requested["failed"] {
 		t.Fatalf("explicit selection = %#v, want only failed", requested)
+	}
+}
+
+// 书号填错导致的抓取失败是确定性的：同一书号重试没有意义，但用户改过书号后
+// 必须能重新抓取，否则只能手工改数据库状态。
+func TestRetryReselectsFetchFailureAfterSourceBookIDChanged(t *testing.T) {
+	entry := map[string]any{
+		"status": "failed", "stage": "fetch_original",
+		"error": "自动获取正文失败：书号 111111 在七猫付费无法读取：请检查ID是否正确",
+	}
+	if automationBookRetryable(entry, "111111") {
+		t.Fatal("同一书号反复失败不应重试")
+	}
+	if !automationBookRetryable(entry, "794582") {
+		t.Fatal("书号变化后必须允许重试")
+	}
+	selected := selectRetryableAutomationBooks(map[string]any{"book-1": entry}, nil, map[string]string{"book-1": "794582"})
+	if !selected["book-1"] {
+		t.Fatalf("changed source book id must be selected: %#v", selected)
+	}
+	skipped := selectRetryableAutomationBooks(map[string]any{"book-1": entry}, nil, map[string]string{"book-1": "111111"})
+	if skipped["book-1"] {
+		t.Fatalf("unchanged source book id must not be selected: %#v", skipped)
 	}
 }
 
