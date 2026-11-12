@@ -34,7 +34,7 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
-import { createPrivateComicTask, downloadComicPageImagesZip, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, setPrimaryBookAssetImage, updateBookAsset, updateComicPage, uploadBookAssetImage, uploadComicGlobalReference, uploadComicPageImage } from '../../shared/api/batchFactory';
+import { createPrivateComicTask, downloadComicPageImagesZip, downloadComicPromptZip, downloadDouyinPublishZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, setPrimaryBookAssetImage, updateBookAsset, updateComicPage, uploadBookAssetImage, uploadComicGlobalReference, uploadComicPageImage } from '../../shared/api/batchFactory';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 import PrivateComicWorkspace from './PrivateComicWorkspace';
@@ -2114,6 +2114,30 @@ export function ScriptPage() {
     }
   }
 
+  async function downloadPrivateComicDouyinPublish() {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || privateComicAction) return;
+    setPrivateComicAction('downloadDouyin');
+    setPrivateComicError('');
+    try {
+      const blob = await downloadDouyinPublishZip(batchId, bookId);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `抖音发布包_${privateComicTitle(privateComicDraft.sourceText, privateComicDraft.title) || '漫画'}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      message.success('已开始下载抖音发布包');
+    } catch (error) {
+      setPrivateComicError(error?.message || '抖音发布包下载失败');
+    } finally {
+      setPrivateComicAction('');
+    }
+  }
+
   async function submitPrivateComic() {
     if (privateComicBusy) return;
     setPrivateComicError('');
@@ -2600,6 +2624,7 @@ export function ScriptPage() {
           onSavePagePrompt={(page, prompts) => savePrivateComicPagePrompts(page, prompts)}
           onDownloadAll={() => void downloadPrivateComicPackage()}
           onDownloadAllImages={() => void downloadPrivateComicPageImages()}
+          onDownloadDouyin={() => void downloadPrivateComicDouyinPublish()}
           onUploadPageImage={uploadPrivateComicPageImage}
           busy={privateComicBusy}
           error={privateComicError}

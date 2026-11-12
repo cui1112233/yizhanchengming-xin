@@ -8,8 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +23,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
@@ -1804,6 +1812,8 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const promptZip = pages + "/download-zip"
 	// images-zip 只打包每页主图；提示词与资产图仍走 download-zip。
 	const imagesZip = pages + "/images-zip"
+	// douyin-zip 输出统一 3:4 的抖音发布包：图片、发布文案与 manifest。
+	const douyinZip = pages + "/douyin-zip"
 	const images = pages + "/{pageId}/images"
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
@@ -1884,6 +1894,19 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			return
 		}
 		serveComicZip(w, files, plan, "comic-images.zip")
+	})
+	mux.HandleFunc("GET "+douyinZip, func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		plan, err := planComicDouyinPublishZip(r.Context(), store, comicStore, files, owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		serveComicZip(w, files, plan, "douyin-publish.zip")
 	})
 	mux.HandleFunc("PUT "+page, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -2628,6 +2651,179 @@ func planComicPageImagesZip(ctx context.Context, store batchfactoryv11.Store, co
 	return comicZipPlan{filename: comicDownloadFileStem(title) + "_漫画图片.zip", manifest: string(manifestJSON), entries: entries}, nil
 }
 
+const (
+	douyinPublishImageWidth   = 1080
+	douyinPublishImageHeight  = 1440
+	douyinPublishJPEGQuality  = 88
+	douyinPublishCaptionRunes = 60
+)
+
+type douyinPublishPage struct {
+	index      int
+	videoID    string
+	storageRef string
+}
+
+type douyinPublishManifest struct {
+	Title       string                       `json:"title"`
+	PageCount   int                          `json:"pageCount"`
+	Images      []douyinPublishManifestImage `json:"images"`
+	GeneratedAt string                       `json:"generatedAt"`
+	Skipped     []douyinPublishSkippedPage   `json:"skipped,omitempty"`
+}
+
+type douyinPublishManifestImage struct {
+	Index        int    `json:"index"`
+	FileName     string `json:"fileName"`
+	SourceWidth  int    `json:"sourceWidth"`
+	SourceHeight int    `json:"sourceHeight"`
+}
+
+type douyinPublishSkippedPage struct {
+	Index   int    `json:"index"`
+	VideoID string `json:"videoId,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+// planComicDouyinPublishZip 收集每页主图，输出抖音可直接发布的 3:4 图片包。
+// 计划阶段只校验页与文件引用；真正的解码、缩放、补边与 JPEG 编码留到流式
+// 写出阶段逐页完成，避免整本图片同时驻留内存。缺主图的页直接跳过，有主图
+// 但解码失败时记入 manifest.skipped，不阻断整包。
+func planComicDouyinPublishZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, owner, batchID, bookID string) (comicZipPlan, error) {
+	if files == nil {
+		return comicZipPlan{}, fmt.Errorf("%w: 漫画图片存储不可用", batchfactoryv11.ErrUnavailable)
+	}
+	batch, err := store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return comicZipPlan{}, err
+	}
+	var book batchfactoryv11.Book
+	found := false
+	for _, candidate := range batch.Books {
+		if candidate.ID == bookID {
+			book, found = candidate, true
+			break
+		}
+	}
+	if !found {
+		return comicZipPlan{}, batchfactoryv11.ErrNotFound
+	}
+	title := strings.TrimSpace(book.Title)
+	if title == "" {
+		title = "私人定制漫画"
+	}
+	pages, err := comicStore.ListComicPages(ctx, owner, batchID, bookID)
+	if err != nil {
+		return comicZipPlan{}, err
+	}
+	selected := make([]douyinPublishPage, 0, len(pages))
+	for _, page := range pages {
+		primary, ok := primaryComicPageImage(page)
+		if !ok || strings.TrimSpace(primary.StorageRef) == "" {
+			continue
+		}
+		selected = append(selected, douyinPublishPage{index: len(selected) + 1, videoID: page.VideoID, storageRef: primary.StorageRef})
+	}
+	if len(selected) == 0 {
+		return comicZipPlan{}, fmt.Errorf("%w: 还没有可发布的漫画图片", batchfactoryv11.ErrConflict)
+	}
+	sourceText := strings.TrimSpace(book.SourceText)
+	if sourceText == "" {
+		sourceText = strings.TrimSpace(book.TxtText)
+	}
+	plan := comicZipPlan{filename: "douyin-publish.zip"}
+	plan.custom = func(writer *zip.Writer) error {
+		manifest := douyinPublishManifest{
+			Title:       title,
+			Images:      make([]douyinPublishManifestImage, 0, len(selected)),
+			GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+		}
+		for _, page := range selected {
+			fileName := fmt.Sprintf("图片/%02d.jpg", page.index)
+			sourceWidth, sourceHeight, imageErr := writeDouyinPublishImage(writer, files, page.storageRef, fileName)
+			if imageErr != nil {
+				manifest.Skipped = append(manifest.Skipped, douyinPublishSkippedPage{Index: page.index, VideoID: page.videoID, Reason: imageErr.Error()})
+				continue
+			}
+			manifest.Images = append(manifest.Images, douyinPublishManifestImage{Index: page.index, FileName: fileName, SourceWidth: sourceWidth, SourceHeight: sourceHeight})
+		}
+		manifest.PageCount = len(manifest.Images)
+		if err := writeComicZipText(writer, "发布文案.txt", douyinPublishCaption(title, sourceText, manifest.PageCount)); err != nil {
+			return err
+		}
+		encoded, err := json.MarshalIndent(manifest, "", "  ")
+		if err != nil {
+			return err
+		}
+		return writeComicZipText(writer, "manifest.json", string(encoded))
+	}
+	return plan, nil
+}
+
+// writeDouyinPublishImage 逐页解码后等比缩放并补白到 1080×1440（3:4），
+// 再以 JPEG 写出。这里只做等比缩放、不裁切，避免切掉对白与关键画面。
+func writeDouyinPublishImage(writer *zip.Writer, files *localartifact.Store, storageRef, name string) (int, int, error) {
+	file, err := files.Open(storageRef)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer file.Close()
+	source, _, err := image.Decode(file)
+	if err != nil {
+		return 0, 0, err
+	}
+	sourceBounds := source.Bounds()
+	sourceWidth, sourceHeight := sourceBounds.Dx(), sourceBounds.Dy()
+	if sourceWidth <= 0 || sourceHeight <= 0 {
+		return 0, 0, fmt.Errorf("图片尺寸无效")
+	}
+	canvas := image.NewRGBA(image.Rect(0, 0, douyinPublishImageWidth, douyinPublishImageHeight))
+	draw.Draw(canvas, canvas.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
+	scale := math.Min(float64(douyinPublishImageWidth)/float64(sourceWidth), float64(douyinPublishImageHeight)/float64(sourceHeight))
+	width := int(math.Round(float64(sourceWidth) * scale))
+	height := int(math.Round(float64(sourceHeight) * scale))
+	if width > douyinPublishImageWidth {
+		width = douyinPublishImageWidth
+	}
+	if height > douyinPublishImageHeight {
+		height = douyinPublishImageHeight
+	}
+	if width < 1 {
+		width = 1
+	}
+	if height < 1 {
+		height = 1
+	}
+	offsetX := (douyinPublishImageWidth - width) / 2
+	offsetY := (douyinPublishImageHeight - height) / 2
+	draw.CatmullRom.Scale(canvas, image.Rect(offsetX, offsetY, offsetX+width, offsetY+height), source, sourceBounds, draw.Over, nil)
+	entry, err := writer.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := jpeg.Encode(entry, canvas, &jpeg.Options{Quality: douyinPublishJPEGQuality}); err != nil {
+		return 0, 0, err
+	}
+	return sourceWidth, sourceHeight, nil
+}
+
+// douyinPublishCaption 生成抖音发布文案：标题、简介、正文前 60 字与话题。
+func douyinPublishCaption(title, sourceText string, pageCount int) string {
+	excerpt := strings.NewReplacer("\r\n", "", "\n", "", "\r", "").Replace(sourceText)
+	excerpt = strings.TrimSpace(excerpt)
+	if runes := []rune(excerpt); len(runes) > douyinPublishCaptionRunes {
+		excerpt = string(runes[:douyinPublishCaptionRunes])
+	}
+	var builder strings.Builder
+	fmt.Fprintf(&builder, "标题：%s\n简介：\n%s｜小说改编漫画，共 %d 页。\n", title, title, pageCount)
+	if excerpt != "" {
+		builder.WriteString(excerpt)
+		builder.WriteString("\n")
+	}
+	builder.WriteString("完整故事在主页，点开合集一次看完。\n话题：#漫画 #小说改编 #原创漫画 #爽文\n")
+	return builder.String()
+}
+
 // primaryComicPageImage 取页面主图；主图标记缺失时退回第一张候选图。
 func primaryComicPageImage(page batchfactoryv11.ComicPage) (batchfactoryv11.ComicPageImage, bool) {
 	for _, image := range page.Images {
@@ -2841,6 +3037,9 @@ type comicZipPlan struct {
 	markdown string
 	manifest string
 	entries  []comicZipEntry
+	// custom 用于需要逐页转码的场景（如抖音 3:4 发布包）。设置后由它接管
+	// 条目写出，但仍复用同一个 zip.Writer 与 serveComicZip 的流式/错误处理。
+	custom func(*zip.Writer) error
 }
 
 // planComicPromptZip 只做数据库读取、提示词拼装和条目收集，不生成 ZIP 字节。
@@ -2973,6 +3172,13 @@ func planComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comicS
 // 顺序 io.Copy，内存占用只跟单个读缓冲有关。
 func writeComicZipStream(w io.Writer, files *localartifact.Store, plan comicZipPlan) error {
 	writer := zip.NewWriter(w)
+	if plan.custom != nil {
+		if err := plan.custom(writer); err != nil {
+			_ = writer.Close()
+			return err
+		}
+		return writer.Close()
+	}
 	if plan.markdown != "" {
 		if err := writeComicZipText(writer, "最终完整出图提示词.md", plan.markdown); err != nil {
 			_ = writer.Close()

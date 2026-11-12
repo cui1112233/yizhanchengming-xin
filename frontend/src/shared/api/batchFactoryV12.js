@@ -574,6 +574,10 @@ export function downloadComicPageImagesZip(batchId, bookId) {
   return apiRequest(comicPagesPath(batchId, bookId, 'images-zip'), { responseType: 'blob' });
 }
 
+export function downloadDouyinPublishZip(batchId, bookId) {
+  return apiRequest(comicPagesPath(batchId, bookId, 'douyin-zip'), { responseType: 'blob' });
+}
+
 export function uploadComicPageImage(batchId, bookId, videoId, dataUrl) {
   return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/images`), { method: 'POST', body: body({ dataUrl }) });
 }
@@ -920,6 +924,8 @@ export default {
   updateComicPage,
   generateComicPage,
   downloadComicPromptZip,
+  downloadComicPageImagesZip,
+  downloadDouyinPublishZip,
   generateComicBook,
   setComicPageReferenceImages,
   applyComicPageReferenceImages,

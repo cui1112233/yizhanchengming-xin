@@ -126,3 +126,16 @@ test('comic page cards replace one page image and download all page images', () 
   assert.match(apiSource, /export function downloadComicPageImagesZip\(batchId, bookId\)/);
   assert.match(apiSource, /images-zip/);
 });
+
+test('private comic workspace downloads the douyin publish package', () => {
+  const apiSource = fs.readFileSync(path.join(here, '..', '..', 'shared', 'api', 'batchFactoryV12.js'), 'utf8');
+  assert.match(source, /onDownloadDouyin/);
+  assert.match(source, /下载抖音发布包/);
+  assert.match(scriptPageSource, /async function downloadPrivateComicDouyinPublish\(\)/);
+  assert.match(scriptPageSource, /await downloadDouyinPublishZip\(batchId, bookId\)/);
+  assert.match(scriptPageSource, /抖音发布包_\$\{privateComicTitle\(privateComicDraft\.sourceText, privateComicDraft\.title\)/);
+  assert.match(scriptPageSource, /message\.success\('已开始下载抖音发布包'\)/);
+  assert.match(scriptPageSource, /onDownloadDouyin=\{\(\) => void downloadPrivateComicDouyinPublish\(\)\}/);
+  assert.match(apiSource, /export function downloadDouyinPublishZip\(batchId, bookId\)/);
+  assert.match(apiSource, /douyin-zip/);
+});

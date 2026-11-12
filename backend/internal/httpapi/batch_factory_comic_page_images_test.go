@@ -6,6 +6,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -183,4 +187,112 @@ func TestComicPageImagesZipRejectsBookWithoutImages(t *testing.T) {
 	if strings.HasPrefix(response.Body.String(), "PK") {
 		t.Fatal("empty book must not return a zip")
 	}
+}
+
+func TestComicPageDouyinPublishZipConvertsPagesToThreeFour(t *testing.T) {
+	store, batch, files, now := newComicPageImagesTestBatch(t, "第一页", "第二页")
+	book := batch.Books[0]
+	source := image.NewRGBA(image.Rect(0, 0, 1024, 1536))
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, source); err != nil {
+		t.Fatal(err)
+	}
+	for _, video := range book.Videos {
+		page, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, batchfactoryv11.UpsertComicPageInput{ComicPrompt: "漫画页", ImagePrompt: "出图", Status: "ready"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		artifact, err := files.SaveImage("douyin-"+page.ID, "image/png", bytes.NewReader(encoded.Bytes()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.CreateComicPageImage(context.Background(), "alice", batch.ID, book.ID, page.ID, batchfactoryv11.CreateComicPageImageInput{StorageRef: artifact.StorageRef, MediaType: "image/png", Source: "upload"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store, LocalArtifacts: files})
+	response := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/books/"+book.ID+"/comic-pages/douyin-zip", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get("Content-Type"); got != "application/zip" {
+		t.Fatalf("content-type=%q", got)
+	}
+	if disposition := response.Header().Get("Content-Disposition"); !strings.Contains(disposition, "douyin-publish.zip") {
+		t.Fatalf("content-disposition=%q", disposition)
+	}
+	archive, err := zip.NewReader(bytes.NewReader(response.Body.Bytes()), int64(response.Body.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := make(map[string]*zip.File, len(archive.File))
+	for _, entry := range archive.File {
+		entries[entry.Name] = entry
+	}
+	for _, name := range []string{"图片/01.jpg", "图片/02.jpg", "发布文案.txt", "manifest.json"} {
+		if entries[name] == nil {
+			t.Fatalf("missing entry %q in %v", name, entryNames(archive.File))
+		}
+	}
+
+	imageFile, err := entries["图片/01.jpg"].Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := jpeg.Decode(imageFile)
+	_ = imageFile.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bounds := decoded.Bounds(); bounds.Dx() != 1080 || bounds.Dy() != 1440 {
+		t.Fatalf("douyin image size=%dx%d want 1080x1440", bounds.Dx(), bounds.Dy())
+	}
+
+	captionFile, err := entries["发布文案.txt"].Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	caption, err := io.ReadAll(captionFile)
+	_ = captionFile.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(caption), "标题：测试书") || !strings.Contains(string(caption), "共 2 页") {
+		t.Fatalf("caption=%q", string(caption))
+	}
+
+	manifestFile, err := entries["manifest.json"].Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest douyinPublishManifest
+	decodeErr := json.NewDecoder(manifestFile).Decode(&manifest)
+	_ = manifestFile.Close()
+	if decodeErr != nil {
+		t.Fatal(decodeErr)
+	}
+	if manifest.PageCount != 2 || len(manifest.Images) != 2 {
+		t.Fatalf("manifest=%+v", manifest)
+	}
+	if manifest.Images[0].FileName != "图片/01.jpg" || manifest.Images[0].SourceWidth != 1024 || manifest.Images[0].SourceHeight != 1536 {
+		t.Fatalf("manifest image=%+v", manifest.Images[0])
+	}
+}
+
+func TestComicPageDouyinPublishZipRejectsBookWithoutImages(t *testing.T) {
+	store, batch, files, now := newComicPageImagesTestBatch(t, "第一页")
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store, LocalArtifacts: files})
+	response := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/books/"+batch.Books[0].ID+"/comic-pages/douyin-zip", nil)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func entryNames(files []*zip.File) []string {
+	names := make([]string, 0, len(files))
+	for _, entry := range files {
+		names = append(names, entry.Name)
+	}
+	return names
 }

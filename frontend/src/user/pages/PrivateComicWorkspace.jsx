@@ -304,7 +304,7 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
   </div>;
 }
 
-function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt, onDownloadAll, onDownloadAllImages, onUploadPageImage }) {
+function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage, onSavePagePrompt, onDownloadAll, onDownloadAllImages, onDownloadDouyin, onUploadPageImage }) {
   const pageList = Array.isArray(pages) ? pages : [];
   const imagedPages = pageList.filter(page => (Array.isArray(page?.images) ? page.images : []).length > 0).length;
   // 首屏只挂 COMIC_OUTPUT_FIRST_SCREEN 张卡片，滚到尾部哨兵再按批追加；
@@ -339,6 +339,7 @@ function ComicOutputCards({ pages, taskReady, action, actionKey, onGeneratePage,
       <Space size={8}>
         <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={action === 'download'} disabled={!pageList.length || (action && action !== 'download')} onClick={onDownloadAll}>下载全部</Button>
         <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={action === 'downloadImages'} disabled={!imagedPages || (action && action !== 'downloadImages')} onClick={onDownloadAllImages}>下载全部漫画图</Button>
+        <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={action === 'downloadDouyin'} disabled={!imagedPages || (action && action !== 'downloadDouyin')} onClick={onDownloadDouyin}>下载抖音发布包</Button>
       </Space>
     </div>
     {visiblePages.map((page, index) => <ComicPageCard
@@ -380,6 +381,7 @@ export function PrivateComicWorkspace({
   onSavePagePrompt,
   onDownloadAll,
   onDownloadAllImages,
+  onDownloadDouyin,
   onUploadPageImage,
   onDraftChange,
   task,
@@ -881,6 +883,7 @@ export function PrivateComicWorkspace({
           onSavePagePrompt={onSavePagePrompt}
           onDownloadAll={onDownloadAll}
           onDownloadAllImages={onDownloadAllImages}
+          onDownloadDouyin={onDownloadDouyin}
           onUploadPageImage={onUploadPageImage}
         /> : task ? <div className="script-empty legacy-panel-card">
           <div className="script-empty-title">还没有漫画页</div>
