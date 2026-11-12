@@ -73,11 +73,15 @@ func classifyProviderError(err error) (headline, detail string) {
 		return text, detail
 	case strings.Contains(lower, "not configured"), strings.Contains(lower, "catalog is unavailable"):
 		return "文本模型未配置：请到「设置 → 模型」选择一个可用的文本模型后重试。", detail
+	case strings.Contains(lower, "insufficient quota"), strings.Contains(lower, "not enough quota"),
+		strings.Contains(lower, "insufficient balance"), strings.Contains(lower, "quota exceeded"),
+		strings.Contains(text, "余额不足"), strings.Contains(text, "额度不足"), strings.Contains(text, "欠费"):
+		return "文本模型账户余额不足或已欠费，请充值后重试。", detail
 	case strings.Contains(lower, "401"), strings.Contains(lower, "403"),
 		strings.Contains(lower, "unauthorized"), strings.Contains(lower, "forbidden"),
 		strings.Contains(lower, "invalid api key"), strings.Contains(lower, "invalid_api_key"),
-		strings.Contains(text, "鉴权"), strings.Contains(text, "密钥"):
-		return "文本模型鉴权失败，请检查模型密钥后重试。", detail
+		strings.Contains(lower, "invalid token"), strings.Contains(text, "鉴权"), strings.Contains(text, "密钥"):
+		return "文本模型密钥无效或账户余额不足，请检查模型密钥、确认账户余额后重试。", detail
 	case strings.Contains(lower, "429"), strings.Contains(lower, "rate limit"),
 		strings.Contains(lower, "too many requests"), strings.Contains(text, "限流"):
 		return "上游文本模型触发限流，请稍后重试。", detail

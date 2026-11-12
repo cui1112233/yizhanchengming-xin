@@ -60,10 +60,19 @@ func directorHTTPFailureHeadline(status int, body string) string {
 		strings.Contains(lower, "content filter") || strings.Contains(lower, "moderation") ||
 		strings.Contains(lower, "safety") || strings.Contains(body, "审核") || strings.Contains(body, "违规"):
 		return "上游模型以内容审核为由拒绝了本次请求。系统已自动执行两轮安全修复，仍未通过审核；本页已停止继续调用，避免重复扣费。请调整这一页的描述，或更换文本模型。"
+	case strings.Contains(lower, "insufficient quota") || strings.Contains(lower, "not enough quota") ||
+		strings.Contains(lower, "insufficient balance") || strings.Contains(lower, "quota exceeded") ||
+		strings.Contains(lower, "exceeded your current quota") ||
+		strings.Contains(body, "余额不足") || strings.Contains(body, "额度不足") || strings.Contains(body, "欠费"):
+		return "文本模型账户余额不足或已欠费，请充值后重试。"
 	case status == http.StatusTooManyRequests:
 		return "上游文本模型触发限流，请稍后重试。"
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return "文本模型鉴权失败，请检查模型密钥后重试。"
+		// 中转站欠费时也常以 401 Invalid token 返回，不能只说“密钥失效”。
+		if strings.Contains(lower, "invalid token") || strings.Contains(body, "令牌无效") || strings.Contains(body, "无效的令牌") {
+			return "文本模型令牌无效或账户已欠费，请检查模型密钥、确认账户余额后重试。"
+		}
+		return "文本模型密钥无效或账户余额不足，请检查模型密钥、确认账户余额后重试。"
 	case status == http.StatusRequestEntityTooLarge ||
 		strings.Contains(lower, "context length") || strings.Contains(lower, "context_length") ||
 		strings.Contains(lower, "maximum context") || strings.Contains(lower, "max_tokens") ||
