@@ -1841,7 +1841,7 @@ func workshopPreviewResult(inputText string, maxTxt int, sourceMetadata ...works
 	return result, nil
 }
 
-func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, aiJudge novelfetchworkshop.AIGenderJudge, aiJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error), usersDir string, uploadTarget videomanagementconnector.Service) {
+func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, aiJudge novelfetchworkshop.AIGenderJudge, aiJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error), usersDir string, uploadTarget videomanagementconnector.Service, profiles *MemberProfileStore, accounts auth.Store) {
 	resolveGenderJudgeFor := func(ctx context.Context, owner string) novelfetchworkshop.AIGenderJudge {
 		if aiJudgeResolver == nil {
 			return aiJudge
@@ -3140,6 +3140,17 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			publicSource = nested
 		}
 		publicSource = novelfetchworkshop.EnsureWorkshopDefaults(publicSource)
+		// 普通成员只读所属管理员的模型目录：成员自己保存的旧副本不再展示，
+		// 避免“页面看到旧 Key、预检按管理员目录判断”的配置漂移。
+		if canManage, _ := configManagementState(identity, profiles, accounts); !canManage {
+			if owner := effectiveModelCatalogOwner(identity, profiles, accounts); owner != "" {
+				if managed, err := store.GetConfig(req.Context(), owner); err == nil {
+					if catalog, ok := managed["modelCatalog"].([]any); ok && len(catalog) > 0 {
+						publicSource["modelCatalog"] = catalog
+					}
+				}
+			}
+		}
 		appConfig := novelFetchAppConfig(publicSource)
 		platforms, ok := publicSource["platforms"].([]any)
 		if !ok {
@@ -3183,7 +3194,13 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	})
 
 	saveWorkshopConfig := func(w http.ResponseWriter, req *http.Request) {
-		saveNovelFetchConfig(w, req, store, func(merged map[string]any) map[string]any {
+		stripCatalog := false
+		if identity, ok := BridgeIdentityFromContext(req.Context()); ok {
+			if canManage, _ := configManagementState(identity, profiles, accounts); !canManage {
+				stripCatalog = true
+			}
+		}
+		saveNovelFetchConfig(w, req, store, stripCatalog, func(merged map[string]any) map[string]any {
 			return map[string]any{"ok": true, "settings": merged}
 		})
 	}
@@ -3208,7 +3225,7 @@ func novelFetchSubmitChunks(bookIDs []string, batchSize int) [][]string {
 	return chunks
 }
 
-func saveNovelFetchConfig(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, response func(map[string]any) map[string]any) {
+func saveNovelFetchConfig(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, stripModelCatalog bool, response func(map[string]any) map[string]any) {
 	identity, ok := BridgeIdentityFromContext(req.Context())
 	if !ok || identity.Username == "" {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
@@ -3222,6 +3239,11 @@ func saveNovelFetchConfig(w http.ResponseWriter, req *http.Request, store novelf
 	settings, _ := patch["settings"].(map[string]any)
 	if settings == nil {
 		settings = patch
+	}
+	// 普通成员不能覆盖模型目录：目录统一由所属管理员维护，成员侧只读。
+	if stripModelCatalog {
+		delete(settings, "modelCatalog")
+		delete(settings, "modelCatalogVersion")
 	}
 	current, err := store.GetConfig(req.Context(), identity.Username)
 	if err != nil {

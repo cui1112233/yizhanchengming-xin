@@ -164,7 +164,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		}
 		automationStages := &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
-			ImageReady:           shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore),
+			ImageReady:           shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner),
 			VideoReady:           shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production),
 			TextProviderResolver: runtimeTextProviderResolver,
 		}
@@ -257,7 +257,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerDirectorRoutes(v11, options.Director, options.Store)
 		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, TextProviderResolver: runtimeTextProviderResolver}
 		if options.LocalArtifacts != nil {
-			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore)
+			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner)
 			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)
 			stageService.ImageGenerator = func(ctx context.Context, owner, batchID, bookID string) error {
 				batch, err := options.Store.GetBatch(ctx, owner, batchID)
@@ -428,7 +428,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, videoProviderRegistry, options.Store, "v12", runtimeCatalogStore)
 	if options.Store != nil {
-		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)}
+		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner), VideoReady: shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)}
 		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
@@ -665,7 +665,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
-		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchQueue, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver, options.UserDataDir, options.VideoManagementConnector)
+		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchQueue, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver, options.UserDataDir, options.VideoManagementConnector, options.MemberProfileStore, options.AuthStore)
 		registerNovelFetchLegacyWorkflowRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchQueue, options.UserDataDir, func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
 			if options.NovelFetchRewriteResolver == nil {
 				return options.NovelFetchRewrite, nil
@@ -929,7 +929,7 @@ func shuihuoImageModelReady(model map[string]any) bool {
 	return shuihuoModelCredential(model) != ""
 }
 
-func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore) func(context.Context, string) (bool, string) {
+func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, resolveOwner func(string) string) func(context.Context, string) (bool, string) {
 	return func(ctx context.Context, owner string) (bool, string) {
 		config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStore)
 		if err == nil {
@@ -940,9 +940,16 @@ func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfet
 			}
 		}
 		// 出图既可能走旧 modelCatalog，也可能走 API 接口配置里的 custom:/channel:
-		// 渠道。预检必须与真实出图同口径，否则已选可用渠道的组织会被整批判为
-		// “图片模型或图片生成服务未配置”。
-		if shuihuoImageChannelReady(ctx, userConfig, owner) {
+		// 渠道。渠道必须和真实出图一样按“解析后的模型归属账号”读取，否则成员
+		// 自己的 API 配置为空时会被整批判为“图片模型或图片生成服务未配置”，
+		// 与成员实际使用的管理员渠道口径不一致。
+		channelOwner := owner
+		if resolveOwner != nil {
+			if resolved := strings.TrimSpace(resolveOwner(owner)); resolved != "" {
+				channelOwner = resolved
+			}
+		}
+		if shuihuoImageChannelReady(ctx, userConfig, channelOwner) {
 			return true, ""
 		}
 		if err != nil {

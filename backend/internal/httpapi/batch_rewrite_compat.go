@@ -44,7 +44,13 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	root.Handle("GET /api/batch-rewrite/config", handler)
 	root.Handle("GET /api/batch-rewrite/bootstrap", handler)
 	configSaveHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		saveNovelFetchConfig(w, req, store, func(merged map[string]any) map[string]any {
+		// 旧版兼容接口拿不到成员档案，按 owner 兜底：非 owner 一律不允许写模型目录，
+		// 目录统一由所属管理员在新版配置页维护。
+		stripCatalog := true
+		if identity, ok := BridgeIdentityFromContext(req.Context()); ok && identity.IsOwner {
+			stripCatalog = false
+		}
+		saveNovelFetchConfig(w, req, store, stripCatalog, func(merged map[string]any) map[string]any {
 			return map[string]any{"ok": true, "config": legacyBatchRewriteConfig(merged, false)}
 		})
 	}))
