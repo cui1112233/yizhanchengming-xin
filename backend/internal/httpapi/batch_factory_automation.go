@@ -71,6 +71,12 @@ type BatchAutomationCoordinator struct {
 	comicRunSlots chan struct{}
 }
 
+// comicSlotStallTimeout 是出图槽位的停滞上限。持槽书本超过这个时间没有任何
+// 真实进展（上游不回包、页图不落库），就主动中止并释放槽位，让队列里的下一本
+// 先出图；本书按失败处理、可以直接重试，不会让整批一直卡在同一本上。
+// 排队等待、响应头返回和正文传输都会刷新心跳，正常慢图不会被误判。
+const comicSlotStallTimeout = 10 * time.Minute
+
 // comicBookGenerationConcurrency 默认 1：一本一本地出图并发布。可用
 // QIANTIE_COMIC_BOOK_CONCURRENCY 临时调大，但必须小于通道真实并发能力。
 func comicBookGenerationConcurrency() int {
@@ -3600,7 +3606,35 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							waitTicker.Stop()
 							defer func() { <-c.comicRunSlots }()
 						}
-						return c.comicGenerate(generateCtx, owner, batchID, book.ID)
+						// 出图槽位看门狗：占着槽位却长时间没有任何真实进展时，主动
+						// 中止本次尝试并立刻释放槽位，让下一本先出图；本书按失败处理，
+						// 可以直接重试，避免整批一直卡在同一本上。
+						var slotStalled atomic.Bool
+						slotWatchDone := make(chan struct{})
+						go func() {
+							ticker := time.NewTicker(30 * time.Second)
+							defer ticker.Stop()
+							for {
+								select {
+								case <-slotWatchDone:
+									return
+								case <-ticker.C:
+									last, _ := stallLast.Load().(time.Time)
+									if last.IsZero() || c.now().Sub(last) <= comicSlotStallTimeout {
+										continue
+									}
+									slotStalled.Store(true)
+									cancel()
+									return
+								}
+							}
+						}()
+						defer close(slotWatchDone)
+						collection, err := c.comicGenerate(generateCtx, owner, batchID, book.ID)
+						if err != nil && slotStalled.Load() {
+							return collection, fmt.Errorf("出图超过 %s 没有任何进展，已释放出图槽位，本书可直接重试：%w", comicSlotStallTimeout, err)
+						}
+						return collection, err
 					}, nil)
 					generationCancel()
 					if generateErr != nil {
