@@ -76,6 +76,45 @@ const (
 // 这类页不再自动续跑，只允许用户手动重试，避免同一页反复扣费。
 const automationBilledNotRetrievedMessage = "上游已出图但我们没收到，不会自动重跑，可手动重试"
 
+// automationManualCodeLabels 把内部稳定错误码翻成用户能直接理解的中文。
+// 页面和任务卡片不再直接展示 AUTH_OR_QUOTA 这类内部码。
+var automationManualCodeLabels = map[string]string{
+	automationCodeAuthQuota:           "图片通道余额不足或 Key 无效，请处理后重试",
+	automationCodeBilledNotRetrieved:  automationBilledNotRetrievedMessage,
+	automationCodeContentPolicy:       "提示词被内容审核拒绝，需要人工检查",
+	automationCodeContentSoftRefusal:  "上游以对话方式拒绝了提示词，需要人工检查",
+	automationCodeImageBodyStalled:    "图片正文传输中断，可手动重试",
+	automationCodeImageBodySlow:       "图片正文传输超时，可手动重试",
+	automationCodeProviderTimeout:     "出图请求超时，可重试",
+	automationCodePublishUnconfirmed:  "发布结果未确认，需要人工核对",
+	automationCodePageNotFound:        "找不到对应漫画页，需要人工检查",
+	automationCodePromptMissing:       "缺少漫画提示词，需要重新分析",
+	automationCodePromptFailed:        "漫画提示词生成失败，可重试",
+	automationCodePageRejected:        "上游拒绝了该页请求，需要人工处理",
+	automationCodePageShortage:        "漫画页数量不足，需要人工检查",
+}
+
+// automationManualReasonText 支持用 "/" 连接多个原因码，逐段翻译。
+func automationManualReasonText(codes string) string {
+	parts := strings.Split(codes, "/")
+	labels := make([]string, 0, len(parts))
+	for _, part := range parts {
+		code := strings.TrimSpace(part)
+		if code == "" {
+			continue
+		}
+		if label, ok := automationManualCodeLabels[code]; ok {
+			labels = append(labels, label)
+			continue
+		}
+		labels = append(labels, code)
+	}
+	if len(labels) == 0 {
+		return "需要人工处理"
+	}
+	return strings.Join(labels, "；")
+}
+
 // automationBilledNotRetrievedSaveMessage 是「上游已出图并计费，但本地磁盘
 // 写满导致落盘失败」的唯一对外文案。它和读失败一样禁止自动续跑。
 const automationBilledNotRetrievedSaveMessage = "上游已出图并计费，但服务器磁盘空间不足无法保存；为避免重复扣费不会自动重跑，请清理磁盘后手动重试"
@@ -250,6 +289,17 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 		d := base
 		d.Code = automationCodeNetwork
 		d.BaseBackoff = 3 * time.Second
+		d.MaxBackoff = 2 * time.Minute
+		return d
+	case strings.Contains(msg, "漫画页生成超时（"+batchfactoryv11.ComicPageAutoRetryMarker),
+		strings.Contains(msg, comicPageInterruptedMessage):
+		// 超时页已被页租约回收器放回可重试状态（文案里带“自动重试 N/2”），
+		// 以及请求中断的可读原因。它们不能按纯超时的预算再压一轮，直接续跑。
+		d := base
+		d.Code = automationCodeProviderTimeout
+		d.MinAttemptsBeforeRetry = 1
+		d.MaxAttempts = automationRetryEscalationThreshold
+		d.BaseBackoff = 30 * time.Second
 		d.MaxBackoff = 2 * time.Minute
 		return d
 	case strings.Contains(msg, "deadline exceeded"), strings.Contains(msg, "超时"):

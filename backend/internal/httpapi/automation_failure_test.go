@@ -14,6 +14,27 @@ import (
 	"qiantie/backend/internal/localartifact"
 )
 
+func TestShuihuoImageQuotaShortfallMessage(t *testing.T) {
+	raw := `{"error":{"message":"Not enough quota to pre-consume for this request: ¥0.020000 remaining, ¥0.030000 required (request id: 20261112073614)"}}`
+	message, ok := shuihuoImageQuotaShortfallMessage(raw)
+	if !ok {
+		t.Fatal("quota shortfall must be recognised")
+	}
+	if !strings.Contains(message, "余额不足") || !strings.Contains(message, "0.02") || !strings.Contains(message, "0.03") {
+		t.Fatalf("quota message must be Chinese and carry both amounts, got %q", message)
+	}
+	if _, ok := shuihuoImageQuotaShortfallMessage(`{"error":"invalid api key"}`); ok {
+		t.Fatal("plain auth error must not be reported as quota shortfall")
+	}
+}
+
+func TestAutomationManualReasonTextTranslatesCodes(t *testing.T) {
+	message := automationManualReasonText(automationCodeAuthQuota + "/" + automationCodeBilledNotRetrieved)
+	if strings.Contains(message, "AUTH_OR_QUOTA") || !strings.Contains(message, "余额不足") {
+		t.Fatalf("manual reason must be human readable Chinese, got %q", message)
+	}
+}
+
 func TestClassifyFailureTable(t *testing.T) {
 	cases := []struct {
 		name            string
@@ -29,6 +50,10 @@ func TestClassifyFailureTable(t *testing.T) {
 		{"rate limited", errors.New("HTTP 429 too many requests"), "comic_images", automationCodeRateLimited, automationFailureTransient, true, false, automationPageRetryMaxAttempts},
 		{"network reset", errors.New("read tcp: wsarecv: connection reset by peer"), "comic_images", automationCodeNetwork, automationFailureTransient, true, false, automationPageRetryMaxAttempts},
 		{"provider timeout", errors.New("context deadline exceeded"), "comic_images", automationCodeProviderTimeout, automationFailureTransient, true, false, automationRetryEscalationThreshold},
+		// 超时回收器写进 last_error 的自动重试文案必须保持可重试，不能转人工。
+		{"stale timeout auto retry 1", errors.New("漫画页生成超时（自动重试 1/2）"), "comic_images", automationCodeProviderTimeout, automationFailureTransient, true, false, automationRetryEscalationThreshold},
+		{"stale timeout auto retry 2", errors.New("漫画页生成超时（自动重试 2/2）"), "comic_images", automationCodeProviderTimeout, automationFailureTransient, true, false, automationRetryEscalationThreshold},
+		{"generation interrupted", errors.New(comicPageInterruptedMessage), "comic_images", automationCodeProviderTimeout, automationFailureTransient, true, false, automationRetryEscalationThreshold},
 		{"infrastructure", errors.New("Error 1038: Out of sort memory"), "comic_images", automationCodeInfrastructure, automationFailureTransient, true, false, automationPageRetryMaxAttempts},
 		// 内容审核拒绝必须走自动改写（最多 comicPromptRepairMaxRounds 轮），
 		// 耗尽后由 errComicPromptRepairExhausted 转 needs_manual。
@@ -81,6 +106,31 @@ func TestRecordAutomationPageLedgerKeepsInFlightRetryable(t *testing.T) {
 	}
 	if record["state"] != "skipped" || automationBoolValue(record["needsManual"]) {
 		t.Fatalf("record=%#v, want repairable skipped state", record)
+	}
+}
+
+// 超时回收的自动重试文案必须第一次就进入续跑队列，而不是先跳过再升级。
+func TestStaleTimeoutAutoRetryQueuesImmediately(t *testing.T) {
+	now := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	for _, message := range []string{
+		"漫画页生成超时（自动重试 1/2）",
+		"漫画页生成超时（自动重试 2/2）",
+		comicPageInterruptedMessage,
+	} {
+		entry := map[string]any{}
+		outcome := recordAutomationPageLedger(entry, &comicPageWorkError{Failures: []comicPageFailure{{
+			VideoID: "video-1", Label: "漫画页 01", Err: errors.New(message),
+		}}}, "comic_images", now)
+		if outcome.NeedsManual {
+			t.Fatalf("%q 必须保持可自动续跑", message)
+		}
+		if !outcome.RetryQueued {
+			t.Fatalf("%q 第一次失败就应进入续跑队列", message)
+		}
+		record, _ := automationFailureLedger(entry, "comic_images")["video-1"].(map[string]any)
+		if record == nil || record["state"] != "retrying" || record["lastErrorCode"] != automationCodeProviderTimeout {
+			t.Fatalf("%q record=%#v, want retrying PROVIDER_TIMEOUT", message, record)
+		}
 	}
 }
 

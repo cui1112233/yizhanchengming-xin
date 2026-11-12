@@ -448,7 +448,16 @@ func automationBookAutoContinue(book map[string]any) map[string]any {
 		pages := automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book})
 		reason := "需人工处理"
 		if len(pages) > 0 {
-			reason = "需人工处理 " + toString(pages[0]["label"]) + "：" + toString(pages[0]["code"])
+			// 优先展示页级已经生成好的中文原因（含余额、审核等结论），
+			// 不再把 AUTH_OR_QUOTA 这类内部码直接抛给用户。
+			detail := strings.TrimSpace(toString(pages[0]["message"]))
+			if index := strings.Index(detail, "\n"); index >= 0 {
+				detail = strings.TrimSpace(detail[:index])
+			}
+			if detail == "" {
+				detail = automationManualReasonText(toString(pages[0]["code"]))
+			}
+			reason = "需人工处理 " + toString(pages[0]["label"]) + "：" + detail
 		}
 		return map[string]any{"willContinue": false, "reason": reason}
 	case "failed":

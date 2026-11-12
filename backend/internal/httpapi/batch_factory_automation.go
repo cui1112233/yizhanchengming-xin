@@ -3296,7 +3296,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						if len(outcome.ManualCodes) > 0 {
 							reason = strings.Join(outcome.ManualCodes, "/")
 						}
-						entry["message"] = fmt.Sprintf("%s；需人工处理（%s）", message, reason)
+						entry["message"] = fmt.Sprintf("%s；%s", message, automationManualReasonText(reason))
 						entry["needsManual"] = true
 						delete(entry, "retryRequested")
 						delete(entry, "retryAt")

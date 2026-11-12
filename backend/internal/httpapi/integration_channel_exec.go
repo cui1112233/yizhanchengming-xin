@@ -407,7 +407,7 @@ func generateIntegrationChannelImage(ctx context.Context, target integrationChan
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, http.StatusBadGateway, shuihuoImageUpstreamError{
-			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode),
+			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode, string(raw)),
 			Raw:        string(raw),
 			StatusCode: response.StatusCode,
 		}

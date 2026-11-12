@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -4017,7 +4018,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 				return "", "", fmt.Errorf("%w: %s", errShuihuoImageReferenceUnusable, strings.TrimPrefix(shuihuoImageProviderErrorDetail(raw), ": "))
 			}
 			return "", "", shuihuoImageUpstreamError{
-				Message:    shuihuoImageStatusRejectionMessage(response.StatusCode),
+				Message:    shuihuoImageStatusRejectionMessage(response.StatusCode, string(raw)),
 				Raw:        shuihuoImageProviderErrorDetail(raw),
 				StatusCode: response.StatusCode,
 			}
@@ -4651,11 +4652,38 @@ func (e shuihuoImageUpstreamError) Unwrap() error { return batchfactoryv11.ErrUp
 // shuihuoImageStatusRejectionMessage 按上游状态码给出中文结论：401/403 是渠道
 // 凭证问题（Key 无效或没有出图权限），不能再说成“模型不支持出图”；其余非 2xx
 // 状态才归到通道拒绝这一类。
-func shuihuoImageStatusRejectionMessage(status int) string {
+func shuihuoImageStatusRejectionMessage(status int, raw string) string {
+	// 余额不足通常也以 403 返回。必须先单独识别，否则会被误报成“Key 无效”，
+	// 用户按 Key 问题排查半天，实际只是账号没钱了。
+	if message, ok := shuihuoImageQuotaShortfallMessage(raw); ok {
+		return message
+	}
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		return fmt.Sprintf("图片通道鉴权失败（HTTP %d），请检查渠道 Key 是否有效、是否具备出图权限", status)
 	}
 	return fmt.Sprintf("图片通道拒绝了本次请求（HTTP %d），当前配置的模型可能不支持出图", status)
+}
+
+var shuihuoImageQuotaAmountPattern = regexp.MustCompile(`[¥￥]\s*([0-9]+(?:\.[0-9]+)?)`)
+
+// shuihuoImageQuotaShortfallMessage 把上游的余额不足原文翻译成一句中文结论，
+// 并尽量带上「剩余 / 需要」两个金额，方便用户判断要充多少。
+func shuihuoImageQuotaShortfallMessage(raw string) (string, bool) {
+	lower := strings.ToLower(raw)
+	isQuota := strings.Contains(lower, "not enough quota") ||
+		strings.Contains(lower, "insufficient quota") ||
+		strings.Contains(lower, "insufficient balance") ||
+		strings.Contains(lower, "pre-consume") ||
+		strings.Contains(raw, "余额不足") ||
+		strings.Contains(raw, "额度不足")
+	if !isQuota {
+		return "", false
+	}
+	amounts := shuihuoImageQuotaAmountPattern.FindAllStringSubmatch(raw, -1)
+	if len(amounts) >= 2 {
+		return fmt.Sprintf("上游账号余额不足：剩余 ¥%s，本次出图需要 ¥%s，请充值后重试", amounts[0][1], amounts[1][1]), true
+	}
+	return "上游账号余额不足，请充值后重试", true
 }
 
 func appendShuihuoUpstreamRaw(message, raw string) string {
@@ -5170,7 +5198,7 @@ func generateShuihuoRelayImage(ctx context.Context, files *localartifact.Store, 
 			detail = detail[:500]
 		}
 		return "", "", "", shuihuoImageUpstreamError{
-			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode),
+			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode, detail),
 			Raw:        detail,
 			StatusCode: response.StatusCode,
 		}
@@ -5526,7 +5554,7 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, shuihuoImageUpstreamError{
-			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode),
+			Message:    shuihuoImageStatusRejectionMessage(response.StatusCode, string(raw)),
 			Raw:        shuihuoImageProviderErrorDetail(raw),
 			StatusCode: response.StatusCode,
 		}
