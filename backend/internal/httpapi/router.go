@@ -197,6 +197,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 		if options.N8ComicPublisher != nil {
 			options.AutomationCoordinator.SetComicPublisher(options.N8ComicPublisher.PublishFromSettings)
+			options.AutomationCoordinator.SetComicPublishRecordReader(options.N8ComicPublisher.savedRecord)
 			options.AutomationCoordinator.SetComicPublishPreflight(options.N8ComicPublisher.ValidateBookSettings)
 		}
 		log.Printf("[DIAG] AutomationCoordinator reader=%v path=%q", options.AutomationStatusReader != nil, func() string {
@@ -624,8 +625,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerPluginToolRoutes(root, auth, options.TextProvider, newAgentTextCompletionExecutor(pluginTextModels))
 		registerScriptDirectorPipelineCompat(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
 	}
-	v11Root := auth.Middleware(capabilityNotFoundHandler(v11))
-	v12Root := auth.Middleware(capabilityNotFoundHandler(v12))
+	v11Root := auth.Middleware(adminBatchReadThrough(capabilityNotFoundHandler(v11), options.Store, options.MemberProfileStore, options.AuthStore))
+	v12Root := auth.Middleware(adminBatchReadThrough(capabilityNotFoundHandler(v12), options.Store, options.MemberProfileStore, options.AuthStore))
 	if legacyV11Public() {
 		root.Handle("/api/batch-factory/v11/", v11Root)
 	}

@@ -50,6 +50,7 @@ type BatchAutomationCoordinator struct {
 	publish121            *BatchFactory121Publisher
 	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
 	comicPublish          func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
+	comicPublishRecord    func(context.Context, string, string, string) (N8ComicPublishRecord, bool)
 	comicPublishPreflight func(context.Context, string, string, string, batchfactoryv11.SettingsPatch) error
 	mu                    sync.Mutex
 	controlMu             sync.Mutex
@@ -948,6 +949,12 @@ func (c *BatchAutomationCoordinator) SetComicBookGenerator(generator func(contex
 func (c *BatchAutomationCoordinator) SetComicPublisher(publisher func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)) {
 	if c != nil {
 		c.comicPublish = publisher
+	}
+}
+
+func (c *BatchAutomationCoordinator) SetComicPublishRecordReader(reader func(context.Context, string, string, string) (N8ComicPublishRecord, bool)) {
+	if c != nil {
+		c.comicPublishRecord = reader
 	}
 }
 
@@ -2135,6 +2142,22 @@ func (c *BatchAutomationCoordinator) latestComicCollection(ctx context.Context, 
 		return batchfactoryv11.ComicCollection{}, fmt.Errorf("漫画合集不存在")
 	}
 	return collections[len(collections)-1], nil
+}
+
+// publishedComicRecord 返回该书最新合集对应的已发布记录，用于避免重复发布。
+func (c *BatchAutomationCoordinator) publishedComicRecord(ctx context.Context, owner, batchID, bookID string) (N8ComicPublishRecord, string, bool) {
+	if c == nil || c.comicPublishRecord == nil {
+		return N8ComicPublishRecord{}, "", false
+	}
+	collection, err := c.latestComicCollection(ctx, owner, batchID, bookID, "")
+	if err != nil || strings.TrimSpace(collection.ID) == "" {
+		return N8ComicPublishRecord{}, "", false
+	}
+	record, found := c.comicPublishRecord(ctx, owner, batchID, collection.ID)
+	if !found || record.Status != "published" {
+		return N8ComicPublishRecord{}, "", false
+	}
+	return record, collection.ID, true
 }
 
 func (c *BatchAutomationCoordinator) publishVideo(ctx context.Context, owner, batchID, bookID string) error {
@@ -3347,6 +3370,20 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "stopped", "stopped", "测试任务已停止", c.now()
 					persist()
 					continue
+				}
+				// 幂等：已经发布成功的书，在重新执行/误点执行时直接跳过，
+				// 避免在 N8 重复创建合集。强制重生成时才允许重新发布。
+				if !automationBoolValue(job["forceRegenerate"]) &&
+					automationStringValue(job["runMode"], "full_submit") == "full_submit" &&
+					batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
+					if record, collectionID, published := c.publishedComicRecord(ctx, owner, batchID, book.ID); published {
+						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "该书已发布过，跳过重复上传", c.now()
+						entry["comicCollectionId"], entry["comicCarouselId"], entry["comicPublishName"] = collectionID, record.CarouselID, record.Name
+						entry["comicImageIDs"] = record.ImageIDs
+						appendAutomationBookLog(entry, c.now(), "publish", "检测到已发布记录，跳过重复发布")
+						persist()
+						continue
+					}
 				}
 				if entryStatus == "scheduled" && automationStringValue(entry["stage"], "") == "waiting_submit" {
 					if c.automationSubmitDeferred(job) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/prompt"
 )
@@ -314,6 +315,10 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			return
 		}
 		payload := map[string]any{"batch": batch}
+		// 管理员只读查看其他账号的批次时，明确标出真实归属账号。
+		if batchOwner := batchReadThroughOwner(r.Context()); batchOwner != "" {
+			payload["ownerUsername"] = batchOwner
+		}
 		if readiness := comicReadinessByBook(r.Context(), store, catalog, owner, batch); len(readiness) > 0 {
 			payload["comicReadiness"] = readiness
 		}
@@ -659,6 +664,61 @@ func writeBatchAccessError(w http.ResponseWriter, r *http.Request, store any, id
 func bridgeOwner(r *http.Request) (string, bool) {
 	identity, ok := BridgeIdentityFromContext(r.Context())
 	return identity.Username, ok && identity.Username != ""
+}
+
+type batchReadThroughOwnerKey struct{}
+
+// adminBatchReadThrough 允许管理员/DEV 只读查看其他账号的批次。
+// 仅对 GET/HEAD 生效：命中后把请求身份临时切换为批次归属账号，让下游所有
+// 按 owner 过滤的只读接口正常返回；写操作不切换，仍然按原账号处理。
+func adminBatchReadThrough(next http.Handler, store any, profiles *MemberProfileStore, accounts auth.Store) http.Handler {
+	lookup, ok := store.(batchOwnerLookup)
+	if !ok {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			next.ServeHTTP(w, r)
+			return
+		}
+		batchID := batchIDFromAPIPath(r.URL.Path)
+		if batchID == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		identity, ok := BridgeIdentityFromContext(r.Context())
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if canManage, _ := configManagementState(identity, profiles, accounts); !canManage {
+			next.ServeHTTP(w, r)
+			return
+		}
+		owner, err := lookup.BatchOwner(r.Context(), batchID)
+		if err != nil || owner == "" || strings.EqualFold(owner, identity.Username) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		ctx := context.WithValue(r.Context(), batchReadThroughOwnerKey{}, owner)
+		ctx = context.WithValue(ctx, bridgeIdentityKey{}, BridgeIdentity{Username: owner, IsOwner: identity.IsOwner})
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func batchReadThroughOwner(ctx context.Context) string {
+	owner, _ := ctx.Value(batchReadThroughOwnerKey{}).(string)
+	return owner
+}
+
+func batchIDFromAPIPath(path string) string {
+	segments := strings.Split(strings.Trim(path, "/"), "/")
+	for index, segment := range segments {
+		if segment == "batches" && index+1 < len(segments) && strings.HasPrefix(segments[index+1], "batch_") {
+			return segments[index+1]
+		}
+	}
+	return ""
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
