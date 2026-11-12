@@ -4095,10 +4095,10 @@ func applyShuihuoImageWatermark(ctx context.Context, imageBytes []byte, mediaTyp
 // 因此正文总上限取 5 分钟，停滞检测仍会在 180 秒无新字节时提前结束坏连接。
 // 两组值都是变量，测试可临时覆盖。
 var (
-	// 没有长期任务截止时间的单页/交互请求，最多排队 5 分钟。
-	// 自动化页图会由 shuihuoImageQueueBudget 使用页级截止时间延长等待，
-	// 保留首次进入 FIFO 队列的位置，避免每 5 分钟退出后重新排到队尾。
-	shuihuoImageQueueWaitTimeout       = 5 * time.Minute
+	// 单页/交互请求排队上限。通道只有 1~2 个真实并发时，多本书同时出图会让
+	// 排队深度达到十几二十个；排队上限过短会让请求在轮到自己之前就到期重排，
+	// 表现为整本书一直卡在“缺几页”，永远到不了发布。
+	shuihuoImageQueueWaitTimeout       = 15 * time.Minute
 	shuihuoImageResponseHeaderTimeout  = 3 * time.Minute
 	shuihuoImageBodyStallTimeoutURL    = 180 * time.Second
 	shuihuoImageBodyStallTimeoutBase64 = 180 * time.Second
@@ -4169,8 +4169,9 @@ func shuihuoImageQueueError(parent context.Context, queueErr error) error {
 // 新字节仍会断流；只是不再把「一直有数据回来」的已付费图片拦腰丢掉。
 const shuihuoImageRequestTimeout time.Duration = 0
 
-// shuihuoImageQueueBudget 始终限制一次排队最多 5 分钟。页级续跑会保留已完成
-// 页面并只补缺页，不需要让一个 waiter 占着 FIFO 位置几十分钟。
+// shuihuoImageQueueBudget 限制一次排队最多 15 分钟。页级续跑会保留已完成
+// 页面并只补缺页，但排队上限必须大于“排队深度 ÷ 通道并发 × 单张耗时”，
+// 否则请求会在轮到自己之前反复到期重排，造成整本长期缺页。
 func shuihuoImageQueueBudget(ctx context.Context) time.Duration {
 	return shuihuoImageQueueWaitTimeout
 }
