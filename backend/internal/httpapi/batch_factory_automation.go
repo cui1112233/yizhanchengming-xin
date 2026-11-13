@@ -353,6 +353,8 @@ func (c *BatchAutomationCoordinator) ReapZombieJobs(ctx context.Context) error {
 		return nil
 	}
 	now := c.now()
+	// 先取活 run 快照（只用 controlMu），再进状态锁，避免锁顺序反转。
+	liveRuns := c.snapshotLiveRuns()
 	c.mu.Lock()
 	state, err := c.loadLocked()
 	if err != nil {
@@ -361,7 +363,7 @@ func (c *BatchAutomationCoordinator) ReapZombieJobs(ctx context.Context) error {
 	}
 	reclaimed := make([]string, 0)
 	for jobID, job := range state.Jobs {
-		if reclaimAutomationZombieRunningJob(job, jobID, now) {
+		if reclaimAutomationZombieRunningJob(job, jobID, now, liveRuns[jobID]) {
 			reclaimed = append(reclaimed, jobID)
 		}
 	}
@@ -392,6 +394,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 		job                   map[string]any
 	}
 	due := make([]dueJob, 0)
+	liveRuns := c.snapshotLiveRuns()
 	c.mu.Lock()
 	state, err := c.loadLocked()
 	if err != nil {
@@ -407,7 +410,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 	changed := false
 	reclaimed := make([]string, 0)
 	for jobID, job := range state.Jobs {
-		if reclaimAutomationZombieRunningJob(job, jobID, now) {
+		if reclaimAutomationZombieRunningJob(job, jobID, now, liveRuns[jobID]) {
 			reclaimed = append(reclaimed, jobID)
 			changed = true
 			continue
@@ -686,22 +689,49 @@ const automationBatchRetryRounds = 3
 // 比书级停滞阈值多留 2 分钟，让看门狗先落「跳过这本书」的可读状态。
 const automationZombieRunningIdleTimeout = automationStallTimeout + 2*time.Minute
 
+// automationZombieRunlessIdleTimeout 是本进程已经没有对应 run 的 running job
+// 的回收阈值。服务重启后进程内的 run goroutine 全部消失，但耐久状态里的 job
+// 仍是 running；如果只等 42 分钟的通用停滞阈值，界面会一直显示“正在执行”
+// 却没有任何进展，重试接口还会因为 state=running 返回 409。2 分钟没有任何
+// 状态写入即可判定为“上次进程留下的空壳”并回收成可重试的 failed。
+const automationZombieRunlessIdleTimeout = 2 * time.Minute
+
 const automationZombieRunningMessage = "执行轮次已失效（长时间无进展）"
 
+// snapshotLiveRuns 返回当前进程里仍有 run goroutine 的 job 集合。
+// 在进入状态锁之前调用，避免 mu → controlMu 的锁顺序。
+func (c *BatchAutomationCoordinator) snapshotLiveRuns() map[string]bool {
+	c.controlMu.Lock()
+	defer c.controlMu.Unlock()
+	live := make(map[string]bool, len(c.runCancels))
+	for jobID := range c.runCancels {
+		live[jobID] = true
+	}
+	return live
+}
+
 // automationZombieRunningReclaimable 判断 job 是否是执行轮次中断后残留的
-// “running” 假状态：只要长时间没有任何状态写入即可回收，不再看书的在途状态。
-func automationZombieRunningReclaimable(job map[string]any, now time.Time) bool {
+// “running” 假状态：长时间没有任何状态写入，或本进程已经没有对应 run
+// 且短窗口内无写入，即可回收。
+func automationZombieRunningReclaimable(job map[string]any, now time.Time, liveRun bool) bool {
 	if job == nil || automationStringValue(job["state"], "") != "running" {
 		return false
 	}
 	last := automationStoredJobTime(job["updatedAt"])
-	return !last.IsZero() && now.Sub(last) >= automationZombieRunningIdleTimeout
+	if last.IsZero() {
+		return false
+	}
+	idle := now.Sub(last)
+	if idle >= automationZombieRunningIdleTimeout {
+		return true
+	}
+	return !liveRun && idle >= automationZombieRunlessIdleTimeout
 }
 
 // reclaimAutomationZombieRunningJob 把僵尸 running 落成 failed 终态，并按终态
 // 语义清掉残留的重试标记，避免 dispatcher 再把一个已经没人执行的 job 重新派发。
-func reclaimAutomationZombieRunningJob(job map[string]any, jobID string, now time.Time) bool {
-	if !automationZombieRunningReclaimable(job, now) {
+func reclaimAutomationZombieRunningJob(job map[string]any, jobID string, now time.Time, liveRun bool) bool {
+	if !automationZombieRunningReclaimable(job, now, liveRun) {
 		return false
 	}
 	books, _ := job["books"].(map[string]any)
@@ -717,7 +747,7 @@ func reclaimAutomationZombieRunningJob(job map[string]any, jobID string, now tim
 			entry["status"] = "failed"
 			entry["stage"] = automationStringValue(entry["stage"], "unknown")
 			entry["message"] = automationZombieRunningMessage
-			entry["error"] = "执行轮次已失效：超过 10 分钟没有任何进展"
+			entry["error"] = "执行轮次已失效：长时间没有进展，可直接重试"
 			entry["updatedAt"] = now
 		}
 	}

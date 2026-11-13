@@ -565,6 +565,53 @@ func TestReapZombieJobsIgnoresDispatchNextCheck(t *testing.T) {
 	}
 }
 
+func TestReapZombieJobsReclaimsRestartOrphanAfterShortIdle(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	now := time.Date(2026, 11, 13, 11, 0, 0, 0, time.UTC)
+	job := func(id string, idle time.Duration, status string) map[string]any {
+		return map[string]any{
+			"id": id, "owner": "alice", "batchId": "batch-" + id,
+			"state": "running", "updatedAt": now.Add(-idle),
+			"counts": automationCounts(1, 1, 0, 0),
+			"books": map[string]any{
+				"book-1": map[string]any{"bookId": "book-1", "status": status, "stage": "comic_images", "updatedAt": now.Add(-idle)},
+			},
+		}
+	}
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		// 进程重启后遗留：没有活的 run，且已经 3 分钟没有状态写入。
+		"job-orphan": job("job-orphan", 3*time.Minute, "running"),
+		// 本进程仍在执行：同样的空闲时长，但有活的 run，不能被回收。
+		"job-live": job("job-live", 3*time.Minute, "running"),
+		// 刚启动不久：没有 run 但还没到 2 分钟短窗口，先不回收。
+		"job-fresh": job("job-fresh", 30*time.Second, "running"),
+	}}
+	writeLegacyAutomationState(t, path, state)
+	coordinator := newDispatchTestCoordinator(path, now)
+	coordinator.runCancels = map[string]context.CancelFunc{"job-live": func() {}}
+
+	if err := coordinator.ReapZombieJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if automationStringValue(got.Jobs["job-orphan"]["state"], "") != "failed" {
+		t.Fatalf("重启遗留的 running 壳未被回收: %#v", got.Jobs["job-orphan"])
+	}
+	book, _ := got.Jobs["job-orphan"]["books"].(map[string]any)["book-1"].(map[string]any)
+	if automationStringValue(book["status"], "") != "failed" || !strings.Contains(automationStringValue(book["error"], ""), "可直接重试") {
+		t.Fatalf("书必须变成可重试的 failed 且给出可读原因: %#v", book)
+	}
+	for _, id := range []string{"job-live", "job-fresh"} {
+		if automationStringValue(got.Jobs[id]["state"], "") != "running" {
+			t.Fatalf("%s 不应被回收: %#v", id, got.Jobs[id])
+		}
+	}
+}
+
 func TestRecordAutomationPageLedgerQueueBusyDoesNotConsumePaidRetryBudget(t *testing.T) {
 	now := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
 	entry := map[string]any{}
