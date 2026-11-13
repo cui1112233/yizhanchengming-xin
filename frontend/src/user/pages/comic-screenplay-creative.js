@@ -29,7 +29,11 @@ export function creativeConfigPayload(draft, revision) {
 
 export function creativePromptOptions(prompts, purpose, selectedId) {
   const rows = prompts.filter(item => String(item.purpose || item.type || '').replaceAll('-', '_') === purpose);
-  const options = rows.map(item => ({ value: item.id, label: `${item.name}${item.version ? ` · ${item.version}` : ''}` }));
+  const options = rows.map(item => {
+    const version = String(item.version ?? '').trim();
+    const displayVersion = /^[0-9a-f]{8,}$/i.test(version) ? '' : version;
+    return { value: item.id, label: `${item.name}${displayVersion ? ` · ${displayVersion}` : ''}` };
+  });
   if (selectedId && !rows.some(item => item.id === selectedId)) options.unshift({ value: selectedId, label: `已保存的选择（${selectedId}，当前不可用）`, disabled: true });
   return options;
 }
@@ -76,4 +80,13 @@ export function comicImageModelSelection(config, { models = [], references = [],
   if (!error && !loading && !modelId) error = `作品尚未设置${editing ? '图片编辑或图片生成' : '图片生成'}模型，请在项目设置保存，或为本次操作选择模型。`;
   if (!error && !loading && modelId && !models.some(item => item.id === modelId)) error = `${override ? '临时选择的' : '作品保存的'}图片模型「${modelId}」当前不可用，请重新选择；没有自动更换模型。`;
   return { modelId, source, editing, options, error, loading };
+}
+
+
+export function applyCreativeConfigToProject(project, config, revision = project?.revision) {
+  return { ...project, creative_config: config, revision, art_style: config?.style?.name || '', selected_style: config?.style?.id || '' };
+}
+
+export function comicProjectStyleName(project) {
+  return project?.creative_config ? project.creative_config.style?.name || '' : project?.art_style || '';
 }

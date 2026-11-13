@@ -12,7 +12,7 @@ import ComicScreenplayMediaPanel from './ComicScreenplayMediaPanel.jsx';
 import ComicScreenplayFileTools from './ComicScreenplayFileTools.jsx';
 import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-creation.js';
 import { ComicDegreeCards, ComicSourceInput, ComicCreativeFields } from './ComicScreenplayCreationFields.jsx';
-import { comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeConfigPayload, emptyCreativeConfig } from './comic-screenplay-creative.js';
+import { applyCreativeConfigToProject, comicProjectStyleName, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeConfigPayload, emptyCreativeConfig } from './comic-screenplay-creative.js';
 import { parseComicScreenplayDraftSource } from '../../shared/api/comicScreenplay.js';
 
 const ratioOptions = ['9:16', '16:9', '1:1', '4:3'].map(value => ({ value, label: value }));
@@ -177,7 +177,8 @@ export default function ComicScreenplayPage() {
       setCreativeLibrary(library); setCreative(creativeConfigDraft(response.creative_config));
       setCreativeRevision(response.revision); setCreativeReady(true);
       setStoryboardEngine(current => comicStoryboardEngine(response.creative_config?.storyboard_prompt_id, current));
-      setWorkspace(current => current ? { ...current, project: { ...current.project, creative_config: response.creative_config } } : current);
+      setWorkspace(current => current ? { ...current, project: applyCreativeConfigToProject(current.project, response.creative_config, response.revision) } : current);
+      setForm(current => ({ ...current, artStyle: response.creative_config?.style?.name || '', selectedStyle: response.creative_config?.style?.id || '' }));
     } catch (error) { if (ticket === creativeTicket.current) setCreativeError(error.message || '创作配置读取失败，暂不能保存'); }
     finally { if (ticket === creativeTicket.current) setCreativeLoading(false); }
   }
@@ -271,7 +272,8 @@ export default function ComicScreenplayPage() {
       if (selectedProject.current !== id) return;
       setCreative(creativeConfigDraft(saved.creative_config)); setCreativeRevision(saved.revision);
       setStoryboardEngine(current => comicStoryboardEngine(saved.creative_config?.storyboard_prompt_id, current));
-      setWorkspace(current => current ? { ...current, project: { ...current.project, revision: saved.revision, creative_config: saved.creative_config } } : current);
+      setWorkspace(current => current ? { ...current, project: applyCreativeConfigToProject(current.project, saved.creative_config, saved.revision) } : current);
+      setForm(current => ({ ...current, artStyle: saved.creative_config?.style?.name || '', selectedStyle: saved.creative_config?.style?.id || '' }));
       await refreshProjects();
       message.success('设置已保存');
     } catch (error) {
@@ -504,7 +506,7 @@ export default function ComicScreenplayPage() {
     return <div className={`comic-screenplay-page comic-screenplay-workbench layout-${display.editor_version||'studio'} ${display.sidebar_collapsed?'sidebar-collapsed':''} ${display.show_descriptions===false?'hide-descriptions':''}`} style={{'--comic-body-size':`${display.font_size||14}px`}}>
       <header className="comic-screenplay-toolbar">
         <Button type="text" icon={<ArrowLeft size={16} />} onClick={() => {abortRef.current?.abort();projectRequest.current+=1;selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);void refreshProjects();}}>返回项目库</Button>
-        <div><strong>{project.title || '漫剧创作'}</strong><span>{project.aspect_ratio || '9:16'} · {project.art_style || '通用动漫'}</span></div>
+        <div><strong>{project.title || '漫剧创作'}</strong><span>{project.aspect_ratio || '9:16'} · {comicProjectStyleName(project) || '未指定画风'}</span></div>
         <div className="comic-screenplay-toolbar-actions">
           {working && abortRef.current ? <Button danger onClick={() => abortRef.current?.abort()}>取消任务</Button> : null}
           <Button disabled={readOnly} onClick={()=>setDisplayOpen(true)}>显示设置</Button>{access?.owner?<Button onClick={()=>setTeamOpen(true)}>团队权限</Button>:null}<Button onClick={() => openProject(selectedId)}>刷新</Button>
@@ -610,7 +612,7 @@ export default function ComicScreenplayPage() {
       <Input prefix={<Search size={16} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索作品..." allowClear />
       <div className="library-filter-actions"><Select value={sortOrder} suffixIcon={<ChevronDown size={15} />} onChange={setSortOrder} options={[{ value: 'desc', label: '按时间降序' }, { value: 'asc', label: '按时间升序' }]} /><Button type="text" icon={viewMode === 'grid' ? <Grid2X2 size={18} /> : <LayoutGrid size={18} />} onClick={() => setViewMode(value => value === 'grid' ? 'list' : 'grid')} /></div>
     </div>
-    <Spin spinning={loading}><div className={`comic-project-grid ${viewMode === 'list' ? 'is-list' : ''}`}>{visibleProjects.length ? visibleProjects.map(project => <article key={project.id} className="comic-project-card" onClick={() => openProject(project.id)}><div className="comic-project-cover"><Clapperboard size={38} /><span>{project.aspect_ratio || '9:16'}</span></div><div className="comic-project-meta"><div><h3>{project.title}</h3><p>{project.art_style || '未选择风格'} · {prettyTime(project.updated_at)}</p></div>{scope!=='team'?<Button type="text" onClick={async event=>{event.stopPropagation();try{const result=await getComicDisplay(project.id);await (scope==='archived'?restoreComic:archiveComic)(project.id,{expected_revision:result.state?.revision||0});await refreshProjects();}catch(err){message.error(err.message);}}}>{scope==='archived'?'恢复':'归档'}</Button>:null}{scope!=='team'?<Popconfirm title="删除这个漫剧项目？" onConfirm={async event => { event?.stopPropagation?.(); await deleteComicScreenplay(project.id); await refreshProjects(); }}><Button type="text" danger icon={<Trash2 size={16} />} onClick={event => event.stopPropagation()} /></Popconfirm>:null}</div></article>) : <Empty description={scope === 'team' ? '暂无团队作品' : '暂无项目，在上方输入框输入内容开始创作'} />}</div></Spin>
+    <Spin spinning={loading}><div className={`comic-project-grid ${viewMode === 'list' ? 'is-list' : ''}`}>{visibleProjects.length ? visibleProjects.map(project => <article key={project.id} className="comic-project-card" onClick={() => openProject(project.id)}><div className="comic-project-cover"><Clapperboard size={38} /><span>{project.aspect_ratio || '9:16'}</span></div><div className="comic-project-meta"><div><h3>{project.title}</h3><p>{comicProjectStyleName(project) || '未指定画风'} · {prettyTime(project.updated_at)}</p></div>{scope!=='team'?<Button type="text" onClick={async event=>{event.stopPropagation();try{const result=await getComicDisplay(project.id);await (scope==='archived'?restoreComic:archiveComic)(project.id,{expected_revision:result.state?.revision||0});await refreshProjects();}catch(err){message.error(err.message);}}}>{scope==='archived'?'恢复':'归档'}</Button>:null}{scope!=='team'?<Popconfirm title="删除这个漫剧项目？" onConfirm={async event => { event?.stopPropagation?.(); await deleteComicScreenplay(project.id); await refreshProjects(); }}><Button type="text" danger icon={<Trash2 size={16} />} onClick={event => event.stopPropagation()} /></Popconfirm>:null}</div></article>) : <Empty description={scope === 'team' ? '暂无团队作品' : '暂无项目，在上方输入框输入内容开始创作'} />}</div></Spin>
     <Modal title="最近创作历史" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={<Button onClick={() => setHistoryOpen(false)}>关闭</Button>}>
       <div className="screenplay-version-list">{projects.length ? [...projects].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).map(project => <button type="button" key={project.id} onClick={() => { setHistoryOpen(false); void openProject(project.id); }}><b>{project.title}</b><span>{prettyTime(project.updated_at)}</span></button>) : <Empty description="还没有创作记录" />}</div>
     </Modal>

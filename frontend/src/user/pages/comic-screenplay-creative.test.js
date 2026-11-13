@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { comicImageModelSelection, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeConfigPayload, creativePromptOptions } from './comic-screenplay-creative.js';
+import { applyCreativeConfigToProject, comicProjectStyleName, comicImageModelSelection, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeConfigPayload, creativePromptOptions } from './comic-screenplay-creative.js';
 import { loadComicCreativeLibrary, loadComicCreativeConfig, saveComicCreativeConfig, getComicStylePreview, createComicCreativeStyle } from '../../shared/api/comicScreenplay.js';
 const config = { script_prompt_id: 'script144', storyboard_prompt_id: 'story307', character_design_prompt_id: 'char213', scene_design_prompt_id: 'scene289', style: { id: 'own-style', name: '我的风格' }, image_core_instruction: '保留服装细节', image_model_id: 'image', image_edit_model_id: 'edit' };
 
@@ -111,4 +111,33 @@ test('分镜提示词切换V9到V7再V3时，引擎精确随所选提示词切�
   engine = comicStoryboardEngine('storyboard_xiaoluo_v7_15s', engine); assert.equal(engine, 'xiaoluo_v7_15s');
   engine = comicStoryboardEngine('storyboard_xiaoyunque_v3', engine); assert.equal(engine, 'xiaoyunque_v3');
   assert.equal(comicStoryboardEngine('historical-other', engine), 'xiaoyunque_v3');
+});
+
+
+test('提示词选项隐藏摘要版本，保留可读版本且不改变原目录元数据', () => {
+  const prompts = [
+    { id: 'professional', name: '专业剧本', purpose: 'script', version: '8e503d320f3d520a', sha256: 'frozen-hash' },
+    { id: 'readable', name: '可读版本剧本', purpose: 'script', version: 'v1' },
+    { id: 'uppercase', name: '另一剧本', purpose: 'script', version: 'ABCDEF1234567890' },
+  ];
+  assert.deepEqual(creativePromptOptions(prompts, 'script').map(item => item.label), ['专业剧本', '可读版本剧本 · v1', '另一剧本']);
+  assert.equal(prompts[0].version, '8e503d320f3d520a');
+  assert.equal(prompts[0].sha256, 'frozen-hash');
+  assert.deepEqual(creativePromptOptions(prompts, 'script').map(item => item.value), ['professional', 'readable', 'uppercase']);
+});
+
+
+test('创作配置读回或保存后同步项目画风名称与ID，清空不会残留旧页头', () => {
+  const old = { id: 'p', revision: 1, art_style: '3D国漫1', selected_style: 'old', creative_config: { style: { id: 'old', name: '3D国漫1' } } };
+  const selected = applyCreativeConfigToProject(old, { style: { id: 'new', name: '新画风' } }, 2);
+  assert.equal(selected.art_style, '新画风'); assert.equal(selected.selected_style, 'new');
+  const cleared = applyCreativeConfigToProject(selected, { style: null }, 3);
+  assert.equal(cleared.art_style, ''); assert.equal(cleared.selected_style, ''); assert.equal(cleared.revision, 3);
+  assert.equal(comicProjectStyleName(cleared), '');
+  assert.equal(old.art_style, '3D国漫1');
+});
+
+test('作品卡片以已有创作配置为准，不从旧字段恢复已清空画风', () => {
+  assert.equal(comicProjectStyleName({ art_style: '残留旧名称', creative_config: { style: null } }), '');
+  assert.equal(comicProjectStyleName({ art_style: '历史名称' }), '历史名称');
 });
