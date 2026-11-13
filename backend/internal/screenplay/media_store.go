@@ -24,10 +24,11 @@ type MediaItem struct {
 	CreatedAt  time.Time `json:"createdAt"`
 }
 type MediaState struct {
-	Revision int64             `json:"revision"`
-	Items    []MediaItem       `json:"items"`
-	Selected map[string]string `json:"selected"`
-	Voices   map[string]string `json:"voices"`
+	Positioning *PositioningState `json:"positioning,omitempty"`
+	Revision    int64             `json:"revision"`
+	Items       []MediaItem       `json:"items"`
+	Selected    map[string]string `json:"selected"`
+	Voices      map[string]string `json:"voices"`
 }
 type MediaStore interface {
 	LoadMedia(context.Context, string, string) (MediaState, error)

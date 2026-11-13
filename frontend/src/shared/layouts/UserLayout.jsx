@@ -84,6 +84,9 @@ export function UserLayout({ children }) {
   const [loginForm] = Form.useForm();
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => shouldAutoCollapseAgentNavigation(window.location.pathname));
+  const [comicWorkspaceOpen,setComicWorkspaceOpen] = useState(false), [comicNavigationCollapsed,setComicNavigationCollapsed] = useState(true);
+  const effectiveSidebarCollapsed = comicWorkspaceOpen ? comicNavigationCollapsed : sidebarCollapsed;
+  useEffect(()=>{const receive=event=>{setComicWorkspaceOpen(event.detail?.open===true);if(event.detail?.open)setComicNavigationCollapsed(true);};window.addEventListener('qiantie:comic-workspace',receive);return()=>window.removeEventListener('qiantie:comic-workspace',receive);},[]);
   const [theme, setTheme] = useState(initialTheme);
   const [systemMode, setSystemMode] = useState(initialSystemMode);
   const [petVisible, setPetVisible] = useState(true);
@@ -523,16 +526,16 @@ export function UserLayout({ children }) {
     <ConfigProvider theme={createAntTheme(theme, systemMode)}>
       <div className={`legacy-shell${windowBackgroundId !== 'none' ? ' has-window-background' : ''}${windowBackgroundId === 'custom' ? ' is-custom-window-background' : ''}${videoBackgroundClass}`} style={shellBackgroundStyle}>
       <WindowVideoBackground backgroundId={windowBackgroundId} />
-      <aside className={`legacy-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
+      <aside className={`legacy-sidebar${effectiveSidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="legacy-brand">
           <button
             className="legacy-sidebar-toggle"
             type="button"
-            aria-label={sidebarCollapsed ? '展开导航' : '收起导航'}
-            aria-expanded={!sidebarCollapsed}
-            onClick={toggleSidebar}
+            aria-label={effectiveSidebarCollapsed ? '展开导航' : '收起导航'}
+            aria-expanded={!effectiveSidebarCollapsed}
+            onClick={()=>comicWorkspaceOpen?setComicNavigationCollapsed(value=>!value):toggleSidebar()}
           >
-            {sidebarCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
+            {effectiveSidebarCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
           </button>
           <WorkModeMenu pathname={pathname} className="legacy-brand-link">
             <Suspense fallback={<BrandLogo className="legacy-brand-logo" />}>

@@ -19,7 +19,9 @@ func BuildChapterTextRequest(p Project, c Chapter, instruction, contextJSON stri
 			return TextRequest{}, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 		}
 		system = snap.Body
-		jsonResponse = id == prompt.CreativeScript144
+		// 144 requires JSON followed by an optional plain-text conversion report.
+		// JSON-only provider mode would contradict that documented output contract.
+		jsonResponse = false
 	}
 	if strings.TrimSpace(c.SourceText) == "" {
 		return TextRequest{}, ErrEmptyContent
@@ -52,9 +54,17 @@ func ApplyChapterGeneration(c *Chapter, raw string) error {
 }
 func professionalScriptMarkdown(raw string) (string, error) {
 	cleaned := strings.TrimSpace(raw)
-	cleaned = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(cleaned, "```json"), "```"))
-	if !strings.HasPrefix(cleaned, "{") {
+	if !strings.HasPrefix(cleaned, "{") && !strings.HasPrefix(cleaned, "```json") {
+		// Legacy Markdown remains valid, but a prefixed professional JSON response
+		// must not silently become an editable plain-text script.
+		if strings.Contains(cleaned, "\"scenes\"") || strings.Contains(cleaned, "【转换自检】") {
+			return "", ErrAIInvalidJSON
+		}
 		return cleaned, nil
+	}
+	payload, err := decodeProfessionalScriptObject(cleaned)
+	if err != nil {
+		return "", err
 	}
 	var doc struct {
 		Episode int    `json:"episode_index"`
@@ -68,7 +78,7 @@ func professionalScriptMarkdown(raw string) (string, error) {
 			Content    []json.RawMessage `json:"script_content"`
 		} `json:"scenes"`
 	}
-	if json.Unmarshal([]byte(cleaned), &doc) != nil || len(doc.Scenes) == 0 {
+	if json.Unmarshal(payload, &doc) != nil || len(doc.Scenes) == 0 {
 		return "", ErrAIInvalidJSON
 	}
 	if doc.Episode <= 0 {
@@ -163,25 +173,72 @@ func renderScriptLibrary(ctx context.Context, store Store, owner, projectID, bod
 	return luoshui.Render(body, vars), nil
 }
 
-// editableScreenplayOutput supports independently generated JSON chapters while
-// keeping their exact joined responses in Document.RawResult.
-func editableScreenplayOutput(raw string) (string, error) {
-	cleaned := strings.TrimSpace(raw)
-	if !strings.HasPrefix(cleaned, "{") {
-		return professionalScriptMarkdown(raw)
-	}
-	decoder := json.NewDecoder(strings.NewReader(cleaned))
-	var parts []string
-	for decoder.More() {
-		var chapter json.RawMessage
-		if err := decoder.Decode(&chapter); err != nil {
-			return "", ErrAIInvalidJSON
-		}
-		text, err := professionalScriptMarkdown(string(chapter))
-		if err != nil {
+// Each provider response is parsed independently. Segment boundaries are never
+// inferred from self-check prose because that could swallow the next episode.
+func editableScreenplayOutput(raw string) (string, error) { return professionalScriptMarkdown(raw) }
+
+func selectedScreenplayOutput(raw, promptID string) (string, error) {
+	if promptID == prompt.CreativeScript144 {
+		if _, err := decodeProfessionalScriptObject(raw); err != nil {
 			return "", err
 		}
-		parts = append(parts, text)
 	}
-	return strings.Join(parts, "\n\n"), nil
+	return editableScreenplayOutput(raw)
+}
+
+func decodeProfessionalScriptObject(raw string) (json.RawMessage, error) {
+	cleaned := strings.TrimSpace(raw)
+	fenced := strings.HasPrefix(cleaned, "```json")
+	if fenced {
+		cleaned = strings.TrimSpace(strings.TrimPrefix(cleaned, "```json"))
+	}
+	if !strings.HasPrefix(cleaned, "{") {
+		return nil, ErrAIInvalidJSON
+	}
+	decoder := json.NewDecoder(strings.NewReader(cleaned))
+	var payload json.RawMessage
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, ErrAIInvalidJSON
+	}
+	tail := strings.TrimSpace(cleaned[decoder.InputOffset():])
+	if fenced {
+		if !strings.HasPrefix(tail, "```") {
+			return nil, ErrAIInvalidJSON
+		}
+		tail = strings.TrimSpace(strings.TrimPrefix(tail, "```"))
+	}
+	if tail != "" && !validConversionSelfCheck(tail) {
+		return nil, ErrAIInvalidJSON
+	}
+	return payload, nil
+}
+
+func validConversionSelfCheck(tail string) bool {
+	lines := strings.Split(strings.ReplaceAll(tail, "\r\n", "\n"), "\n")
+	if strings.TrimSpace(lines[0]) != "【转换自检】" {
+		return false
+	}
+	allowed := map[string]bool{"原文对话总数": true, "action元素总数": true, "场景总数": true, "element_id 是否连续无重复": true, "每集结构": true}
+	seen := map[string]bool{}
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// The report is plain text with the five documented field labels. It is
+		// not an arbitrary tail container and cannot contain a second JSON object.
+		if strings.ContainsAny(line, "{}[]") || strings.Contains(line, "```") {
+			return false
+		}
+		label, value, found := strings.Cut(line, "：")
+		if !found {
+			label, value, found = strings.Cut(line, ":")
+		}
+		label = strings.TrimSpace(label)
+		if !found || !allowed[label] || seen[label] || strings.TrimSpace(value) == "" {
+			return false
+		}
+		seen[label] = true
+	}
+	return len(seen) > 0
 }

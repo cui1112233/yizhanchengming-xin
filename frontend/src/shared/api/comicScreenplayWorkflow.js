@@ -64,3 +64,22 @@ export function importComicMediaPackage(id,file,expectedRevision,request=apiRequ
 }
 export const listComicMediaVoices=(id,request=apiRequest)=>read(id,'media/voices',request);
 export const downloadComicMediaResult=(id,jobId,request=apiRequest)=>request(comicWorkflowPath(id,`media/exports/${identifier(jobId,'导出任务')}`),{responseType:'blob'});
+
+
+export const getComicPositioning = (id, request = apiRequest) => read(id, 'positioning', request);
+export const saveComicPositioning = (id, input, request = apiRequest) => put(id, 'positioning', input, request);
+export function generateComicPositioningImage(id, itemId, input, request = apiRequest) {
+  const { signal, ...body } = input || {};
+  return request(comicWorkflowPath(id, `positioning/${identifier(itemId, '站位条目')}/image`), { method: 'POST', body: JSON.stringify(body), signal, timeoutMs: 0, suppressGlobalError: true });
+}
+export function analyzeComicPositioning(id, input, signal, request = apiRequest) {
+  return request(comicWorkflowPath(id, 'positioning/analyze'), { method: 'POST', body: JSON.stringify(input), timeoutMs: 0, signal, suppressGlobalError: true });
+}
+
+export function bindComicPositioningImage(id, itemId, input, request = apiRequest) {
+  return request(comicWorkflowPath(id, `positioning/${identifier(itemId, '站位条目')}/image/upload`), { method: 'POST', body: JSON.stringify(input) });
+}
+export function editComicPositioningImage(id, itemId, input, request = apiRequest) {
+  const { signal, ...body } = input || {};
+  return request(comicWorkflowPath(id, `positioning/${identifier(itemId, '站位条目')}/image/edit`), { method: 'POST', body: JSON.stringify(body), signal, timeoutMs: 0, suppressGlobalError: true });
+}

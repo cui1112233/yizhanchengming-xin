@@ -23,6 +23,7 @@ import (
 )
 
 type ScreenplayMediaWorkbench struct {
+	PositioningText    func(context.Context, string, screenplay.TextRequest) (screenplay.TextResponse, error)
 	Projects           screenplay.Store
 	Media              screenplay.MediaStore
 	Cut                aicut.Store

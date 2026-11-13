@@ -13,8 +13,8 @@ func TestCreativeChapterSelectedPromptAndLosslessJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(req.SystemPrompt, "{ROLES_PLACEHOLDER}") || !strings.Contains(req.SystemPrompt, "甲：主角") || !strings.Contains(req.SystemPrompt, "零遗漏") || !strings.Contains(req.UserPrompt, "水墨风格") || !strings.Contains(req.UserPrompt, "原文全文") || !req.JSONResponse {
-		t.Fatalf("request=%+v", req)
+	if strings.Contains(req.SystemPrompt, "{ROLES_PLACEHOLDER}") || !strings.Contains(req.SystemPrompt, "甲：主角") || !strings.Contains(req.SystemPrompt, "零遗漏") || !strings.Contains(req.UserPrompt, "水墨风格") || !strings.Contains(req.UserPrompt, "原文全文") || req.JSONResponse {
+		t.Fatal("selected script, asset library, style, source, or response mode mismatch")
 	}
 	raw := ` {"episode_index":1,"title":"测试","scenes":[{"scene_number":"1-1","location":"家","time":"日","indoor_outdoor":"内","characters":["甲"],"script_content":[{"element_type":"action","description":"门开了","extra":"保留"},{"element_type":"dialogue","character":"甲","content":"完整尾句。","emotion":"惊讶","is_voiceover":true}]}]} `
 	chapter := Chapter{}

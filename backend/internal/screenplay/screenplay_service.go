@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/prompt/luoshui"
 )
 
@@ -82,11 +81,12 @@ func (s *ScreenplayService) GenerateA1(ctx context.Context, req A1Request) (Scre
 	}
 
 	outputs := make([]string, 0, len(segments))
+	editableOutputs := make([]string, 0, len(segments))
 	for _, segment := range segments {
 		response, err := s.Generator.Generate(ctx, TextRequest{
 			Model:        defaultString(req.Model, project.ModelID),
 			SystemPrompt: systemPrompt,
-			JSONResponse: promptID == prompt.CreativeScript144,
+			JSONResponse: false,
 			UserPrompt:   styledAssetContent(project, luoshui.Render(segment, req.ExtraVars)),
 		})
 		if err != nil {
@@ -99,13 +99,18 @@ func (s *ScreenplayService) GenerateA1(ctx context.Context, req A1Request) (Scre
 		if output == "" {
 			return ScreenplayResult{}, ErrAIEmptyContent
 		}
+		editable, parseErr := selectedScreenplayOutput(response.Content, promptID)
+		if parseErr != nil {
+			return ScreenplayResult{}, parseErr
+		}
+		editableOutputs = append(editableOutputs, editable)
 		outputs = append(outputs, response.Content)
 	}
 	content = strings.Join(outputs, "\n\n")
 	if strings.TrimSpace(content) == "" {
 		return ScreenplayResult{}, ErrAIEmptyBody
 	}
-	return s.persist(ctx, req.Owner, req.ProjectID, "a1", content, len(segments))
+	return s.persistPrepared(ctx, req.Owner, req.ProjectID, "a1", content, strings.Join(editableOutputs, "\n\n"), len(segments))
 }
 
 func (s *ScreenplayService) GenerateB(ctx context.Context, req BRequest) (ScreenplayResult, error) {
@@ -136,7 +141,7 @@ func (s *ScreenplayService) GenerateB(ctx context.Context, req BRequest) (Screen
 	response, err := s.Generator.Generate(ctx, TextRequest{
 		Model:        defaultString(req.Model, project.ModelID),
 		SystemPrompt: systemPrompt,
-		JSONResponse: promptID == prompt.CreativeScript144,
+		JSONResponse: false,
 		UserPrompt:   styledAssetContent(project, luoshui.Render(userPrompt, req.ExtraVars)),
 	})
 	if err != nil {
@@ -149,13 +154,24 @@ func (s *ScreenplayService) GenerateB(ctx context.Context, req BRequest) (Screen
 	if output == "" {
 		return ScreenplayResult{}, ErrAIEmptyContent
 	}
-	return s.persist(ctx, req.Owner, req.ProjectID, "b", response.Content, 1)
+	editable, parseErr := selectedScreenplayOutput(response.Content, promptID)
+	if parseErr != nil {
+		return ScreenplayResult{}, parseErr
+	}
+	return s.persistPrepared(ctx, req.Owner, req.ProjectID, "b", response.Content, editable, 1)
 }
 
 func (s *ScreenplayService) persist(ctx context.Context, owner, projectID, source, content string, segmentCount int) (ScreenplayResult, error) {
 	editable, err := editableScreenplayOutput(content)
 	if err != nil {
 		return ScreenplayResult{}, err
+	}
+	return s.persistPrepared(ctx, owner, projectID, source, content, editable, segmentCount)
+}
+
+func (s *ScreenplayService) persistPrepared(ctx context.Context, owner, projectID, source, content, editable string, segmentCount int) (ScreenplayResult, error) {
+	if ctx.Err() != nil {
+		return ScreenplayResult{}, ctx.Err()
 	}
 	parsed := ParseScreenplayMarkdown(editable)
 	if len(parsed.Shots) == 0 || len(parsed.Episodes) == 0 {

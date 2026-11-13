@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { importComicMediaPackage } from '../../shared/api/comicScreenplayWorkflow.js';
 import { safeComicMediaUrl } from './comic-screenplay-workflow.js';
 
-export default function ComicScreenplayMediaTools({projectId,data,targets=[],readOnly=false,canGenerate=true,busy='',onAction,onRefresh,modelId,imageModelError='',imageModelLabel='',prompt,references=[]}){
+export default function ComicScreenplayMediaTools({projectId,data,targets=[],readOnly=false,canGenerate=true,busy='',onAction,onRefresh,modelId,imageModelError='',imageModelLabel='',prompt,references=[],initialBatchTargets=[]}){
  const [imageId,setImageId]=useState(''),[rows,setRows]=useState(2),[columns,setColumns]=useState(2),[bindings,setBindings]=useState([]),[batchTargets,setBatchTargets]=useState([]),[working,setWorking]=useState(''),[batchProgress,setBatchProgress]=useState('');
  const batchControl=useRef({cancelled:false});
+ const initialBatchKey=initialBatchTargets.join('|');
+ useEffect(()=>{setBatchTargets([...new Set(initialBatchTargets)]);},[initialBatchKey]);
  useEffect(()=>{const control={cancelled:false};batchControl.current=control;setWorking('');setBatchProgress('');return()=>{control.cancelled=true;};},[projectId]);
  const images=(data?.items||[]).filter(item=>item.kind==='image'&&item.status==='succeeded'&&item.assetId),selected=images.find(item=>item.id===imageId),disabled=readOnly||!!busy||!!working,batchDisabled=!canGenerate||!!busy||!!working||!!imageModelError,count=rows*columns;
  async function split(){if(disabled||!imageId)return;setWorking('split');try{await onAction('split_grid',{itemId:imageId,rows,columns,targetIds:Array.from({length:count},(_,index)=>bindings[index]||'')});}finally{setWorking('');}}

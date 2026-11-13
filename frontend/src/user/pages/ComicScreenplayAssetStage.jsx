@@ -1,0 +1,28 @@
+import { Alert, Button, Checkbox, Empty, Input, Select, Space, Tabs } from 'antd';
+import { ImageOff, LayoutGrid, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getComicMedia } from '../../shared/api/comicScreenplayWorkflow.js';
+import { apiRequest } from '../../shared/api/client.js';
+import { comicAssetMediaImage } from './comic-screenplay-stages.js';
+import AssetImage from './ComicScreenplayImage.jsx';
+import ComicScreenplayPositioningStage from './ComicScreenplayPositioningStage.jsx';
+import ComicScreenplayMediaPanel from './ComicScreenplayMediaPanel.jsx';
+
+const assetTabs = [{ key: 'character', label: '人物' }, { key: 'scene', label: '场景' }, { key: 'prop', label: '道具' }, { key: 'positioning', label: '站位' }, { key: 'voice', label: 'AI音色' }];
+export default function ComicScreenplayAssetStage({ projectId, workspace, readOnly, canGenerate, working, degree, onDegree, onAdd, onEdit, onDelete, onExtract, onMedia }) {
+  const [type, setType] = useState('character'), [query, setQuery] = useState(''), [compact, setCompact] = useState(false), [selected, setSelected] = useState([]), [visited,setVisited] = useState({character:true});
+  const [media, setMedia] = useState(null), [mediaError, setMediaError] = useState('');
+  useEffect(() => { let alive = true; const refresh = () => getComicMedia(projectId).then(data => { if (alive) { setMedia(data); setMediaError(''); } }).catch(error => { if (alive) setMediaError(error.message || '资产图片读取失败'); }); void refresh(); const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 10000); return () => { alive = false; clearInterval(timer); }; }, [projectId, workspace?.project?.revision]);
+  const assets = workspace?.assets || [], typed = assets.filter(item => item.type === type), filtered = typed.filter(item => `${item.name} ${item.description || ''}`.toLowerCase().includes(query.toLowerCase()));
+  const hasScript = !!workspace?.document?.content?.trim();
+  function imageFor(asset) { return comicAssetMediaImage(media,asset.id)?.url || ''; }
+  return <div className="comic-assets-stage"><Alert type="info" showIcon closable message="资产图片在视频生成过程中可以继续生成与更新；先核对人物、场景和道具的设定。" /><div className="comic-asset-tabs" role="tablist" aria-label="资产类型">{assetTabs.map(tab => <button type="button" role="tab" aria-selected={type === tab.key} className={type === tab.key ? 'is-active' : ''} key={tab.key} onClick={() => { setType(tab.key); setVisited(current=>({...current,[tab.key]:true})); setQuery(''); }}><span>{tab.label}</span>{!['voice','positioning'].includes(tab.key) ? <small>{assets.filter(item => item.type === tab.key).length}</small> : null}</button>)}</div>
+  <div hidden={type!=='positioning'}>{visited.positioning?<ComicScreenplayPositioningStage key={projectId} projectId={projectId} workspace={workspace} media={media} readOnly={readOnly} canGenerate={canGenerate} />:null}</div>
+  <div hidden={type!=='voice'}>{visited.voice?<ComicScreenplayMediaPanel key={projectId} projectId={projectId} workspace={workspace} readOnly={readOnly} canGenerate={canGenerate} onlyTab="audio" initialTab="audio" />:null}</div>
+  {!['positioning','voice'].includes(type)?<>
+    <div className="comic-asset-toolbar"><b>共 {typed.length} 个{assetTabs.find(tab => tab.key === type)?.label}</b><Input style={{ width: 180 }} prefix={<Search size={14} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索资产" allowClear /><Button aria-label="切换紧凑卡片" icon={<LayoutGrid size={15} />} onClick={() => setCompact(value => !value)}>{compact ? '标准卡片' : '紧凑卡片'}</Button><Button disabled={readOnly || !!working} icon={<Plus size={14} />} onClick={() => onAdd(type)}>新增{assetTabs.find(tab => tab.key === type)?.label}</Button><Select aria-label="资产解析程度" value={degree} onChange={onDegree} disabled={readOnly || !!working} options={[{value:'master',label:'大师 · 3D'},{value:'master_real',label:'大师 · 写实'},{value:'more_diff',label:'差异化'},{value:'standard',label:'标准'}]} /><Button disabled={!canGenerate || !!working || !hasScript} title={!hasScript ? '请先生成或导入并保存剧本' : undefined} loading={working === type} onClick={() => onExtract(type)}>资产分析</Button><Button disabled={!canGenerate || !selected.length} onClick={() => onMedia({ tab: 'tools', targetIds: selected })}>批量制作图片 {selected.length || ''}</Button></div>
+    {!hasScript ? <Alert type="info" showIcon message="可以先手动添加资产；资产分析前请回到剧本阶段，生成或导入并保存剧本。" /> : null}{mediaError ? <Alert type="warning" showIcon message={mediaError} /> : null}
+    <div className={`comic-picture-assets${compact ? ' is-compact' : ''}`}>{filtered.map(asset => <article key={asset.id} className="comic-picture-asset"><div className="comic-asset-thumb"><AssetImage src={imageFor(asset)} name={asset.name} /><Checkbox aria-label={`选择${asset.name}`} checked={selected.includes(asset.id)} onChange={event => setSelected(rows => event.target.checked ? [...new Set([...rows, asset.id])] : rows.filter(id => id !== asset.id))} /></div><div className="comic-picture-asset-copy"><b>{asset.name}</b><p>{asset.description || asset.identity || '尚未填写设定'}</p><Space wrap><Button size="small" disabled={readOnly || !!working} icon={<Pencil size={13} />} onClick={() => onEdit(asset)}>编辑</Button><Button size="small" disabled={!canGenerate} onClick={() => onMedia({ tab: 'images', targetId: asset.id })}>制作图片</Button><Button size="small" danger disabled={readOnly || !!working} icon={<Trash2 size={13} />} onClick={() => onDelete(asset.id)}>删除</Button></Space></div></article>)}</div>{!filtered.length ? <Empty description={query ? '没有匹配的资产' : '还没有此类资产，可以手动新增，或明确执行资产分析'} /> : null}
+  </>:null}
+  </div>;
+}

@@ -35,9 +35,13 @@ func (g screenplayTextGenerator) Generate(ctx context.Context, req screenplay.Te
 	if provider == nil {
 		return screenplay.TextResponse{}, screenplay.ErrAPIKeyMissing
 	}
+	maxTokens := req.MaxOutputTokens
+	if maxTokens <= 0 {
+		maxTokens = 16000
+	}
 	content, err := provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
 		SystemPrompt: req.SystemPrompt, UserPrompt: req.UserPrompt,
-		Temperature: req.Temperature, MaxTokens: req.MaxOutputTokens,
+		Temperature: req.Temperature, MaxTokens: maxTokens,
 		DisableJSONResponse: !req.JSONResponse,
 	})
 	return screenplay.TextResponse{Content: content, Model: req.Model}, err
