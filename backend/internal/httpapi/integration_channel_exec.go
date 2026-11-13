@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/imagecapacity"
 	"qiantie/backend/internal/safehttp"
 )
 
@@ -149,6 +150,9 @@ func resolveIntegrationImageCatalogEntry(ctx context.Context, userConfig *UserCo
 		"credential":  target.Credential,
 		"provider":    batchfactoryv11.VideoProviderPersonalAPI,
 		"enabled":     true,
+	}
+	if len(target.Params) > 0 {
+		entry["params"] = target.Params
 	}
 	if target.FullURL {
 		// 完整请求地址直接作为 endpoint，避免被再补一次 /images/generations。
@@ -337,12 +341,15 @@ func decodeIntegrationImageResponse(raw []byte, count int) ([]string, error) {
 		if imageURL == "" && strings.TrimSpace(item.B64JSON) != "" {
 			encoded := strings.TrimSpace(item.B64JSON)
 			decodedBytes, decodeErr := base64.StdEncoding.DecodeString(encoded)
-			if decodeErr != nil || len(decodedBytes) == 0 {
+			if decodeErr != nil || len(decodedBytes) == 0 || (imagecapacity.Enabled() && validateCapacityImageBytes(decodedBytes) != nil) {
 				return nil, fmt.Errorf("图片模型返回了无效图片数据")
 			}
 			imageURL = "data:" + detectedShuihuoImageMediaType(decodedBytes) + ";base64," + encoded
 		}
 		if imageURL != "" {
+			if err := validateCapacityImageURL(imageURL); err != nil {
+				return nil, err
+			}
 			imageURLs = append(imageURLs, imageURL)
 		}
 	}
@@ -356,7 +363,9 @@ func decodeIntegrationImageResponse(raw []byte, count int) ([]string, error) {
 }
 
 // generateIntegrationChannelImage 用渠道配置构造真实的 /images/generations 请求。
-func generateIntegrationChannelImage(ctx context.Context, target integrationChannelTarget, input AgentImageGenerationInput) ([]string, int, error) {
+func generateIntegrationChannelImage(ctx context.Context, target integrationChannelTarget, input AgentImageGenerationInput) (imageResultsOut []string, imageStatusOut int, imageReturnErr error) {
+	ctx, finishImage := beginImageRequestOperation(ctx)
+	defer func() { finishImage(imageReturnErr) }()
 	prompt := strings.TrimSpace(input.Prompt)
 	if prompt == "" {
 		return nil, http.StatusBadRequest, fmt.Errorf("图片生成提示词不能为空")
@@ -431,6 +440,7 @@ func generateIntegrationChannelImage(ctx context.Context, target integrationChan
 	if err != nil {
 		return nil, http.StatusBadGateway, err
 	}
+	confirmImageRequestResult(ctx)
 	if input.Count > 0 && len(images) < input.Count {
 		return nil, http.StatusBadGateway, fmt.Errorf("图片模型只返回了 %d 张图片，少于请求的 %d 张", len(images), input.Count)
 	}

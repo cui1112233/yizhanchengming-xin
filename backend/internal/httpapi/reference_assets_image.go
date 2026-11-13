@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -79,6 +81,16 @@ func registerReferenceAssetImageGenerateRoute(root *http.ServeMux, middleware Br
 			return
 		}
 		settings := readReferenceAssetImageSettingsForModel(req.Context(), store, identity.Username, catalogStore, toString(input["imageModelId"]))
+		operationCtx, finishImage := beginImageRequestOperation(req.Context())
+		req = req.WithContext(operationCtx)
+		imageSucceeded := false
+		defer func() {
+			if imageSucceeded {
+				finishImage(nil)
+			} else {
+				finishImage(fmt.Errorf("图片未完整取回"))
+			}
+		}()
 		missing := []string{}
 		for _, key := range []string{"base_url", "model", "api_key"} {
 			if strings.TrimSpace(toString(settings[key])) == "" {
@@ -114,14 +126,14 @@ func registerReferenceAssetImageGenerateRoute(root *http.ServeMux, middleware Br
 		if timeout < 30 {
 			timeout = 30
 		}
-		ctx, cancel := context.WithTimeout(req.Context(), time.Duration(timeout)*time.Second)
-		defer cancel()
+		ctx := req.Context()
 		upstreamReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(body)))
 		upstreamReq.Header.Set("Content-Type", "application/json")
 		upstreamReq.Header.Set("Authorization", "Bearer "+toString(settings["api_key"]))
 		response, err := safehttp.NewClientWithTimeout(time.Duration(timeout) * time.Second).Do(upstreamReq)
 		if err != nil {
-			if ctx.Err() != nil {
+			var networkErr net.Error
+			if ctx.Err() != nil || (errors.As(err, &networkErr) && networkErr.Timeout()) {
 				writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": fmt.Sprintf("图片AI请求超时（超过 %d 秒）", timeout), "code": "IMAGE_AI_TIMEOUT"})
 				return
 			}
@@ -143,10 +155,12 @@ func registerReferenceAssetImageGenerateRoute(root *http.ServeMux, middleware Br
 			return
 		}
 		assetType := strings.ToLower(strings.TrimSpace(toString(input["asset_type"])))
+		confirmImageRequestResult(operationCtx)
 		if !validReferenceAssetType(assetType) {
 			assetType = "character"
 		}
 		assetID := strings.TrimSpace(toString(input["asset_id"]))
+		imageSucceeded = true
 		if !validReferenceAssetID(assetID) {
 			assetID = "gen_" + fmt.Sprint(time.Now().Unix())
 		}

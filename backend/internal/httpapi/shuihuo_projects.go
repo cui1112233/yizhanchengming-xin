@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/imagecapacity"
 	"qiantie/backend/internal/imagegenerationcache"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
@@ -63,6 +64,7 @@ var shuihuoProductionConfigs sync.Map
 // ggwk 网关的长响应对并发连接敏感，擅自放大到 4/8 路会增加断流和
 // PROTOCOL_ERROR，实际反而更慢。统一配置和环境变量仍可在安全范围内调整。
 const shuihuoImageConcurrencyEnv = "QIANTIE_SHUHUO_IMAGE_CONCURRENCY"
+
 // 默认给到上限 4 路：按本串行出图后，一本书独占全部通道，4 路能把
 // 「30 页 × 单张 150~200s」从约 28 分钟压到约 8 分钟；用户仍可在
 // 统一配置里按通道情况下调到 1/2/3 路。
@@ -469,6 +471,9 @@ func shuihuoImageSemaphoreFromContext(ctx context.Context) *shuihuoImageSemaphor
 }
 
 func shuihuoImageConcurrencyFromContext(ctx context.Context) int {
+	if imagecapacity.Enabled() {
+		return 20
+	}
 	if ctx == nil {
 		return shuihuoImageGenerationConcurrency()
 	}
@@ -479,6 +484,9 @@ func shuihuoImageConcurrencyFromContext(ctx context.Context) int {
 }
 
 func acquireShuihuoGPTImageGenerationSlot(ctx context.Context, modelID string) (func(), error) {
+	if imagecapacity.Enabled() {
+		return func() {}, nil
+	}
 	if !shuihuoIsGPTImageModel(modelID) {
 		return func() {}, nil
 	}
@@ -3322,6 +3330,7 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
+	ctx = imagecapacity.WithIdentity(ctx, owner, batch.Books[0].ID)
 	wanted := make(map[string]bool, len(assetIDs))
 	for _, id := range assetIDs {
 		if id = strings.TrimSpace(id); id != "" {
@@ -3377,6 +3386,9 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 	// files have returned. This prevents one slow asset from making the whole
 	// "立即执行" flow look frozen.
 	assetImageConcurrency := comicAssetConcurrencyFromContext(ctx)
+	if imagecapacity.Enabled() {
+		assetImageConcurrency = 20
+	}
 	// 资产图与漫画页共用统一配置的出图并发上限。
 	workCtx := withShuihuoImageStage(withShuihuoImageConcurrency(ctx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault)), shuihuoImageStageAsset)
 	// 资产图与漫画页共用统一配置，水印设置也一并注入。
@@ -3541,6 +3553,9 @@ func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batch
 }
 
 func retryableShuihuoAssetImageTransportError(err error) bool {
+	if errors.Is(err, imagecapacity.ErrOutcomeUnknown) {
+		return false
+	}
 	if err == nil {
 		return false
 	}
@@ -3866,6 +3881,13 @@ func newShuihuoProviderImageRequest(ctx context.Context, endpoint, modelID, prom
 		return newShuihuoImageEditRequestWithResponseFormat(ctx, endpoint, modelID, prompt, shuihuoImageSizeForModel(modelID, aspectRatio), referenceImageURLs, responseFormat)
 	}
 	payload := map[string]any{"model": modelID, "prompt": prompt, "n": 1, "size": shuihuoImageSizeForModel(modelID, aspectRatio)}
+	if params, ok := model["params"].(map[string]any); ok {
+		for key, value := range params {
+			if key != "model" && key != "prompt" && key != "n" && key != "size" {
+				payload[key] = value
+			}
+		}
+	}
 	if strings.TrimSpace(responseFormat) != "" {
 		payload["response_format"] = responseFormat
 	}
@@ -3892,7 +3914,9 @@ func shuihuoImageResponseRejectsResponseFormat(raw []byte) bool {
 
 // requestShuihuoProviderImage 执行一次图片供应商请求（含排队、解码与落盘）。
 // 内容审核拒绝会返回 errShuihuoImageContentPolicy，由调用方决定是否降级重试。
-func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, model map[string]any, endpoint, credential, imagePrompt string, referenceImageURLs []string) (string, string, error) {
+func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, model map[string]any, endpoint, credential, imagePrompt string, referenceImageURLs []string) (imageMediaOut, imageStorageOut string, imageReturnErr error) {
+	ctx, finishImage := beginImageRequestOperation(ctx)
+	defer func() { finishImage(imageReturnErr) }()
 	size := shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)
 	useEdits := len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID)
 	outerAttempt := shuihuoImageOuterAttemptFromContext(ctx)
@@ -3917,7 +3941,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		}
 		queueStart := time.Now()
 		queueCtx, cancelQueue := shuihuoImageQueueContext(slotCtx)
-		releaseHostSlot, _, err := shuihuoAdaptiveImageLimiter.acquire(queueCtx, endpoint, configuredConcurrency)
+		releaseHostSlot, err := acquireLegacyHostImageSlot(queueCtx, endpoint, configuredConcurrency)
 		if err != nil {
 			cancelQueue()
 			queued := time.Since(queueStart)
@@ -4065,7 +4089,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		downloadElapsed = time.Since(downloadStart)
 		if err != nil {
 			// 图已经生成，只是 CDN 下载不下来：改用 base64 重发一次，跳开 CDN。
-			if errors.Is(err, errShuihuoImageDownloadUnusable) && responseFormat != "b64_json" && attempt < 2 {
+			if !imagecapacity.Enabled() && errors.Is(err, errShuihuoImageDownloadUnusable) && responseFormat != "b64_json" && attempt < 2 {
 				log.Printf("shuihuo image download unavailable; retrying with base64 model=%s", target.ModelID)
 				responseFormat = "b64_json"
 				continue
@@ -4073,6 +4097,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 			return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
 		}
 		// 统一配置启用水印时，在保存前叠加白底方框文字。
+		confirmImageRequestResult(ctx)
 		saveStart := time.Now()
 		imageBytes, mediaType = applyShuihuoImageWatermark(ctx, imageBytes, mediaType)
 		artifactID, err := localexecutor.NewArtifactID()
@@ -5206,6 +5231,7 @@ func shuihuoImageExtension(mediaType string) string {
 const shuihuoRelayImageRequestTimeout = 12 * time.Minute
 
 func generateShuihuoRelayImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, prompt string, references []string, baseURL, token, account string) (string, string, string, error) {
+	ctx = imagecapacity.WithoutSharedAdmission(ctx)
 	if token == "" {
 		return "", "", "", fmt.Errorf("%w: 中继通道缺少访问凭证，请在配置中补全", batchfactoryv11.ErrUnavailable)
 	}
@@ -5530,7 +5556,14 @@ func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Stor
 	return map[string]any{"id": artifactID, "status": "completed", "kind": "audio", "segmentId": segmentID, "mediaUrl": "/api/shuihuo-production/media/" + artifactID + "/download", "createdAt": entry["createdAt"]}, nil
 }
 
-func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID, modelID string, catalogStores ...novelfetchworkshop.Store) (map[string]any, error) {
+func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID, modelID string, catalogStores ...novelfetchworkshop.Store) (imageResultOut map[string]any, imageReturnErr error) {
+	bookID := batch.ID
+	if len(batch.Books) > 0 {
+		bookID = batch.Books[0].ID
+	}
+	ctx = imagecapacity.WithIdentity(ctx, owner, bookID)
+	ctx, finishImage := beginImageRequestOperation(ctx)
+	defer func() { finishImage(imageReturnErr) }()
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -5609,6 +5642,7 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 	if decodeErr != nil {
 		return nil, fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, decodeErr)
 	}
+	confirmImageRequestResult(ctx)
 	artifactID, err := localexecutor.NewArtifactID()
 	if err != nil {
 		return nil, err
@@ -5683,7 +5717,16 @@ func shuihuoImageSizeForModel(modelID, aspectRatio string) string {
 	}
 }
 
-func decodeShuihuoGeneratedImage(ctx context.Context, client *http.Client, b64, imageURL, credential, providerEndpoint string) (string, []byte, error) {
+func decodeShuihuoGeneratedImage(ctx context.Context, client *http.Client, b64, imageURL, credential, providerEndpoint string) (mediaOut string, dataOut []byte, imageDecodeErr error) {
+	defer func() {
+		if imagecapacity.Enabled() && imageDecodeErr == nil {
+			if err := validateCapacityImageBytes(dataOut); err != nil {
+				mediaOut = ""
+				dataOut = nil
+				imageDecodeErr = err
+			}
+		}
+	}()
 	encoded := strings.TrimSpace(b64)
 	if encoded != "" {
 		if strings.HasPrefix(strings.ToLower(encoded), "data:") {

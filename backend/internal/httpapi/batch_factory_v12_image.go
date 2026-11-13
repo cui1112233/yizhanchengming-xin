@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/imagecapacity"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/safehttp"
 )
@@ -61,7 +62,10 @@ func configuredBatchImage(ctx context.Context, store batchfactoryv11.Store, cata
 	return map[string]any{"ok": true, "imageUrl": results[0]}, http.StatusOK, nil
 }
 
-func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, owner string, input AgentImageGenerationInput) ([]string, int, error) {
+func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, owner string, input AgentImageGenerationInput) (imageResultsOut []string, imageStatusOut int, imageReturnErr error) {
+	ctx = imageRequestIdentity(ctx, owner, input.ProjectID)
+	ctx, finishImage := beginImageRequestOperation(ctx)
+	defer func() { finishImage(imageReturnErr) }()
 	prompt := strings.TrimSpace(input.Prompt)
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
@@ -172,12 +176,15 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 		if imageURL == "" && strings.TrimSpace(item.B64JSON) != "" {
 			encoded := strings.TrimSpace(item.B64JSON)
 			decodedBytes, decodeErr := base64.StdEncoding.DecodeString(encoded)
-			if decodeErr != nil || len(decodedBytes) == 0 {
+			if decodeErr != nil || len(decodedBytes) == 0 || (imagecapacity.Enabled() && validateCapacityImageBytes(decodedBytes) != nil) {
 				return nil, http.StatusBadGateway, fmt.Errorf("图片模型返回了无效图片数据")
 			}
 			imageURL = "data:" + detectedShuihuoImageMediaType(decodedBytes) + ";base64," + encoded
 		}
 		if imageURL != "" {
+			if err := validateCapacityImageURL(imageURL); err != nil {
+				return nil, http.StatusBadGateway, err
+			}
 			imageURLs = append(imageURLs, imageURL)
 		}
 	}
@@ -190,5 +197,6 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 	if input.Count > 0 && len(imageURLs) > input.Count {
 		imageURLs = imageURLs[:input.Count]
 	}
+	confirmImageRequestResult(ctx)
 	return imageURLs, http.StatusOK, nil
 }

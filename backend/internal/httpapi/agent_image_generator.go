@@ -51,6 +51,7 @@ func agentLocalDoubaoImageModelForQuality(quality string) string {
 
 func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, executors *localexecutor.Service, files *localartifact.Store, assets agentworkspace.AssetStore, references agentworkspace.ReferenceURLProvider) AgentImageGenerator {
 	return func(ctx context.Context, owner string, input AgentImageGenerationInput) ([]string, int, error) {
+		ctx = imageRequestIdentity(ctx, owner, input.ProjectID)
 		// channel:/custom: 候选走 API 接口配置里的地址、Key 和模型名。
 		if target, matched, err := integrationChannelTargetFor(ctx, userConfig, owner, input.ModelID); matched {
 			if err != nil {

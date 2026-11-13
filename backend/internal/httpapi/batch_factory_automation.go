@@ -3451,6 +3451,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 			// 每本书一个可取消上下文：停滞看门狗只跳过这一本书，其它书的
 			// goroutine 继续跑；取消原因用于区分「停滞」与上游错误。
 			bookCtx, bookCancel := context.WithCancelCause(ctx)
+			bookCtx = imageRequestIdentity(bookCtx, owner, book.ID)
 			defer bookCancel(nil)
 			ctx := bookCtx
 			var entryLogMu sync.Mutex

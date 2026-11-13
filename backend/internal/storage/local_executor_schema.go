@@ -123,5 +123,6 @@ func AppMigrations() []Migration {
 	out = append(out, AutomationMigrations()...)
 	out = append(out, ScreenplayMigrations()...)
 	out = append(out, NovelCreationMigrations()...)
+	out = append(out, ImageCapacityMigrations()...)
 	return out
 }

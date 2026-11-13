@@ -19,6 +19,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/ffmpegbin"
 	"qiantie/backend/internal/giantmaterialexecutor"
+	"qiantie/backend/internal/imagecapacity"
 	"qiantie/backend/internal/imagegenerationcache"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
@@ -116,6 +117,7 @@ type RouterOptions struct {
 	AgentAssets               agentworkspace.AssetStore
 	AgentAssetObjects         agentworkspace.AssetObjectStore
 	RedisURL                  string
+	ImageCapacity             *imagecapacity.Controller
 	LocalExecutors            *localexecutor.Service
 	GiantMaterialExecutor     *giantmaterialexecutor.Service
 	GiantMaterialResolver     GiantMaterialResolver
@@ -493,6 +495,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	registerReferenceAssetImageGenerateRoute(root, auth, options.UserConfigStore, runtimeCatalogStore, options.LocalExecutors)
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore, options.NovelFetchStore, options.MemberProfileStore)
 	registerAPIIntegrationRoutes(root, auth, options.UserConfigStore, options.AuthStore, options.MemberProfileStore)
+	registerImageCapacityRoutes(root, auth, options)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
 	RegisterNovelFetchUploadSessionCompat(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)

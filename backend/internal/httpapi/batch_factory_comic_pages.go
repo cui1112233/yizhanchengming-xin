@@ -1354,6 +1354,7 @@ func missingComicPageWorkItems(generationVideos []batchfactoryv11.Video, pages [
 }
 
 func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.ComicCollection, error) {
+	ctx = imageRequestIdentity(ctx, owner, bookID)
 	detachedCtx, cancel := comicBookGenerationContext(ctx)
 	defer cancel()
 	ctx = detachedCtx
@@ -1379,6 +1380,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	// 出图并发来自统一配置，漫画资产图与漫画页共用同一个上限。
 	imageConcurrency := shuihuoClampImageConcurrency(comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
+	imageConcurrency = imageRequestWorkerCount(imageConcurrency)
 	ctx = withShuihuoImageConcurrency(ctx, imageConcurrency)
 	provider := comicSettingString(effective, "imageProvider", "")
 	modelID := comicSettingString(effective, "imageModelId", "")
@@ -1494,7 +1496,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	// "立即执行" flow look stuck even though the provider was working. Keep
 	// page order for the final collection, while allowing several page workers
 	// to queue; the provider limit is the configured image concurrency above.
-	const pageWorkers = 5
+	pageWorkers := imageRequestWorkerCount(5)
 	if progress != nil {
 		progress("comic_images", fmt.Sprintf("准备并发生成漫画图片（已完成 %d/%d 张，出图并发 %d 路）", completedPages, totalPages, imageConcurrency))
 	}

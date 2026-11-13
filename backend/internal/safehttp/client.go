@@ -5,9 +5,56 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"syscall"
 	"time"
 )
+
+var outboundDecorator struct {
+	sync.RWMutex
+	wrap    func(http.RoundTripper) http.RoundTripper
+	managed func(http.RoundTripper, time.Duration) http.RoundTripper
+}
+
+// SetManagedOutboundDecorator moves request timeout ownership inside admission,
+// so time spent waiting for capacity cannot consume a paid provider deadline.
+func SetManagedOutboundDecorator(wrap func(http.RoundTripper, time.Duration) http.RoundTripper) func() {
+	outboundDecorator.Lock()
+	previous := outboundDecorator.managed
+	outboundDecorator.managed = wrap
+	outboundDecorator.Unlock()
+	return func() { outboundDecorator.Lock(); outboundDecorator.managed = previous; outboundDecorator.Unlock() }
+}
+func managedOutbound(base http.RoundTripper, timeout time.Duration) (http.RoundTripper, time.Duration) {
+	outboundDecorator.RLock()
+	wrap := outboundDecorator.managed
+	outboundDecorator.RUnlock()
+	if wrap != nil {
+		return wrap(base, timeout), 0
+	}
+	return decorateOutbound(base), timeout
+}
+
+// SetOutboundDecorator installs application-wide admission control without
+// replacing the underlying SSRF checks. Call once before serving requests.
+// The restoration closure is for isolated tests and application shutdown.
+func SetOutboundDecorator(wrap func(http.RoundTripper) http.RoundTripper) func() {
+	outboundDecorator.Lock()
+	previous := outboundDecorator.wrap
+	outboundDecorator.wrap = wrap
+	outboundDecorator.Unlock()
+	return func() { outboundDecorator.Lock(); outboundDecorator.wrap = previous; outboundDecorator.Unlock() }
+}
+
+func decorateOutbound(base http.RoundTripper) http.RoundTripper {
+	outboundDecorator.RLock()
+	wrap := outboundDecorator.wrap
+	outboundDecorator.RUnlock()
+	if wrap != nil {
+		return wrap(base)
+	}
+	return base
+}
 
 // Options 描述一个出站客户端。所有字段都可留空，留空时使用默认值。
 type Options struct {
@@ -38,9 +85,10 @@ func NewClient(options Options) *http.Client {
 	if redirects <= 0 {
 		redirects = DefaultMaxRedirects
 	}
+	transport, timeout := managedOutbound(newTransport(options), timeout)
 	return &http.Client{
 		Timeout:       timeout,
-		Transport:     newTransport(options),
+		Transport:     transport,
 		CheckRedirect: redirectPolicy(redirects),
 	}
 }
@@ -59,8 +107,9 @@ func NewClientWithTransport(timeout time.Duration, transport *http.Transport) *h
 // 但不设置整个请求的绝对总超时。适用于响应头已有独立超时、正文
 // 由调用方按「无数据进展」检测断流的大文件下载。
 func NewClientWithTransportWithoutTimeout(transport *http.Transport) *http.Client {
+	outbound, _ := managedOutbound(newTransport(Options{Transport: transport}), 0)
 	return &http.Client{
-		Transport:     newTransport(Options{Transport: transport}),
+		Transport:     outbound,
 		CheckRedirect: redirectPolicy(DefaultMaxRedirects),
 	}
 }
@@ -68,7 +117,8 @@ func NewClientWithTransportWithoutTimeout(transport *http.Transport) *http.Clien
 // NewTransport 只返回带防护的 Transport，供必须沿用“无整体超时、由调用方
 // context 控制”的 Client（例如大文件上传）使用。
 func NewTransport(options Options) http.RoundTripper {
-	return newTransport(options)
+	transport, _ := managedOutbound(newTransport(options), options.Timeout)
+	return transport
 }
 
 func newTransport(options Options) http.RoundTripper {
