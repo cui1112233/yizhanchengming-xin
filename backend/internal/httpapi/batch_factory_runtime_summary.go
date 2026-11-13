@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
@@ -84,6 +85,10 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 			if hasComicPages && len(book.Videos) > 0 {
 				pages, pagesErr := listComicPagesForView(r.Context(), comicStore, owner, batch.ID, book.ID, true)
 				if pagesErr == nil {
+					activity := comicPageActivityCounts(pages, time.Now())
+					stageSummary["comicImageGeneratingCount"] = activity.Generating
+					stageSummary["comicImageFailedCount"] = activity.Failed
+					stageSummary["comicImageInterruptedCount"] = activity.Interrupted
 					readiness := buildComicReadiness(book.Videos, pages, comicPageGenerationLimit)
 					stageSummary["comicImageReadyCount"] = readiness.PrimaryReadyCount
 					stageSummary["comicImageTotalCount"] = readiness.PagesTotal

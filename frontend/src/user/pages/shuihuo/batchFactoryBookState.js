@@ -80,7 +80,10 @@ export function bookFailureIsHistorical({ automationBook = null, lastFailed = nu
 
 export function batchFactoryAutomationRetryAction(status) {
   const queued = (Array.isArray(status?.books) ? status.books : []).filter(book => book?.retryRequested === true && taskState(book) !== 'completed').length;
-  const failed = Number(status?.counts?.failed || 0) + Number(status?.counts?.blocked || 0);
+  const rows = Array.isArray(status?.books) ? status.books : [];
+  const failed = rows.length
+    ? rows.filter(book => ['failed', 'blocked', 'stopped'].includes(taskState(book)) && book.stage !== 'published').length
+    : Number(status?.counts?.failed || 0) + Number(status?.counts?.blocked || 0);
   const terminal = ['failed', 'completed', 'stopped'].includes(String(status?.state || '').trim().toLowerCase());
   if (queued && terminal) {
     return { label: `重新启动重试（${queued}）`, disabled: false };

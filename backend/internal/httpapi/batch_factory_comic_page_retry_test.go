@@ -4,9 +4,19 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
+
+func TestFailedComicPagesIncludesOnlyExpiredGenerationLeases(t *testing.T) {
+	now := time.Date(2026, 11, 13, 10, 0, 0, 0, time.UTC)
+	pages := []batchfactoryv11.ComicPage{{VideoID: "old", Status: "generating", UpdatedAt: now.Add(-comicPageGenerationStaleAfter - time.Minute)}, {VideoID: "active", Status: "generating", UpdatedAt: now.Add(-time.Minute)}, {VideoID: "done", Status: "succeeded"}, {VideoID: "failed", Status: "generation_failed"}}
+	got := failedComicPages(pages, now)
+	if len(got) != 2 || got[0].videoID != "old" || got[1].videoID != "failed" {
+		t.Fatalf("retry must protect active/succeeded pages: %+v", got)
+	}
+}
 
 func TestFailedComicPagesKeepsOnlyGenerationFailed(t *testing.T) {
 	pages := []batchfactoryv11.ComicPage{

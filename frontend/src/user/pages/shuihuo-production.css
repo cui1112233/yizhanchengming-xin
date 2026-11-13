@@ -3356,8 +3356,8 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-novel-list-v13{min-width:780px!important;width:100%}
 .batch-factory-novel-list-v13 .batch-factory-novel-list-head,
 .batch-factory-novel-list-v13 .batch-factory-novel-list-row{
-  display:grid!important;grid-template-columns:56px minmax(240px,320px) minmax(96px,1.3fr) minmax(72px,1fr) minmax(64px,1fr) minmax(88px,1fr) 224px!important;
-  min-width:840px!important;width:100%;align-items:center
+  display:grid!important;grid-template-columns:56px minmax(240px,320px) minmax(96px,1.3fr) minmax(72px,1fr) minmax(64px,1fr) minmax(88px,1fr) 96px!important;
+  min-width:780px!important;width:100%;align-items:center
 }
 .batch-factory-novel-list-v13 .batch-factory-novel-list-head>span,
 .batch-factory-novel-list-v13 .batch-factory-novel-list-row>span{min-width:0;padding:8px 10px!important;border-right:1px solid var(--sh-line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3468,7 +3468,7 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
   .batch-factory-workbench > .batch-factory-automation-status-line{max-width:calc(100% - 24px);margin:6px 12px 0}
   .batch-factory-audio-options-v13{grid-template-columns:1fr}
   .batch-factory-novel-list-v13{min-width:700px!important}
-  .batch-factory-novel-list-v13 .batch-factory-novel-list-head,.batch-factory-novel-list-v13 .batch-factory-novel-list-row{grid-template-columns:52px minmax(170px,240px) minmax(96px,1.3fr) minmax(72px,1fr) minmax(64px,1fr) minmax(88px,1fr) 224px!important;min-width:780px!important}
+  .batch-factory-novel-list-v13 .batch-factory-novel-list-head,.batch-factory-novel-list-v13 .batch-factory-novel-list-row{grid-template-columns:52px minmax(170px,240px) minmax(96px,1.3fr) minmax(72px,1fr) minmax(64px,1fr) minmax(88px,1fr) 96px!important;min-width:700px!important}
   .batch-factory-follow-audio-control{justify-content:flex-start}.batch-factory-follow-audio-control small{text-align:left}
 }
 /* BF_AUDIO_PLANNING_V13_1_END */
@@ -5082,7 +5082,7 @@ body.shuihuo-reference-shell
   position: sticky;
   right: 0;
   z-index: 2;
-  min-width: 224px;
+  min-width: 96px;
   color: var(--text-primary);
   background: var(--frost-floating, var(--surface-2, #252e3c));
   backdrop-filter: var(--frost-floating-blur, blur(24px));
@@ -5095,7 +5095,7 @@ body.shuihuo-reference-shell
 }
 @media (max-width: 960px) {
   .batch-factory-novel-list-v13 .batch-factory-novel-list-head > span:nth-child(7),
-  .batch-factory-novel-list-v13 .batch-factory-novel-list-row > span:nth-child(7) { min-width: 224px; }
+  .batch-factory-novel-list-v13 .batch-factory-novel-list-row > span:nth-child(7) { min-width: 96px; }
 }
 
 /* 单书配置只在“真正偏离批次”的字段上挂一个短徽标，继承态完全不出文字。 */

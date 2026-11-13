@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
@@ -16,12 +17,16 @@ type failedComicPage struct {
 	input   batchfactoryv11.UpsertComicPageInput
 }
 
-// failedComicPages 收集需要重新出图的漫画页，只保留页级生成失败的记录，
-// 避免把已成功或仍在生成中的页面重复提交给上游（重复提交会重复计费）。
-func failedComicPages(pages []batchfactoryv11.ComicPage) []failedComicPage {
+// failedComicPages 只重试失败页或已超过现有安全租约的中断页。
+// 已成功和租约仍有效的在途页面不会重复提交给上游。
+func failedComicPages(pages []batchfactoryv11.ComicPage, at ...time.Time) []failedComicPage {
+	now := time.Now()
+	if len(at) > 0 {
+		now = at[0]
+	}
 	failed := make([]failedComicPage, 0, len(pages))
 	for _, page := range pages {
-		if page.Status != "generation_failed" {
+		if page.Status != "generation_failed" && !comicPageGenerationTaskIsStale(page, now) {
 			continue
 		}
 		failed = append(failed, failedComicPage{

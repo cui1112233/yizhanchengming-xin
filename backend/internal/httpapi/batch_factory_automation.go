@@ -5072,12 +5072,25 @@ func (c *BatchAutomationCoordinator) Cancel(owner, batchID string) error {
 			continue
 		}
 		stateValue := automationStringValue(job["state"], "")
-		if stateValue != "running" && stateValue != "paused" && stateValue != "scheduled" {
+		if stateValue != "running" && stateValue != "paused" && stateValue != "scheduled" && stateValue != "needs_attention" {
 			continue
 		}
 		job["state"], job["updatedAt"], job["stopAt"] = "stopped", c.now(), c.now()
 		job["lastError"] = "用户停止自动化"
-		job["counts"] = automationCounts(0, 0, 0, 0)
+		books, _ := job["books"].(map[string]any)
+		for _, raw := range books {
+			entry, _ := raw.(map[string]any)
+			if entry == nil {
+				continue
+			}
+			switch automationStringValue(entry["status"], "") {
+			case "completed", "failed", "blocked", "stopped":
+				continue
+			}
+			entry["status"], entry["updatedAt"] = "stopped", c.now()
+			entry["message"] = "本轮任务已结束，已有成果保留，可重新启动或重试未完成任务"
+		}
+		job["counts"] = automationCountsFromBooks(books)
 		clearAutomationRetryMarks(job)
 		state.Jobs[id] = job
 		stoppedIDs = append(stoppedIDs, id)
@@ -5358,6 +5371,10 @@ func (c *BatchAutomationCoordinator) control(owner, batchID, nextState string, a
 	if nextState == "running" && automationStringValue(target["state"], "") == "running" {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 任务正在执行，完成后再继续", batchfactoryv11.ErrConflict)
+	}
+	if nextState == "paused" && automationStringValue(target["state"], "") != "running" {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("%w: 当前任务未在执行，无需重复暂停", batchfactoryv11.ErrConflict)
 	}
 	target["state"], target["updatedAt"] = nextState, c.now()
 	if err := c.saveLocked(state); err != nil {
