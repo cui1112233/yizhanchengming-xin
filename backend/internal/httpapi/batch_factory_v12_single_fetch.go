@@ -704,6 +704,15 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		if r.ContentLength != 0 && !decodeJSON(w, r, &input) {
 			return
 		}
+		if isBatchCustomCopy(*book) {
+			original, err := reuseCustomCopyOriginal(r.Context(), store, owner, batch.ID, *book)
+			if err != nil {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "reused", "reused": true, "book": original, "length": len([]rune(original.SourceText)), "sourceMetadata": original.SourceMetadata})
+			return
+		}
 		retryProcessing := strings.EqualFold(stringValue(book.SourceMetadata["processingStatus"]), "failed") && strings.TrimSpace(book.TxtText) != ""
 		if !input.Force && !retryProcessing && strings.TrimSpace(book.SourceText) != "" {
 			writeJSON(w, http.StatusOK, map[string]any{

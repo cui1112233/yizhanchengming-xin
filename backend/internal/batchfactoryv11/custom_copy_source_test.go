@@ -16,6 +16,9 @@ func TestCustomCopyKeepsCompleteProductionText(t *testing.T) {
 	if parsed[0].BookID != id || parsed[0].Title != "青霄赴" || parsed[0].SourceMetadata["customCopyRecordId"] != "280893" {
 		t.Fatalf("lost selection: %+v", parsed[0])
 	}
+	if parsed[0].SourceMetadata["sourceContentVersion"] != "original" || parsed[0].SourceMetadata["sensitiveStatus"] != "skipped" {
+		t.Fatal("custom copy must use original without cleanup")
+	}
 	book := Book{SourceText: parsed[0].SourceText, SourceMetadata: parsed[0].SourceMetadata}
 	book.SourceMetadata["contentRangeLines"] = 5
 	if got := productionTextForBook(book); got != text {

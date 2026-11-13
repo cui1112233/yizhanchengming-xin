@@ -456,6 +456,10 @@ func ParseManualBookList(input ManualIntakeInput) ([]CreateBookInput, error) {
 		}
 		meta := map[string]any{"platformName": input.PlatformName, "gender": row.gender, "style": row.style, "tags": row.tags, "reason": row.reason, "rating": row.rating, "paidBookId": row.paidID, "freeBookId": row.freeID, "sourceLine": row.sourceLine, "parseMode": row.mode, "parseColumns": row.columns, "sourceMode": "manual_original"}
 		if fetchedMeta["sourceMode"] == "custom_copy" {
+			meta["sourceContentVersion"] = "original"
+			meta["processingStatus"] = "done"
+			meta["sensitiveStatus"] = "skipped"
+			meta["sensitiveSkipReason"] = "custom_copy"
 			for _, key := range []string{"sourceMode", "customCopyRecordId", "customCopyCreatedAt", "customCopyPlatform"} {
 				if value, ok := fetchedMeta[key].(string); ok {
 					meta[key] = value

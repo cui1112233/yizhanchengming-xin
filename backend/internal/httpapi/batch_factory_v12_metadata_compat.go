@@ -80,6 +80,16 @@ func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchf
 		results := make([]map[string]any, 0, len(batch.Books))
 		for _, book := range batch.Books {
 			row := map[string]any{"bookId": book.ID}
+			if isBatchCustomCopy(book) {
+				_, err := reuseCustomCopyOriginal(req.Context(), store, identity.Username, batchID, book)
+				row["status"] = "existing"
+				if err != nil {
+					row["status"] = "failed"
+					row["error"] = err.Error()
+				}
+				results = append(results, row)
+				continue
+			}
 			platform := firstMetadataString(book.SourceMetadata, "platformId", "platform_id")
 			if platform == "" {
 				platform = book.Platform
