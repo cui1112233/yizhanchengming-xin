@@ -688,7 +688,15 @@ func registerScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		writeJSON(w, http.StatusCreated, map[string]any{"batch": batch, "steps": screenplay.StepDefinitions})
 	})
 	handle("GET /api/comic-screenplays/projects/{id}/batch", func(w http.ResponseWriter, req *http.Request, owner string) {
+		if _, err := store.GetProject(req.Context(), owner, req.PathValue("id")); err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
 		batch, err := store.GetBatch(req.Context(), owner, req.PathValue("id"))
+		if errors.Is(err, screenplay.ErrNotFound) {
+			writeJSON(w, http.StatusOK, map[string]any{"batch": nil, "steps": screenplay.StepDefinitions, "logs": []screenplay.BatchLog{}})
+			return
+		}
 		if err != nil {
 			writeScreenplayError(w, err)
 			return

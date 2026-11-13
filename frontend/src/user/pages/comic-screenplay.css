@@ -21,6 +21,8 @@
 .comic-choice-check{display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px;width:18px;height:18px;border:1px solid var(--border-default);border-radius:50%}
 .is-active .comic-choice-check{background:var(--theme-primary);border-color:var(--theme-primary);color:var(--surface-base)}
 .comic-degree-cards.is-compact{grid-template-columns:1fr;margin:8px 0 0}
+.comic-screenplay-inspector{min-height:0;overflow-y:auto}
+.comic-inspector-field{margin-bottom:16px;color:var(--text-primary);font-size:13px}
 .comic-screenplay-page .asset-actions>.comic-degree-cards{flex-basis:100%;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:6px}
 .comic-style-current{display:flex;align-items:center;gap:4px;min-width:0}
 .comic-style-current .style-picker-trigger{width:100%;flex:1;min-width:0;text-align:left}

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,41 @@ import (
 	"testing"
 	"time"
 )
+
+type screenplayBatchFailureStore struct {
+	screenplay.Store
+}
+
+func (s screenplayBatchFailureStore) GetBatch(context.Context, string, string) (*screenplay.Batch, error) {
+	return nil, errors.New("database unavailable")
+}
+
+func TestScreenplayNewProjectBatchIsEmptyAndOwnershipIsChecked(t *testing.T) {
+	now := time.Now()
+	store := screenplay.NewMemoryStore()
+	_, err := store.CreateProject(context.Background(), screenplay.Project{ID: "new-project", OwnerUsername: "alice", Title: "新作品"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterScreenplayRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, store, nil, func() time.Time { return now })
+	rec := signedJSONRequest(t, mux, now, "alice", http.MethodGet, "/api/comic-screenplays/projects/new-project/batch", nil)
+	if rec.Code != 200 || !containsText(rec.Body.String(), `"batch":null`) || !containsText(rec.Body.String(), `"logs":[]`) || !containsText(rec.Body.String(), `"steps":`) {
+		t.Fatalf("empty batch=%d %s", rec.Code, rec.Body.String())
+	}
+	for _, tc := range []struct{ owner, id string }{{"bob", "new-project"}, {"alice", "missing"}} {
+		rec := signedJSONRequest(t, mux, now, tc.owner, http.MethodGet, "/api/comic-screenplays/projects/"+tc.id+"/batch", nil)
+		if rec.Code != 404 {
+			t.Fatalf("%s/%s batch=%d %s", tc.owner, tc.id, rec.Code, rec.Body.String())
+		}
+	}
+	failing := http.NewServeMux()
+	RegisterScreenplayRoutes(failing, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, screenplayBatchFailureStore{Store: store}, nil, func() time.Time { return now })
+	failed := signedJSONRequest(t, failing, now, "alice", http.MethodGet, "/api/comic-screenplays/projects/new-project/batch", nil)
+	if failed.Code != 500 {
+		t.Fatalf("real failure=%d %s", failed.Code, failed.Body.String())
+	}
+}
 
 func TestScreenplayInputStylesAndAtomicSource(t *testing.T) {
 	now := time.Now()
