@@ -1,10 +1,15 @@
 import { formatWorkDateTime } from '../../shared/workDateTime.js';
-import { Alert, Button, Empty, Input, message, Modal, Popconfirm, Select, Spin, Tabs, Upload } from 'antd';
+import { Alert, Button, Checkbox, Empty, Input, InputNumber, message, Modal, Popconfirm, Select, Spin, Tabs, Upload } from 'antd';
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Clapperboard, Clock3, Download, FileText, Grid2X2, History, LayoutGrid, PauseCircle, Pencil, Play, Plus, Search, Sparkles, Trash2, UploadCloud, Users, Map, Package, WandSparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplay, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, extractComicAssets, generateComicScreenplay, generateComicStoryboard, getComicScreenplayBatch, listComicScreenplayPrompts, listComicScreenplays, loadComicScreenplayWorkspace, mergeComicStoryboardShot, moveComicScreenplayShot, parseComicScreenplaySource, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from '../../shared/api/comicScreenplay.js';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
 import './comic-screenplay.css';
+import { getComicDisplay, listArchivedComics, listSharedComics, archiveComic, restoreComic, batchEditComicShots } from '../../shared/api/comicScreenplayWorkflow.js';
+import { ComicChaptersPanel, ComicAssistantPanel, ComicTeamDialog, ComicDisplayDialog } from './ComicScreenplayAuthoringPanels.jsx';
+import ComicScreenplayProductionPanel from './ComicScreenplayProductionPanel.jsx';
+import ComicScreenplayMediaPanel from './ComicScreenplayMediaPanel.jsx';
+import ComicScreenplayFileTools from './ComicScreenplayFileTools.jsx';
 import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-creation.js';
 import { ComicDegreeCards, ComicSourceInput, ComicStylePicker } from './ComicScreenplayCreationFields.jsx';
 import { parseComicScreenplayDraftSource } from '../../shared/api/comicScreenplay.js';
@@ -82,7 +87,13 @@ export default function ComicScreenplayPage() {
   const [selectedId, setSelectedId] = useState('');
   const [workspace, setWorkspace] = useState(null);
   const [working, setWorking] = useState('');
-  const [batchData, setBatchData] = useState(null);
+  const [access, setAccess] = useState(null);
+  const [display, setDisplay] = useState({editor_version:'studio',font_size:14,show_descriptions:true});
+  const [activeTab,setActiveTab] = useState('source');
+  const [teamOpen,setTeamOpen] = useState(false), [displayOpen,setDisplayOpen] = useState(false);
+  const [storyboardEngine,setStoryboardEngine] = useState('xiaoluo_v7_15s');
+  const [selectedShots,setSelectedShots] = useState({}), [bulkDuration,setBulkDuration] = useState(3);
+  const readOnly = !access?.edit, canGenerate = !!access?.generate;
   const [source, setSource] = useState('');
   const [createContent, setCreateContent] = useState('');
   const [sourceMode, setSourceMode] = useState('text');
@@ -106,16 +117,18 @@ export default function ComicScreenplayPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [documentDraft, setDocumentDraft] = useState('');
-  const abortRef = useRef(null);
+  const abortRef = useRef(null),sourceSavePromise=useRef(null);
+  const libraryRequest=useRef(0),projectRequest=useRef(0),selectedProject=useRef(''),libraryScope=useRef(scope);libraryScope.current=scope;
 
   async function refreshProjects() {
-    setLoading(true);
-    try { setProjects(await listComicScreenplays()); }
-    catch (error) { message.error(error.message || '漫剧项目读取失败'); }
-    finally { setLoading(false); }
+    if(scope!==libraryScope.current)return;
+    const ticket=++libraryRequest.current;setLoading(true);
+    try { const rows=scope==='team'?await listSharedComics():scope==='archived'?await listArchivedComics():await listComicScreenplays(); if(ticket===libraryRequest.current)setProjects(Array.isArray(rows)?rows:rows.projects||[]); }
+    catch (error) { if(ticket===libraryRequest.current)message.error(error.message || '漫剧项目读取失败'); }
+    finally { if(ticket===libraryRequest.current)setLoading(false); }
   }
 
-  useEffect(() => { void refreshProjects(); return () => { abortRef.current?.abort(); sourceImportGate.current.cancel(); }; }, []);
+  useEffect(() => {setProjects([]);void refreshProjects(); return () => {libraryRequest.current+=1; abortRef.current?.abort(); sourceImportGate.current.cancel(); }; }, [scope]);
   useEffect(() => { setDocumentDraft(workspace?.document?.content || ''); }, [workspace?.document?.id]);
 
   async function openCreateDialog() {
@@ -133,54 +146,62 @@ export default function ComicScreenplayPage() {
   }
 
   async function openProject(id) {
-    const switching = id !== selectedId;
-    setSelectedId(id); setLoading(true);
+    const ticket=++projectRequest.current;
+    const switching=id!==selectedProject.current;
+    selectedProject.current=id;setSelectedId(id);setLoading(true);
+    if(switching){setWorkspace(null);setAccess(null);setSelectedShots({});setShotEditor(null);setAssetEditor(null);setStoryboardShotEditor(null);setTeamOpen(false);setDisplayOpen(false);}
     try {
-      const data = await loadComicScreenplayWorkspace(id); setWorkspace(data);
-      setSource(data?.project?.source_text || '');
-      if (switching) setTaskWarnings([]);
-      const episodes = splitDocumentEpisodes(data?.document?.content);
-      setStoryboardEpisode(current => (episodes.some(item => item.no === current) ? current : episodes[0]?.no || 1));
-      setForm(current => ({ ...current, model: data?.project?.model_id || current.model, promptId: data?.project?.prompt_id || current.promptId, degree: data?.project?.asset_degree || current.degree, artStyle: data?.project?.art_style || '', selectedStyle: data?.project?.selected_style || data?.project?.art_style || '', aspectRatio: data?.project?.aspect_ratio || current.aspectRatio, scriptMode: data?.project?.script_mode || current.scriptMode }));
-      try { setBatchData(await getComicScreenplayBatch(id)); } catch { setBatchData(null); }
-    }
-    catch (error) { message.error(error.message || '工作台读取失败'); setSelectedId(''); }
-    finally { setLoading(false); }
+      const [data,authoring]=await Promise.all([loadComicScreenplayWorkspace(id),getComicDisplay(id)]);
+      if(ticket!==projectRequest.current||selectedProject.current!==id)return;
+      setWorkspace(data);setAccess(authoring.access||data.access);setSource(data?.project?.source_text||'');
+      if(switching){setTaskWarnings([]);const prefs=authoring.state?.display||{};setDisplay(prefs);setActiveTab(prefs.active_tab||'source');}
+      const episodes=splitDocumentEpisodes(data?.document?.content);
+      setStoryboardEpisode(current=>episodes.some(item=>item.no===current)?current:episodes[0]?.no||1);
+      setForm(current=>({...current,model:data?.project?.model_id||'',promptId:data?.project?.prompt_id||'b_director_screenplay',degree:data?.project?.asset_degree||'master',artStyle:data?.project?.art_style||'',selectedStyle:data?.project?.selected_style||data?.project?.art_style||'',aspectRatio:data?.project?.aspect_ratio||'9:16',scriptMode:data?.project?.script_mode||'b'}));
+    }catch(error){if(ticket===projectRequest.current){message.error(error.message||'工作台读取失败');selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);}}
+    finally{if(ticket===projectRequest.current)setLoading(false);}
   }
 
+  async function refreshCurrentProject(id){if(selectedProject.current===id)return openProject(id);}
+
   async function persistSource() {
-    if ([...source].length > 600000) throw new Error('原文超过 60 万字，请按章拆分后分批提交');
+    if(readOnly)return workspace?.project;
+    if([...source].length>600000)throw new Error('原文超过 60 万字，请按章拆分后分批提交');
+    if(source===workspace?.project?.source_text)return workspace.project;
+    const key=JSON.stringify([selectedId,source]);
+    if(sourceSavePromise.current?.key===key)return sourceSavePromise.current.promise;
     setSourceSaving(true);
-    try {
-      const project = await saveComicScreenplaySource(selectedId, source);
-      if (project) setWorkspace(current => (current ? { ...current, project } : current));
-      return project;
-    } finally { setSourceSaving(false); }
+    const id=selectedId;
+    const pending={key,promise:saveComicScreenplaySource(id,source).then(project=>{if(project&&selectedProject.current===id)setWorkspace(current=>current?{...current,project}:current);return project;}).finally(()=>{if(sourceSavePromise.current===pending){sourceSavePromise.current=null;setSourceSaving(false);}})};
+    sourceSavePromise.current=pending;return pending.promise;
   }
 
   async function saveSource() {
+    if(readOnly)return;
     if (!selectedId || sourceSaving) return;
     try { await persistSource(); message.success('原文已保存'); }
     catch (error) { message.error(error.message || '原文保存失败'); }
   }
 
   async function saveDocumentDraft() {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     if (!selectedId || working) return;
     try {
       setWorking('document-save');
       await saveComicScreenplayDocument(selectedId, documentDraft);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       message.success('剧本已保存为新版本');
     } catch (error) { message.error(error.message || '剧本保存失败'); }
     finally { setWorking(''); }
   }
 
   async function restoreDocumentVersion(documentId) {
+    if(readOnly)return;
     if (!selectedId || working) return;
     try {
       setWorking('document-restore');
       await restoreComicScreenplayDocument(selectedId, documentId);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       setVersionHistoryOpen(false);
       message.success('历史版本已恢复，并保存为新的当前版本');
     } catch (error) { message.error(error.message || '版本恢复失败'); }
@@ -188,6 +209,7 @@ export default function ComicScreenplayPage() {
   }
 
   async function saveSettings() {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     if (!selectedId || settingsSaving) return;
     const project = workspace?.project || {};
     try {
@@ -248,11 +270,12 @@ export default function ComicScreenplayPage() {
   }
 
   async function runTask(key, task) {
+    if(!canGenerate){message.info('尚未获准使用作品拥有者的生成服务');return;}
     if (working) return;
     const controller = new AbortController(); abortRef.current = controller; setWorking(key); setTaskWarnings([]);
     try {
       const result = await task(controller.signal);
-      setWorkspace(await loadComicScreenplayWorkspace(selectedId));
+      if(selectedProject.current!==selectedId)return;await refreshCurrentProject(selectedId);
       const warnings = collectWarnings(result);
       const partialFailure = describePartialFailure(result);
       if (partialFailure) {
@@ -266,7 +289,7 @@ export default function ComicScreenplayPage() {
       }
     }
     catch (error) {
-      if (error?.name === 'AbortError') message.info('已取消，本次生成的内容不会保存');
+      if (error?.name === 'AbortError') message.info('已停止等待，请刷新核对已保存结果后再决定是否重试');
       else message.error(error.message || '处理失败');
     }
     finally { if (abortRef.current === controller) abortRef.current = null; setWorking(''); }
@@ -277,7 +300,7 @@ export default function ComicScreenplayPage() {
     const fallback = String(workspace?.document?.content || source || '').trim();
     if (!episodes.length && !fallback) { message.error('请先生成或输入剧本'); return; }
     const project = workspace?.project || {};
-    const payload = { engine: 'xiaoluo_v7_15s', style: project.art_style || '', synopsis: project.synopsis || '', model: form.model };
+    const payload = { engine: storyboardEngine, style: project.art_style || '', synopsis: project.synopsis || '', model: form.model };
     if (!episodes.length) {
       payload.episodeNo = 1; payload.content = fallback;
     } else if (storyboardEpisode === 0) {
@@ -289,55 +312,19 @@ export default function ComicScreenplayPage() {
     return runTask('storyboard', signal => generateComicStoryboard(selectedId, { ...payload, signal }));
   }
 
-  async function startBatch() {
-    if (!selectedId || working) return;
-    const controller = new AbortController();
-    try {
-      abortRef.current = controller;
-      setWorking('batch');
-      let data = await startComicScreenplayBatch(selectedId);
-      setBatchData(data);
-      message.info('生产任务已启动，正在执行整条链路');
-      for (let attempt = 0; attempt < 64; attempt += 1) {
-        const status = data?.batch?.status;
-        if (['completed', 'failed', 'paused', 'waiting_user', 'awaiting_user'].includes(status)) break;
-        data = await runComicScreenplayBatchNext(selectedId, controller.signal);
-        setBatchData(current => ({ ...current, ...data }));
-      }
-      const latest = await getComicScreenplayBatch(selectedId);
-      setBatchData(latest);
-      setWorkspace(await loadComicScreenplayWorkspace(selectedId));
-      if (latest?.batch?.status === 'completed') message.success('漫剧生产链路已全部完成');
-      else if (latest?.batch?.status === 'waiting_user' || latest?.batch?.status === 'awaiting_user') message.warning('任务等待人工确认，请处理审核问题后继续');
-      else if (latest?.batch?.status === 'failed') message.error(latest?.batch?.last_error || '生产链路执行失败，已保留完成的产物');
-      else if (latest?.batch?.status === 'paused') message.info('生产任务已暂停，已完成的产物已保存');
-    }
-    catch (error) {
-      try { setBatchData(await getComicScreenplayBatch(selectedId)); } catch { /* 保留当前状态 */ }
-      if (error?.name === 'AbortError') message.info('已暂停，完成的产物已经保存');
-      else message.error(error.message || '生产任务执行失败');
-    }
-    finally { if (abortRef.current === controller) abortRef.current = null; setWorking(''); }
-  }
-
-  async function pauseBatch() {
-    try { abortRef.current?.abort(); setWorking('batch-cancel'); const data = await cancelComicScreenplayBatch(selectedId); setBatchData(current => ({ ...current, ...data })); message.success('生产任务已暂停'); }
-    catch (error) { message.error(error.message || '暂停失败'); }
-    finally { setWorking(''); }
-  }
-
   async function downloadExport() {
     try {
       setWorking('export');
       const data = await exportComicScreenplay(selectedId);
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' }));
       const link = document.createElement('a'); link.href = url; link.download = `${workspace?.project?.title || '漫剧项目'}.json`; link.click(); URL.revokeObjectURL(url);
-      message.success('项目包已导出');
+      message.success('项目数据已导出');
     } catch (error) { message.error(error.message || '导出失败'); }
     finally { setWorking(''); }
   }
 
   async function saveShot() {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     if (!shotEditor) return;
     try {
       setWorking('shot-save');
@@ -345,27 +332,29 @@ export default function ComicScreenplayPage() {
       if (shotEditor.id) await updateComicScreenplayShot(selectedId, shotEditor.id, input);
       else await createComicScreenplayShot(selectedId, input);
       setShotEditor(null);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       message.success(shotEditor.id ? '场次已保存' : '场次已新增');
     } catch (error) { message.error(error.message || '场次保存失败'); }
     finally { setWorking(''); }
   }
 
   async function moveShot(shotId, direction) {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     try {
       setWorking(`shot-${direction}`);
       await moveComicScreenplayShot(selectedId, shotId, direction);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       message.success(direction === 'up' ? '已上移' : '已下移');
     } catch (error) { message.error(error.message || '移动失败'); }
     finally { setWorking(''); }
   }
 
   async function removeShot(shotId) {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     try {
       setWorking('shot-delete');
       await deleteComicScreenplayShot(selectedId, shotId);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       message.success('场次已删除');
     } catch (error) { message.error(error.message || '删除失败'); }
     finally { setWorking(''); }
@@ -380,6 +369,7 @@ export default function ComicScreenplayPage() {
   }
 
   async function saveStoryboardShot() {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     if (!storyboardShotEditor || working) return;
     const editor = storyboardShotEditor;
     const input = {
@@ -404,6 +394,7 @@ export default function ComicScreenplayPage() {
   }
 
   async function runStoryboardShotAction(key, action, successText) {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     if (working) return;
     try {
       setWorking(key);
@@ -415,6 +406,7 @@ export default function ComicScreenplayPage() {
   }
 
   async function saveAsset() {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     if (!assetEditor) return;
     try {
       setWorking('asset-save');
@@ -422,24 +414,31 @@ export default function ComicScreenplayPage() {
       if (assetEditor.id) await updateComicScreenplayAsset(selectedId, assetEditor.id, input);
       else await createComicScreenplayAsset(selectedId, input);
       setAssetEditor(null);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       message.success(assetEditor.id ? '资产已保存' : '资产已新增');
     } catch (error) { message.error(error.message || '资产保存失败'); }
     finally { setWorking(''); }
   }
 
   async function removeAsset(assetId) {
+    if(readOnly){message.info('当前作品只有查看权限');return;}
     try {
       setWorking('asset-delete');
       await deleteComicScreenplayAsset(selectedId, assetId);
-      await openProject(selectedId);
+      await refreshCurrentProject(selectedId);
       message.success('资产已删除');
     } catch (error) { message.error(error.message || '资产删除失败'); }
     finally { setWorking(''); }
   }
 
+  async function bulkEdit(board,operation,order){
+    if(readOnly||working)return;
+    const ids=selectedShots[board.id]||[];
+    if(!ids.length&&operation!=='reorder'){message.info('请先选择镜头');return;}
+    try{setWorking('shots-bulk');const result=await batchEditComicShots(selectedId,board.engine,board.episode_no,{expected_revision:board.revision,operation,shot_ids:ids,duration:bulkDuration,order});replaceStoryboard(result.storyboard||result);setSelectedShots(current=>({...current,[board.id]:[]}));message.success('分镜修改已保存');}catch(error){message.error(error.message||'分镜修改失败');}finally{setWorking('');}
+  }
+
   const visibleProjects = useMemo(() => {
-    if (scope === 'team') return [];
     return projects
       .filter(item => item.title?.toLowerCase().includes(query.trim().toLowerCase()))
       .sort((a, b) => (sortOrder === 'desc' ? -1 : 1) * (new Date(a.updated_at) - new Date(b.updated_at)));
@@ -450,75 +449,63 @@ export default function ComicScreenplayPage() {
   if (selectedId) {
     const project = workspace?.project || projects.find(item => item.id === selectedId) || {};
     const assets = workspace?.assets || [];
-    return <div className="comic-screenplay-page comic-screenplay-workbench">
+    return <div className={`comic-screenplay-page comic-screenplay-workbench layout-${display.editor_version||'studio'} ${display.sidebar_collapsed?'sidebar-collapsed':''} ${display.show_descriptions===false?'hide-descriptions':''}`} style={{'--comic-body-size':`${display.font_size||14}px`}}>
       <header className="comic-screenplay-toolbar">
-        <Button type="text" icon={<ArrowLeft size={16} />} onClick={() => { abortRef.current?.abort(); setSelectedId(''); setWorkspace(null); }}>返回项目库</Button>
+        <Button type="text" icon={<ArrowLeft size={16} />} onClick={() => {abortRef.current?.abort();projectRequest.current+=1;selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);void refreshProjects();}}>返回项目库</Button>
         <div><strong>{project.title || '漫剧创作'}</strong><span>{project.aspect_ratio || '9:16'} · {project.art_style || '通用动漫'}</span></div>
         <div className="comic-screenplay-toolbar-actions">
-          {working ? <Button danger onClick={() => abortRef.current?.abort()}>取消任务</Button> : null}
-          <Button onClick={() => openProject(selectedId)}>刷新</Button>
+          {working && abortRef.current ? <Button danger onClick={() => abortRef.current?.abort()}>取消任务</Button> : null}
+          <Button disabled={readOnly} onClick={()=>setDisplayOpen(true)}>显示设置</Button>{access?.owner?<Button onClick={()=>setTeamOpen(true)}>团队权限</Button>:null}<Button onClick={() => openProject(selectedId)}>刷新</Button>
         </div>
       </header>
       <main className="comic-screenplay-main">
         <aside className="comic-screenplay-steps">
-          <div className="step-card is-active"><FileText size={18} /><div><b>1. 剧本</b><span>输入或导入原文，生成分集剧本</span></div></div>
-          <div className="step-card"><Users size={18} /><div><b>2. 资产</b><span>角色、场景、道具</span></div></div>
-          <div className="step-card"><Clapperboard size={18} /><div><b>3. 分镜</b><span>逐集生成镜头组</span></div></div>
-          <div className="step-card"><WandSparkles size={18} /><div><b>4. 生产</b><span>图片、视频、旁白与导出</span></div></div>
+          {[['source','原文与剧本',FileText],['chapters','章节规划',FileText],['assets','资产库',Users],['storyboard','分镜工作台',Clapperboard],['production','自动生产',WandSparkles],['media','媒体与交付',Package],['assistant','作品助手',Sparkles]].map(([key,label,Icon],index)=><button type="button" key={key} className={`step-card ${activeTab===key?'is-active':''}`} onClick={()=>setActiveTab(key)}><Icon size={18}/><b>{index+1}. {label}</b></button>)}
         </aside>
         <section className="comic-screenplay-content">
           {taskWarnings.length ? <Alert type="warning" showIcon closable onClose={() => setTaskWarnings([])} message={`本次处理有 ${taskWarnings.length} 条警告`} description={<ul style={{ margin: 0, paddingLeft: 18 }}>{taskWarnings.map((item, index) => <li key={index}>{item}</li>)}</ul>} style={{ marginBottom: 12 }} /> : null}
-          <Tabs items={[
-            { key: 'source', label: '原文与剧本', children: <div className="screenplay-editor-grid"><div className="editor-pane"><div className="pane-title">原文</div><Input.TextArea value={source} onChange={event => setSource(event.target.value)} onBlur={() => { if (selectedId && source) void persistSource().catch(error => message.error(error.message || '原文保存失败')); }} placeholder="粘贴小说正文，或上传 TXT / DOCX 文件" autoSize={{ minRows: 18 }} /><div className="asset-actions"><Upload accept=".txt,.docx" beforeUpload={file => { void parseComicScreenplaySource(selectedId, file).then(async content => { setSource(content); await saveComicScreenplaySource(selectedId, content); message.success('原文已读取并保存'); }).catch(error => message.error(error.message || '文件读取失败')); return false; }} showUploadList={false}><Button icon={<UploadCloud size={16} />}>上传 TXT / DOCX</Button></Upload><Button loading={sourceSaving} onClick={saveSource}>保存原文</Button><Button type="primary" icon={<Sparkles size={16} />} loading={working === 'script'} onClick={() => runTask('script', async signal => { await persistSource(); return generateComicScreenplay(selectedId, { mode: form.scriptMode, content: source, model: form.model, promptId: form.promptId, signal }); })}>生成分集剧本</Button></div></div><div className="editor-pane"><div className="pane-title"><span>当前剧本 · v{workspace?.document?.version || 0}</span><Button size="small" icon={<History size={14} />} onClick={() => setVersionHistoryOpen(true)}>版本历史</Button></div><Input.TextArea className="screenplay-output screenplay-document-editor" value={documentDraft} onChange={event => setDocumentDraft(event.target.value)} placeholder="生成后可在这里继续修改剧本" autoSize={{ minRows: 18 }} /><div className="asset-actions"><Button type="primary" loading={working === 'document-save'} disabled={!workspace?.document} onClick={saveDocumentDraft}>保存新版本</Button></div></div></div> },
-            { key: 'assets', label: `资产库 ${assets.length}`, children: <div><div className="asset-actions"><ComicDegreeCards value={form.degree} onChange={degree => setForm(current => ({ ...current, degree }))} /><Button icon={<Plus size={16} />} onClick={() => setAssetEditor({ type: 'character', degree: form.degree, name: '', identity: '', description: '', prompt: '', voice: '', episodes: '', tag: '' })}>新增资产</Button><Button icon={<Users size={16} />} onClick={() => runTask('character', signal => extractComicAssets(selectedId, { type: 'character', degree: form.degree, content: workspace?.document?.content || source, model: form.model, signal }))}>提取角色</Button><Button icon={<Map size={16} />} onClick={() => runTask('scene', signal => extractComicAssets(selectedId, { type: 'scene', degree: form.degree, content: workspace?.document?.content || source, model: form.model, signal }))}>提取场景</Button><Button icon={<Package size={16} />} onClick={() => runTask('prop', signal => extractComicAssets(selectedId, { type: 'prop', degree: form.degree, content: workspace?.document?.content || source, model: form.model, signal }))}>提取道具</Button></div><div className="asset-grid">{assets.length ? assets.map(asset => <article key={asset.id} className="asset-card"><span>{assetTypeOptions.find(item => item.value === asset.type)?.label || asset.type}</span><b>{asset.name}</b><p>{asset.description || asset.identity || '暂无描述'}</p><div className="asset-card-actions"><Button size="small" icon={<Pencil size={14} />} onClick={() => setAssetEditor({ id: asset.id, revision: asset.revision, type: asset.type, degree: asset.degree, name: asset.name, identity: asset.identity || '', description: asset.description || '', prompt: asset.prompt || '', voice: asset.voice || '', episodes: asset.episodes || '', tag: asset.tag || '' })}>编辑</Button><Popconfirm title="删除这个资产？" description="删除后不可恢复" onConfirm={() => removeAsset(asset.id)}><Button size="small" danger icon={<Trash2 size={14} />}>删除</Button></Popconfirm></div></article>) : <Empty description="尚未提取或新增资产" />}</div></div> },
-            { key: 'storyboard', label: '分镜工作台', children: <div>
+          <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
+            { key: 'source', label: '原文与剧本', children: <div className="screenplay-editor-grid"><div className="editor-pane"><div className="pane-title">原文</div><Input.TextArea readOnly={readOnly} value={source} onChange={event => setSource(event.target.value)} onBlur={() => { if (!readOnly && selectedId && source && source!==workspace?.project?.source_text) void persistSource().catch(error => message.error(error.message || '原文保存失败')); }} placeholder="粘贴小说正文，或上传 TXT / DOCX 文件" autoSize={{ minRows: 18 }} /><div className="asset-actions"><Upload disabled={readOnly||!!working} accept=".txt,.docx" beforeUpload={file => {if(readOnly)return false; void parseComicScreenplaySource(selectedId, file).then(async content => { const id=selectedId;const project=await saveComicScreenplaySource(id,content);if(selectedProject.current===id){setSource(content);setWorkspace(current=>current?{...current,project}:current);message.success('原文已读取并保存');} }).catch(error => message.error(error.message || '文件读取失败')); return false; }} showUploadList={false}><Button disabled={readOnly||!!working} icon={<UploadCloud size={16} />}>上传 TXT / DOCX</Button></Upload><Button disabled={readOnly} loading={sourceSaving} onClick={saveSource}>保存原文</Button><Button disabled={!canGenerate} type="primary" icon={<Sparkles size={16} />} loading={working === 'script'} onClick={() => runTask('script', async signal => { if(!readOnly)await persistSource(); return generateComicScreenplay(selectedId, { mode: form.scriptMode, content: source, model: form.model, promptId: form.promptId, signal }); })}>生成分集剧本</Button></div></div><div className="editor-pane"><div className="pane-title"><span>当前剧本 · v{workspace?.document?.version || 0}</span><Button size="small" icon={<History size={14} />} onClick={() => setVersionHistoryOpen(true)}>版本历史</Button></div><Input.TextArea readOnly={readOnly} className="screenplay-output screenplay-document-editor" value={documentDraft} onChange={event => setDocumentDraft(event.target.value)} placeholder="生成后可在这里继续修改剧本" autoSize={{ minRows: 18 }} /><div className="asset-actions"><Button type="primary" loading={working === 'document-save'} disabled={readOnly||!workspace?.document} onClick={saveDocumentDraft}>保存新版本</Button></div></div></div> },
+            { key: 'assets', label: `资产库 ${assets.length}`, children: <div><div className="asset-actions"><ComicDegreeCards value={form.degree} onChange={degree => setForm(current => ({ ...current, degree }))} /><Button disabled={readOnly||!!working} icon={<Plus size={16} />} onClick={() => setAssetEditor({ type: 'character', degree: form.degree, name: '', identity: '', description: '', prompt: '', voice: '', episodes: '', tag: '' })}>新增资产</Button><Button disabled={!canGenerate||!!working} icon={<Users size={16} />} onClick={() => runTask('character', signal => extractComicAssets(selectedId, { type: 'character', degree: form.degree, content: workspace?.document?.content || source, model: form.model, signal }))}>提取角色</Button><Button disabled={!canGenerate||!!working} icon={<Map size={16} />} onClick={() => runTask('scene', signal => extractComicAssets(selectedId, { type: 'scene', degree: form.degree, content: workspace?.document?.content || source, model: form.model, signal }))}>提取场景</Button><Button disabled={!canGenerate||!!working} icon={<Package size={16} />} onClick={() => runTask('prop', signal => extractComicAssets(selectedId, { type: 'prop', degree: form.degree, content: workspace?.document?.content || source, model: form.model, signal }))}>提取道具</Button></div><div className="asset-grid">{assets.length ? assets.map(asset => <article key={asset.id} className="asset-card"><span>{assetTypeOptions.find(item => item.value === asset.type)?.label || asset.type}</span><b>{asset.name}</b><p>{asset.description || asset.identity || '暂无描述'}</p><div className="asset-card-actions"><Button disabled={readOnly||!!working} size="small" icon={<Pencil size={14} />} onClick={() => setAssetEditor({ id: asset.id, revision: asset.revision, type: asset.type, degree: asset.degree, name: asset.name, identity: asset.identity || '', description: asset.description || '', prompt: asset.prompt || '', voice: asset.voice || '', episodes: asset.episodes || '', tag: asset.tag || '' })}>编辑</Button><Popconfirm title="删除这个资产？" description="删除后不可恢复" onConfirm={() => removeAsset(asset.id)}><Button disabled={readOnly||!!working} size="small" danger icon={<Trash2 size={14} />}>删除</Button></Popconfirm></div></article>) : <Empty description="尚未提取或新增资产" />}</div></div> },
+            { key: 'storyboard', label: '分镜工作台', children: <div><ComicScreenplayFileTools key={selectedId} projectId={selectedId} workspace={workspace} readOnly={readOnly} onSaved={()=>selectedProject.current===selectedId?openProject(selectedId):undefined}/>
               <div className="asset-actions">
                 <Select style={{ minWidth: 150 }} value={storyboardEpisode} onChange={setStoryboardEpisode} options={documentEpisodes.length ? [...documentEpisodes.map(item => ({ value: item.no, label: `第 ${item.no} 集` })), { value: 0, label: '全部集' }] : [{ value: 1, label: '第 1 集（全文）' }]} />
-                <Button type="primary" loading={working === 'storyboard'} onClick={startStoryboard}>生成 CM 分镜</Button>
-                <Button icon={<Plus size={16} />} onClick={() => setShotEditor({ episodeNo: storyboardEpisode || 1, heading: '', scriptText: '', characters: '', scene: '', props: '' })}>新增场次</Button>
+                <Select aria-label="分镜引擎" value={storyboardEngine} onChange={setStoryboardEngine} options={[{value:'xiaoluo_v7_15s',label:'小罗 · 15秒镜头组'},{value:'xiaoyunque_v3',label:'小云雀 V3 分镜'}]}/><Button disabled={!canGenerate} type="primary" loading={working === 'storyboard'} onClick={startStoryboard}>生成 CM 分镜</Button>
+                <Button disabled={readOnly||!!working} icon={<Plus size={16} />} onClick={() => setShotEditor({ episodeNo: storyboardEpisode || 1, heading: '', scriptText: '', characters: '', scene: '', props: '' })}>新增场次</Button>
               </div>
               <p style={{ margin: '0 0 12px', color: '#8a8f99' }}>{documentEpisodes.length ? '按集生成：只提交选中集的内容；选「全部集」会逐集提交。' : '未检测到「# 第N集」标题，将按第 1 集提交全文。'}</p>
               <div className="shot-editor-list">{(workspace?.shots || []).length ? workspace.shots.map((shot, index) => <article key={shot.id} className="shot-editor-card">
                 <div><span>第 {shot.episode_no} 集 · 场次 {shot.sort_order}</span><b>{shot.heading || '未命名场次'}</b><p>{shot.script_text || '暂无内容'}</p></div>
                 <div className="shot-editor-actions">
-                  <Button aria-label="上移场次" icon={<ArrowUp size={15} />} disabled={working || index === 0 || workspace.shots[index - 1]?.episode_no !== shot.episode_no} onClick={() => moveShot(shot.id, 'up')} />
-                  <Button aria-label="下移场次" icon={<ArrowDown size={15} />} disabled={working || index === workspace.shots.length - 1 || workspace.shots[index + 1]?.episode_no !== shot.episode_no} onClick={() => moveShot(shot.id, 'down')} />
-                  <Button aria-label="编辑场次" icon={<Pencil size={15} />} onClick={() => setShotEditor({ id: shot.id, episodeNo: shot.episode_no, heading: shot.heading, scriptText: shot.script_text, characters: (shot.characters || []).join('、'), scene: shot.scene || '', props: (shot.props || []).join('、') })} />
-                  <Popconfirm title="删除这个场次？" description="删除后不可恢复" onConfirm={() => removeShot(shot.id)}><Button danger aria-label="删除场次" icon={<Trash2 size={15} />} /></Popconfirm>
+                  <Button aria-label="上移场次" icon={<ArrowUp size={15} />} disabled={readOnly || working || index === 0 || workspace.shots[index - 1]?.episode_no !== shot.episode_no} onClick={() => moveShot(shot.id, 'up')} />
+                  <Button aria-label="下移场次" icon={<ArrowDown size={15} />} disabled={readOnly || working || index === workspace.shots.length - 1 || workspace.shots[index + 1]?.episode_no !== shot.episode_no} onClick={() => moveShot(shot.id, 'down')} />
+                  <Button disabled={readOnly||!!working} aria-label="编辑场次" icon={<Pencil size={15} />} onClick={() => setShotEditor({ id: shot.id, episodeNo: shot.episode_no, heading: shot.heading, scriptText: shot.script_text, characters: (shot.characters || []).join('、'), scene: shot.scene || '', props: (shot.props || []).join('、') })} />
+                  <Popconfirm title="删除这个场次？" description="删除后不可恢复" onConfirm={() => removeShot(shot.id)}><Button disabled={readOnly||!!working} danger aria-label="删除场次" icon={<Trash2 size={15} />} /></Popconfirm>
                 </div>
               </article>) : <Empty description="尚未生成或新增场次" />}</div>
               <div className="storyboard-list">{(workspace?.storyboards || []).length ? (workspace.storyboards || []).map(item => <section className="storyboard-card" key={item.id}>
-                <header><div><b>第 {item.episode_no} 集分镜</b><span>{item.shot_count} 个镜头组 · 版本 {item.revision} · {item.status}</span></div><Button size="small" icon={<Plus size={14} />} disabled={Boolean(working)} onClick={() => setStoryboardShotEditor({ engine: item.engine, episodeNo: item.episode_no, afterShotId: item.shots?.at(-1)?.id || '', durationSec: 3, sceneId: 0, characters: '', scene: '', props: '', videoDesc: '' })}>末尾新增</Button></header>
-                <div className="storyboard-shot-list">{(item.shots || []).length ? item.shots.map((shot, index) => <article className="storyboard-shot-card" key={shot.id}>
-                  <div className="storyboard-shot-copy"><span>镜头 {shot.seq} · {Number(shot.duration_sec || 0).toFixed(1)} 秒</span><b>{shot.scene || '未命名场景'}</b><p>{shot.video_desc || '暂无画面描述'}</p><small>角色：{shot.characters || '无'} · 道具：{shot.props || '无'}</small></div>
-                  <div className="storyboard-shot-actions">
-                    <Button size="small" onClick={() => setStoryboardShotEditor({ id: shot.id, engine: item.engine, episodeNo: item.episode_no, durationSec: shot.duration_sec, sceneId: shot.scene_id, characters: shot.characters || '', scene: shot.scene || '', props: shot.props || '', videoDesc: shot.video_desc || '' })}>编辑</Button>
-                    <Button size="small" disabled={Boolean(working)} onClick={() => setStoryboardShotEditor({ engine: item.engine, episodeNo: item.episode_no, afterShotId: shot.id, durationSec: 3, sceneId: shot.scene_id, characters: '', scene: shot.scene || '', props: '', videoDesc: '' })}>在后面新增</Button>
-                    <Button size="small" disabled={Boolean(working) || Number(shot.duration_sec) <= 0.4} onClick={() => runStoryboardShotAction('storyboard-shot-split', () => splitComicStoryboardShot(selectedId, item.engine, item.episode_no, shot.id), '分镜已等分拆开')}>拆分</Button>
-                    <Button size="small" disabled={Boolean(working) || index === item.shots.length - 1} onClick={() => runStoryboardShotAction('storyboard-shot-merge', () => mergeComicStoryboardShot(selectedId, item.engine, item.episode_no, shot.id), '已与下一条分镜合并')}>与下一条合并</Button>
-                    <Popconfirm title="删除这条分镜？" description="删除后会重新排列后续镜头序号" onConfirm={() => runStoryboardShotAction('storyboard-shot-delete', () => deleteComicStoryboardShot(selectedId, item.engine, item.episode_no, shot.id), '分镜已删除')}><Button size="small" danger disabled={Boolean(working)}>删除</Button></Popconfirm>
+                <header><div><b>第 {item.episode_no} 集分镜</b><span>{item.shot_count} 个镜头组 · 版本 {item.revision} · {item.status}</span></div><Button size="small" icon={<Plus size={14} />} disabled={readOnly || Boolean(working)} onClick={() => setStoryboardShotEditor({ engine: item.engine, episodeNo: item.episode_no, afterShotId: item.shots?.at(-1)?.id || '', durationSec: 3, sceneId: 0, characters: '', scene: '', props: '', videoDesc: '' })}>末尾新增</Button></header>
+                <div className="comic-bulk-tools"><Checkbox disabled={readOnly} checked={!!item.shots?.length&&(selectedShots[item.id]||[]).length===item.shots.length} onChange={event=>setSelectedShots(current=>({...current,[item.id]:event.target.checked?item.shots.map(shot=>shot.id):[]}))}>全选镜头</Checkbox><span>已选 {(selectedShots[item.id]||[]).length}</span><InputNumber disabled={readOnly} aria-label="批量镜头时长" min={.1} max={120} step={.1} value={bulkDuration} onChange={value=>setBulkDuration(value||3)}/><Button disabled={readOnly||!!working} onClick={()=>bulkEdit(item,'duration')}>统一时长</Button><Button disabled={readOnly||!!working} onClick={()=>bulkEdit(item,'duplicate')}>复制选中</Button><Popconfirm title="删除选中的镜头？" onConfirm={()=>bulkEdit(item,'delete')}><Button danger disabled={readOnly||!!working}>删除选中</Button></Popconfirm></div><div className="storyboard-shot-list">{(item.shots || []).length ? item.shots.map((shot, index) => <article className="storyboard-shot-card" key={shot.id}>
+                  <div className="storyboard-shot-copy"><Checkbox disabled={readOnly} checked={(selectedShots[item.id]||[]).includes(shot.id)} onChange={event=>setSelectedShots(current=>({...current,[item.id]:event.target.checked?[...(current[item.id]||[]),shot.id]:(current[item.id]||[]).filter(id=>id!==shot.id)}))}>选择</Checkbox><span>镜头 {shot.seq} · {Number(shot.duration_sec || 0).toFixed(1)} 秒</span><b>{shot.scene || '未命名场景'}</b><p>{shot.video_desc || '暂无画面描述'}</p><small>角色：{shot.characters || '无'} · 道具：{shot.props || '无'}</small></div>
+                  <div className="storyboard-shot-actions"><Button disabled={readOnly||!!working||index===0} onClick={()=>{const order=item.shots.map(row=>row.id);[order[index],order[index-1]]=[order[index-1],order[index]];void bulkEdit(item,'reorder',order);}}>上移</Button>
+                    <Button disabled={readOnly||!!working} size="small" onClick={() => setStoryboardShotEditor({ id: shot.id, engine: item.engine, episodeNo: item.episode_no, durationSec: shot.duration_sec, sceneId: shot.scene_id, characters: shot.characters || '', scene: shot.scene || '', props: shot.props || '', videoDesc: shot.video_desc || '' })}>编辑</Button>
+                    <Button size="small" disabled={readOnly || Boolean(working)} onClick={() => setStoryboardShotEditor({ engine: item.engine, episodeNo: item.episode_no, afterShotId: shot.id, durationSec: 3, sceneId: shot.scene_id, characters: '', scene: shot.scene || '', props: '', videoDesc: '' })}>在后面新增</Button>
+                    <Button size="small" disabled={readOnly || Boolean(working) || Number(shot.duration_sec) <= 0.4} onClick={() => runStoryboardShotAction('storyboard-shot-split', () => splitComicStoryboardShot(selectedId, item.engine, item.episode_no, shot.id), '分镜已等分拆开')}>拆分</Button>
+                    <Button size="small" disabled={readOnly || Boolean(working) || index === item.shots.length - 1} onClick={() => runStoryboardShotAction('storyboard-shot-merge', () => mergeComicStoryboardShot(selectedId, item.engine, item.episode_no, shot.id), '已与下一条分镜合并')}>与下一条合并</Button>
+                    <Popconfirm title="删除这条分镜？" description="删除后会重新排列后续镜头序号" onConfirm={() => runStoryboardShotAction('storyboard-shot-delete', () => deleteComicStoryboardShot(selectedId, item.engine, item.episode_no, shot.id), '分镜已删除')}><Button size="small" danger disabled={readOnly || Boolean(working)}>删除</Button></Popconfirm>
                   </div>
                 </article>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这份分镜还没有镜头，可从末尾新增" />}</div>
               </section>) : <Empty description="尚未生成分镜" />}</div>
             </div> },
-            { key: 'production', label: '生产与导出', children: <div className="production-panel">
-              <div className="asset-actions"><Button type="primary" icon={<Play size={16} />} loading={working === 'batch'} onClick={startBatch}>{batchData?.batch?.status === 'paused' ? '继续任务' : '启动生产任务'}</Button><Button danger icon={<PauseCircle size={16} />} disabled={!batchData?.batch || batchData?.batch?.status === 'paused'} loading={working === 'batch-cancel'} onClick={pauseBatch}>暂停任务</Button><Button icon={<Download size={16} />} loading={working === 'export'} onClick={downloadExport}>导出项目包</Button></div>
-              <div className="production-status">
-                <h3>任务状态：{batchData?.batch ? batchStatusLabel(batchData.batch.status) : '尚未启动'}</h3>
-                {batchData?.batch?.last_error ? <Alert type="error" showIcon message="最近一次失败" description={batchData.batch.last_error} /> : null}
-                <div className="production-steps">{(batchData?.steps || []).map(step => {
-                  const state = batchData?.batch?.steps?.[step.key];
-                  return <article key={step.key} className={`status-${state?.status || 'pending'}`}><span>{step.label}</span><b>{batchStatusLabel(state?.status)}</b>{state?.total_episodes > 0 ? <small>{Object.values(state.episodes || {}).filter(item => item.status === 'done').length}/{state.total_episodes} 集</small> : null}{state?.error ? <em title={state.error}>{state.error}</em> : null}</article>;
-                })}</div>
-                <p>系统按“原文 → 剧本 → 审核 → 资产 → 审核 → 分镜 → 审核 → 视频 → 完成”逐步执行；暂停、刷新和继续都会读取已保存进度。</p>
-              </div>
-              {Object.values(batchData?.batch?.steps || {}).some(step => step?.artifacts?.length) ? <section className="production-artifacts"><h4>已保存产物</h4>{Object.values(batchData.batch.steps).flatMap(step => step?.artifacts || []).map((artifact, index) => { const view = artifactView(artifact); return view.href ? <a key={`${artifact}-${index}`} href={view.href} target="_blank" rel="noreferrer">{view.label}</a> : <span key={`${artifact}-${index}`}>{view.label}</span>; })}</section> : null}
-              {batchData?.logs?.length ? <section className="production-logs"><h4>执行记录</h4>{batchData.logs.slice().reverse().map((log, index) => <div key={log.id || index} className={`log-${log.level || 'info'}`}><time>{prettyTime(log.created_at)}</time><span>{log.message}</span></div>)}</section> : null}
-            </div> }
+            { key:'chapters',label:'章节规划',children:<ComicChaptersPanel key={selectedId} projectId={selectedId} readOnly={readOnly} canGenerate={canGenerate} onSaved={()=>selectedProject.current===selectedId?openProject(selectedId):undefined}/> },
+            { key:'assistant',label:'作品助手',children:<ComicAssistantPanel key={selectedId} projectId={selectedId} readOnly={readOnly} canGenerate={canGenerate} onSaved={()=>selectedProject.current===selectedId?openProject(selectedId):undefined}/> },
+            { key:'production',label:'自动生产',children:<ComicScreenplayProductionPanel projectId={selectedId} canGenerate={canGenerate} onExportData={downloadExport} onSaved={()=>selectedProject.current===selectedId?openProject(selectedId):undefined} onNavigate={setActiveTab}/> },
+            { key:'media',label:'媒体与交付',children:<ComicScreenplayMediaPanel key={selectedId} canOpenCut={!!access?.owner} projectId={selectedId} workspace={workspace} readOnly={readOnly} canGenerate={canGenerate}/> }
           ]} />
         </section>
-        <aside className="comic-screenplay-inspector"><h3>项目设置</h3><label>文本模型<Input value={form.model} placeholder="使用账号默认模型" onChange={event => setForm(current => ({ ...current, model: event.target.value }))} /></label><label>画面比例<Select value={form.aspectRatio} options={ratioOptions} onChange={aspectRatio => setForm(current => ({ ...current, aspectRatio }))} /></label><label>画风<ComicStylePicker value={form} onChange={style => setForm(current => ({ ...current, ...style }))} /></label><div className="comic-inspector-field"><span>资产解析程度</span><ComicDegreeCards compact value={form.degree} onChange={degree => setForm(current => ({ ...current, degree }))} /></div><label>创作模式<Select value={form.scriptMode} options={[{ value: 'a1', label: '小说转剧本' }, { value: 'b', label: '导演级剧本' }]} onChange={scriptMode => setForm(current => ({ ...current, scriptMode }))} /></label><Button type="primary" block loading={settingsSaving} onClick={saveSettings}>保存设置</Button><div className="workspace-stats"><span>版本 <b>{workspace?.documents?.length || 0}</b></span><span>场次 <b>{workspace?.shots?.length || 0}</b></span><span>角色 <b>{workspace?.characters?.length || 0}</b></span><span>场景 <b>{workspace?.scenes?.length || 0}</b></span></div></aside>
+        <aside className="comic-screenplay-inspector"><fieldset disabled={readOnly} style={{border:0,padding:0,margin:0}}><h3>项目设置</h3><label>文本模型<Input value={form.model} placeholder="使用账号默认模型" onChange={event => setForm(current => ({ ...current, model: event.target.value }))} /></label><label>画面比例<Select value={form.aspectRatio} options={ratioOptions} onChange={aspectRatio => setForm(current => ({ ...current, aspectRatio }))} /></label><label>画风<ComicStylePicker value={form} onChange={style => setForm(current => ({ ...current, ...style }))} /></label><div className="comic-inspector-field"><span>资产解析程度</span><ComicDegreeCards compact value={form.degree} onChange={degree => setForm(current => ({ ...current, degree }))} /></div><label>创作模式<Select value={form.scriptMode} options={[{ value: 'a1', label: '小说转剧本' }, { value: 'b', label: '导演级剧本' }]} onChange={scriptMode => setForm(current => ({ ...current, scriptMode }))} /></label><Button type="primary" block loading={settingsSaving} disabled={readOnly} onClick={saveSettings}>保存设置</Button><div className="workspace-stats"><span>版本 <b>{workspace?.documents?.length || 0}</b></span><span>场次 <b>{workspace?.shots?.length || 0}</b></span><span>角色 <b>{workspace?.characters?.length || 0}</b></span><span>场景 <b>{workspace?.scenes?.length || 0}</b></span></div></fieldset></aside>
       </main>
+      {teamOpen?<ComicTeamDialog projectId={selectedId} open onClose={()=>setTeamOpen(false)}/>:null}{displayOpen?<ComicDisplayDialog readOnly={readOnly} projectId={selectedId} open onClose={()=>setDisplayOpen(false)} onSaved={prefs=>{setDisplay(prefs);setActiveTab(prefs.active_tab||activeTab);}}/>:null}
       <Modal title={assetEditor?.id ? '编辑资产' : '新增资产'} open={Boolean(assetEditor)} onCancel={() => setAssetEditor(null)} confirmLoading={working === 'asset-save'} onOk={saveAsset} okText="保存" cancelText="取消" destroyOnHidden>
         <div className="shot-form">
           <label><span>资产类型</span><Select value={assetEditor?.type || 'character'} options={assetTypeOptions} onChange={type => setAssetEditor(current => ({ ...current, type }))} /></label>
@@ -554,7 +541,7 @@ export default function ComicScreenplayPage() {
         <div className="screenplay-version-list">
           {(workspace?.documents || []).map(document => <article key={document.id}>
             <div><b>v{document.version}</b><span>{document.status === 'active' ? '当前版本' : `历史版本 · ${prettyTime(document.updated_at || document.created_at)}`}</span></div>
-            {document.status === 'active' ? <span>正在使用</span> : <Popconfirm title={`恢复 v${document.version}？`} description="系统会复制成一个新版本，现有版本不会被覆盖。" onConfirm={() => restoreDocumentVersion(document.id)}><Button size="small" loading={working === 'document-restore'}>恢复此版本</Button></Popconfirm>}
+            {document.status === 'active' ? <span>正在使用</span> : <Popconfirm title={`恢复 v${document.version}？`} description="系统会复制成一个新版本，现有版本不会被覆盖。" onConfirm={() => restoreDocumentVersion(document.id)}><Button disabled={readOnly||!!working} size="small" loading={working === 'document-restore'}>恢复此版本</Button></Popconfirm>}
           </article>)}
         </div>
       </Modal>
@@ -566,12 +553,12 @@ export default function ComicScreenplayPage() {
       <div><h1>漫剧创作</h1><p>管理和创建您的漫剧作品</p></div>
       <div className="library-heading-actions"><Button type="text" icon={<Clock3 size={18} />} onClick={() => setHistoryOpen(true)}>历史</Button><Button className="create-screenplay-button" type="primary" icon={<Plus size={16} />} onClick={openCreateDialog}>创建漫剧</Button></div>
     </div>
-    <div className="library-tabs"><button className={scope === 'personal' ? 'is-active' : ''} onClick={() => setScope('personal')}>个人作品</button><button title="团队协作的数据权限尚未接入，当前不会展示假项目" aria-disabled="true" onClick={() => message.info('团队协作尚未接入成员和权限数据，暂不展示假项目')}>团队作品</button></div>
+    <div className="library-tabs">{[['personal','个人作品'],['team','团队作品'],['archived','已归档']].map(([key,label])=><button key={key} className={scope===key?'is-active':''} onClick={()=>setScope(key)}>{label}</button>)}</div>
     <div className="comic-screenplay-filters">
       <Input prefix={<Search size={16} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索作品..." allowClear />
-      <div className="library-filter-actions"><Select value={sortOrder} suffixIcon={<ChevronDown size={15} />} onChange={setSortOrder} options={[{ value: 'desc', label: '按时间降序' }, { value: 'asc', label: '按时间升序' }]} /><Button type="text" icon={viewMode === 'grid' ? <Grid2X2 size={18} /> : <LayoutGrid size={18} />} onClick={() => setViewMode(value => value === 'grid' ? 'list' : 'grid')} /><Button type="text" icon={<Sparkles size={16} />} disabled title="新版工作台尚未开放">新版</Button><span className="version-active"><History size={16} />旧版</span></div>
+      <div className="library-filter-actions"><Select value={sortOrder} suffixIcon={<ChevronDown size={15} />} onChange={setSortOrder} options={[{ value: 'desc', label: '按时间降序' }, { value: 'asc', label: '按时间升序' }]} /><Button type="text" icon={viewMode === 'grid' ? <Grid2X2 size={18} /> : <LayoutGrid size={18} />} onClick={() => setViewMode(value => value === 'grid' ? 'list' : 'grid')} /></div>
     </div>
-    <Spin spinning={loading}><div className={`comic-project-grid ${viewMode === 'list' ? 'is-list' : ''}`}>{visibleProjects.length ? visibleProjects.map(project => <article key={project.id} className="comic-project-card" onClick={() => openProject(project.id)}><div className="comic-project-cover"><Clapperboard size={38} /><span>{project.aspect_ratio || '9:16'}</span></div><div className="comic-project-meta"><div><h3>{project.title}</h3><p>{project.art_style || '未选择风格'} · {prettyTime(project.updated_at)}</p></div><Popconfirm title="删除这个漫剧项目？" onConfirm={async event => { event?.stopPropagation?.(); await deleteComicScreenplay(project.id); await refreshProjects(); }}><Button type="text" danger icon={<Trash2 size={16} />} onClick={event => event.stopPropagation()} /></Popconfirm></div></article>) : <Empty description={scope === 'team' ? '暂无团队作品' : '暂无项目，在上方输入框输入内容开始创作'} />}</div></Spin>
+    <Spin spinning={loading}><div className={`comic-project-grid ${viewMode === 'list' ? 'is-list' : ''}`}>{visibleProjects.length ? visibleProjects.map(project => <article key={project.id} className="comic-project-card" onClick={() => openProject(project.id)}><div className="comic-project-cover"><Clapperboard size={38} /><span>{project.aspect_ratio || '9:16'}</span></div><div className="comic-project-meta"><div><h3>{project.title}</h3><p>{project.art_style || '未选择风格'} · {prettyTime(project.updated_at)}</p></div>{scope!=='team'?<Button type="text" onClick={async event=>{event.stopPropagation();try{const result=await getComicDisplay(project.id);await (scope==='archived'?restoreComic:archiveComic)(project.id,{expected_revision:result.state?.revision||0});await refreshProjects();}catch(err){message.error(err.message);}}}>{scope==='archived'?'恢复':'归档'}</Button>:null}{scope!=='team'?<Popconfirm title="删除这个漫剧项目？" onConfirm={async event => { event?.stopPropagation?.(); await deleteComicScreenplay(project.id); await refreshProjects(); }}><Button type="text" danger icon={<Trash2 size={16} />} onClick={event => event.stopPropagation()} /></Popconfirm>:null}</div></article>) : <Empty description={scope === 'team' ? '暂无团队作品' : '暂无项目，在上方输入框输入内容开始创作'} />}</div></Spin>
     <Modal title="最近创作历史" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={<Button onClick={() => setHistoryOpen(false)}>关闭</Button>}>
       <div className="screenplay-version-list">{projects.length ? [...projects].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).map(project => <button type="button" key={project.id} onClick={() => { setHistoryOpen(false); void openProject(project.id); }}><b>{project.title}</b><span>{prettyTime(project.updated_at)}</span></button>) : <Empty description="还没有创作记录" />}</div>
     </Modal>

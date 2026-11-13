@@ -617,21 +617,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		personalTemplates = aicut.NewMemoryPersonalTemplateStore()
 	}
 	RegisterAICutPersonalTemplateRoutes(root, auth, personalTemplates)
-	var screenplayMedia screenplay.BatchMediaRunner
-	if options.UserConfigStore != nil {
-		videoResolver := func(ctx context.Context, owner, modelKey string) (batchfactoryv11.VideoProviderConfig, error) {
-			config, err := options.UserConfigStore.GetConfig(ctx, owner)
-			if err != nil {
-				return batchfactoryv11.VideoProviderConfig{}, err
-			}
-			return scriptVideoModelConfig(ctx, options.Store, owner, config, modelKey)
-		}
-		screenplayMedia = &screenplayVideoRunner{
-			service: &scriptVideoService{resolver: videoResolver, localExecutor: options.LocalExecutors},
-			configs: options.UserConfigStore,
-		}
-	}
-	RegisterScreenplayRoutesWithCatalog(root, auth, options.Screenplay, runtimeTextProviderResolver, options.Now, options.PresetCatalog, screenplayMedia)
+	registerScreenplayWorkflow(root, auth, options, runtimeTextProviderResolver, runtimeCatalogStore)
 	RegisterNovelCreationRoutes(root, auth, options.NovelCreation, options.NovelCreationRunStarter)
 	RegisterAICutAssetRoutes(root, auth, options.AICut, options.AgentAssetObjects, options.Now)
 	RegisterAICutCreativeCanvasRoutes(root, auth, scopedTimelineStore, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)

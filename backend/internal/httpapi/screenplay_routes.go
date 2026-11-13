@@ -51,7 +51,13 @@ func RegisterScreenplayRoutesWithCatalog(mux *http.ServeMux, auth BridgeAuth, st
 	registerScreenplayRoutes(mux, auth, store, resolver, now, catalog, mediaRunners...)
 }
 
+func RegisterScreenplayWorkflowRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, catalog *prompt.Catalog, authors *screenplay.AuthoringService, mediaRunners ...screenplay.BatchMediaRunner) {
+	registerScreenplayRoutesWorkflow(mux, auth, store, resolver, now, catalog, authors, mediaRunners...)
+}
 func registerScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, catalog *prompt.Catalog, mediaRunners ...screenplay.BatchMediaRunner) {
+	registerScreenplayRoutesWorkflow(mux, auth, store, resolver, now, catalog, nil, mediaRunners...)
+}
+func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, catalog *prompt.Catalog, authors *screenplay.AuthoringService, mediaRunners ...screenplay.BatchMediaRunner) {
 	if mux == nil || store == nil {
 		return
 	}
@@ -67,6 +73,10 @@ func registerScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 			identity, ok := BridgeIdentityFromContext(req.Context())
 			if !ok || strings.TrimSpace(identity.Username) == "" {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			if authors != nil && req.PathValue("id") != "" {
+				serveScreenplayWorkflow(w, req, strings.TrimSpace(identity.Username), pattern, authors, fn)
 				return
 			}
 			fn(w, req, strings.TrimSpace(identity.Username))
@@ -102,6 +112,15 @@ func registerScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		if err != nil {
 			writeScreenplayError(w, err)
 			return
+		}
+		if authors != nil {
+			visible := make([]screenplay.Project, 0, len(projects))
+			for _, p := range projects {
+				if !ScreenplayProjectArchived(req.Context(), authors.Repository, owner, p.ID) {
+					visible = append(visible, p)
+				}
+			}
+			projects = visible
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"projects": projects})
 	})
@@ -269,6 +288,12 @@ func registerScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		storyboardsV7, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV7)
 		storyboardsV3, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoyunqueV3)
 		payload["storyboards"] = append(storyboardsV7, storyboardsV3...)
+		if authors != nil {
+			identity, _ := BridgeIdentityFromContext(req.Context())
+			_, editErr := authors.Resolve(req.Context(), identity.Username, project.ID, "edit")
+			_, genErr := authors.Resolve(req.Context(), identity.Username, project.ID, "generate")
+			payload["access"] = map[string]bool{"owner": owner == identity.Username, "read": true, "edit": editErr == nil, "generate": genErr == nil}
+		}
 		writeJSON(w, http.StatusOK, payload)
 	})
 	type shotInput struct {
@@ -800,6 +825,8 @@ func screenplayErrorStatus(err error) int {
 	switch {
 	case strings.Contains(err.Error(), "已存在"):
 		status = http.StatusConflict
+	case errors.Is(err, screenplay.ErrAccessDenied):
+		status = http.StatusForbidden
 	case errors.Is(err, screenplay.ErrNotFound), errors.Is(err, screenplay.ErrNoActiveScript):
 		status = http.StatusNotFound
 	case errors.Is(err, screenplay.ErrRevisionConflict), errors.Is(err, screenplay.ErrLockBusy), errors.Is(err, screenplay.ErrInvalidState):

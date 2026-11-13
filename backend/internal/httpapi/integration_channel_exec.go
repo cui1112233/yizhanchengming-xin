@@ -382,8 +382,14 @@ func generateIntegrationChannelImage(ctx context.Context, target integrationChan
 		endpoint = fullEndpoint
 	}
 	payload := map[string]any{"model": target.ModelID, "prompt": prompt}
+	if len(input.ReferenceImages) > 0 {
+		if !strings.Contains(strings.ToLower(target.ModelID), "seedream") {
+			return nil, http.StatusUnprocessableEntity, fmt.Errorf("此图片通道尚未支持参考图协议，请选择Seedream或豆包本地模型")
+		}
+		payload["image"] = input.ReferenceImages
+	}
 	for key, value := range target.Params {
-		if key == "" || key == "model" || key == "prompt" {
+		if key == "" || key == "model" || key == "prompt" || (key == "image" && len(input.ReferenceImages) > 0) {
 			continue
 		}
 		payload[key] = value

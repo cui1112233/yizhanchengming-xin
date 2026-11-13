@@ -1,0 +1,26 @@
+import { Alert, Button, InputNumber, message, Modal, Select, Upload } from 'antd';
+import { useState } from 'react';
+import { apiRequest } from '../../shared/api/client.js';
+import { loadComicScreenplayWorkspace } from '../../shared/api/comicScreenplay.js';
+import { comicWorkflowPath } from '../../shared/api/comicScreenplayWorkflow.js';
+
+function download(value,name){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=name;link.click();URL.revokeObjectURL(url);}
+export default function ComicScreenplayFileTools({projectId,workspace,readOnly,onSaved}){
+ const [numbered,setNumbered]=useState(null),[pending,setPending]=useState(null),[busy,setBusy]=useState(false),[boardId,setBoardId]=useState(''),[from,setFrom]=useState(1),[to,setTo]=useState(1);
+ const boards=workspace?.storyboards||[];
+ const load=()=>apiRequest(comicWorkflowPath(projectId,'source-numbered'));
+ async function show(){try{setNumbered(await load());}catch(error){message.error(error.message);}}
+ async function exportBoard(){if(busy)return;setBusy(true);try{
+ const [latest,source]=await Promise.all([loadComicScreenplayWorkspace(projectId),load()]);
+ const board=(latest.storyboards||[]).find(row=>row.id===boardId);
+ if(!board)throw new Error('这份分镜已经变化，请刷新工作区后重新选择');
+ const normalized=String(latest.project?.source_text||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+ if(normalized!==(source.lines||[]).map(row=>row.text).join('\n'))throw new Error('读取期间原文发生变化，请刷新后重新核对');
+ Modal.confirm({title:'核对原文编号后导出分镜',width:900,okText:'已核对当前编号，确认导出',cancelText:'暂不导出',content:<><Alert type="warning" showIcon message="此操作不会自动证明旧分镜来自当前原文。请核对镜头中的原文行号，确认它们与下方当前编号对应。"/><div style={{maxHeight:'50vh',overflow:'auto'}}><h4>当前编号原文</h4><pre className="comic-numbered-source">{source.lines.map(row=>`L${row.number}  ${row.text}`).join('\n')}</pre><h4>最新保存的分镜 · v{board.revision}</h4><pre className="comic-numbered-source">{board.shots.map(row=>`镜头${row.seq}：${row.video_desc}`).join('\n\n')}</pre></div></>,onOk:()=>download({format:'yzcm-storyboard-file-v1',source_binding:'user_confirmed_numbered_source',source_sha256:source.source_sha256,storyboard:board},`第${board.episode_no}集-分镜.json`)});
+ }catch(error){message.error(error.message);}finally{setBusy(false);}}
+ async function parse(file){if(readOnly||busy)return false;try{if(file.size>8*1024*1024)throw new Error('分镜文件不能超过8MB');const input=JSON.parse(await file.text());if(input.format!=='yzcm-storyboard-file-v1'||!Array.isArray(input.storyboard?.shots)||!input.source_sha256)throw new Error('请选择本工作台导出的分镜JSON文件');const latest=await loadComicScreenplayWorkspace(projectId);const target=(latest.storyboards||[]).find(row=>row.engine===input.storyboard.engine&&row.episode_no===input.storyboard.episode_no);setPending({...input,expected_revision:target?.revision||0});}catch(error){message.error(error.message||'无法读取分镜文件');}return false;}
+ async function apply(){if(!pending||readOnly||busy)return;setBusy(true);try{const board=pending.storyboard;await apiRequest(comicWorkflowPath(projectId,'storyboards/import'),{method:'POST',body:JSON.stringify({expected_revision:pending.expected_revision,source_sha256:pending.source_sha256,storyboard:board})});setPending(null);await onSaved?.();message.success('分镜已导入，旧生产结果需要重新核对');}catch(error){message.error(error.message);}finally{setBusy(false);}}
+ return <section className="comic-file-tools"><div className="comic-bulk-tools"><Button onClick={show}>编号原文</Button><Select aria-label="导出分镜文件" value={boardId||undefined} placeholder="选择要导出的分镜" options={boards.map(row=>({value:row.id,label:`第${row.episode_no}集 · ${row.engine}`}))} onChange={setBoardId}/><Button disabled={!boardId||busy} onClick={exportBoard}>导出分镜文件</Button><Upload accept=".json" beforeUpload={parse} showUploadList={false} disabled={readOnly}><Button disabled={readOnly}>导入分镜文件</Button></Upload></div>
+ <Modal title="编号原文" open={!!numbered} width={760} onCancel={()=>setNumbered(null)} footer={<><Button onClick={()=>download(numbered,'编号原文.json')}>下载编号原文</Button><Button onClick={()=>setNumbered(null)}>关闭</Button></>}><p className="comic-helper-text">编号对应当前保存的原文。修改原文后摘要会变化，旧分镜文件会被拦截；引用可写进镜头画面描述。</p><div className="comic-bulk-tools"><span>引用行</span><InputNumber min={1} max={numbered?.lines?.length||1} value={from} onChange={value=>setFrom(value||1)}/><span>至</span><InputNumber min={from} max={numbered?.lines?.length||1} value={to} onChange={value=>setTo(value||from)}/><span>〔原文 L{from}–L{Math.max(from,to)}〕</span></div><pre className="comic-numbered-source">{numbered?.lines?.map(row=>`L${row.number}  ${row.text}`).join('\n')}</pre></Modal>
+ <Modal title="确认导入分镜" open={!!pending} onCancel={()=>setPending(null)} onOk={apply} okButtonProps={{disabled:readOnly||busy}} confirmLoading={busy} okText="替换本集分镜"><Alert type="warning" showIcon message="会替换当前同引擎、同集数的分镜，请先导出原文件备份。"/><p>将替换目标分镜版本 v{pending?.expected_revision||0}；期间有新修改会拒绝覆盖。</p><p>第 {pending?.storyboard?.episode_no} 集 · {pending?.storyboard?.shots?.length||0} 个镜头</p><pre className="comic-numbered-source">{pending?.storyboard?.shots?.slice(0,5).map(row=>row.video_desc).join('\n\n')}</pre></Modal></section>;
+}

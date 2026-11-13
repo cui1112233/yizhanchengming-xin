@@ -72,6 +72,9 @@ func TestAppMigrationsIncludesV11AndV12Migrations(t *testing.T) {
 	want = append(want, AICutMigrations()...)
 	want = append(want, AutomationMigrations()...)
 	want = append(want, ScreenplayMigrations()...)
+	want = append(want, ScreenplayProductionMigrations()...)
+	want = append(want, ScreenplayMediaMigrations()...)
+	want = append(want, ScreenplayAuthoringMigrations()...)
 	want = append(want, NovelCreationMigrations()...)
 	want = append(want, ImageCapacityMigrations()...)
 	if len(migrations) != len(want) {

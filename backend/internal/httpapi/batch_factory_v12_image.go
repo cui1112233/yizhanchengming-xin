@@ -115,6 +115,12 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 	}
 	defer releaseImageSlot()
 	payload := map[string]any{"model": modelString(model, "modelId"), "prompt": prompt}
+	if len(input.ReferenceImages) > 0 {
+		if !strings.Contains(strings.ToLower(modelString(model, "modelId")), "seedream") {
+			return nil, http.StatusUnprocessableEntity, fmt.Errorf("此图片模型尚未支持参考图协议，请选择Seedream或豆包本地模型")
+		}
+		payload["image"] = input.ReferenceImages
+	}
 	if input.Count > 0 {
 		payload["n"] = input.Count
 	}

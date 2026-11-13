@@ -32,6 +32,7 @@ type AgentImageGenerationInput struct {
 	Count             int
 	Advanced          map[string]any
 	ReferenceAssetIDs []string
+	ReferenceImages   []string
 }
 
 type AgentImageGenerator func(context.Context, string, AgentImageGenerationInput) ([]string, int, error)

@@ -67,7 +67,7 @@ func TestBatchExecutorRunsPersistedProjectToCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	media := &fakeBatchMediaRunner{}
-	executor := BatchExecutor{Store: store, Media: media}
+	executor := BatchExecutor{Store: store, Media: media, Generator: productionTestGenerator{}, Finalizer: productionTestFinalizer{}}
 
 	for attempts := 0; attempts < 16; attempts++ {
 		result, runErr := executor.RunNext(ctx, "alice", project.ID)

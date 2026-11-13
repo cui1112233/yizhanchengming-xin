@@ -1,0 +1,63 @@
+import { Alert, Button, Checkbox, Empty, Input, InputNumber, message, Modal, Popconfirm, Select, Space, Spin, Switch } from 'antd';
+import { BookOpen, Check, Plus, Save, Send, Sparkles, Trash2, Users } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { applyComicProposal, generateComicChapter, getComicAssistant, getComicChapters, getComicDisplay, getComicTeam, planComicChapters, saveComicChapters, saveComicDisplay, saveComicTeam, sendComicAssistant } from '../../shared/api/comicScreenplayWorkflow.js';
+
+function errorMessage(error){message.error(error.message||'操作失败，请稍后重试');}
+function useAuthoringResource(projectId,load){
+  const [data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+  const sequence=useRef(0);
+  const refresh=useCallback(async()=>{const ticket=++sequence.current;setLoading(true);setError('');try{const result=await load(projectId);if(ticket===sequence.current)setData(result);}catch(err){if(ticket===sequence.current)setError(err.message||'读取失败');}finally{if(ticket===sequence.current)setLoading(false);}},[projectId,load]);
+  useEffect(()=>{void refresh();return()=>{sequence.current+=1;};},[refresh]);
+  return {data,setData,loading,error,refresh};
+}
+function ResourceError({error,retry}){return error?<Alert type="error" showIcon message={error} action={<Button size="small" onClick={retry}>重试</Button>}/>:null;}
+
+export function ComicChaptersPanel({projectId,onSaved,readOnly=false,canGenerate=true}){
+  const {data,setData,loading,error,refresh}=useAuthoringResource(projectId,getComicChapters);
+  const [chapters,setChapters]=useState([]),[selected,setSelected]=useState(''),[busy,setBusy]=useState(''),[instruction,setInstruction]=useState(''),[dirty,setDirty]=useState(false);
+  useEffect(()=>{if(!data)return;const rows=data.state?.chapters||[];setChapters(rows);setSelected(current=>rows.some(item=>item.id===current)?current:rows[0]?.id||'');setDirty(false);},[data]);
+  const active=chapters.find(item=>item.id===selected);
+  const patch=values=>{setChapters(rows=>rows.map(item=>item.id===selected?{...item,...values}:item));setDirty(true);};
+  async function act(kind,action){if(busy)return;setBusy(kind);try{const next=await action();setData(next);setDirty(false);await onSaved?.();message.success(kind==='save'?'章节已保存':'处理完成，结果已保存');}catch(err){errorMessage(err);}finally{setBusy('');}}
+  const save=()=>!readOnly&&act('save',()=>saveComicChapters(projectId,{expected_revision:data?.state?.revision||0,chapters}));
+  return <div className="comic-chapters-panel"><ResourceError error={error} retry={refresh}/><Spin spinning={loading}>
+    <div className="comic-panel-heading"><div><h3>章节与分集</h3><p>分别管理原文和剧本，生成结果会保存为工作台的新剧本版本。</p></div><Space><Button icon={<Plus size={14}/>} disabled={readOnly||!!busy} onClick={()=>{const id=`chapter_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;setChapters(rows=>[...rows,{id,title:`第${rows.length+1}章`,source_text:'',script_text:''}]);setSelected(id);setDirty(true);}}>新增章节</Button><Button onClick={refresh} disabled={!!busy||dirty}>刷新章节</Button><Button type="primary" icon={<Save size={14}/>} disabled={readOnly||!dirty||!!busy||loading||!!error} loading={busy==='save'} onClick={save}>保存章节</Button></Space></div>
+    <div className="comic-chapter-layout"><aside>{chapters.map((item,index)=><button type="button" key={item.id} className={selected===item.id?'is-active':''} onClick={()=>setSelected(item.id)}><BookOpen size={15}/><span>{item.title||`第${index+1}章`}</span><small>{[...String(item.source_text||'')].length} 字</small></button>)}{!chapters.length?<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有章节"/>:null}</aside><section>{active?<>
+      <div className="comic-chapter-title"><Input value={active.title} disabled={readOnly} placeholder="章节标题" onChange={event=>patch({title:event.target.value})}/><Popconfirm title="移除此章节？保存后生效" onConfirm={()=>{setChapters(rows=>rows.filter(item=>item.id!==selected));setSelected(chapters.find(item=>item.id!==selected)?.id||'');setDirty(true);}}><Button aria-label="移除当前章节" danger disabled={readOnly} icon={<Trash2 size={15}/>}/></Popconfirm></div>
+      <div className="comic-chapter-editors"><label>章节原文<Input.TextArea rows={15} disabled={readOnly} value={active.source_text||''} onChange={event=>patch({source_text:event.target.value})} placeholder="输入或粘贴这一章的原文"/></label><label>本章剧本<Input.TextArea rows={15} disabled={readOnly} value={active.script_text||''} onChange={event=>patch({script_text:event.target.value})} placeholder="可以手工编辑，也可以生成后继续修改"/></label></div>
+      <Button icon={<Sparkles size={14}/>} disabled={!canGenerate||dirty||!!busy||loading||!!error} title={dirty?'请先保存章节':undefined} loading={busy==='script'} onClick={()=>act('script',()=>generateComicChapter(projectId,selected,{expected_revision:data?.state?.revision||0,instruction}))}>生成本章剧本</Button>
+    </>:<Empty description="新增章节，或使用下方章节计划整理内容"/>}</section></div>
+    <div className="comic-plan-box"><b>AI 章节计划</b><Input.TextArea value={instruction} onChange={event=>setInstruction(event.target.value)} rows={2} placeholder="例如：根据已保存的原文，按情节划分为 8 集，保留完整事件。" disabled={!canGenerate}/><Button icon={<Sparkles size={14}/>} disabled={!canGenerate||dirty||!!busy||loading||!!error} loading={busy==='plan'} onClick={()=>act('plan',()=>planComicChapters(projectId,{expected_revision:data?.state?.revision||0,instruction}))}>生成并保存章节计划</Button><small>会使用项目已保存的文本模型；先保存当前修改。</small></div>
+  </Spin></div>;
+}
+
+export function ComicAssistantPanel({projectId,onSaved,readOnly=false,canGenerate=true}){
+  const {data,setData,loading,error,refresh}=useAuthoringResource(projectId,getComicAssistant);
+  const [text,setText]=useState(''),[busy,setBusy]=useState('');
+  const state=data?.state||{};const messages=state.messages||state.conversation||[];const proposals=state.proposals||[];
+  async function send(){if(!canGenerate||!text.trim()||busy||loading||error)return;setBusy('chat');try{setData(await sendComicAssistant(projectId,{message:text.trim(),expected_revision:state.revision||0}));setText('');}catch(err){errorMessage(err);}finally{setBusy('');}}
+  async function apply(proposal){if(readOnly||busy||proposal.status!=='pending')return;setBusy(proposal.id);try{setData(await applyComicProposal(projectId,{proposal_id:proposal.id,expected_revision:state.revision||0,confirmed:true}));await onSaved?.();message.success('修改已应用并保存');}catch(err){errorMessage(err);}finally{setBusy('');}}
+  return <div className="comic-assistant-panel"><ResourceError error={error} retry={refresh}/><div className="comic-panel-heading"><div><h3>作品助手</h3><p>读取当前作品与章节，提出可查看、可确认的修改。不会自行启动图片或视频生产。</p></div><Button onClick={refresh}>刷新会话</Button></div><Spin spinning={loading}>
+    <div className="comic-assistant-messages">{messages.length?messages.map((item,index)=><article key={item.id||index} className={`role-${item.role}`}><b>{item.role==='user'?'你':'作品助手'}</b><div>{item.content||item.text||''}</div></article>):<Empty description="说明你想修改的章节、人物或分镜"/>}</div>
+    {proposals.map(proposal=><article key={proposal.id} className="comic-assistant-proposal"><b>{proposal.summary||'建议修改'}</b>{Array.isArray(proposal.actions)?<ul>{proposal.actions.map((action,index)=><li key={index}>{action.summary||action.title||action.description||({replace_chapters:'更新章节',save_document:'保存剧本新版本',update_asset:'修改资产设定',update_shot:'修改分镜'}[action.kind])||({document:'更新剧本',chapter:'修改章节',asset:'修改资产',shot:'修改场次'}[action.kind])||'作品内容修改'}{action.target_id?<small> · {action.target_id}</small>:null}<pre>{action.content||(action.chapter?JSON.stringify(action.chapter,null,2):'')||(action.asset?JSON.stringify(action.asset,null,2):'')||(action.shot?JSON.stringify(action.shot,null,2):'')||''}</pre></li>)}</ul>:null}<Popconfirm title="确认应用这些修改？" description="应用后会保存到当前作品，请先核对上述内容。" onConfirm={()=>apply(proposal)}><Button icon={<Check size={14}/>} type="primary" loading={busy===proposal.id} disabled={readOnly||!!busy||proposal.status!=='pending'||proposal.applied}> {proposal.status==='applied'||proposal.applied?'已应用':proposal.status==='stale'?'内容已变更，请重新询问':'应用修改'}</Button></Popconfirm></article>)}
+    <div className="comic-assistant-compose"><Input.TextArea value={text} onChange={event=>setText(event.target.value)} rows={3} maxLength={10000} placeholder="例如：检查第一集节奏，给出修改建议；或把人物称呼统一。" disabled={!canGenerate}/><Button type="primary" icon={<Send size={14}/>} loading={busy==='chat'} disabled={!canGenerate||!text.trim()||!!busy||loading||!!error} onClick={send}>发送</Button></div>
+  </Spin></div>;
+}
+
+export function ComicTeamDialog({projectId,open,onClose}){
+  const {data,setData,loading,error,refresh}=useAuthoringResource(projectId,getComicTeam);
+  const [members,setMembers]=useState([]),[username,setUsername]=useState(''),[busy,setBusy]=useState(false);
+  useEffect(()=>{setMembers(data?.state?.members||[]);},[data]);
+  const patch=(index,values)=>setMembers(rows=>rows.map((row,i)=>i===index?{...row,...values}:row));
+  async function save(){setBusy(true);try{setData(await saveComicTeam(projectId,{expected_revision:data?.state?.revision||0,members}));message.success('作品分享权限已保存');}catch(err){errorMessage(err);}finally{setBusy(false);}}
+  return <Modal title="作品协作权限" open={open} onCancel={onClose} width={680} onOk={save} confirmLoading={busy} okText="保存权限" cancelText="关闭"><ResourceError error={error} retry={refresh}/><Spin spinning={loading}><Alert type="info" showIcon message="默认只分享内容。允许生成会使用项目拥有者已配置的模型服务，请明确授权。"/><div className="comic-team-add"><Input value={username} onChange={event=>setUsername(event.target.value)} placeholder="输入本系统已有用户名"/><Button icon={<Users size={14}/>} onClick={()=>{const value=username.trim();if(!value)return;if(members.some(item=>item.username===value)){message.info('该成员已在列表中');return;}setMembers(rows=>[...rows,{username:value,read:true,edit:false,generate:false}]);setUsername('');}}>添加成员</Button></div>{members.map((member,index)=><div className="comic-team-member" key={member.username}><b>{member.username}</b><Checkbox checked={member.read} onChange={event=>patch(index,{read:event.target.checked,edit:event.target.checked&&member.edit,generate:event.target.checked&&member.generate})}>查看</Checkbox><Checkbox checked={member.edit} disabled={!member.read} onChange={event=>patch(index,{edit:event.target.checked})}>编辑</Checkbox><Checkbox checked={member.generate} disabled={!member.read} onChange={event=>patch(index,{generate:event.target.checked})}>允许生成</Checkbox><Button type="text" danger aria-label={`移除成员 ${member.username}`} icon={<Trash2 size={14}/>} onClick={()=>setMembers(rows=>rows.filter((_,i)=>i!==index))}/></div>)}</Spin></Modal>;
+}
+
+export function ComicDisplayDialog({projectId,open,onClose,onSaved,readOnly=false}){
+  const {data,setData,loading,error,refresh}=useAuthoringResource(projectId,getComicDisplay);
+  const [display,setDisplay]=useState({}),[busy,setBusy]=useState(false);
+  useEffect(()=>{setDisplay(data?.state?.display||{});},[data]);
+  async function save(){if(readOnly||loading||error)return;setBusy(true);try{const result=await saveComicDisplay(projectId,{expected_revision:data?.state?.revision||0,display});setData(result);onSaved?.(result.state?.display||display);message.success('显示偏好已保存');onClose();}catch(err){errorMessage(err);}finally{setBusy(false);}}
+  return <Modal title="当前作品显示设置" okButtonProps={{disabled:readOnly||loading||!!error}} open={open} onCancel={onClose} onOk={save} confirmLoading={busy} okText="保存" cancelText="取消"><ResourceError error={error} retry={refresh}/><Spin spinning={loading}><div className="comic-display-fields"><label>工作区布局<Select value={display.editor_version||'studio'} options={[{value:'studio',label:'新版 · 完整工作区'},{value:'classic',label:'经典 · 分步工作区'}]} onChange={editor_version=>setDisplay(current=>({...current,editor_version}))}/></label><label>打开作品时显示<Select value={display.active_tab||'source'} options={[['source','原文与剧本'],['chapters','章节规划'],['assets','资产库'],['storyboard','分镜工作台'],['production','自动生产'],['media','媒体与交付'],['assistant','作品助手']].map(([value,label])=>({value,label}))} onChange={active_tab=>setDisplay(current=>({...current,active_tab}))}/></label><label>正文字号<InputNumber min={12} max={22} value={display.font_size||14} onChange={font_size=>setDisplay(current=>({...current,font_size:font_size||14}))}/></label><label>收起步骤导航<Switch checked={!!display.sidebar_collapsed} onChange={sidebar_collapsed=>setDisplay(current=>({...current,sidebar_collapsed}))}/></label><label>显示辅助说明<Switch checked={display.show_descriptions!==false} onChange={show_descriptions=>setDisplay(current=>({...current,show_descriptions}))}/></label></div></Spin></Modal>;
+}

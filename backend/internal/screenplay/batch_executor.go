@@ -22,6 +22,7 @@ type BatchExecutor struct {
 	Store     Store
 	Generator TextGenerator
 	Media     BatchMediaRunner
+	Finalizer ProductionFinalizer
 }
 
 type BatchRunResult struct {
@@ -47,8 +48,40 @@ func (e BatchExecutor) RunNext(ctx context.Context, owner, projectID string) (Ba
 		return BatchRunResult{}, err
 	}
 	defer func() { _ = e.Store.ReleaseLock(context.Background(), lockName, token) }()
+	authoringLock := "authoring:" + owner + ":" + projectID
+	if err := e.Store.AcquireLock(ctx, authoringLock, token, 15*time.Minute); err != nil {
+		return BatchRunResult{}, err
+	}
+	defer func() { _ = e.Store.ReleaseLock(context.Background(), authoringLock, token) }()
+	if renewer, ok := e.Store.(productionLockRenewer); ok {
+		runCtx, cancel := context.WithCancel(ctx)
+		ctx = runCtx
+		defer cancel()
+		done := make(chan struct{})
+		defer close(done)
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-runCtx.Done():
+					return
+				case <-ticker.C:
+					for _, name := range []string{lockName, authoringLock} {
+						if err := renewer.RenewProductionLock(runCtx, name, token, 15*time.Minute); err != nil {
+							cancel()
+							return
+						}
+					}
+				}
+			}
+		}()
+	}
 
 	var unit Unit
+	var regenerate bool
 	started, err := e.Store.MutateBatch(ctx, owner, projectID, func(batch *Batch) error {
 		if NormalizeBatchStatus(batch.Status) == BatchPaused {
 			return fmt.Errorf("%w: 批次已暂停，请先继续任务", ErrInvalidState)
@@ -58,6 +91,12 @@ func (e BatchExecutor) RunNext(ctx context.Context, owner, projectID string) (Ba
 		if nextErr != nil {
 			return nextErr
 		}
+		if step := batch.Step(unit.StepKey); step != nil {
+			regenerate = step.Status == StepStale
+			if ep := step.Episodes[unit.Episode]; ep != nil && ep.Status == StepStale {
+				regenerate = true
+			}
+		}
 		return StartStep(batch, unit)
 	})
 	if err != nil {
@@ -65,7 +104,7 @@ func (e BatchExecutor) RunNext(ctx context.Context, owner, projectID string) (Ba
 	}
 	_ = e.Store.AppendBatchLog(ctx, started.ID, owner, "info", "开始执行："+unit.String())
 
-	outcome, runErr := e.executeUnit(ctx, owner, projectID, unit)
+	outcome, runErr := e.executeUnit(ctx, owner, projectID, unit, regenerate)
 	if runErr != nil {
 		if errors.Is(runErr, context.Canceled) || errors.Is(runErr, ErrUserCancelled) {
 			paused, persistErr := e.Store.MutateBatch(context.Background(), owner, projectID, func(batch *Batch) error {
@@ -80,6 +119,13 @@ func (e BatchExecutor) RunNext(ctx context.Context, owner, projectID string) (Ba
 		}
 		failed, persistErr := e.Store.MutateBatch(context.Background(), owner, projectID, func(batch *Batch) error {
 			FailStep(batch, unit, runErr.Error())
+			if regenerate && (unit.StepKey == "3_assets" || unit.StepKey == "5_storyboard") {
+				st := batch.Step(unit.StepKey)
+				st.Status = StepStale
+				if ep := st.Episodes[unit.Episode]; ep != nil {
+					ep.Status = StepStale
+				}
+			}
 			return nil
 		})
 		_ = e.Store.AppendBatchLog(context.Background(), started.ID, owner, "error", unit.String()+"失败："+runErr.Error())
@@ -90,6 +136,12 @@ func (e BatchExecutor) RunNext(ctx context.Context, owner, projectID string) (Ba
 	}
 
 	completed, err := e.Store.MutateBatch(ctx, owner, projectID, func(batch *Batch) error {
+		wasPaused := batch.Status == BatchPaused
+		defer func() {
+			if wasPaused {
+				batch.Status = BatchPaused
+			}
+		}()
 		if outcome.episodeCount > 0 {
 			for _, key := range []string{"5_storyboard", "6_storyboard_doctor", "7_video"} {
 				if step := batch.Step(key); step != nil {
@@ -111,7 +163,7 @@ func (e BatchExecutor) RunNext(ctx context.Context, owner, projectID string) (Ba
 	return BatchRunResult{Batch: completed, Unit: unit, Artifacts: outcome.artifacts}, nil
 }
 
-func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string, unit Unit) (batchUnitOutcome, error) {
+func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string, unit Unit, regenerate bool) (batchUnitOutcome, error) {
 	project, err := e.Store.GetProject(ctx, owner, projectID)
 	if err != nil {
 		return batchUnitOutcome{}, err
@@ -161,7 +213,7 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 		if activeErr != nil || strings.TrimSpace(document.Content) == "" {
 			return batchUnitOutcome{}, ErrNoActiveScript
 		}
-		return batchUnitOutcome{review: passingBatchReview(project, unit, "剧本结构完整，可以进入资产提取")}, nil
+		return e.doctor(ctx, project, unit, document.Content)
 
 	case "3_assets":
 		allArtifacts := make([]string, 0)
@@ -170,7 +222,7 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 			if listErr != nil {
 				return batchUnitOutcome{}, listErr
 			}
-			if len(rows) == 0 {
+			if len(rows) == 0 || regenerate {
 				if e.Generator == nil {
 					return batchUnitOutcome{}, fmt.Errorf("%w: %s资产为空且未配置文本模型", ErrInvalidState, kind)
 				}
@@ -190,6 +242,7 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 		return batchUnitOutcome{artifacts: allArtifacts}, nil
 
 	case "4_preset_doctor":
+		assets := []Asset{}
 		for _, kind := range []AssetType{AssetCharacter, AssetScene, AssetProp} {
 			rows, listErr := e.Store.ListAssets(ctx, owner, projectID, kind)
 			if listErr != nil {
@@ -198,15 +251,16 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 			if len(rows) == 0 {
 				return batchUnitOutcome{}, fmt.Errorf("%w: 缺少%s资产", ErrArtifactInvalid, kind)
 			}
+			assets = append(assets, rows...)
 		}
-		return batchUnitOutcome{review: passingBatchReview(project, unit, "角色、场景和道具均已登记")}, nil
+		return e.doctor(ctx, project, unit, assets)
 
 	case "5_storyboard":
 		episode := unit.Episode
 		if episode <= 0 {
 			episode = 1
 		}
-		if storyboard, found := existingBatchStoryboard(ctx, e.Store, owner, projectID, episode); found {
+		if storyboard, found := existingBatchStoryboard(ctx, e.Store, owner, projectID, episode); found && !regenerate {
 			return batchUnitOutcome{artifacts: []string{"storyboard://" + storyboard.ID}}, nil
 		}
 		if e.Generator == nil {
@@ -234,7 +288,7 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 		if !found || storyboard.ShotCount <= 0 || len(storyboard.Shots) == 0 {
 			return batchUnitOutcome{}, fmt.Errorf("%w: 第 %d 集没有可审核的分镜", ErrArtifactInvalid, episode)
 		}
-		return batchUnitOutcome{review: passingBatchReview(project, unit, fmt.Sprintf("第 %d 集分镜结构完整", episode))}, nil
+		return e.doctor(ctx, project, unit, storyboard)
 
 	case "7_video":
 		if e.Media == nil {
@@ -258,17 +312,24 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 		return batchUnitOutcome{artifacts: artifacts}, nil
 
 	case "8_finalize":
-		return batchUnitOutcome{artifacts: []string{"project://" + project.ID + "/completed"}}, nil
+		if e.Finalizer == nil {
+			return batchUnitOutcome{}, ErrClipsReady
+		}
+		artifacts, err := e.Finalizer.Finalize(ctx, project)
+		if err != nil {
+			return batchUnitOutcome{}, err
+		}
+		if len(artifacts) == 0 {
+			return batchUnitOutcome{}, fmt.Errorf("%w: 交付结果为空", ErrArtifactInvalid)
+		}
+		for _, a := range artifacts {
+			if !(strings.HasPrefix(a, "https://") || strings.HasPrefix(a, "/api/")) {
+				return batchUnitOutcome{}, fmt.Errorf("%w: 交付必须提供可访问媒体或工程", ErrArtifactInvalid)
+			}
+		}
+		return batchUnitOutcome{artifacts: artifacts}, nil
 	default:
 		return batchUnitOutcome{}, fmt.Errorf("%w: 未知批次步骤 %s", ErrInvalidArgument, unit.StepKey)
-	}
-}
-
-func passingBatchReview(project Project, unit Unit, summary string) *Review {
-	return &Review{
-		ID: newScreenplayID("review"), ProjectID: project.ID, OwnerUsername: project.OwnerUsername,
-		StepKey: unit.StepKey, TargetKey: unit.String(), Mode: "review", Pass: true,
-		BlockNextStep: false, Summary: summary, PromptID: unit.StepKey,
 	}
 }
 
