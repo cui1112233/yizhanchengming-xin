@@ -298,6 +298,45 @@ func TestOpenAICompatibleProviderRetainsUpstreamBodyAndClassifies400(t *testing.
 	}
 }
 
+// 中转返回“请求参数有误”的 400 时，去掉 response_format 并压低 max_tokens
+// 再试一次；模型不存在这类 400 不允许重试（见上一个用例）。
+func TestOpenAICompatibleProviderRetriesParameter400WithoutJSONMode(t *testing.T) {
+	var calls int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempt := atomic.AddInt32(&calls, 1)
+		var request map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if attempt == 1 {
+			if _, ok := request["response_format"]; !ok {
+				t.Fatalf("first attempt must carry response_format: %#v", request)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"code":"upstream_error","message":"请求参数有误，请检查后重试","param":null,"type":"invalid_request_error"}}`))
+			return
+		}
+		if _, ok := request["response_format"]; ok {
+			t.Fatalf("fallback must drop response_format: %#v", request)
+		}
+		if tokens, _ := request["max_tokens"].(float64); tokens > 8192 {
+			t.Fatalf("fallback max_tokens=%v, want <= 8192", tokens)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{}"}}]}`))
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatibleProvider{Endpoint: server.URL, APIKey: "test-key", Model: "gemini-3.7-flash-high", Client: server.Client()}
+	if _, err := provider.Complete(context.Background(), TextCompletionRequest{SystemPrompt: "s", UserPrompt: "u", MaxTokens: 24000}); err != nil {
+		t.Fatalf("parameter 400 must be recovered by the fallback: %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("calls=%d, want exactly one fallback request", got)
+	}
+}
+
 func TestOpenAICompatibleProviderRetriesRateLimitOnce(t *testing.T) {
 	var calls int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -203,6 +203,24 @@ func (p *OpenAICompatibleProvider) Validate() error {
 	return nil
 }
 
+// director400LooksLikeParameterRejection 判断 400 是否更像“参数不被上游接受”，
+// 而不是模型名/凭据错误。只有参数类 400 才值得去掉 response_format、压低
+// max_tokens 再试一次；模型不存在、密钥错误重试没有意义，还会多打一次上游。
+func director400LooksLikeParameterRejection(raw []byte) bool {
+	text := strings.ToLower(string(raw))
+	for _, deny := range []string{"model not found", "model_not_found", "模型不存在", "does not exist", "unauthorized", "insufficient"} {
+		if strings.Contains(text, deny) {
+			return false
+		}
+	}
+	for _, hint := range []string{"请求参数有误", "invalid_request_error", "unsupported", "response_format", "max_tokens", "param"} {
+		if strings.Contains(text, hint) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompletionRequest) (string, error) {
 	if err := p.Validate(); err != nil {
 		return "", err
@@ -232,7 +250,11 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	const maxAttempts = 3
 	var raw []byte
 	var statusCode int
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	// 部分 OpenAI 兼容中转会对 response_format 或超大的 max_tokens 直接返回
+	// 400「请求参数有误」。这种 400 不是凭据/余额问题，允许去掉 response_format
+	// 并把输出预算压到安全值后再试一次；仍然 400 才按确定性失败返回。
+	fallbackTried := false
+	for attempt := 1; attempt <= maxAttempts+1; attempt++ {
 		resp, reqErr := p.do(ctx, body)
 		if reqErr != nil {
 			if !directorProviderRetryableTransportError(reqErr) || attempt == maxAttempts {
@@ -260,7 +282,28 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		}
 		httpErr := &DirectorHTTPError{StatusCode: statusCode, Model: strings.TrimSpace(p.Model), Body: string(raw)}
 		log.Printf("director provider error model=%s status=%d endpoint=%s body=%s", p.Model, statusCode, directorProviderEndpointHost(p.Endpoint), directorHTTPBodySnippet(raw, 400))
-		if !directorProviderRetryableStatus(statusCode) || attempt == maxAttempts {
+		if statusCode == http.StatusBadRequest && !fallbackTried && director400LooksLikeParameterRejection(raw) {
+			fallbackTried = true
+			fallbackMaxTokens := input.MaxTokens
+			if fallbackMaxTokens > 8192 {
+				fallbackMaxTokens = 8192
+			}
+			fallbackPayload := map[string]any{
+				"model": p.Model,
+				"messages": []map[string]string{
+					{"role": "system", "content": input.SystemPrompt},
+					{"role": "user", "content": input.UserPrompt},
+				},
+				"temperature": input.Temperature,
+				"max_tokens":  fallbackMaxTokens,
+			}
+			if fallbackBody, marshalErr := json.Marshal(fallbackPayload); marshalErr == nil {
+				log.Printf("director provider retry without response_format model=%s endpoint=%s max_tokens=%d", p.Model, directorProviderEndpointHost(p.Endpoint), fallbackMaxTokens)
+				body = fallbackBody
+				continue
+			}
+		}
+		if !directorProviderRetryableStatus(statusCode) || attempt >= maxAttempts {
 			return "", httpErr
 		}
 		if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
