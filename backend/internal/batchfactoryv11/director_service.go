@@ -46,9 +46,7 @@ func hasCJK(text string) bool {
 }
 
 func isTruncatedDirectorOutput(err error) bool {
-	return err != nil && (errors.Is(err, errDirectorOutputTruncated) ||
-		// 兼容历史记录与测试替身使用的旧英文标记。
-		strings.Contains(err.Error(), "director provider output truncated (finish_reason=length)"))
+	return IsModelOutputTruncated(err)
 }
 
 func sourceDigest(source string) string {

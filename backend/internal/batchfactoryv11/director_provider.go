@@ -30,6 +30,19 @@ type DirectorHTTPError struct {
 // 更紧凑的提示词重试。用哨兵而不是英文文案匹配，避免界面被迫展示英文。
 var errDirectorOutputTruncated = fmt.Errorf("文本模型输出被长度截断，请重试或增大输出上限")
 
+// IsModelOutputTruncated 判断错误是否属于“模型输出被长度上限截断”。
+// 这类失败既可能是资产过多，也可能是模型把思考 token 计入输出预算，
+// 属于可重试的通道抖动，不能按配置错误直接判成永久失败。
+func IsModelOutputTruncated(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, errDirectorOutputTruncated) ||
+		strings.Contains(err.Error(), "文本模型输出被长度截断") ||
+		// 兼容历史记录与测试替身使用的旧英文标记。
+		strings.Contains(err.Error(), "director provider output truncated (finish_reason=length)")
+}
+
 // Error 只把中文结论交给界面；状态码、模型名、上游 JSON 与 request id 全部
 // 放到第二行「上游原文」里，由前端折叠到「展开原始信息」。
 func (e *DirectorHTTPError) Error() string {

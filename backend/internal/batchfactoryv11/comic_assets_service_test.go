@@ -3,8 +3,69 @@ package batchfactoryv11
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
+
+// seedComicAssetBook 准备一本已选漫画资产预设、可直接跑资产提取的书。
+func seedComicAssetBook(t *testing.T) (*MemoryStore, Batch, Book) {
+	t.Helper()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{
+		Title:      "漫画资产截断",
+		SourceText: "她叫林溪。周野推门进来。",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode": rawSetting(t, "comic"),
+			"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+				"enabled": true, "assets": map[string]any{"presetId": "batch-comic-assets", "body": "提取漫画资产"},
+			}}),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return store, batch, batch.Books[0]
+}
+
+func TestRunComicAssetExtractionRetriesWithCompactPromptAfterTruncation(t *testing.T) {
+	store, batch, book := seedComicAssetBook(t)
+	provider := &truncatingDirectorProvider{values: []string{"truncated", `{"characters":[{"name":"林溪","prompt":"短发女主"}],"scenes":[],"props":[]}`}}
+
+	assets, err := (&DirectorService{Store: store, Provider: provider}).RunComicAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
+	if err != nil {
+		t.Fatalf("comic asset extraction should recover from one truncated response: %v", err)
+	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("calls=%d, want exactly one compact retry", len(provider.calls))
+	}
+	if !strings.Contains(provider.calls[1].SystemPrompt, "更紧凑") || !provider.calls[1].DisableJSONResponse {
+		t.Fatalf("retry must request compact output without JSON response mode: %#v", provider.calls[1])
+	}
+	if len(assets) == 0 || assets[0].Name != "林溪" {
+		t.Fatalf("assets=%+v, want the recovered character", assets)
+	}
+}
+
+func TestRunComicAssetExtractionReportsTruncationAfterSecondAttempt(t *testing.T) {
+	store, batch, book := seedComicAssetBook(t)
+	provider := &alwaysTruncatingDirectorProvider{}
+
+	_, err := (&DirectorService{Store: store, Provider: provider}).RunComicAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
+	if err == nil || !strings.Contains(err.Error(), "长度截断") {
+		t.Fatalf("err=%v, want an explicit truncation action for the user", err)
+	}
+	if !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("err=%v, want ErrUnavailable so the stage can report a channel problem", err)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("calls=%d, want one original call plus one compact retry", provider.calls)
+	}
+}
 
 func TestNormalizeProductionModeRestoresLegacyEnabledComicModule(t *testing.T) {
 	mode := normalizeProductionMode(SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{

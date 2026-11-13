@@ -2413,6 +2413,11 @@ func retryableComicAutomationError(err error) bool {
 	if strings.Contains(message, "文本模型输出不符合当前格式要求") || strings.Contains(message, "可重试：") {
 		return true
 	}
+	// 输出被长度上限截断（资产过多，或思考 token 占用输出预算）同样是通道
+	// 抖动：稍后重跑有机会成功，不能按 ErrUnavailable 直接判成永久失败。
+	if batchfactoryv11.IsModelOutputTruncated(err) {
+		return true
+	}
 	for _, permanent := range []error{
 		batchfactoryv11.ErrConflict,
 		batchfactoryv11.ErrInvalid,

@@ -142,7 +142,25 @@ func (s *DirectorService) RunComicAssetExtraction(ctx context.Context, owner, ba
 	}
 	completion, err := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens})
 	if err != nil {
-		return nil, err
+		// 输出被长度截断可能是资产过多，也可能是模型把思考 token 计入了输出
+		// 预算。先用紧凑指令重试一次，避免一次截断就把整本书判成永久失败。
+		if !IsModelOutputTruncated(err) {
+			return nil, err
+		}
+		retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{
+			SystemPrompt:        contract.SystemPrompt + "\n上一轮输出因长度截断。请只保留原文实际出现的人物、场景和关键道具，名称与提示词都使用更紧凑的短语并减少输出量；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
+			UserPrompt:          contract.UserPrompt,
+			Temperature:         0.2,
+			MaxTokens:           contract.MaxTokens,
+			DisableJSONResponse: true,
+		})
+		if retryErr != nil {
+			if IsModelOutputTruncated(retryErr) {
+				return nil, fmt.Errorf("%w: 文本模型输出被长度截断，已自动压缩重试仍失败。请换用输出上限更大的文本模型后重试", ErrUnavailable)
+			}
+			return nil, retryErr
+		}
+		completion = retryCompletion
 	}
 	raw, err := ParseDirectorJSON(completion)
 	if err != nil {

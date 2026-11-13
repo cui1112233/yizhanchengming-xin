@@ -64,6 +64,9 @@ func TestClassifyFailureTable(t *testing.T) {
 		{"typed provider 401", shuihuoImageUpstreamError{StatusCode: http.StatusUnauthorized, Message: "上游拒绝了本次请求"}, "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
 		{"page not found", batchfactoryv11.ErrNotFound, "comic_images", automationCodePageNotFound, automationFailureDeterministic, false, false, 1},
 		{"page in flight", errors.New("该页正在生成，请勿重复提交"), "comic_images", automationCodePageInFlight, automationFailureTransient, false, false, 0},
+		// 输出被长度上限截断是模型/通道抖动，不能按 ErrUnavailable 判成永久失败：
+		// 首次失败即进入续跑队列，允许有限次自动回补。
+		{"model output truncated", fmt.Errorf("%w: 文本模型请求失败：文本模型输出被长度截断，请重试或增大输出上限", batchfactoryv11.ErrUnavailable), "comic_assets", automationCodeTransient, automationFailureTransient, true, false, automationRetryEscalationThreshold},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -81,6 +84,21 @@ func TestClassifyFailureTable(t *testing.T) {
 				t.Fatalf("maxAttempts=%d, want %d", got.MaxAttempts, tc.wantMaxAttempts)
 			}
 		})
+	}
+}
+
+func TestTruncatedModelOutputStaysRetryable(t *testing.T) {
+	for _, message := range []string{
+		"文本模型请求失败：文本模型输出被长度截断，请重试或增大输出上限",
+		"文本模型请求失败：文本模型输出被长度截断，已自动压缩重试仍失败。请换用输出上限更大的文本模型后重试",
+	} {
+		err := fmt.Errorf("%w: %s", batchfactoryv11.ErrUnavailable, message)
+		if !retryableComicAutomationError(err) {
+			t.Fatalf("%q 必须保持可重试，否则整本会被误判为确定性失败", message)
+		}
+		if deterministicAutomationFailure(err) {
+			t.Fatalf("%q 不得判为确定性失败", message)
+		}
 	}
 }
 

@@ -81,19 +81,19 @@ const automationBilledNotRetrievedMessage = "上游已出图但我们没收到�
 // automationManualCodeLabels 把内部稳定错误码翻成用户能直接理解的中文。
 // 页面和任务卡片不再直接展示 AUTH_OR_QUOTA 这类内部码。
 var automationManualCodeLabels = map[string]string{
-	automationCodeAuthQuota:           "图片通道余额不足或 Key 无效，请处理后重试",
-	automationCodeBilledNotRetrieved:  automationBilledNotRetrievedMessage,
-	automationCodeContentPolicy:       "提示词被内容审核拒绝，需要人工检查",
-	automationCodeContentSoftRefusal:  "上游以对话方式拒绝了提示词，需要人工检查",
-	automationCodeImageBodyStalled:    "图片正文传输中断，可手动重试",
-	automationCodeImageBodySlow:       "图片正文传输超时，可手动重试",
-	automationCodeProviderTimeout:     "出图请求超时，可重试",
-	automationCodePublishUnconfirmed:  "发布结果未确认，需要人工核对",
-	automationCodePageNotFound:        "找不到对应漫画页，需要人工检查",
-	automationCodePromptMissing:       "缺少漫画提示词，需要重新分析",
-	automationCodePromptFailed:        "漫画提示词生成失败，可重试",
-	automationCodePageRejected:        "上游拒绝了该页请求，需要人工处理",
-	automationCodePageShortage:        "漫画页数量不足，需要人工检查",
+	automationCodeAuthQuota:          "图片通道余额不足或 Key 无效，请处理后重试",
+	automationCodeBilledNotRetrieved: automationBilledNotRetrievedMessage,
+	automationCodeContentPolicy:      "提示词被内容审核拒绝，需要人工检查",
+	automationCodeContentSoftRefusal: "上游以对话方式拒绝了提示词，需要人工检查",
+	automationCodeImageBodyStalled:   "图片正文传输中断，可手动重试",
+	automationCodeImageBodySlow:      "图片正文传输超时，可手动重试",
+	automationCodeProviderTimeout:    "出图请求超时，可重试",
+	automationCodePublishUnconfirmed: "发布结果未确认，需要人工核对",
+	automationCodePageNotFound:       "找不到对应漫画页，需要人工检查",
+	automationCodePromptMissing:      "缺少漫画提示词，需要重新分析",
+	automationCodePromptFailed:       "漫画提示词生成失败，可重试",
+	automationCodePageRejected:       "上游拒绝了该页请求，需要人工处理",
+	automationCodePageShortage:       "漫画页数量不足，需要人工检查",
 }
 
 // automationManualReasonText 支持用 "/" 连接多个原因码，逐段翻译。
@@ -235,6 +235,17 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 			CountsTowardRetryBudget: true, MinAttemptsBeforeRetry: 1,
 			MaxAttempts: comicPromptRepairMaxRounds, BudgetKey: budget,
 		}
+	case batchfactoryv11.IsModelOutputTruncated(err):
+		// 模型输出被长度上限截断（资产过多，或思考 token 占用了输出预算）是
+		// 通道抖动，不是配置错误。必须允许有限次自动回补，不能把整本书直接
+		// 判成“确定性失败，跳过回补”。
+		d := base
+		d.Code = automationCodeTransient
+		d.MinAttemptsBeforeRetry = 1
+		d.MaxAttempts = automationRetryEscalationThreshold
+		d.BaseBackoff = 30 * time.Second
+		d.MaxBackoff = 5 * time.Minute
+		return d
 	case errors.Is(err, errShuihuoImageContentPolicy) || strings.Contains(msg, "content policy") ||
 		strings.Contains(msg, "内容审核"):
 		// 硬审核拒绝：每轮改写一次提示词。达到 comicPromptRepairMaxRounds
