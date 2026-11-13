@@ -17,6 +17,7 @@ import { DEFAULT_PET_ID, dispatchPetSelection, getPetDefinition, getPetOptions, 
 import { LittleCompanionSprite } from '../../shared/pet/LittleCompanionSprite';
 import { ThemePicker } from '../../shared/components/ThemePicker';
 import { WindowBackgroundPicker } from '../../shared/components/WindowBackgroundPicker';
+import { previewBatchCompletionSound } from '../../shared/notifications/installBatchCompletionNotifications.js';
 
 const petOptions = getPetOptions();
 
@@ -355,7 +356,12 @@ export function SettingsPage({ theme = '', themePreference = 'system', onThemeCh
           <Form.Item label="提示音" name="soundEnabled" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Typography.Paragraph type="secondary">用于在剧本人物/场景提取完成、剧本创作完成时提醒；提取或生成失败（如网络、404、鉴权错误）时播放警示音。</Typography.Paragraph>
+          <Typography.Paragraph type="secondary">用于批量工厂全部任务完成、剧本人物/场景提取完成和剧本创作完成时提醒；提取或生成失败（如网络、404、鉴权错误）时播放警示音。</Typography.Paragraph>
+          <Button size="small" disabled={!soundEnabled || soundVolumePercent === 0} onClick={async () => {
+            const played = await previewBatchCompletionSound({soundEnabled: soundEnabled !== false, soundVolume: soundVolumePercent}, {getPreferences: () => ({soundEnabled: form.getFieldValue('soundEnabled') !== false, soundVolume: form.getFieldValue('soundVolume')})});
+            if (played) message.success('已播放整批完成提示音');
+            else message.warning('暂时无法播放，请重新点击试听');
+          }}>试听整批完成音</Button>
           <Form.Item label="提示音音量">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Form.Item name="soundVolume" noStyle>

@@ -20,8 +20,10 @@ import '../shared/styles/cinematic-glass.css';
 import '../shared/styles/frosted-surfaces.css';
 import { installClientErrorReporting } from '../shared/error-reporting';
 import { UserApp } from './App';
+import { installBatchCompletionNotifications } from '../shared/notifications/installBatchCompletionNotifications.js';
 
 installClientErrorReporting();
+installBatchCompletionNotifications();
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
