@@ -312,8 +312,76 @@ func TestClaimAutomationPriorityBookReclaimsStaleRunningEntry(t *testing.T) {
 	}
 }
 
-// run 记录还在（liveRun=true）但 job 与所有书长时间无任何进展时必须回收，
-// 否则界面会一直显示“正在执行”，重试接口还会返回 409。
+// 槽位必须按申请顺序发放：普通 channel 的唤醒顺序随机，会让先排队的书被
+// 其他批次反复插队。
+func TestComicSlotQueueServesWaitersInArrivalOrder(t *testing.T) {
+	queue := newAutomationComicSlotQueue(1)
+	if err := queue.acquire(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	order := make(chan int, 3)
+	for index := 0; index < 3; index++ {
+		waiter := index
+		go func() {
+			if err := queue.acquire(context.Background(), nil); err != nil {
+				return
+			}
+			order <- waiter
+			queue.release()
+		}()
+		// 让 goroutine 先进入等待队列，保证 index 即排队顺序。
+		time.Sleep(20 * time.Millisecond)
+	}
+	queue.release()
+
+	got := make([]int, 0, 3)
+	for index := 0; index < 3; index++ {
+		select {
+		case value := <-order:
+			got = append(got, value)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("waiters not served in time: %v", got)
+		}
+	}
+	for index, value := range got {
+		if value != index {
+			t.Fatalf("served order = %v, want [0 1 2]", got)
+		}
+	}
+}
+
+// 取消排队的书必须从队列里摘掉，否则会占着位置让后面的书永远等不到。
+func TestComicSlotQueueCancelRemovesWaiter(t *testing.T) {
+	queue := newAutomationComicSlotQueue(1)
+	if err := queue.acquire(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- queue.acquire(ctx, nil)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	if err := <-done; err == nil {
+		t.Fatal("cancelled waiter must return an error")
+	}
+	queue.release()
+
+	next := make(chan struct{}, 1)
+	go func() {
+		if err := queue.acquire(context.Background(), nil); err == nil {
+			next <- struct{}{}
+			queue.release()
+		}
+	}()
+	select {
+	case <-next:
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled waiter leaked a slot")
+	}
+}
+
 func TestZombieRunningJobWithoutRecentProgressIsReclaimable(t *testing.T) {
 	now := time.Date(2026, 11, 13, 7, 52, 0, 0, time.UTC)
 	stale := now.Add(-30 * time.Minute).Format(time.RFC3339Nano)

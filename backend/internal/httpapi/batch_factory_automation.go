@@ -69,7 +69,89 @@ type BatchAutomationCoordinator struct {
 	// comicRunSlots 限制同时进入“资产+页图”出图的书籍数量。出图是最贵的上游
 	// 环节，多本同时各开多页并发会把请求全堵在队列里，每本都缺几页、谁也无法
 	// 提交。改成按本串行后，一本出完并发布，下一本才开始出图。
-	comicRunSlots chan struct{}
+	// 队列按申请顺序（FIFO）发放槽位，避免不同批次的书互相插队导致饥饿。
+	comicRunSlots *automationComicSlotQueue
+}
+
+// automationComicSlotQueue 是带 FIFO 顺序的信号量。普通 buffered channel 的
+// 唤醒顺序由调度器决定，多批次同时抢槽位时后来者可能先拿到，先排队的书会被
+// 无限插队。这里显式维护等待队列，释放时只唤醒队首。
+type automationComicSlotQueue struct {
+	mu       sync.Mutex
+	capacity int
+	active   int
+	waiters  []chan struct{}
+}
+
+func newAutomationComicSlotQueue(capacity int) *automationComicSlotQueue {
+	if capacity < 1 {
+		capacity = 1
+	}
+	return &automationComicSlotQueue{capacity: capacity}
+}
+
+// acquire 阻塞直到拿到槽位。排队期间每分钟调用一次 onWait（用于写排队心跳），
+// ctx 取消时把自己从队列里摘掉；若取消瞬间槽位已经发放，则把它还给队列。
+func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func()) error {
+	q.mu.Lock()
+	if q.active < q.capacity && len(q.waiters) == 0 {
+		q.active++
+		q.mu.Unlock()
+		return nil
+	}
+	ready := make(chan struct{})
+	q.waiters = append(q.waiters, ready)
+	q.mu.Unlock()
+
+	if onWait != nil {
+		onWait()
+	}
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ready:
+			return nil
+		case <-ticker.C:
+			if onWait != nil {
+				onWait()
+			}
+		case <-ctx.Done():
+			if !q.removeWaiter(ready) {
+				// 槽位已经发放给自己，归还后再退出，避免容量泄漏。
+				q.release()
+			}
+			return ctx.Err()
+		}
+	}
+}
+
+// release 释放槽位；有等待者时直接把槽位交给队首（active 不变）。
+func (q *automationComicSlotQueue) release() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if len(q.waiters) > 0 {
+		next := q.waiters[0]
+		q.waiters = q.waiters[1:]
+		close(next)
+		return
+	}
+	if q.active > 0 {
+		q.active--
+	}
+}
+
+// removeWaiter 把仍在排队的自己摘掉；返回 false 表示已经拿到槽位。
+func (q *automationComicSlotQueue) removeWaiter(ready chan struct{}) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for index, waiter := range q.waiters {
+		if waiter == ready {
+			q.waiters = append(q.waiters[:index], q.waiters[index+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 // comicSlotStallTimeout 是出图槽位的停滞上限。持槽书本超过这个时间没有任何
@@ -197,7 +279,7 @@ func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets Automati
 	if len(providerSync) > 0 {
 		syncProvider = providerSync[0]
 	}
-	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now, providerSync: syncProvider, comicRunSlots: make(chan struct{}, comicBookGenerationConcurrency())}
+	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now, providerSync: syncProvider, comicRunSlots: newAutomationComicSlotQueue(comicBookGenerationConcurrency())}
 }
 
 func (c *BatchAutomationCoordinator) SetAutomationStateStore(store AutomationStateStore) {
@@ -940,7 +1022,7 @@ func markAutomationBookStarted(entry map[string]any, now time.Time) bool {
 		return prepareAutomationBookRetry(entry, automationNumberValue(entry["batchRetryCount"], 0), now)
 	}
 	if automationStringValue(entry["status"], "") == "queued" {
-		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "assets", "并发槽位已获得，开始执行", now
+		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "assets", "已认领，等待出图槽位", now
 		return true
 	}
 	return false
@@ -3832,36 +3914,25 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						// 不会再出现“每本都缺几页、一本也提交不了”。
 						// 等待期间持续刷新整本心跳，避免排队被误判成停滞而取消。
 						if c.comicRunSlots != nil {
-							waitTicker := time.NewTicker(time.Minute)
 							waitStarted := c.now()
 							// 排队等待期间必须把状态写回前端，否则界面一直显示
 							// “正在逐页生成”却没有任何页产出；耐久层也会因为长时间
 							// 没有写入把正常排队的 job 误判成僵尸。
 							writeQueueWait := func() {
 								entryLogMu.Lock()
-								entry["message"] = fmt.Sprintf("正在排队等待出图槽位（同一时间只生成一本书，已等待 %d 分钟）",
+								entry["message"] = fmt.Sprintf("正在排队等待出图槽位（按顺序排队，已等待 %d 分钟）",
 									int(c.now().Sub(waitStarted).Minutes()))
 								entry["updatedAt"] = c.now()
+								if generationLease != nil {
+									generationLease.touch(comicGenerationIdleExtend)
+								}
 								persist()
 								entryLogMu.Unlock()
 							}
-							writeQueueWait()
-							for waiting := true; waiting; {
-								select {
-								case c.comicRunSlots <- struct{}{}:
-									waiting = false
-								case <-waitTicker.C:
-									if generationLease != nil {
-										generationLease.touch(comicGenerationIdleExtend)
-									}
-									writeQueueWait()
-								case <-generateCtx.Done():
-									waitTicker.Stop()
-									return batchfactoryv11.ComicCollection{}, generateCtx.Err()
-								}
+							if err := c.comicRunSlots.acquire(generateCtx, writeQueueWait); err != nil {
+								return batchfactoryv11.ComicCollection{}, err
 							}
-							waitTicker.Stop()
-							defer func() { <-c.comicRunSlots }()
+							defer c.comicRunSlots.release()
 						}
 						// 出图槽位看门狗：占着槽位却长时间没有任何真实进展时，主动
 						// 中止本次尝试并立刻释放槽位，让下一本先出图；本书按失败处理，
