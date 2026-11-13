@@ -944,7 +944,7 @@ func TestAutomationGlobalPreflightIgnoresBookConfig(t *testing.T) {
 func TestAutomationBookPreflightReason(t *testing.T) {
 	coordinator := &BatchAutomationCoordinator{}
 	batch := batchfactoryv11.Batch{}
-	book := batchfactoryv11.Book{ID: "book-1", Title: "书一"}
+	book := batchfactoryv11.Book{ID: "book-1", Title: "书一", SourceText: "第一章 正文内容"}
 	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "execute_only"); !strings.Contains(reason, "文本模型") {
 		t.Fatalf("reason=%q, want missing text model", reason)
 	}
@@ -980,7 +980,7 @@ func TestAutomationBookPreflightChecksComicPublishDirectory(t *testing.T) {
 		"productionMode":       json.RawMessage(`"comic"`),
 		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","organizationName":"博量","producerAdminName":"制作者","workIds":[9001]}`),
 	}}}
-	book := batchfactoryv11.Book{ID: "book-1", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+	book := batchfactoryv11.Book{ID: "book-1", SourceText: "第一章 正文内容", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
 		"textModelId":     json.RawMessage(`"text-1"`),
 		"imageModelId":    json.RawMessage(`"image-1"`),
 		"publishSettings": json.RawMessage(`{"websiteProfileId":"p1"}`),
@@ -1016,7 +1016,7 @@ func TestAutomationBookPreflightChecksComicPublishDirectory(t *testing.T) {
 		"productionMode":       json.RawMessage(`"video"`),
 		"comicPublishSettings": json.RawMessage(`{"organizationId":"1"}`),
 	}}}
-	videoBook := batchfactoryv11.Book{ID: "book-3", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+	videoBook := batchfactoryv11.Book{ID: "book-3", SourceText: "第一章 正文内容", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
 		"textModelId":  json.RawMessage(`"text-1"`),
 		"videoModelId": json.RawMessage(`"video-1"`),
 	}}}

@@ -551,6 +551,11 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 		})
 	}
 	if runMode == "full_submit" {
+		// 正文尚未获取的书不参与发布/分类校验：运行时会先自动补抓正文，
+		// 补抓失败只影响这本书，不能因为男女频/风格为空把整批卡在预检。
+		if len(productionLines(book)) == 0 {
+			return issues
+		}
 		publishIssues := automationBookPublishIssues(productionMode, effective)
 		issues = append(issues, publishIssues...)
 		if productionMode == "comic" && len(publishIssues) == 0 && c.comicPublishPreflight != nil {
