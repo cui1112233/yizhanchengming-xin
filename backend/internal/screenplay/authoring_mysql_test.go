@@ -17,7 +17,10 @@ func TestMySQLAuthoringPersistsAcrossRepositoriesAndRejectsConflict(t *testing.T
 	defer db.Close()
 	repo := NewMySQLStore(db).AuthoringRepository()
 	st := AuthoringState{Owner: "alice", ProjectID: "p", Chapters: []Chapter{{ID: "c", Title: "章", ScriptText: "持久结果"}}}
-	m.ExpectExec("INSERT IGNORE INTO screenplay_authoring").WithArgs("p", "alice", int64(1), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	initial := st
+	initial.Revision = 1
+	initialJSON, _ := json.Marshal(initial)
+	m.ExpectExec("INSERT IGNORE INTO screenplay_authoring").WithArgs("p", "alice", int64(1), string(initialJSON)).WillReturnResult(sqlmock.NewResult(1, 1))
 	st, e = repo.Save(ctx, st, 0)
 	if e != nil {
 		t.Fatal(e)
@@ -29,7 +32,10 @@ func TestMySQLAuthoringPersistsAcrossRepositoriesAndRejectsConflict(t *testing.T
 	if e != nil || got.Chapters[0].ScriptText != "持久结果" || got.Revision != 1 {
 		t.Fatal(got, e)
 	}
-	m.ExpectExec("UPDATE screenplay_authoring").WithArgs(sqlmock.AnyArg(), int64(2), "p", "alice", int64(1)).WillReturnResult(sqlmock.NewResult(0, 0))
+	next := got
+	next.Revision = 2
+	nextJSON, _ := json.Marshal(next)
+	m.ExpectExec("UPDATE screenplay_authoring").WithArgs(string(nextJSON), int64(2), "p", "alice", int64(1)).WillReturnResult(sqlmock.NewResult(0, 0))
 	if _, e = other.Save(ctx, got, 1); !errors.Is(e, ErrRevisionConflict) {
 		t.Fatal(e)
 	}

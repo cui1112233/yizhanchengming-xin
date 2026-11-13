@@ -35,9 +35,9 @@ func (r *MySQLAuthoringRepository) Save(ctx context.Context, st AuthoringState, 
 	}
 	var result sql.Result
 	if v == 0 {
-		result, e = r.db.ExecContext(ctx, `INSERT IGNORE INTO screenplay_authoring(project_id,owner_username,revision,body) VALUES(?,?,?,?)`, st.ProjectID, st.Owner, st.Revision, b)
+		result, e = r.db.ExecContext(ctx, `INSERT IGNORE INTO screenplay_authoring(project_id,owner_username,revision,body) VALUES(?,?,?,?)`, st.ProjectID, st.Owner, st.Revision, string(b))
 	} else {
-		result, e = r.db.ExecContext(ctx, `UPDATE screenplay_authoring SET body=?,revision=? WHERE project_id=? AND owner_username=? AND revision=?`, b, st.Revision, st.ProjectID, st.Owner, v)
+		result, e = r.db.ExecContext(ctx, `UPDATE screenplay_authoring SET body=?,revision=? WHERE project_id=? AND owner_username=? AND revision=?`, string(b), st.Revision, st.ProjectID, st.Owner, v)
 	}
 	if e != nil {
 		return AuthoringState{}, e

@@ -84,7 +84,7 @@ func (s *MySQLStore) SaveShotTask(ctx context.Context, t ShotTask) error {
 	if e != nil {
 		return e
 	}
-	_, e = s.db.ExecContext(ctx, `INSERT INTO screenplay_production_shots(owner_username,project_id,storyboard_id,shot_seq,request_hash,payload,updated_at) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE payload=VALUES(payload),updated_at=VALUES(updated_at)`, t.Owner, t.ProjectID, t.StoryboardID, t.Seq, t.RequestHash, raw, t.UpdatedAt)
+	_, e = s.db.ExecContext(ctx, `INSERT INTO screenplay_production_shots(owner_username,project_id,storyboard_id,shot_seq,request_hash,payload,updated_at) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE payload=VALUES(payload),updated_at=VALUES(updated_at)`, t.Owner, t.ProjectID, t.StoryboardID, t.Seq, t.RequestHash, string(raw), t.UpdatedAt)
 	return e
 }
 func (s *MySQLStore) ListShotTasks(ctx context.Context, owner, id string) ([]ShotTask, error) {

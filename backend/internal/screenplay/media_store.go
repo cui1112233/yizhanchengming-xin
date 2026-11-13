@@ -120,7 +120,7 @@ func (s *MySQLStore) MutateMedia(ctx context.Context, o, p string, fn func(*Medi
 	if err != nil {
 		return out, err
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE screenplay_media_workbench SET state_json=? WHERE owner_username=? AND project_id=?", raw, o, p)
+	_, err = tx.ExecContext(ctx, "UPDATE screenplay_media_workbench SET state_json=? WHERE owner_username=? AND project_id=?", string(raw), o, p)
 	if err != nil {
 		return out, err
 	}

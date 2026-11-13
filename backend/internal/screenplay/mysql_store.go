@@ -166,7 +166,7 @@ func (s *MySQLStore) CreateBatch(ctx context.Context, batch *Batch) error {
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		batch.ID, batch.ProjectID, batch.OwnerUsername, batch.SessionID, string(batch.Status),
 		batch.CurrentStep, batch.CurrentEpisode, batch.PlanVersion, string(batch.PermissionMode),
-		pending, batch.LastError, batch.Revision, batch.CreatedAt, batch.UpdatedAt, batch.LastRunAt)
+		jsonDocumentText(pending), batch.LastError, batch.Revision, batch.CreatedAt, batch.UpdatedAt, batch.LastRunAt)
 	var mysqlErr *mysql.MySQLError
 	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
 		return fmt.Errorf("%w: 项目 %s 已存在批次", ErrInvalidArgument, batch.ProjectID)
@@ -259,7 +259,7 @@ session_id = ?, status = ?, current_step = ?, current_episode = ?, plan_version 
 pending_actions = ?, last_error = ?, revision = revision + 1, updated_at = ?, last_run_at = ?
 WHERE id = ? AND owner_username = ? AND revision = ?`,
 		batch.SessionID, string(NormalizeBatchStatus(batch.Status)), batch.CurrentStep, batch.CurrentEpisode,
-		batch.PlanVersion, string(batch.PermissionMode), pending, batch.LastError, batch.UpdatedAt,
+		batch.PlanVersion, string(batch.PermissionMode), jsonDocumentText(pending), batch.LastError, batch.UpdatedAt,
 		batch.LastRunAt, batch.ID, batch.OwnerUsername, expectedRevision)
 	if err != nil {
 		return err
@@ -410,7 +410,7 @@ ON DUPLICATE KEY UPDATE status = VALUES(status), total_episodes = VALUES(total_e
 started_at = VALUES(started_at), finished_at = VALUES(finished_at), artifacts = VALUES(artifacts),
 error = VALUES(error), review = VALUES(review)`,
 			batch.ID, batch.OwnerUsername, def.Key, string(state.Status), state.TotalEpisodes,
-			state.StartedAt, state.FinishedAt, artifacts, nullString(state.Error), nullableBytes(review))
+			state.StartedAt, state.FinishedAt, jsonDocumentText(artifacts), nullString(state.Error), nullableBytes(review))
 		if err != nil {
 			return err
 		}
@@ -507,7 +507,14 @@ func nullableBytes(value []byte) any {
 	if len(value) == 0 {
 		return nil
 	}
-	return value
+	return string(value)
+}
+
+func jsonDocumentText(value []byte) string {
+	if len(value) == 0 {
+		return "null"
+	}
+	return string(value)
 }
 
 func nullString(value string) any {
