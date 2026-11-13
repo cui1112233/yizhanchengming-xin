@@ -318,7 +318,7 @@ export function fetchBookOriginal(batchId, bookId, options = {}) {
       ...(Number(options.maxTxt) > 0 ? { maxTxt: Number(options.maxTxt) } : {}),
       ...(String(options.platform || '').trim() ? { platform: String(options.platform).trim() } : {})
     }),
-    timeoutMs: LONG_RUNNING_API_TIMEOUT_MS
+    timeoutMs: Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : LONG_RUNNING_API_TIMEOUT_MS
   });
 }
 

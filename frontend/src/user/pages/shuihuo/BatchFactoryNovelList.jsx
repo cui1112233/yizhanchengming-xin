@@ -4006,7 +4006,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             metadata: { ...(book.sourceMetadata || {}), originalReadStage: 'direct', originalReadError: '', contentPending: true },
             expectedRevision: Number(book.revision || 0)
           });
-          await fetchBookOriginal(batch.id, book.id);
+          // 单本直取最多等 90 秒；书城上游偶发长时间无响应时不能拖住整次添加。
+          await fetchBookOriginal(batch.id, book.id, { timeoutMs: 90000 });
           latestBatch = resultData(await getBatch(batch.id), 'batch');
           const refreshedBook = findRegisteredGiantMaterialBook(latestBatch?.books, entry.giantMaterialId);
           if (refreshedBook?.id) {
