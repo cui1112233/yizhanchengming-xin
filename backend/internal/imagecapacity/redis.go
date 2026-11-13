@@ -204,7 +204,11 @@ func NewController(repo Repository, do func(context.Context, ...string) (any, er
 	if prefix == "" {
 		prefix = "qiantie:imagecapacity"
 	}
-	return &Controller{repo: repo, do: do, prefix: prefix, heartbeat: 10 * time.Second, horizon: 30 * time.Minute, cacheTTL: time.Second, cache: make(map[string]cachedPolicy)}
+	// horizon 是租约的最长存活时间，也是进程被杀后旧租约自动失效的时间。
+	// 单张图现在有 60 秒响应头 + 120 秒正文停滞超时，正常不会超过 3 分钟；
+	// 原来 30 分钟会让重启前遗留的租约把出图池占满半小时，表现就是
+	// “重启后一直没有任何图片请求，也不报错”。
+	return &Controller{repo: repo, do: do, prefix: prefix, heartbeat: 10 * time.Second, horizon: 3 * time.Minute, cacheTTL: time.Second, cache: make(map[string]cachedPolicy)}
 }
 func (c *Controller) Resolve(ctx context.Context, r Request) (Policy, error) {
 	if c == nil || c.repo == nil || c.do == nil {
