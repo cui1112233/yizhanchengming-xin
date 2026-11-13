@@ -702,11 +702,12 @@ const automationZombieRunningIdleTimeout = automationStallTimeout + 2*time.Minut
 const automationZombieRunlessIdleTimeout = 2 * time.Minute
 
 // automationZombieStaleProgressTimeout 是“run 记录还在、但 job 与所有书都
-// 没有任何进展”的兜底阈值。视频等待自身 10 分钟无进展就会收口，15 分钟
-// 仍未写过任何状态说明执行轮次已经消失。
-const automationZombieStaleProgressTimeout = 15 * time.Minute
+// 没有任何进展”的兜底阈值。排队等出图槽位时每分钟都会刷新心跳，所以超过
+// 5 分钟完全没写入说明执行轮次已经消失；此时任务应尽快停止并把书标成失败，
+// 让用户直接点重试，而不是一直显示“正在执行”。
+const automationZombieStaleProgressTimeout = 5 * time.Minute
 
-const automationZombieRunningMessage = "执行轮次已失效（长时间无进展）"
+const automationZombieRunningMessage = "执行已中断（长时间没有进展），请点击重试"
 
 // snapshotLiveRuns 返回当前进程里仍有 run goroutine 的 job 集合。
 // 在进入状态锁之前调用，避免 mu → controlMu 的锁顺序。
