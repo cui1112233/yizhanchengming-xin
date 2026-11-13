@@ -56,9 +56,9 @@ func (s *MySQLStore) SaveScreenplay(ctx context.Context, doc Document, shots []S
 		return Document{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO screenplay_documents
-(id, project_id, owner_username, source, version, status, content, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		doc.ID, doc.ProjectID, doc.OwnerUsername, doc.Source, doc.Version, doc.Status, doc.Content,
+(id, project_id, owner_username, source, version, status, content, raw_result, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		doc.ID, doc.ProjectID, doc.OwnerUsername, doc.Source, doc.Version, doc.Status, doc.Content, doc.RawResult,
 		doc.ContentSHA256, doc.ChapterCount, doc.EpisodeCount, doc.SegmentCount, doc.Revision, doc.CreatedAt, doc.UpdatedAt); err != nil {
 		return Document{}, err
 	}
@@ -115,10 +115,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 
 func (s *MySQLStore) ActiveDocument(ctx context.Context, owner, projectID string) (Document, error) {
 	var doc Document
-	err := s.db.QueryRowContext(ctx, `SELECT id, project_id, owner_username, source, version, status, content, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
+	err := s.db.QueryRowContext(ctx, `SELECT id, project_id, owner_username, source, version, status, content, COALESCE(raw_result, ''), content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
 FROM screenplay_documents WHERE project_id = ? AND owner_username = ? AND status = 'active' ORDER BY version DESC LIMIT 1`,
 		projectID, owner).Scan(&doc.ID, &doc.ProjectID, &doc.OwnerUsername, &doc.Source, &doc.Version, &doc.Status,
-		&doc.Content, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
+		&doc.Content, &doc.RawResult, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
 		&doc.Revision, &doc.CreatedAt, &doc.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Document{}, ErrNoActiveScript
@@ -128,10 +128,10 @@ FROM screenplay_documents WHERE project_id = ? AND owner_username = ? AND status
 
 func (s *MySQLStore) GetDocument(ctx context.Context, owner, projectID, documentID string) (Document, error) {
 	var doc Document
-	err := s.db.QueryRowContext(ctx, `SELECT id, project_id, owner_username, source, version, status, content, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
+	err := s.db.QueryRowContext(ctx, `SELECT id, project_id, owner_username, source, version, status, content, COALESCE(raw_result, ''), content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
 FROM screenplay_documents WHERE id = ? AND project_id = ? AND owner_username = ?`, documentID, projectID, owner).
 		Scan(&doc.ID, &doc.ProjectID, &doc.OwnerUsername, &doc.Source, &doc.Version, &doc.Status,
-			&doc.Content, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
+			&doc.Content, &doc.RawResult, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
 			&doc.Revision, &doc.CreatedAt, &doc.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Document{}, fmt.Errorf("%w: 剧本版本 %s", ErrNotFound, documentID)
@@ -140,7 +140,7 @@ FROM screenplay_documents WHERE id = ? AND project_id = ? AND owner_username = ?
 }
 
 func (s *MySQLStore) ListDocuments(ctx context.Context, owner, projectID string) ([]Document, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, project_id, owner_username, source, version, status, '' AS content, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
+	rows, err := s.db.QueryContext(ctx, `SELECT id, project_id, owner_username, source, version, status, '' AS content, '' AS raw_result, content_sha256, chapter_count, episode_count, segment_count, revision, created_at, updated_at
 FROM screenplay_documents WHERE project_id = ? AND owner_username = ? ORDER BY version DESC`, projectID, owner)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ FROM screenplay_documents WHERE project_id = ? AND owner_username = ? ORDER BY v
 	for rows.Next() {
 		var doc Document
 		if err := rows.Scan(&doc.ID, &doc.ProjectID, &doc.OwnerUsername, &doc.Source, &doc.Version, &doc.Status,
-			&doc.Content, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
+			&doc.Content, &doc.RawResult, &doc.ContentSHA256, &doc.ChapterCount, &doc.EpisodeCount, &doc.SegmentCount,
 			&doc.Revision, &doc.CreatedAt, &doc.UpdatedAt); err != nil {
 			return nil, err
 		}

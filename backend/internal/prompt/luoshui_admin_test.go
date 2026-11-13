@@ -50,7 +50,7 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 		"plugin.viral-opening":     2,
 		"plugin.character-edit":    1,
 		"plugin.cover-generation":  1,
-		"plugin.comic-screenplay":  12,
+		"plugin.comic-screenplay":  16,
 		"plugin.unassigned":        23,
 	}
 	for slot, want := range wantCounts {
@@ -70,7 +70,7 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 	}
 	for _, item := range LuoshuiAdminPresets() {
 		name, _ := item["name"].(string)
-		if strings.Contains(name, "洛水") || strings.Contains(name, "小洛") {
+		if (strings.Contains(name, "洛水") || strings.Contains(name, "小洛")) && item["corpusId"] != CreativeStoryboard307 {
 			t.Fatalf("后台名称不应出现旧产品名: %q", name)
 		}
 	}

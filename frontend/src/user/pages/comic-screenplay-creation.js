@@ -4,11 +4,9 @@ export function comicDraftPayload(form, content) {
   if (!sourceText.trim()) throw new Error('请直接输入或导入原文内容');
   if ([...sourceText].length > 600000) throw new Error('原文超过 60 万字，请按章拆分后分批提交');
   if (!form.model) throw new Error('请选择可用的文本模型');
-  if (!form.artStyle || !form.selectedStyle) throw new Error('请选择画风');
   return {
     title: form.title.trim(), sourceText, modelId: form.model,
     promptId: form.promptId, scriptMode: form.scriptMode,
-    artStyle: form.artStyle, selectedStyle: form.selectedStyle,
     aspectRatio: form.aspectRatio, assetDegree: form.degree, permissionMode: 'bypass',
   };
 }

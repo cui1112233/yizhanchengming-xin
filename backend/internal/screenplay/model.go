@@ -61,6 +61,7 @@ const (
 type StoryboardEngine string
 
 const (
+	EngineXiaoluoV9    StoryboardEngine = "xiaoluo_v9_30s"
 	EngineXiaoluoV7    StoryboardEngine = "xiaoluo_v7_15s"
 	EngineXiaoyunqueV3 StoryboardEngine = "xiaoyunque_v3"
 )
@@ -75,28 +76,30 @@ var (
 
 // Project 是一个漫剧项目（对应洛水 workspace 级配置）。
 type Project struct {
-	ID             string         `json:"id"`
-	OwnerUsername  string         `json:"owner_username"`
-	Title          string         `json:"title"`
-	ScriptMode     string         `json:"script_mode"` // a1 | b
-	AspectRatio    string         `json:"aspect_ratio"`
-	ArtStyle       string         `json:"art_style"`
-	StyleDesc      string         `json:"-"`
-	SelectedStyle  string         `json:"selected_style"`
-	Synopsis       string         `json:"synopsis"`
-	SourceText     string         `json:"source_text"`
-	ModelID        string         `json:"model_id"`
-	PromptID       string         `json:"prompt_id"`
-	AssetDegree    AssetDegree    `json:"asset_degree"`
-	PermissionMode PermissionMode `json:"permission_mode"`
-	Revision       int64          `json:"revision"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	CreativeConfig *CreativeConfig `json:"creative_config,omitempty"`
+	ID             string          `json:"id"`
+	OwnerUsername  string          `json:"owner_username"`
+	Title          string          `json:"title"`
+	ScriptMode     string          `json:"script_mode"` // a1 | b
+	AspectRatio    string          `json:"aspect_ratio"`
+	ArtStyle       string          `json:"art_style"`
+	StyleDesc      string          `json:"-"`
+	SelectedStyle  string          `json:"selected_style"`
+	Synopsis       string          `json:"synopsis"`
+	SourceText     string          `json:"source_text"`
+	ModelID        string          `json:"model_id"`
+	PromptID       string          `json:"prompt_id"`
+	AssetDegree    AssetDegree     `json:"asset_degree"`
+	PermissionMode PermissionMode  `json:"permission_mode"`
+	Revision       int64           `json:"revision"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 // Document 是剧本正文的不可变版本。A1 / B 档都追加新版本，旧版本置 superseded，
 // 从而修复原版无锁覆盖同一文件的缺陷。
 type Document struct {
+	RawResult     string    `json:"raw_result,omitempty"`
 	ID            string    `json:"id"`
 	ProjectID     string    `json:"project_id"`
 	OwnerUsername string    `json:"owner_username"`

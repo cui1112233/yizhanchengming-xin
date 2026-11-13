@@ -61,6 +61,7 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 	if mux == nil || store == nil {
 		return
 	}
+	RegisterScreenplayCreativeRoutes(mux, auth, store, authors)
 	if now == nil {
 		now = time.Now
 	}
@@ -287,7 +288,8 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		payload["assets"] = assets
 		storyboardsV7, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV7)
 		storyboardsV3, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoyunqueV3)
-		payload["storyboards"] = append(storyboardsV7, storyboardsV3...)
+		storyboardsV9, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV9)
+		payload["storyboards"] = append(append(storyboardsV7, storyboardsV3...), storyboardsV9...)
 		if authors != nil {
 			identity, _ := BridgeIdentityFromContext(req.Context())
 			_, editErr := authors.Resolve(req.Context(), identity.Username, project.ID, "edit")
@@ -584,7 +586,8 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		}
 		first, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoluoV7)
 		second, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoyunqueV3)
-		writeJSON(w, http.StatusOK, map[string]any{"storyboards": append(first, second...)})
+		third, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoluoV9)
+		writeJSON(w, http.StatusOK, map[string]any{"storyboards": append(append(first, second...), third...)})
 	})
 	type storyboardShotInput struct {
 		AfterShotID string  `json:"afterShotId"`
@@ -777,7 +780,8 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		assets, _ := store.ListAssets(req.Context(), owner, projectID, "")
 		storyboardsA, _ := store.ListStoryboards(req.Context(), owner, projectID, screenplay.EngineXiaoluoV7)
 		storyboardsB, _ := store.ListStoryboards(req.Context(), owner, projectID, screenplay.EngineXiaoyunqueV3)
-		payload["assets"], payload["storyboards"] = assets, append(storyboardsA, storyboardsB...)
+		storyboardsC, _ := store.ListStoryboards(req.Context(), owner, projectID, screenplay.EngineXiaoluoV9)
+		payload["assets"], payload["storyboards"] = assets, append(append(storyboardsA, storyboardsB...), storyboardsC...)
 		if batch, batchErr := store.GetBatch(req.Context(), owner, projectID); batchErr == nil {
 			payload["batch"] = batch
 		}

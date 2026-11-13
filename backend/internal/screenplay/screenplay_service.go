@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/prompt/luoshui"
 )
 
@@ -70,10 +71,14 @@ func (s *ScreenplayService) GenerateA1(ctx context.Context, req A1Request) (Scre
 	if plan, blocked := pendingPlan(project, req.Confirmed, "1_screenplay", "运行 A1 小说转剧本", "调用 A1 提示词并写入 screenplay.md"); blocked {
 		return plan, nil
 	}
-	promptID := defaultString(req.PromptID, project.PromptID, "a1_novel_to_screenplay")
-	systemPrompt, ok := s.prompts().RuntimeBody(promptID)
-	if !ok {
-		return ScreenplayResult{}, fmt.Errorf("%w: 未找到提示词 %s", ErrInvalidArgument, promptID)
+	promptID := defaultString(req.PromptID, selectedScriptPrompt(project), "a1_novel_to_screenplay")
+	selected, resolveErr := ResolveProjectPrompt(project, promptID, "script")
+	if resolveErr != nil {
+		return ScreenplayResult{}, fmt.Errorf("%w: %v", ErrInvalidArgument, resolveErr)
+	}
+	systemPrompt, renderErr := renderScriptLibrary(ctx, s.Store, req.Owner, req.ProjectID, selected.Body)
+	if renderErr != nil {
+		return ScreenplayResult{}, renderErr
 	}
 
 	outputs := make([]string, 0, len(segments))
@@ -81,16 +86,20 @@ func (s *ScreenplayService) GenerateA1(ctx context.Context, req A1Request) (Scre
 		response, err := s.Generator.Generate(ctx, TextRequest{
 			Model:        defaultString(req.Model, project.ModelID),
 			SystemPrompt: systemPrompt,
-			UserPrompt:   luoshui.Render(segment, req.ExtraVars),
+			JSONResponse: promptID == prompt.CreativeScript144,
+			UserPrompt:   styledAssetContent(project, luoshui.Render(segment, req.ExtraVars)),
 		})
 		if err != nil {
 			return ScreenplayResult{}, wrapAIError(err)
+		}
+		if ctx.Err() != nil {
+			return ScreenplayResult{}, ctx.Err()
 		}
 		output := strings.TrimSpace(response.Content)
 		if output == "" {
 			return ScreenplayResult{}, ErrAIEmptyContent
 		}
-		outputs = append(outputs, output)
+		outputs = append(outputs, response.Content)
 	}
 	content = strings.Join(outputs, "\n\n")
 	if strings.TrimSpace(content) == "" {
@@ -114,29 +123,41 @@ func (s *ScreenplayService) GenerateB(ctx context.Context, req BRequest) (Screen
 	if plan, blocked := pendingPlan(project, req.Confirmed, "1_screenplay", "运行 B 档导演级剧本", "调用 B 档提示词并写入 screenplay.md"); blocked {
 		return plan, nil
 	}
-	promptID := defaultString(req.PromptID, project.PromptID, "b_director_screenplay")
-	systemPrompt, ok := s.prompts().RuntimeBody(promptID)
-	if !ok {
-		return ScreenplayResult{}, fmt.Errorf("%w: 缺少提示词 %s", ErrInvalidArgument, promptID)
+	promptID := defaultString(req.PromptID, selectedScriptPrompt(project), "b_director_screenplay")
+	selected, resolveErr := ResolveProjectPrompt(project, promptID, "script")
+	if resolveErr != nil {
+		return ScreenplayResult{}, fmt.Errorf("%w: %v", ErrInvalidArgument, resolveErr)
+	}
+	systemPrompt, renderErr := renderScriptLibrary(ctx, s.Store, req.Owner, req.ProjectID, selected.Body)
+	if renderErr != nil {
+		return ScreenplayResult{}, renderErr
 	}
 	userPrompt := buildBNovelPrompt(req, novel)
 	response, err := s.Generator.Generate(ctx, TextRequest{
 		Model:        defaultString(req.Model, project.ModelID),
 		SystemPrompt: systemPrompt,
-		UserPrompt:   luoshui.Render(userPrompt, req.ExtraVars),
+		JSONResponse: promptID == prompt.CreativeScript144,
+		UserPrompt:   styledAssetContent(project, luoshui.Render(userPrompt, req.ExtraVars)),
 	})
 	if err != nil {
 		return ScreenplayResult{}, wrapAIError(err)
+	}
+	if ctx.Err() != nil {
+		return ScreenplayResult{}, ctx.Err()
 	}
 	output := strings.TrimSpace(response.Content)
 	if output == "" {
 		return ScreenplayResult{}, ErrAIEmptyContent
 	}
-	return s.persist(ctx, req.Owner, req.ProjectID, "b", output, 1)
+	return s.persist(ctx, req.Owner, req.ProjectID, "b", response.Content, 1)
 }
 
 func (s *ScreenplayService) persist(ctx context.Context, owner, projectID, source, content string, segmentCount int) (ScreenplayResult, error) {
-	parsed := ParseScreenplayMarkdown(content)
+	editable, err := editableScreenplayOutput(content)
+	if err != nil {
+		return ScreenplayResult{}, err
+	}
+	parsed := ParseScreenplayMarkdown(editable)
 	if len(parsed.Shots) == 0 || len(parsed.Episodes) == 0 {
 		return ScreenplayResult{}, fmt.Errorf("%w screenplay.md 未产出可解析的集/场", ErrArtifactInvalid)
 	}
@@ -164,7 +185,8 @@ func (s *ScreenplayService) persist(ctx context.Context, owner, projectID, sourc
 		ProjectID:     projectID,
 		OwnerUsername: owner,
 		Source:        source,
-		Content:       content,
+		Content:       editable,
+		RawResult:     content,
 		ChapterCount:  0,
 		EpisodeCount:  len(parsed.Episodes),
 		SegmentCount:  segmentCount,

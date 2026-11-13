@@ -34,6 +34,12 @@ func screenplayStyles(catalog *prompt.Catalog) ([]screenplayStyle, error) {
 // are never trusted. Old name-only projects retain their existing style.
 func resolveScreenplayStyle(catalog *prompt.Catalog, selected, name string, current *screenplay.Project) (screenplay.Project, error) {
 	selected, name = strings.TrimSpace(selected), strings.TrimSpace(name)
+	if current != nil && current.CreativeConfig != nil {
+		if selected == "" || selected == current.SelectedStyle {
+			return *current, nil
+		}
+		return screenplay.Project{}, errors.New("请通过创意配置选择用户画风")
+	}
 	if selected == "" {
 		if current != nil && (name == "" || name == current.ArtStyle) {
 			return *current, nil

@@ -21,6 +21,7 @@ type LuoshuiAdminGroup struct {
 // 漫剧创作链路实际读取的提示词，按「剧本 → 资产 → 分镜」顺序排列。
 // 审校类（doctor_*）当前没有运行时代码读取，仍留在未归属分区。
 var comicScreenplayPromptIDs = []string{
+	CreativeScript144, CreativeStoryboard307, CreativeCharacter213, CreativeScene289,
 	"a1_novel_to_screenplay",
 	"b_director_screenplay",
 	"asset_character_v6_3d",

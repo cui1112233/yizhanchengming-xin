@@ -15,8 +15,8 @@ func TestRegistryMatchesSpecCorpus(t *testing.T) {
 		t.Fatalf("加载语料失败: %v", err)
 	}
 	entries := reg.List()
-	if len(entries) != 49 {
-		t.Fatalf("提示词条数 = %d, want 49", len(entries))
+	if len(entries) != 53 {
+		t.Fatalf("提示词条数 = %d, want 53", len(entries))
 	}
 	for _, entry := range entries {
 		raw := reg.entries[entry.ID].body

@@ -582,8 +582,21 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 	if in.Action == "tts" && (strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 5000) {
 		return nil, fmt.Errorf("配音文本须为1到5000字")
 	}
-	if in.Action == "image" && (strings.TrimSpace(in.ModelID) == "" || strings.TrimSpace(in.Prompt) == "") {
-		return nil, fmt.Errorf("请选择图片模型并填写提示词")
+	if in.Action == "image" {
+		if p.CreativeConfig != nil && strings.TrimSpace(in.ModelID) == "" {
+			in.ModelID = p.CreativeConfig.ImageModelID
+			if len(in.ReferenceItemIDs) > 0 {
+				in.ModelID = firstText(p.CreativeConfig.ImageEditModelID, in.ModelID)
+			}
+		}
+		if strings.TrimSpace(in.ModelID) == "" {
+			return nil, fmt.Errorf("请选择图片模型")
+		}
+		var err error
+		in.Prompt, err = s.creativeImagePrompt(ctx, p, in.TargetID, in.Prompt)
+		if err != nil {
+			return nil, err
+		}
 	}
 	refs := []string{}
 	for _, id := range in.ReferenceItemIDs {

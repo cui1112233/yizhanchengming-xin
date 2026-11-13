@@ -586,5 +586,53 @@
     "file": "plugin_cover_design.txt",
     "constant_pool_prefix": "",
     "verified": true
+  },
+  {
+    "id": "luoshui_professional_screenplay_144",
+    "section": "creative.144",
+    "name": "专业剧本",
+    "source": "prompts#144 / 剧本大师",
+    "length": 12654,
+    "sha256_16": "8e503d320f3d520a",
+    "expected_sha256_16": "8e503d320f3d520a",
+    "file": "luoshui_professional_screenplay_144.txt",
+    "constant_pool_prefix": "",
+    "verified": true
+  },
+  {
+    "id": "luoshui_character_design_213",
+    "section": "creative.213",
+    "name": "角色设定四宫格图",
+    "source": "prompts#213 / 人设设计",
+    "length": 598,
+    "sha256_16": "9d0f9ff6f8df1ad8",
+    "expected_sha256_16": "9d0f9ff6f8df1ad8",
+    "file": "luoshui_character_design_213.txt",
+    "constant_pool_prefix": "",
+    "verified": true
+  },
+  {
+    "id": "luoshui_scene_design_289",
+    "section": "creative.289",
+    "name": "场景四视图",
+    "source": "prompts#289 / 场景设计",
+    "length": 284,
+    "sha256_16": "8b80f8c7a2beb426",
+    "expected_sha256_16": "8b80f8c7a2beb426",
+    "file": "luoshui_scene_design_289.txt",
+    "constant_pool_prefix": "",
+    "verified": true
+  },
+  {
+    "id": "luoshui_storyboard_v9_30s_307",
+    "section": "creative.307",
+    "name": "小洛V9分镜-30s",
+    "source": "prompts#307 / 剧本分镜",
+    "length": 27823,
+    "sha256_16": "0810ea30fd14ef07",
+    "expected_sha256_16": "0810ea30fd14ef07",
+    "file": "luoshui_storyboard_v9_30s_307.txt",
+    "constant_pool_prefix": "",
+    "verified": true
   }
 ]

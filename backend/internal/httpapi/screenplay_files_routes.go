@@ -82,7 +82,7 @@ func registerScreenplayFileRoutes(mux *http.ServeMux, auth BridgeAuth, authors *
 				return fmt.Errorf("%w: 原文已变化，请重新导出编号原文后核对", screenplay.ErrRevisionConflict)
 			}
 			b := in.Board
-			if b.Engine != screenplay.EngineXiaoluoV7 && b.Engine != screenplay.EngineXiaoyunqueV3 {
+			if b.Engine != screenplay.EngineXiaoluoV7 && b.Engine != screenplay.EngineXiaoyunqueV3 && b.Engine != screenplay.EngineXiaoluoV9 {
 				return screenplay.ErrInvalidArgument
 			}
 			if b.EpisodeNo < 1 || len(b.Shots) == 0 || len(b.Shots) > 2000 {

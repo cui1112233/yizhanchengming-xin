@@ -15,6 +15,7 @@ import (
 type MemoryStore struct {
 	mu           sync.Mutex
 	projects     map[string]Project
+	userStyles   map[string]UserStyle
 	documents    map[string][]Document
 	shots        map[string][]Shot
 	characters   map[string][]Character
@@ -390,6 +391,7 @@ func (m *MemoryStore) GetProject(_ context.Context, owner, id string) (Project, 
 	if !ok {
 		return Project{}, fmt.Errorf("%w: 项目 %s", ErrNotFound, id)
 	}
+	project.CreativeConfig = cloneCreativeConfig(project.CreativeConfig)
 	return project, nil
 }
 

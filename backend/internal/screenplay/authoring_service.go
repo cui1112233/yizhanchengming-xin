@@ -13,6 +13,7 @@ import (
 var ErrAccessDenied = errors.New("没有此项目的操作权限")
 
 type Chapter struct {
+	RawResult  string `json:"raw_result,omitempty"`
 	ID         string `json:"id"`
 	Title      string `json:"title"`
 	SourceText string `json:"source_text"`

@@ -4,11 +4,11 @@ import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-cr
 
 const form = { title: '新故事', model: 'text-model', promptId: 'b_director_screenplay', scriptMode: 'b', artStyle: '水墨', selectedStyle: 'style-ink', degree: 'master', aspectRatio: '9:16' };
 
-test('直接输入创建，一次提交原文和所选画风标识，不提交前端提示词', () => {
+test('直接输入创建保留原文，创作画风由独立配置保存', () => {
   const payload = comicDraftPayload(form, '\n窗外是风景。\n下一幕由你创造。\n');
   assert.equal(payload.sourceText, '\n窗外是风景。\n下一幕由你创造。\n');
-  assert.equal(payload.selectedStyle, 'style-ink');
-  assert.equal(payload.artStyle, '水墨');
+  assert.equal(payload.selectedStyle, undefined);
+  assert.equal(payload.artStyle, undefined);
   assert.equal(payload.assetDegree, 'master');
   assert.equal(payload.styleDesc, undefined);
 });
@@ -17,7 +17,7 @@ test('空白或过长原文在创建前被拦截', () => {
   assert.throws(() => comicDraftPayload(form, ' \n\t'), /输入或导入/);
   assert.throws(() => comicDraftPayload(form, '文'.repeat(600001)), /60 万/);
   assert.throws(() => comicDraftPayload({ ...form, title: ' ' }, '正文'), /作品名称/);
-  assert.throws(() => comicDraftPayload({ ...form, artStyle: '', selectedStyle: '' }, '正文'), /画风/);
+  assert.equal(comicDraftPayload({ ...form, artStyle: '', selectedStyle: '' }, '正文').sourceText, '正文');
 });
 
 test('两次导入乱序完成，仅最新文件可以更新草稿', async () => {

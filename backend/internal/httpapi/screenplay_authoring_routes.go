@@ -287,8 +287,18 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 					}
 				}
 				b, _ := json.Marshal(contextData)
-				result, e := (screenplayTextGenerator{owner: o, resolver: resolver}).Generate(r.Context(), screenplay.TextRequest{Model: project.ModelID, SystemPrompt: system, UserPrompt: string(b) + "\n用户要求：" + user, JSONResponse: jsonResponse, MaxOutputTokens: 16000, Temperature: 0.4})
+				request := screenplay.TextRequest{Model: project.ModelID, SystemPrompt: system, UserPrompt: string(b) + "\n用户要求：" + user, JSONResponse: jsonResponse, MaxOutputTokens: 16000, Temperature: 0.4}
+				if chapterIndex >= 0 {
+					request, e = screenplay.BuildChapterTextRequest(project, st.Chapters[chapterIndex], user, string(b))
+					if e != nil {
+						return e
+					}
+				}
+				result, e := (screenplayTextGenerator{owner: o, resolver: resolver}).Generate(r.Context(), request)
 				if e != nil {
+					return e
+				}
+				if e = r.Context().Err(); e != nil {
 					return e
 				}
 				raw := strings.TrimSpace(result.Content)
@@ -307,7 +317,9 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 					}
 					st.Chapters = parsed.Chapters
 				case "chapters/{chapter}/script":
-					st.Chapters[chapterIndex].ScriptText = raw
+					if e = screenplay.ApplyChapterGeneration(&st.Chapters[chapterIndex], result.Content); e != nil {
+						return e
+					}
 					if _, e = screenplay.PublishChapterCollection(r.Context(), store, o, st.ProjectID, st.Chapters); e != nil {
 						return e
 					}

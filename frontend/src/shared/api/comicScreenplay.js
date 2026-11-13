@@ -214,3 +214,40 @@ export async function cancelComicScreenplayBatch(projectId, request = apiRequest
 export async function exportComicScreenplay(projectId, request = apiRequest) {
   return request(projectPath(projectId, '/export'));
 }
+
+
+function creativeProjectPath(projectId) {
+  const id = String(projectId || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(id)) throw new Error('漫剧项目无效');
+  return `/api/screenplays/${id}/creative-config`;
+}
+
+export async function loadComicCreativeLibrary(request = apiRequest) {
+  const response = await request('/api/screenplays/creative-library');
+  return { styles: Array.isArray(response?.styles) ? response.styles : [], prompts: Array.isArray(response?.prompts) ? response.prompts : [] };
+}
+
+export async function loadComicCreativeConfig(projectId, request = apiRequest) {
+  return request(creativeProjectPath(projectId));
+}
+
+export async function saveComicCreativeConfig(projectId, input, request = apiRequest) {
+  return request(creativeProjectPath(projectId), { method: 'PUT', body: JSON.stringify(input) });
+}
+
+export async function getComicStylePreview(src, request = apiRequest) {
+  const path = String(src || '');
+  if (!/^\/api\/reference-assets\/file\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(path)
+    && !/^\/api\/agent\/tasks\/[A-Za-z0-9_-]+\/assets\/[A-Za-z0-9_-]+\/content$/.test(path)
+    && !/^\/api\/ai-cut\/projects\/[A-Za-z0-9_-]+\/assets\/[A-Za-z0-9_-]+\/content$/.test(path)) throw new Error('画风预览地址无效');
+  return request(path, { responseType: 'blob', suppressGlobalError: true });
+}
+
+export async function createComicCreativeStyle(input, request = apiRequest) {
+  const name = String(input?.name || '').trim(), prompt = String(input?.prompt || '').trim();
+  if (!name) throw new Error('请输入画风名称');
+  if (!prompt) throw new Error('请输入画风文字');
+  const response = await request('/api/screenplays/styles', { method: 'POST', body: JSON.stringify({ name, prompt, images: [] }) });
+  if (!response?.style?.id) throw new Error('画风保存结果缺少编号，请刷新画风库核对');
+  return response.style;
+}

@@ -24,6 +24,7 @@ const (
 type StoryboardRequest struct {
 	Owner     string           `json:"owner"`
 	ProjectID string           `json:"project_id"`
+	PromptID  string           `json:"prompt_id"`
 	Engine    StoryboardEngine `json:"engine"`
 	// EpisodeNo 为 0 时按全部剧集逐集生成；>0 只生成该集。
 	EpisodeNo int            `json:"episode_no"`
@@ -69,6 +70,27 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if err != nil {
 		return StoryboardResult{}, err
 	}
+	if req.PromptID != "" {
+		promptID = req.PromptID
+	} else if project.CreativeConfig != nil && project.CreativeConfig.StoryboardPromptID != "" {
+		promptID = project.CreativeConfig.StoryboardPromptID
+	}
+	selected, resolveErr := ResolveProjectPrompt(project, promptID, "storyboard")
+	if resolveErr != nil {
+		return StoryboardResult{}, fmt.Errorf("%w: %v", ErrInvalidArgument, resolveErr)
+	}
+	// The selected prompt defines the output protocol, including validation and
+	// persistence identity. A stale client engine must never widen its limits.
+	switch selected.ID {
+	case "luoshui_storyboard_v9_30s_307":
+		engine = EngineXiaoluoV9
+	case "storyboard_xiaoluo_v7_15s":
+		engine = EngineXiaoluoV7
+	case "storyboard_xiaoyunque_v3":
+		engine = EngineXiaoyunqueV3
+	default:
+		return StoryboardResult{}, fmt.Errorf("%w: 分镜提示词 %s 的输出协议未登记", ErrInvalidArgument, selected.ID)
+	}
 	if project.PermissionMode == PermissionAuto && !req.Confirmed {
 		return StoryboardResult{
 			RequiresConfirmation: true,
@@ -86,10 +108,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 		return StoryboardResult{}, ErrEmptyContent
 	}
 
-	systemPrompt, ok := s.prompts().RuntimeBody(promptID)
-	if !ok {
-		return StoryboardResult{}, fmt.Errorf("%w: 缺少提示词 %s", ErrInvalidArgument, promptID)
-	}
+	systemPrompt := selected.Body
 	roles, scenes, props, err := s.libraryPlaceholders(ctx, req)
 	if err != nil {
 		return StoryboardResult{}, err
@@ -137,7 +156,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 		}
 
 		response, callErr := s.Generator.Generate(ctx, TextRequest{
-			Model:        firstNonEmpty(req.Model, "gpt-4o-mini"),
+			Model:        firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"),
 			SystemPrompt: luoshui.Render(systemPrompt, vars),
 			UserPrompt:   content,
 			JSONResponse: true,
@@ -155,6 +174,9 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 			continue
 		}
 
+		if ctx.Err() != nil {
+			return result, ctx.Err()
+		}
 		shots, parseErr := parseStoryboardJSON(strings.TrimSpace(response.Content))
 		if parseErr != nil {
 			if firstErr == nil {
@@ -343,6 +365,8 @@ func resolveStoryboardEngine(engine StoryboardEngine) (StoryboardEngine, string,
 	case "", EngineXiaoyunqueV3:
 		// 批次默认走小云雀 v3（规格 §7）。
 		return EngineXiaoyunqueV3, "storyboard_xiaoyunque_v3", nil
+	case EngineXiaoluoV9:
+		return EngineXiaoluoV9, "luoshui_storyboard_v9_30s_307", nil
 	case EngineXiaoluoV7:
 		return EngineXiaoluoV7, "storyboard_xiaoluo_v7_15s", nil
 	}
@@ -407,6 +431,10 @@ func validateStoryboardGroups(engine StoryboardEngine, episodeNo int, shots []St
 	for _, shot := range shots {
 		prefix := fmt.Sprintf("第 %d 集第 %d 组", episodeNo, shot.Seq)
 		switch engine {
+		case EngineXiaoluoV9:
+			if shot.Duration <= 0 || shot.Duration > 30 {
+				warnings = append(warnings, fmt.Sprintf("%s duration_sec=%.1f 不在 0–30s 区间", prefix, shot.Duration))
+			}
 		case EngineXiaoluoV7:
 			if shot.Duration <= 0 {
 				warnings = append(warnings, prefix+" duration_sec 缺失或为 0")

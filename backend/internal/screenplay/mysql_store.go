@@ -55,6 +55,9 @@ FROM screenplay_projects WHERE id = ? AND owner_username = ? AND deleted_at IS N
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, fmt.Errorf("%w: 项目 %s", ErrNotFound, id)
 	}
+	if err == nil {
+		err = s.loadCreativeConfig(ctx, &project)
+	}
 	return project, err
 }
 

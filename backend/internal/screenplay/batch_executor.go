@@ -343,7 +343,18 @@ func normalizeBatchDegree(degree AssetDegree) AssetDegree {
 }
 
 func existingBatchStoryboard(ctx context.Context, store Store, owner, projectID string, episode int) (Storyboard, bool) {
-	for _, engine := range []StoryboardEngine{EngineXiaoyunqueV3, EngineXiaoluoV7} {
+	engines := []StoryboardEngine{EngineXiaoyunqueV3, EngineXiaoluoV7, EngineXiaoluoV9}
+	if project, err := store.GetProject(ctx, owner, projectID); err == nil && project.CreativeConfig != nil {
+		switch project.CreativeConfig.StoryboardPromptID {
+		case "luoshui_storyboard_v9_30s_307":
+			engines = []StoryboardEngine{EngineXiaoluoV9}
+		case "storyboard_xiaoluo_v7_15s":
+			engines = []StoryboardEngine{EngineXiaoluoV7}
+		case "storyboard_xiaoyunque_v3":
+			engines = []StoryboardEngine{EngineXiaoyunqueV3}
+		}
+	}
+	for _, engine := range engines {
 		row, err := store.GetStoryboard(ctx, owner, projectID, episode, engine)
 		if err == nil {
 			return row, true
