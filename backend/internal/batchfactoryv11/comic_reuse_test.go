@@ -48,6 +48,26 @@ func TestComicAssetIdentityIssueDetectsGenericCharacterWithoutFormalName(t *test
 	}
 }
 
+func TestComicAssetIdentityIssueAllowsLifeStageVariantsOfSameFormalName(t *testing.T) {
+	book := Book{AssetRecords: []BookAsset{
+		{Kind: "character", Name: "林岁安少年", FormalName: "林岁安", Prompt: "十五岁少年，清瘦", Source: "comic"},
+		{Kind: "character", Name: "林岁安幼儿", FormalName: "林岁安", Prompt: "五岁幼童，圆脸", Source: "comic"},
+	}}
+	if issue := ComicAssetIdentityIssue(book); issue != "" {
+		t.Fatalf("life-stage variants with distinct asset names must not block production, got issue %q", issue)
+	}
+}
+
+func TestComicAssetIdentityIssueStillRejectsDuplicatedAssetNames(t *testing.T) {
+	book := Book{AssetRecords: []BookAsset{
+		{Kind: "character", Name: "林岁安", FormalName: "林岁安", Prompt: "十五岁少年", Source: "comic"},
+		{Kind: "character", Name: "林岁安", FormalName: "林岁安", Prompt: "五岁幼童", Source: "comic"},
+	}}
+	if issue := ComicAssetIdentityIssue(book); issue == "" {
+		t.Fatal("two assets with the same asset name must still be treated as a duplicated identity")
+	}
+}
+
 func TestComicAssetIdentityIssueAllowsDistinctFormalNames(t *testing.T) {
 	book := Book{AssetRecords: []BookAsset{
 		{Kind: "character", Name: "我", FormalName: "沈知微", Prompt: "年轻女性，黑色长发", Source: "comic"},

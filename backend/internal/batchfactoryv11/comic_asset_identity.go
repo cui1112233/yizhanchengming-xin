@@ -34,7 +34,15 @@ func ComicAssetIdentityIssue(book Book) string {
 		}
 		key := normalizeComicIdentityKey(identity)
 		if previous, exists := seen[key]; exists {
-			return fmt.Sprintf("人物“%s”和“%s”使用了同一个身份名称", previous, name)
+			// 同一角色的不同成长阶段（如“林岁安少年/林岁安幼儿”）共用正式姓名，
+			// 但资产名不同，属于可区分的两个资产，不能按重复身份阻断生产。
+			if normalizeComicIdentityKey(previous) == normalizeComicIdentityKey(name) {
+				return fmt.Sprintf("人物“%s”和“%s”使用了同一个身份名称", previous, name)
+			}
+			key = key + "|" + normalizeComicIdentityKey(name)
+			if previous, exists := seen[key]; exists {
+				return fmt.Sprintf("人物“%s”和“%s”使用了同一个身份名称", previous, name)
+			}
 		}
 		seen[key] = name
 	}
