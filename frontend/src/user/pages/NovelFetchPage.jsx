@@ -10,7 +10,7 @@ import {
   analyzeWorkshopOpening, deleteWorkshopKnowledge, deleteWorkshopTasks, fetchWorkshopOriginal,
   generateWorkshopAi, getWorkshopConfig, getWorkshopKnowledge, getWorkshopKnowledgeSummary,
   getWorkshopPlatforms, getWorkshopTask, getWorkshopTaskRulesTrace, getWorkshopTaskSensitiveLog, getWorkshopTaskSiteSubmitLog, getWorkshopJob, getWorkshopJobs, listWorkshopTasks, normalizeWorkshopOpening, optimizeWorkshopKnowledge,
-  getWorkshopLogs, listWorkshopSchedules, deleteWorkshopSchedule, saveWorkshopSchedule, updateWorkshopSchedule, saveWorkshopBody,
+  getWorkshopLogs, listWorkshopSchedules, deleteWorkshopSchedule, cancelWorkshopSchedule, saveWorkshopSchedule, updateWorkshopSchedule, saveWorkshopBody,
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
   updateWorkshopAiCount, applyWorkshopRules,
   saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, startWorkshopAutomation, pauseWorkshopAutomation, suggestWorkshopRules, testWorkshopAi, reprocessWorkshopSensitive, getWorkshopRealtimeStatus,
@@ -21,7 +21,7 @@ import { listAvailableModels as listAvailableTextModels, modelSelectOptions } fr
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
 import { NovelFetchAutomationOptions } from './novel-fetch-automation-options.js';
 import { withNovelFetchConfigDefaults, withNovelFetchVersionProfiles } from './novel-fetch-config-defaults.js';
-import { novelFetchAiVersions, novelFetchSensitiveComparisons, novelFetchTaskSummaryItems } from './novel-fetch-task-detail.js';
+import { novelFetchAiVersions, novelFetchSensitiveComparisons, novelFetchSubmitDiagnostic, novelFetchTaskSummaryItems } from './novel-fetch-task-detail.js';
 import { novelFetchProgressLines } from './novel-fetch-progress.js';
 import { beijingDateKey, currentBatchBookIds, filterNovelFetchTasks, mergeNovelFetchQueueStatus, novelFetchBatchResultSummary, novelFetchCharCount, novelFetchCurrentBatchTaskDetail, novelFetchOriginalFetchRetry, novelFetchPollingPlan, novelFetchQueueSummary, novelFetchStageLabel, novelFetchSubmissionLabel, novelFetchTaskDateKey, novelFetchTaskStatus, novelFetchVersionReady, retainVisibleTaskIds, stoppableCurrentBatchBookIds } from './novel-fetch-status.js';
 import { singleVersionRetryPayload, submissionPreviewMatches } from './novel-fetch-submit.js';
@@ -30,6 +30,8 @@ import { describeWebSubmitExecution, describeWebSubmitReconcile, describeWebSubm
 import { NovelFetchCylinderList, NovelFetchMetricStrip, NovelFetchSubpageShell } from './novel-fetch-workbench-ui.jsx';
 import { batchFactoryRawSourceText, batchFactorySourceMetadata, batchFactorySourceText, batchFactoryVersionLabel } from './novel-fetch-batch-factory.js';
 import { normalizeNovelFetchInput, serializeNovelFetchRows } from './novel-fetch-input-format.js';
+import { parseOpeningDraft } from './novel-fetch-knowledge-edits.js';
+import { buildRuleConfigPatch } from './novel-fetch-rule-config.js';
 import { dispatchGlobalStatus } from '../../shared/notifications/globalTaskCenter.js';
 import { getMemberCenter, getTeamMembers } from '../../shared/api/member.js';
 import { listGlobalAccounts } from '../../shared/api/accountAdmin.js';
@@ -52,7 +54,12 @@ const TABS = [
 ];
 const AI_VERSIONS = ['original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'];
 const AI_VERSION_LABELS = { original: '原文', ai1: 'AI1', ai2: 'AI2', ai3: 'AI3', ai4: 'AI4', ai5: 'AI5' };
-const AUTO_REWRITE_METHODS = { ai1: 'auto', ai2: 'auto', ai3: 'auto', ai4: 'auto', ai5: 'auto' };
+const REWRITE_METHOD_OPTIONS = [
+  { value: 'auto', label: '自动轮换' },
+  { value: 'high_imitation', label: '高仿文章库' },
+  { value: 'opening_instruction', label: '爆款开头词库' },
+  { value: 'instruction', label: '批量改文指令库' }
+];
 const INPUT_FORMAT_OPTIONS = [
   { value: 'smart', label: '智能识别', description: '每行输入 ID 和书名即可', columnPreset: '智能识别', columnOrder: [] },
   { value: 'paid_id_title_gender_reason', label: '付费 ID、书名、男女频、理由', description: '按制表符分列', columnPreset: '付费 ID + 书名 + 男女频 + 理由', columnOrder: ['bookId', 'bookName', 'gender', 'reason'] },
@@ -70,7 +77,7 @@ function formatScheduleTime(value) {
 }
 
 function scheduleStatusLabel(value) {
-  return { scheduled: '待执行', dispatching: '正在入队', queued: '已入队', running: '执行中', done: '已完成', success: '已完成', completed: '已完成', upload_pending: '处理完成，待上传', failed: '失败', cancelled: '已取消', stopped: '已停止' }[value] || value || '待执行';
+  return { scheduled: '待执行', dispatching: '正在入队', queued: '已入队', running: '执行中', paused: '已暂停', waiting_retry: '等待重试', waiting_login: '等待登录', done: '已完成', success: '已完成', completed: '已完成', upload_pending: '处理完成，待上传', failed: '失败', cancelled: '已取消', stopped: '已停止' }[value] || value || '待执行';
 }
 
 function diagnosticValue(value) {
@@ -91,12 +98,11 @@ function renderNovelFetchRulesDiagnostic(data) {
 }
 
 function renderNovelFetchSubmitDiagnostic(data) {
-  const logs = Array.isArray(data?.logs) ? data.logs : [];
-  const result = data?.result && typeof data.result === 'object' ? data.result : null;
-  if (!logs.length && !result) return <V88EmptyState title="还没有提交记录" description="提交任务后，这里会显示每次提交的结果和耗时。" />;
+  const { result, rows, verified, receiptId, reason } = novelFetchSubmitDiagnostic(data);
+  if (!rows.length && !result) return <V88EmptyState title="尚未发起提交" description={reason} />;
   return <Space direction="vertical" size={12} style={{ width: '100%' }}>
-    {result ? <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }} items={Object.entries(result).map(([key, value]) => ({ key, label: key, children: diagnosticValue(value) }))} /> : null}
-    {logs.length ? <Table size="small" pagination={{ pageSize: 10 }} rowKey={(row, index) => row.id || row.time || row.createdAt || index} dataSource={logs} columns={[{ title: '时间', render: (_, row) => row.time || row.createdAt || row.created_at || '—' }, { title: '状态', dataIndex: 'status', render: value => value || '—' }, { title: '版本', dataIndex: 'version', render: value => value || '—' }, { title: '结果', render: (_, row) => String(row.result || row.error || row.message || '').slice(0, 160) }]} /> : null}
+    {result ? <Alert showIcon type={verified ? 'success' : 'info'} message={verified ? '视频管理系统已回读确认' : '提交结果尚未确认'} description={receiptId !== '—' ? `后台记录编号：${receiptId}` : undefined} /> : null}
+    {rows.length ? <Table size="small" pagination={{ pageSize: 10 }} rowKey="key" dataSource={rows} columns={[{ title: '时间', dataIndex: 'timeLabel' }, { title: '状态', dataIndex: 'statusLabel' }, { title: '版本', dataIndex: 'versionLabel' }, { title: '结果', dataIndex: 'message' }]} /> : null}
   </Space>;
 }
 const PLATFORMS = [
@@ -168,7 +174,7 @@ function parseRuleEditorValue(value) {
 function summarizeWorkshopProgress(rows, fallbackSubmissions = []) {
   const source = Array.isArray(rows) ? rows : [];
   const text = value => String(value ?? '').trim().toLowerCase();
-  const isDone = value => /^(done|success|completed|complete|ready|ai_done|uploaded|已完成|完成|成功|已上传)$/.test(text(value));
+  const isDone = value => /^(done|success|completed|complete|ready|ai_done|uploaded|submitted|已提交|已完成|完成|成功|已上传)$/.test(text(value));
   const isFailed = value => /fail|error|failed|失败|错误/.test(text(value));
   const originalDone = source.filter(row => isDone(row.originalStatus ?? row.original_status) || Number(row.originalRawChars ?? row.original_raw_chars) > 0).length;
   const aiDone = source.filter(row => {
@@ -470,7 +476,7 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
                 <span><small>处理模型</small><strong>{item.model}</strong></span>
                 <span><small>尝试次数</small><strong>{item.attempts}</strong></span>
               </div>
-              {item.error !== '—' ? <Alert type="error" showIcon message={item.error} /> : null}
+              {item.error !== '—' ? item.recovered ? <Collapse size="small" items={[{ key: 'previous-error', label: 'AI 修复未成功，已使用规则替换完成（查看历史原因）', children: <pre className="novel-fetch-diagnostic-value">{item.error}</pre> }]} /> : <Alert type="error" showIcon message={item.error} /> : null}
               <div className="novel-fetch-sensitive-compare">
                 <div><span>命中片段</span><pre>{item.before}</pre></div>
                 <div><span>处理后片段</span><pre>{item.after}</pre></div>
@@ -480,7 +486,7 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
         </div>;
   return <Drawer open={Boolean(taskDetail)} title={taskDetail?.bookId ? `任务详情 · ${taskDetail.bookId}` : '任务详情'} width={860} onClose={onClose}>
     {taskDetail?.data ? <Tabs key={`${taskDetail.bookId}-${taskDetail.initialTab || 'summary'}`} defaultActiveKey={taskDetail.initialTab || 'summary'} items={[
-      { key: 'summary', label: '任务概览', children: <Descriptions className="novel-fetch-detail-summary" bordered column={{ xs: 1, sm: 2 }} items={summaryItems.map(item => ({ ...item, children: item.value }))} /> },
+      { key: 'summary', label: '任务概览', children: <Descriptions className="novel-fetch-detail-summary" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} items={summaryItems.map(item => ({ ...item, children: item.value }))} /> },
       { key: 'original', label: '原文', children: <><Input.TextArea rows={18} value={originalText} onChange={event => setOriginalText(event.target.value)} /><Space style={{ marginTop: 12 }}><Button loading={saving} type="primary" onClick={saveOriginal}>保存原文</Button><Button onClick={() => setOriginalText(taskDetail.data.original || taskDetail.data.originalRaw || '')}>恢复已保存原文</Button></Space></> },
       { key: 'ai', label: `AI 文案${aiVersions.length ? `（${aiVersions.length}）` : ''}`, children: aiVersions.length ? <Tabs className="novel-fetch-ai-versions" type="card" items={aiVersions.map(version => ({ key: version.key, label: version.label, children: <div className="novel-fetch-ai-copy"><div className="novel-fetch-ai-copy__head"><strong>{version.label}</strong><span>{version.content.length.toLocaleString('zh-CN')} 字</span></div>{version.knowledge ? <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }} style={{ marginBottom: 12 }} items={[
         { key: 'strategy', label: '改文方案', children: version.knowledge.strategy_name || version.knowledge.strategy || version.knowledge.method || '—' },
@@ -622,6 +628,10 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const [ruleScope, setRuleScope] = useState('original');
   const [ruleKind, setRuleKind] = useState('sensitive');
   const [ruleConfigText, setRuleConfigText] = useState('{}');
+  const [ruleConfigRevision, setRuleConfigRevision] = useState(undefined);
+  const ruleReadSequence = useRef(0);
+  const ruleDrafts = useRef(new Map());
+  const [knowledgeConfigRevision, setKnowledgeConfigRevision] = useState(undefined);
   const [ruleResult, setRuleResult] = useState(null);
   const [ruleAiSample, setRuleAiSample] = useState('');
   const [ruleAiGoal, setRuleAiGoal] = useState('');
@@ -663,7 +673,6 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const [loginPassword, setLoginPassword] = useState('');
   const [uploadProfileDraft, setUploadProfileDraft] = useState('');
   const [uploadProfileLoading, setUploadProfileLoading] = useState(false);
-  const [versionPrompts, setVersionPrompts] = useState({ rewrite: '', processingRule: '', knowledgeUsage: '' });
   const [uploadProfiles, setUploadProfiles] = useState([]);
   const [selectedUploadProfile, setSelectedUploadProfile] = useState('');
   const [profileBindings, setProfileBindings] = useState({});
@@ -674,7 +683,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const [configSection, setConfigSection] = useState('workflow');
   const [selectedVersions, setSelectedVersions] = useState(() => savedProcessSettings.selectedVersions);
   const [batchFactorySourceVersion, setBatchFactorySourceVersion] = useState('sensitive');
-  const [rewriteMethods] = useState(AUTO_REWRITE_METHODS);
+  const [rewriteMethods, setRewriteMethods] = useState(() => savedProcessSettings.rewriteMethods);
   const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => savedProcessSettings.sensitiveAiProcessEnabled);
   const [textModel, setTextModel] = useState(() => savedProcessSettings.textModel);
   const [textModelOptions, setTextModelOptions] = useState([]);
@@ -859,6 +868,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     try {
       const [items, summary] = await Promise.all([getWorkshopKnowledge(knowledgeKind), getWorkshopKnowledgeSummary()]);
       const loaded = items?.data || items || { items: [] };
+      setKnowledgeConfigRevision(items.configRevision);
       setKnowledge(loaded);
       const loadedItems = Array.isArray(loaded.items) ? loaded.items : [];
       setKnowledgeSelectedId(current => loadedItems.some(item => String(item.id) === String(current)) ? current : String(loadedItems[0]?.id || ''));
@@ -881,6 +891,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         : String(rewrite.method_sequence || '');
       const loadedValues = {
         ...config,
+        configRevision: data.settings?.configRevision,
         workflow: { ...(config.workflow || {}) },
         fetch: { ...(config.fetch || {}) },
         rewrite,
@@ -894,14 +905,26 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       configForm.setFieldsValue(loadedValues);
       setConfigEffective(loadedValues);
       setConfigDirty(false);
+      const submit = config.web_submit || {};
+      setUploadProfiles(Array.isArray(submit.upload_profiles) ? submit.upload_profiles : []);
+      setSelectedUploadProfile(String(submit.selected_profile || ''));
+      setProfileBindings(withNovelFetchVersionProfiles(submit.version_profiles || submit.profile_bindings));
       setKnowledgeUsagePrompt(String(config.knowledge?.usage_prompt || config.knowledge_usage_prompt || ''));
       const configuredPlatforms = Array.isArray(data.platforms) ? data.platforms : Array.isArray(config.platforms) ? config.platforms : [];
       if (configuredPlatforms.length) setPlatformOptions(configuredPlatforms.map(item => { const id = Number(item.id ?? item.platform_id ?? item.value); const name = item.name || item.platform_name || item.label || String(id); return { value: id, label: `${name} (${id})` }; }));
     } catch (error) { message.error(error.message || '读取配置失败'); } finally { setConfigLoading(false); }
   }
-  async function loadRuleConfig(kind = ruleKind) {
+  async function loadRuleConfig(kind = ruleKind, restoreSample = true) {
+    const sequence = ++ruleReadSequence.current;
+    const draft = ruleDrafts.current.get(kind);
+    if (draft) {
+      setRuleConfigText(draft.text);
+      setRuleConfigRevision(draft.revision);
+      return;
+    }
     try {
       const data = await getWorkshopConfig();
+      if (sequence !== ruleReadSequence.current) return;
       const config = data.appConfig || data.config || {};
       // The Go API keeps both V78's legacy knowledge view and the canonical
       // library view. An empty legacy object must not hide a populated library
@@ -929,9 +952,12 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         || (kind === 'sensitive' ? (knowledgeConfig.sensitive_rules ? { groups: [{ name: '系统敏感词', enabled: true, apply_to_original: true, apply_to_ai: true, rules: knowledgeConfig.sensitive_rules }] } : {}) : {})
         || {};
       // 处理规则提示词与规则 JSON 都保存在统一配置里；只恢复 JSON 会让用户切换回来时误以为规则丢失。
-      setRuleText(String(config.processing_rule_prompt || rewrite.processing_rule_prompt || data.processing_rule_prompt || data.settings?.processing_rule_prompt || ''));
-      setRuleScope(String(config.processing_rule_scope || rewrite.processing_rule_scope || data.processing_rule_scope || 'both'));
+      if (restoreSample) {
+        setRuleText(current => current || String(config.processing_rule_prompt || rewrite.processing_rule_prompt || data.processing_rule_prompt || data.settings?.processing_rule_prompt || ''));
+        setRuleScope(String(config.processing_rule_scope || rewrite.processing_rule_scope || data.processing_rule_scope || 'both'));
+      }
       setRuleConfigText(JSON.stringify(selected, null, 2));
+      setRuleConfigRevision(data.settings?.configRevision);
     } catch (error) { message.error(error.message || '读取处理规则配置失败'); }
   }
   async function loadWebSubmit() {
@@ -1069,19 +1095,27 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       return;
     }
     dispatchGlobalStatus({
-      text: `小说获取队列：处理中 ${running} 个，排队 ${queued} 个。`,
+      text: `批量测书队列：处理中 ${running} 个，排队 ${queued} 个。`,
       tone: running > 0 ? 'working' : 'info',
       durationMs: 60000
     });
   }, [queueSummary.running, queueSummary.queued]);
 
   useEffect(() => {
-    if (activeTab === 'config') { loadConfig(); openVersionConfig(); }
-    if (activeTab === 'knowledge' || activeTab === 'rules') { loadKnowledge(); loadConfig(); loadRuleConfig(); }
+    if (activeTab === 'config') loadConfig();
     if (activeTab === 'rules') setKnowledgeView('rules');
     if (activeTab === 'submit' || activeTab === 'logs') loadWebSubmit();
     if (activeTab === 'logs') setSubmitView('logs');
-  }, [activeTab, knowledgeKind, ruleKind]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if ((activeTab === 'knowledge' || activeTab === 'rules') && knowledgeView === 'library') loadKnowledge();
+  }, [activeTab, knowledgeKind, knowledgeView]);
+
+  useEffect(() => {
+    if ((activeTab === 'knowledge' || activeTab === 'rules') && knowledgeView === 'rules') loadRuleConfig();
+    return () => { ruleReadSequence.current += 1; };
+  }, [activeTab, knowledgeView, ruleKind]);
 
   useEffect(() => {
     const item = (knowledge.items || []).find(entry => String(entry.id) === String(knowledgeSelectedId));
@@ -1267,7 +1301,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   async function handleGenerateAi() {
     if (!selectedTask) return message.warning('请先选择一个任务');
     setTaskActionBusy('generate-ai');
-    try { await generateWorkshopAi(selectedTask, 1); await selectTask(selectedTask); await loadTasks(); message.success('已生成 AI 版本'); } catch (error) { message.error(error.message || '生成 AI 版本失败'); } finally { setTaskActionBusy(''); }
+    try { const result = await generateWorkshopAi(selectedTask); await selectTask(selectedTask); await loadTasks(); message.success(result.message || '缺少的 AI 版本已生成'); } catch (error) { message.error(error.message || '生成 AI 版本失败'); } finally { setTaskActionBusy(''); }
   }
   async function handleRetryTasks() {
     if (!selectedTaskKeys.length) return message.warning('请先选择需要重试的任务');
@@ -1284,7 +1318,12 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   async function handleRulePreview() {
     if (!ruleText.trim()) return message.warning('请填写待处理文本');
     setRuleLoading(true);
-    try { setRuleResult(await previewWorkshopRules(ruleText, ruleScope)); } catch (error) { message.error(error.message || '预览规则失败'); } finally { setRuleLoading(false); }
+    try {
+      const rules = ruleConfigText.trim() ? JSON.parse(ruleConfigText) : null;
+      if (rules !== null && (!rules || Array.isArray(rules) || typeof rules !== 'object')) throw new Error('规则配置必须是 JSON 对象');
+      const patch = rules === null ? {} : buildRuleConfigPatch(ruleKind, rules, await getWorkshopConfig());
+      setRuleResult(await previewWorkshopRules(ruleText, ruleScope, { knowledge: patch.knowledge, layoutConfig: patch.layout }));
+    } catch (error) { message.error(error.message || '预览规则失败'); } finally { setRuleLoading(false); }
   }
   async function handleRuleSuggest() {
     const sample = ruleAiSample.trim() || ruleText.trim();
@@ -1292,18 +1331,20 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     setRuleLoading(true);
     try {
       const result = await suggestWorkshopRules(sample, ruleKind, ruleAiGoal.trim() || '请根据当前规则类型生成可保存的规则建议');
-      setRuleResult(current => ({ ...current, suggestions: result }));
+      setRuleResult(current => ({ ...current, suggestions: result.suggestions }));
     } catch (error) { message.error(error.message || '生成规则建议失败'); } finally { setRuleLoading(false); }
   }
   async function saveRuleConfiguration() {
-    if (!ruleText.trim()) return message.warning('请先填写规则内容');
     try {
       let ruleConfig = {};
       if (ruleConfigText.trim()) {
         ruleConfig = JSON.parse(ruleConfigText);
         if (!ruleConfig || Array.isArray(ruleConfig) || typeof ruleConfig !== 'object') throw new Error('规则配置必须是 JSON 对象');
       }
-      await saveWorkshopConfig({ processing_rule_prompt: ruleText, processing_rule_scope: ruleScope, knowledge: { [ruleKind]: ruleConfig } });
+      const patch = buildRuleConfigPatch(ruleKind, ruleConfig, await getWorkshopConfig());
+      const saved = await saveWorkshopConfig({ processing_rule_prompt: ruleText, processing_rule_scope: ruleScope, ...patch, configRevision:ruleConfigRevision });
+      setRuleConfigRevision(saved.settings?.configRevision);
+      ruleDrafts.current.delete(ruleKind);
       message.success('处理规则已保存');
     } catch (error) { message.error(error.message || '保存处理规则失败'); }
   }
@@ -1316,7 +1357,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         if (!extra || Array.isArray(extra) || typeof extra !== 'object') throw new Error('完整字段必须是 JSON 对象');
       }
       delete values.details;
-      await saveWorkshopKnowledge(knowledgeKind, { ...extra, ...values });
+      await saveWorkshopKnowledge(knowledgeKind, { ...extra, ...values }, {configRevision:knowledgeConfigRevision});
       setKnowledgeModal(false);
       await loadKnowledge();
       message.success('知识条目已保存');
@@ -1353,12 +1394,12 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   async function deleteKnowledgeLibraryItem() {
     if (!knowledgeDraft?.id) return;
     Modal.confirm({ title: '确认删除当前知识库条目？', onOk: async () => {
-      try { await deleteWorkshopKnowledge(knowledgeKind, knowledgeDraft.id); await loadKnowledge(); message.success('已删除条目'); } catch (error) { message.error(error.message || '删除条目失败'); }
+      try { await deleteWorkshopKnowledge(knowledgeKind, knowledgeDraft.id, {configRevision:knowledgeConfigRevision}); await loadKnowledge(); message.success('已删除条目'); } catch (error) { message.error(error.message || '删除条目失败'); }
     } });
   }
   async function saveKnowledgeLibraryItem() {
     if (!knowledgeDraft) return;
-    try { await saveWorkshopKnowledge(knowledgeKind, knowledgeDraft); await loadKnowledge(); message.success('条目已保存'); } catch (error) { message.error(error.message || '保存条目失败'); }
+    try { await saveWorkshopKnowledge(knowledgeKind, knowledgeDraft, {configRevision:knowledgeConfigRevision}); await loadKnowledge(); message.success('条目已保存'); } catch (error) { message.error(error.message || '保存条目失败'); }
   }
   async function runKnowledgeItemAction(action, successMessage, fallbackMessage) {
     setKnowledgeLoading(true);
@@ -1390,7 +1431,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       const data = await rerunWorkshopBatch(batchId, scope);
       processForm.setFieldValue('bookIds', data.input_snapshot || '');
       changeTab('process');
-      message.success(scope === 'abnormal' ? '异常任务已载入处理清单' : '历史批次已载入处理清单');
+      message.info('清单已载入，尚未启动处理；已有任务请到任务列表使用“重试失败”，不会重新生成已完成版本');
     } catch (error) {
       message.error(error.message || '载入历史批次失败');
     } finally {
@@ -1399,7 +1440,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   }
   async function optimizeKnowledgeLibraryItem() {
     if (!knowledgeDraft?.id) return;
-    try { await optimizeWorkshopKnowledge(knowledgeKind, knowledgeDraft.id); await loadKnowledge(); message.success('AI 优化已完成'); } catch (error) { message.error(error.message || 'AI 优化失败'); }
+    try { await optimizeWorkshopKnowledge(knowledgeKind, knowledgeDraft.id, { item: knowledgeDraft, goal: knowledgeImproveGoal.trim(), configRevision:knowledgeConfigRevision }); await loadKnowledge(); message.success('AI 优化已完成'); } catch (error) { message.error(error.message || 'AI 优化失败'); }
   }
   async function saveKnowledgeUsagePrompt() {
     try {
@@ -1418,17 +1459,29 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     } catch (error) { message.error(error.message || '分析失败'); }
   }
   async function handleOpeningSaveAnalyzed() {
-    if (!openingItems.length) return message.warning('请先执行 AI 拆解');
     try {
-      for (const item of openingItems) await saveWorkshopOpening(item);
+      const items = parseOpeningDraft(openingResult);
+      for (let index = 0; index < items.length; index += 1) {
+        await saveWorkshopOpening(items[index]);
+        const remaining = items.slice(index + 1);
+        setOpeningItems(remaining);
+        setOpeningResult(JSON.stringify(remaining, null, 2));
+      }
       await loadKnowledge();
-      message.success(`已将 ${openingItems.length} 条开头词加入知识库`);
+      message.success(`已将 ${items.length} 条开头词加入知识库`);
     } catch (error) { message.error(error.message || '保存分析结果失败'); }
   }
   async function handleWebSubmit(action, success, describe = describeWebSubmitExecution) {
     setWebSubmitLoading(true);
     try {
       const result = await action();
+      if (action === syncWebSubmitStyles && result?.settings) {
+        setWebSubmitConfig(current => ({ ...(current || {}), ...result.settings }));
+        if (Array.isArray(result.styles)) {
+          configForm.setFieldValue('styles', JSON.stringify(result.styles, null, 2));
+          setConfigEffective(current => ({ ...(current || {}), styles: JSON.stringify(result.styles, null, 2) }));
+        }
+      }
       const feedback = describe(result, success);
       if (feedback.level === 'warning') message.warning(feedback.text);
       else if (feedback.level === 'error') message.error(feedback.text);
@@ -1467,7 +1520,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       title: '确认开始自动提交',
       content: `将按当前预览提交 ${selectedTaskKeys.length} 个任务，确认继续？`,
       onOk: async () => {
-        const result = await handleWebSubmit(() => startWebSubmit({ taskIds: selectedTaskKeys }), '自动提交完成');
+        const result = await handleWebSubmit(() => startWebSubmit({ taskIds: selectedTaskKeys, previewRevision: webSubmitPlan.revision }), '自动提交完成');
         if (!result) return;
         setWebSubmitResults(result.results || []);
         setWebSubmitHistory(current => [...(result.results || []), ...current]);
@@ -1541,7 +1594,12 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   async function syncUploadStylesFromManager() {
     setUploadProfileLoading(true);
     try {
-      await syncWebSubmitStyles();
+      const result = await syncWebSubmitStyles();
+      if (result.settings) setWebSubmitConfig(current => ({ ...(current || {}), ...result.settings }));
+      if (Array.isArray(result.styles)) {
+        configForm.setFieldValue('styles', JSON.stringify(result.styles, null, 2));
+        setConfigEffective(current => ({ ...(current || {}), styles: JSON.stringify(result.styles, null, 2) }));
+      }
       message.success('风格目录已同步');
     } catch (error) {
       message.error(error.message || '同步风格目录失败');
@@ -1575,14 +1633,14 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   async function updateSelectedAiCount() {
     if (!selectedTaskKeys.length) return message.warning('请先选择任务');
     setTaskActionBusy('ai-count');
-    try { await updateWorkshopAiCount(selectedTaskKeys, batchAiCount); await loadTasks(); message.success(`已调整为 ${batchAiCount} 个 AI 版本`); } catch (error) { message.error(error.message || '调整 AI 数量失败'); } finally { setTaskActionBusy(''); }
+    try { const result = await updateWorkshopAiCount(selectedTaskKeys, batchAiCount); await loadTasks(); if (result.failed) message.warning(`已保存 ${result.updated} 本，${result.failed} 本保存失败，请重试`); else message.success(result.message || '已保存，点击“生成 AI 改文”补齐版本，下次生成生效'); } catch (error) { message.error(error.message || '调整 AI 数量失败'); } finally { setTaskActionBusy(''); }
   }
   async function retryFailedTasks() {
-    const source = currentBatchRows.length ? currentBatchRows : visibleTasks;
-    const failed = source.filter(task => String(task.status || task.aiStatus || task.ai_status || '').includes('fail')).map(task => task.bookId || task.book_id).filter(Boolean);
+    const source = currentBatchRows.filter(task => currentBatchIds.includes(task.bookId || task.book_id));
+    const failed = source.filter(task => novelFetchTaskStatus(task).status === 'failed').map(task => task.bookId || task.book_id).filter(Boolean);
     if (!failed.length) return message.info('当前没有失败任务');
     setTaskActionBusy('retry-failed');
-    try { await retryWorkshopTasks(failed); await loadTasks(); message.success('失败任务已加入重试'); } catch (error) { message.error(error.message || '重试失败任务失败'); } finally { setTaskActionBusy(''); }
+    try { const result = await retryWorkshopTasks(failed); await Promise.all([loadTasks(), loadCurrentBatch()]); message[result.failed ? 'warning' : 'success'](`重试已处理：${novelFetchBatchResultSummary(result)}`); } catch (error) { message.error(error.message || '重试失败任务失败'); } finally { setTaskActionBusy(''); }
   }
   async function retryAllFailedTasks() {
     const failed = tasks
@@ -1591,7 +1649,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       .filter(Boolean);
     if (!failed.length) return message.info('全部任务中没有失败项');
     setTaskActionBusy('retry-all-failed');
-    try { await retryWorkshopTasks(failed); await loadTasks(); message.success(`已将 ${failed.length} 个失败任务加入重试`); } catch (error) { message.error(error.message || '重试全部失败任务失败'); } finally { setTaskActionBusy(''); }
+    try { const result = await retryWorkshopTasks(failed); await Promise.all([loadTasks(), loadCurrentBatch()]); message[result.failed ? 'warning' : 'success'](`重试已处理：${novelFetchBatchResultSummary(result)}`); } catch (error) { message.error(error.message || '重试全部失败任务失败'); } finally { setTaskActionBusy(''); }
   }
   function selectAllTasks() { setSelectedTaskKeys(visibleTasks.map(task => task.bookId || task.book_id).filter(Boolean)); }
   function shiftTaskDate(days) {
@@ -1616,12 +1674,10 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     setTaskActionBusy('rules-all');
     try { await applyWorkshopRules(ids, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success(`已处理全部 ${ids.length} 个任务`); } catch (error) { message.error(error.message || '规则处理全部任务失败'); } finally { setTaskActionBusy(''); }
   }
-  async function submitVisibleTasks(all = false) {
-    const ids = currentBatchIds.length
-      ? currentBatchIds
-      : visibleTasks.map(task => task.bookId || task.book_id).filter(Boolean);
+  async function submitVisibleTasks() {
+    const ids = currentBatchIds;
     if (!ids.length) return message.info('当前没有可提交任务');
-    const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), all ? '已提交全部任务' : '已提交当前任务');
+    const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), '当前批次提交已处理');
     if (result) setWebSubmitResults(result.results || []);
   }
   async function submitAllTasks() {
@@ -1630,13 +1686,13 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), `已提交全部 ${ids.length} 个任务`);
     if (result) setWebSubmitResults(result.results || []);
   }
-  async function deleteTasksByFilter(filter, emptyMessage) {
-    const ids = tasks.filter(filter).map(task => task.bookId || task.book_id).filter(Boolean);
+  async function deleteTasksByFilter(filter, emptyMessage, scopeIds = null) {
+    const ids = tasks.filter(task => (scopeIds === null || scopeIds.includes(task.bookId || task.book_id)) && filter(task)).map(task => task.bookId || task.book_id).filter(Boolean);
     if (!ids.length) return message.info(emptyMessage);
-    Modal.confirm({ title: '确认删除任务', content: '删除后无法恢复，确认继续？', onOk: async () => { await deleteWorkshopTasks(ids); setSelectedTaskKeys(current => current.filter(id => !ids.includes(id))); await loadTasks(); message.success('任务已删除'); } });
+    return Modal.confirm({ title: scopeIds === null ? '确认删除全部任务范围内的任务' : '确认删除当前批次任务', content: `本次将删除 ${ids.length} 本任务，删除后无法恢复，确认继续？`, onOk: async () => { await deleteWorkshopTasks(ids); setSelectedTaskKeys(current => current.filter(id => !ids.includes(id))); await Promise.all([loadTasks(), loadCurrentBatch()]); message.success('任务已删除'); } });
   }
-  async function transferToBatchFactory() {
-    const transferIds = selectedTaskKeys.length ? selectedTaskKeys : currentBatchIds;
+  async function transferToBatchFactory(scope = 'selected') {
+    const transferIds = scope === 'batch' ? currentBatchIds : selectedTaskKeys;
     if (!transferIds.length) {
       message.warning('请先选择要进入批量工厂的任务');
       return;
@@ -1690,15 +1746,10 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       setTasksLoading(false);
     }
   }
-  async function saveVersionConfig() {
-    try {
-      await saveWorkshopConfig({ rewrite: { prompt: versionPrompts.rewrite, processing_rule_prompt: versionPrompts.processingRule, ai_slot_methods: rewriteMethods }, knowledge: { usage_prompt: versionPrompts.knowledgeUsage }, selected_versions: selectedVersions, sensitive_ai_enabled: sensitiveAiProcessEnabled });
-      const versionProfiles = withNovelFetchVersionProfiles(profileBindings);
-      await saveWebSubmitConfig({ selected_profile: selectedUploadProfile, profile_bindings: versionProfiles, version_profiles: versionProfiles, submit_versions: selectedVersions });
-      message.success('版本配置已保存');
-    } catch (error) { message.error(error.message || '保存版本配置失败'); }
-  }
+
   async function saveConfig() {
+    if (configLoading) return;
+    setConfigLoading(true);
     try {
       const values = configForm.getFieldsValue(true);
       const parseCatalog = value => {
@@ -1712,7 +1763,8 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       rewrite.method_sequence = String(rewrite.method_sequence_text || '')
         .split(',').map(item => item.trim()).filter(Boolean);
       delete rewrite.method_sequence_text;
-      const saved = await saveWorkshopConfig({ ...values, rewrite, platforms: parseCatalog(values.platforms), styles: parseCatalog(values.styles) });
+      const versionProfiles = withNovelFetchVersionProfiles(profileBindings);
+      const saved = await saveWorkshopConfig({ ...values, rewrite, web_submit: { ...(values.web_submit || {}), selected_profile: selectedUploadProfile, profile_bindings: versionProfiles, version_profiles: versionProfiles }, platforms: parseCatalog(values.platforms), styles: parseCatalog(values.styles) });
       const savedSettings = saved?.settings || { ...values, rewrite };
       const savedRewrite = { ...(savedSettings.rewrite || {}) };
       savedRewrite.method_sequence_text = Array.isArray(savedRewrite.method_sequence)
@@ -1723,23 +1775,9 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       setConfigEffective(effectiveValues);
       setConfigDirty(false);
       message.success('配置已保存');
-    } catch (error) { message.error(error.message || '保存配置失败'); }
+    } catch (error) { message.error(error.message || '保存配置失败'); } finally { setConfigLoading(false); }
   }
-  async function openVersionConfig() {
-    try {
-      const data = await getWorkshopConfig();
-      const rewrite = data.appConfig?.rewrite || data.config?.rewrite || {};
-      const knowledgeConfig = data.appConfig?.knowledge || data.config?.knowledge || {};
-      setVersionPrompts({ rewrite: rewrite.prompt || '', processingRule: rewrite.processing_rule_prompt || '', knowledgeUsage: knowledgeConfig.usage_prompt || '' });
-    } catch { /* keep an empty draft when the optional config endpoint is unavailable */ }
-    try {
-      const submit = await getWebSubmitConfig();
-      const config = submit.settings || submit.config || {};
-      setUploadProfiles(Array.isArray(config.upload_profiles) ? config.upload_profiles : []);
-      setSelectedUploadProfile(String(config.selected_profile || ''));
-      setProfileBindings(withNovelFetchVersionProfiles(config.version_profiles || config.profile_bindings));
-    } catch { /* profile configuration is optional until the upload backend is paired */ }
-  }
+
 
   const knowledgeTabCount = key => ({
     high_imitation: knowledgeSummary.high_imitation || knowledgeSummary.high_imitation_prompts || 0,
@@ -1752,6 +1790,27 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
 
   const knowledgeCollectionOptionsForKind = knowledgeCollectionOptions(knowledgeKind, knowledge);
   const visibleKnowledgeItems = filterKnowledgeCollection(knowledge.items, knowledgeCollection);
+  function editRuleDraft(text) {
+    ruleReadSequence.current += 1;
+    ruleDrafts.current.set(ruleKind, { text, revision: ruleConfigRevision });
+    setRuleConfigText(text);
+  }
+  function openRuleCollection(kind) {
+    setRuleKind(kind);
+    setKnowledgeView('rules');
+  }
+  async function refreshKnowledgeView() {
+    if (knowledgeView === 'rules') {
+      if (ruleDrafts.current.has(ruleKind)) return Modal.confirm({
+        title: '重新读取当前规则？',
+        content: '当前规则有未保存的修改，重新读取会放弃这些修改，其他规则草稿不受影响。',
+        okText: '放弃修改并重新读取', cancelText: '继续编辑',
+        onOk: () => { ruleDrafts.current.delete(ruleKind); return loadRuleConfig(); }
+      });
+      return loadRuleConfig();
+    }
+    return loadKnowledge();
+  }
   const openKnowledgeCollection = (kind, collection = 'all') => {
     setKnowledgeKind(kind);
     setKnowledgeCollection(collection);
@@ -1767,11 +1826,11 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     { key: 'high_imitation_references', label: '高仿参考', value: knowledgeSummary.high_imitation_references, description: '高仿样本', onClick: () => openKnowledgeCollection('high_imitation', 'references') }
   ];
   const knowledgeRuleMetrics = [
-    { key: 'sensitive_rules', label: '敏感词', value: knowledgeSummary.sensitive_rules, description: '敏感词替换', onClick: () => openKnowledgeCollection('layout_rules') },
-    { key: 'symbol_rules', label: '字位符号', value: knowledgeSummary.symbol_rules, description: '符号替换', onClick: () => openKnowledgeCollection('symbol_rules') },
-    { key: 'pair_fill_rules', label: '成对补符号', value: knowledgeSummary.pair_fill_rules, description: '补齐规则', onClick: () => openKnowledgeCollection('symbol_rules') },
-    { key: 'chapter_exact_rules', label: '章节整行', value: knowledgeSummary.chapter_exact_rules, description: '整行清洗', onClick: () => openKnowledgeCollection('chapter_rules') },
-    { key: 'chapter_inline_rules', label: '章节开头', value: knowledgeSummary.chapter_inline_rules, description: '行内清洗', onClick: () => openKnowledgeCollection('chapter_rules') }
+    { key: 'sensitive_rules', label: '敏感词', value: knowledgeSummary.sensitive_rules, description: '敏感词替换', onClick: () => openRuleCollection('sensitive') },
+    { key: 'symbol_rules', label: '字位符号', value: knowledgeSummary.symbol_rules, description: '符号替换', onClick: () => openRuleCollection('symbol_rules') },
+    { key: 'pair_fill_rules', label: '成对补符号', value: knowledgeSummary.pair_fill_rules, description: '补齐规则', onClick: () => openRuleCollection('pair_fill_rules') },
+    { key: 'chapter_exact_rules', label: '章节整行', value: knowledgeSummary.chapter_exact_rules, description: '整行清洗', onClick: () => openRuleCollection('chapter_exact_rules') },
+    { key: 'chapter_inline_rules', label: '章节开头', value: knowledgeSummary.chapter_inline_rules, description: '行内清洗', onClick: () => openRuleCollection('chapter_inline_rules') }
   ];
   const knowledgePanel = <Space direction="vertical" size={12} style={{ width: '100%' }}>
     <section className="novel-fetch-knowledge-catalog">
@@ -1786,9 +1845,9 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   </Space>;
   const openingPanel = <div className="novel-fetch-panel novel-fetch-opening-analyzer"><div className="novel-fetch-toolbar"><div><Typography.Title level={5}>爆款开头拆解入库</Typography.Title><Typography.Text type="secondary">拆解结构、情绪和钩子后再确认入库。</Typography.Text></div><span className="novel-fetch-toolbar-spacer" /><Button onClick={() => normalizeWorkshopOpening().then(loadKnowledge)}>规范化现有开头词</Button></div><div className="novel-fetch-opening-fields"><Input value={openingStyle} onChange={event => setOpeningStyle(event.target.value)} placeholder="适用风格类型（可选）" /><Input value={openingExtra} onChange={event => setOpeningExtra(event.target.value)} placeholder="补充要求（可选）" /></div><div className="novel-fetch-opening-compare"><label>爆款开头原文<Input.TextArea rows={9} value={openingText} onChange={event => setOpeningText(event.target.value)} /></label><label>拆解结果（可编辑）<Input.TextArea rows={9} value={openingResult} onChange={event => setOpeningResult(event.target.value)} className="mono" /></label></div><Space wrap><Button type="primary" onClick={handleOpeningAnalyze}>AI 拆解开头词</Button><Button onClick={handleOpeningSaveAnalyzed}>确认加入开头词库</Button><Button onClick={() => { setOpeningText(''); setOpeningStyle(''); setOpeningExtra(''); setOpeningResult(''); setOpeningItems([]); }}>清空</Button></Space></div>;
   const versionConfigPanel = <div className="novel-fetch-panel novel-fetch-version-config-panel">
-    <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>版本对应配置档</Typography.Title><Typography.Text type="secondary">统一管理视频管理系统配置档、版本提示词和提交版本。</Typography.Text></div></div>
+    <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>版本对应配置档</Typography.Title><Typography.Text type="secondary">管理默认上传配置档和各版本的配置档绑定，统一使用右上角保存。</Typography.Text></div></div>
     <Space wrap><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button onClick={syncWebSubmitOrganizations}>同步组织归属</Button><Button onClick={() => handleWebSubmit(syncWebSubmitStyles, '已同步批量风格类型')}>同步批量风格类型</Button></Space>
-    <div className="novel-fetch-version-profile-grid"><label>默认上传配置档<Select value={selectedUploadProfile || undefined} placeholder="选择默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={setSelectedUploadProfile} /></label>{AI_VERSIONS.map(version => <label key={version}>{AI_VERSION_LABELS[version]} 配置档<Select allowClear value={profileBindings[version] || undefined} placeholder="跟随默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={value => setProfileBindings(current => ({ ...withNovelFetchVersionProfiles(current), [version]: value || '' }))} /></label>)}</div><Typography.Text type="secondary">原文和 AI1-AI5 均可单独指定；未绑定版本统一跟随默认配置档。</Typography.Text><div className="novel-fetch-version-prompts"><label>改文提示词<Input.TextArea rows={3} value={versionPrompts.rewrite} onChange={event => setVersionPrompts(current => ({ ...current, rewrite: event.target.value }))} placeholder="本次处理的改文提示词" /></label><label>处理规则提示词<Input.TextArea rows={3} value={versionPrompts.processingRule} onChange={event => setVersionPrompts(current => ({ ...current, processingRule: event.target.value }))} placeholder="整本书共同遵守的规则" /></label><label>知识库使用提示词<Input.TextArea rows={3} value={versionPrompts.knowledgeUsage} onChange={event => setVersionPrompts(current => ({ ...current, knowledgeUsage: event.target.value }))} placeholder="知识库的使用要求" /></label></div><Button type="primary" onClick={saveVersionConfig}>保存版本配置</Button>
+    <div className="novel-fetch-version-profile-grid"><label>默认上传配置档<Select value={selectedUploadProfile || undefined} placeholder="选择默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={value => { setSelectedUploadProfile(value); setConfigDirty(true); }} /></label>{AI_VERSIONS.map(version => <label key={version}>{AI_VERSION_LABELS[version]} 配置档<Select allowClear value={profileBindings[version] || undefined} placeholder="跟随默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={value => { setProfileBindings(current => ({ ...withNovelFetchVersionProfiles(current), [version]: value || '' })); setConfigDirty(true); }} /></label>)}</div><Typography.Text type="secondary">原文和 AI1-AI5 均可单独指定；未绑定版本统一跟随默认配置档。</Typography.Text><Typography.Text type="secondary">提示词请在“提示词配置”中编辑；全部修改统一点击右上角“保存配置”。</Typography.Text>
   </div>;
   const submissionStatus = [
     { key: 'environment', label: '环境', value: webSubmitEnvironment ? '已检测' : '待检测' },
@@ -1797,7 +1856,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     { key: 'execute', label: '执行', value: webSubmitResults.length ? `${webSubmitResults.length} 条结果` : '未执行' }
   ];
   const submitReadyPanel = <Space direction="vertical" size={12} style={{ width: '100%' }}>
-    <Alert type="info" showIcon message="仅在确认“开始自动提交”后执行外部提交。小说获取和批量工厂共用同一份视频管理系统登录会话。" />
+    <Alert type="info" showIcon message="仅在确认“开始自动提交”后执行外部提交。批量测书和批量工厂共用同一份视频管理系统登录会话。" />
     <div className="novel-fetch-panel novel-fetch-submit-actions"><Typography.Title level={5}>提交前检查</Typography.Title><Space wrap><Button loading={webSubmitLoading} onClick={async () => { const result = await handleWebSubmit(checkWebSubmitEnvironment, '环境检测完成'); if (result) setWebSubmitEnvironment(result); }}>环境检测</Button><Button loading={webSubmitLoading} onClick={verifyWebSubmitVisible}>验证登录可用性</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button loading={webSubmitLoading} onClick={syncWebSubmitOrganizations}>同步组织归属</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitStyles, '同步网站风格完成')}>同步网站风格</Button><Button disabled={!selectedTaskKeys.length} loading={webSubmitLoading} onClick={handleWebSubmitPreview}>生成提交预览</Button><Button type="primary" disabled={!webSubmitPreviewReady} loading={webSubmitLoading} onClick={confirmWebSubmit}>开始自动提交</Button></Space></div>
     <div className="novel-fetch-panel novel-fetch-submit-settings"><Typography.Title level={5}>提交配置</Typography.Title><div className="novel-fetch-submit-config-grid"><label>组织归属<Select value={webSubmitConfig?.organization || undefined} placeholder="跟随网站配置档" options={(webSubmitConfig?.organization_catalog || []).map(item => ({ value: String(item.id || item.value), label: item.name || item.label || item.id }))} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), organization: value }))} /></label><label>最少字数<InputNumber min={0} value={webSubmitConfig?.min_text_chars ?? 0} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), min_text_chars: value || 0 }))} /></label><label>失败重试<InputNumber min={0} max={10} value={webSubmitConfig?.retry_times ?? 1} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), retry_times: value || 0 }))} /></label><label className="novel-fetch-submit-check"><Checkbox checked={webSubmitConfig?.skip_submitted !== false} onChange={event => setWebSubmitConfig(current => ({ ...(current || {}), skip_submitted: event.target.checked }))}>跳过已提交版本</Checkbox></label></div><Button onClick={() => handleWebSubmit(() => saveWebSubmitConfig(webSubmitConfig), '提交配置已保存')}>保存提交配置</Button></div>
     <div className="novel-fetch-panel novel-fetch-submit-summary"><Typography.Text>已选任务 <strong>{selectedTaskKeys.length}</strong></Typography.Text><Typography.Text>配置版本 <strong>{(webSubmitConfig?.submit_versions || webSubmitConfig?.submitVersions || []).join('、') || '默认'}</strong></Typography.Text><Typography.Text>可用组织 <strong>{webSubmitConfig?.organization_catalog?.length || 0}</strong></Typography.Text></div>
@@ -1809,13 +1868,12 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const submissionPanel = <Space direction="vertical" size={12} style={{ width: '100%' }}><NovelFetchMetricStrip items={submissionStatus} /><Tabs className="novel-fetch-section-tabs" activeKey={submitView} onChange={setSubmitView} items={[{ key: 'ready', label: '提交准备', children: submitReadyPanel }, { key: 'result', label: `本次结果${webSubmitResults.length ? ` (${webSubmitResults.length})` : ''}`, children: submitResultPanel }, { key: 'history', label: '提交历史', children: submitHistoryPanel }, { key: 'logs', label: '操作日志', children: submitLogsPanel }]} /></Space>;
   const currentBatchMenuItems = [
     { key: 'retry-failed', label: '重试当前批次失败', onClick: retryFailedTasks },
-    { key: 'factory', label: '当前批次进入批量工厂', onClick: transferToBatchFactory },
+    { key: 'factory', label: '当前批次进入批量工厂', onClick: () => transferToBatchFactory('batch') },
     { key: 'rules', label: '规则处理当前批次', onClick: applyAllRules },
-    { key: 'submit', label: '提交当前批次', onClick: () => submitVisibleTasks(false) },
-    { key: 'resubmit', label: '重新提交当前批次', onClick: () => submitVisibleTasks(true) },
+    { key: 'submit', label: '提交当前批次', onClick: () => submitVisibleTasks() },
     { type: 'divider' },
-    { key: 'delete-failed', danger: true, label: '删除失败', onClick: () => deleteTasksByFilter(task => /fail|error/.test(String(task.status || task.aiStatus || task.ai_status)), '当前没有失败任务') },
-    { key: 'delete-all', danger: true, label: '删除全部', onClick: () => deleteTasksByFilter(() => true, '当前没有任务') }
+    { key: 'delete-failed', danger: true, label: '删除当前批次失败任务', onClick: () => deleteTasksByFilter(task => novelFetchTaskStatus(task).status === 'failed', '当前批次没有失败任务', currentBatchIds) },
+    { key: 'delete-all', danger: true, label: '删除当前批次全部任务', onClick: () => deleteTasksByFilter(() => true, '当前批次没有任务', currentBatchIds) }
   ];
   const panels = {
     process: <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -1841,7 +1899,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         {inputFormat === 'custom' ? <div className="novel-fetch-public-grid novel-fetch-public-grid--two novel-fetch-input-format-row">{customColumnOrder.map((column, index) => <label className="novel-fetch-field" key={`input-column-${index}`}><span>第 {index + 1} 列</span><Select value={column} options={Object.entries(INPUT_COLUMN_LABELS).map(([value, label]) => ({ value, label, disabled: customColumnOrder.includes(value) && value !== column }))} onChange={value => setCustomColumnOrder(current => current.map((item, itemIndex) => itemIndex === index ? value : item))} /></label>)}</div> : null}
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className={`novel-fetch-public-input ${String(bookIdsValue).trim() ? 'has-content' : ''}`} rows={5} placeholder={inputFormatOption.description} /></Form.Item>
         <section className="novel-fetch-public-section novel-fetch-settings-row"><div className="novel-fetch-settings-col"><span className="novel-fetch-settings-label">本次处理设置</span><div className="novel-fetch-content-limit"><span className="novel-fetch-limit-chip"><span>截取字数：</span><InputNumber min={100} max={100000} value={processForm.getFieldValue('maxTxt') || 4000} onChange={value => processForm.setFieldValue('maxTxt', value || 4000)} /></span></div></div><div className="novel-fetch-settings-col"><span className="novel-fetch-settings-label">AI 文案版本</span><div className="novel-fetch-version-grid">{AI_VERSIONS.map(version => <label key={version} className={`novel-fetch-version-option ${selectedVersions.includes(version) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedVersions.includes(version)} onChange={event => setSelectedVersions(current => event.target.checked ? [...current, version] : current.filter(item => item !== version))} /><span>{AI_VERSION_LABELS[version]}</span></label>)}</div></div></section>
-        <div className="novel-fetch-public-grid novel-fetch-public-grid--two novel-fetch-process-policy-row"><label className="novel-fetch-field"><span>改文方式</span><div className="novel-fetch-readonly-field">AI1 自动轮换 <span aria-hidden="true">⌄</span></div></label><label className="novel-fetch-field novel-fetch-sensitive-field"><span>敏感处理</span><span className="novel-fetch-check-line"><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</span></label></div>
+        <div className="novel-fetch-public-grid novel-fetch-public-grid--two novel-fetch-process-policy-row"><div className="novel-fetch-field"><span>改文方式</span><div className="novel-fetch-methods">{selectedVersions.filter(version => version !== 'original').map(version => <div className="novel-fetch-method" key={version}><span>{AI_VERSION_LABELS[version]}</span><Select aria-label={`${AI_VERSION_LABELS[version]} 改文方式`} value={rewriteMethods[version] || 'auto'} options={REWRITE_METHOD_OPTIONS} onChange={value => setRewriteMethods(current => ({ ...current, [version]: value }))} /></div>)}{!selectedVersions.some(version => version !== 'original') ? <Typography.Text type="secondary">选择 AI 文案版本后可设置改文方式</Typography.Text> : null}</div></div><label className="novel-fetch-field novel-fetch-sensitive-field"><span>敏感处理</span><span className="novel-fetch-check-line"><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</span></label></div>
         <div className="novel-fetch-public-actions"><V88Button variant="primary" loading={processing} onClick={handleProcess}>开始处理</V88Button>{processing ? <V88Button variant="danger" onClick={handleCancelProcess}>停止等待</V88Button> : null}<V88Button variant="secondary" onClick={() => openScheduleDialog()}>开始定时</V88Button><V88Button variant="secondary" onClick={() => openScheduleDialog(true)}>定时任务</V88Button><V88Button variant="secondary" loading={taskActionBusy === 'sensitive-repair'} onClick={handleSensitiveRepair}>敏感词 AI 修复</V88Button><V88Button variant="ghost" icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</V88Button></div>
       </Form>
       <Modal className="novel-fetch-schedule-modal" open={scheduleModalOpen} width={640} title={<div className="novel-fetch-schedule-title"><span className="novel-fetch-schedule-icon"><CalendarClock size={18} /></span><div><strong>定时任务</strong><small>一次性任务 · 由 Go 后端统一调度</small></div></div>} okText={editingScheduleId ? '保存调整' : '保存定时任务'} cancelText="取消" confirmLoading={scheduleSaving} onCancel={() => { setEditingScheduleId(''); setScheduleModalOpen(false); }} onOk={handleScheduleProcess}>
@@ -1851,7 +1909,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
           <label className="novel-fetch-field"><span>开始时间</span><div className="novel-fetch-schedule-input-wrap"><Input ref={scheduleInputRef} type="datetime-local" min={scheduleInputValue(new Date(Date.now() + 60 * 1000))} value={scheduleTime} onChange={event => setScheduleTime(event.target.value)} onClick={event => event.currentTarget.showPicker?.()} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.showPicker?.(); }} /><CalendarClock className="novel-fetch-schedule-input-icon" size={16} aria-hidden="true" /></div></label>
         </div>
         <div className="novel-fetch-schedule-list-heading"><strong>已保存任务</strong><span>{schedules.length} 个</span></div>
-        {schedules.length ? <div className="novel-fetch-schedule-list">{schedules.map(row => <div className="novel-fetch-schedule-row" key={row.id}><div className="novel-fetch-schedule-row-main"><CalendarClock size={15} /><div><strong>{formatScheduleTime(row.run_at || row.runAt)}</strong><small>创建于 {formatScheduleTime(row.created_at || row.createdAt)} · 默认自动上传</small></div></div><span className={`novel-fetch-schedule-status is-${row.status || 'scheduled'}`}>{scheduleStatusLabel(row.status)}</span><Space className="novel-fetch-schedule-row-actions" size={6}>{(!row.status || row.status === 'scheduled') && <V88Button size="small" variant="secondary" onClick={() => editSchedule(row)}>调整时间</V88Button>}<V88Button size="small" variant="danger" onClick={async () => { await deleteWorkshopSchedule(row.id); await loadSchedules(); }}>删除</V88Button></Space></div>)}</div> : <V88EmptyState icon={<CalendarClock size={24} />} title="还没有定时任务" description="选择开始时间并保存后，任务会显示在这里。" action={<V88Button size="small" variant="secondary" onClick={() => scheduleInputRef.current?.focus()}>选择开始时间</V88Button>} />}
+        {schedules.length ? <div className="novel-fetch-schedule-list">{schedules.map(row => <div className="novel-fetch-schedule-row" key={row.id}><div className="novel-fetch-schedule-row-main"><CalendarClock size={15} /><div><strong>{formatScheduleTime(row.run_at || row.runAt)}</strong><small>创建于 {formatScheduleTime(row.created_at || row.createdAt)} · 默认自动上传</small></div></div><span className={`novel-fetch-schedule-status is-${row.status || 'scheduled'}`}>{scheduleStatusLabel(row.status)}</span><Space className="novel-fetch-schedule-row-actions" size={6}>{(!row.status || row.status === 'scheduled') && <V88Button size="small" variant="secondary" onClick={() => editSchedule(row)}>调整时间</V88Button>}{!['cancelled', 'canceled', 'completed', 'done', 'success', 'failed', 'stopped', 'skipped_existing'].includes(row.status) ? <V88Button size="small" variant="danger" onClick={async () => { try { await cancelWorkshopSchedule(row.id); await loadSchedules(); message.success('定时任务已取消，已生成内容保留'); } catch (error) { message.error(error.message || '取消失败'); } }}>取消任务</V88Button> : <V88Button size="small" variant="danger" onClick={async () => { try { await deleteWorkshopSchedule(row.id); await loadSchedules(); } catch (error) { message.error(error.message || '删除记录失败'); } }}>删除记录</V88Button>}</Space></div>)}</div> : <V88EmptyState icon={<CalendarClock size={24} />} title="还没有定时任务" description="选择开始时间并保存后，任务会显示在这里。" action={<V88Button size="small" variant="secondary" onClick={() => scheduleInputRef.current?.focus()}>选择开始时间</V88Button>} />}
        </Modal>
         </div>
       <div className="novel-fetch-process-side">
@@ -1868,7 +1926,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         </div><div className="novel-fetch-progress-list"><div><span>原文获取</span><i style={{ '--progress': `${progressPercent(processSummary.originalDone)}%` }} /><b>{processSummary.originalDone} / {processSummary.total}</b></div><div><span>AI 文案生成</span><i style={{ '--progress': `${progressPercent(processSummary.aiDone)}%` }} /><b>{processSummary.aiDone} / {processSummary.total}</b></div><div><span>视频管理系统提交</span><i style={{ '--progress': `${progressPercent(processSummary.submissionDone)}%` }} /><b>{processSummary.submissionDone} / {processSummary.total}</b></div></div>
         <div className="novel-fetch-live-log-title">实时日志</div><div className="novel-fetch-live-log"><pre>{liveLogLines.join('\n')}</pre></div></div>
       </div>
-      <div className="novel-fetch-public-actions novel-fetch-process-secondary-actions"><V88Button variant="secondary" loading={taskActionBusy === 'retry-failed'} onClick={retryFailedTasks}>重试当前失败</V88Button><V88Button variant="secondary" loading={taskActionBusy === 'rules-current-batch'} onClick={applyAllRules}>处理当前规则</V88Button><V88Button variant="secondary" loading={webSubmitLoading} onClick={() => submitVisibleTasks(false)}>提交当前批次</V88Button><label className="novel-fetch-factory-version-picker"><span>入厂内容</span><Select aria-label="入厂内容版本" value={batchFactorySourceVersion} onChange={setBatchFactorySourceVersion} options={['sensitive', 'original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'].map(value => ({ value, label: batchFactoryVersionLabel(value) }))} /></label><V88Button variant="secondary" loading={tasksLoading} onClick={transferToBatchFactory}>当前批次入厂</V88Button></div>
+      <div className="novel-fetch-public-actions novel-fetch-process-secondary-actions"><V88Button variant="secondary" loading={taskActionBusy === 'retry-failed'} onClick={retryFailedTasks}>重试当前失败</V88Button><V88Button variant="secondary" loading={taskActionBusy === 'rules-current-batch'} onClick={applyAllRules}>处理当前规则</V88Button><V88Button variant="secondary" loading={webSubmitLoading} onClick={() => submitVisibleTasks()}>提交当前批次</V88Button><label className="novel-fetch-factory-version-picker"><span>入厂内容</span><Select aria-label="入厂内容版本" value={batchFactorySourceVersion} onChange={setBatchFactorySourceVersion} options={['sensitive', 'original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'].map(value => ({ value, label: batchFactoryVersionLabel(value) }))} /></label><V88Button variant="secondary" loading={tasksLoading} onClick={() => transferToBatchFactory('batch')}>当前批次入厂</V88Button></div>
       <div className="novel-fetch-workbench-shortcuts" aria-label="工作台功能入口">
         <button type="button" className="novel-fetch-workbench-shortcut" onClick={() => changeTab('knowledge')}>
           <strong>知识库</strong><span>知识库 + 处理规则</span>
@@ -1966,17 +2024,17 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
                 { key: 'submit', label: '提交日志', onClick: () => openDetail('submit') },
                 { type: 'divider' },
                 { key: 'fetch', label: '重新抓取原文', onClick: () => run(() => fetchWorkshopOriginal(bookId, row.maxTxt || row.max_txt)) },
-                { key: 'ai', label: '生成 AI', onClick: () => run(() => generateWorkshopAi(bookId, 1)) },
+                { key: 'ai', label: '生成 AI', onClick: () => run(() => generateWorkshopAi(bookId)) },
                 { key: 'restore', label: '恢复原文', onClick: () => run(() => restoreWorkshopOriginal(bookId)) }
               ] }}><Tooltip title="任务操作"><Button size="small" aria-label="任务操作" icon={<MoreHorizontal size={14} />} /></Tooltip></Dropdown>;
           } }
         ]} />
         <div className="novel-fetch-task-summary"><span>当前批次 <strong>{currentBatch?.id || '—'}</strong></span><span>完成 <strong>{processSummary.aiDone}</strong></span><span>执行中 <strong>{processSummary.processing}</strong></span><span>等待重试 <strong>{processSummary.waitingRetry}</strong></span><span>失败 <strong>{processSummary.failed}</strong></span><Dropdown trigger={['click']} menu={{ items: currentBatchMenuItems }}><Button className="novel-fetch-task-batch-menu">当前批次操作</Button></Dropdown></div>
-      </> : <div className="novel-fetch-history-panel"><div className="novel-fetch-toolbar"><Typography.Title level={5}>历史批次</Typography.Title><span className="novel-fetch-toolbar-spacer" /><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadHistoryBatches}>刷新历史批次</Button></div><Table scroll={{ x: 720 }} size="small" rowKey="id" dataSource={historyBatches.filter(batch => batch.id !== currentBatch?.id)} locale={{ emptyText: <V88EmptyState title="还没有历史批次" description="完成一个批次后会显示在这里。" action={<V88Button size="small" variant="secondary" loading={tasksLoading} onClick={loadHistoryBatches}>刷新历史批次</V88Button>} /> }} columns={[{ title: '批次', dataIndex: 'id' }, { title: '书籍数', render: (_, row) => row.taskIds?.length || 0 }, { title: '状态', dataIndex: 'status' }, { title: '操作', render: (_, row) => <Space><Button size="small" loading={tasksLoading} onClick={() => rerunHistoryBatch(row.id, 'all')}>全部重跑</Button><Button size="small" loading={tasksLoading} disabled={!row.taskIds?.length} onClick={() => rerunHistoryBatch(row.id, 'abnormal')}>重跑异常</Button></Space> }]} /></div>}
+      </> : <div className="novel-fetch-history-panel"><div className="novel-fetch-toolbar"><Typography.Title level={5}>历史批次</Typography.Title><span className="novel-fetch-toolbar-spacer" /><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadHistoryBatches}>刷新历史批次</Button></div><Table scroll={{ x: 720 }} size="small" rowKey="id" dataSource={historyBatches.filter(batch => batch.id !== currentBatch?.id)} locale={{ emptyText: <V88EmptyState title="还没有历史批次" description="完成一个批次后会显示在这里。" action={<V88Button size="small" variant="secondary" loading={tasksLoading} onClick={loadHistoryBatches}>刷新历史批次</V88Button>} /> }} columns={[{ title: '批次', dataIndex: 'id' }, { title: '书籍数', render: (_, row) => row.taskIds?.length || 0 }, { title: '状态', dataIndex: 'status' }, { title: '操作', render: (_, row) => <Space><Button size="small" loading={tasksLoading} onClick={() => rerunHistoryBatch(row.id, 'all')}>载入全部清单</Button><Button size="small" loading={tasksLoading} disabled={!row.taskIds?.length} onClick={() => rerunHistoryBatch(row.id, 'abnormal')}>载入异常清单</Button></Space> }]} /></div>}
     </div>,
      config: <NovelFetchConfigPanel form={configForm} effectiveValues={configEffective} dirty={configDirty} onDirty={() => setConfigDirty(true)} versionPanel={versionConfigPanel} section={configSection} onSectionChange={setConfigSection} />,
     knowledge: <Space direction="vertical" size={12} style={{ width: '100%' }}><div className="novel-fetch-panel"><Typography.Title level={5}>知识库使用提示词</Typography.Title><Input.TextArea rows={4} value={knowledgeUsagePrompt} onChange={event => setKnowledgeUsagePrompt(event.target.value)} placeholder="告诉 AI 如何参考知识库，且不得照搬示例内容" /><Button type="primary" style={{ marginTop: 8 }} onClick={saveKnowledgeUsagePrompt}>保存知识库配置</Button></div><div className="novel-fetch-panel"><Typography.Title level={5}>三大知识库</Typography.Title><Typography.Text type="secondary">资料库只供 AI 自动取用，任务处理仍然全自动</Typography.Text><div className="novel-fetch-knowledge-summary">{[['开头词', knowledgeSummary.opening_phrases], ['改文模板', knowledgeSummary.rewrite_profiles], ['临时指令', knowledgeSummary.temporary_instructions], ['高仿提示词', knowledgeSummary.high_imitation_prompts], ['高仿参考', knowledgeSummary.high_imitation_references], ['敏感词', knowledgeSummary.sensitive_rules], ['字位符号', knowledgeSummary.symbol_rules], ['成对补符号', knowledgeSummary.pair_fill_rules], ['章节整行', knowledgeSummary.chapter_exact_rules], ['章节开头', knowledgeSummary.chapter_inline_rules]].map(([label, count]) => <Tag key={label}>{label} {Number(count || 0)}</Tag>)}</div></div><div className="novel-fetch-panel"><Tabs activeKey={knowledgeKind} onChange={setKnowledgeKind} items={KNOWLEDGE_TABS.map(([key, label]) => ({ key, label: `${label}（${knowledgeTabCount(key)}）` }))} /><Space wrap><Input allowClear value={knowledgeSearch} onChange={event => setKnowledgeSearch(event.target.value)} placeholder="搜索标题、分类、标签或内容" style={{ width: 300 }} /><Button onClick={() => { knowledgeForm.resetFields(); setKnowledgeDetails('{}'); setKnowledgeModal(true); }}>新增条目</Button><Button loading={knowledgeLoading} onClick={loadKnowledge}>刷新</Button>{knowledgeKind === 'opening_phrases' ? <Button loading={knowledgeLoading} onClick={() => runKnowledgeItemAction(normalizeWorkshopOpening, '开头词已规范化', '规范化开头词失败')}>规范化开头词</Button> : null}</Space></div>{knowledgeKind === 'opening_phrases' ? <div className="novel-fetch-panel"><Typography.Title level={5}>爆款开头拆解入库</Typography.Title><Space wrap style={{ width: '100%' }}><Input value={openingStyle} onChange={event => setOpeningStyle(event.target.value)} placeholder="适用风格类型（可选）" style={{ flex: 1, minWidth: 240 }} /><Input value={openingExtra} onChange={event => setOpeningExtra(event.target.value)} placeholder="补充要求（可选）" style={{ flex: 1, minWidth: 240 }} /></Space><Input.TextArea rows={5} value={openingText} onChange={event => setOpeningText(event.target.value)} placeholder="爆款开头原文" style={{ marginTop: 12 }} /><Input.TextArea rows={5} value={openingResult} onChange={event => setOpeningResult(event.target.value)} placeholder="拆解结果（分析后可编辑）" className="mono" style={{ marginTop: 12 }} /><Space style={{ marginTop: 8 }} wrap><Button type="primary" onClick={handleOpeningAnalyze}>AI 拆解开头词</Button><Button onClick={handleOpeningSaveAnalyzed}>确认加入开头词库</Button><Button onClick={() => { setOpeningText(''); setOpeningStyle(''); setOpeningExtra(''); setOpeningResult(''); setOpeningItems([]); }}>清空</Button></Space></div> : null}<Table className="novel-fetch-panel" rowKey="id" loading={knowledgeLoading} dataSource={(knowledge.items || []).filter(item => { const q = knowledgeSearch.trim().toLowerCase(); return !q || `${item.title || item.name || ''} ${item.category || item.style || ''} ${item.tags || ''} ${item.content || item.prompt || item.text || ''}`.toLowerCase().includes(q); })} columns={[{ title: '条目', render: (_, item) => item.title || item.name || item.text || item.id }, { title: '分类/标签', render: (_, item) => `${item.category || item.style || '自动'} ${Array.isArray(item.tags) ? item.tags.join('、') : item.tags || ''}` }, { title: '内容', render: (_, item) => String(item.content || item.prompt || item.text || item.find || '').slice(0, 120) }, { title: '操作', render: (_, item) => <Space><Button size="small" onClick={() => { const { id, ...details } = item; knowledgeForm.setFieldsValue({ ...item, details: JSON.stringify(details, null, 2) }); setKnowledgeDetails(JSON.stringify(details, null, 2)); setKnowledgeModal(true); }}>编辑</Button><Button size="small" loading={knowledgeLoading} onClick={() => runKnowledgeItemAction(() => saveWorkshopKnowledge(knowledgeKind, { ...item, id: undefined, title: `${item.title || item.name || '未命名'}（副本）` }), '条目已复制', '复制条目失败')}>复制</Button><Button size="small" loading={knowledgeLoading} onClick={() => runKnowledgeItemAction(() => optimizeWorkshopKnowledge(knowledgeKind, item.id), '条目已优化', 'AI 优化失败')}>AI 优化</Button><Button size="small" danger loading={knowledgeLoading} onClick={() => runKnowledgeItemAction(() => deleteWorkshopKnowledge(knowledgeKind, item.id), '条目已删除', '删除条目失败')}>删除</Button></Space> }]} /><Modal open={knowledgeModal} title={`知识条目 · ${KNOWLEDGE_TABS.find(([key]) => key === knowledgeKind)?.[1] || ''}`} onCancel={() => setKnowledgeModal(false)} onOk={saveKnowledge}><Form form={knowledgeForm} layout="vertical"><Form.Item name="id" hidden><Input /></Form.Item><Form.Item name="title" label="名称/标题"><Input /></Form.Item><Space style={{ width: '100%' }} size={12}><Form.Item name="category" label="分类" style={{ flex: 1 }}><Input /></Form.Item><Form.Item name="style" label="适用风格" style={{ flex: 1 }}><Input /></Form.Item><Form.Item name="tags" label="标签" style={{ flex: 1 }}><Input placeholder="用逗号分隔" /></Form.Item></Space><Form.Item name="find" label="命中内容（规则库适用）"><Input /></Form.Item><Form.Item name="replace" label="替换内容（规则库适用）"><Input /></Form.Item><Form.Item name="content" label="内容/提示词"><Input.TextArea rows={7} /></Form.Item><Form.Item label="完整字段（JSON，可保留任意 V78 字段）"><Input.TextArea rows={8} value={knowledgeDetails} onChange={event => setKnowledgeDetails(event.target.value)} className="mono" /></Form.Item></Form></Modal></Space>,
-    rules: <Space direction="vertical" size={12} style={{ width: '100%' }}><div className="novel-fetch-panel"><Space wrap><Select value={ruleKind} onChange={value => { setRuleKind(value); loadRuleConfig(value); }} options={[{ value: 'sensitive', label: '敏感词规则' }, { value: 'layout_rules', label: '批量排版规则' }, { value: 'chapter_exact_rules', label: '章节清洗：整行删除' }, { value: 'chapter_inline_rules', label: '章节清洗：行内命中' }, { value: 'symbol_rules', label: '字位符号规则' }, { value: 'pair_fill_rules', label: '成对补符号规则' }]} /><Select value={ruleScope} onChange={setRuleScope} options={[{ value: 'original', label: '原文' }, { value: 'ai', label: 'AI 版本' }, { value: 'both', label: '原文 + AI 版本' }]} /><Button disabled={!selectedTaskData?.original} onClick={() => setRuleText(selectedTaskData.original)}>载入当前任务原文</Button><Button type="primary" loading={ruleLoading} onClick={handleRulePreview}>预览规则</Button><Button loading={ruleLoading} onClick={handleRuleSuggest}>AI 规则建议</Button><Button onClick={saveRuleConfiguration}>保存规则配置</Button></Space><Typography.Text type="secondary">抓取原文后自动处理，AI 返回后也自动处理；当前编辑器保存到 Go 配置，处理页开关决定是否执行。</Typography.Text><RuleEditor kind={ruleKind} value={ruleConfigText} onChange={setRuleConfigText} /><div className="novel-fetch-rule-editor"><Typography.Title level={5}>规则 AI 助手</Typography.Title><Input.TextArea rows={4} value={ruleAiSample} onChange={event => setRuleAiSample(event.target.value)} placeholder="粘贴一段需要分析的原文或 AI 文案" /><Input.TextArea rows={3} value={ruleAiGoal} onChange={event => setRuleAiGoal(event.target.value)} placeholder="例如：提取敏感词、识别章节序号、建议排版参数" /><Space><Button type="primary" loading={ruleLoading} onClick={handleRuleSuggest}>AI 生成当前规则</Button>{ruleResult?.suggestions ? <Button onClick={() => setRuleConfigText(JSON.stringify(ruleResult.suggestions, null, 2))}>加入对应规则</Button> : null}</Space></div><details className="novel-fetch-advanced-rule"><summary>高级 JSON（与 V78 字段完全兼容）</summary><Input.TextArea style={{ marginTop: 12 }} rows={12} value={ruleConfigText} onChange={event => setRuleConfigText(event.target.value)} className="mono" placeholder="当前规则配置 JSON" /></details><Input.TextArea style={{ marginTop: 12 }} rows={9} value={ruleText} onChange={event => setRuleText(event.target.value)} placeholder="输入需要处理的文本或整批任务共同规则" /></div>{ruleResult ? <div className="novel-fetch-compare"><Tabs items={[{ key: 'result', label: '处理后文本', children: <Input.TextArea rows={14} readOnly value={ruleResult.result || ''} /> }, { key: 'trace', label: '阶段追踪', children: <Collapse items={(ruleResult.trace || []).map((item, index) => ({ key: String(index), label: item.title || `阶段 ${index + 1}`, children: JSON.stringify(item) }))} /> }, { key: 'suggestions', label: '规则建议', children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(ruleResult.suggestions || {}, null, 2)}</Typography.Paragraph> }]} /></div> : null}</Space>,
+    rules: <Space direction="vertical" size={12} style={{ width: '100%' }}><div className="novel-fetch-panel"><Space wrap><Select value={ruleKind} onChange={setRuleKind} options={[{ value: 'sensitive', label: '敏感词规则' }, { value: 'layout_rules', label: '批量排版规则' }, { value: 'chapter_exact_rules', label: '章节清洗：整行删除' }, { value: 'chapter_inline_rules', label: '章节清洗：行内命中' }, { value: 'symbol_rules', label: '字位符号规则' }, { value: 'pair_fill_rules', label: '成对补符号规则' }]} /><Select value={ruleScope} onChange={setRuleScope} options={[{ value: 'original', label: '原文' }, { value: 'ai', label: 'AI 版本' }, { value: 'both', label: '原文 + AI 版本' }]} /><Button disabled={!selectedTaskData?.original} onClick={() => setRuleText(selectedTaskData.original)}>载入当前任务原文</Button><Button type="primary" loading={ruleLoading} onClick={handleRulePreview}>预览规则</Button><Button onClick={saveRuleConfiguration}>保存规则配置</Button></Space><Typography.Text type="secondary">抓取原文后自动处理，AI 返回后也自动处理；当前编辑器保存到 Go 配置，处理页开关决定是否执行。</Typography.Text><RuleEditor kind={ruleKind} value={ruleConfigText} onChange={editRuleDraft} /><div className="novel-fetch-rule-editor"><Typography.Title level={5}>规则 AI 助手</Typography.Title><Input.TextArea rows={4} value={ruleAiSample} onChange={event => setRuleAiSample(event.target.value)} placeholder="粘贴一段需要分析的原文或 AI 文案" /><Input.TextArea rows={3} value={ruleAiGoal} onChange={event => setRuleAiGoal(event.target.value)} placeholder="例如：提取敏感词、识别章节序号、建议排版参数" /><Space><Button type="primary" loading={ruleLoading} onClick={handleRuleSuggest}>AI 生成当前规则</Button>{ruleResult?.suggestions ? <Button onClick={() => editRuleDraft(JSON.stringify(ruleResult.suggestions, null, 2))}>加入对应规则</Button> : null}</Space></div><details className="novel-fetch-advanced-rule"><summary>高级 JSON（与 V78 字段完全兼容）</summary><Input.TextArea style={{ marginTop: 12 }} rows={12} value={ruleConfigText} onChange={event => editRuleDraft(event.target.value)} className="mono" placeholder="当前规则配置 JSON" /></details><Input.TextArea style={{ marginTop: 12 }} rows={9} value={ruleText} onChange={event => setRuleText(event.target.value)} placeholder="输入需要处理的文本或整批任务共同规则" /></div>{ruleResult ? <div className="novel-fetch-compare"><Tabs items={[{ key: 'result', label: '处理后文本', children: <Input.TextArea rows={14} readOnly value={ruleResult.result || ''} /> }, { key: 'trace', label: '阶段追踪', children: <Collapse items={(ruleResult.trace || []).map((item, index) => ({ key: String(index), label: item.title || `阶段 ${index + 1}`, children: JSON.stringify(item) }))} /> }, { key: 'suggestions', label: '规则建议', children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(ruleResult.suggestions || {}, null, 2)}</Typography.Paragraph> }]} /></div> : null}</Space>,
     logs: <div className="novel-fetch-panel"><Typography.Title level={5}>操作日志</Typography.Title><Select value={selectedTask || undefined} style={{ width: 320, marginBottom: 12 }} placeholder="选择任务查看日志" options={tasks.map(task => ({ value: task.bookId, label: task.bookName || task.bookId }))} onChange={selectTask} />{selectedTaskData ? <Collapse items={(selectedTaskData.logs || []).map((log, index) => ({ key: String(index), label: `${log.time || ''} ${log.event || '操作日志'}`, children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{log.detail || JSON.stringify(log)}</Typography.Paragraph> }))} /> : <Table size="small" pagination={{ pageSize: 20 }} rowKey={(row, index) => row.id || index} dataSource={globalLogs} locale={{ emptyText: '暂无操作记录' }} columns={[{ title: '时间', dataIndex: 'time', render: (value, row) => formatWorkDateTime(value || row.createdAt || row.created_at) }, { title: '事件', dataIndex: 'event' }, { title: '详情', render: (_, row) => String(row.detail || row.message || '').slice(0, 120) }]} />}</div>
   };
 
@@ -1988,7 +2046,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const activePanel = activeTab === 'process'
     ? panels.process
     : activeTab === 'knowledge' || activeTab === 'rules'
-      ? <NovelFetchSubpageShell title="知识库" description="维护 AI 参考资料、爆款开头和自动处理规则" onBack={() => changeTab('process')} actions={<><V88Button variant="secondary" icon={<Settings2 size={14} />} onClick={() => setKnowledgeSettingsOpen(true)}>知识库设置</V88Button><V88Button variant="ghost" icon={<RefreshCw size={14} />} loading={knowledgeLoading} onClick={loadKnowledge}>刷新</V88Button><V88Button variant="primary" onClick={addKnowledgeLibraryItem}>新增资料</V88Button></>}><Tabs className="novel-fetch-section-tabs" activeKey={knowledgeView} onChange={setKnowledgeView} items={[{ key: 'library', label: '资料库', children: panels.knowledge }, { key: 'opening', label: '爆款开头拆解', children: openingPanel }, { key: 'rules', label: '处理规则', children: panels.rules }]} /></NovelFetchSubpageShell>
+      ? <NovelFetchSubpageShell title="知识库" description="维护 AI 参考资料、爆款开头和自动处理规则" onBack={() => changeTab('process')} actions={<><V88Button variant="secondary" icon={<Settings2 size={14} />} onClick={() => setKnowledgeSettingsOpen(true)}>知识库设置</V88Button>{knowledgeView !== 'opening' ? <V88Button variant="ghost" icon={<RefreshCw size={14} />} loading={knowledgeLoading} onClick={refreshKnowledgeView}>刷新</V88Button> : null}{knowledgeView === 'library' ? <V88Button variant="primary" onClick={addKnowledgeLibraryItem}>新增资料</V88Button> : null}</>}><Tabs className="novel-fetch-section-tabs" activeKey={knowledgeView} onChange={setKnowledgeView} items={[{ key: 'library', label: '资料库', children: panels.knowledge }, { key: 'opening', label: '爆款开头拆解', children: openingPanel }, { key: 'rules', label: '处理规则', children: panels.rules }]} /></NovelFetchSubpageShell>
       : activeTab === 'tasks'
         ? <NovelFetchSubpageShell className="novel-fetch-task-subpage" title="任务" description="查看当前任务、历史批次和每本书的处理详情" onBack={() => changeTab('process')} actions={<V88Button variant="ghost" icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</V88Button>}>{panels.tasks}</NovelFetchSubpageShell>
       : activeTab === 'config'

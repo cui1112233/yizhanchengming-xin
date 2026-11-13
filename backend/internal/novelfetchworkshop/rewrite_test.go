@@ -14,7 +14,7 @@ func (f rewriteProviderFunc) Complete(ctx context.Context, request RewriteReques
 }
 
 func TestGenerateAIRewritesSavesVersionsAndBackendPrompt(t *testing.T) {
-	store := NewMemoryStore()
+	store := plainRewriteTestStore("alice")
 	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-1", Original: "原文第一段"}); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestGenerateAIRewritesSavesVersionsAndBackendPrompt(t *testing.T) {
 }
 
 func TestGenerateAIRewritesDoesNotSaveEmptyOrFailedVersion(t *testing.T) {
-	store := NewMemoryStore()
+	store := plainRewriteTestStore("alice")
 	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-2", Original: "原文"}); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestGenerateAIRewritesDoesNotSaveEmptyOrFailedVersion(t *testing.T) {
 }
 
 func TestGenerateAIRewritesUsesCompactInstructionBlock(t *testing.T) {
-	store := NewMemoryStore()
+	store := plainRewriteTestStore("alice")
 	original := strings.Join([]string{
 		"第一行原文。", "第二行原文。", "第三行原文。", "第四行原文。", "第五行原文。",
 		"第六行原文。", "第七行原文。", "第八行原文。", "第九行原文。", "第十行原文。",
@@ -103,7 +103,7 @@ func TestGenerateAIRewritesUsesCompactInstructionBlock(t *testing.T) {
 }
 
 func TestGenerateAIRewritesForVersionsOnlySavesExplicitSelections(t *testing.T) {
-	store := NewMemoryStore()
+	store := plainRewriteTestStore("alice")
 	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-selected", Original: "原文"}); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestGenerateAIRewritesForVersionsOnlySavesExplicitSelections(t *testing.T) 
 }
 
 func TestGenerateAIRewritesRunsPostProcessorBeforeSavingBody(t *testing.T) {
-	store := NewMemoryStore()
+	store := plainRewriteTestStore("alice")
 	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-rules", Original: "原文", ProcessedText: "原文"}); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestGenerateAIRewritesRunsPostProcessorBeforeSavingBody(t *testing.T) {
 }
 
 func TestGenerateAIRewritesConsumesSavedRewriteAndKnowledgeConfig(t *testing.T) {
-	store := NewMemoryStore()
+	store := plainRewriteTestStore("alice")
 	if err := store.PutConfig(context.Background(), "alice", map[string]any{
 		"appConfig": map[string]any{
 			"rewrite":   map[string]any{"process_line_count": 1, "anchor_line_count": 1, "temperature": 0.7, "ai_slot_methods": map[string]any{"ai1": "opening_instruction"}, "method_sequence": []any{"opening_instruction"}, "default_template_id": "tpl-1", "prompt": "账号改文要求"},

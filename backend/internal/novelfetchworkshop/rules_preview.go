@@ -60,12 +60,25 @@ func previewChapterCleanup(text string, layout, chapter map[string]any) string {
 		return text
 	}
 	removeInline := chapter["chapter_remove_inline"] == true
+	removeStandalone := chapter["chapter_remove_standalone"] != false
 	patterns := []*regexp.Regexp{defaultChapterLine}
-	if raw, ok := chapter["chapter_exact_rules"].([]any); ok {
-		for _, value := range raw {
+	for _, key := range []string{"chapter_exact_rules", "chapter_builtin_exact_rules"} {
+		if raw, ok := chapter[key].([]any); ok {
+			for _, value := range raw {
+				if item, ok := value.(map[string]any); ok && item["enabled"] != false {
+					if pattern, err := regexp.Compile(ruleString(item["find"])); err == nil {
+						patterns = append(patterns, pattern)
+					}
+				}
+			}
+		}
+	}
+	inlinePatterns := []*regexp.Regexp{}
+	for _, key := range []string{"chapter_inline_rules", "chapter_builtin_inline_rules"} {
+		for _, value := range anySlice(chapter[key]) {
 			if item, ok := value.(map[string]any); ok && item["enabled"] != false {
 				if pattern, err := regexp.Compile(ruleString(item["find"])); err == nil {
-					patterns = append(patterns, pattern)
+					inlinePatterns = append(inlinePatterns, pattern)
 				}
 			}
 		}
@@ -74,10 +87,20 @@ func previewChapterCleanup(text string, layout, chapter map[string]any) string {
 	for index, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		remove := false
-		for _, pattern := range patterns {
-			if pattern.MatchString(line) {
-				remove = true
-				break
+		if removeStandalone {
+			for _, pattern := range patterns {
+				if match := pattern.FindStringIndex(line); match != nil && match[0] == 0 {
+					remove = true
+					break
+				}
+			}
+		}
+		if !remove && removeInline {
+			for _, pattern := range inlinePatterns {
+				if match := pattern.FindStringIndex(line); match != nil && match[0] == 0 {
+					remove = true
+					break
+				}
 			}
 		}
 		if !remove && removeInline && strings.HasPrefix(trimmed, "第") {

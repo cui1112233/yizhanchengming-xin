@@ -1,0 +1,2705 @@
+{
+  "source": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\rea-batch-book-20261112\\批量原文改文系统_源码\\main.py",
+  "source_sha256": "5c400add3ecfdc00211e562999ac2fbeea9c2534a6dcf4cf845d2596f87650d2",
+  "boundary": "用户提供的原包 main.py 所有 /api 路由；候选匹配仅用于定位，不证明功能一致",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/api/auth/me",
+      "function": "auth_me_api",
+      "source_line": 18274,
+      "source_end": 18300,
+      "inputs": [],
+      "direct_output_keys": [
+        "admin_impersonating",
+        "authenticated",
+        "impersonating_user",
+        "is_local_admin",
+        "mode",
+        "session_days",
+        "user"
+      ],
+      "calls": [
+        "admin_impersonating_user_id",
+        "app.get",
+        "bool",
+        "clean_cell",
+        "ctx.get",
+        "current_access_context",
+        "current_user_id",
+        "find_account",
+        "public_account"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/auth/login",
+      "function": "auth_login_api",
+      "source_line": 18304,
+      "source_end": 18322,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "LoginRequest",
+          "request_fields": [
+            {
+              "name": "username",
+              "type": "str"
+            },
+            {
+              "name": "password",
+              "type": "str"
+            }
+          ]
+        },
+        {
+          "name": "response",
+          "type": "Response",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "me",
+        "ok"
+      ],
+      "calls": [
+        "HTTPException",
+        "account.get",
+        "app.post",
+        "clean_cell",
+        "create_access_session",
+        "find_account",
+        "initialize_user_files",
+        "now_iso",
+        "public_account",
+        "response.set_cookie",
+        "save_account",
+        "verify_account_password"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18307,
+          "expression": "HTTPException(status_code=401, detail='账号不可用或不存在')"
+        },
+        {
+          "line": 18309,
+          "expression": "HTTPException(status_code=401, detail='账号或密码错误')"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/auth/logout",
+      "function": "auth_logout_api",
+      "source_line": 18326,
+      "source_end": 18331,
+      "inputs": [
+        {
+          "name": "request",
+          "type": "Request",
+          "request_fields": []
+        },
+        {
+          "name": "response",
+          "type": "Response",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "ok"
+      ],
+      "calls": [
+        "app.post",
+        "delete_access_session",
+        "request.cookies.get",
+        "response.delete_cookie"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/admin/accounts",
+      "function": "admin_accounts_api",
+      "source_line": 18355,
+      "source_end": 18357,
+      "inputs": [],
+      "direct_output_keys": [
+        "accounts"
+      ],
+      "calls": [
+        "admin_accounts_payload",
+        "app.get",
+        "require_local_admin"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/admin_read_compat.go",
+          "line": 303,
+          "method": "GET",
+          "route": "/api/admin/accounts"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/admin/accounts",
+      "function": "admin_create_account_api",
+      "source_line": 18361,
+      "source_end": 18364,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "AccountCreateRequest",
+          "request_fields": [
+            {
+              "name": "username",
+              "type": "str"
+            },
+            {
+              "name": "display_name",
+              "type": "str"
+            },
+            {
+              "name": "password",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "account",
+        "accounts",
+        "ok"
+      ],
+      "calls": [
+        "admin_accounts_payload",
+        "app.post",
+        "create_access_account",
+        "require_local_admin"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/admin_governance_compat.go",
+          "line": 41,
+          "method": "POST",
+          "route": "/api/admin/accounts"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/admin/accounts/{user_id}",
+      "function": "admin_patch_account_api",
+      "source_line": 18368,
+      "source_end": 18383,
+      "inputs": [
+        {
+          "name": "user_id",
+          "type": "str",
+          "request_fields": []
+        },
+        {
+          "name": "req",
+          "type": "AccountPatchRequest",
+          "request_fields": [
+            {
+              "name": "display_name",
+              "type": "str | None"
+            },
+            {
+              "name": "enabled",
+              "type": "bool | None"
+            },
+            {
+              "name": "deleted",
+              "type": "bool | None"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "account",
+        "accounts",
+        "ok"
+      ],
+      "calls": [
+        "HTTPException",
+        "account.get",
+        "admin_accounts_payload",
+        "app.patch",
+        "bool",
+        "clean_cell",
+        "find_account",
+        "now_iso",
+        "public_account",
+        "require_local_admin",
+        "save_account"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18372,
+          "expression": "HTTPException(status_code=404, detail='账号不存在')"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/admin/accounts/{user_id}/reset-password",
+      "function": "admin_reset_password_api",
+      "source_line": 18387,
+      "source_end": 18396,
+      "inputs": [
+        {
+          "name": "user_id",
+          "type": "str",
+          "request_fields": []
+        },
+        {
+          "name": "req",
+          "type": "PasswordResetRequest",
+          "request_fields": [
+            {
+              "name": "password",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "account",
+        "ok"
+      ],
+      "calls": [
+        "HTTPException",
+        "account.update",
+        "app.post",
+        "create_password_fields",
+        "find_account",
+        "len",
+        "public_account",
+        "require_local_admin",
+        "save_account",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18390,
+          "expression": "HTTPException(status_code=400, detail='密码至少 6 位')"
+        },
+        {
+          "line": 18393,
+          "expression": "HTTPException(status_code=404, detail='账号不存在')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/admin_governance_compat.go",
+          "line": 78,
+          "method": "POST",
+          "route": "/api/admin/accounts/{username}/reset-password"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/admin/switch-user",
+      "function": "admin_switch_user_api",
+      "source_line": 18400,
+      "source_end": 18417,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "AdminSwitchUserRequest",
+          "request_fields": [
+            {
+              "name": "user_id",
+              "type": "str"
+            }
+          ]
+        },
+        {
+          "name": "response",
+          "type": "Response",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "impersonating_user",
+        "local_admin",
+        "ok"
+      ],
+      "calls": [
+        "HTTPException",
+        "account.get",
+        "app.post",
+        "clean_cell",
+        "find_account",
+        "initialize_user_files",
+        "public_account",
+        "require_local_admin",
+        "response.delete_cookie",
+        "response.set_cookie"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18407,
+          "expression": "HTTPException(status_code=404, detail='账号不存在或已删除')"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/admin/switch-user/clear",
+      "function": "admin_clear_switch_user_api",
+      "source_line": 18421,
+      "source_end": 18425,
+      "inputs": [
+        {
+          "name": "response",
+          "type": "Response",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "ok"
+      ],
+      "calls": [
+        "app.post",
+        "response.delete_cookie"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/config",
+      "function": "get_config",
+      "source_line": 18429,
+      "source_end": 18441,
+      "inputs": [],
+      "direct_output_keys": [
+        "app_config",
+        "column_presets",
+        "knowledge",
+        "knowledge_summary",
+        "parse_modes",
+        "platforms",
+        "sensitive",
+        "styles",
+        "web_submit",
+        "work_form"
+      ],
+      "calls": [
+        "app.get",
+        "knowledge_counts",
+        "platforms",
+        "public_app_config_for_current",
+        "raw_sensitive_config",
+        "read_knowledge_config",
+        "styles",
+        "web_submit_public_config",
+        "work_form_state"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 44,
+          "method": "GET",
+          "route": "/api/batch-rewrite/config"
+        },
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 271,
+          "method": "GET",
+          "route": "/api/batch-rewrite/web-submit/config"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 3176,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/config"
+        },
+        {
+          "file": "backend/internal/httpapi/plugin_tools.go",
+          "line": 48,
+          "method": "GET",
+          "route": "/api/plugins/{toolID}/config"
+        },
+        {
+          "file": "backend/internal/httpapi/upscale_routes.go",
+          "line": 59,
+          "method": "GET",
+          "route": "/api/ai-upscale/config"
+        },
+        {
+          "file": "backend/internal/httpapi/user_config.go",
+          "line": 302,
+          "method": "GET",
+          "route": "/api/config"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/config",
+      "function": "save_config",
+      "source_line": 18445,
+      "source_end": 18466,
+      "inputs": [
+        {
+          "name": "payload",
+          "type": "ConfigSaveRequest",
+          "request_fields": [
+            {
+              "name": "app_config",
+              "type": "dict[str, Any] | None"
+            },
+            {
+              "name": "platforms",
+              "type": "list[dict[str, Any]] | None"
+            },
+            {
+              "name": "styles",
+              "type": "list[str] | None"
+            },
+            {
+              "name": "sensitive",
+              "type": "Any"
+            },
+            {
+              "name": "knowledge",
+              "type": "dict[str, Any] | None"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "config",
+        "ok"
+      ],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "app_config",
+        "console_bookid_fetch_config",
+        "copy.deepcopy",
+        "current_user_id",
+        "get_config",
+        "is_user_context",
+        "isinstance",
+        "local_admin_global_view",
+        "maybe_wake_bookid_fetch_after_config_save",
+        "next_config.pop",
+        "save_app_config",
+        "save_knowledge_config",
+        "str",
+        "user_styles_path",
+        "write_json"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18465,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 57,
+          "method": "POST",
+          "route": "/api/batch-rewrite/config"
+        },
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 324,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/config"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 3256,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/config"
+        },
+        {
+          "file": "backend/internal/httpapi/user_config.go",
+          "line": 324,
+          "method": "POST",
+          "route": "/api/config"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/work-form",
+      "function": "work_form_api",
+      "source_line": 18470,
+      "source_end": 18471,
+      "inputs": [],
+      "direct_output_keys": [
+        "state"
+      ],
+      "calls": [
+        "app.get",
+        "work_form_state"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/work-form",
+      "function": "save_work_form_api",
+      "source_line": 18475,
+      "source_end": 18476,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "WorkFormStateRequest",
+          "request_fields": [
+            {
+              "name": "state",
+              "type": "dict[str, Any]"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "ok",
+        "state"
+      ],
+      "calls": [
+        "app.post",
+        "save_work_form_state"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 246,
+          "method": "POST",
+          "route": "/api/batch-rewrite/work-form"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/schedules",
+      "function": "schedules_api",
+      "source_line": 18480,
+      "source_end": 18481,
+      "inputs": [
+        {
+          "name": "limit",
+          "type": "int",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "schedules"
+      ],
+      "calls": [
+        "app.get",
+        "list_schedules"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_factory_schedules.go",
+          "line": 103,
+          "method": "GET",
+          "route": "/api/batch-factory/v12/schedules"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 203,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/schedules"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 804,
+          "method": "GET",
+          "route": "/api/batch-rewrite/schedules"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/schedules",
+      "function": "create_schedule_api",
+      "source_line": 18485,
+      "source_end": 18486,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "ScheduleCreateRequest",
+          "request_fields": [
+            {
+              "name": "run_at",
+              "type": "str"
+            },
+            {
+              "name": "platform_id",
+              "type": "str"
+            },
+            {
+              "name": "input_text",
+              "type": "str"
+            },
+            {
+              "name": "parse_mode",
+              "type": "str"
+            },
+            {
+              "name": "column_preset_id",
+              "type": "str"
+            },
+            {
+              "name": "column_order",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.post",
+        "create_schedule"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_factory_schedules.go",
+          "line": 118,
+          "method": "POST",
+          "route": "/api/batch-factory/v12/schedules"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 212,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/schedules"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 805,
+          "method": "POST",
+          "route": "/api/batch-rewrite/schedules"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/schedules/{schedule_id}",
+      "function": "patch_schedule_api",
+      "source_line": 18490,
+      "source_end": 18494,
+      "inputs": [
+        {
+          "name": "schedule_id",
+          "type": "str",
+          "request_fields": []
+        },
+        {
+          "name": "req",
+          "type": "SchedulePatchRequest",
+          "request_fields": [
+            {
+              "name": "status",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.patch",
+        "cancel_schedule",
+        "clean_cell",
+        "clean_cell(req.status).lower"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18493,
+          "expression": "HTTPException(status_code=400, detail='仅支持取消定时处理')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_factory_schedules.go",
+          "line": 166,
+          "method": "PATCH",
+          "route": "/api/batch-factory/v12/schedules/{id}"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 233,
+          "method": "PATCH",
+          "route": "/api/novel-fetch-workshop/schedules/{id}"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/schedules/{schedule_id}",
+      "function": "delete_schedule_api",
+      "source_line": 18498,
+      "source_end": 18499,
+      "inputs": [
+        {
+          "name": "schedule_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.delete",
+        "delete_schedule_record"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_factory_schedules.go",
+          "line": 214,
+          "method": "DELETE",
+          "route": "/api/batch-factory/v12/schedules/{id}"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 234,
+          "method": "DELETE",
+          "route": "/api/novel-fetch-workshop/schedules/{id}"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/knowledge",
+      "function": "knowledge_api",
+      "source_line": 18503,
+      "source_end": 18504,
+      "inputs": [],
+      "direct_output_keys": [
+        "summary"
+      ],
+      "calls": [
+        "app.get",
+        "knowledge_counts"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/knowledge/optimize",
+      "function": "optimize_knowledge_api",
+      "source_line": 18508,
+      "source_end": 18512,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "KnowledgeOptimizeRequest",
+          "request_fields": [
+            {
+              "name": "library_type",
+              "type": "str"
+            },
+            {
+              "name": "item",
+              "type": "dict[str, Any]"
+            },
+            {
+              "name": "goal",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "optimize_knowledge_item",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18512,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 237,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/knowledge/optimize"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 846,
+          "method": "POST",
+          "route": "/api/batch-rewrite/knowledge/optimize"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/opening/analyze",
+      "function": "opening_analyze_api",
+      "source_line": 18516,
+      "source_end": 18520,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "OpeningAnalyzeRequest",
+          "request_fields": [
+            {
+              "name": "source_text",
+              "type": "str"
+            },
+            {
+              "name": "style",
+              "type": "str"
+            },
+            {
+              "name": "extra_requirement",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "analyze_opening_phrase",
+        "app.post",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18520,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2958,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/opening/analyze"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/opening/save",
+      "function": "opening_save_api",
+      "source_line": 18524,
+      "source_end": 18530,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "OpeningSaveRequest",
+          "request_fields": [
+            {
+              "name": "item",
+              "type": "dict[str, Any]"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "get_config",
+        "save_opening_item",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18530,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2992,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/opening/save"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/opening/normalize",
+      "function": "opening_normalize_api",
+      "source_line": 18534,
+      "source_end": 18540,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "get_config",
+        "normalize_opening_library",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18540,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 3020,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/opening/normalize"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/ai/test",
+      "function": "ai_test_api",
+      "source_line": 18544,
+      "source_end": 18548,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "AiTestRequest",
+          "request_fields": [
+            {
+              "name": "purpose",
+              "type": "str"
+            },
+            {
+              "name": "settings",
+              "type": "dict[str, Any] | None"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "str",
+        "test_ai_connection"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18548,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2689,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/ai/test"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/process",
+      "function": "process_api",
+      "source_line": 18552,
+      "source_end": 18565,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "ProcessRequest",
+          "request_fields": [
+            {
+              "name": "platform_id",
+              "type": "str"
+            },
+            {
+              "name": "input_text",
+              "type": "str"
+            },
+            {
+              "name": "parse_mode",
+              "type": "str"
+            },
+            {
+              "name": "column_preset_id",
+              "type": "str"
+            },
+            {
+              "name": "column_order",
+              "type": "str"
+            },
+            {
+              "name": "max_txt",
+              "type": "int | None"
+            },
+            {
+              "name": "ai_count",
+              "type": "int | None"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "clean_cell",
+        "process_batch",
+        "save_work_form_state"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18554,
+          "expression": "HTTPException(status_code=400, detail='请输入书籍信息')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2012,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/process"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 869,
+          "method": "POST",
+          "route": "/api/process"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/process/start",
+      "function": "process_start_api",
+      "source_line": 18569,
+      "source_end": 18576,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "ProcessRequest",
+          "request_fields": [
+            {
+              "name": "platform_id",
+              "type": "str"
+            },
+            {
+              "name": "input_text",
+              "type": "str"
+            },
+            {
+              "name": "parse_mode",
+              "type": "str"
+            },
+            {
+              "name": "column_preset_id",
+              "type": "str"
+            },
+            {
+              "name": "column_order",
+              "type": "str"
+            },
+            {
+              "name": "max_txt",
+              "type": "int | None"
+            },
+            {
+              "name": "ai_count",
+              "type": "int | None"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "clean_cell",
+        "start_process_job"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18571,
+          "expression": "HTTPException(status_code=400, detail='请输入书籍信息')"
+        },
+        {
+          "line": 18576,
+          "expression": "HTTPException(status_code=409, detail=detail)"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2089,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/process/start"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 870,
+          "method": "POST",
+          "route": "/api/process/start"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/process/stop",
+      "function": "process_stop_api",
+      "source_line": 18580,
+      "source_end": 18581,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "ProcessStopRequest",
+          "request_fields": [
+            {
+              "name": "job_id",
+              "type": "str"
+            },
+            {
+              "name": "pause_auto_queue",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.post",
+        "stop_process_job"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 201,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/process/stop"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 871,
+          "method": "POST",
+          "route": "/api/process/stop"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/process/queue/start",
+      "function": "process_queue_start_api",
+      "source_line": 18585,
+      "source_end": 18586,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "TaskBatchRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "permanent",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.post",
+        "start_manual_queue_job"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 872,
+          "method": "POST",
+          "route": "/api/process/queue/start"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/process/queue/status",
+      "function": "process_queue_status_api",
+      "source_line": 18590,
+      "source_end": 18591,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "queue_status_summary"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 879,
+          "method": "GET",
+          "route": "/api/process/queue/status"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/realtime/status",
+      "function": "realtime_status_api",
+      "source_line": 18595,
+      "source_end": 18596,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "realtime_status_summary"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2311,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/realtime/status"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 810,
+          "method": "GET",
+          "route": "/api/batch-rewrite/realtime/status"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/integrations/workbench/push",
+      "function": "workbench_push_api",
+      "source_line": 18600,
+      "source_end": 18614,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "WorkbenchPushRequest",
+          "request_fields": [
+            {
+              "name": "source",
+              "type": "str"
+            },
+            {
+              "name": "source_run_id",
+              "type": "str"
+            },
+            {
+              "name": "trigger_mode",
+              "type": "str"
+            },
+            {
+              "name": "platform_id",
+              "type": "str"
+            },
+            {
+              "name": "books",
+              "type": "list[WorkbenchPushBook]"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "JSONResponse",
+        "app.post",
+        "current_process_job_id",
+        "push_workbench_books",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18614,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/integrations/changdu/bookid-fetch/run",
+      "function": "changdu_bookid_fetch_run_api",
+      "source_line": 18618,
+      "source_end": 18623,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "BookIdFetchRunRequest | None",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "BookIdFetchRunRequest",
+        "HTTPException",
+        "app.post",
+        "require_push_integration_admin",
+        "run_bookid_fetch",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18623,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/integrations/changdu/bookid-fetch/status",
+      "function": "changdu_bookid_fetch_status_api",
+      "source_line": 18627,
+      "source_end": 18629,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "bookid_fetch_status_summary",
+        "require_push_integration_admin"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/process/jobs/latest",
+      "function": "process_latest_job_api",
+      "source_line": 18633,
+      "source_end": 18642,
+      "inputs": [
+        {
+          "name": "limit",
+          "type": "int",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "jobs",
+        "latest"
+      ],
+      "calls": [
+        "app.get",
+        "jobs.append",
+        "latest_process_jobs",
+        "len",
+        "max",
+        "min",
+        "parse_int",
+        "process_job_public_for_current"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2230,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/process/jobs/latest"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/process/jobs/{job_id}",
+      "function": "process_job_api",
+      "source_line": 18646,
+      "source_end": 18653,
+      "inputs": [
+        {
+          "name": "job_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.get",
+        "clean_cell",
+        "isinstance",
+        "process_job_matches_current_control_scope",
+        "process_job_path",
+        "process_job_public_for_current",
+        "raw_job.setdefault",
+        "re.sub",
+        "read_json"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18649,
+          "expression": "HTTPException(status_code=404, detail='处理任务不存在')"
+        },
+        {
+          "line": 18651,
+          "expression": "HTTPException(status_code=403, detail='无权访问该处理任务')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2255,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/process/jobs/{jobId}"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks",
+      "function": "tasks_api",
+      "source_line": 18657,
+      "source_end": 18660,
+      "inputs": [
+        {
+          "name": "scope",
+          "type": "str",
+          "request_fields": []
+        },
+        {
+          "name": "date",
+          "type": "str",
+          "request_fields": []
+        },
+        {
+          "name": "q",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "date",
+        "query",
+        "scope",
+        "tasks"
+      ],
+      "calls": [
+        "app.get",
+        "clean_cell",
+        "list_tasks",
+        "task_list_date_filter"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/agent_workspace_compat.go",
+          "line": 66,
+          "method": "GET",
+          "route": "/api/agent/tasks"
+        },
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 75,
+          "method": "GET",
+          "route": "/api/batch-rewrite/tasks"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2322,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/tasks"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 903,
+          "method": "GET",
+          "route": "/api/tasks"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/batch-delete",
+      "function": "batch_delete_api",
+      "source_line": 18664,
+      "source_end": 18669,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "TaskBatchRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "permanent",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "batch_delete_tasks"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18669,
+          "expression": "HTTPException(status_code=409, detail=detail)"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 183,
+          "method": "POST",
+          "route": "/api/batch-rewrite/tasks/batch-delete"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/permanent-delete",
+      "function": "permanent_delete_api",
+      "source_line": 18674,
+      "source_end": 18686,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "TaskBatchRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "permanent",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "TaskBatchRequest",
+        "app.post",
+        "batch_delete_tasks",
+        "clean_cell",
+        "current_request_is_local_admin"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18677,
+          "expression": "HTTPException(status_code=403, detail='永久删除仅限本机管理员')"
+        },
+        {
+          "line": 18681,
+          "expression": "HTTPException(status_code=400, detail='无效的永久删除范围')"
+        },
+        {
+          "line": 18683,
+          "expression": "HTTPException(status_code=400, detail='永久删除选中任务时必须先选择任务')"
+        },
+        {
+          "line": 18686,
+          "expression": "HTTPException(status_code=409, detail=f\"永久删除失败：{exc.active_job_id or '-'}\")"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/permanent_delete",
+      "function": "permanent_delete_api",
+      "source_line": 18674,
+      "source_end": 18686,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "TaskBatchRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "permanent",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "TaskBatchRequest",
+        "app.post",
+        "batch_delete_tasks",
+        "clean_cell",
+        "current_request_is_local_admin"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18677,
+          "expression": "HTTPException(status_code=403, detail='永久删除仅限本机管理员')"
+        },
+        {
+          "line": 18681,
+          "expression": "HTTPException(status_code=400, detail='无效的永久删除范围')"
+        },
+        {
+          "line": 18683,
+          "expression": "HTTPException(status_code=400, detail='永久删除选中任务时必须先选择任务')"
+        },
+        {
+          "line": 18686,
+          "expression": "HTTPException(status_code=409, detail=f\"永久删除失败：{exc.active_job_id or '-'}\")"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/batch-retry",
+      "function": "batch_retry_api",
+      "source_line": 18690,
+      "source_end": 18691,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "TaskBatchRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "permanent",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.post",
+        "batch_retry_tasks"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2346,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/tasks/batch-retry"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/batch-ai-count",
+      "function": "batch_ai_count_api",
+      "source_line": 18695,
+      "source_end": 18696,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "BatchAiCountRequest",
+          "request_fields": [
+            {
+              "name": "count",
+              "type": "int"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.post",
+        "batch_update_ai_count"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 283,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/tasks/batch-ai-count"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 845,
+          "method": "POST",
+          "route": "/api/batch-rewrite/tasks/batch-ai-count"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/apply-rules",
+      "function": "apply_rules_api",
+      "source_line": 18700,
+      "source_end": 18701,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "ApplyRulesRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "scope",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.post",
+        "batch_apply_rules"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 284,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/tasks/apply-rules"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 843,
+          "method": "POST",
+          "route": "/api/batch-rewrite/tasks/apply-rules"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/web-submit/config",
+      "function": "web_submit_config_api",
+      "source_line": 18705,
+      "source_end": 18706,
+      "inputs": [],
+      "direct_output_keys": [
+        "settings"
+      ],
+      "calls": [
+        "app.get",
+        "web_submit_public_config"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 271,
+          "method": "GET",
+          "route": "/api/batch-rewrite/web-submit/config"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/web-submit/config",
+      "function": "web_submit_save_config_api",
+      "source_line": 18710,
+      "source_end": 18716,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "WebSubmitConfigRequest",
+          "request_fields": [
+            {
+              "name": "settings",
+              "type": "dict[str, Any]"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "ok",
+        "settings"
+      ],
+      "calls": [
+        "app.post",
+        "current.get",
+        "dict",
+        "incoming.get",
+        "save_web_submit_config",
+        "str",
+        "str(incoming.get('password') or '').strip",
+        "web_submit_config",
+        "web_submit_public_config"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 324,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/config"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/web-submit/sync-configs",
+      "function": "web_submit_sync_configs_api",
+      "source_line": 18720,
+      "source_end": 18724,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "str",
+        "sync_site_submit_data"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18724,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 557,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/sync-configs"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/web-submit/sync-styles",
+      "function": "web_submit_sync_styles_api",
+      "source_line": 18728,
+      "source_end": 18732,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "str",
+        "sync_site_submit_data"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18732,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 469,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/sync-styles"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/web-submit/environment",
+      "function": "web_submit_environment_api",
+      "source_line": 18736,
+      "source_end": 18737,
+      "inputs": [],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "environment_check"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 340,
+          "method": "GET",
+          "route": "/api/batch-rewrite/web-submit/environment"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/web-submit/test-visible",
+      "function": "web_submit_test_visible_api",
+      "source_line": 18741,
+      "source_end": 18745,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "WebSubmitRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "versions",
+              "type": "list[str]"
+            },
+            {
+              "name": "force",
+              "type": "bool"
+            },
+            {
+              "name": "grouped",
+              "type": "bool"
+            },
+            {
+              "name": "dry_run",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "str",
+        "test_site_submit_visible"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18745,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/web_submit_compat.go",
+          "line": 104,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/test-visible"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/web-submit/preview",
+      "function": "web_submit_preview_api",
+      "source_line": 18749,
+      "source_end": 18753,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "WebSubmitRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "versions",
+              "type": "list[str]"
+            },
+            {
+              "name": "force",
+              "type": "bool"
+            },
+            {
+              "name": "grouped",
+              "type": "bool"
+            },
+            {
+              "name": "dry_run",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "preview_site_submit",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18753,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/web_submit_preview_compat.go",
+          "line": 120,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/preview"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/web-submit/submit",
+      "function": "web_submit_submit_api",
+      "source_line": 18757,
+      "source_end": 18761,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "WebSubmitRequest",
+          "request_fields": [
+            {
+              "name": "ids",
+              "type": "list[str]"
+            },
+            {
+              "name": "mode",
+              "type": "str"
+            },
+            {
+              "name": "versions",
+              "type": "list[str]"
+            },
+            {
+              "name": "force",
+              "type": "bool"
+            },
+            {
+              "name": "grouped",
+              "type": "bool"
+            },
+            {
+              "name": "dry_run",
+              "type": "bool"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "str",
+        "submit_site_tasks"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18761,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/web_submit_submit_compat.go",
+          "line": 64,
+          "method": "POST",
+          "route": "/api/batch-rewrite/web-submit/submit"
+        },
+        {
+          "file": "backend/internal/httpapi/web_submit_submit_compat.go",
+          "line": 65,
+          "method": "POST",
+          "route": "/api/web-submit/submit"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/rules/preview",
+      "function": "rules_preview_api",
+      "source_line": 18765,
+      "source_end": 18769,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "RulePreviewRequest",
+          "request_fields": [
+            {
+              "name": "text",
+              "type": "str"
+            },
+            {
+              "name": "scope",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "processed"
+      ],
+      "calls": [
+        "app.post",
+        "clean_cell",
+        "process_document_text"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2743,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/rules/preview"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/rules/trace",
+      "function": "rules_trace_api",
+      "source_line": 18773,
+      "source_end": 18777,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "RulePreviewRequest",
+          "request_fields": [
+            {
+              "name": "text",
+              "type": "str"
+            },
+            {
+              "name": "scope",
+              "type": "str"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "stages"
+      ],
+      "calls": [
+        "app.post",
+        "clean_cell",
+        "process_document_trace"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/rules/ai-suggest",
+      "function": "rules_ai_suggest_api",
+      "source_line": 18781,
+      "source_end": 18785,
+      "inputs": [
+        {
+          "name": "req",
+          "type": "RuleAiSuggestRequest",
+          "request_fields": [
+            {
+              "name": "rule_type",
+              "type": "str"
+            },
+            {
+              "name": "sample_text",
+              "type": "str"
+            },
+            {
+              "name": "goal",
+              "type": "str"
+            },
+            {
+              "name": "current_config",
+              "type": "dict[str, Any]"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "str",
+        "suggest_rules_with_ai"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18785,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks/{book_id}/summary",
+      "function": "task_detail_summary_api",
+      "source_line": 18789,
+      "source_end": 18790,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "task_detail_summary"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks/{book_id}/content",
+      "function": "task_detail_content_api",
+      "source_line": 18794,
+      "source_end": 18795,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "task_detail_content"
+      ],
+      "explicit_failures": [],
+      "candidates": [],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks/{book_id}",
+      "function": "task_detail_api",
+      "source_line": 18799,
+      "source_end": 18800,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "task_detail"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/agent_workspace_compat.go",
+          "line": 74,
+          "method": "GET",
+          "route": "/api/agent/tasks/{id}"
+        },
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 92,
+          "method": "GET",
+          "route": "/api/batch-rewrite/tasks/{id}"
+        },
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2453,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/tasks/{bookId}"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks/{book_id}/rules-trace",
+      "function": "task_rules_trace_api",
+      "source_line": 18804,
+      "source_end": 18805,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "task_rules_trace"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 181,
+          "method": "GET",
+          "route": "/api/batch-rewrite/tasks/{id}/rules-trace"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks/{book_id}/sensitive-log",
+      "function": "task_sensitive_log_api",
+      "source_line": 18809,
+      "source_end": 18810,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [],
+      "calls": [
+        "app.get",
+        "task_sensitive_log"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 180,
+          "method": "GET",
+          "route": "/api/batch-rewrite/tasks/{id}/sensitive-log"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/tasks/{book_id}/site-submit-log",
+      "function": "task_site_submit_log_api",
+      "source_line": 18814,
+      "source_end": 18838,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "logs",
+        "meta",
+        "result"
+      ],
+      "calls": [
+        "HTTPException",
+        "app.get",
+        "item_path.exists",
+        "item_path.read_text",
+        "item_path.read_text(encoding='utf-8').splitlines",
+        "json.loads",
+        "log_paths.append",
+        "read_meta",
+        "read_web_submit_result",
+        "require_task_visible",
+        "rows.append",
+        "safe_book_id",
+        "web_submit_legacy_log_path",
+        "web_submit_log_path"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18819,
+          "expression": "HTTPException(status_code=404, detail='ID无效')"
+        },
+        {
+          "line": 18822,
+          "expression": "HTTPException(status_code=404, detail='任务不存在')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+          "line": 182,
+          "method": "GET",
+          "route": "/api/batch-rewrite/tasks/{id}/site-submit-log"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/{book_id}/fetch",
+      "function": "refetch_task_api",
+      "source_line": 18842,
+      "source_end": 18847,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "task"
+      ],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "fetch_original_for_task",
+        "require_task_visible",
+        "safe_book_id"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18845,
+          "expression": "HTTPException(status_code=400, detail='ID无效')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2484,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/tasks/{bookId}/fetch"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/{book_id}/restore-original",
+      "function": "restore_original_api",
+      "source_line": 18851,
+      "source_end": 18859,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        }
+      ],
+      "direct_output_keys": [
+        "task"
+      ],
+      "calls": [
+        "HTTPException",
+        "ValueError",
+        "app.post",
+        "require_task_visible",
+        "restore_original_from_backup",
+        "safe_book_id",
+        "str"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18859,
+          "expression": "HTTPException(status_code=400, detail=str(exc))"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2589,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/tasks/{bookId}/restore-original"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "POST",
+      "route": "/api/tasks/{book_id}/generate-ai",
+      "function": "generate_ai_api",
+      "source_line": 18863,
+      "source_end": 18872,
+      "inputs": [
+        {
+          "name": "book_id",
+          "type": "str",
+          "request_fields": []
+        },
+        {
+          "name": "req",
+          "type": "GenerateAiRequest",
+          "request_fields": [
+            {
+              "name": "count",
+              "type": "int"
+            }
+          ]
+        }
+      ],
+      "direct_output_keys": [
+        "task"
+      ],
+      "calls": [
+        "HTTPException",
+        "app.post",
+        "clean_cell",
+        "generate_ai_for_task",
+        "meta.get",
+        "now_iso",
+        "read_meta",
+        "release_ai_manual_retry_hold",
+        "require_task_visible",
+        "safe_book_id",
+        "write_meta"
+      ],
+      "explicit_failures": [
+        {
+          "line": 18866,
+          "expression": "HTTPException(status_code=400, detail='ID无效')"
+        }
+      ],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+          "line": 2635,
+          "method": "POST",
+          "route": "/api/novel-fetch-workshop/tasks/{bookId}/generate-ai"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    },
+    {
+      "method": "GET",
+      "route": "/api/logs",
+      "function": "logs_api",
+      "source_line": 18876,
+      "source_end": 18895,
+      "inputs": [],
+      "direct_output_keys": [
+        "logs"
+      ],
+      "calls": [
+        "LOG_DIR.glob",
+        "app.get",
+        "book_id.startswith",
+        "item.get",
+        "json.loads",
+        "local_admin_global_view",
+        "path.read_text",
+        "path.read_text(encoding='utf-8').splitlines",
+        "read_meta",
+        "rows.append",
+        "rows.sort",
+        "sorted",
+        "str",
+        "task_visible_to_current"
+      ],
+      "explicit_failures": [],
+      "candidates": [
+        {
+          "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+          "line": 26,
+          "method": "GET",
+          "route": "/api/novel-fetch-workshop/logs"
+        },
+        {
+          "file": "backend/internal/httpapi/router.go",
+          "line": 803,
+          "method": "GET",
+          "route": "/api/batch-rewrite/logs"
+        }
+      ],
+      "acceptance": "未逐项验收"
+    }
+  ]
+}

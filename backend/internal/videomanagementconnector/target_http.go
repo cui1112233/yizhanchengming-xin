@@ -282,6 +282,9 @@ func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input S
 	}
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+		return Submission{}, ErrSessionExpired
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return Submission{}, fmt.Errorf("target site submit returned HTTP %d", response.StatusCode)
 	}
@@ -379,11 +382,20 @@ func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return Submission{}, fmt.Errorf("target site readback returned HTTP %d", response.StatusCode)
 	}
-	var value any
-	if json.Unmarshal(raw, &value) != nil {
-		value = string(raw)
+	if result["success"] != true {
+		return Submission{}, fmt.Errorf("视频管理系统查询未成功，提交结果尚未确认")
 	}
-	return Submission{ID: id, Status: "readback", ReadbackRaw: value}, nil
+	for _, record := range arrayOfMaps(result["data"]) {
+		if strings.TrimSpace(fmt.Sprint(record["bookid"])) != strings.TrimSpace(id) {
+			continue
+		}
+		recordID := strings.TrimSpace(fmt.Sprint(record["id"]))
+		if recordID == "" || recordID == "<nil>" {
+			continue
+		}
+		return Submission{ID: recordID, Status: "readback", ReadbackRaw: record}, nil
+	}
+	return Submission{}, fmt.Errorf("视频管理系统尚未查到本书的提交记录，请稍后回读确认")
 }
 
 func (s *TargetHTTPService) base() (string, error) {

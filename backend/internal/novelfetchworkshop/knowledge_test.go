@@ -2,10 +2,88 @@ package novelfetchworkshop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 )
+
+func TestOptimizeKnowledgeUsesUnsavedDraftAndGoalWithoutChangingIdentity(t *testing.T) {
+	settings := map[string]any{}
+	_, err := SaveKnowledge(settings, "opening_phrases", map[string]any{"id": "opening_draft", "text": "已保存开头"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	optimized, err := OptimizeKnowledge(context.Background(), settings, "opening_phrases", "opening_draft", rewriteProviderFunc(func(_ context.Context, request RewriteRequest) (string, error) {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(request.UserPrompt), &payload); err != nil {
+			t.Fatal(err)
+		}
+		current := payload["current_item"].(map[string]any)
+		if current["text"] != "尚未保存的修改" || current["id"] != "opening_draft" || payload["user_goal"] != "保留变量" {
+			t.Fatalf("draft or goal missing: %#v", payload)
+		}
+		return `{"item":{"id":"wrong-id","text":"完成优化"}}`, nil
+	}), map[string]any{"item": map[string]any{"id": "wrong-draft", "text": "尚未保存的修改"}, "goal": "保留变量"})
+	if err != nil || optimized["id"] != "opening_draft" || optimized["text"] != "完成优化" {
+		t.Fatalf("result=%#v err=%v", optimized, err)
+	}
+}
+
+func TestOptimizeKnowledgeFailureDoesNotSaveDraft(t *testing.T) {
+	settings := map[string]any{}
+	_, err := SaveKnowledge(settings, "opening_phrases", map[string]any{"id": "opening_failure", "text": "原始内容"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = OptimizeKnowledge(context.Background(), settings, "opening_phrases", "opening_failure", rewriteProviderFunc(func(_ context.Context, _ RewriteRequest) (string, error) {
+		return "", fmt.Errorf("test provider failure")
+	}), map[string]any{"item": map[string]any{"text": "未保存修改"}})
+	if err == nil {
+		t.Fatal("expected provider failure")
+	}
+	library, _ := ListKnowledge(settings, "opening_phrases")
+	if normalizeKnowledgeItems(library["items"])[0]["text"] != "原始内容" {
+		t.Fatal("failed optimization saved draft")
+	}
+}
+
+func TestOptimizeKnowledgeRequestsFieldsConsumedByEachCollection(t *testing.T) {
+	for _, tc := range []struct{ kind, collection, field string }{
+		{"rewrite_templates", "profiles", "user_prompt_template"},
+		{"rewrite_templates", "temporary_instructions", "content"},
+		{"high_imitation", "references", "reference_text"},
+		{"high_imitation", "prompts", "system_prompt"},
+		{"opening_phrases", "", "content"},
+	} {
+		t.Run(tc.kind+tc.collection, func(t *testing.T) {
+			settings := map[string]any{}
+			_, err := SaveKnowledge(settings, tc.kind, map[string]any{"id": "entry", "collection": tc.collection, "name": "资料", "content": "内容"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = OptimizeKnowledge(context.Background(), settings, tc.kind, "entry", rewriteProviderFunc(func(_ context.Context, request RewriteRequest) (string, error) {
+				var payload map[string]any
+				if err := json.Unmarshal([]byte(request.UserPrompt), &payload); err != nil {
+					t.Fatal(err)
+				}
+				found := false
+				for _, field := range payload["required_fields"].([]any) {
+					if field == tc.field {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("runtime field %s missing: %s", tc.field, request.UserPrompt)
+				}
+				return `{"item":{"name":"已优化"}}`, nil
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
 
 func TestKnowledgeCRUDPersistsInConfig(t *testing.T) {
 	settings := map[string]any{}
@@ -31,10 +109,41 @@ func TestAnalyzeOpeningUsesProvider(t *testing.T) {
 		if request.UserPrompt == "" {
 			t.Fatal("opening prompt is empty")
 		}
-		return "反转开头模板", nil
+		return `{"items":[{"text":"反转开头模板"}]}`, nil
 	}), "原始开头")
 	if err != nil || len(items) != 1 || items[0]["text"] != "反转开头模板" {
 		t.Fatalf("unexpected opening analysis: %#v err=%v", items, err)
+	}
+}
+
+func TestRepeatedOpeningAnalysisDoesNotOverwriteExistingLibrary(t *testing.T) {
+	settings := map[string]any{}
+	for _, text := range []string{"第一次开头", "第二次开头"} {
+		items, err := AnalyzeOpening(context.Background(), rewriteProviderFunc(func(_ context.Context, _ RewriteRequest) (string, error) {
+			return `{"items":[{"id":"opening_001","text":"` + text + `"}]}`, nil
+		}), "样本")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := items[0]["id"]; exists {
+			t.Fatal("analysis must not reuse a saved id")
+		}
+		if _, err := SaveKnowledge(settings, "opening_phrases", items[0]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	library, _ := ListKnowledge(settings, "opening_phrases")
+	if len(normalizeKnowledgeItems(library["items"])) != 2 {
+		t.Fatal("new analysis overwrote existing opening")
+	}
+}
+
+func TestOpeningAnalysisRejectsRefusalAndNonStructuredOutput(t *testing.T) {
+	for _, content := range []string{"抱歉，无法处理", `{"items":[]}`, `{"items":[{}]}`} {
+		_, err := AnalyzeOpening(context.Background(), rewriteProviderFunc(func(_ context.Context, _ RewriteRequest) (string, error) { return content, nil }), "样本")
+		if err == nil {
+			t.Fatalf("accepted invalid analysis %s", content)
+		}
 	}
 }
 

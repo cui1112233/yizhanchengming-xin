@@ -27,6 +27,7 @@ type ProcessJob struct {
 	Attempts           int               `json:"attempts"`
 	LastError          string            `json:"lastError,omitempty"`
 	DedupeKey          string            `json:"dedupeKey,omitempty"`
+	DedupeBookIDs      []string          `json:"dedupeBookIds,omitempty"`
 }
 
 type ProcessQueue interface {
@@ -105,6 +106,7 @@ func (q *MemoryQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, _ 
 		q.dedupe[key] = job.ID
 	}
 	job.DedupeKey = processBookDedupeMarker(job)
+	job.DedupeBookIDs = append([]string{}, job.BookIDs...)
 	q.mu.Unlock()
 	if err := q.Enqueue(ctx, job); err != nil {
 		q.mu.Lock()
@@ -185,6 +187,7 @@ func (q *MemoryQueue) Claim(ctx context.Context, wait time.Duration) (ProcessJob
 	defer timer.Stop()
 	select {
 	case job := <-q.pending:
+		job = processJobWithDedupeScope(job)
 		q.mu.Lock()
 		q.inflight[job.ID] = job
 		q.mu.Unlock()
@@ -206,7 +209,14 @@ func (q *MemoryQueue) Ack(_ context.Context, job ProcessJob) error {
 
 func (q *MemoryQueue) Fail(ctx context.Context, job ProcessJob, retry bool) error {
 	q.mu.Lock()
+	if inflight, ok := q.inflight[job.ID]; ok && len(job.DedupeBookIDs) == 0 {
+		job.DedupeBookIDs = processJobWithDedupeScope(inflight).DedupeBookIDs
+	}
 	delete(q.inflight, job.ID)
+	if retry && strings.HasPrefix(job.DedupeKey, "books:") {
+		q.releaseDedupe(processCompletedDedupeBooks(job))
+		job.DedupeBookIDs = append([]string{}, job.BookIDs...)
+	}
 	q.mu.Unlock()
 	if retry {
 		if err := q.Enqueue(ctx, job); err != nil {
@@ -225,6 +235,9 @@ func (q *MemoryQueue) Fail(ctx context.Context, job ProcessJob, retry bool) erro
 
 func (q *MemoryQueue) releaseDedupe(job ProcessJob) {
 	if strings.HasPrefix(job.DedupeKey, "books:") {
+		if len(job.DedupeBookIDs) > 0 {
+			job.BookIDs = job.DedupeBookIDs
+		}
 		for _, key := range processBookDedupeKeys(job) {
 			if q.dedupe[key] == job.ID {
 				delete(q.dedupe, key)
@@ -235,6 +248,31 @@ func (q *MemoryQueue) releaseDedupe(job ProcessJob) {
 	if q.dedupe[job.DedupeKey] == job.ID {
 		delete(q.dedupe, job.DedupeKey)
 	}
+}
+
+// Preserve the lock scope returned by Claim even when the worker narrows BookIDs
+// to only failed books. This also upgrades queued payloads written before this field.
+func processJobWithDedupeScope(job ProcessJob) ProcessJob {
+	if strings.HasPrefix(job.DedupeKey, "books:") && len(job.DedupeBookIDs) == 0 {
+		job.DedupeBookIDs = append([]string{}, job.BookIDs...)
+	}
+	return job
+}
+
+func processCompletedDedupeBooks(job ProcessJob) ProcessJob {
+	remaining := map[string]bool{}
+	for _, bookID := range job.BookIDs {
+		remaining[strings.TrimSpace(bookID)] = true
+	}
+	scope := processJobWithDedupeScope(job).DedupeBookIDs
+	job.BookIDs = nil
+	job.DedupeBookIDs = nil
+	for _, bookID := range scope {
+		if !remaining[strings.TrimSpace(bookID)] {
+			job.BookIDs = append(job.BookIDs, bookID)
+		}
+	}
+	return job
 }
 
 func validateProcessJob(job ProcessJob) error {

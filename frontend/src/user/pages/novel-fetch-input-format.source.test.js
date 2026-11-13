@@ -11,7 +11,7 @@ test('处理页在执行与定时前使用同一份输入格式和解析结果',
   assert.match(source, /input_format:\s*inputFormat/);
   assert.match(source, /column_preset:\s*inputFormatLabel/);
   assert.match(source, /输入格式/);
-  assert.match(source, /解析预览/);
+  assert.match(source, /localInputPreview\.validRows/);
   assert.match(source, /自定义列顺序/);
   assert.match(source, /serializeNovelFetchRows\(parsed\.rows\)/);
   assert.match(source, /columnMapping:\s*inputColumnMapping/);

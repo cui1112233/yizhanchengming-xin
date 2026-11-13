@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/prompt/batchbook"
 )
 
 // RewriteRequest 是小说改文模型收到的最小请求。提示词放在后端，前端只能选择数量。
@@ -64,6 +66,9 @@ type rewriteRuntimePlan struct {
 	OpeningPhraseName          string
 	HighImitationReferenceName string
 	Instructions               []string
+	SystemPrompt               string
+	UserTemplate               string
+	ResponseMode               string
 }
 
 func rewriteItemText(item map[string]any) string {
@@ -108,15 +113,15 @@ func rewritePlan(settings map[string]any, versionID string, index int) rewriteRu
 	if configured := mapOrEmpty(app["ai"]); len(configured) > 0 {
 		ai = configured
 	}
-	plan := rewriteRuntimePlan{ProcessLines: ruleInt(rewrite["process_line_count"], rewriteProcessLines), AnchorLines: ruleInt(rewrite["anchor_line_count"], rewriteAnchorLines), Temperature: rewriteTemperature, MaxTokens: rewriteMaxTokens, TemplateID: strings.TrimSpace(fmt.Sprint(rewrite["default_template_id"]))}
+	plan := rewriteRuntimePlan{ProcessLines: ruleInt(rewrite["process_line_count"], rewriteProcessLines), AnchorLines: ruleInt(rewrite["anchor_line_count"], rewriteAnchorLines), Temperature: rewriteTemperature, MaxTokens: rewriteMaxTokens, TemplateID: rewriteString(rewrite["default_template_id"])}
 	if value, ok := rewrite["temperature"].(float64); ok {
 		plan.Temperature = value
 	}
 	if value, ok := ai["max_tokens"].(float64); ok && value > 0 {
 		plan.MaxTokens = int(value)
 	}
-	if slots := mapOrEmpty(rewrite["ai_slot_methods"]); strings.TrimSpace(fmt.Sprint(slots[versionID])) != "" && fmt.Sprint(slots[versionID]) != "auto" {
-		plan.Method = strings.TrimSpace(fmt.Sprint(slots[versionID]))
+	if slots := mapOrEmpty(rewrite["ai_slot_methods"]); rewriteString(slots[versionID]) != "" && rewriteString(slots[versionID]) != "auto" {
+		plan.Method = rewriteString(slots[versionID])
 	}
 	if plan.Method == "" {
 		methods := anySlice(rewrite["method_sequence"])
@@ -142,12 +147,18 @@ func rewritePlan(settings map[string]any, versionID string, index int) rewriteRu
 	}
 	templates := knowledgeLibrary(settings, "rewrite_templates")
 	for _, item := range append(arrayMap(templates["profiles"]), arrayMap(templates["items"])...) {
+		if item["enabled"] == false {
+			continue
+		}
 		id := strings.TrimSpace(fmt.Sprint(item["id"]))
 		if plan.TemplateID != "" && id != plan.TemplateID {
 			continue
 		}
-		if text := rewriteItemText(item); text != "" {
+		if text := rewriteItemText(item); text != "" || rewriteString(item["user_prompt_template"]) != "" || rewriteString(item["system_prompt"]) != "" {
 			plan.Instructions = append(plan.Instructions, "改文模板："+text)
+			plan.SystemPrompt = rewriteString(item["system_prompt"])
+			plan.UserTemplate = rewriteString(item["user_prompt_template"])
+			plan.ResponseMode = rewriteString(item["response_mode"])
 			plan.TemplateName = rewriteItemName(item)
 			if plan.TemplateID == "" {
 				plan.TemplateID = id
@@ -224,7 +235,15 @@ func buildRewritePrompt(document Document, original string, index int, plan rewr
 	if anchor != "" {
 		prompt += "\n\n后续衔接参考（不要改写这部分）：\n" + anchor
 	}
-	return prompt, processCount, len(strings.Join(lines[:processCount], "\n"))
+	if plan.UserTemplate != "" {
+		prompt = fillRewriteTemplate(plan.UserTemplate, map[string]string{
+			"content_id": document.BookID, "book_id": document.BookID, "book_name": bookName,
+			"style": style, "gender": gender, "full_text": original,
+			"target_lines_text": block, "anchor_lines_text": anchor,
+			"line_count": strconv.Itoa(processCount), "extra_instruction": strings.Join(plan.Instructions, "\n"),
+		})
+	}
+	return prompt, processCount, len([]rune(block))
 }
 
 func mergeRewriteBlock(original, changed string, processCount int) string {
@@ -283,7 +302,7 @@ func GenerateAIRewritesForVersions(ctx context.Context, store Store, owner, book
 
 // GenerateAIRewritesForVersionsProcessed applies the same persisted rule
 // pipeline used for originals before each AI body becomes visible.
-func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, owner, bookID string, versions []string, provider RewriteProvider, processor RewriteTextProcessor) (Document, error) {
+func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, owner, bookID string, versions []string, provider RewriteProvider, processor RewriteTextProcessor, methodOverrides ...map[string]string) (Document, error) {
 	if provider == nil {
 		return Document{}, errors.New("AI 改文模型未配置")
 	}
@@ -299,7 +318,32 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 		return Document{}, errors.New("请先抓取原文，再生成 AI 改文")
 	}
 	document = normalizeDocument(document)
-	settings, _ := store.GetConfig(ctx, owner)
+	settings, err := store.GetConfig(ctx, owner)
+	if err != nil {
+		return document, err
+	}
+	if len(methodOverrides) > 0 && len(methodOverrides[0]) > 0 {
+		app := mapOrEmpty(settings["appConfig"])
+		rewrite := mapOrEmpty(settings["rewrite"])
+		if configured := mapOrEmpty(app["rewrite"]); len(configured) > 0 {
+			rewrite = configured
+		}
+		slots := cloneMap(mapOrEmpty(rewrite["ai_slot_methods"]))
+		for version, method := range methodOverrides[0] {
+			switch method {
+			case "", "auto", "high_imitation", "opening_instruction", "instruction":
+			default:
+				return document, fmt.Errorf("不支持的改文方式：%s", method)
+			}
+			if method == "" {
+				method = "auto"
+			}
+			slots[version] = method
+		}
+		rewrite["ai_slot_methods"] = slots
+		app["rewrite"] = rewrite
+		settings["appConfig"] = app
+	}
 	seen := map[string]bool{}
 	requested := make([]string, 0, len(versions))
 	for _, versionID := range versions {
@@ -323,45 +367,26 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 	for _, versionID := range requested {
 		index, _ := strconv.Atoi(strings.TrimPrefix(versionID, "ai"))
 		plan := rewritePlan(settings, versionID, index)
+		if plan.TemplateID != "" && plan.TemplateName == "" {
+			return document, fmt.Errorf("所选改文模板不可用，请重新选择模板")
+		}
 		userPrompt, processCount, targetChars := buildRewritePrompt(document, original, index, plan)
 		request := RewriteRequest{
-			SystemPrompt: "你是短剧小说改文编辑。只处理用户标出的待处理片段，不得扩写、续写或解释；保持人物身份、关键因果、时间顺序和男女频风格不变。只输出改写后的正文。",
+			SystemPrompt: batchbook.RewriteSystem,
 			UserPrompt:   userPrompt,
 			Temperature:  plan.Temperature,
 			MaxTokens:    plan.MaxTokens,
 		}
-		result, callErr := provider.Complete(ctx, request)
-		result = strings.TrimSpace(result)
-		if callErr != nil {
-			document.Meta["aiStatus"] = "failed"
-			document.Meta["aiError"] = callErr.Error()
-			_ = store.PutDocument(ctx, owner, document)
-			return document, callErr
+		if plan.SystemPrompt != "" {
+			request.SystemPrompt = fillRewriteTemplate(plan.SystemPrompt, map[string]string{"content_id": document.BookID, "book_id": document.BookID})
 		}
-		if result == "" {
-			err = errors.New("AI 改文返回为空")
+		result, generationErr := completeValidatedRewrite(ctx, provider, request, document.BookID, plan.ResponseMode, processCount, targetChars)
+		if generationErr != nil {
+			document.Meta["rewriteValidationHold"] = errors.Is(generationErr, ErrRewriteValidation)
 			document.Meta["aiStatus"] = "failed"
-			document.Meta["aiError"] = err.Error()
+			document.Meta["aiError"] = generationErr.Error()
 			_ = store.PutDocument(ctx, owner, document)
-			return document, err
-		}
-		if !rewriteWithinSize(result, targetChars) {
-			request.UserPrompt += "\n\n上一次输出过长。请删除解释和扩写，只保留与待处理片段等量的改写正文。"
-			result, callErr = provider.Complete(ctx, request)
-			result = strings.TrimSpace(result)
-			if callErr != nil {
-				document.Meta["aiStatus"] = "failed"
-				document.Meta["aiError"] = callErr.Error()
-				_ = store.PutDocument(ctx, owner, document)
-				return document, callErr
-			}
-			if result == "" || !rewriteWithinSize(result, targetChars) {
-				err = errors.New("AI 改文输出过长，请检查改文提示词或模型配置")
-				document.Meta["aiStatus"] = "failed"
-				document.Meta["aiError"] = err.Error()
-				_ = store.PutDocument(ctx, owner, document)
-				return document, err
-			}
+			return document, generationErr
 		}
 		result = mergeRewriteBlock(original, result, processCount)
 		if processor != nil {
@@ -387,11 +412,22 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 			document.Meta["sensitiveByVersion"] = sensitiveByVersion
 		}
 		document.Versions[versionID] = result
+		model := ""
+		if identity, ok := provider.(interface{ ModelIdentity() string }); ok {
+			model = strings.TrimSpace(identity.ModelIdentity())
+			if model != "" {
+				document.Meta["rewriteModel"] = model
+			}
+		}
+		document.Meta["aiCurrentVersion"] = versionID
 		evidence, _ := document.Meta["rewriteEvidenceByVersion"].(map[string]any)
 		if evidence == nil {
 			evidence = map[string]any{}
 		}
 		evidence[versionID] = map[string]any{"method": plan.Method, "strategy_name": plan.StrategyName, "template_id": plan.TemplateID, "template_name": plan.TemplateName, "opening_phrase_name": plan.OpeningPhraseName, "high_imitation_reference_name": plan.HighImitationReferenceName, "process_line_count": plan.ProcessLines, "anchor_line_count": plan.AnchorLines, "temperature": plan.Temperature, "max_tokens": plan.MaxTokens}
+		if model != "" {
+			evidence[versionID].(map[string]any)["model"] = model
+		}
 		document.Meta["rewriteEvidenceByVersion"] = evidence
 		ref, bodyErr := store.PutBody(ctx, owner, BodyRecord{
 			BookID:  document.BookID,
@@ -405,8 +441,13 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 			return document, bodyErr
 		}
 		document.BodyRefs[versionID] = ref
+		// Persist each successful version before starting another model call.
+		if err := store.PutDocument(ctx, owner, document); err != nil {
+			return document, err
+		}
 	}
 	document.Meta["aiStatus"] = "done"
+	delete(document.Meta, "rewriteValidationHold")
 	document.Meta["aiGeneratedCount"] = len(requested)
 	document.Meta["aiError"] = ""
 	document.Meta["aiUpdatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)

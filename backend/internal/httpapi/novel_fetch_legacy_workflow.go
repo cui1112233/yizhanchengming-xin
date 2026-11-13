@@ -232,6 +232,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 	})
 	mux.HandleFunc("PATCH /api/novel-fetch-workshop/schedules/{id}", func(w http.ResponseWriter, req *http.Request) { updateSchedule(w, req, store, false) })
 	mux.HandleFunc("DELETE /api/novel-fetch-workshop/schedules/{id}", func(w http.ResponseWriter, req *http.Request) { updateSchedule(w, req, store, true) })
+	mux.HandleFunc("POST /api/novel-fetch-workshop/schedules/{id}/cancel", func(w http.ResponseWriter, req *http.Request) { cancelWorkshopSchedule(w, req, store, queue) })
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/knowledge/optimize", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -258,7 +259,11 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "资料库类型或条目ID不能为空"})
 			return
 		}
-		cfg, _ := store.GetConfig(req.Context(), identity.Username)
+		cfg, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取资料库失败：" + err.Error()})
+			return
+		}
 		var provider novelfetchworkshop.RewriteProvider
 		if rewriteProvider != nil {
 			provider, _ = rewriteProvider(req)
@@ -268,7 +273,10 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
-		_ = store.PutConfig(req.Context(), identity.Username, cfg)
+		if err := store.PutConfig(req.Context(), identity.Username, cfg); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "优化结果保存失败：" + err.Error()})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "item": out})
 	})
 
@@ -276,8 +284,13 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/apply-rules", func(w http.ResponseWriter, req *http.Request) { applySensitive(w, req, store, false, rewriteProvider) })
 	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/reprocess-sensitive", func(w http.ResponseWriter, req *http.Request) { applySensitive(w, req, store, true, rewriteProvider) })
 	mux.HandleFunc("POST /api/novel-fetch-workshop/web-submit/operations", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input map[string]any
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			return
+		}
+		if toString(input["kind"]) != "configs" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "不支持该操作；同步风格请使用风格目录同步入口"})
 			return
 		}
 		id := fmt.Sprintf("op-%d", time.Now().UnixNano())
@@ -292,7 +305,14 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			}
 		}
 		novelFetchOperations.Lock()
-		novelFetchOperations.items[id] = item
+		// Expire old polling snapshots instead of retaining every operation forever.
+		for key, previous := range novelFetchOperations.items {
+			created, err := time.Parse(time.RFC3339Nano, toString(previous["createdAt"]))
+			if err != nil || time.Since(created) > time.Hour {
+				delete(novelFetchOperations.items, key)
+			}
+		}
+		novelFetchOperations.items[identity.Username+"\x00"+id] = item
 		novelFetchOperations.Unlock()
 		// The legacy workbench reads id/status/result from the top level, while
 		// newer callers also accept the nested operation object. Return both
@@ -300,8 +320,9 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		writeJSON(w, http.StatusOK, legacyOperationResponse(item))
 	})
 	mux.HandleFunc("GET /api/novel-fetch-workshop/web-submit/operations/{id}", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
 		novelFetchOperations.RLock()
-		item := novelFetchOperations.items[req.PathValue("id")]
+		item := novelFetchOperations.items[identity.Username+"\x00"+req.PathValue("id")]
 		novelFetchOperations.RUnlock()
 		if item == nil {
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "操作不存在"})
@@ -440,6 +461,10 @@ func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		m, _ := v.(map[string]any)
 		if m["id"] == id {
 			if remove {
+				if !workshopScheduleTerminal(firstText(m["status"])) {
+					writeJSON(w, http.StatusConflict, map[string]any{"error": "请先取消或停止定时任务，再删除记录；删除记录不会删除书目"})
+					return
+				}
 				found = m
 				continue
 			}
@@ -463,6 +488,83 @@ func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	writeJSON(w, http.StatusOK, map[string]any{"schedule": found})
 }
 
+func workshopScheduleTerminal(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "cancelled", "canceled", "completed", "done", "success", "failed", "stopped", "skipped_existing":
+		return true
+	}
+	return false
+}
+
+func cancelWorkshopSchedule(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue) {
+	identity, _ := BridgeIdentityFromContext(req.Context())
+	cfg, err := store.GetConfig(req.Context(), identity.Username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取定时任务失败"})
+		return
+	}
+	schedules, _ := cfg["novel_fetch_schedules"].([]any)
+	for _, raw := range schedules {
+		item, _ := raw.(map[string]any)
+		if firstText(item["id"]) != req.PathValue("id") {
+			continue
+		}
+		status := firstText(item["status"])
+		if workshopScheduleTerminal(status) {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": item, "deleted_count": 0})
+			return
+		}
+		if status == "dispatching" {
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "任务正在入队，请稍后刷新再取消"})
+			return
+		}
+		ids := scheduleStringSlice(item["book_ids"])
+		if len(ids) > 0 {
+			cancellation, ok := queue.(novelfetchworkshop.ProcessCancellationQueue)
+			if !ok {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "任务队列暂不支持取消，请稍后重试"})
+				return
+			}
+			if err := cancellation.CancelBooks(req.Context(), identity.Username, ids); err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "取消队列任务失败，请重试"})
+				return
+			}
+		}
+		// Running books retain their bodies: cancellation is cooperative. Only
+		// a never-dispatched schedule may clean explicitly owned created_ids.
+		deleted := 0
+		if status == "scheduled" || status == "" {
+			owned := []string{}
+			for _, id := range scheduleStringSlice(item["created_ids"]) {
+				doc, getErr := store.GetDocument(req.Context(), identity.Username, id)
+				if getErr == nil && firstText(doc.Meta["schedule_id"], doc.Meta["scheduleId"]) == firstText(item["id"]) {
+					owned = append(owned, id)
+				}
+			}
+			if len(owned) > 0 {
+				result, deleteErr := store.DeleteDocuments(req.Context(), identity.Username, owned)
+				if deleteErr != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "清理定时创建的书目失败，请重试"})
+					return
+				}
+				deleted = result.Deleted
+			}
+		}
+		item["status"] = "cancelled"
+		item["cancelled_at"] = time.Now().UTC().Format(time.RFC3339Nano)
+		item["updatedAt"] = item["cancelled_at"]
+		item["message"] = "定时任务已取消；已生成内容保留"
+		cfg["novel_fetch_schedules"] = schedules
+		if err := store.PutConfig(req.Context(), identity.Username, cfg); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存取消状态失败，请重试"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": item, "deleted_count": deleted})
+		return
+	}
+	writeJSON(w, http.StatusNotFound, map[string]any{"error": "定时任务不存在"})
+}
+
 func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, key string) {
 	identity, _ := BridgeIdentityFromContext(req.Context())
 	var in struct {
@@ -478,6 +580,15 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		ids = in.BookIDs
 	}
 	uniqueIDs := uniqueNovelFetchTaskIDs(ids)
+	if in.Count < 1 || in.Count > 20 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "AI 数量须为 1 到 20"})
+		return
+	}
+	cfg, err := store.GetConfig(req.Context(), identity.Username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取 AI 数量配置失败"})
+		return
+	}
 	changed, failed := 0, 0
 	updatedIDs := make([]string, 0, len(uniqueIDs))
 	for _, id := range uniqueIDs {
@@ -489,12 +600,16 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		if d.Meta == nil {
 			d.Meta = map[string]any{}
 		}
-		d.Meta[key] = in.Count
-		_ = store.PutDocument(req.Context(), identity.Username, d)
+		d.Meta[key] = workshopAIRequestedCount(d, cfg, in.Count)
+		d.Meta["ai_count"] = d.Meta[key]
+		if err := store.PutDocument(req.Context(), identity.Username, d); err != nil {
+			failed++
+			continue
+		}
 		changed++
 		updatedIDs = append(updatedIDs, id)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "requested": len(uniqueIDs), "updated": changed, "skipped": 0, "failed": failed, "task_ids": updatedIDs})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": failed == 0, "requested": len(uniqueIDs), "updated": changed, "skipped": 0, "failed": failed, "task_ids": updatedIDs, "message": "已保存，下次生成 AI 改文时只补缺少的版本；当前运行任务和已有版本不受影响"})
 }
 
 func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, restore bool, resolveProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error)) {

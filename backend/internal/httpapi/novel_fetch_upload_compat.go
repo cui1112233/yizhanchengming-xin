@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"qiantie/backend/internal/novelfetchworkshop"
 	"strings"
 	"time"
 
@@ -16,6 +17,10 @@ import (
 // The cookie is still verified against the real target site; a local file alone
 // is never treated as proof of a live login.
 func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, targets ...videomanagementconnector.Service) {
+	registerNovelFetchUploadSessionWithStore(root, middleware, usersDir, nil, targets...)
+}
+
+func registerNovelFetchUploadSessionWithStore(root *http.ServeMux, middleware BridgeAuth, usersDir string, store novelfetchworkshop.Store, targets ...videomanagementconnector.Service) {
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
@@ -76,6 +81,10 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 		}
 		if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "https://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "上传会话保存失败"})
+			return
+		}
+		if err := resumeWorkshopUploadsAfterLogin(req.Context(), store, identity.Username); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "登录已保存，但待上传任务恢复失败，请稍后重试"})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "username": strings.TrimSpace(input.Username), "status": "ready"})

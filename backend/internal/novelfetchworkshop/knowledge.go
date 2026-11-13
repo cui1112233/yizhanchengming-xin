@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"qiantie/backend/internal/prompt/batchbook"
 	"strings"
 	"time"
 )
@@ -225,7 +226,16 @@ func SaveKnowledge(settings map[string]any, kind string, item map[string]any) (m
 	id := strings.TrimSpace(fmt.Sprint(item["id"]))
 	if id == "" || id == "<nil>" {
 		prefix := map[string]string{"high_imitation": "hi", "opening_phrases": "opening", "rewrite_templates": "template"}[kind]
-		id = fmt.Sprintf("%s_%03d", prefix, len(items)+1)
+		existingIDs := map[string]bool{}
+		for _, existing := range items {
+			existingIDs[strings.TrimSpace(fmt.Sprint(existing["id"]))] = true
+		}
+		for index := len(items) + 1; ; index++ {
+			id = fmt.Sprintf("%s_%03d", prefix, index)
+			if !existingIDs[id] {
+				break
+			}
+		}
 	}
 	normalized := cloneMap(item)
 	normalized["id"] = id
@@ -309,11 +319,11 @@ func DeleteKnowledge(settings map[string]any, kind, id string) (bool, error) {
 
 // OptimizeKnowledge asks the unified text model to refine one saved knowledge
 // item, then writes only non-empty returned fields back to the same item.
-func OptimizeKnowledge(ctx context.Context, settings map[string]any, kind, id string, provider RewriteProvider) (map[string]any, error) {
+func OptimizeKnowledge(ctx context.Context, settings map[string]any, kind, id string, provider RewriteProvider, options ...map[string]any) (map[string]any, error) {
 	required := map[string][]string{
-		"high_imitation":    {"title", "source", "style", "content"},
-		"opening_phrases":   {"text", "style", "tags", "source"},
-		"rewrite_templates": {"name", "style", "prompt"},
+		"high_imitation":    {"name", "system_prompt", "user_prompt_template", "analysis"},
+		"opening_phrases":   {"name", "content", "analysis", "slot_hint", "style", "tags"},
+		"rewrite_templates": {"name", "system_prompt", "user_prompt_template", "required_variables", "response_mode"},
 	}
 	fields, ok := required[kind]
 	if !ok {
@@ -337,10 +347,29 @@ func OptimizeKnowledge(ctx context.Context, settings map[string]any, kind, id st
 	if current == nil {
 		return nil, errors.New("知识条目不存在")
 	}
+	goal := "让这个条目更适合批量自动改文，保留原意，输出更清楚。"
+	if len(options) > 0 {
+		if draft, ok := options[0]["item"].(map[string]any); ok {
+			current = cloneMap(current)
+			for key, value := range draft {
+				current[key] = value
+			}
+			current["id"] = targetID
+		}
+		if text, ok := options[0]["goal"].(string); ok && strings.TrimSpace(text) != "" {
+			goal = strings.TrimSpace(text)
+		}
+	}
+	if kind == "high_imitation" && current["collection"] == "references" {
+		fields = []string{"name", "reference_text", "analysis", "style", "gender", "tags"}
+	}
+	if kind == "rewrite_templates" && current["collection"] == "temporary_instructions" {
+		fields = []string{"name", "content"}
+	}
 	libraryNames := map[string]string{"high_imitation": "高仿文章库", "opening_phrases": "爆款开头词库", "rewrite_templates": "批量改文指令库"}
 	payload := map[string]any{
 		"library_name": libraryNames[kind], "library_type": kind, "current_item": current,
-		"user_goal":       "让这个条目更适合批量自动改文，保留原意，输出更清楚。",
+		"user_goal":       goal,
 		"required_fields": fields,
 		"rules":           []string{"只整理当前资料库条目，不要发散新功能。", "不要删除原有 id；没有把握的字段保持原值。"},
 		"return_format":   map[string]any{"item": map[string]any{}},
@@ -367,6 +396,9 @@ func OptimizeKnowledge(ctx context.Context, settings map[string]any, kind, id st
 	optimized := cloneMap(current)
 	optimized["id"] = targetID
 	for key, value := range parsed.Item {
+		if key == "id" || key == "collection" {
+			continue
+		}
 		if value == nil {
 			continue
 		}
@@ -460,8 +492,8 @@ func AnalyzeOpening(ctx context.Context, provider RewriteProvider, text string) 
 		return nil, errors.New("请先粘贴爆款开头原文")
 	}
 	content, err := provider.Complete(ctx, RewriteRequest{
-		SystemPrompt: "你是中文短剧爆款开头拆解助手。只返回 JSON 对象，格式为 {\"items\":[{\"text\":\"开头句式\",\"style\":\"风格\",\"tags\":[\"标签\"],\"source\":\"来源\"}]}，不要解释。",
-		UserPrompt:   "请拆解以下开头，保留句式骨架和剧情槽位：\n" + text,
+		SystemPrompt: batchbook.OpeningSystem,
+		UserPrompt:   batchbook.OpeningUser + text,
 		Temperature:  0.2,
 		MaxTokens:    2000,
 	})
@@ -473,10 +505,10 @@ func AnalyzeOpening(ctx context.Context, provider RewriteProvider, text string) 
 	}
 	if json.Unmarshal([]byte(content), &parsed) == nil && len(parsed.Items) > 0 {
 		items := make([]map[string]any, 0, len(parsed.Items))
-		for index, item := range parsed.Items {
+		for _, item := range parsed.Items {
 			normalized, normalizeErr := SaveKnowledge(map[string]any{}, "opening_phrases", item)
 			if normalizeErr == nil {
-				normalized["id"] = fmt.Sprintf("opening_%03d", index+1)
+				delete(normalized, "id")
 				items = append(items, normalized)
 			}
 		}
@@ -484,7 +516,7 @@ func AnalyzeOpening(ctx context.Context, provider RewriteProvider, text string) 
 			return items, nil
 		}
 	}
-	return []map[string]any{{"id": "opening_001", "text": strings.TrimSpace(content), "style": "现代通用", "tags": []any{}, "source": "go"}}, nil
+	return nil, errors.New("AI 未返回有效的开头拆解结果，请调整原文或要求后重试")
 }
 
 func firstValue(item map[string]any, keys ...string) any {

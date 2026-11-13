@@ -25,7 +25,7 @@ func TestNovelFetchWorkshopGenerateAIRouteUsesGoProvider(t *testing.T) {
 		if request.UserPrompt == "" {
 			t.Fatal("rewrite prompt is empty")
 		}
-		return "Go 改写正文", nil
+		return `{"id":"book-rewrite","changed_lines":[{"line_no":1,"text":"Go 改写正文"}]}`, nil
 	})
 	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchRewrite: provider})
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/book-rewrite/generate-ai", map[string]any{"count": 1}, now, secret)
@@ -403,7 +403,7 @@ func TestNovelFetchProcessStartGeneratesOnlySelectedAIVersion(t *testing.T) {
 			return `{"style":"现代悬疑","confidence":0.9,"reason":"正文围绕案件线索推进"}`, nil
 		}
 		rewriteCalls++
-		return "改写后的正文", nil
+		return `{"id":"12345678901","changed_lines":[{"line_no":1,"text":"改写后的正文"}]}`, nil
 	})
 	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue(), NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{

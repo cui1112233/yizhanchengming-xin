@@ -48,7 +48,7 @@ function stageLabel(value) {
 function sourceLabel(value) {
   return {
     ai: 'AI 处理', ai_group: 'AI 整组处理', group: 'AI 整组处理',
-    system_rule: '系统规则', direct: '直接替换'
+    system_rule: '系统规则', direct: '直接替换', fallback: '规则兜底替换'
   }[String(value || '').toLowerCase()] || display(value);
 }
 
@@ -56,12 +56,13 @@ export function novelFetchAiVersions(data = {}) {
   const versions = data.versions && typeof data.versions === 'object' ? data.versions : {};
   const meta = data.meta && typeof data.meta === 'object' ? data.meta : {};
   const history = first(meta.rewriteKnowledgeHistory, meta.rewrite_knowledge_history);
+  const evidence = first(meta.rewriteEvidenceByVersion, meta.rewrite_evidence_by_version) || {};
   const historyByVersion = new Map((Array.isArray(history) ? history : []).map(item => [String(first(item.version, item.versionId, item.ai_index, item.aiIndex, '')).toLowerCase(), item]));
   const rows = Object.entries(versions)
     .filter(([key]) => /^ai\d+$/i.test(key))
     .map(([key, value]) => {
       const item = { key: key.toLowerCase(), label: `AI 版本 ${Number(key.replace(/\D/g, ''))}`, content: bodyContent(value) };
-      const knowledge = historyByVersion.get(key.toLowerCase()) || historyByVersion.get(`ai${key.replace(/\D/g, '')}`);
+      const knowledge = evidence[key.toLowerCase()] || historyByVersion.get(key.toLowerCase()) || historyByVersion.get(`ai${key.replace(/\D/g, '')}`);
       if (knowledge) item.knowledge = knowledge;
       return item;
     })
@@ -86,6 +87,9 @@ export function novelFetchTaskSummaryItems(data = {}) {
     ? meta.sensitiveFixed
     : (meta.sensitive_fixed && typeof meta.sensitive_fixed === 'object' ? meta.sensitive_fixed : {});
   const versions = novelFetchAiVersions(data);
+  const currentVersionKey = String(first(meta.aiCurrentVersion, meta.ai_current_version, '')).toLowerCase();
+  const latestVersion = versions.find(version => version.key === currentVersionKey) || versions.at(-1);
+  const knowledge = latestVersion?.knowledge || {};
   const platformId = first(meta.platformId, meta.platform_id, data.platformId, data.platform_id);
   const platform = first(meta.platformName, meta.platform_name, data.platformName, data.platform_name, PLATFORM_LABELS[platformId], platformId);
   const processed = countValue(data.processedChars, data.processed_chars, meta.processedChars, meta.processed_chars, data.original?.length);
@@ -111,16 +115,16 @@ export function novelFetchTaskSummaryItems(data = {}) {
     ['命中 / 已处理', `${hitCount} / ${fixedCount}`],
     ['AI 状态', stageLabel(first(data.aiStatus, data.ai_status, meta.aiStatus, meta.ai_status))],
     ['AI 失败原因', first(meta.aiError, meta.ai_error)],
-    ['AI 当前版本', first(meta.aiCurrentVersion, meta.ai_current_version)],
+    ['AI 当前版本', first(meta.aiCurrentVersion, meta.ai_current_version, latestVersion?.key.toUpperCase())],
     ['AI 文案版本', `${aiCount || versions.length} 个`],
     ['AI 尝试次数', first(meta.aiLastAttemptCount, meta.ai_last_attempt_count)],
     ['AI 最近失败', first(meta.aiLastAttemptError, meta.ai_last_attempt_error, '无')],
     ['网站提交失败原因', first(meta.siteSubmitError, meta.site_submit_error)],
-    ['改文模型', first(meta.rewriteModel, meta.rewrite_model)],
-    ['改文方案', first(meta.rewriteKnowledge?.strategyName, meta.rewrite_knowledge?.strategy_name, meta.rewriteKnowledge?.strategy, meta.rewrite_knowledge?.strategy)],
-    ['改文模板', first(meta.rewriteKnowledge?.rewriteTemplateName, meta.rewrite_knowledge?.rewrite_template_name)],
-    ['开头词', first(meta.rewriteKnowledge?.openingPhraseName, meta.rewrite_knowledge?.opening_phrase_name)],
-    ['高仿参考', first(meta.rewriteKnowledge?.highImitationReferenceName, meta.rewrite_knowledge?.high_imitation_reference_name)],
+    ['改文模型', first(knowledge.model, meta.rewriteModel, meta.rewrite_model)],
+    ['改文方案', first(knowledge.strategy_name, knowledge.strategyName, knowledge.method, meta.rewriteKnowledge?.strategyName, meta.rewrite_knowledge?.strategy_name, meta.rewriteKnowledge?.strategy, meta.rewrite_knowledge?.strategy)],
+    ['改文模板', first(knowledge.template_name, knowledge.rewrite_template_name, meta.rewriteKnowledge?.rewriteTemplateName, meta.rewrite_knowledge?.rewrite_template_name)],
+    ['开头词', first(knowledge.opening_phrase_name, meta.rewriteKnowledge?.openingPhraseName, meta.rewrite_knowledge?.opening_phrase_name)],
+    ['高仿参考', first(knowledge.high_imitation_reference_name, meta.rewriteKnowledge?.highImitationReferenceName, meta.rewrite_knowledge?.high_imitation_reference_name)],
     ['创建时间', formatTime(first(data.createdAt, data.created_at, meta.createdAt, meta.created_at))],
     ['更新时间', formatTime(first(data.updatedAt, data.updated_at, meta.updatedAt, meta.updated_at))],
     ['当前批次', first(data.batchId, data.batch_id, meta.batchId, meta.batch_id, meta.currentBatchId, meta.current_batch_id)]
@@ -149,6 +153,7 @@ export function novelFetchSensitiveComparisons(data = {}) {
         String(first(fixed.source, fixedData.source)).toLowerCase() === 'system_rule' ? '规则引擎' : '—'),
       attempts: first(fixed.attempt, fixed.attempt_count, fixed.attemptCount, present(fixed.status) ? 1 : '—'),
       error: display(first(fixed.error, fixed.error_message, fixed.errorMessage)),
+      recovered: ['done', 'completed', 'fixed'].includes(String(fixed.status || fixedData.status || '').toLowerCase()) && ['fallback', 'system_rule'].includes(String(fixed.source || fixedData.source || '').toLowerCase()),
       before: display(first(hit.snippet, fixed.before), '暂无命中片段'),
       after: display(fixed.after, '暂无处理后内容')
     };
@@ -167,4 +172,21 @@ export function novelFetchSensitiveComparisons(data = {}) {
     items,
     logs: Array.isArray(data.logs) ? data.logs : []
   };
+}
+
+export function novelFetchSubmitDiagnostic(data = {}) {
+  const result = data.result && typeof data.result === 'object' && Object.keys(data.result).length ? data.result : null;
+  const statusLabels = { submitted: '已回读确认', completed: '已完成', failed: '提交失败', error: '提交失败', waiting_login: '等待登录', waiting_configuration: '等待配置', pending_confirmation: '等待后台确认', started: '开始提交', queued: '等待提交', skipped: '已跳过' };
+  const eventLabels = { site_submit: '提交结果', auto_submit_started: '开始自动提交', auto_submit_completed: '自动提交完成', auto_submit_failed: '自动提交失败', auto_submit_deferred: '等待提交' };
+  const rows = (Array.isArray(data.logs) ? data.logs : []).map((row, index) => ({
+    ...row,
+    key: String(index),
+    timeLabel: formatTime(first(row.time, row.createdAt, row.created_at)),
+    statusLabel: statusLabels[row.status] || eventLabels[row.event] || '提交记录',
+    versionLabel: row.version ? String(row.version).toUpperCase() : '—',
+    message: String(first(row.error, row.message, row.detail, row.remote_receipt?.verified === true ? '视频管理系统已回读确认' : '', typeof row.result === 'string' ? row.result : '', eventLabels[row.event]) || '—')
+  }));
+  return { result, rows, verified: result?.remote_receipt?.verified === true || result?.verified === true,
+    receiptId: display(first(result?.remote_receipt?.submission_id, result?.submissionId)),
+    reason: String(data.reason || '尚未发起提交，请先完成正文与 AI 文案处理') };
 }

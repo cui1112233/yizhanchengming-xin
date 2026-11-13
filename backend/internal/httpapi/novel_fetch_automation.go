@@ -118,6 +118,9 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 		meta = map[string]any{}
 	}
 	status := strings.ToLower(firstText(meta["status"], meta["queueState"], meta["taskStatus"]))
+	if meta["rewriteValidationHold"] == true {
+		return false
+	}
 	submitStatus := strings.ToLower(firstText(meta["siteSubmitStatus"], meta["site_submit_status"]))
 	if submitStatus == "waiting_configuration" || submitStatus == "waiting_login" {
 		return false
@@ -182,14 +185,32 @@ func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.S
 	}
 	for _, document := range documents {
 		status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"], document.Meta["taskStatus"]))
-		if status != "processing" && status != "running" && status != "ai_processing" {
+		if status != "processing" && status != "running" && status != "ai_processing" && status != "queued" {
 			continue
 		}
 		updated, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(document.UpdatedAt))
 		if err != nil || updated.After(cutoff) {
 			continue
 		}
-		if recoveryQueue != nil {
+		if status == "queued" {
+			// Age alone does not prove a queued job is orphaned. Never replace a
+			// job which Redis still owns, or retry when Redis cannot be checked.
+			jobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
+			if len(queues) == 0 || jobID == "" {
+				continue
+			}
+			checker, ok := queues[0].(interface {
+				ProcessJobExists(context.Context, string) (bool, error)
+			})
+			if !ok {
+				continue
+			}
+			exists, checkErr := checker.ProcessJobExists(ctx, jobID)
+			if checkErr != nil || exists {
+				continue
+			}
+		}
+		if recoveryQueue != nil && status != "queued" {
 			staleJobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
 			if staleJobID == "" {
 				batchID := firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"])
@@ -277,6 +298,7 @@ func novelFetchAutomationConfigurationBlock(document novelfetchworkshop.Document
 			continue
 		}
 		if strings.Contains(normalized, "风格") || strings.Contains(normalized, "性别") ||
+			strings.Contains(normalized, "正文复检未通过") ||
 			strings.Contains(normalized, "未找到正文版本") || strings.Contains(normalized, "正文少于") ||
 			strings.Contains(normalized, "未配置上传") || strings.Contains(normalized, "未登录") ||
 			strings.Contains(normalized, "登录已失效") {
@@ -405,6 +427,12 @@ func markNovelFetchAutomationSubmitResult(ctx context.Context, store novelfetchw
 			delete(document.Meta, "automationSubmitAttempts")
 			delete(document.Meta, "automationNextRetryAt")
 			delete(document.Meta, "automationSubmitError")
+		} else if workshopSubmitRequiresLogin(submitErr) {
+			document.Meta["siteSubmitStatus"] = "waiting_login"
+			document.Meta["status"], document.Meta["queueState"] = "waiting_login", "waiting_login"
+			document.Meta["automationSubmitError"] = workshopLoginRequiredMessage
+			delete(document.Meta, "automationSubmitAttempts")
+			delete(document.Meta, "automationNextRetryAt")
 		} else if blocked := novelFetchAutomationConfigurationBlock(document, submitErr); blocked != "" {
 			document.Meta["siteSubmitStatus"] = "waiting_configuration"
 			document.Meta["status"] = "waiting_configuration"
@@ -433,11 +461,19 @@ func markNovelFetchAutomationSubmitResult(ctx context.Context, store novelfetchw
 }
 
 func novelFetchAutomationStatus(ctx context.Context, store novelfetchworkshop.Store, registry *workshopProcessRegistry, owner string) (map[string]any, error) {
-	settings, err := store.GetConfig(ctx, owner)
-	if err != nil {
-		return nil, err
+	var settings map[string]any
+	var documents []novelfetchworkshop.Document
+	var err error
+	if reader, ok := store.(interface {
+		AutomationStatusInputs(context.Context, string) (map[string]any, []novelfetchworkshop.Document, error)
+	}); ok {
+		settings, documents, err = reader.AutomationStatusInputs(ctx, owner)
+	} else {
+		settings, err = store.GetConfig(ctx, owner)
+		if err == nil {
+			documents, err = store.ListDocuments(ctx, owner)
+		}
 	}
-	documents, err := store.ListDocuments(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +520,7 @@ func novelFetchAutomationStatus(ctx context.Context, store novelfetchworkshop.St
 	return map[string]any{
 		"ok": true, "enabled": novelFetchAutomationEnabled(settings), "auto_queue_enabled": novelFetchAutomationEnabled(settings),
 		"active_job_id": activeJobID, "counts": counts, "processing_count": counts["running"],
-		"pending_count": counts["queued"] + counts["waiting_retry"], "latest_job": latest,
+		"pending_count": counts["queued"] + counts["waiting_retry"], "latest_job": novelFetchJobStatusSummary(latest),
 		"updated_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}, nil
 }

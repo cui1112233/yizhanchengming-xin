@@ -498,7 +498,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	registerImageCapacityRoutes(root, auth, options)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
-	RegisterNovelFetchUploadSessionCompat(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
+	registerNovelFetchUploadSessionWithStore(root, novelCompatAuth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
 	RegisterNovelFetchUploadBatchCompat(root, novelCompatAuth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
 	RegisterWebSubmitTargetCheckCompat(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
 	publish121OrganizationsHandler(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
@@ -905,7 +905,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	// Compress JSON responses at the outermost layer so every registered route
 	// benefits without touching individual handlers. Non-JSON streams (images,
 	// ServeContent Range/304) are passed through untouched.
-	return withJSONCompression(withAICutTimelineScope(root, auth))
+	return withWorkshopSubmitQueue(withJSONCompression(withAICutTimelineScope(root, auth)), options.NovelFetchQueue)
 }
 
 // registerCanonicalNovelFetchWebSubmitAliases keeps the public workshop

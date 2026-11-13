@@ -260,12 +260,22 @@ func (s *MemoryStore) DeleteDocuments(_ context.Context, owner string, ids []str
 func (s *MemoryStore) GetConfig(_ context.Context, owner string) (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return EnsureWorkshopDefaults(cloneMap(s.configs[owner])), nil
+	settings := EnsureWorkshopDefaults(cloneMap(s.configs[owner]))
+	settings[ConfigRevisionKey] = configRevision(s.configs[owner])
+	return settings, nil
 }
 
 func (s *MemoryStore) PutConfig(_ context.Context, owner string, settings map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	next, err := checkedConfigRevision(s.configs[owner], settings)
+	if err != nil {
+		return err
+	}
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	settings[ConfigRevisionKey] = next
 	s.configs[owner] = cloneMap(settings)
 	return nil
 }

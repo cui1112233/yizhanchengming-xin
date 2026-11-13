@@ -680,6 +680,9 @@
 }
 
 .novel-fetch-process-policy-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.novel-fetch-methods { display: flex; flex-direction: column; gap: 8px; }
+.novel-fetch-method { display: flex; align-items: center; gap: 8px; }
+.novel-fetch-method > .ant-select { flex: 1; min-width: 0; }
 .novel-fetch-public-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .novel-fetch-input-format-row { align-items: end; margin-bottom: 12px; }
 .novel-fetch-input-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 34px; padding: 0 11px; border: 1px solid var(--legacy-border); border-radius: 7px; background: var(--legacy-panel); color: var(--text-secondary); font-size: 12px; }

@@ -1,0 +1,111 @@
+package httpapi
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"qiantie/backend/internal/novelfetchworkshop"
+)
+
+type workshopRetryQueueResult struct {
+	Requested      int               `json:"requested"`
+	Queued         int               `json:"queued"`
+	Updated        int               `json:"updated"`
+	Retried        int               `json:"retried"`
+	Failed         int               `json:"failed"`
+	Skipped        int               `json:"skipped"`
+	AlreadyRunning int               `json:"already_running"`
+	TaskIDs        []string          `json:"task_ids"`
+	Jobs           []map[string]any  `json:"jobs"`
+	Errors         map[string]string `json:"errors"`
+	OK             bool              `json:"ok"`
+}
+
+// This function only persists work in the existing queue. Provider calls and
+// body processing belong to the worker, whose context outlives the HTTP call.
+func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, ids []string, sensitiveAI bool) (workshopRetryQueueResult, error) {
+	result := workshopRetryQueueResult{Requested: len(ids), TaskIDs: []string{}, Jobs: []map[string]any{}, Errors: map[string]string{}, OK: true}
+	settings, err := store.GetConfig(ctx, owner)
+	if err != nil {
+		return result, err
+	}
+	uniqueQueue, queueReady := queue.(novelfetchworkshop.ProcessBookDedupQueue)
+	autoSubmit := novelFetchAutomationEnabled(settings)
+	for _, bookID := range ids {
+		document, err := store.GetDocument(ctx, owner, bookID)
+		if err != nil {
+			result.Failed++
+			result.Errors[bookID] = "读取任务失败"
+			continue
+		}
+		if active := activeNovelFetchJobForBooks(ctx, store, owner, []string{bookID}); active != nil {
+			result.Skipped++
+			result.AlreadyRunning++
+			result.Jobs = append(result.Jobs, active)
+			continue
+		}
+		originalReady := strings.EqualFold(firstText(document.Meta["originalStatus"], document.Meta["original_status"]), "done")
+		aiStatus := strings.ToLower(firstText(document.Meta["aiStatus"], document.Meta["ai_status"]))
+		status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"]))
+		aiDone := aiStatus == "done" || aiStatus == "ai_done" || aiStatus == "completed"
+		uploadNeeded := autoSubmit && firstText(document.Meta["siteSubmitStatus"], document.Meta["site_submit_status"]) != "submitted"
+		if originalReady && aiDone && status != "failed" && !uploadNeeded {
+			result.Skipped++
+			continue
+		}
+		if !queueReady {
+			return result, fmt.Errorf("重试队列未配置或不支持防重复入队，未执行生成，请检查 Redis 队列")
+		}
+		if cancelled, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
+			if err := cancelled.ClearCancelledBooks(ctx, owner, []string{bookID}); err != nil {
+				result.Failed++
+				result.Errors[bookID] = "清理取消状态失败"
+				continue
+			}
+		}
+		versions := []string{}
+		for index := 1; index <= workshopAIRequestedCount(document, settings, 0); index++ {
+			versions = append(versions, fmt.Sprintf("ai%d", index))
+		}
+		if autoSubmit {
+			versions = cleanStrings(append(novelFetchAutomationVersions(settings), versions...))
+		}
+		batchID := firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"], "retry-batch")
+		job := novelfetchworkshop.ProcessJob{ID: fmt.Sprintf("retry_%d", time.Now().UnixNano()), Owner: owner, BatchID: batchID, BookIDs: []string{bookID}, PlatformID: firstText(document.Meta["platformId"], document.Meta["platform_id"], "2"), MaxTxt: document.MaxTxt, SensitiveAIEnabled: sensitiveAI || novelFetchSensitiveAIEnabled(settings), AutoSubmit: autoSubmit, SelectedVersions: versions, TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定")}
+		if job.MaxTxt <= 0 {
+			job.MaxTxt = 4000
+		}
+		job.RewriteMethods = map[string]string{}
+		for version, method := range mapOrEmpty(mapOrEmpty(mapOrEmpty(settings["appConfig"])["rewrite"])["ai_slot_methods"]) {
+			job.RewriteMethods[version] = firstText(method)
+		}
+		started := time.Now().UTC().Format(time.RFC3339Nano)
+		if err := store.PutRun(ctx, owner, novelfetchworkshop.RunRecord{RunID: job.ID, BookID: batchID, Stage: "novel_fetch_process", Status: "queued", TextModelID: job.TextModelID, ModelID: "novel-fetch-workshop", ModelDisplayName: "批量测书后台重试", StartedAt: started}); err != nil {
+			result.Failed++
+			result.Errors[bookID] = "保存重试任务失败"
+			continue
+		}
+		queued, existingID, err := uniqueQueue.EnqueueUniqueBooks(ctx, job, 24*time.Hour)
+		if err != nil {
+			_ = updateWorkshopRun(store, job, "failed", "重试入队失败", started, true)
+			result.Failed++
+			result.Errors[bookID] = "重试入队失败，请检查 Redis 队列"
+			continue
+		}
+		if !queued {
+			_ = updateWorkshopRun(store, job, "duplicate_skipped", "该书已有后台任务，本次没有重复入队", started, true)
+			result.Skipped++
+			result.AlreadyRunning++
+			result.Jobs = append(result.Jobs, map[string]any{"id": existingID, "existing": true})
+			continue
+		}
+		result.Queued++
+		result.TaskIDs = append(result.TaskIDs, bookID)
+		result.Jobs = append(result.Jobs, map[string]any{"id": job.ID, "book_id": bookID, "status": "queued"})
+	}
+	result.Updated, result.Retried = result.Queued, result.Queued
+	result.OK = result.Failed == 0
+	return result, nil
+}

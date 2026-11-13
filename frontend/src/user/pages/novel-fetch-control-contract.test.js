@@ -10,7 +10,6 @@ test('visible workflow actions have Go-backed handlers', () => {
   for (const name of [
     'fetchWorkshopOriginal',
     'startWorkshopProcess',
-    'previewWorkshopProcess',
     'retryWorkshopTasks',
     'stopWorkshopTasks',
     'generateWorkshopAi',

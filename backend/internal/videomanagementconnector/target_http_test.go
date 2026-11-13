@@ -12,6 +12,20 @@ import (
 	"testing"
 )
 
+func TestTextSubmissionHTTPAuthFailureIsExplicitSessionExpiry(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }))
+			defer server.Close()
+			service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+			_, err := service.Submit(context.Background(), Session{Cookie: "sid=fixture"}, SubmissionInput{BookID: "123", Content: []byte("测试正文")})
+			if !errors.Is(err, ErrSessionExpired) {
+				t.Fatalf("auth failure classified as unknown: %v", err)
+			}
+		})
+	}
+}
+
 func TestTargetHTTPServiceUsesConfiguredProxy(t *testing.T) {
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() != "http://two.121w.com/tttadmin/login.php" {
@@ -65,7 +79,7 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 			if (r.URL.Query().Get("bookid") != "book-1" && r.URL.Query().Get("bookid") != "1") || r.URL.Query().Get("page") != "1" || r.URL.Query().Get("pageSize") != "10" {
 				t.Errorf("unexpected readback query: %s", r.URL.RawQuery)
 			}
-			_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+			_, _ = w.Write([]byte(`{"success":true,"data":[{"bookid":"book-1","id":"remote-record-1"}]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -84,7 +98,7 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
 	readback, err := service.GetSubmission(context.Background(), session, "book-1")
-	if err != nil || readback.ID != "book-1" || readback.Status != "readback" {
+	if err != nil || readback.ID != "remote-record-1" || readback.Status != "readback" {
 		t.Fatalf("readback=%#v err=%v", readback, err)
 	}
 	book, err := service.GetBook(context.Background(), session, "1", 1, 10)

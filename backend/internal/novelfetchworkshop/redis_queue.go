@@ -55,9 +55,18 @@ func NewRedisQueueWithDo(prefix string, do RedisDoFunc) *RedisQueue {
 	return &RedisQueue{Prefix: prefix, Do: do}
 }
 
-func (q *RedisQueue) pendingKey() string        { return q.Prefix + ":pending" }
-func (q *RedisQueue) processingKey() string     { return q.Prefix + ":processing" }
-func (q *RedisQueue) jobKey(id string) string   { return q.Prefix + ":job:" + id }
+func (q *RedisQueue) pendingKey() string      { return q.Prefix + ":pending" }
+func (q *RedisQueue) processingKey() string   { return q.Prefix + ":processing" }
+func (q *RedisQueue) jobKey(id string) string { return q.Prefix + ":job:" + id }
+
+func (q *RedisQueue) ProcessJobExists(ctx context.Context, id string) (bool, error) {
+	value, err := q.command(ctx, "EXISTS", q.jobKey(strings.TrimSpace(id)))
+	if err != nil {
+		return false, err
+	}
+	count, err := strconv.Atoi(fmt.Sprint(value))
+	return count > 0, err
+}
 func (q *RedisQueue) leaseKey(id string) string { return q.Prefix + ":lease:" + id }
 func (q *RedisQueue) dedupeKey(key string) string {
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.TrimSpace(key))))
@@ -164,6 +173,7 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 		return false, "", fmt.Errorf("source book ids are required for unique enqueue")
 	}
 	job.DedupeKey = processBookDedupeMarker(job)
+	job.DedupeBookIDs = append([]string{}, job.BookIDs...)
 	body, err := json.Marshal(job)
 	if err != nil {
 		return false, "", err
@@ -210,7 +220,7 @@ func (q *RedisQueue) Claim(ctx context.Context, lease time.Duration) (ProcessJob
 	if _, err := q.command(ctx, "SET", q.leaseKey(id), time.Now().UTC().Format(time.RFC3339Nano), "NX", "EX", strconv.Itoa(seconds)); err != nil {
 		return ProcessJob{}, err
 	}
-	return job, nil
+	return processJobWithDedupeScope(job), nil
 }
 
 func (q *RedisQueue) RecoverStaleJob(ctx context.Context, jobID string) (bool, error) {
@@ -256,6 +266,9 @@ func (q *RedisQueue) Ack(ctx context.Context, job ProcessJob) error {
 }
 
 func (q *RedisQueue) jobBookDedupeKeys(job ProcessJob) []string {
+	if len(job.DedupeBookIDs) > 0 {
+		job.BookIDs = job.DedupeBookIDs
+	}
 	seen := map[string]bool{}
 	keys := make([]string, 0, len(job.BookIDs))
 	for _, bookID := range job.BookIDs {
@@ -277,6 +290,12 @@ func (q *RedisQueue) Fail(ctx context.Context, job ProcessJob, retry bool) error
 		return err
 	}
 	if retry {
+		if strings.HasPrefix(job.DedupeKey, "books:") {
+			if err := q.releaseJobDedupe(ctx, processCompletedDedupeBooks(job)); err != nil {
+				return err
+			}
+			job.DedupeBookIDs = append([]string{}, job.BookIDs...)
+		}
 		if err := q.Enqueue(ctx, job); err != nil {
 			_, _ = q.command(ctx, "DEL", q.jobKey(job.ID))
 			_ = q.releaseJobDedupe(ctx, job)

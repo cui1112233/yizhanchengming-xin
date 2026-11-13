@@ -20,6 +20,7 @@ test('readNovelFetchProcessSettings_withSavedV78Options_restoresAllProcessingSel
   assert.equal(settings.maxTxt, 4000);
   assert.deepEqual(settings.selectedVersions, ['original', 'ai1']);
   assert.equal(settings.sensitiveAiProcessEnabled, true);
+  assert.equal(settings.rewriteMethods.ai1, 'auto');
 });
 
 test('writeNovelFetchProcessSettings_withV78Options_persistsValuesForNextPageVisit', () => {
@@ -42,4 +43,5 @@ test('writeNovelFetchProcessSettings_withV78Options_persistsValuesForNextPageVis
     rewriteMethods: { ai1: 'high_imitation' },
     sensitiveAiProcessEnabled: false
   });
+  assert.equal(readNovelFetchProcessSettings(storage).rewriteMethods.ai1, 'high_imitation');
 });

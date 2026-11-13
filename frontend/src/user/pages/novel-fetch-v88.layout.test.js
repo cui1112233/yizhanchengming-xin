@@ -33,7 +33,7 @@ test('删除/停止类危险操作使用 danger 变体', () => {
   assert.match(source, /variant="danger"[\s\S]{0,240}?>删除全部<\/V88Button>/);
   assert.match(source, /variant="danger"[\s\S]{0,240}?>删除失败<\/V88Button>/);
   assert.match(source, /variant="danger"[\s\S]{0,240}?>删除选中<\/V88Button>/);
-  assert.match(source, /variant="danger"[\s\S]{0,240}?>删除<\/V88Button>/);
+  assert.match(source, /<Button\s+danger\s+disabled=\{!selectedId\}\s+onClick=\{onDelete\}>删除条目<\/Button>/);
   assert.match(source, /variant=\{queueSummary\.enabled \? 'danger' : 'primary'\}/);
 });
 

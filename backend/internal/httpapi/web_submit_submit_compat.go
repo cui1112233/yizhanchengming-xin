@@ -24,11 +24,12 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			return
 		}
 		var body struct {
-			TaskIDs      []string `json:"taskIds"`
-			IDs          []string `json:"ids"`
-			Versions     []string `json:"versions"`
-			OperationID  string   `json:"operationId"`
-			ReadbackOnly bool     `json:"readback_only"`
+			TaskIDs         []string `json:"taskIds"`
+			IDs             []string `json:"ids"`
+			Versions        []string `json:"versions"`
+			OperationID     string   `json:"operationId"`
+			ReadbackOnly    bool     `json:"readback_only"`
+			PreviewRevision string   `json:"previewRevision"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
@@ -36,6 +37,13 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		}
 		if len(body.TaskIDs) == 0 {
 			body.TaskIDs = body.IDs
+		}
+		if body.PreviewRevision != "" {
+			revision, err := webSubmitPreviewRevision(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
+			if err != nil || revision != body.PreviewRevision {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "正文、版本或提交配置已变化，请重新生成提交预览后确认"})
+				return
+			}
 		}
 		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly}, genderJudgeResolver, targets...)
 		if err != nil {

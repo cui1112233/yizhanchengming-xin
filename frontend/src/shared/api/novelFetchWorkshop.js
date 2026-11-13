@@ -107,6 +107,10 @@ export function deleteWorkshopSchedule(id) {
   return apiRequest(`/api/novel-fetch-workshop/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+export function cancelWorkshopSchedule(id) {
+  return apiRequest(`/api/novel-fetch-workshop/schedules/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: '{}' });
+}
+
 export function getWorkshopLogs() {
   return apiRequest('/api/novel-fetch-workshop/logs');
 }
@@ -226,10 +230,10 @@ export function suggestWorkshopRules(text, ruleType, goal) {
 }
 
 // 预览规则排版结果与分阶段 trace
-export function previewWorkshopRules(text, scope = 'ai') {
+export function previewWorkshopRules(text, scope = 'ai', options = {}) {
   return apiRequest('/api/novel-fetch-workshop/rules/preview', {
     method: 'POST',
-    body: JSON.stringify({ text, scope })
+    body: JSON.stringify({ text, scope, ...options })
   });
 }
 
@@ -249,22 +253,24 @@ export function getWorkshopKnowledge(kind) {
   return apiRequest(`/api/novel-fetch-workshop/knowledge/${encodeURIComponent(kind)}`);
 }
 
-export function saveWorkshopKnowledge(kind, item) {
+export function saveWorkshopKnowledge(kind, item, options = {}) {
   return apiRequest(`/api/novel-fetch-workshop/knowledge/${encodeURIComponent(kind)}`, {
     method: 'POST',
-    body: JSON.stringify({ item })
+    body: JSON.stringify({ item, ...options })
   });
 }
 
-export function deleteWorkshopKnowledge(kind, id) {
-  return apiRequest(`/api/novel-fetch-workshop/knowledge/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, {
+export function deleteWorkshopKnowledge(kind, id, options = {}) {
+  const query = options.configRevision === undefined ? '' : `?configRevision=${encodeURIComponent(options.configRevision)}`;
+  return apiRequest(`/api/novel-fetch-workshop/knowledge/${encodeURIComponent(kind)}/${encodeURIComponent(id)}${query}`, {
     method: 'DELETE'
   });
 }
 
-export function optimizeWorkshopKnowledge(kind, id) {
+export function optimizeWorkshopKnowledge(kind, id, options = {}) {
   return apiRequest(`/api/novel-fetch-workshop/knowledge/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/optimize`, {
-    method: 'POST'
+    method: 'POST',
+    body: JSON.stringify(options)
   });
 }
 

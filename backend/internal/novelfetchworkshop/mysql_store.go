@@ -207,6 +207,7 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 				settings["modelCatalogVersion"] = version
 			}
 		}
+		settings[ConfigRevisionKey] = "0"
 		return EnsureWorkshopDefaults(settings), nil
 	}
 	if err != nil {
@@ -230,6 +231,7 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 		// from the user's uncommitted legacy config file; never write them back.
 		mergeLegacyRuntimeModelFields(catalog, legacyCatalog)
 	}
+	settings[ConfigRevisionKey] = configRevision(settings)
 	return EnsureWorkshopDefaults(settings), nil
 }
 
@@ -324,12 +326,42 @@ func (s *MySQLStore) PutConfig(ctx context.Context, owner string, settings map[s
 	if settings == nil {
 		settings = map[string]any{}
 	}
-	raw, err := json.Marshal(settings)
+	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_configs(owner_username,settings_json,created_at,updated_at) VALUES(?,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE settings_json=VALUES(settings_json), updated_at=CURRENT_TIMESTAMP(6)`, owner, string(raw))
-	return err
+	defer tx.Rollback()
+	// Create an empty row only inside this transaction so even the first two
+	// writers serialize on the same MySQL record.
+	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO novel_fetch_workshop_configs(owner_username,settings_json,created_at,updated_at) VALUES(?,'{}',CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6))`, owner); err != nil {
+		return err
+	}
+	var previousRaw []byte
+	if err := tx.QueryRowContext(ctx, `SELECT settings_json FROM novel_fetch_workshop_configs WHERE owner_username=? FOR UPDATE`, owner).Scan(&previousRaw); err != nil {
+		return err
+	}
+	var previous map[string]any
+	if err := json.Unmarshal(previousRaw, &previous); err != nil {
+		return err
+	}
+	next, err := checkedConfigRevision(previous, settings)
+	if err != nil {
+		return err
+	}
+	updated := cloneMap(settings)
+	updated[ConfigRevisionKey] = next
+	raw, err := json.Marshal(updated)
+	if err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE novel_fetch_workshop_configs SET settings_json=CAST(? AS CHAR CHARACTER SET utf8mb4), updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=?`, string(raw), owner); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	settings[ConfigRevisionKey] = next
+	return nil
 }
 
 func (s *MySQLStore) ListConfigOwners(ctx context.Context) ([]string, error) {

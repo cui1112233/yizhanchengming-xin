@@ -2,6 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as statusHelpers from './novel-fetch-status.js';
 
+test('queued retry acknowledgement does not claim processing has finished', () => {
+  const text = statusHelpers.novelFetchBatchResultSummary({ queued: 2, failed: 1, skipped: 1, already_running: 1 });
+  assert.match(text, /加入后台重试 2 项/);
+  assert.match(text, /失败 1 项/);
+  assert.doesNotMatch(text, /已处理|已完成/);
+});
+
+test('raw original file is not an AI1 result and failed version metadata is not content', () => {
+  assert.equal(statusHelpers.novelFetchVersionReady({ aiFiles: ['original_raw'], aiStatus: 'failed' }), false);
+  assert.equal(statusHelpers.novelFetchVersionReady({ versions: { ai1: { state: 'failed' } }, aiStatus: 'failed' }), false);
+  assert.equal(statusHelpers.novelFetchVersionReady({ versions: { ai1: false }, aiStatus: 'failed' }), false);
+  assert.equal(statusHelpers.novelFetchVersionReady({ aiFiles: ['ai2'] }, 'ai1'), false);
+  assert.equal(statusHelpers.novelFetchVersionReady({ aiFiles: ['ai2'] }, 'ai2'), true);
+  assert.equal(statusHelpers.novelFetchVersionReady({ versions: { ai1: { state: 'ready' } } }), true);
+});
+
+test('upload-only failure keeps completed body status and actionable next step', () => {
+  assert.equal(statusHelpers.novelFetchTaskStatus({ status: 'upload_pending', originalStatus: 'done', aiStatus: 'done', siteSubmitStatus: 'failed' }).label, '正文已完成，待重试上传');
+});
+
 const {
   beijingDateKey, currentBatchBookIds, filterNovelFetchTasks, novelFetchCharCount,
   novelFetchStageLabel, novelFetchTaskDateKey, novelFetchTaskStatus,

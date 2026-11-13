@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 )
 
 type webSubmitRequest struct {
+	Queue        novelfetchworkshop.ProcessQueue
 	TaskIDs      []string
 	Versions     []string
 	OperationID  string
@@ -31,30 +33,71 @@ type webSubmitExecution struct {
 type webSubmitRequestError struct {
 	Status  int
 	Message string
+	Code    string
 }
 
 func (err *webSubmitRequestError) Error() string { return err.Message }
 
+// A book may already have uploads from previous days. An HTTP success or a
+// matching book alone cannot confirm the current send attempt.
+func submissionMatchesAttempt(receipt videomanagementconnector.Submission, expectedID, startedAt string) bool {
+	record := mapOrEmpty(receipt.ReadbackRaw)
+	bookID := firstText(record["bookid"])
+	if bookID == "" {
+		return strings.TrimSpace(receipt.ID) != ""
+	} // Other connectors return an explicit confirmed receipt.
+	if expectedID != "" && expectedID != bookID {
+		return receipt.ID == expectedID
+	}
+	started, err := time.Parse(time.RFC3339Nano, startedAt)
+	if err != nil {
+		return false
+	}
+	created, err := time.ParseInLocation(time.DateTime, firstText(record["addtime"]), time.FixedZone("Asia/Shanghai", 8*60*60))
+	return err == nil && !created.Before(started.Truncate(time.Second))
+}
+
 func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfetchworkshop.Store, request webSubmitRequest, genderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), targets ...videomanagementconnector.Service) (webSubmitExecution, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+	if request.Queue == nil {
+		request.Queue, _ = ctx.Value(submitQueueKey{}).(novelfetchworkshop.ProcessQueue)
+	}
 	operationID := strings.TrimSpace(request.OperationID)
 	if operationID == "" {
 		operationID = fmt.Sprintf("web-submit-%d", time.Now().UTC().UnixNano())
 	}
 	result := webSubmitExecution{OperationID: operationID, Results: []any{}}
+	release, guardErr := acquireWorkshopSubmit(ctx, request.Queue, owner, "")
+	if guardErr != nil {
+		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "queued", guardErr.Error())
+		return result, &webSubmitRequestError{Status: http.StatusConflict, Message: guardErr.Error()}
+	}
+	defer release()
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
 		return result, &webSubmitRequestError{Status: http.StatusInternalServerError, Message: "读取提交配置失败"}
 	}
 	web := mapOrEmpty(mapOrEmpty(settings["appConfig"])["web_submit"])
 	if web["enabled"] != true {
+		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "waiting_configuration", "网站提交尚未启用；请先保存账号并勾选启用网站提交")
 		return result, &webSubmitRequestError{Status: http.StatusBadRequest, Message: "网站提交尚未启用；请先保存账号并勾选启用网站提交"}
 	}
 	session := readUploadTargetSession(usersDir, owner)
 	cookie := strings.TrimSpace(toString(session["cookie"]))
 	if cookie == "" {
-		return result, &webSubmitRequestError{Status: http.StatusBadRequest, Message: "请先在网站提交页保存账号密码并登录目标站"}
+		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "waiting_login", "视频管理系统未登录，请先登录后再提交")
+		return result, &webSubmitRequestError{Status: http.StatusBadRequest, Message: "请先在网站提交页保存账号密码并登录目标站", Code: "UPLOAD_LOGIN_REQUIRED"}
 	}
 	versions := cleanStrings(request.Versions)
+	var pauseTarget videomanagementconnector.Service
+	if len(targets) > 0 {
+		pauseTarget = targets[0]
+	}
+	if err := checkWorkshopSubmitPause(ctx, store, owner, session, pauseTarget); err != nil {
+		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "waiting_login", err.Error())
+		return result, err
+	}
 	if len(versions) == 0 {
 		versions = cleanStrings(anyStrings(web["submit_versions"]))
 	}
@@ -123,7 +166,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 			}
 			recordSuccess := func(submission, confirmed videomanagementconnector.Submission) {
 				row["status"] = "submitted"
-				row["submissionId"] = submission.ID
+				row["submissionId"] = firstText(confirmed.ID, submission.ID)
 				row["verified"] = true
 				row["retryable"] = false
 				row["readback_status"] = "confirmed"
@@ -143,7 +186,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					delete(receipts, version)
 					meta["siteSubmitPendingConfirmation"] = receipts
 				}
-				doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "submitted", "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": true, "remote_receipt": map[string]any{"verified": true, "submission_id": submission.ID, "upload_success_count": 1, "remote_record": confirmed.ReadbackRaw}})
+				doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "submitted", "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": true, "remote_receipt": map[string]any{"verified": true, "submission_id": firstText(confirmed.ID, submission.ID), "upload_success_count": 1, "remote_record": confirmed.ReadbackRaw}})
 			}
 			if skipSubmitted && containsVersion(done, version) {
 				row["status"] = "skipped"
@@ -152,7 +195,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				continue
 			}
 			targetSession := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
-			needsReadback := strings.EqualFold(firstText(meta["siteSubmitStatus"], meta["site_submit_status"]), "pending_confirmation") && containsVersion(anyStrings(meta["siteSubmitFailedVersions"]), version)
+			_, needsReadback := mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version]
+			if !needsReadback && len(mapOrEmpty(meta["siteSubmitPendingConfirmation"])) == 0 {
+				needsReadback = strings.EqualFold(firstText(meta["siteSubmitStatus"], meta["site_submit_status"]), "pending_confirmation") && containsVersion(anyStrings(meta["siteSubmitFailedVersions"]), version)
+			}
 			if request.ReadbackOnly && !needsReadback {
 				row["error"] = "该版本没有待核对的提交记录"
 				result.Results = append(result.Results, row)
@@ -167,6 +213,11 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, bookID)
 				if readbackErr != nil {
 					uncertainVersion("上传已接收，正在等待目标站回读确认", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version]))
+					continue
+				}
+				attempt := mapOrEmpty(mapOrEmpty(meta["siteSubmitAttempts"])[version])
+				if !submissionMatchesAttempt(confirmed, firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID), firstText(attempt["started_at"])) {
+					uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID))
 					continue
 				}
 				recordSuccess(confirmed, confirmed)
@@ -184,6 +235,13 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 			if minTextChars > 0 && len([]rune(content.Content)) < minTextChars {
 				failedVersion("正文少于最少字数", false)
 				continue
+			}
+			if strings.HasPrefix(strings.ToLower(version), "ai") {
+				if err := novelfetchworkshop.ValidateRewriteProse(content.Content); err != nil {
+					failedVersion("AI 正文复检未通过："+err.Error()+"；请重新生成该版本后提交", false)
+					row["retryable"] = false
+					continue
+				}
 			}
 			profile := webSubmitProfile(web, version)
 			row["profile"] = firstText(profile["id"], profile["name"], mapOrEmpty(web["version_profiles"])[version], mapOrEmpty(web["profile_bindings"])[version], web["selected_profile"])
@@ -225,6 +283,21 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				}
 			}
 			if submitErr != nil {
+				if errors.Is(submitErr, videomanagementconnector.ErrSessionExpired) || errors.Is(submitErr, videomanagementconnector.ErrSessionMissing) {
+					delete(mapOrEmpty(meta["siteSubmitPendingConfirmation"]), version)
+					markSubmissionFailure(meta, version, workshopLoginRequiredMessage)
+					meta["siteSubmitStatus"] = "waiting_login"
+					doc.Meta = meta
+					doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "waiting_login", "error": workshopLoginRequiredMessage, "externalRequested": true, "time": time.Now().UTC().Format(time.RFC3339Nano)})
+					if err := store.PutDocument(ctx, owner, doc); err != nil {
+						return result, err
+					}
+					if err := pauseWorkshopSubmitAccount(ctx, store, owner, session); err != nil {
+						return result, err
+					}
+					result.Failed++
+					return result, &webSubmitRequestError{Status: http.StatusConflict, Message: workshopLoginRequiredMessage, Code: "UPLOAD_LOGIN_REQUIRED"}
+				}
 				uncertainVersion("提交结果不确定，等待目标站回读确认", bookID)
 				continue
 			}
@@ -233,7 +306,16 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				uncertainVersion("上传已接收，但目标站回读确认失败", submission.ID)
 				continue
 			}
+			if !submissionMatchesAttempt(confirmed, firstText(submission.ID, bookID), firstText(mapOrEmpty(attempts[version])["started_at"])) {
+				uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(submission.ID, bookID))
+				continue
+			}
 			recordSuccess(submission, confirmed)
+		}
+		if len(mapOrEmpty(meta["siteSubmitPendingConfirmation"])) > 0 {
+			meta["siteSubmitStatus"] = "pending_confirmation"
+		} else if len(anyStrings(meta["siteSubmitFailedVersions"])) > 0 {
+			meta["siteSubmitStatus"] = "pending_upload"
 		}
 		doc.Meta = meta
 		if err := store.PutDocument(ctx, owner, doc); err != nil {

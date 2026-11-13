@@ -109,6 +109,12 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 			result = append(result, groups[key])
 		}
 		plan := map[string]any{"material_limit": 8, "groups": result, "skipped": skipped}
+		revision, err := webSubmitPreviewRevision(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "生成提交预览校验失败"})
+			return
+		}
+		plan["revision"] = revision
 		writeJSON(w, http.StatusOK, map[string]any{"material_limit": 8, "groups": result, "skipped": skipped, "plan": plan})
 	}))
 	root.Handle("POST /api/batch-rewrite/web-submit/preview", previewHandler)

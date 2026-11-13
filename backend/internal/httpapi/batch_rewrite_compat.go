@@ -168,15 +168,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				"logs":            document.Logs,
 			})
 		case strings.HasSuffix(req.URL.Path, "/site-submit-log"):
-			logs := []any{}
-			if raw, ok := meta["websiteSubmitHistory"].([]any); ok {
-				logs = raw
-			}
-			var result any = map[string]any{}
-			if len(logs) > 0 {
-				result = logs[len(logs)-1]
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "result": result, "logs": logs})
+			writeJSON(w, http.StatusOK, workshopSubmitDiagnostic(document))
 		default:
 			stages := document.Meta["rulesTrace"]
 			if stages == nil {
@@ -313,6 +305,10 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				return
 			}
 			body.Settings["password_masked"] = true
+			if err := resumeWorkshopUploadsAfterLogin(req.Context(), store, identity.Username); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "登录已保存，但待上传任务恢复失败，请稍后重试"})
+				return
+			}
 			delete(body.Settings, "password")
 		}
 		settings, err := store.GetConfig(req.Context(), identity.Username)

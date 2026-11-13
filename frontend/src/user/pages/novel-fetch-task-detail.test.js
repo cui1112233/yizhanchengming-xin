@@ -4,8 +4,48 @@ import assert from 'node:assert/strict';
 import {
   novelFetchAiVersions,
   novelFetchSensitiveComparisons,
+  novelFetchSubmitDiagnostic,
   novelFetchTaskSummaryItems
 } from './novel-fetch-task-detail.js';
+
+test('task detail reads persisted per-version rewrite evidence without inventing history', () => {
+  const data = { versions: {ai1: '正文一', ai2: '正文二'}, meta: { rewriteModel: 'model-used', rewriteEvidenceByVersion: {
+    ai1: {strategy_name: '方案一', template_name: '模板一'},
+    ai2: {strategy_name: '方案二', template_name: '模板二', opening_phrase_name: '开头二'}
+  }}};
+  const versions = novelFetchAiVersions(data);
+  assert.equal(versions[0].knowledge.template_name, '模板一');
+  assert.equal(versions[1].knowledge.strategy_name, '方案二');
+  const summary = Object.fromEntries(novelFetchTaskSummaryItems(data).map(row => [row.label, row.value]));
+  assert.equal(summary['AI 当前版本'], 'AI2');
+  assert.equal(summary['改文方案'], '方案二');
+  assert.equal(summary['改文模板'], '模板二');
+  assert.equal(summary['开头词'], '开头二');
+  assert.equal(summary['改文模型'], 'model-used');
+  data.meta.aiCurrentVersion = 'ai1';
+  data.meta.rewriteEvidenceByVersion.ai1.model = 'model-one';
+  const selected = Object.fromEntries(novelFetchTaskSummaryItems(data).map(row => [row.label, row.value]));
+  assert.equal(selected['改文方案'], '方案一');
+  assert.equal(selected['改文模型'], 'model-one');
+  assert.equal(Object.fromEntries(novelFetchTaskSummaryItems({versions: {ai1:'旧正文'}}).map(row=>[row.label,row.value]))['改文模型'], '—');
+});
+
+test('submission diagnostics distinguish an empty result, real receipt and no attempt', () => {
+  const empty = novelFetchSubmitDiagnostic({ result: {}, logs: [], reason: '文本模型不可用' });
+  assert.equal(empty.result, null);
+  assert.equal(empty.reason, '文本模型不可用');
+  const receipt = novelFetchSubmitDiagnostic({result: {status:'submitted',version:'ai1',remote_receipt:{verified:true,submission_id:'287175'}},logs:[{event:'site_submit',status:'submitted',version:'ai1',time:'2026-11-13T04:44:11Z'}]});
+  assert.equal(receipt.rows[0].statusLabel, '已回读确认');
+  assert.equal(receipt.receiptId, '287175');
+  assert.equal(receipt.verified, true);
+});
+
+test('fallback completion marks old AI failure as recovered and retains its evidence', () => {
+  const data = novelFetchSensitiveComparisons({sensitive_hits:{hits:[{hit_index:1,keyword:'测试'}]},sensitive_fixed:{status:'done',items:[{hit_index:1,status:'done',source:'fallback',error:'旧模型错误',after:'处理后'}]}});
+  assert.equal(data.items[0].source, '规则兜底替换');
+  assert.equal(data.items[0].recovered, true);
+  assert.equal(data.items[0].error, '旧模型错误');
+});
 
 test('task summary exposes stable Chinese labels instead of internal meta keys', () => {
   const items = novelFetchTaskSummaryItems({
@@ -122,6 +162,7 @@ test('sensitive comparisons join hits and fixes by hit index', () => {
     model: '模型A',
     attempts: 2,
     error: '—',
+    recovered: false,
     before: '仿佛有一团棉花',
     after: '好像有一团棉花'
   });

@@ -1465,7 +1465,7 @@ func TestWorkshopProcessWorkerRetrySkipsCompletedFetchAndAIVersions(t *testing.T
 					return `{"style":"现代悬疑","confidence":0.9,"reason":"正文围绕案件线索推进"}`, nil
 				}
 				rewriteCalls++
-				return "新生成的第二版", nil
+				return `{"id":"33333333333","changed_lines":[{"line_no":1,"text":"新生成的第二版"}]}`, nil
 			}), nil
 		},
 	}
@@ -2032,18 +2032,31 @@ func TestNovelFetchBatchRetryReusesStoredRawInsteadOfFetchingAgain(t *testing.T)
 	}))
 	defer upstream.Close()
 	store := novelfetchworkshop.NewMemoryStore()
-	document := novelfetchworkshop.Document{BookID: "stored-raw", OriginalRaw: "已保存的完整原文", MaxTxt: 4000, Meta: map[string]any{
-		"platformId": "15", "originalStatus": "waiting_sensitive_ai", "sensitiveStatus": "waiting_retry",
+	document := novelfetchworkshop.Document{BookID: "stored-raw", OriginalRaw: "已保存的完整原文", Gender: "女频", MaxTxt: 4000, Meta: map[string]any{
+		"style": "现代悬疑", "platformId": "15", "originalStatus": "waiting_sensitive_ai", "sensitiveStatus": "waiting_retry",
 		"status": "waiting_retry", "queueState": "waiting_retry", "error": "旧的敏感词处理失败",
 	}}
 	if err := store.PutDocument(context.Background(), "tester", document); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}})
+	settings, _ := store.GetConfig(context.Background(), "tester")
+	mapOrEmpty(settings["workflow"])["skip_short_original"] = false
+	_ = store.PutConfig(context.Background(), "tester", settings)
+	queue := &uniqueRecordingNovelFetchQueue{}
+	fetcher := &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue, NovelFetchFetcher: fetcher})
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-retry", map[string]any{"ids": []string{"stored-raw"}}, now, secret)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusAccepted {
 		t.Fatalf("batch retry status=%d body=%s", response.Code, response.Body.String())
 	}
+	if len(queue.jobs) != 1 {
+		t.Fatal("retry was not queued")
+	}
+	job := queue.jobs[0]
+	// Isolate the stored-raw recovery stage; missing AI versions are covered by the retry queue tests.
+	job.SelectedVersions = nil
+	worker := &workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry(), fetcher: fetcher}
+	worker.process(context.Background(), job)
 	updated, err := store.GetDocument(context.Background(), "tester", "stored-raw")
 	if err != nil {
 		t.Fatal(err)
@@ -2051,14 +2064,14 @@ func TestNovelFetchBatchRetryReusesStoredRawInsteadOfFetchingAgain(t *testing.T)
 	if requests != 0 || updated.OriginalRaw != "已保存的完整原文" || updated.Meta["originalStatus"] != "done" {
 		t.Fatalf("retry did not resume from stored raw: requests=%d doc=%#v", requests, updated)
 	}
-	if updated.Meta["status"] != novelfetchworkshop.TaskStatusInputReady || updated.Meta["queueState"] != novelfetchworkshop.TaskStatusInputReady || updated.Meta["error"] != nil {
+	if updated.Meta["status"] != "completed" || updated.Meta["queueState"] != "completed" || updated.Meta["error"] != nil {
 		t.Fatalf("successful retry kept a stale failure state: %#v", updated.Meta)
 	}
 	if len(updated.Logs) == 0 {
 		t.Fatal("successful retry did not append a recovery log")
 	}
 	lastLog, _ := updated.Logs[len(updated.Logs)-1].(map[string]any)
-	if lastLog["event"] != "process_input_ready" {
+	if lastLog["event"] != "process_completed" {
 		t.Fatalf("successful retry left the task detail on a stale failure log: %#v", updated.Logs)
 	}
 }

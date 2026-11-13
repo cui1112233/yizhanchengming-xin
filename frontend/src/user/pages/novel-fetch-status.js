@@ -6,6 +6,7 @@ const labels = {
   waiting_classification: '等待确认分类',
   waiting_sensitive_ai: '等待敏感词 AI',
   pending_submit: '处理完成，待提交',
+  upload_pending: '正文已完成，待重试上传',
   waiting_configuration: '等待配置',
   waiting_login: '等待登录',
   completed: '完成',
@@ -21,6 +22,7 @@ const colors = {
   waiting_classification: 'orange',
   waiting_sensitive_ai: 'orange',
   pending_submit: 'cyan',
+  upload_pending: 'orange',
   waiting_configuration: 'orange',
   waiting_login: 'orange',
   completed: 'green',
@@ -54,6 +56,9 @@ export function novelFetchOriginalFetchRetry(row = {}) {
 }
 
 export function novelFetchBatchResultSummary(result = {}) {
+  if (Object.hasOwn(result, 'queued')) {
+    return `已加入后台重试 ${Number(result.queued) || 0} 项，已有任务 ${Number(result.already_running) || 0} 项，跳过 ${Number(result.skipped) || 0} 项，失败 ${Number(result.failed) || 0} 项；执行结果请看任务状态`;
+  }
   const requested = Number(result.requested) || 0;
   const updated = Number(result.updated ?? result.retried ?? result.processed ?? result.deleted) || 0;
   const skipped = Number(result.skipped) || 0;
@@ -86,11 +91,15 @@ export function novelFetchVersionReady(row = {}, version = 'ai1') {
   const versionID = String(version || '').trim().toLowerCase();
   if (!versionID) return false;
   const versions = row.versions && typeof row.versions === 'object' ? row.versions : {};
-  if (String(versions[versionID] ?? '').trim()) return true;
+  const value = versions[versionID];
+  if (typeof value === 'string' && value.trim()) return true;
+  if (value && typeof value === 'object') return text(value.state) === 'ready';
+  if (value === false) return false;
+  const files = row.aiFiles ?? row.ai_files;
+  if (Array.isArray(files)) return files.some(file => String(file).toLowerCase() === versionID);
   if (versionID !== 'ai1') return false;
   return done(row.aiStatus ?? row.ai_status)
-    || Number(row.aiGeneratedCount ?? row.ai_generated_count) > 0
-    || (Array.isArray(row.aiFiles ?? row.ai_files) && (row.aiFiles ?? row.ai_files).length > 0);
+    || Number(row.aiGeneratedCount ?? row.ai_generated_count) > 0;
 }
 
 export function beijingDateKey(date = new Date()) {
@@ -215,7 +224,7 @@ export function novelFetchTaskStatus(row = {}) {
   const hasProcessedContent = done(original) || Number(row.originalRawChars ?? row.original_raw_chars) > 0;
   const hasAIContent = done(ai)
     || Number(row.aiGeneratedCount ?? row.ai_generated_count) > 0
-    || (Array.isArray(row.aiFiles ?? row.ai_files) && (row.aiFiles ?? row.ai_files).length > 0);
+    || (Array.isArray(row.aiFiles ?? row.ai_files) && (row.aiFiles ?? row.ai_files).some(version => /^ai[1-9]\d*$/i.test(String(version))));
   const submitConfirmed = done(submit);
   const pendingSubmit = hasProcessedContent && hasAIContent && !submitConfirmed;
   let status = raw;
