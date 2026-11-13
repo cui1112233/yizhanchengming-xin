@@ -99,6 +99,25 @@ func TestBatchAutomationCoordinatorLoadsMySQLStateOnce(t *testing.T) {
 	}
 }
 
+func TestTrimAutomationJobLogsCapsEveryBook(t *testing.T) {
+	logs := make([]any, automationBookLogLimit+5)
+	for i := range logs {
+		logs[i] = map[string]any{"message": "x", "stage": "comic_images"}
+	}
+	job := map[string]any{"books": map[string]any{
+		"book-1": map[string]any{"logs": logs},
+		"book-2": map[string]any{"logs": []any{map[string]any{"message": "only"}}},
+	}}
+	trimAutomationJobLogs(job)
+	books := job["books"].(map[string]any)
+	if got := len(books["book-1"].(map[string]any)["logs"].([]any)); got != automationBookLogLimit {
+		t.Fatalf("book-1 logs=%d, want %d", got, automationBookLogLimit)
+	}
+	if got := len(books["book-2"].(map[string]any)["logs"].([]any)); got != 1 {
+		t.Fatalf("book-2 logs=%d, want 1", got)
+	}
+}
+
 func TestMySQLAutomationStateStoreSaveJobsWritesOnlyChangedRow(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

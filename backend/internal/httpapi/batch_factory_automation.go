@@ -1366,6 +1366,7 @@ func (c *BatchAutomationCoordinator) setJobLocked(owner, batchID, jobID string, 
 		if job == nil {
 			job = map[string]any{}
 		}
+		trimAutomationJobLogs(job)
 		if automationStringValue(job["id"], "") == "" {
 			job["id"] = jobID
 		}
@@ -4661,6 +4662,27 @@ func markAutomationEntrySuperseded(entry map[string]any, now time.Time) {
 // MySQL，日志曾占到单条 400KB 的八成，是 binlog 写放大的主要来源；60 条足够
 // 回溯最近阶段，页级账本与终态信息不受影响。
 const automationBookLogLimit = 60
+
+// trimAutomationJobLogs 统一裁剪每本书的历史日志。旧数据里超出上限的日志
+// 只有在下次追加时才会被裁剪，完成的书永远不会再追加；在落库前统一裁剪，
+// 避免每次写库都把整份历史日志写进 binlog。
+func trimAutomationJobLogs(job map[string]any) {
+	if job == nil {
+		return
+	}
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		book, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		entries, ok := book["logs"].([]any)
+		if !ok || len(entries) <= automationBookLogLimit {
+			continue
+		}
+		book["logs"] = entries[len(entries)-automationBookLogLimit:]
+	}
+}
 
 // appendAutomationBookLog 把一条阶段事件追加到单本书的执行日志里。
 // 同一句重复上报只更新时间，不重复占位，避免进度刷屏。
