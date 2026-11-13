@@ -62,7 +62,7 @@ export function BatchFactoryCustomCopyPicker({ inputText, onAdd, disabled = fals
       <div style={{ marginBottom: 10, fontWeight: 600 }}>书籍 ID {result.bookId} <Tag>{result.copies.length} 份文案</Tag></div>
       {result.error || !result.copies.length ? <Alert type="warning" showIcon message={result.error || '没有找到该书的文案，请核对书籍 ID'} /> :
         <Radio.Group value={selections[result.bookId]} onChange={event => setSelections(current => ({ ...current, [result.bookId]: event.target.value }))} style={{ width: '100%' }}>
-          <Space direction="vertical" style={{ width: '100%' }} size={10}>{result.copies.map((copy, index) => <div key={copy.id} style={{ padding: 12, borderRadius: 10, background: 'rgba(128,140,160,.08)', border: '1px solid rgba(128,140,160,.2)' }}>
+          <Space direction="vertical" style={{ width: '100%' }} size={10}>{result.copies.map((copy, index) => <div key={copy.id} style={{ fontSize: 14, padding: 12, borderRadius: 10, background: 'rgba(128,140,160,.08)', border: '1px solid rgba(128,140,160,.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <Radio value={copy.id}>{copy.title || result.bookId} · 文案 {index + 1}</Radio>
               <Button size="small" onClick={() => setPreview(copy)}>查看全文</Button>
