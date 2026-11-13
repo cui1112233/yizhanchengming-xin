@@ -265,3 +265,72 @@ func TestJobFinalizeKeepsPendingRetryJobRunning(t *testing.T) {
 		t.Fatal("没有 retryAt 的书不得判为待续跑")
 	}
 }
+
+// 服务重启后书会被留在 running（旧进程的 epoch），新一轮认领必须能接管，
+// 否则整轮 run 会在第一本书就 revision conflict 退出、job 永远悬在 running。
+func TestClaimAutomationPriorityBookReclaimsStaleRunningEntry(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 11, 13, 7, 17, 0, 0, time.UTC)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "batch",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "book", SourceText: "正文"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bookID := batch.Books[0].ID
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-1": {
+			"id": "job-1", "owner": "alice", "batchId": batch.ID, "state": "running",
+			"books": map[string]any{
+				bookID: map[string]any{
+					"bookId": bookID, "status": "running", "stage": "stopped",
+					automationBookClaimEpochField: 9,
+				},
+			},
+		},
+	}}
+	coordinator := &BatchAutomationCoordinator{
+		store:           store,
+		automationStore: &memoryAutomationStateStore{state: state, found: true},
+		now:             func() time.Time { return now },
+		runEpochs:       map[string]int64{"job-1": 1},
+	}
+
+	claimed, entry, err := coordinator.claimAutomationPriorityBook(ctx, "alice", batch.ID, "job-1", 1, batch.Books[0])
+	if err != nil {
+		t.Fatalf("claim stale running book: %v", err)
+	}
+	if entry == nil || automationNumberValue(entry[automationBookClaimEpochField], 0) != 1 {
+		t.Fatalf("claimed=%s fallback=%s entry=%#v, want book reclaimed by epoch 1", claimed.ID, bookID, entry)
+	}
+
+	// 同一轮里重复认领仍然是冲突，避免并发重复执行同一本书。
+	if _, _, err := coordinator.claimAutomationPriorityBook(ctx, "alice", batch.ID, "job-1", 1, batch.Books[0]); err == nil {
+		t.Fatal("same-epoch duplicate claim must stay a conflict")
+	}
+}
+
+// run 记录还在（liveRun=true）但 job 与所有书长时间无任何进展时必须回收，
+// 否则界面会一直显示“正在执行”，重试接口还会返回 409。
+func TestZombieRunningJobWithoutRecentProgressIsReclaimable(t *testing.T) {
+	now := time.Date(2026, 11, 13, 7, 52, 0, 0, time.UTC)
+	stale := now.Add(-30 * time.Minute).Format(time.RFC3339Nano)
+	job := map[string]any{
+		"state": "running", "updatedAt": stale,
+		"books": map[string]any{
+			"book-1": map[string]any{"status": "running", "stage": "stopped", "updatedAt": stale},
+		},
+	}
+	if !automationZombieRunningReclaimable(job, now, true) {
+		t.Fatal("长时间无进展的 running job 必须可回收（即使 runCancels 里还有记录）")
+	}
+
+	fresh := now.Add(-time.Minute).Format(time.RFC3339Nano)
+	job["updatedAt"] = fresh
+	job["books"].(map[string]any)["book-1"].(map[string]any)["updatedAt"] = fresh
+	if automationZombieRunningReclaimable(job, now, true) {
+		t.Fatal("仍在写进度的 job 不得被回收")
+	}
+}

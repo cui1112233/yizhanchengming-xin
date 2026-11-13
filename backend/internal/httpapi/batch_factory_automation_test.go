@@ -1912,7 +1912,7 @@ func TestBatchFetchDisplayErrorExplainsMissingOrMismatchedBookID(t *testing.T) {
 
 	got := batchFetchDisplayError(err, batchfactoryv11.Book{BookID: "10816851", Platform: "4", SourceMetadata: map[string]any{"platformName": "点众付费"}})
 
-	if got == nil || got.Error() != "书号 10816851 在点众付费无法读取：请检查ID是否正确，可能是书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试" {
+	if got == nil || got.Error() != "书号 10816851 在点众付费无法读取：可能是书号与书名/书城不匹配、该书已下架，或该平台渠道暂时不可用。可稍后重试；若持续失败请更换书号，或打开“编辑内容”粘贴正文后重试" {
 		t.Fatalf("display error = %v", got)
 	}
 }

@@ -563,6 +563,11 @@ func automationRetryDue(entry map[string]any, now time.Time) bool {
 // 调度器重新打开书时递增，旧 run 的迟到写入因此自动失效。
 const automationBookRunVersionField = "runVersion"
 
+// automationBookClaimEpochField 记录这本书最后一次被哪一轮（进程内 epoch）
+// 认领。进程重启后 epoch 从 1 重新计数，书上的旧 epoch 与当前 epoch 不同，
+// 认领时据此判断 running 是“上一轮残留”而不是“本轮正在执行”。
+const automationBookClaimEpochField = "claimEpoch"
+
 // reopenAutomationRetryBook 是书级自动重跑的唯一权威入口。
 // 返回值表示是否真正重新打开。needs_manual 的书只清理重试标记，不重新激活。
 func reopenAutomationRetryBook(entry map[string]any, now time.Time) bool {
@@ -696,6 +701,11 @@ const automationZombieRunningIdleTimeout = automationStallTimeout + 2*time.Minut
 // 状态写入即可判定为“上次进程留下的空壳”并回收成可重试的 failed。
 const automationZombieRunlessIdleTimeout = 2 * time.Minute
 
+// automationZombieStaleProgressTimeout 是“run 记录还在、但 job 与所有书都
+// 没有任何进展”的兜底阈值。视频等待自身 10 分钟无进展就会收口，15 分钟
+// 仍未写过任何状态说明执行轮次已经消失。
+const automationZombieStaleProgressTimeout = 15 * time.Minute
+
 const automationZombieRunningMessage = "执行轮次已失效（长时间无进展）"
 
 // snapshotLiveRuns 返回当前进程里仍有 run goroutine 的 job 集合。
@@ -725,7 +735,32 @@ func automationZombieRunningReclaimable(job map[string]any, now time.Time, liveR
 	if idle >= automationZombieRunningIdleTimeout {
 		return true
 	}
+	// runCancels 里挂着一条记录不代表执行轮次还活着：goroutine 可能在认领
+	// 冲突/上游阻塞后已经退出，却没人清掉注册。只要 job 和所有书都超过
+	// automationZombieStaleProgressTimeout 没有任何进展，就按空壳回收。
+	if idle >= automationZombieStaleProgressTimeout && !automationJobHasRecentProgress(job, now, automationZombieStaleProgressTimeout) {
+		return true
+	}
 	return !liveRun && idle >= automationZombieRunlessIdleTimeout
+}
+
+// automationJobHasRecentProgress 判断 job 内是否还有书在阈值内写过状态。
+// 出图、视频等待、发布都会刷新书上的 updatedAt / lastProgressAt，长时间
+// 全都不动说明执行轮次已经消失。
+func automationJobHasRecentProgress(job map[string]any, now time.Time, window time.Duration) bool {
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		for _, key := range []string{"lastProgressAt", "updatedAt"} {
+			if at := automationStoredJobTime(entry[key]); !at.IsZero() && now.Sub(at) < window {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // reclaimAutomationZombieRunningJob 把僵尸 running 落成 failed 终态，并按终态
@@ -5205,6 +5240,7 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 		return
 	}
 	registerBatchAutomationPreflightRoute(mux, auth, coordinator, version)
+	registerBatchCompletionNoticesRoute(mux, auth, coordinator, version)
 	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/priority", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

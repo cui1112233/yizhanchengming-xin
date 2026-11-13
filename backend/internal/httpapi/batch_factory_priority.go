@@ -207,7 +207,14 @@ func (c *BatchAutomationCoordinator) claimAutomationPriorityBook(ctx context.Con
 		return chosen, cloneAutomationEntry(entry), nil
 	}
 	if entry["status"] == "running" {
-		return fallback, nil, batchfactoryv11.ErrConflict
+		// 旧一轮 run（服务重启前的进程，或已被取消的上一轮）会把书留在
+		// running。若继续按“正在执行”拒绝认领，新一轮整轮 run 会在第一本书
+		// 就 revision conflict 退出，job 永远悬在 running、无法重试。
+		if automationNumberValue(entry[automationBookClaimEpochField], 0) == int(epoch) {
+			return fallback, nil, batchfactoryv11.ErrConflict
+		}
+		entry["message"] = "上一轮执行已中断，本轮重新认领"
+		appendAutomationBookLog(entry, c.now(), automationStringValue(entry["stage"], ""), entry["message"].(string))
 	}
 	next := []string{}
 	for _, id := range automationPriorityIDs(job) {
@@ -219,6 +226,7 @@ func (c *BatchAutomationCoordinator) claimAutomationPriorityBook(ctx context.Con
 	delete(entry, "priorityRequested")
 	markAutomationBookQueued(entry, c.now())
 	markAutomationBookStarted(entry, c.now())
+	entry[automationBookClaimEpochField] = int(epoch)
 	job["updatedAt"] = c.now()
 	job["counts"] = automationCountsFromBooks(books)
 	if err := c.saveLocked(state); err != nil {
