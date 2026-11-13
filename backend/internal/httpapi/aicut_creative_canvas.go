@@ -37,6 +37,32 @@ func RegisterAICutCreativeCanvasRoutes(mux *http.ServeMux, auth BridgeAuth, cuts
 	if now == nil {
 		now = time.Now
 	}
+	// Resolve origins from owned projects, never from client-supplied project IDs.
+	mux.Handle("GET /api/agent/tasks/{id}/cut-project", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := BridgeIdentityFromContext(r.Context())
+		owner := strings.TrimSpace(identity.Username)
+		if !ok || owner == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		task := r.PathValue("id")
+		if _, err := projects.Project(r.Context(), owner, task); err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
+		items, err := cuts.ListProjects(r.Context(), owner)
+		if err != nil {
+			writeAICutError(w, err)
+			return
+		}
+		for _, item := range items {
+			if aicutCreativeTaskID(owner, item.ID) == task {
+				writeJSON(w, http.StatusOK, map[string]any{"binding": map[string]string{"taskId": task, "projectId": item.ID, "projectTitle": item.Title}})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"binding": nil})
+	})))
 	handle := func(pattern string, fn func(http.ResponseWriter, *http.Request, string, string)) {
 		mux.Handle(pattern, auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			identity, ok := BridgeIdentityFromContext(r.Context())

@@ -56,7 +56,6 @@ export function resolveAICutShortcut(event = {}, context = {}) {
   if (key === 'escape') return 'close';
   if (modifier && (key === '/' || key === '?')) return 'shortcuts';
   if (modifier && key === '1') return 'canvas-view';
-  if (modifier && key === '2') return 'editor-view';
   if (modifier && key === 'n') return 'new-project';
   if (modifier && key === 's' && context.hasProject) return 'save';
   if (modifier && key === 'e' && context.hasProject) return 'export';

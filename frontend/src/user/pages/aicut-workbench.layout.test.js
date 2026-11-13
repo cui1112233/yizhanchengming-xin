@@ -242,8 +242,9 @@ test('AI-CUT建议卡依据实际能力填入剪辑要求', () => {
 test('AI-CUT Agent使用当前页面宠物服务，不占用素材栏', () => {
   assert.match(page, /AICutAgentPanel/);
   assert.match(page, /onTimelineChanged/);
-  assert.match(page, /openPetPageService\(workspaceMode === 'canvas' \? 'canvas-agent' : 'aicut-agent'\)/);
-  assert.match(page, /if \(!projectId \|\| workspaceMode !== 'editor'\) return/);
+  assert.match(page, /openPetPageService\('aicut-agent'\)/);
+  assert.match(page, /openBoundCreativeCanvas/);
+  assert.doesNotMatch(page, /<AICutCreativeCanvas|workspaceMode/);
   assert.doesNotMatch(page, /className="aicut-agent-(fab|drawer)"/);
   assert.match(page, /setAgentDrawerOpen/);
   assert.match(pageCSS, /aicut-agent-drawer/);

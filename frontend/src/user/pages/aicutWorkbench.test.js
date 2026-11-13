@@ -102,7 +102,7 @@ test('转场手柄拖动按缩放换算时长并限制在有效范围', () => {
   assert.equal(draggedTransitionDuration(300, -36, 2, 1000), 550);
 });
 
-test('快捷键可以在AI创作画布和专业剪辑之间切换', () => {
+test('快捷键打开统一画布且不再拦截浏览器Ctrl2', () => {
   assert.equal(resolveAICutShortcut({ key: '1', ctrlKey: true }), 'canvas-view');
-  assert.equal(resolveAICutShortcut({ key: '2', ctrlKey: true }), 'editor-view');
+  assert.equal(resolveAICutShortcut({ key: '2', ctrlKey: true }), null);
 });

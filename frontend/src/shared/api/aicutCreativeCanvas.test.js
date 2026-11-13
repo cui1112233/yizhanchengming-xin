@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ensureAICutCreativeCanvas, transferAICutCreativeAssets, transferAICutCreativeScript } from './aicut.js';
+import { ensureAICutCreativeCanvas, getAICutCreativeBinding, transferAICutCreativeAssets, transferAICutCreativeScript } from './aicut.js';
+
+test('canvas origin lookup is read only and rejects arbitrary paths', async () => {
+  const binding = await getAICutCreativeBinding('canvas-1', async (path, options) => {
+    assert.equal(path, '/api/agent/tasks/canvas-1/cut-project'); assert.equal(options, undefined);
+    return { binding: { taskId: 'canvas-1', projectId: 'cut-1' } };
+  });
+  assert.equal(binding.projectId, 'cut-1');
+  assert.equal(await getAICutCreativeBinding('canvas-1', async () => ({binding:null})), null);
+  await assert.rejects(getAICutCreativeBinding('../other'), /无效/);
+});
 
 test('creative canvas binding uses the current project and POST without arbitrary task id', async () => {
   const result = await ensureAICutCreativeCanvas('cut-1', async (path, options) => {

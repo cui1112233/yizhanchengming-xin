@@ -1,0 +1,14 @@
+.agent-canvas-header-stack { grid-column: 1 / -1; min-width: 0; }
+.agent-page .agent-canvas-workspace { grid-template-rows: auto minmax(0, 1fr); }
+.agent-page .agent-canvas-workspace .agent-project-drawer,
+.agent-page .agent-canvas-workspace .agent-storyboard-workspace-splitter { top: var(--agent-workspace-header-height, 48px); }
+.aicut-canvas-handoff { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; background: var(--agent-panel); color: var(--agent-text); border-bottom: 1px solid var(--agent-border); }
+.aicut-canvas-handoff__origin { display: flex; align-items: center; min-width: 0; flex: 1; gap: 6px; }
+.aicut-canvas-handoff__origin strong { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.aicut-canvas-handoff .ant-select { min-width: 150px; max-width: 220px; }
+.aicut-canvas-handoff > .ant-alert { width: 100%; }
+.aicut-canvas-handoff__items { display: flex; flex-direction: column; gap: 10px; width: 100%; max-height: 360px; overflow: auto; padding-block: 10px; }
+.aicut-canvas-handoff__items .ant-checkbox-wrapper { align-items: flex-start; margin-inline-start: 0; }
+.aicut-canvas-handoff__items .ant-checkbox-wrapper span strong, .aicut-canvas-handoff__items .ant-checkbox-wrapper span span { display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
+@media (max-width: 720px) { .aicut-canvas-handoff__origin { flex-basis: 100%; } }
+@media (max-width: 1000px) { .agent-page .agent-canvas-workspace.is-storyboard .agent-conversation-panel { top: var(--agent-workspace-header-height, 48px); } }

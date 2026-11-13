@@ -1,6 +1,6 @@
 import { Button, Checkbox, ConfigProvider, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag, Upload, message } from 'antd';
 import { Bot, ClipboardPaste, MoreHorizontal, LockKeyhole, UnlockKeyhole, Volume2, VolumeX, SkipBack, SkipForward, Maximize2, Captions, Clapperboard, CloudUpload, Copy, Film, ImageIcon, Keyboard, Magnet, Music, Palette, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pause, Play, Plus, Redo2, Save, Scissors, Sparkles, Star, Trash2, Type, Undo2, Upload as UploadIcon, WandSparkles, X } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PlayerViewControls from './aicut/PlayerViewControls.jsx';
 import PreviewViewport from './aicut/PreviewViewport.jsx';
 import { previewSource } from './aicut/playerView.js';
@@ -23,7 +23,8 @@ import AICutAgentPanel from '../components/AICutAgentPanel.jsx';
 import AICutPetHost from '../components/AICutPetHost.jsx';
 import { getCurrentUsername } from '../../shared/api/auth.js';
 import { registerPetPageService, openPetPageService } from '../../shared/pet/pageService.js';
-const AICutCreativeCanvas = lazy(() => import('../components/AICutCreativeCanvas.jsx'));
+import { ensureAICutCreativeCanvas } from '../../shared/api/aicut.js';
+import { openBoundCreativeCanvas, persistLatestCanvasNavigation } from './aicutCanvasNavigation.js';
 import { addEffectLayer, addTimelineTrack, draggedTimelineStart, markTimelineClip, normalizeSubtitleRhythm, orderedTimelineTracks, removeTimelineTrack, renameTimelineTrack, setTimelineClipText, subtitleRhythmLabel, timelinePixelDeltaToTime, timelinePixelsToTime, timelineTimeToPixels, toggleTimelineTrackFlag, updateTimelineTrackSettings } from './aicutTimeline.js';
 import { createAICutClipboard, executeAICutCommand, findTimelineEditPoint, reconcileTimelineSave, restoreTimelineSnapshot } from './aicutCommands.js';
 import { buildAICutPreviewFrame, getAICutTimelineDuration, nextAICutCanvasFit, seekAICutPreviewTime } from './aicutPreview.js';
@@ -503,7 +504,7 @@ export default function AICutPage() {
   const [asrJobs, setASRJobs] = useState([]);
   const [asrBusy, setASRBusy] = useState(false);
   const [materialTab, setMaterialTab] = useState('我的素材');
-  const [workspaceMode, setWorkspaceMode] = useState('editor');
+  const [openingCreative, setOpeningCreative] = useState(false);
   const [toolCategory, setToolCategory] = useState('媒体');
   const [assetFolders, setAssetFolders] = useState([]);
   const [selectedAssetFolderId, setSelectedAssetFolderId] = useState('all');
@@ -1185,7 +1186,6 @@ export default function AICutPage() {
         setAgentDrawerOpen(false);
       } else if (action === 'shortcuts') setShortcutOpen(true);
       else if (action === 'canvas-view') void openCreativeCanvas();
-      else if (action === 'editor-view') setWorkspaceMode('editor');
       else if (action === 'new-project') setCreateOpen(true);
       else if (action === 'save') saveTimeline();
       else if (action === 'export') openExportPanel();
@@ -3295,13 +3295,23 @@ export default function AICutPage() {
   }
 
   async function openCreativeCanvas() {
+    if (openingCreative || loading || saving || timelineBusy || timelineNetworkBusy) return;
     const scope = activeTimelineScopeRef.current;
+    setOpeningCreative(true);
     try {
-      await persistBeforeTimelineChange();
-      if (activeTimelineScopeRef.current === scope) setWorkspaceMode('canvas');
+      await openBoundCreativeCanvas({ projectId, timelineId: activeTimelineId }, {
+        scope, getScope: () => activeTimelineScopeRef.current,
+        save: () => persistLatestCanvasNavigation({
+          scope, getScope: () => activeTimelineScopeRef.current,
+          isDirty: () => Boolean(saveInFlightRef.current || lastPersistedEditSequenceRef.current < editSequenceRef.current),
+          save: () => petPageRuntime.current.saveTimeline({ silent: true, requireLatest: true })
+        }),
+        ensure: ensureAICutCreativeCanvas,
+        navigate: href => window.location.assign(href)
+      });
     } catch (error) {
       message.error(error?.message || '请先保存当前剪辑后再打开创作画布');
-    }
+    } finally { setOpeningCreative(false); }
   }
 
   async function refreshTimelineFromAgent() {
@@ -4611,7 +4621,7 @@ export default function AICutPage() {
     if (!body || !videoTrack) return;
     openedTimelineProjectRef.current = `${projectId}:${activeTimelineId}`;
     body.scrollTop = Math.max(0, body.scrollTop + videoTrack.getBoundingClientRect().top - body.getBoundingClientRect().top - 50);
-  }, [projectId, activeTimelineId, loadedTimelineProjectId, timeline.tracks.length, workspaceMode]);
+  }, [projectId, activeTimelineId, loadedTimelineProjectId, timeline.tracks.length]);
   function renderUnifiedTimeline() {
     const canvasWidth = Math.max(900, (editorShellRef.current?.clientWidth || 0) - 130, timelineTimeToPixels(durationMs + 2000, timelineZoom) + 20);
     const orderedTracks = orderedTimelineTracks(displayTracks);
@@ -4850,7 +4860,7 @@ export default function AICutPage() {
 
   const timelineNetworkBusy = Boolean(importingSRT || correctingCaptions || trimmingFillers || mediaToolBusy || consolidateBusy || asrBusy || ttsBusy || voiceCloneBusy || backgroundRemovalBusyId || personSegmentationBusy || regionTrackingBusy || uploading);
   petPageRuntime.current = { loading, busy: timelineBusy || timelineNetworkBusy, saveTimeline };
-  const petServiceScope = `${getCurrentUsername()}:${projectId}:${activeTimelineId}:${workspaceMode}`;
+  const petServiceScope = `${getCurrentUsername()}:${projectId}:${activeTimelineId}:editor`;
   const refreshPetTimeline = useCallback(() => refreshTimelineFromAgent(), [projectId, activeTimelineId]);
   const preparePetAgentRun = useCallback(async () => {
     const scope = `${projectId}:${activeTimelineId}`;
@@ -4868,7 +4878,7 @@ export default function AICutPage() {
     petPageServiceCleanup.current = null;
   }, [petServiceScope]);
   useEffect(() => {
-    if (!projectId || workspaceMode !== 'editor') return;
+    if (!projectId) return;
     petPageServiceCleanup.current = registerPetPageService({
       id: 'aicut-agent', scope: petServiceScope,
       label: `AI-CUT 剪辑 · ${currentProject?.title || '当前工程'}`,
@@ -4882,10 +4892,10 @@ export default function AICutPage() {
         onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshPetTimeline}
       />
     });
-  }, [petServiceScope, projectId, activeTimelineId, workspaceMode, timeline.revision, currentProject?.title, agentModels, assets, activeAgentSkill, agentDraft, autoEditOpen, selectedClipKeys, previewTimeMs]);
+  }, [petServiceScope, projectId, activeTimelineId, timeline.revision, currentProject?.title, agentModels, assets, activeAgentSkill, agentDraft, autoEditOpen, selectedClipKeys, previewTimeMs]);
   useEffect(() => {
     if (agentDrawerOpen && projectId) {
-      openPetPageService(workspaceMode === 'canvas' ? 'canvas-agent' : 'aicut-agent');
+      openPetPageService('aicut-agent');
       setAgentDrawerOpen(false);
     }
   }, [agentDrawerOpen, projectId, petServiceScope]);
@@ -4960,10 +4970,10 @@ export default function AICutPage() {
                 ))}
               </select>
               <div className="aicut-reference-modes">
-                <button type="button" className={workspaceMode === 'canvas' ? 'on' : ''} onClick={() => void openCreativeCanvas()}>
-                  AI 创作画布
+                <button type="button" disabled={openingCreative || loading || saving || timelineBusy || timelineNetworkBusy} title="在 CM 中打开本工程的同一张画布" onClick={() => void openCreativeCanvas()}>
+                  {openingCreative ? '正在打开画布…' : 'AI 创作画布'}
                 </button>
-                <button type="button" className={workspaceMode === 'editor' ? 'on' : ''} onClick={() => setWorkspaceMode('editor')}>
+                <button type="button" className="on" disabled aria-current="page" title="当前：专业剪辑" style={{ opacity: 1, cursor: 'default' }}>
                   专业剪辑
                 </button>
               </div>
@@ -4999,29 +5009,7 @@ export default function AICutPage() {
               </div>
             </header>
 
-            {workspaceMode === 'canvas' ? (
-              <Suspense fallback={<div className="aicut-canvas-loading"><Spin tip="正在打开创作画布…" /></div>}>
-                <AICutCreativeCanvas
-                  petServiceScope={petServiceScope}
-                  key={`${projectId}:${activeTimelineId}`}
-                  projectId={projectId}
-                  projectTitle={currentProject?.title || '当前工程'}
-                  timelineRevision={timeline.revision}
-                  onOpenEditor={() => setWorkspaceMode('editor')}
-                  onTransferred={async (result) => {
-                    const operationScope = `${projectId}:${activeTimelineId}`;
-                    const requestedProjectId = projectId;
-                    const refreshed = await listAICutAssets(requestedProjectId);
-                    if (activeTimelineScopeRef.current !== operationScope) return;
-                    setAssets(refreshed);
-                    if (result?.timeline) await refreshTimelineFromAgent();
-                    if (activeTimelineScopeRef.current !== operationScope) return;
-                    setWorkspaceMode('editor');
-                  }}
-                />
-              </Suspense>
-            ) : (
-              <EditorShell ref={editorShellRef} layout={editorLayout} inspectorDrawerOpen={inspectorDrawerOpen} hasSelection={Boolean(selectedClipEntry)}>
+            <EditorShell ref={editorShellRef} layout={editorLayout} inspectorDrawerOpen={inspectorDrawerOpen} hasSelection={Boolean(selectedClipEntry)}>
                 {editorLayout.inspectorMode === 'drawer' || inspectorCollapsed ? (
                   <button type="button" className="aicut-open-inspector" aria-label={(editorLayout.inspectorMode === 'drawer') && inspectorDrawerOpen ? '关闭属性栏' : '打开属性栏'} onClick={() => (editorLayout.inspectorMode === 'drawer' ? setInspectorDrawerOpen((value) => !value) : setInspectorCollapsed(false))}>
                     {(editorLayout.inspectorMode === 'drawer') && inspectorDrawerOpen ? '关闭属性' : '属性'}
@@ -5580,7 +5568,6 @@ export default function AICutPage() {
                   {renderUnifiedTimeline()}
                 </section>
               </EditorShell>
-            )}
 
             {activeCompoundId ? (
               <CompoundTimelineWorkspace
@@ -5679,11 +5666,6 @@ export default function AICutPage() {
                 <span>AI 创作画布</span>
                 <kbd>Ctrl</kbd>
                 <kbd>1</kbd>
-              </p>
-              <p>
-                <span>专业剪辑</span>
-                <kbd>Ctrl</kbd>
-                <kbd>2</kbd>
               </p>
               <p>
                 <span>快捷键</span>

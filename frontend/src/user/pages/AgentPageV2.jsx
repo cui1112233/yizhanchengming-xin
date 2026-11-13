@@ -7,6 +7,7 @@ import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../s
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
 import { createV88AntTheme } from '../../shared/styles/theme';
 import { AgentCanvas } from '../components/AgentCanvas';
+import AICutCanvasHandoff from '../components/AICutCanvasHandoff.jsx';
 import { AgentDirectorConversation } from '../components/AgentDirectorConversation';
 import { AgentStoryboardWorkspace } from '../components/AgentStoryboardWorkspace';
 import { AgentWorkspaceDrawer } from '../components/AgentWorkspaceDrawer';
@@ -202,6 +203,7 @@ export function AgentPageV2({ theme = 'dark' }) {
 
   function syncTaskUrl(taskId, historyMode = 'replace') {
     const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('taskId') !== taskId) searchParams.delete('cutTimeline');
     searchParams.delete('task');
     if (taskId) {
       searchParams.set('taskId', taskId);
@@ -1288,6 +1290,7 @@ export function AgentPageV2({ theme = 'dark' }) {
         className={`${viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'} is-${viewState.activeView}${storyboardDirectorResizing ? ' is-resizing-director' : ''}`}
         style={viewState.activeView === 'storyboard' ? { '--storyboard-director-split': `${viewState.storyboard.layout.director}%` } : undefined}
       >
+        <div className="agent-canvas-header-stack">
         <AgentWorkspaceHeader
           projectTitle={activeTask?.title}
           activeView={viewState.activeView}
@@ -1308,6 +1311,16 @@ export function AgentPageV2({ theme = 'dark' }) {
           onRetrySync={() => void canvasSaveQueueRef.current?.retry()}
           onOpenProxy={() => setProxyOpen(true)}
         />
+        <AICutCanvasHandoff key={activeTaskId || 'none'} taskId={activeTaskId} canvas={canvas} selectedNodeIds={selectedCanvasNodes}
+          onFlushCanvas={async () => {
+            const queue = canvasSaveQueueRef.current;
+            if (!queue || activeTaskIdRef.current !== activeTaskId) throw new Error('画布尚未准备完成');
+            const result = await queue.flushRequired();
+            if (activeTaskIdRef.current !== activeTaskId) throw new Error('创作项目已切换');
+            return result;
+          }}
+        />
+        </div>
 
         <AgentWorkspaceDrawer
           open={viewState.drawerOpen}

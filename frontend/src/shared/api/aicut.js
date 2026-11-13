@@ -13,6 +13,11 @@ export async function ensureAICutCreativeCanvas(projectId, request = apiRequest)
   return request(projectPath(projectId, '/creative-canvas'), { method: 'POST' });
 }
 
+export async function getAICutCreativeBinding(taskId, request = apiRequest) {
+  if (typeof taskId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(taskId)) throw new Error('画布编号无效');
+  return (await request(`/api/agent/tasks/${taskId}/cut-project`)).binding || null;
+}
+
 export async function transferAICutCreativeAssets(projectId, assetIds, request = apiRequest) {
   const ids = [...new Set((Array.isArray(assetIds) ? assetIds : []).map(id => String(id || '').trim()).filter(Boolean))];
   if (!ids.length || ids.length > 30) throw new Error('每次请选择 1–30 个素材');
