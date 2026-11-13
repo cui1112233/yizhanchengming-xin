@@ -1,0 +1,11 @@
+[Unit]
+Description=Qiantie disk cleanup (binlog, releases, temp, media retention)
+
+[Service]
+Type=oneshot
+Environment=MEDIA_RETENTION_DAYS=21
+Environment=DISK_LIMIT_PERCENT=80
+ExecStart=/usr/local/bin/qiantie-cleanup-disk.sh
+
+[Install]
+WantedBy=multi-user.target
