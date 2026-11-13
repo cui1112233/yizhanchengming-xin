@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/screenplay"
 )
 
@@ -43,6 +44,14 @@ func (g screenplayTextGenerator) Generate(ctx context.Context, req screenplay.Te
 }
 
 func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, mediaRunners ...screenplay.BatchMediaRunner) {
+	RegisterScreenplayRoutesWithCatalog(mux, auth, store, resolver, now, nil, mediaRunners...)
+}
+
+func RegisterScreenplayRoutesWithCatalog(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, catalog *prompt.Catalog, mediaRunners ...screenplay.BatchMediaRunner) {
+	registerScreenplayRoutes(mux, auth, store, resolver, now, catalog, mediaRunners...)
+}
+
+func registerScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), now func() time.Time, catalog *prompt.Catalog, mediaRunners ...screenplay.BatchMediaRunner) {
 	if mux == nil || store == nil {
 		return
 	}
@@ -73,6 +82,14 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		return true
 	}
 
+	handle("GET /api/comic-screenplays/styles", func(w http.ResponseWriter, req *http.Request, owner string) {
+		styles, err := screenplayStyles(catalog)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"styles": styles})
+	})
 	handle("GET /api/comic-screenplays/prompts", func(w http.ResponseWriter, req *http.Request, owner string) {
 		writeJSON(w, http.StatusOK, map[string]any{"prompts": []map[string]any{
 			{"id": "b_director_screenplay", "name": "专业剧本", "mode": "b", "description": "导演级剧本结构，适合完整小说改编"},
@@ -90,18 +107,19 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 	})
 	handle("POST /api/comic-screenplays/projects", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			ID             string `json:"id"`
-			Title          string `json:"title"`
-			ScriptMode     string `json:"scriptMode"`
-			AspectRatio    string `json:"aspectRatio"`
-			ArtStyle       string `json:"artStyle"`
-			StyleDesc      string `json:"styleDesc"`
-			SelectedStyle  string `json:"selectedStyle"`
-			Synopsis       string `json:"synopsis"`
-			ModelID        string `json:"modelId"`
-			PromptID       string `json:"promptId"`
-			AssetDegree    string `json:"assetDegree"`
-			PermissionMode string `json:"permissionMode"`
+			SourceText     *string `json:"sourceText"`
+			ID             string  `json:"id"`
+			Title          string  `json:"title"`
+			ScriptMode     string  `json:"scriptMode"`
+			AspectRatio    string  `json:"aspectRatio"`
+			ArtStyle       string  `json:"artStyle"`
+			StyleDesc      string  `json:"styleDesc"`
+			SelectedStyle  string  `json:"selectedStyle"`
+			Synopsis       string  `json:"synopsis"`
+			ModelID        string  `json:"modelId"`
+			PromptID       string  `json:"promptId"`
+			AssetDegree    string  `json:"assetDegree"`
+			PermissionMode string  `json:"permissionMode"`
 		}
 		if !decode(w, req, &input) {
 			return
@@ -110,11 +128,24 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "作品名称不能为空"})
 			return
 		}
+		if input.SourceText != nil && (strings.TrimSpace(*input.SourceText) == "" || len([]rune(*input.SourceText)) > screenplay.MaxSingleCallRunes) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入正文，最多支持 60 万字"})
+			return
+		}
+		style, err := resolveScreenplayStyle(catalog, input.SelectedStyle, input.ArtStyle, nil)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		source := ""
+		if input.SourceText != nil {
+			source = *input.SourceText
+		}
 		id := strings.TrimSpace(input.ID)
 		if id == "" {
 			id = newAgentID("comic")
 		}
-		project, err := store.CreateProject(req.Context(), screenplay.Project{ID: id, OwnerUsername: owner, Title: input.Title, ScriptMode: input.ScriptMode, AspectRatio: input.AspectRatio, ArtStyle: input.ArtStyle, StyleDesc: input.StyleDesc, SelectedStyle: input.SelectedStyle, Synopsis: input.Synopsis, ModelID: input.ModelID, PromptID: input.PromptID, AssetDegree: screenplay.AssetDegree(input.AssetDegree), PermissionMode: screenplay.ParsePermissionMode(input.PermissionMode), CreatedAt: now().UTC()})
+		project, err := store.CreateProject(req.Context(), screenplay.Project{ID: id, OwnerUsername: owner, Title: input.Title, ScriptMode: input.ScriptMode, AspectRatio: input.AspectRatio, SourceText: source, ArtStyle: style.ArtStyle, StyleDesc: style.StyleDesc, SelectedStyle: style.SelectedStyle, Synopsis: input.Synopsis, ModelID: input.ModelID, PromptID: input.PromptID, AssetDegree: screenplay.AssetDegree(input.AssetDegree), PermissionMode: screenplay.ParsePermissionMode(input.PermissionMode), CreatedAt: now().UTC()})
 		if err != nil {
 			writeScreenplayError(w, err)
 			return
@@ -147,7 +178,17 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		if !decode(w, req, &input) {
 			return
 		}
-		project, err := store.UpdateProject(req.Context(), owner, req.PathValue("id"), screenplay.Project{Title: input.Title, ScriptMode: input.ScriptMode, AspectRatio: input.AspectRatio, ArtStyle: input.ArtStyle, StyleDesc: input.StyleDesc, SelectedStyle: input.SelectedStyle, Synopsis: input.Synopsis, ModelID: input.ModelID, PromptID: input.PromptID, AssetDegree: screenplay.AssetDegree(input.AssetDegree), PermissionMode: screenplay.ParsePermissionMode(input.PermissionMode)}, input.ExpectedRevision)
+		current, err := store.GetProject(req.Context(), owner, req.PathValue("id"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		style, err := resolveScreenplayStyle(catalog, input.SelectedStyle, input.ArtStyle, &current)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		project, err := store.UpdateProject(req.Context(), owner, req.PathValue("id"), screenplay.Project{Title: input.Title, ScriptMode: input.ScriptMode, AspectRatio: input.AspectRatio, ArtStyle: style.ArtStyle, StyleDesc: style.StyleDesc, SelectedStyle: style.SelectedStyle, Synopsis: input.Synopsis, ModelID: input.ModelID, PromptID: input.PromptID, AssetDegree: screenplay.AssetDegree(input.AssetDegree), PermissionMode: screenplay.ParsePermissionMode(input.PermissionMode)}, input.ExpectedRevision)
 		if err != nil {
 			writeScreenplayError(w, err)
 			return
@@ -335,11 +376,7 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 		}
 		writeJSON(w, http.StatusOK, result)
 	})
-	handle("POST /api/comic-screenplays/projects/{id}/source/parse", func(w http.ResponseWriter, req *http.Request, owner string) {
-		if _, err := store.GetProject(req.Context(), owner, req.PathValue("id")); err != nil {
-			writeScreenplayError(w, err)
-			return
-		}
+	parseSource := func(w http.ResponseWriter, req *http.Request, owner string) {
 		if !limitRequestBody(w, req, maxScreenplayUploadBytes) {
 			return
 		}
@@ -350,6 +387,9 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 			}
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "文件过大或上传格式无效"})
 			return
+		}
+		if req.MultipartForm != nil {
+			defer req.MultipartForm.RemoveAll()
 		}
 		file, header, err := req.FormFile("file")
 		if err != nil {
@@ -377,11 +417,23 @@ func RegisterScreenplayRoutes(mux *http.ServeMux, auth BridgeAuth, store screenp
 			return
 		}
 		content = strings.TrimSpace(content)
+		if len([]rune(content)) > screenplay.MaxSingleCallRunes {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "原文超过 60 万字，请按章拆分后分批提交"})
+			return
+		}
 		if content == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "文件中没有可读取的正文"})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"filename": header.Filename, "content": content, "runes": len([]rune(content))})
+	}
+	handle("POST /api/comic-screenplays/source/parse", parseSource)
+	handle("POST /api/comic-screenplays/projects/{id}/source/parse", func(w http.ResponseWriter, req *http.Request, owner string) {
+		if _, err := store.GetProject(req.Context(), owner, req.PathValue("id")); err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		parseSource(w, req, owner)
 	})
 	handle("POST /api/comic-screenplays/projects/{id}/assets/extract", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {

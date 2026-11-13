@@ -31,15 +31,15 @@ type AssetRequest struct {
 }
 
 type AssetResult struct {
-	Batch                AssetBatch      `json:"batch"`
-	Assets               []Asset         `json:"assets"`
-	ChunkCount           int             `json:"chunk_count"`
-	FailedChunks         int             `json:"failed_chunks"`
-	Warnings             []string        `json:"warnings,omitempty"`
-	PartialFailure       bool            `json:"partial_failure"`
+	Batch                AssetBatch          `json:"batch"`
+	Assets               []Asset             `json:"assets"`
+	ChunkCount           int                 `json:"chunk_count"`
+	FailedChunks         int                 `json:"failed_chunks"`
+	Warnings             []string            `json:"warnings,omitempty"`
+	PartialFailure       bool                `json:"partial_failure"`
 	FailedBatches        []AssetBatchFailure `json:"failed_batches,omitempty"`
-	RequiresConfirmation bool            `json:"requires_confirmation"`
-	PendingActions       []PendingAction `json:"pending_actions,omitempty"`
+	RequiresConfirmation bool                `json:"requires_confirmation"`
+	PendingActions       []PendingAction     `json:"pending_actions,omitempty"`
 }
 
 // AssetBatchFailure 记录失败批次的位置和原因。批次号与章节区间一起返回，
@@ -110,7 +110,7 @@ func (s *AssetService) Extract(ctx context.Context, req AssetRequest) (AssetResu
 				results[index] = chunkOutcome{err: err}
 				return
 			}
-			assets, err := s.extractChunk(ctx, req, promptID, systemPrompt, chunk, index+1)
+			assets, err := s.extractChunk(ctx, req, promptID, systemPrompt, styledAssetContent(project, chunk), index+1)
 			results[index] = chunkOutcome{assets: assets, err: err}
 		}(index, chunk)
 	}
@@ -493,3 +493,11 @@ func extractJSONObject(raw string) (string, bool) {
 }
 
 func (t AssetType) String() string { return string(t) }
+
+func styledAssetContent(project Project, content string) string {
+	style := firstNonEmpty(project.StyleDesc, project.ArtStyle)
+	if style == "" {
+		return content
+	}
+	return "画风要求：" + style + "\n\n正文：\n" + content
+}

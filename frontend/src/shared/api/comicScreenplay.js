@@ -58,6 +58,19 @@ export async function listComicScreenplayPrompts(request = apiRequest) {
   return Array.isArray(response?.prompts) ? response.prompts : [];
 }
 
+export async function listComicScreenplayStyles(request = apiRequest) {
+  const response = await request('/api/comic-screenplays/styles');
+  return Array.isArray(response?.styles) ? response.styles : [];
+}
+
+export async function parseComicScreenplayDraftSource(file, request = apiRequest) {
+  if (!(file instanceof Blob) || !/\.(txt|docx)$/i.test(file.name || '')) throw new Error('请选择 TXT 或 DOCX 文件');
+  const body = new FormData();
+  body.append('file', file, file.name);
+  const response = await request('/api/comic-screenplays/source/parse', { method: 'POST', body });
+  return String(response?.content || '');
+}
+
 export async function createComicScreenplay(input, request = apiRequest) {
   const title = String(input?.title || '').trim();
   if (!title) throw new Error('作品名称不能为空');

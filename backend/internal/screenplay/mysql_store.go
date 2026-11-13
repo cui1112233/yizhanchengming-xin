@@ -30,10 +30,10 @@ func (s *MySQLStore) CreateProject(ctx context.Context, project Project) (Projec
 	}
 	project.UpdatedAt = now
 	_, err := s.db.ExecContext(ctx, `INSERT INTO screenplay_projects
-(id, owner_username, title, script_mode, aspect_ratio, art_style, style_desc, selected_style, synopsis, model_id, prompt_id, asset_degree, permission_mode, revision, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+(id, owner_username, title, script_mode, aspect_ratio, art_style, style_desc, selected_style, synopsis, source_text, model_id, prompt_id, asset_degree, permission_mode, revision, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
 		project.ID, project.OwnerUsername, project.Title, project.ScriptMode, project.AspectRatio,
-		project.ArtStyle, project.StyleDesc, project.SelectedStyle, project.Synopsis,
+		project.ArtStyle, project.StyleDesc, project.SelectedStyle, project.Synopsis, project.SourceText,
 		project.ModelID, project.PromptID, string(project.AssetDegree), string(project.PermissionMode), project.CreatedAt, project.UpdatedAt)
 	var mysqlErr *mysql.MySQLError
 	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {

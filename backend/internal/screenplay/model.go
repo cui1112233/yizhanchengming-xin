@@ -81,7 +81,7 @@ type Project struct {
 	ScriptMode     string         `json:"script_mode"` // a1 | b
 	AspectRatio    string         `json:"aspect_ratio"`
 	ArtStyle       string         `json:"art_style"`
-	StyleDesc      string         `json:"style_desc"`
+	StyleDesc      string         `json:"-"`
 	SelectedStyle  string         `json:"selected_style"`
 	Synopsis       string         `json:"synopsis"`
 	SourceText     string         `json:"source_text"`

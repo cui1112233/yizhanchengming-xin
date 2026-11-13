@@ -94,7 +94,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if err != nil {
 		return StoryboardResult{}, err
 	}
-	style := firstNonEmpty(req.Style, project.ArtStyle, project.StyleDesc, project.SelectedStyle)
+	style := firstNonEmpty(project.StyleDesc, req.Style, project.ArtStyle)
 	synopsis := firstNonEmpty(req.Synopsis, project.Synopsis)
 
 	result := StoryboardResult{EpisodeCount: len(episodes)}
