@@ -18,6 +18,9 @@ if command -v mysql >/dev/null 2>&1; then
   mysql -e "PURGE BINARY LOGS BEFORE NOW() - INTERVAL ${BINLOG_MINUTES} MINUTE;" 2>/dev/null \
     && log "binlog purged before -${BINLOG_MINUTES}min"
   mysql -e "SET GLOBAL binlog_expire_logs_seconds=$((BINLOG_MINUTES * 60));" 2>/dev/null || true
+  # 单实例没有副本/CDC 消费方。MINIMAL 只记录被修改列，避免大 JSON 行在每次
+  # 更新时把修改前后两份都写进 binlog（job_json 单条约 400KB）。
+  mysql -e "SET GLOBAL binlog_row_image='MINIMAL';" 2>/dev/null || true
 fi
 
 # 2. 历史发布二进制：只保留当前软链指向的版本和最近一个回滚版本。

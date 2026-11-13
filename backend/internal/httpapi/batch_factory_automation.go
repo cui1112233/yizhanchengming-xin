@@ -4657,8 +4657,10 @@ func markAutomationEntrySuperseded(entry map[string]any, now time.Time) {
 	appendAutomationBookLog(entry, now, automationStringValue(entry["stage"], ""), "旧执行轮次已被新一轮接管")
 }
 
-// automationBookLogLimit 限制单本书保留的执行日志条数，避免状态文件无限增长。
-const automationBookLogLimit = 200
+// automationBookLogLimit 限制每本书保留的执行日志条数。job_json 会整行写入
+// MySQL，日志曾占到单条 400KB 的八成，是 binlog 写放大的主要来源；60 条足够
+// 回溯最近阶段，页级账本与终态信息不受影响。
+const automationBookLogLimit = 60
 
 // appendAutomationBookLog 把一条阶段事件追加到单本书的执行日志里。
 // 同一句重复上报只更新时间，不重复占位，避免进度刷屏。
