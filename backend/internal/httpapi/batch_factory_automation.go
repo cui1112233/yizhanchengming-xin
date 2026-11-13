@@ -3179,6 +3179,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		queueMu.Unlock()
 	}
 	qi := 0
+	var priorityDispatchErr error
 	for {
 		queueMu.Lock()
 		for qi >= len(queue) && inflight > 0 {
@@ -3228,6 +3229,36 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		}
 		workers.Add(1)
 		semaphore <- struct{}{}
+		selected, latestEntry, priorityErr := c.claimAutomationPriorityBookWithRetry(ctx, owner, batchID, jobID, epoch, book)
+		if priorityErr != nil {
+			log.Printf("batch automation next-book claim failed job=%s: %v", jobID, priorityErr)
+			priorityDispatchErr = priorityErr
+			<-semaphore
+			workers.Done()
+			queueMu.Lock()
+			inflight--
+			queueMu.Unlock()
+			break
+		}
+		queueMu.Lock()
+		queue = replaceAutomationQueuedBook(queue, qi, book, selected)
+		queueMu.Unlock()
+		book = selected
+		if latestEntry != nil {
+			jobMu.Lock()
+			initialEntry, _ = books[book.ID].(map[string]any)
+			if initialEntry == nil {
+				initialEntry = map[string]any{}
+				books[book.ID] = initialEntry
+			}
+			clear(initialEntry)
+			for key, value := range latestEntry {
+				initialEntry[key] = value
+			}
+			entry = cloneAutomationEntry(initialEntry)
+			entryVersion = automationNumberValue(initialEntry[automationBookRunVersionField], 0)
+			jobMu.Unlock()
+		}
 		// 等待期间用户可能已暂停/停止；拿到槽位后以持久化状态为准，
 		// 避免用阻塞前的旧快照覆盖控制态。
 		jobMu.Lock()
@@ -4180,6 +4211,14 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	if control, _, controlErr := c.currentJobControl(owner, batchID, jobID); controlErr == nil && (control == "paused" || control == "stopped") {
 		return
 	}
+	if priorityDispatchErr != nil {
+		if ctx.Err() == nil {
+			if err := c.markAutomationPriorityAttention(owner, batchID, jobID, epoch, priorityDispatchErr); err != nil {
+				log.Printf("mark automation queue attention job=%s: %v", jobID, err)
+			}
+		}
+		return
+	}
 	// 同一个 jobID 上可能已经启动了新一轮 run（重试/续跑）。旧 run 只有在自己的
 	// epoch 仍然有效、并且本次调度的书都已到终态时才允许写 job 终态与 counts，
 	// 否则会把新 run 的状态覆盖成 failed/completed（线上表现为 job 提前 failed
@@ -4213,6 +4252,15 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		latestBatch.Books = slices.DeleteFunc(latestBatch.Books, func(book batchfactoryv11.Book) bool { return !queued[book.ID] })
 		c.launchRun(owner, batchID, jobID, nextJob, latestBatch)
 		return
+	}
+	// Recount from persisted entries rather than only this goroutine's local
+	// Priority is consumed in durable state at slot pickup. Do not restore the
+	// launch-time list when this worker writes its final job snapshot.
+	if _, latest, err := c.currentJobControl(owner, batchID, jobID); err != nil {
+		log.Printf("read final priority list job=%s: %v", jobID, err)
+		return
+	} else if latest != nil {
+		job["priorityBookIds"] = automationPriorityIDs(latest)
 	}
 	// Recount from persisted entries rather than only this goroutine's local
 	// failures. A retry run intentionally skips unrelated terminal books; those
@@ -4880,6 +4928,11 @@ func (c *BatchAutomationCoordinator) Resume(ctx context.Context, owner, batchID 
 		if err != nil {
 			return err
 		}
+		tracked, _ := job["books"].(map[string]any)
+		batch.Books = slices.DeleteFunc(batch.Books, func(book batchfactoryv11.Book) bool { _, ok := tracked[book.ID]; return !ok })
+		if strings.HasPrefix(automationStringValue(job["lastError"], ""), "领取下一本失败") {
+			delete(job, "lastError")
+		}
 		if c.providerSync != nil {
 			if err := c.providerSync(ctx, owner); err != nil {
 				return err
@@ -5101,6 +5154,8 @@ func resetAutomationManualPageRetryBudget(entry map[string]any) {
 }
 
 func (c *BatchAutomationCoordinator) control(owner, batchID, nextState string, after func(map[string]any) error) (map[string]any, error) {
+	unlockBatch := c.lockBatchRun(owner, batchID)
+	defer unlockBatch()
 	c.mu.Lock()
 	state, err := c.loadLocked()
 	if err != nil {
@@ -5150,6 +5205,25 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 		return
 	}
 	registerBatchAutomationPreflightRoute(mux, auth, coordinator, version)
+	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/priority", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			BookID string `json:"bookId"`
+		}
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		result, err := coordinator.PrioritizeBook(r.Context(), owner, r.PathValue("batchId"), input.BookID)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"automation": result})
+	})))
 	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/start", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

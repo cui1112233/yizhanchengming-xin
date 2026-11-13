@@ -173,6 +173,9 @@ import { videoProviderForModel } from './videoProviderBinding';
 import { modelOptionsForProvider } from './providerModelBinding';
 import { stripBaseSetupSection } from '../scriptFinalSegment';
 import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
+import { prioritizeBatchBook } from '../../../shared/api/batchFactoryPriority.js';
+import { batchFactoryPriorityAction } from './batchFactoryPriority.js';
+import './batchFactoryPriority.css';
 import { agentCanvasURL, bindBatchFactoryBookAndNavigate } from '../agent-canvas-batch-factory.js';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts.js';
 import { ComicReferenceChips } from './ComicReferenceChips.jsx';
@@ -258,7 +261,7 @@ function batchFactoryBookStageBadge(book, { productionStatus, stageSummary, auto
   return null;
 }
 
-function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, onRunBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks, onAddGiantBooks }) {
+function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, onRunBook, onPrioritizeBook, priorityAction, priorityBusyId, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks, onAddGiantBooks }) {
   const selected = new Set(selectedBookIds);
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
   const selectedCount = selectedBookIds.length;
@@ -317,7 +320,7 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
         <span>{publicationMetadataValue(metadata, 'style')}</span>
         <span>{publicationMetadataValue(metadata, 'gender')}</span>
         <span className={`batch-factory-source-status is-${sourceStatus.tone} ${row.status === '处理中' ? 'is-scheduled' : ''}`} title={`${sourceStatus.detail}${row.state?.detail ? ` · ${row.state.detail}` : ''}`}><b>{row.state?.published ? '已发布' : sourceStatus.label}</b><small>{row.state?.published ? sourceStatus.label : row.status}{row.state?.manual ? ' · 已手调' : ''}</small></span>
-        <span className="batch-factory-novel-actions"><Button size="small" onClick={() => onViewBook(book)}>查看</Button>{onRunBook ? <Button size="small" type="link" onClick={() => onRunBook(book)}>执行这本</Button> : null}</span>
+        <span className="batch-factory-novel-actions batch-factory-priority-actions"><Button size="small" onClick={() => onViewBook(book)}>查看</Button>{onRunBook ? <Button size="small" type="link" onClick={() => onRunBook(book)}>执行这本</Button> : null}{onPrioritizeBook ? <Button size="small" title={priorityAction(book.id).reason} disabled={!priorityAction(book.id).enabled || Boolean(priorityBusyId)} loading={priorityBusyId === book.id} onClick={() => onPrioritizeBook(book.id)}>{priorityAction(book.id).label}</Button> : null}</span>
       </div>;
     })}
     <AddBooksRow books={books} platformOptions={platformOptions} onAddBooks={onAddBooks} onAddGiantBooks={onAddGiantBooks} />
@@ -3598,6 +3601,10 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const failureToastReadyRef = useRef(false);
   const failureSummaryRef = useRef({ signature: '', at: 0 });
   const [automationBusy, setAutomationBusy] = useState('');
+  const [priorityBusyId, setPriorityBusyId] = useState('');
+  const priorityRequestRef = useRef(null);
+  const priorityBatchRef = useRef(batch?.id);
+  priorityBatchRef.current = batch?.id;
   const automationBusyAtRef = useRef(0);
   const [automationStartOpen, setAutomationStartOpen] = useState(false);
   const automationAutoOpenedRef = useRef(false);
@@ -5104,6 +5111,30 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     setAutomationPresets(values);
     return values;
   }
+  function priorityAction(bookId) {
+    const action = batchFactoryPriorityAction(automationStatus, bookId);
+    return automationBusy || actionBusy ? {...action, enabled:false, reason:'请等待当前操作完成'} : action;
+  }
+  async function prioritizeBook(bookId) {
+    if (priorityRequestRef.current || !priorityAction(bookId).enabled) return;
+    const scope = batch.id;
+    const request = {scope, bookId};
+    priorityRequestRef.current = request;
+    setPriorityBusyId(bookId);
+    try {
+      const result = await prioritizeBatchBook(scope, bookId);
+      if (priorityBatchRef.current !== scope || priorityRequestRef.current !== request) return;
+      setAutomationStatus(current => mergeAutomationLogSnapshot(current, resultData(result, 'automation') || current));
+      message.success('已插队，当前正在处理的书完成后优先执行这一本');
+    } catch (error) {
+      if (priorityBatchRef.current === scope) message.error(error?.message || '插队失败，请刷新队列后重试');
+    } finally {
+      if (priorityRequestRef.current === request) {
+        priorityRequestRef.current = null;
+        setPriorityBusyId('');
+      }
+    }
+  }
   // 行内「执行这本」：把范围锁定到这一本再打开启动弹窗，预检也只查这一本。
   function runSingleBook(book) {
     if (!book?.id) return;
@@ -5624,6 +5655,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     const assetStageCount = runningBooks.filter(book => String(book?.stage || '').includes('asset')).length;
     const pageStageCount = runningBooks.filter(book => book?.stage === 'comic_images').length;
     const lastError = String(automationStatus?.lastError || '').trim();
+    const nextPriorityId = automationStatus?.priorityBookIds?.[0];
+    const nextPriorityTitle = books.find(book => book.id === nextPriorityId)?.title || nextPriorityId;
     return (
       <button
         type="button"
@@ -5633,6 +5666,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         onClick={() => setLogsOpen(true)}
       >
         自动化：{stateLabel}
+        {nextPriorityTitle ? `，待优先：${nextPriorityTitle}` : ''}
         {problemCount > 0 ? `，失败/阻塞 ${problemCount} 本` : ''}
         {runningBooks.length > 0 ? `，出图中 ${runningBooks.length} 本（资产图 ${assetStageCount} 本 / 漫画页 ${pageStageCount} 本）` : ''}
         {batchRetryCount > 0 ? `，已跳过 ${batchRetryCount} 本等待批末回补` : ''}
@@ -5647,6 +5681,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       <div className="shuihuo-workbench-toolbar" role="toolbar" aria-label="批量工厂工具栏">
         <Button type={novelListOpen ? 'primary' : 'text'} icon={<BarsOutlined />} onClick={() => setNovelListOpen(current => !current)}>{novelListOpen ? '返回生产表' : '小说列表'}</Button>
         <Button type="text" icon={<SettingOutlined />} onClick={() => setUnifiedSettingsOpen(true)}>统一配置</Button>
+        <Button title={priorityAction(selectedBookIds.length === 1 ? selectedBookIds[0] : '').reason} disabled={selectedBookIds.length !== 1 || !priorityAction(selectedBookIds[0]).enabled || Boolean(priorityBusyId)} loading={Boolean(priorityBusyId)} onClick={() => prioritizeBook(selectedBookIds[0])}>{selectedBookIds.length === 1 ? priorityAction(selectedBookIds[0]).label : '插队'}</Button>
         <Dropdown menu={{ items: automationMenuItems, onClick: ({ key }) => key === 'start' ? openAutomationStart() : runAutomationAction(key) }}><Button type="text" loading={Boolean(automationBusy)} disabled={automationState === 'idle' && automationStartBlocked}>{automationLabel}</Button></Dropdown>
         <Dropdown menu={{ items: agentMenuItems, onClick: ({ key }) => key === 'all' ? openBatchInAgent() : openSelectedInAgent() }}><Button type="text" disabled={Boolean(actionBusy)} loading={actionBusy === 'agent-all' || actionBusy?.startsWith?.('agent-')}>Agent 优化</Button></Dropdown>
         <Dropdown menu={{ items: batchMenuItems, onClick: async ({ key }) => { if (key === 'selected-production') return runSelectedProduction(); if (key === 'production') return runProduction(); if (key === 'merge') return runMerge(); if (key === 'comic-pages') { setAutomationRunMode('storyboard_only'); return openAutomationStart(); } if (key === 'comic-collection') { setAutomationRunMode('video_no_submit'); return openAutomationStart(); } } }}><Button className="shuihuo-batch-button" type="text" icon={<PictureOutlined />} loading={actionBusy === 'production' || actionBusy === 'selected-production' || actionBusy === 'merge'}>批量操作</Button></Dropdown>
@@ -5682,6 +5717,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             onSelectionChange={setSelectedBookIds}
             onViewBook={setViewingBook}
             onRunBook={runSingleBook}
+            onPrioritizeBook={prioritizeBook}
+            priorityAction={priorityAction}
+            priorityBusyId={priorityBusyId}
             platformNames={platformNames}
             platformOptions={platformOptions}
             productionStatus={productionStatus}

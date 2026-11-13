@@ -495,7 +495,8 @@ func publicAutomationJob(job map[string]any) map[string]any {
 		"runMode": job["runMode"], "scheduleMode": job["scheduleMode"], "concurrency": job["concurrency"], "preset": job["preset"],
 		"scheduledAt": job["scheduledAt"], "createdAt": job["createdAt"], "startedAt": job["startedAt"],
 		"updatedAt": job["updatedAt"], "completedAt": job["completedAt"], "lastError": job["lastError"],
-		"counts": job["counts"],
+		"counts":          job["counts"],
+		"priorityBookIds": automationPriorityIDs(job),
 	}
 	if result["autoPublish"] == nil {
 		result["autoPublish"] = false
@@ -560,6 +561,7 @@ func publicAutomationJob(job map[string]any) map[string]any {
 				"message": messageValue, "error": errorValue, "publishError": publishError, "updatedAt": book["updatedAt"],
 				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": retryAt,
 				"retryRequested": retryRequested, "logs": publicAutomationBookLogs(book["logs"], 50),
+				"priorityRequested": book["priorityRequested"],
 				"batchRetryPending": batchRetryPending, "batchRetryCount": batchRetryCount,
 				"needsManualPages": automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book}),
 				"autoContinue":     automationBookAutoContinue(book),
