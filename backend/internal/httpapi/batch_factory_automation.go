@@ -1576,7 +1576,14 @@ func (c *BatchAutomationCoordinator) applyResumePreflight(ctx context.Context, o
 			continue
 		}
 		// stage 保持恢复前的值：已经完成的漫画阶段不会被重新跑一遍。
-		entry["status"], entry["message"], entry["error"], entry["updatedAt"] = "running", "服务已恢复，自动化继续执行", "", now
+		// 还要排在队列里的书必须显式写 queued：写成 running 会让页面显示
+		// “正在执行”却没有任何进展，用户既看不到失败也无法重试。
+		if stage := automationStringValue(entry["stage"], ""); stage == "" || stage == "queued" {
+			entry["status"], entry["stage"], entry["message"] = "queued", "queued", "排队中，等待出图槽位"
+		} else {
+			entry["status"], entry["message"] = "running", "服务已恢复，自动化继续执行"
+		}
+		entry["error"], entry["updatedAt"] = "", now
 		entry["retryRequested"] = true
 		running++
 	}
