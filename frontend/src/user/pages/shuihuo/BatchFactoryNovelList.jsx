@@ -1,3 +1,7 @@
+import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
+import { normalizeGiantMaterialId } from '../giantMaterialTest.js';
+import { availableGiantMaterialBooks, buildGiantMaterialPlaceholderIntakes, findRegisteredGiantMaterialBook } from './batchFactoryGiantMaterialImport.js';
+import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { h3PromptEditRequest } from './h3PromptEditing.js';
 import { batchAccessErrorMessage } from './batchFactoryBatchAccessNotice.js';
 import { readStoryboardPromptEditableText, storyboardPromptTextForSave } from './storyboardPromptEditor.js';
@@ -254,7 +258,7 @@ function batchFactoryBookStageBadge(book, { productionStatus, stageSummary, auto
   return null;
 }
 
-function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, onRunBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks }) {
+function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, onRunBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks, onAddGiantBooks }) {
   const selected = new Set(selectedBookIds);
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
   const selectedCount = selectedBookIds.length;
@@ -316,19 +320,24 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
         <span className="batch-factory-novel-actions"><Button size="small" onClick={() => onViewBook(book)}>查看</Button>{onRunBook ? <Button size="small" type="link" onClick={() => onRunBook(book)}>执行这本</Button> : null}</span>
       </div>;
     })}
-    <AddBooksRow books={books} platformOptions={platformOptions} onAddBooks={onAddBooks} />
+    <AddBooksRow books={books} platformOptions={platformOptions} onAddBooks={onAddBooks} onAddGiantBooks={onAddGiantBooks} />
   </div>;
 }
 
-function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
+function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks }) {
   const [open, setOpen] = useState(false);
   const [inputText, setInputText] = useState('');
   const [platform, setPlatform] = useState('');
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const [busy, setBusy] = useState(false);
-  const options = Array.isArray(platformOptions) && platformOptions.length
-    ? platformOptions
-    : batchFactoryPlatformOptions([], { fallback: true });
+  const options = useMemo(() => {
+    const base = Array.isArray(platformOptions) && platformOptions.length
+      ? platformOptions
+      : batchFactoryPlatformOptions([], { fallback: true });
+    if (base.some(item => String(item.value) === 'giant_material')) return base;
+    return [...base, { value: 'giant_material', label: '巨量获取' }];
+  }, [platformOptions]);
+  const giantMode = platform === 'giant_material';
   useEffect(() => {
     if (!platform && options.length) setPlatform(String(options[0].value));
   }, [options, platform]);
@@ -336,15 +345,23 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
     const match = line.match(/^(\d{1,25})(?:\s+|[，,、|])?(.*)$/);
     return match ? { bookId: match[1], title: String(match[2] || '').trim() || `小说 ${match[1]}` } : null;
   }).filter(Boolean), [inputText]);
+  const giantIds = useMemo(() => String(inputText || '').split(/[\s,，、|]+/).map(item => normalizeGiantMaterialId(item)).filter(Boolean), [inputText]);
   const existing = useMemo(() => new Set(books.map(book => String(book?.bookId || '').trim()).filter(Boolean)), [books]);
-  const duplicates = parsed.filter(item => existing.has(item.bookId));
+  const existingGiantIds = useMemo(() => new Set(books.map(book => String(book?.sourceMetadata?.giantMaterialId || '').trim()).filter(Boolean)), [books]);
+  const duplicates = giantMode
+    ? giantIds.filter(id => existingGiantIds.has(id))
+    : parsed.filter(item => existing.has(item.bookId));
   async function submit() {
-    if (!parsed.length) { message.warning('请按每行“书 ID”或“书 ID + 书名”输入'); return; }
+    if (giantMode && !giantIds.length) { message.warning('请填写巨量素材 ID，多个用换行或逗号分隔'); return; }
+    if (!giantMode && !parsed.length) { message.warning('请按每行“书 ID”或“书 ID + 书名”输入'); return; }
     if (!platform) { message.warning('请选择书城'); return; }
+    if (!giantMode && !onAddBooks) { message.warning('当前批次不支持添加书城书籍'); return; }
+    if (giantMode && !onAddGiantBooks) { message.warning('当前批次不支持添加巨量素材'); return; }
     if (duplicates.length && !allowDuplicate) { message.warning(`发现 ${duplicates.length} 本已存在的书，勾选“重复 ID 仍然添加”后再提交`); return; }
     setBusy(true);
     try {
-      await onAddBooks(parsed, platform, allowDuplicate);
+      if (giantMode) await onAddGiantBooks(giantIds, allowDuplicate);
+      else await onAddBooks(parsed, platform, allowDuplicate);
       setInputText('');
       setAllowDuplicate(false);
       setOpen(false);
@@ -355,15 +372,17 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
   return <>
     <div className="batch-factory-novel-list-row batch-factory-novel-add-row" role="row">
       <span className="is-order"><b>＋</b></span>
-      <span className="is-book"><Button type="link" size="small" onClick={() => setOpen(true)}>添加新书</Button><small>输入多个书 ID 或“书 ID + 书名”</small></span>
+      <span className="is-book"><Button type="link" size="small" onClick={() => setOpen(true)}>添加新书</Button><small>输入多个书 ID 或“书 ID + 书名”，也可添加巨量素材</small></span>
       <span>—</span><span>—</span><span>—</span><span>—</span><span>选择书城后添加</span>
     </div>
     <Modal className="batch-factory-add-books-modal" title={<span className="batch-factory-add-books-title"><b>添加新书</b><small>写入当前批次小说列表</small></span>} open={open} onCancel={() => setOpen(false)} onOk={submit} confirmLoading={busy} okText="添加到当前批次" width={620} destroyOnClose>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        <Alert type="info" showIcon message="添加后自动获取正文与分类信息" description="新书会继承当前批次配置，自动获取正文并识别风格、男女频；当前已有任务时，正文获取成功的新书会排在后面继续生产。" />
+        <Alert type="info" showIcon message={giantMode ? '巨量素材会先登记为占位书，再由巨量素材执行器读取正文' : '添加后自动获取正文与分类信息'} description={giantMode ? '执行器读取完成后自动回填正文；未安装或未登录执行器时无法派发读取任务。' : '新书会继承当前批次配置，自动获取正文并识别风格、男女频；当前已有任务时，正文获取成功的新书会排在后面继续生产。'} />
         <label className="batch-factory-engine-field"><span><b>书城</b></span><Select value={platform || undefined} onChange={value => setPlatform(String(value || ''))} options={options.map(item => ({ value: String(item.value), label: item.label }))} placeholder="请选择书城" style={{ width: '100%' }} /></label>
-        <label className="batch-factory-engine-field"><span><b>书 ID / 书名</b><small>每行一本，例如：2091926811672429633\t书名</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'2091926811672429633\n209208048803840415\t第二本小说'} /></label>
-        {duplicates.length ? <Alert type="warning" showIcon message={`发现 ${duplicates.length} 本已存在的书`} description={duplicates.map(item => item.bookId).join('、')} /> : null}
+        {giantMode
+          ? <label className="batch-factory-engine-field"><span><b>巨量素材 ID</b><small>每行一个，也可用逗号分隔</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'7123456789012345678\n7123456789012345679'} /></label>
+          : <label className="batch-factory-engine-field"><span><b>书 ID / 书名</b><small>每行一本，例如：2091926811672429633\t书名</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'2091926811672429633\n209208048803840415\t第二本小说'} /></label>}
+        {duplicates.length ? <Alert type="warning" showIcon message={`发现 ${duplicates.length} 本已存在的书`} description={duplicates.join('、')} /> : null}
         <Checkbox checked={allowDuplicate} onChange={event => setAllowDuplicate(event.target.checked)}>重复 ID 仍然添加</Checkbox>
       </Space>
     </Modal>
@@ -3867,6 +3886,113 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       message.success(automationStarted ? `已添加 ${newlyAddedBooks.length} 本书，并已接入自动生产` : `已添加并获取 ${newlyAddedBooks.length} 本书的正文与分类信息`);
     }
   }
+  // 「添加新书」的巨量获取：素材 ID 先解析成占位书追加进当前批次，再给执行器
+  // 派发 OCR 任务。正文由执行器回填，这里不走书城直取。
+  async function addGiantBooksToBatch(materialIds, allowDuplicate) {
+    if (!batch?.id) throw new Error('当前批次尚未加载完成，请刷新后重试');
+    const ids = [...new Set((Array.isArray(materialIds) ? materialIds : []).map(item => normalizeGiantMaterialId(item)).filter(Boolean))];
+    if (!ids.length) throw new Error('请填写有效的巨量素材 ID');
+    const executorResponse = await listGiantMaterialExecutors();
+    const executors = Array.isArray(executorResponse?.executors)
+      ? executorResponse.executors
+      : Array.isArray(executorResponse?.data?.executors) ? executorResponse.data.executors : [];
+    if (!executors.some(executor => executor?.online === true)) {
+      throw new Error('巨量素材执行器未安装或未登录，请先在「设置 → 执行器状态」完成配对');
+    }
+    const inheritedContent = inheritedContentSettingsForNewBook(books, contentRangeLines, contentCaptureCharacters);
+    const entries = [];
+    const failures = [];
+    for (const id of ids) {
+      try {
+        const material = await resolveGiantMaterialForBatch(id);
+        const candidates = availableGiantMaterialBooks(material);
+        if (!candidates.length) throw new Error('素材没有关联书籍信息');
+        if (candidates.length > 1) throw new Error('素材关联多本书，请在新建批次的巨量弹窗里选择具体书目');
+        const durationSeconds = Number(material?.durationSeconds || material?.duration || 0);
+        if (!(durationSeconds > 0)) throw new Error('素材没有有效的视频时长');
+        entries.push({ giantMaterialId: id, material, book: candidates[0], durationSeconds });
+      } catch (error) {
+        failures.push(`${id}: ${error?.message || '解析失败'}`);
+      }
+    }
+    if (!entries.length) throw new Error(failures.join('；') || '巨量素材解析失败');
+    const intakeResult = await createNovelFetchIntake(buildGiantMaterialPlaceholderIntakes(
+      entries.map(entry => ({ giantMaterialId: entry.giantMaterialId, material: entry.material, book: entry.book })),
+      { contentRangeLines: inheritedContent.contentRangeLines, originalReadStrategy: 'ocr_first' }
+    ));
+    const intake = resultData(intakeResult, 'intake');
+    if (!intake?.id) throw new Error('新增书籍暂存失败');
+    await appendNovelFetchIntake(batch.id, intake.id, { allowDuplicate: allowDuplicate === true });
+    let latestBatch = resultData(await getBatch(batch.id), 'batch');
+    const addedBookIDs = [];
+    for (const entry of entries) {
+      const book = findRegisteredGiantMaterialBook(latestBatch?.books, entry.giantMaterialId);
+      if (!book?.id) { failures.push(`${entry.giantMaterialId}: 已加入但未找到占位书`); continue; }
+      try {
+        const createdResponse = await createGiantMaterialJob({
+          materialId: entry.giantMaterialId,
+          platformBookId: entry.book.platformBookId || entry.book.bookId,
+          title: entry.book.title,
+          videoUrl: entry.material.videoUrl,
+          durationSeconds: entry.durationSeconds,
+          modelVersion: 'windows-paddleocr-v1',
+          contentRangeLines: inheritedContent.contentRangeLines
+        });
+        const createdJob = createdResponse?.job || createdResponse?.data?.job || createdResponse;
+        if (!createdJob?.id) throw new Error('执行器没有返回读取任务');
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            latestBatch = resultData(await getBatch(batch.id), 'batch');
+            const latestBook = findRegisteredGiantMaterialBook(latestBatch?.books, entry.giantMaterialId);
+            if (!latestBook?.id) throw new Error('占位书已不存在');
+            await updateBookMetadata(batch.id, latestBook.id, {
+              metadata: {
+                ...(latestBook.sourceMetadata || {}),
+                executorJobId: createdJob.id,
+                contentPending: true,
+                originalReadStage: 'ocr',
+                originalReadError: '',
+                giantOcrState: String(createdJob.state || 'queued').toLowerCase()
+              },
+              expectedRevision: Number(latestBook.revision || 0)
+            });
+            break;
+          } catch (bindError) {
+            if (Number(bindError?.status) !== 409) throw bindError;
+          }
+        }
+        addedBookIDs.push(String(book.id));
+      } catch (error) {
+        failures.push(`${entry.giantMaterialId}: ${error?.message || '读取任务派发失败'}`);
+      }
+    }
+    await refreshBatch();
+    if (addedBookIDs.length) {
+      try {
+        const statusResult = await getBatchAutomationStatus(batch.id);
+        const latestAutomation = resultData(statusResult, 'automation');
+        const presetID = String(latestAutomation?.preset?.id || '').trim();
+        const latestState = String(latestAutomation?.state || '').toLowerCase();
+        if (presetID && ['running', 'completed'].includes(latestState)) {
+          const started = await startBatchAutomation(batch.id, {
+            presetId: presetID,
+            runMode: String(latestAutomation?.runMode || 'full_submit'),
+            autoPublish: latestAutomation?.autoPublish === true,
+            concurrency: normalizeAutomationConcurrency(latestAutomation?.concurrency),
+            bookIds: addedBookIDs
+          });
+          setAutomationStatus(resultData(started, 'automation') || latestAutomation);
+        }
+      } catch (error) {
+        message.warning(`巨量书已加入，但没有接入自动生产：${error?.message || '可在“自动生产”中重试'}`);
+      }
+    }
+    if (failures.length) {
+      message.warning(`已添加 ${addedBookIDs.length} 本巨量书；${failures.length} 条未完成：${failures.join('；')}`);
+    } else if (addedBookIDs.length) {
+      message.success(`已添加 ${addedBookIDs.length} 本巨量书，正文读取任务已派发`);
+    }
+  }
   async function deleteBook(book) {
     if (!batch?.id || !book?.id || actionBusy) return;
     setActionBusy(`delete-${book.id}`);
@@ -5447,6 +5573,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             onBackfill121Metadata={backfill121Metadata}
             backfilling121Metadata={actionBusy === "backfill-121-metadata"}
             onAddBooks={addBooksToBatch}
+            onAddGiantBooks={addGiantBooksToBatch}
           />
         </section>
       ) : (
@@ -6251,7 +6378,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     {value(viewingBook.sourceMetadata, "sourceMode") ===
                     "manual_original"
                       ? "手动书单"
-                      : "小说获取"}
+                      : "批量测书"}
                   </Descriptions.Item>
                   <Descriptions.Item label="敏感处理">
                     {sensitiveDetail.status === 'failed' ? '处理失败' : sensitiveDetail.status === 'review_required' ? '待人工确认' : sensitiveDetail.status === 'partial' ? '部分处理' : sensitiveDetail.status ? '已完成' : '未处理'}
