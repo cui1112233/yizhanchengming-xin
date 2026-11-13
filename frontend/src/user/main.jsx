@@ -17,6 +17,7 @@ import '../shared/styles/login-card.css';
 // legacy workspace and 01-04 incremental styles cannot override the unified UI.
 import '../shared/styles/account-center-visual-rebuild.css';
 import '../shared/styles/cinematic-glass.css';
+import '../shared/styles/frosted-surfaces.css';
 import { installClientErrorReporting } from '../shared/error-reporting';
 import { UserApp } from './App';
 

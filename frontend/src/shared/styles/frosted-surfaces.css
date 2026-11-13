@@ -1,0 +1,109 @@
+/* Glass has depth: working cards < floating controls < dialogs.
+   Opaque defaults also protect browsers without backdrop-filter support. */
+html[data-scheme='glass'][data-theme] {
+  --frost-card: #222a36;
+  --frost-floating: #252e3c;
+  --frost-dialog: #202936;
+  --frost-inset: rgba(255, 255, 255, .045);
+  --frost-workspace: #151c27;
+  --frost-edge: rgba(226, 236, 255, .22);
+  --frost-shadow: 0 16px 48px rgba(0, 0, 0, .28);
+  --frost-mask: rgba(6, 10, 18, .42);
+  --frost-card-blur: none;
+  --frost-floating-blur: none;
+  --frost-dialog-blur: none;
+}
+html[data-scheme='glass'][data-theme='light'] {
+  --frost-card: #f5f8fc;
+  --frost-floating: #f6f8fc;
+  --frost-dialog: #f8fafd;
+  --frost-inset: rgba(45, 65, 92, .045);
+  --frost-workspace: #edf1f7;
+  --frost-edge: rgba(255, 255, 255, .78);
+  --frost-shadow: 0 16px 48px rgba(30, 45, 66, .16);
+  --frost-mask: rgba(30, 40, 58, .24);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-scheme='glass'][data-theme] {
+    --frost-card: rgba(30, 39, 52, .56);
+    --frost-floating: rgba(34, 44, 59, .88);
+    --frost-dialog: rgba(29, 38, 52, .94);
+    --frost-workspace: rgba(16, 23, 34, .90);
+    --frost-card-blur: blur(16px) saturate(110%);
+    --frost-floating-blur: blur(24px) saturate(115%);
+    --frost-dialog-blur: blur(30px) saturate(110%);
+  }
+  html[data-scheme='glass'][data-theme='light'] {
+    --frost-card: rgba(247, 250, 255, .70);
+    --frost-floating: rgba(247, 250, 255, .92);
+    --frost-dialog: rgba(250, 252, 255, .96);
+    --frost-workspace: rgba(237, 243, 250, .94);
+  }
+}
+
+/* A card retains wallpaper color, but background lettering loses definition. */
+html[data-scheme='glass'][data-theme] :is(
+  .settings-section, .ant-card, .ac-card, .ac-panel, .account-center-panel,
+  .plugin-market-card, .private-studio-workbench, .shuihuo-project-card-meta,
+  .novel-fetch-form, .novel-creation-sidebar, .novel-creation-inspector,
+  .novel-creation-composer, .novel-creation-toolbar, .agent-canvas-node-card
+) {
+  background: var(--frost-card) !important;
+  backdrop-filter: var(--frost-card-blur);
+  -webkit-backdrop-filter: var(--frost-card-blur);
+}
+
+/* Portal selectors intentionally do not depend on .legacy-main ancestry. */
+html[data-scheme='glass'][data-theme] :is(
+  .ant-select-dropdown, .ant-dropdown-menu, .ant-dropdown-menu-sub,
+  .ant-popover-inner, .ant-picker-panel-container, .ant-tooltip-inner,
+  .ant-message-notice-content, .ant-notification-notice,
+  .agent-project-drawer, .agent-node-composer, .agent-node-quick-tools,
+  .agent-canvas-context-menu, .agent-canvas-context-submenu,
+  .agent-canvas-connection-drop-menu, .agent-canvas-asset-panel,
+  .agent-canvas-toolbar, .cm-penguin-chat, .cm-penguin-speech
+) {
+  background: var(--frost-floating) !important;
+  color: var(--text-primary);
+  border-color: var(--frost-edge);
+  box-shadow: var(--frost-shadow), inset 0 1px 0 rgba(255, 255, 255, .08);
+  backdrop-filter: var(--frost-floating-blur);
+  -webkit-backdrop-filter: var(--frost-floating-blur);
+}
+html[data-scheme='glass'][data-theme] .ant-popover {
+  --antd-arrow-background-color: var(--frost-floating);
+}
+html[data-scheme='glass'][data-theme] :is(.ant-modal-content, .ant-drawer-content) {
+  background: var(--frost-dialog) !important;
+  color: var(--text-primary);
+  border: 1px solid var(--frost-edge);
+  box-shadow: var(--frost-shadow), inset 0 1px 0 rgba(255, 255, 255, .08);
+  backdrop-filter: var(--frost-dialog-blur);
+  -webkit-backdrop-filter: var(--frost-dialog-blur);
+}
+/* One sheet of glass per dialog; do not stack blur on every child card. */
+html[data-scheme='glass'][data-theme] :is(.ant-modal-content, .ant-drawer-content)
+  :is(.ant-modal-header, .ant-modal-footer, .ant-drawer-header, .ant-drawer-body, .ant-drawer-footer) {
+  background: transparent !important;
+}
+html[data-scheme='glass'][data-theme] :is(.ant-modal-content, .ant-drawer-content)
+  :is(.ant-card, .ac-card, .ac-panel) {
+  background: var(--frost-inset) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-scheme='glass'][data-theme] :is(.ant-modal-mask, .ant-drawer-mask) {
+  background: var(--frost-mask);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* The viewports themselves stay sharp; only their surrounding sheet is frosted. */
+html[data-scheme='glass'][data-theme] .aicut-fullscreen-editor {
+  --edit-panel: var(--frost-floating);
+  --edit-timeline: var(--frost-workspace);
+  --edit-stage: var(--frost-workspace);
+}
+html[data-scheme='glass'][data-theme] .aicut-reference-timeline {
+  background: var(--frost-workspace) !important;
+}
