@@ -151,74 +151,7 @@ func registerImageCapacityRoutes(root *http.ServeMux, auth BridgeAuth, options R
 		}
 		writeImageCapacityStatus(w, status, imageCapacityCanManage(r.Context(), options, identity))
 	})
-	put := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		identity, ok := BridgeIdentityFromContext(r.Context())
-		if !ok {
-			writeJSON(w, 401, map[string]string{"error": "未登录"})
-			return
-		}
-		if !imageCapacityCanManage(r.Context(), options, identity) {
-			writeJSON(w, 403, map[string]string{"error": "只有管理员可以修改全站图片并发"})
-			return
-		}
-		if options.ImageCapacity == nil {
-			writeJSON(w, 503, map[string]string{"error": "全站图片并发控制尚未初始化"})
-			return
-		}
-		var input struct {
-			ModelID      string `json:"modelId"`
-			AspectRatio  string `json:"aspectRatio"`
-			Size         string `json:"size"`
-			References   bool   `json:"references"`
-			AccountLimit int    `json:"accountLimit"`
-			ModelLimit   int    `json:"modelLimit"`
-			InitialLimit int    `json:"initialLimit"`
-			GroupKey     string `json:"groupKey"`
-			Verified     bool   `json:"verified"`
-		}
-		if !decodeJSON(w, r, &input) {
-			return
-		}
-		if err := validateImageCapacityLimits(input.AccountLimit, input.ModelLimit, input.InitialLimit); err != nil {
-			writeJSON(w, 400, map[string]string{"error": err.Error()})
-			return
-		}
-		if len(input.GroupKey) > 100 || strings.ContainsAny(input.GroupKey, "\r\n{}") {
-			writeJSON(w, 400, map[string]string{"error": "账号分组名称无效"})
-			return
-		}
-		target, err := resolveImageCapacityRequest(r.Context(), options, identity, input.ModelID, input.AspectRatio, input.Size, input.References)
-		if err != nil {
-			writeJSON(w, 400, map[string]string{"error": err.Error()})
-			return
-		}
-		current, err := options.ImageCapacity.Resolve(r.Context(), target)
-		if err != nil {
-			writeJSON(w, 503, map[string]string{"error": "并发策略读取失败"})
-			return
-		}
-		current.AccountLimit = input.AccountLimit
-		current.ModelLimit = input.ModelLimit
-		current.InitialLimit = input.InitialLimit
-		current.GroupKey = strings.TrimSpace(input.GroupKey)
-		current.Verified = input.Verified
-		if !current.Verified && (current.ModelLimit > 4 || current.InitialLimit > 4) {
-			writeJSON(w, 400, map[string]string{"error": "未实测的请求规格最多保留 4 路；扩大前请先确认该账号和规格的测试结果"})
-			return
-		}
-		if err := options.ImageCapacity.SavePolicy(r.Context(), target, current); err != nil {
-			writeJSON(w, 409, map[string]string{"error": "并发设置未保存：" + err.Error()})
-			return
-		}
-		status, err := options.ImageCapacity.Snapshot(r.Context(), target)
-		if err != nil {
-			writeJSON(w, 503, map[string]string{"error": "设置已保存，暂时无法读取运行状态"})
-			return
-		}
-		writeImageCapacityStatus(w, status, true)
-	})
 	root.Handle("GET /api/config/image-capacity", auth.Middleware(get))
-	root.Handle("PUT /api/config/image-capacity", auth.Middleware(put))
 }
 
 func writeImageCapacityStatus(w http.ResponseWriter, status imagecapacity.Status, canManage bool) {

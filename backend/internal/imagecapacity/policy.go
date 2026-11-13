@@ -66,24 +66,47 @@ func imageCount(n int) int {
 	}
 	return n
 }
+
+// 出图并发不再由用户配置：上限按全站自动判定，起始值取较宽的 20 路，
+// 遇到 429/连续瞬时失败时由运行时的自适应逻辑自动降档，恢复后逐级回升。
+const (
+	AutoAccountLimit = 30
+	AutoModelLimit   = 30
+	AutoInitialLimit = 20
+)
+
+// upstreamHostKey 只按上游主机归组，不包含密钥：同一网关的不同密钥共享
+// 同一份额度，避免多个 key 各自按上限并发放大总请求数。
+func upstreamHostKey(r Request) string {
+	u, err := url.Parse(strings.TrimSpace(r.Endpoint))
+	host := strings.ToLower(strings.TrimSpace(r.Endpoint))
+	if err == nil && u.Host != "" {
+		host = strings.ToLower(u.Hostname())
+	}
+	return hash([]string{"upstream-host", host})
+}
+
 func defaultPolicy(r Request) Policy {
-	return Policy{AccountKey: AccountKey(r), ProfileKey: ProfileKey(r), Model: r.Model, Size: r.Size, Quality: r.Quality, Resolution: r.Resolution, References: r.References, Count: imageCount(r.Count), AccountLimit: 4, ModelLimit: 4, ModelTotalLimit: 4, InitialLimit: 4}
+	return Policy{AccountKey: AccountKey(r), GroupKey: "auto:" + upstreamHostKey(r), ProfileKey: ProfileKey(r), Model: r.Model, Size: r.Size, Quality: r.Quality, Resolution: r.Resolution, References: r.References, Count: imageCount(r.Count), AccountLimit: AutoAccountLimit, ModelLimit: AutoModelLimit, ModelTotalLimit: AutoModelLimit, InitialLimit: AutoInitialLimit}
 }
 func normalize(p Policy, r Request) Policy {
 	p.AccountKey = AccountKey(r)
 	p.ProfileKey = ProfileKey(r)
 	p.Count = imageCount(r.Count)
+	if p.GroupKey == "" {
+		p.GroupKey = "auto:" + upstreamHostKey(r)
+	}
 	if p.AccountLimit < 1 {
-		p.AccountLimit = 4
+		p.AccountLimit = AutoAccountLimit
 	}
 	if p.ModelLimit < 1 {
-		p.ModelLimit = 4
+		p.ModelLimit = AutoModelLimit
 	}
 	if p.ModelTotalLimit < 1 {
 		p.ModelTotalLimit = p.ModelLimit
 	}
 	if p.InitialLimit < 1 {
-		p.InitialLimit = 4
+		p.InitialLimit = AutoInitialLimit
 	}
 	if p.InitialLimit > p.ModelLimit {
 		p.InitialLimit = p.ModelLimit

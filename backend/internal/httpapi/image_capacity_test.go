@@ -66,13 +66,10 @@ func TestImageCapacityRoutesAreOwnerScopedAndAdminOnly(t *testing.T) {
 	if view["canManage"] != false || policy["quality"] != "high" || policy["resolution"] != "2K" || policy["size"] != "1024x1536" {
 		t.Fatalf("view=%v", view)
 	}
-	denied := request("PUT", "/api/config/image-capacity", `{"modelId":"custom:tested","accountLimit":20,"modelLimit":20,"initialLimit":12,"verified":true}`, false)
-	if denied.Code != 403 || repo.saved != 0 {
-		t.Fatal("ordinary user changed global quota")
-	}
-	untested := request("PUT", "/api/config/image-capacity", `{"modelId":"custom:tested","accountLimit":20,"modelLimit":20,"initialLimit":12,"verified":false}`, true)
-	if untested.Code != 400 || repo.saved != 0 {
-		t.Fatal("untested profile escalated")
+	// 并发完全自动判定，保存接口已移除，任何人都不再能手工改并发。
+	removed := request("PUT", "/api/config/image-capacity", `{"modelId":"custom:tested","accountLimit":20,"modelLimit":20,"initialLimit":12,"verified":true}`, true)
+	if removed.Code != 405 || repo.saved != 0 {
+		t.Fatalf("manual concurrency update should be gone: %d saved=%d", removed.Code, repo.saved)
 	}
 }
 

@@ -2,25 +2,25 @@ package imagecapacity
 
 import (
 	"context"
-	"database/sql"
-	"github.com/DATA-DOG/go-sqlmock"
+	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func TestMySQLUnknownProfileUsesSharedAccountCapAndDefaultFour(t *testing.T) {
+func TestMySQLResolveUsesAutomaticConcurrency(t *testing.T) {
 	db, m, e := sqlmock.New()
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer db.Close()
 	q := Request{Endpoint: "https://provider/v1", Credential: "never-store-this", Model: "unverified", Size: "other", References: true}
-	m.ExpectQuery("SELECT group_key, account_limit").WithArgs(AccountKey(q)).WillReturnRows(sqlmock.NewRows([]string{"group_key", "account_limit"}).AddRow("shared", 20))
-	m.ExpectQuery("SELECT MIN").WithArgs("shared").WillReturnRows(sqlmock.NewRows([]string{"min"}).AddRow(16))
-	m.ExpectQuery("SELECT MIN\\(COALESCE").WithArgs(ProfileKey(q), "shared").WillReturnRows(sqlmock.NewRows([]string{"model", "initial", "verified"}).AddRow(4, 4, false))
-	m.ExpectQuery("SELECT COALESCE\\(MAX").WithArgs("shared", modelIdentity(q.Model)).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(4))
 	p, e := NewMySQLRepository(db).Resolve(context.Background(), q)
-	if e != nil || p.AccountLimit != 16 || p.ModelLimit != 4 || p.InitialLimit != 4 || p.Verified {
-		t.Fatalf("unknown policy %+v %v", p, e)
+	if e != nil || p.AccountLimit != AutoAccountLimit || p.ModelLimit != AutoModelLimit || p.InitialLimit != AutoInitialLimit || p.Verified {
+		t.Fatalf("auto policy %+v %v", p, e)
+	}
+	if !strings.HasPrefix(p.GroupKey, "auto:") {
+		t.Fatalf("group key %q should be auto-derived", p.GroupKey)
 	}
 	if e = m.ExpectationsWereMet(); e != nil {
 		t.Fatal(e)
@@ -39,7 +39,7 @@ func TestMySQLSaveUsesTransactionAndExactProfile(t *testing.T) {
 	p.InitialLimit = 12
 	p.Verified = true
 	m.ExpectBegin()
-	m.ExpectExec("INSERT INTO image_capacity_accounts").WithArgs(p.AccountKey, "", 20).WillReturnResult(sqlmock.NewResult(0, 1))
+	m.ExpectExec("INSERT INTO image_capacity_accounts").WithArgs(p.AccountKey, p.GroupKey, 20).WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec("INSERT INTO image_capacity_policies").WithArgs(p.AccountKey, p.ProfileKey, p.Model, p.Size, p.Quality, p.Resolution, false, 1, 20, 12, true).WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectCommit()
 	if e = NewMySQLRepository(db).Save(context.Background(), p); e != nil {
@@ -53,46 +53,41 @@ func TestMySQLSaveUsesTransactionAndExactProfile(t *testing.T) {
 		t.Fatal("mismatched request profile accepted")
 	}
 }
-func TestMySQLFailureDoesNotFallbackToOpen(t *testing.T) {
+func TestMySQLResolveIgnoresLegacyManualLimits(t *testing.T) {
 	db, m, e := sqlmock.New()
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer db.Close()
-	m.ExpectQuery("SELECT group_key").WillReturnError(sql.ErrConnDone)
-	if _, e = NewMySQLRepository(db).Resolve(context.Background(), Request{}); e == nil {
-		t.Fatal("database error hidden")
+	// 历史手工配置是 4 路；自动并发不应再被这个旧值压回去。
+	m.ExpectQuery("SELECT model_limit").WillReturnRows(sqlmock.NewRows([]string{"model", "initial"}).AddRow(4, 4))
+	p, e := NewMySQLRepository(db).Resolve(context.Background(), Request{Endpoint: "https://provider/v1", Credential: "same"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if p.ModelLimit != AutoModelLimit || p.InitialLimit != AutoInitialLimit {
+		t.Fatalf("legacy limits leaked into auto policy: %+v", p)
+	}
+	if e = m.ExpectationsWereMet(); e == nil {
+		t.Fatal("manual policy table should not be queried any more")
 	}
 }
 
-func TestMySQLExactCountProfileNeverInheritsSingleImageVerification(t *testing.T) {
-	db, m, e := sqlmock.New()
+func TestMySQLResolveIsCountIndependent(t *testing.T) {
+	db, _, e := sqlmock.New()
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer db.Close()
 	repo := NewMySQLRepository(db)
-	q := Request{Endpoint: "https://provider/v1", Credential: "same", Model: "verified", Size: "1024x1536", Count: 1}
 	for _, count := range []int{1, 4} {
-		q.Count = count
-		m.ExpectQuery("SELECT group_key, account_limit").WithArgs(AccountKey(q)).WillReturnRows(sqlmock.NewRows([]string{"group", "cap"}).AddRow("", 20))
-		query := m.ExpectQuery("SELECT model_limit").WithArgs(AccountKey(q), ProfileKey(q))
-		if count == 1 {
-			query.WillReturnRows(sqlmock.NewRows([]string{"model", "initial", "verified"}).AddRow(20, 12, true))
-		} else {
-			query.WillReturnError(sql.ErrNoRows)
-		}
-		m.ExpectQuery("SELECT COALESCE\\(MAX").WithArgs(AccountKey(q), modelIdentity(q.Model)).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(20))
-		p, e := repo.Resolve(context.Background(), q)
+		p, e := repo.Resolve(context.Background(), Request{Endpoint: "https://provider/v1", Credential: "same", Model: "verified", Size: "1024x1536", Count: count})
 		if e != nil {
 			t.Fatal(e)
 		}
-		if count == 1 && (!p.Verified || p.ModelLimit != 20) || count == 4 && (p.Verified || p.ModelLimit != 4 || p.Count != 4) {
-			t.Fatalf("count%d inherited wrong policy %+v", count, p)
+		if p.ModelLimit != AutoModelLimit || p.InitialLimit != AutoInitialLimit || p.Count != count {
+			t.Fatalf("count%d resolved wrong policy %+v", count, p)
 		}
-	}
-	if e = m.ExpectationsWereMet(); e != nil {
-		t.Fatal(e)
 	}
 }
 

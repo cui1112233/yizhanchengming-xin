@@ -3,7 +3,6 @@ package imagecapacity
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 )
 
@@ -37,38 +36,12 @@ func (r *MySQLRepository) EnsureSchema(ctx context.Context) error {
 	return nil
 }
 func (r *MySQLRepository) Resolve(ctx context.Context, q Request) (Policy, error) {
-	p := defaultPolicy(q)
 	if r == nil || r.db == nil {
-		return p, fmt.Errorf("image capacity MySQL unavailable")
+		return defaultPolicy(q), fmt.Errorf("image capacity MySQL unavailable")
 	}
-	err := r.db.QueryRowContext(ctx, `SELECT group_key, account_limit FROM image_capacity_accounts WHERE account_key=?`, p.AccountKey).Scan(&p.GroupKey, &p.AccountLimit)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return p, err
-	}
-	if p.GroupKey != "" { // Explicit group members share the strictest configured account limit.
-		err = r.db.QueryRowContext(ctx, `SELECT MIN(account_limit) FROM image_capacity_accounts WHERE group_key=?`, p.GroupKey).Scan(&p.AccountLimit)
-		if err != nil {
-			return p, err
-		}
-		err = r.db.QueryRowContext(ctx, `SELECT MIN(COALESCE(p.model_limit,4)), MIN(COALESCE(p.initial_limit,4)), MIN(COALESCE(p.verified,FALSE)) FROM image_capacity_accounts a LEFT JOIN image_capacity_policies p ON a.account_key=p.account_key AND p.profile_key=? WHERE a.group_key=?`, p.ProfileKey, p.GroupKey).Scan(&p.ModelLimit, &p.InitialLimit, &p.Verified)
-		if err != nil {
-			return p, err
-		}
-		err = r.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(p.model_limit),4) FROM image_capacity_accounts a JOIN image_capacity_policies p ON a.account_key=p.account_key WHERE a.group_key=? AND LOWER(TRIM(p.model))=?`, p.GroupKey, modelIdentity(q.Model)).Scan(&p.ModelTotalLimit)
-		if err != nil {
-			return p, err
-		}
-		return normalize(p, q), nil
-	}
-	err = r.db.QueryRowContext(ctx, `SELECT model_limit, initial_limit, verified FROM image_capacity_policies WHERE account_key=? AND profile_key=?`, p.AccountKey, p.ProfileKey).Scan(&p.ModelLimit, &p.InitialLimit, &p.Verified)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return p, err
-	}
-	err = r.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(model_limit),4) FROM image_capacity_policies WHERE account_key=? AND LOWER(TRIM(model))=?`, p.AccountKey, modelIdentity(q.Model)).Scan(&p.ModelTotalLimit)
-	if err != nil {
-		return p, err
-	}
-	return normalize(p, q), nil
+	// 并发完全由运行时自动判定：起始 20 路、上限 30 路，遇到限流自动降档。
+	// 历史表里手工保存过的 4 路配置不再参与计算，避免旧值把自动并发压回 4。
+	return normalize(defaultPolicy(q), q), nil
 }
 func (r *MySQLRepository) Save(ctx context.Context, p Policy) error {
 	if r == nil || r.db == nil {

@@ -53,7 +53,7 @@ if action=='acquire' then
    for id,v in pairs(s.waiting) do
     local vp=s.profiles[v.profile];local n=byProfile[v.profile] or 0;local total=running
     if v.model then total=(byModel[v.model] or 0)+legacyUnits end
-    if vp and n+(v.units or 1)<=vp.limit and running+(v.units or 1)<=a.account and total+(v.units or 1)<=(s.models[v.model or ""] or 4) and now>=vp.cooling then
+    if vp and n+(v.units or 1)<=vp.limit and running+(v.units or 1)<=a.account and total+(v.units or 1)<=(s.models[v.model or ""] or 30) and now>=vp.cooling then
      local o=s.owners[v.owner] or 0;local b=s.books[v.owner..':'..v.book] or 0
      if not best or o<bo or (o==bo and (b<bb or (b==bb and v.seq<bs))) then best=id;bo=o;bb=b;bs=v.seq end
     end
