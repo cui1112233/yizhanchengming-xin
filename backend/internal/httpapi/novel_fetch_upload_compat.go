@@ -19,6 +19,7 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
+	registerBatchFactoryCustomCopy(root, middleware, usersDir, targets...)
 	sessionHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {

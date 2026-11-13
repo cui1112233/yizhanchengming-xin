@@ -115,6 +115,9 @@ func publish121Content(book batchfactoryv11.Book, workingFrontContent string) []
 	if len(editedLines) == 0 {
 		return []byte(source)
 	}
+	if book.SourceMetadata["sourceMode"] == "custom_copy" {
+		return []byte(strings.TrimSpace(workingFrontContent))
+	}
 
 	limit := 5
 	switch value := book.SourceMetadata["contentRangeLines"].(type) {

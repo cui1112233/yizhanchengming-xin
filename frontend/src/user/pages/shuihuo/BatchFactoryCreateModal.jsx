@@ -4,6 +4,9 @@ import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
 import { apiErrorMessage } from '../../../shared/apiErrors.js';
 import { classifyBookPublishMetadata, createNovelFetchIntake, fetchBookOriginal, fetchDirectOriginals, getBatch, getBatchAutomationStatus, listAutomationPresets, listBatches, startBatchAutomation, updateBookMetadata } from '../../../shared/api/batchFactory';
 import { batchFactoryPlatformOptions } from './batchFactoryPlatformOptions';
+import { CUSTOM_COPY_OPTION, selectedCopyGroups } from './batchFactoryCustomCopy.js';
+import { BatchFactoryCustomCopyPicker } from './BatchFactoryCustomCopyPicker.jsx';
+import { getToken } from '../../../shared/api/client.js';
 import { buildManualBatchSubmission, manualBookIDsFromInput, manualFetchedSourceText, removePlatformGroup, replacePlatformGroup, totalGroupBookCount, upsertPlatformGroup } from './batchFactoryManualFetch';
 import { automationPresetSnapshot, formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
 import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
@@ -33,12 +36,12 @@ function normalizedError(error, fallback) {
 const GIANT_MATERIAL_PLATFORM_OPTION = { value: 'giant_material', label: '巨量获取' };
 
 function withGiantMaterialOption(options = []) {
-  return [GIANT_MATERIAL_PLATFORM_OPTION, ...(Array.isArray(options) ? options : []).filter(option => option?.value !== GIANT_MATERIAL_PLATFORM_OPTION.value)];
+  return [GIANT_MATERIAL_PLATFORM_OPTION, CUSTOM_COPY_OPTION, ...(Array.isArray(options) ? options : []).filter(option => ![GIANT_MATERIAL_PLATFORM_OPTION.value, CUSTOM_COPY_OPTION.value].includes(option?.value))];
 }
 
 function preferredPlatformId(options, current = '') {
   if (Array.isArray(options) && options.some(option => option?.value === current)) return current;
-  return options.find(option => option?.value !== GIANT_MATERIAL_PLATFORM_OPTION.value)?.value || options[0]?.value || '';
+  return options.find(option => ![GIANT_MATERIAL_PLATFORM_OPTION.value, CUSTOM_COPY_OPTION.value].includes(option?.value))?.value || options[0]?.value || '';
 }
 
 function fallbackPlatformOptions() {
@@ -80,6 +83,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const [initialBatchSettings, setInitialBatchSettings] = useState({});
   const [initialSettingsOpen, setInitialSettingsOpen] = useState(false);
   const giantControllerRef = useRef(null);
+  const customCopySessionRef = useRef('');
 
   async function loadPlatforms() {
     setPlatformState('loading');
@@ -124,6 +128,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   }, [open]);
 
   const isGiantMaterial = platformId === GIANT_MATERIAL_PLATFORM_OPTION.value;
+  const isCustomCopy = platformId === CUSTOM_COPY_OPTION.value;
   const isComicProduction = initialBatchSettings.productionMode === 'comic';
   const inputBookIds = useMemo(() => manualBookIDsFromInput(inputText), [inputText]);
   const giantDuplicateIndexes = useMemo(() => duplicateGiantMaterialBookIndexes(giantItems.map(item => (
@@ -131,6 +136,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   ))), [giantItems]);
 
   function reset() {
+    customCopySessionRef.current = '';
     giantControllerRef.current?.abort();
     giantControllerRef.current = null;
     // 创建请求被网关中断后 busy 可能停在 true，表单关闭时不清理会让
@@ -175,7 +181,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       return;
     }
     setPlatformId(value);
-    if (value === GIANT_MATERIAL_PLATFORM_OPTION.value) {
+    if ([GIANT_MATERIAL_PLATFORM_OPTION.value, CUSTOM_COPY_OPTION.value].includes(value)) {
       setEditingPlatformId(null);
       setInputText('');
       clearGiantMaterialDraft();
@@ -536,6 +542,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   }
 
   function validateDraft() {
+    if (groups.some(group => Object.values(group.sourceMetadataByBookId || {}).some(meta => meta.sourceMode === 'custom_copy')) && customCopySessionRef.current !== getToken()) {
+      message.warning('登录账号已变化，请关闭窗口后重新获取文案'); return false;
+    }
     if (!title.trim()) return message.warning('请填写作品名称');
     if (isGiantMaterial) {
       if (!giantItems.some(item => item.status === 'resolved')) return message.warning('请先点击“解析全部”');
@@ -606,7 +615,10 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       for (const group of groups) {
         const groupKey = String(group.platformId);
         const ids = manualBookIDsFromInput(group.inputText);
-        const have = sourcesByGroup[groupKey] || {};
+        const have = sourcesByGroup[groupKey] || group.sourceTextByBookId || {};
+        sourcesByGroup[groupKey] = have;
+        sourceMetadataByGroup[groupKey] = group.sourceMetadataByBookId || {};
+        fetchedCount += ids.filter(bookId => String(have[bookId] || '').trim()).length;
         const pending = ids.filter(bookId => !String(have[bookId] || '').trim());
         if (!pending.length) continue;
         try {
@@ -628,7 +640,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
             }
           }
           sourcesByGroup[groupKey] = { ...have, ...groupSources };
-          sourceMetadataByGroup[groupKey] = { ...(sourceMetadataByGroup[groupKey] || {}), ...groupMetadata };
+          sourceMetadataByGroup[groupKey] = { ...groupMetadata, ...(sourceMetadataByGroup[groupKey] || {}) };
           // 只按本组请求的 pending id 计数，防止接口回传意外 ID 高估成功数
           for (const bookId of pending) {
             if (String(groupSources[bookId] || '').trim()) fetchedCount += 1;
@@ -644,6 +656,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       }
       // 设计约定：抓不到的书照样创建（正文为空，列表中标红），不阻断整个批量
       const totalCount = totalGroupBookCount(groups);
+
+      if (!validateDraft()) return;
 
       await onCreated(buildManualBatchSubmission({
         title: title.trim(),
@@ -722,14 +736,23 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       </Space>}
     /> : null}
 
-    <label className="shuihuo-form-label" htmlFor="batch-input-text">{isGiantMaterial ? '巨量素材 ID' : '小说列表'} <em>*</em></label>
+    <label className="shuihuo-form-label" htmlFor="batch-input-text">{isCustomCopy ? '书籍 ID（每行一本）' : isGiantMaterial ? '巨量素材 ID' : '小说列表'} <em>*</em></label>
     <Input.TextArea
       id="batch-input-text"
       value={inputText}
       onChange={event => { setInputText(event.target.value); if (isGiantMaterial) clearGiantMaterialDraft(); }}
-      rows={isGiantMaterial ? 3 : 9}
-      placeholder={isGiantMaterial ? '每行一个巨量素材 ID，数量不限\n例如：7689285355255727121' : '每行一本小说，可粘贴 ID、书名、男女频、风格、标签、推荐理由、评级。\n示例：2080989285751305136\t重生书\t女频\t现代爽文\t重生,逆袭\t女主逆袭\tS'}
+      rows={isGiantMaterial || isCustomCopy ? 3 : 9}
+      placeholder={isCustomCopy ? '每行一个书籍 ID，例如：2100242549395006289' : isGiantMaterial ? '每行一个巨量素材 ID，数量不限\n例如：7689285355255727121' : '每行一本小说，可粘贴 ID、书名、男女频、风格、标签、推荐理由、评级。\n示例：2080989285751305136\t重生书\t女频\t现代爽文\t重生,逆袭\t女主逆袭\tS'}
     />
+    {isCustomCopy ? <BatchFactoryCustomCopyPicker inputText={inputText} disabled={busy} onAdd={(results, selections) => {
+      try {
+        if (customCopySessionRef.current && customCopySessionRef.current !== getToken()) throw new Error('登录账号已变化，请关闭窗口后重新获取文案');
+        const next = selectedCopyGroups(groups, results, selections, platformOptions);
+        if (totalGroupBookCount(next) > 50) throw new Error('一个批量最多 50 本书');
+        customCopySessionRef.current = getToken();
+        setGroups(next); setInputText(''); message.success('所选文案已加入批量');
+      } catch (error) { message.warning(error.message); }
+    }} /> : null}
     {isGiantMaterial ? <div className="batch-factory-giant-read-strategy">
       <Switch checked={giantOriginalReadStrategy === 'direct_first'} onChange={checked => setGiantOriginalReadStrategy(checked ? 'direct_first' : 'ocr_first')} />
       <span>优先直接获取原文</span>
@@ -772,11 +795,12 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     <div className="batch-factory-create-toolbar">
       {isGiantMaterial
         ? <><Button loading={giantBusy} disabled={giantBusy || busy || !inputText.trim()} onClick={resolveAllGiantMaterials}>解析全部</Button><Button type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>
-        : <><Button type="primary" onClick={handleAddPlatformGroup}>{editingPlatformId ? '保存书城修改' : '添加书城'}</Button><Button type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>}
+        : <>{!isCustomCopy ? <Button type="primary" onClick={handleAddPlatformGroup}>{editingPlatformId ? '保存书城修改' : '添加书城'}</Button> : null}<Button type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>}
       <Button onClick={() => openAutomationDialog('scheduled')}>开始定时</Button>
       <Button onClick={openScheduleTasks}>定时任务</Button>
       <Button onClick={() => setInitialSettingsOpen(true)}>统一配置</Button>
     </div>
+    {groups.some(group => Object.keys(group.sourceTextByBookId || {}).length > 0) ? <p style={{ fontSize: 12, opacity: .8 }}>“文案获取”使用所选文案全文；内容范围与截取长度仅用于其他书城。</p> : null}
     {!isGiantMaterial && groups.length ? (
       <div className="batch-factory-platform-groups" data-testid="platform-groups">
         {groups.map(group => (
@@ -788,7 +812,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
             onClick={() => handleEditGroup(group)}
             style={{ cursor: 'pointer', marginBottom: 4 }}
           >
-            {group.platformName} ×{manualBookIDsFromInput(group.inputText).length}{editingPlatformId === group.platformId ? '（编辑中）' : ''}
+            {group.platformName} ×{manualBookIDsFromInput(group.inputText).length}{Object.keys(group.sourceTextByBookId || {}).length ? ' · 已选文案' : ''}{editingPlatformId === group.platformId ? '（编辑中）' : ''}
           </Tag>
         ))}
       </div>

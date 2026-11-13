@@ -2791,6 +2791,9 @@ func productionLines(book batchfactoryv11.Book) []string {
 			}
 		}
 	}
+	if book.SourceMetadata["sourceMode"] == "custom_copy" {
+		limit = 0
+	}
 	lines := make([]string, 0, limit)
 	for _, line := range strings.Split(strings.ReplaceAll(book.SourceText, "\r\n", "\n"), "\n") {
 		line = strings.TrimSpace(line)

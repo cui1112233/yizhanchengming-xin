@@ -296,6 +296,9 @@ func (s *DirectorService) comicProductionBook(ctx context.Context, owner, batchI
 
 func comicSourceTextForBook(book Book) string {
 	source := strings.TrimSpace(book.SourceText)
+	if book.SourceMetadata["sourceMode"] == "custom_copy" {
+		return source
+	}
 	limit := 2000
 	if raw, ok := book.SourceMetadata["comicAnalysisCharacters"]; ok {
 		switch value := raw.(type) {
@@ -362,6 +365,9 @@ func (s *DirectorService) productionBookWithSourceMode(ctx context.Context, owne
 }
 
 func productionTextForBook(book Book) string {
+	if book.SourceMetadata["sourceMode"] == "custom_copy" {
+		return strings.TrimSpace(book.SourceText)
+	}
 	limit := 5
 	if raw, ok := book.SourceMetadata["contentRangeLines"]; ok {
 		switch value := raw.(type) {
