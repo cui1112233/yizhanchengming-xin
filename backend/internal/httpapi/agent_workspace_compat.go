@@ -172,6 +172,14 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "导演方案不存在或已失效"})
 			return
 		}
+		if plan.Status == "applied" {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "该方案已经应用，请重新生成方案"})
+			return
+		}
+		if err := checkCanvasPetPlanRevision(project, plan.ID, body.Revision); err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
 		canvas, err := agentworkspace.ApplyDirectorPlan(req.Context(), store, owner, projectID, body.Revision, plan, clock().UTC())
 		if err != nil {
 			writeDirectorPlanError(w, err)
@@ -205,6 +213,15 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 				return
 			}
 			cleanContext := sanitizeAgentContext(body.Context)
+			cleanContext, err = prepareCanvasPetContext(project, cleanContext)
+			if err != nil {
+				if errors.Is(err, agentworkspace.ErrRevisionConflict) {
+					writeAgentStoreError(w, err)
+				} else {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				}
+				return
+			}
 			contextJSON, _ := json.Marshal(cleanContext)
 			directorRequest := agentDirectorRequested(cleanContext)
 			definition := promptagent.WorkspaceChat
@@ -244,6 +261,9 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 				assistantMessage.Context = map[string]any{}
 			}
 			assistantMessage.Context["promptDefinition"] = agentPromptDefinitionSetting(definition)
+			if _, ok := cleanContext["canvasPet"]; ok {
+				assistantMessage.Context["canvasPetRevision"] = project.Canvas.Revision
+			}
 			updatedProject, err := store.AppendExchange(req.Context(), owner, body.TaskID, userMessage, assistantMessage)
 			if err != nil {
 				writeAgentStoreError(w, err)

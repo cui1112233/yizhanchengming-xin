@@ -1,0 +1,19 @@
+.canvas-pet-panel { padding: 14px; color: var(--text-primary, #f3f5fa); font-size: 13px; line-height: 1.65; }
+.canvas-pet-panel p { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.canvas-pet-context { font-weight: 600; }
+.canvas-pet-note, .canvas-pet-empty { color: var(--text-secondary, #c5ccd7); }
+.canvas-pet-empty { padding: 20px 0; }
+.canvas-pet-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.canvas-pet-panel button { color: inherit; border: 1px solid var(--border-default, #637080); background: var(--surface-panel, #262f3c); padding: 6px 12px; border-radius: 9px; cursor: pointer; }
+.canvas-pet-panel button:hover:not(:disabled) { border-color: var(--accent-primary, #7dbece); }
+.canvas-pet-panel button:disabled { opacity: .45; cursor: not-allowed; }
+.canvas-pet-message { padding: 12px; border: 1px solid var(--border-default, #637080); border-radius: 12px; margin: 10px 0; }
+.canvas-pet-message.is-user { margin-left: 20px; background: rgb(127 151 177 / 10%); }
+.canvas-pet-message > strong { font-size: 11px; color: var(--text-secondary, #c5ccd7); }
+.canvas-pet-plan { border-top: 1px solid var(--border-default, #637080); padding-top: 10px; }
+.canvas-pet-plan ul { padding-left: 18px; }
+.canvas-pet-panel [role=alert] { color: #ffc69f; margin: 10px 0; }
+.canvas-pet-composer { display: grid; gap: 6px; }
+.canvas-pet-composer textarea { width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--border-default, #637080); border-radius: 10px; padding: 10px; background: var(--surface-panel, #222b36); color: inherit; font: inherit; }
+.canvas-pet-open { position: absolute; top: 12px; right: 12px; z-index: 5; border: 1px solid var(--agent-border, #617386); border-radius: 10px; padding: 7px 12px; color: var(--agent-text, #f3f5fa); background: var(--agent-panel, #222b36); cursor: pointer; }
+.canvas-pet-write-lock { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; background: rgb(10 16 24 / 60%); color: #f5f8ff; font-size: 15px; cursor: progress; }

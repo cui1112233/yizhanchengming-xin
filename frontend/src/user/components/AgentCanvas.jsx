@@ -15,6 +15,8 @@ import {
   isCanvasMultiSelectionEvent, moveCanvasGroup, removeCanvasEdges, sameCanvasSelection, selectCanvasNodes, ungroupCanvasNodes
 } from '../pages/agent-canvas-commands';
 import { createCanvasHistory } from '../pages/agent-canvas-history';
+import { useCanvasPetService } from './useCanvasPetService.jsx';
+import { createCanvasWriteGate } from '../pages/canvas-pet-service.js';
 import { layoutCanvas } from '../pages/agent-canvas-layout';
 import {
   appearanceCssVariables, applyCanvasEdgeAppearance, canvasEdgeColorOptions, canvasEdgeWidthOptions,
@@ -551,7 +553,7 @@ function IconTool({ label, disabled = false, active = false, onClick, children }
   );
 }
 
-export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, projectType = 'video', projectCapabilities: providedCapabilities, executions = [], scriptShots = [], onScriptShotsChange, workspaceView: workspaceViewState, onWorkspaceViewChange, conversationOpen, onToggleConversation, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onViewportCommit, onFlushCanvas, onServerCanvasChange, onExecutionChange, onAssetsCreated, requestedBookId = '' }, ref) {
+export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, petServiceScope, projectType = 'video', projectCapabilities: providedCapabilities, executions = [], scriptShots = [], onScriptShotsChange, workspaceView: workspaceViewState, onWorkspaceViewChange, conversationOpen, onToggleConversation, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onViewportCommit, onFlushCanvas, onServerCanvasChange, onExecutionChange, onAssetsCreated, requestedBookId = '' }, ref) {
   const projectCapabilities = providedCapabilities || agentProjectCapabilities(projectType);
   const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
   const workspaceView = workspaceViewState || { snapToGrid: false, showMinimap: true, showConnections: true };
@@ -611,6 +613,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   const connectionCompletedRef = useRef(false);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
   const taskIdRef = useRef(taskId);
+  const canvasWrites = useRef(createCanvasWriteGate());
   const focusedBookGroupRef = useRef('');
   const viewportRecoveryKeyRef = useRef('');
   const viewportRecoveryTimerRef = useRef(null);
@@ -746,6 +749,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function publishBatchFactoryMerge(nodeID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskIdRef.current;
     const node = nodesRef.current.find(item => item.id === nodeID);
     const action = batchFactoryMappedAction(node);
@@ -768,6 +774,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
         setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, actionBusy: false } }));
       }
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   const canvasZoom = Number.isFinite(Number(viewport?.zoom)) ? Number(viewport.zoom) : 1;
@@ -1183,6 +1191,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function commitScriptSource(nodeID, sourceText) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskIdRef.current;
     const node = nodesRef.current.find(item => item.id === nodeID && item.data?.type === 'script');
     const config = node?.data?.config || {};
@@ -1212,9 +1223,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } finally {
       if (scriptSourceSaveByNodeRef.current[nodeID] === save) delete scriptSourceSaveByNodeRef.current[nodeID];
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function runBatchFactoryScriptStageForNode(nodeID, stage, textModelID = '', options = {}) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskIdRef.current;
     const savedSource = await scriptSourceSaveByNodeRef.current[nodeID];
     const node = nodesRef.current.find(item => item.id === nodeID && item.data?.type === 'script');
@@ -1275,9 +1291,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
         setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, actionBusy: false } }));
       }
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function splitScriptForNode(nodeID, input) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     if (!requestedTaskId) return;
     setScriptShotsByNode(current => ({ ...current, [nodeID]: { ...(current[nodeID] || {}), state: 'running', errorMessage: '' } }));
@@ -1315,9 +1336,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
         void refreshGenerationTasks(requestedTaskId);
       }
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function batchShotsForNode(nodeID, payload) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     if (!requestedTaskId) return null;
     const result = await runAfterDurableCanvasSave(onFlushCanvas, () => {
@@ -1340,6 +1366,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       }).catch(() => {});
     }
     return result;
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function applyGeneratedCanvas(serverCanvas) {
@@ -1412,6 +1440,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function runMappedBatchFactoryAction(node, selectedModel = '', draftPrompt = '') {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const action = batchFactoryMappedAction(node);
     if (!action) return false;
     const requestedTaskId = taskIdRef.current;
@@ -1484,9 +1515,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       }
     }
     return true;
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function submitTextForNode(nodeID, selectedModel, draftPrompt) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const node = persistGenerationDraftPrompt(nodeID, draftPrompt);
     if (!requestedTaskId || node?.data?.type !== 'text') return;
@@ -1516,9 +1552,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: error?.message || '文字生成失败', attempt: attempt + 1 } }));
       void refreshGenerationTasks(requestedTaskId);
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function submitImageForNode(nodeID, selectedModel, draftPrompt) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const mappedNode = nodesRef.current.find(item => item.id === nodeID);
     if (isBatchFactoryNode(mappedNode?.data)) {
@@ -1577,9 +1618,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
           : { ...current[nodeID], busy: false, error: error?.message || '图片生成失败', phase: '', attempt: attempt + 1 }
       }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function submitImageTool(nodeID, input) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const node = nodesRef.current.find(item => item.id === nodeID);
     if (!requestedTaskId || node?.data?.type !== 'image' || !input?.sourceAssetId) return;
@@ -1609,9 +1655,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
         : { ...current[nodeID], busy: false, error: error?.message || '图片编辑提交失败', phase: '', attempt: attempt + 1 }
       }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function submitVideoTool(nodeID, input) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const source = nodesRef.current.find(item => item.id === nodeID && item.data?.type === 'video');
     const sourceAssetId = String(input?.sourceAssetId || '').trim();
@@ -1647,6 +1698,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       if (requestedTaskId !== taskIdRef.current) return;
       setNodeGenerationByNode(current => ({ ...current, [target.id]: { ...current[target.id], busy: false, error: error?.message || '视频处理任务提交失败', phase: '' } }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function selectImageCandidate(nodeID, assetID) {
@@ -1654,6 +1707,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function confirmImage(nodeID, assetID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const mappedNode = nodesRef.current.find(item => item.id === nodeID);
     const mappedAction = batchFactoryMappedAction(mappedNode);
@@ -1690,9 +1746,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       if (requestedTaskId !== taskIdRef.current) return;
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, error: error?.message || '图片确认失败' } }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function submitAudioForNode(nodeID, selectedModel, draftPrompt) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const mappedNode = nodesRef.current.find(item => item.id === nodeID);
     if (isBatchFactoryNode(mappedNode?.data)) {
@@ -1734,6 +1795,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, error: error?.message || '音频任务执行失败', attempt: attempt + 1 } }));
       void refreshGenerationTasks(requestedTaskId);
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function selectAudioCandidate(nodeID, assetID) {
@@ -1741,6 +1804,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function confirmAudio(nodeID, assetID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const local = nodeGenerationByNode[nodeID] || {};
     const task = generationTasksByNode[nodeID];
@@ -1759,6 +1825,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       if (requestedTaskId !== taskIdRef.current) return;
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, error: error?.message || '音频确认失败' } }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function makeGenerationRetryIdempotencyKey() {
@@ -1767,6 +1835,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function cancelGeneration(nodeID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const task = generationTasksByNode[nodeID];
     if (!requestedTaskId || !task || (task.kind === 'video' && !String(task.mode || '').startsWith('video_'))) return;
@@ -1781,9 +1852,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       if (requestedTaskId !== taskIdRef.current) return;
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], actionBusy: false, error: error?.message || '取消生成任务失败' } }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function retryGeneration(nodeID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const mappedNode = nodesRef.current.find(item => item.id === nodeID);
     if (isBatchFactoryNode(mappedNode?.data)) {
@@ -1804,6 +1880,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       if (requestedTaskId !== taskIdRef.current) return;
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], actionBusy: false, error: error?.message || '重试生成任务失败' } }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function videoRequestPayloadForNode(node, ignoreReferences = false) {
@@ -1817,6 +1895,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function submitVideoForNode(nodeID, ignoreReferences = false, selectedModel = '', draftPrompt) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const mappedNode = nodesRef.current.find(item => item.id === nodeID);
     if (isBatchFactoryNode(mappedNode?.data)) {
@@ -1870,9 +1951,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } finally {
       if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function cancelVideo(nodeID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const job = videoJobs[nodeID];
     if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId || !job) return;
@@ -1887,9 +1973,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } finally {
       if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function retryVideo(nodeID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const mappedNode = nodesRef.current.find(item => item.id === nodeID);
     if (isBatchFactoryNode(mappedNode?.data)) {
@@ -1911,9 +2002,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } finally {
       if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function confirmVideo(nodeID) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskId;
     const job = videoJobs[nodeID];
     if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId || !job) return;
@@ -1930,6 +2026,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } finally {
       if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function handleConnect(connection) {
@@ -2147,6 +2245,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function handleAssetUpload(event) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !taskId || !assetPanel) return;
@@ -2160,6 +2261,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } finally {
       setAssetLoading(false);
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function handleContextCopy() {
@@ -2232,6 +2335,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function removeBatchFactoryNodes(nodeIDs) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskIdRef.current;
     const uniqueIDs = [...new Set((nodeIDs || []).map(value => String(value || '').trim()).filter(Boolean))];
     if (!requestedTaskId || !uniqueIDs.length) return;
@@ -2249,6 +2355,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } catch (error) {
       if (requestedTaskId === taskIdRef.current) message.error(error?.message || '从画布移除失败');
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function removeBatchFactoryNode(nodeID) {
@@ -2412,6 +2520,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function saveDirectorDeskScreenshot(nodeID, file) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const requestedTaskId = taskIdRef.current;
     const source = nodesRef.current.find(node => node.id === nodeID && node.data?.type === 'director');
     if (!requestedTaskId || !source || !(file instanceof File)) throw new Error('导演台预演图无法保存');
@@ -2425,6 +2536,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       message.error(error?.message || '预演图保存失败');
       throw error;
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   function canvasCenterPosition() {
@@ -2455,6 +2568,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
   }
 
   async function handleExternalAssetDrop(event) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const payload = event.dataTransfer.getData('application/x-agent-asset');
     if (!payload || !taskId) return;
     event.preventDefault();
@@ -2471,9 +2587,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } catch (error) {
       message.error(error.message || '添加素材失败');
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
 
   async function handleCanvasPaste(event) {
+    const finishCanvasWrite = canvasWrites.current.beginWrite();
+    try { return await (async () => {
+
     const file = firstClipboardImage(event.clipboardData?.items);
     if (!shouldHandleCanvasImagePaste({
       hasImage: Boolean(file),
@@ -2504,7 +2625,31 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
     } catch (error) {
       message.error({ content: error?.message || '截图粘贴失败', key: messageKey });
     }
+
+    })(); } finally { finishCanvasWrite(); }
   }
+
+  const openCanvasPet = useCanvasPetService({ taskId, scope: petServiceScope, canvas: currentCanvas, selectedIds,
+    beginApply: () => canvasWrites.current.beginApply(),
+    canApply: !Object.values(nodeGenerationByNode).some(item => item?.busy) && !Object.values(videoBusyByNode).some(Boolean)
+      && !Object.values(generationTasksByNode).some(shouldPollGeneration) && !Object.values(videoJobs).some(job => videoNodeViewState(job).polling),
+    flush: onFlushCanvas, acceptCanvas: async next => {
+      const requestedTaskId = taskIdRef.current;
+      const nextAppearance = normalizeCanvasAppearance(next.appearance);
+      const nextEdges = next.edges.map(edge => toFlowEdge(edge, nextAppearance));
+      const nextNodes = syncCanvasEffectiveReferences(next.nodes.map(toFlowNode), nextEdges);
+      const nextViewport = next.viewport || viewportRef.current;
+      // Record the real server edit without enqueueing a second, stale save.
+      updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
+      setNodes(nextNodes); setEdges(nextEdges); setAppearance(nextAppearance); setViewport(nextViewport);
+      historyRef.current.push({ nodes: nextNodes, edges: nextEdges });
+      setHistoryVersion(value => value + 1);
+      const accepted = await onServerCanvasChange(next);
+      return requestedTaskId === taskIdRef.current && accepted !== false;
+    },
+    editSelection: () => { if (selectedIds.length === 1) openNodeComposer(selectedIds[0]); },
+    locateSelection: () => { if (selectedIds.length === 1) locateNode(selectedIds[0]); }
+  });
 
   useImperativeHandle(ref, () => ({
     locateNode,
@@ -2574,6 +2719,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
       style={appearanceCssVariables(appearance)}
     >
       <CanvasNodeContext.Provider value={canvasNodeContextValue}>
+      {taskId && onFlushCanvas && onServerCanvasChange ? <button className="canvas-pet-open nodrag nopan" type="button" onClick={openCanvasPet}>宠物 · 画布创作</button> : null}
       <ReactFlow
         nodes={visibleNodes}
         edges={visibleEdges}

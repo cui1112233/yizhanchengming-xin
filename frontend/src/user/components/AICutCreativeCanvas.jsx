@@ -9,7 +9,7 @@ import { createCreativeCard, creativeCardTypes, creativeAssetSelection, creative
 import { AgentCanvas } from './AgentCanvas';
 import './AICutCreativeCanvas.css';
 
-export default function AICutCreativeCanvas({ projectId, projectTitle, timelineRevision, onOpenEditor, onTransferred }) {
+export default function AICutCreativeCanvas({ projectId, projectTitle, timelineRevision, petServiceScope, onOpenEditor, onTransferred }) {
   const [canvas, setCanvas] = useState(null);
   const [taskId, setTaskId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -242,7 +242,7 @@ export default function AICutCreativeCanvas({ projectId, projectTitle, timelineR
     {status === 'error' && <Alert type="error" showIcon message="保存失败，本机草稿已保留。请重试保存后再生成或送入剪辑。" />}
     <main className="agent-canvas-main aicut-creative-canvas__main">
       {loading ? <div className="aicut-creative-canvas__state"><Spin tip="正在打开创作画布…"><div /></Spin></div> : error ? <div className="aicut-creative-canvas__state"><Alert type="error" message={error} action={<Button onClick={() => setRetry(value => value + 1)}>重试</Button>} /></div> : canvas && <AgentCanvas
-        ref={canvasUIRef} key={taskId} taskId={taskId} canvas={canvas} projectType="video"
+        ref={canvasUIRef} key={taskId} taskId={taskId} canvas={canvas} petServiceScope={petServiceScope} projectType="video"
         onChange={changeCanvas} onSelectionChange={ids => { selectedRef.current = ids; }}
         onViewportCommit={viewport => changeCanvas({ ...sessionRef.current.canvas, viewport })}
         onAppearanceChange={appearance => changeCanvas({ ...sessionRef.current.canvas, appearance })}

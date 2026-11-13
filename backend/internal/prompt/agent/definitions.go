@@ -11,7 +11,7 @@ var WorkspaceChat = promptcatalog.Definition{
 }
 
 var DirectorPlan = promptcatalog.Definition{
-	ID: "agent.director-plan", Version: 1,
+	ID: "agent.director-plan", Version: 2,
 	SystemPrompt:   promptcatalog.AgentDirectorPlanSystemPrompt,
 	RequiredInputs: []string{"user_goal", "canvas_revision", "selected_context"},
 	OutputContract: "只返回一个等待确认的画布修改方案，不声称已经执行。",

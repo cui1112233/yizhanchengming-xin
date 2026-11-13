@@ -4850,7 +4850,7 @@ export default function AICutPage() {
 
   const timelineNetworkBusy = Boolean(importingSRT || correctingCaptions || trimmingFillers || mediaToolBusy || consolidateBusy || asrBusy || ttsBusy || voiceCloneBusy || backgroundRemovalBusyId || personSegmentationBusy || regionTrackingBusy || uploading);
   petPageRuntime.current = { loading, busy: timelineBusy || timelineNetworkBusy, saveTimeline };
-  const petServiceScope = `${getCurrentUsername()}:${projectId}:${activeTimelineId}`;
+  const petServiceScope = `${getCurrentUsername()}:${projectId}:${activeTimelineId}:${workspaceMode}`;
   const refreshPetTimeline = useCallback(() => refreshTimelineFromAgent(), [projectId, activeTimelineId]);
   const preparePetAgentRun = useCallback(async () => {
     const scope = `${projectId}:${activeTimelineId}`;
@@ -4868,7 +4868,7 @@ export default function AICutPage() {
     petPageServiceCleanup.current = null;
   }, [petServiceScope]);
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || workspaceMode !== 'editor') return;
     petPageServiceCleanup.current = registerPetPageService({
       id: 'aicut-agent', scope: petServiceScope,
       label: `AI-CUT 剪辑 · ${currentProject?.title || '当前工程'}`,
@@ -4882,10 +4882,10 @@ export default function AICutPage() {
         onAutoApplied={handleAutoEditApplied} onTimelineChanged={refreshPetTimeline}
       />
     });
-  }, [petServiceScope, projectId, activeTimelineId, timeline.revision, currentProject?.title, agentModels, assets, activeAgentSkill, agentDraft, autoEditOpen, selectedClipKeys, previewTimeMs]);
+  }, [petServiceScope, projectId, activeTimelineId, workspaceMode, timeline.revision, currentProject?.title, agentModels, assets, activeAgentSkill, agentDraft, autoEditOpen, selectedClipKeys, previewTimeMs]);
   useEffect(() => {
     if (agentDrawerOpen && projectId) {
-      openPetPageService('aicut-agent');
+      openPetPageService(workspaceMode === 'canvas' ? 'canvas-agent' : 'aicut-agent');
       setAgentDrawerOpen(false);
     }
   }, [agentDrawerOpen, projectId, petServiceScope]);
@@ -5002,6 +5002,7 @@ export default function AICutPage() {
             {workspaceMode === 'canvas' ? (
               <Suspense fallback={<div className="aicut-canvas-loading"><Spin tip="正在打开创作画布…" /></div>}>
                 <AICutCreativeCanvas
+                  petServiceScope={petServiceScope}
                   key={`${projectId}:${activeTimelineId}`}
                   projectId={projectId}
                   projectTitle={currentProject?.title || '当前工程'}
