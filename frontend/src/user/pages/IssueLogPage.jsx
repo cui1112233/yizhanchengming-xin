@@ -1,3 +1,4 @@
+import { formatWorkDateTime } from '../../shared/workDateTime.js';
 import { Button, Empty, Tag, Typography, message } from 'antd';
 import { Bug, KeyRound, RefreshCw, ServerCrash } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -5,8 +6,7 @@ import { listMyErrorLogs } from '../../shared/api/client';
 import { listBatchRewriteIssues } from '../../shared/api/novelFetchWorkshop';
 
 function formatTime(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('zh-CN', { hour12: false });
+  return formatWorkDateTime(value);
 }
 
 function readableKind(kind) {

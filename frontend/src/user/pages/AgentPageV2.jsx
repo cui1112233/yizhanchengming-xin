@@ -1,3 +1,4 @@
+import { formatWorkDateTime } from '../../shared/workDateTime.js';
 import { Button, ConfigProvider, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { ArrowRight, ArrowUp, Bot, ChevronDown, ChevronUp, Clock3, FilePenLine, FileText, Film, Image as ImageIcon, MessageCircle, MoreHorizontal, Music, Paperclip, Pin, RotateCcw, SearchCheck, Send, Sparkles, Square, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,10 +33,7 @@ import { AgentProxyWorkspace } from './AgentProxyWorkspace';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+  return formatWorkDateTime(value, '');
 }
 
 function createProblemSearchPrompt(text) {

@@ -1,3 +1,4 @@
+import { formatWorkDateTime } from '../../../shared/workDateTime.js';
 import { AppstoreOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, FileTextOutlined, FolderOpenOutlined, PlusOutlined, SearchOutlined, UnorderedListOutlined, UploadOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Alert, Button, Input, Modal, Popconfirm, Select, Upload, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -19,9 +20,7 @@ function readAsDataURL(file) {
 }
 
 function formatTime(value) {
-  if (!value) return '尚未开始制作';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '已创建' : date.toLocaleDateString('zh-CN');
+  return formatWorkDateTime(value, '尚未开始制作');
 }
 
 function AuthenticatedProjectCover({ src, alt, batchId }) {

@@ -1,3 +1,4 @@
+import { formatWorkDateTime } from '../../shared/workDateTime.js';
 import { Alert, Button, Empty, Input, message, Modal, Popconfirm, Select, Spin, Tabs, Upload } from 'antd';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, Clapperboard, Clock3, Download, FileText, Grid2X2, HelpCircle, History, LayoutGrid, Palette, PauseCircle, Pencil, Play, Plus, Search, Sparkles, Trash2, UploadCloud, Users, Map, Package, WandSparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,8 +17,7 @@ const styleOptions = ['通用动漫', '国风3D', '写实影视', '日系漫画'
 const assetTypeOptions = [{ value: 'character', label: '角色' }, { value: 'scene', label: '场景' }, { value: 'prop', label: '道具' }];
 
 function prettyTime(value) {
-  if (!value) return '刚刚';
-  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+  return formatWorkDateTime(value);
 }
 
 const episodeHeadingPattern = /^#[ \t]*第[ \t]*([0-9]+)[ \t]*集[^\n]*$/gm;

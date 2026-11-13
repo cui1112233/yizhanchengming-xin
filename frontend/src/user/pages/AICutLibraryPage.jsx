@@ -1,3 +1,4 @@
+import { formatWorkDateTime } from '../../shared/workDateTime.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Empty, Input, Modal, Select, Skeleton, message } from 'antd';
 import { ArrowLeft, ArrowUpRight, Clapperboard, Film, FolderOpen, Plus, Search, LayoutGrid, List } from 'lucide-react';
@@ -65,7 +66,7 @@ export default function AICutLibraryPage() {
               <span className="aicut-library-ratio">{project.aspectRatio}</span><span className="aicut-library-open">继续剪辑 <ArrowUpRight size={16} /></span>
             </a>
             <div className="aicut-library-card-info"><a href={projectEditorUrl(project.id)} title={project.title}>{project.title}</a><button type="button" aria-label={`重命名：${project.title}`} onClick={() => { setTitle(project.title); setDialog({ type: 'rename', id: project.id }); }}>重命名</button></div>
-            <p>修改于 {new Date(project.updatedAt || project.createdAt).toLocaleString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+            <p>修改于 {formatWorkDateTime(project.updatedAt || project.createdAt)}</p>
           </article>)}
         </div>}
       </>}
