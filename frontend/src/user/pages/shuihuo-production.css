@@ -4094,6 +4094,18 @@ body.shuihuo-reference-shell
   box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .18);
 }
 /* BF_CREATE_BATCH_BUTTONS_END */
+.shuihuo-create-project-modal .ant-btn.batch-factory-execute-now:not(:disabled) {
+  color: #f4cc7a !important;
+  font-weight: 650;
+  border-color: rgba(221, 175, 96, .65) !important;
+  background: linear-gradient(135deg, rgba(94, 69, 31, .82), rgba(45, 36, 25, .84)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 224, 163, .14), 0 2px 8px rgba(0, 0, 0, .14);
+}
+.shuihuo-create-project-modal .ant-btn.batch-factory-execute-now:not(:disabled):hover,
+.shuihuo-create-project-modal .ant-btn.batch-factory-execute-now:not(:disabled):focus-visible {
+  color: #ffe1a1 !important;
+  border-color: #e9bf72 !important;
+}
 
 /* BF_AUTOMATION_PRESET_BUTTONS_BEGIN */
 .batch-factory-automation-preset-modal .ant-btn:not(.ant-btn-link) {

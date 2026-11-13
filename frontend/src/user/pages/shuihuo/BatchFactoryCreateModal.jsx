@@ -794,8 +794,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
 
     <div className="batch-factory-create-toolbar">
       {isGiantMaterial
-        ? <><Button loading={giantBusy} disabled={giantBusy || busy || !inputText.trim()} onClick={resolveAllGiantMaterials}>解析全部</Button><Button type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>
-        : <>{!isCustomCopy ? <Button type="primary" onClick={handleAddPlatformGroup}>{editingPlatformId ? '保存书城修改' : '添加书城'}</Button> : null}<Button type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>}
+        ? <><Button loading={giantBusy} disabled={giantBusy || busy || !inputText.trim()} onClick={resolveAllGiantMaterials}>解析全部</Button><Button className="batch-factory-execute-now" type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>
+        : <>{!isCustomCopy ? <Button type="primary" onClick={handleAddPlatformGroup}>{editingPlatformId ? '保存书城修改' : '添加书城'}</Button> : null}<Button className="batch-factory-execute-now" type="primary" disabled={createDisabled} loading={busy} onClick={() => openAutomationDialog('immediate')}>立即执行</Button></>}
       <Button onClick={() => openAutomationDialog('scheduled')}>开始定时</Button>
       <Button onClick={openScheduleTasks}>定时任务</Button>
       <Button onClick={() => setInitialSettingsOpen(true)}>统一配置</Button>
