@@ -1,6 +1,6 @@
 import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
 import { normalizeGiantMaterialId } from '../giantMaterialTest.js';
-import { availableGiantMaterialBooks, buildGiantMaterialPlaceholderIntakes, findRegisteredGiantMaterialBook } from './batchFactoryGiantMaterialImport.js';
+import { availableGiantMaterialBooks, buildGiantMaterialPlaceholderIntakes, findRegisteredGiantMaterialBook, giantMaterialBookKey, selectGiantMaterialBook } from './batchFactoryGiantMaterialImport.js';
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { h3PromptEditRequest } from './h3PromptEditing.js';
 import { batchAccessErrorMessage } from './batchFactoryBatchAccessNotice.js';
@@ -367,7 +367,7 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
           const books = availableGiantMaterialBooks(material);
           if (!books.length) throw new Error('素材没有关联书籍信息');
           const durationSeconds = Number(material?.durationSeconds || material?.duration || 0);
-          items.push({ id, status: 'resolved', material, book: books[0], bookCount: books.length, durationSeconds: durationSeconds > 0 ? durationSeconds : 0, error: '', exists });
+          items.push({ id, status: 'resolved', material, book: books[0], books, selectedBookKey: giantMaterialBookKey(books[0]), bookCount: books.length, durationSeconds: durationSeconds > 0 ? durationSeconds : 0, error: '', exists });
         } catch (error) {
           items.push({ id, status: 'error', material: null, book: null, bookCount: 0, durationSeconds: 0, error: error?.message || '解析失败', exists });
         }
@@ -404,9 +404,13 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
           message.warning(`有 ${existingItems.length} 条素材已在当前批次：${existingItems.map(item => item.id).join('、')}。勾选“重复 ID 仍然添加”后再提交`);
           return;
         }
-        const multiBook = resolved.find(item => item.bookCount > 1);
-        if (multiBook) { message.error(`素材 ${multiBook.id} 关联多本书，请在新建批次的巨量弹窗里选择具体书目`); return; }
-        await onAddGiantBooks(resolved, allowDuplicate);
+        // 一个素材关联多本书时，用户在解析清单里选择具体书目后再加入。
+        const finalItems = resolved.map(item => (item.bookCount > 1
+          ? { ...item, book: selectGiantMaterialBook(item.material, item.selectedBookKey) }
+          : item));
+        const missingBook = finalItems.find(item => !item.book);
+        if (missingBook) { message.warning(`请为素材 ${missingBook.id} 选择具体书目`); return; }
+        await onAddGiantBooks(finalItems, allowDuplicate);
       } else {
         await onAddBooks(parsed, platform, allowDuplicate);
       }
@@ -433,11 +437,14 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
         {giantMode ? <div className="batch-factory-giant-parse">
           <Button size="small" onClick={parseGiant} loading={giantBusy}>解析素材</Button>
           {giantItems.length ? <div style={{ marginTop: 8 }}>
-            {giantItems.map(item => <div key={item.id} style={{ fontSize: 12, lineHeight: '20px' }}>
+            {giantItems.map(item => <div key={item.id} style={{ fontSize: 12, lineHeight: '20px', marginBottom: 4 }}>
               <b>{item.id}</b>
-              {item.status === 'resolved'
-                ? ` · ${item.book?.title || item.material?.title || '未命名'} · ${item.durationSeconds ? `${Math.round(item.durationSeconds)} 秒` : '时长未知'} · ${item.exists ? '已在当前批次（需勾选重复添加）' : '可添加'}`
-                : ` · 解析失败：${item.error}`}
+              {item.status === 'resolved' ? <>
+                {item.bookCount > 1
+                  ? <Select size="small" style={{ minWidth: 230, marginLeft: 6 }} value={item.selectedBookKey || undefined} onChange={value => setGiantItems(current => current.map(row => row.id === item.id ? { ...row, selectedBookKey: String(value) } : row))} options={(item.books || []).map(book => ({ value: giantMaterialBookKey(book), label: `${book.title} · ${book.platformBookId || book.bookId}` }))} />
+                  : ` · ${item.book?.title || item.material?.title || '未命名'}`}
+                {` · ${item.durationSeconds ? `${Math.round(item.durationSeconds)} 秒` : '时长未知'} · ${item.exists ? '已在当前批次（需勾选重复添加）' : '可添加'}`}
+              </> : ` · 解析失败：${item.error}`}
             </div>)}
           </div> : null}
         </div> : null}
