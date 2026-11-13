@@ -330,6 +330,8 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
   const [platform, setPlatform] = useState('');
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [giantItems, setGiantItems] = useState([]);
+  const [giantBusy, setGiantBusy] = useState(false);
   const options = useMemo(() => {
     const base = Array.isArray(platformOptions) && platformOptions.length
       ? platformOptions
@@ -351,17 +353,63 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
   const duplicates = giantMode
     ? giantIds.filter(id => existingGiantIds.has(id))
     : parsed.filter(item => existing.has(item.bookId));
+  // 巨量素材先解析再添加：逐条展示解析结果（书名/时长/是否已存在/错误原因），
+  // 用户确认重复项后才会真正写入批次。
+  async function parseGiant() {
+    if (!giantIds.length) { message.warning('请先填写巨量素材 ID'); return []; }
+    setGiantBusy(true);
+    const items = [];
+    try {
+      for (const id of giantIds) {
+        const exists = existingGiantIds.has(id);
+        try {
+          const material = await resolveGiantMaterialForBatch(id);
+          const books = availableGiantMaterialBooks(material);
+          if (!books.length) throw new Error('素材没有关联书籍信息');
+          const durationSeconds = Number(material?.durationSeconds || material?.duration || 0);
+          items.push({ id, status: 'resolved', material, book: books[0], bookCount: books.length, durationSeconds: durationSeconds > 0 ? durationSeconds : 0, error: '', exists });
+        } catch (error) {
+          items.push({ id, status: 'error', material: null, book: null, bookCount: 0, durationSeconds: 0, error: error?.message || '解析失败', exists });
+        }
+      }
+    } finally {
+      setGiantItems(items);
+      setGiantBusy(false);
+    }
+    return items;
+  }
+  useEffect(() => { setGiantItems([]); }, [inputText]);
   async function submit() {
     if (giantMode && !giantIds.length) { message.warning('请填写巨量素材 ID，多个用换行或逗号分隔'); return; }
     if (!giantMode && !parsed.length) { message.warning('请按每行“书 ID”或“书 ID + 书名”输入'); return; }
     if (!platform) { message.warning('请选择书城'); return; }
     if (!giantMode && !onAddBooks) { message.warning('当前批次不支持添加书城书籍'); return; }
     if (giantMode && !onAddGiantBooks) { message.warning('当前批次不支持添加巨量素材'); return; }
-    if (duplicates.length && !allowDuplicate) { message.warning(`发现 ${duplicates.length} 本已存在的书，勾选“重复 ID 仍然添加”后再提交`); return; }
+    if (!giantMode && duplicates.length && !allowDuplicate) { message.warning(`发现 ${duplicates.length} 本已存在的书，勾选“重复 ID 仍然添加”后再提交`); return; }
     setBusy(true);
     try {
-      if (giantMode) await onAddGiantBooks(giantIds, allowDuplicate);
-      else await onAddBooks(parsed, platform, allowDuplicate);
+      if (giantMode) {
+        const items = giantItems.length && giantItems.map(item => item.id).join(',') === giantIds.join(',')
+          ? giantItems
+          : await parseGiant();
+        const resolved = items.filter(item => item.status === 'resolved');
+        const invalid = items.filter(item => item.status === 'error');
+        if (!resolved.length) {
+          message.error(invalid.map(item => `${item.id}: ${item.error}`).join('；') || '巨量素材解析失败');
+          return;
+        }
+        if (invalid.length) message.warning(`有 ${invalid.length} 条素材解析失败，已跳过：${invalid.map(item => item.id).join('、')}`);
+        const existingItems = resolved.filter(item => item.exists);
+        if (existingItems.length && !allowDuplicate) {
+          message.warning(`有 ${existingItems.length} 条素材已在当前批次：${existingItems.map(item => item.id).join('、')}。勾选“重复 ID 仍然添加”后再提交`);
+          return;
+        }
+        const multiBook = resolved.find(item => item.bookCount > 1);
+        if (multiBook) { message.error(`素材 ${multiBook.id} 关联多本书，请在新建批次的巨量弹窗里选择具体书目`); return; }
+        await onAddGiantBooks(resolved, allowDuplicate);
+      } else {
+        await onAddBooks(parsed, platform, allowDuplicate);
+      }
       setInputText('');
       setAllowDuplicate(false);
       setOpen(false);
@@ -382,6 +430,17 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
         {giantMode
           ? <label className="batch-factory-engine-field"><span><b>巨量素材 ID</b><small>每行一个，也可用逗号分隔</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'7123456789012345678\n7123456789012345679'} /></label>
           : <label className="batch-factory-engine-field"><span><b>书 ID / 书名</b><small>每行一本，例如：2091926811672429633\t书名</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'2091926811672429633\n209208048803840415\t第二本小说'} /></label>}
+        {giantMode ? <div className="batch-factory-giant-parse">
+          <Button size="small" onClick={parseGiant} loading={giantBusy}>解析素材</Button>
+          {giantItems.length ? <div style={{ marginTop: 8 }}>
+            {giantItems.map(item => <div key={item.id} style={{ fontSize: 12, lineHeight: '20px' }}>
+              <b>{item.id}</b>
+              {item.status === 'resolved'
+                ? ` · ${item.book?.title || item.material?.title || '未命名'} · ${item.durationSeconds ? `${Math.round(item.durationSeconds)} 秒` : '时长未知'} · ${item.exists ? '已在当前批次（需勾选重复添加）' : '可添加'}`
+                : ` · 解析失败：${item.error}`}
+            </div>)}
+          </div> : null}
+        </div> : null}
         {duplicates.length ? <Alert type="warning" showIcon message={`发现 ${duplicates.length} 本已存在的书`} description={duplicates.join('、')} /> : null}
         <Checkbox checked={allowDuplicate} onChange={event => setAllowDuplicate(event.target.checked)}>重复 ID 仍然添加</Checkbox>
       </Space>
@@ -3886,12 +3945,24 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       message.success(automationStarted ? `已添加 ${newlyAddedBooks.length} 本书，并已接入自动生产` : `已添加并获取 ${newlyAddedBooks.length} 本书的正文与分类信息`);
     }
   }
-  // 「添加新书」的巨量获取：素材 ID 先解析成占位书追加进当前批次，再给执行器
-  // 派发 OCR 任务。正文由执行器回填，这里不走书城直取。
-  async function addGiantBooksToBatch(materialIds, allowDuplicate) {
+  // 「添加新书」的巨量获取：前端先解析素材并让用户确认，这里把解析结果登记
+  // 成占位书追加进当前批次，再给执行器派发 OCR 任务；正文由执行器回填。
+  async function addGiantBooksToBatch(parsedItems, allowDuplicate) {
     if (!batch?.id) throw new Error('当前批次尚未加载完成，请刷新后重试');
-    const ids = [...new Set((Array.isArray(materialIds) ? materialIds : []).map(item => normalizeGiantMaterialId(item)).filter(Boolean))];
-    if (!ids.length) throw new Error('请填写有效的巨量素材 ID');
+    const items = (Array.isArray(parsedItems) ? parsedItems : []).filter(item => item?.status === 'resolved' && item?.material && item?.book);
+    if (!items.length) throw new Error('没有可添加的巨量素材');
+    const entries = [...new Map(items.map(item => [String(item.id), {
+      giantMaterialId: String(item.id),
+      material: item.material,
+      book: item.book,
+      durationSeconds: Number(item.durationSeconds || 0)
+    }])).values()].filter(entry => entry.durationSeconds > 0);
+    if (!entries.length) throw new Error('素材没有有效的视频时长');
+    if (allowDuplicate !== true) {
+      const existingKeys = new Set(books.map(book => String(book?.sourceMetadata?.giantMaterialId || book?.bookId || '').trim()).filter(Boolean));
+      const duplicates = entries.filter(entry => existingKeys.has(entry.giantMaterialId) || existingKeys.has(String(entry.book.platformBookId || entry.book.bookId || '').trim()));
+      if (duplicates.length) throw new Error(`发现 ${duplicates.length} 本已在当前批次，请勾选“重复 ID 仍然添加”后再提交`);
+    }
     const executorResponse = await listGiantMaterialExecutors();
     const executors = Array.isArray(executorResponse?.executors)
       ? executorResponse.executors
@@ -3900,22 +3971,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       throw new Error('巨量素材执行器未安装或未登录，请先在「设置 → 执行器状态」完成配对');
     }
     const inheritedContent = inheritedContentSettingsForNewBook(books, contentRangeLines, contentCaptureCharacters);
-    const entries = [];
     const failures = [];
-    for (const id of ids) {
-      try {
-        const material = await resolveGiantMaterialForBatch(id);
-        const candidates = availableGiantMaterialBooks(material);
-        if (!candidates.length) throw new Error('素材没有关联书籍信息');
-        if (candidates.length > 1) throw new Error('素材关联多本书，请在新建批次的巨量弹窗里选择具体书目');
-        const durationSeconds = Number(material?.durationSeconds || material?.duration || 0);
-        if (!(durationSeconds > 0)) throw new Error('素材没有有效的视频时长');
-        entries.push({ giantMaterialId: id, material, book: candidates[0], durationSeconds });
-      } catch (error) {
-        failures.push(`${id}: ${error?.message || '解析失败'}`);
-      }
-    }
-    if (!entries.length) throw new Error(failures.join('；') || '巨量素材解析失败');
     const intakeResult = await createNovelFetchIntake(buildGiantMaterialPlaceholderIntakes(
       entries.map(entry => ({ giantMaterialId: entry.giantMaterialId, material: entry.material, book: entry.book })),
       { contentRangeLines: inheritedContent.contentRangeLines, originalReadStrategy: 'ocr_first' }
