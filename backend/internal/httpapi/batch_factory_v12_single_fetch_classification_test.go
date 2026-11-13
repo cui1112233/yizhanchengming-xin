@@ -166,3 +166,50 @@ func TestEnsureAutomationSourceRecoversPendingClassification(t *testing.T) {
 		t.Fatalf("reclassified once: gender calls=%d style calls=%d", genderCalls, styleCalls)
 	}
 }
+
+// 121 渠道故障会返回“获取书籍信息失败”。可重试判定必须看原始上游原因，
+// 只看展示文案会把这类可自愈的故障记成永久失败，只能人工处理。
+func TestRetryableBatchFetchErrorCoversUpstreamChannelOutage(t *testing.T) {
+	channelErr := fmt.Errorf("121 upstream business error 400: 获取书籍信息失败（bookid=7707248192760319001 platform=7）")
+	if !retryableBatchFetchError(channelErr) {
+		t.Fatal("upstream channel failure must stay retryable")
+	}
+	displayErr := batchFetchDisplayError(channelErr, batchfactoryv11.Book{BookID: "7707248192760319001"})
+	if !retryableBatchFetchError(displayErr) {
+		t.Fatalf("display error must keep the retryable cause: %v", displayErr)
+	}
+	decoderErr := fmt.Errorf("121 upstream returned invalid JSON: %w", fmt.Errorf("invalid character '<' looking for beginning of value"))
+	if !retryableBatchFetchError(decoderErr) {
+		t.Fatal("HTML-prefixed response must stay retryable")
+	}
+	if retryableBatchFetchError(fmt.Errorf("121 upstream 参数不完整：缺少书号或书城 ID（bookid=\"\" platform=\"7\"）")) {
+		t.Fatal("local parameter validation must not be retried")
+	}
+}
+
+func TestPersistBatchFetchFailureMarksHTMLPrefixedUpstreamErrorRetryable(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "渠道故障批次",
+		Books: []batchfactoryv11.CreateBookInput{{BookID: "7707248192760319001", Title: "小姑子", Platform: "7"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	channelErr := fmt.Errorf("121 upstream business error 400: 获取书籍信息失败（bookid=%s platform=7）", book.BookID)
+	persistBatchFetchFailure(ctx, store, "alice", batch.ID, book, batchFetchDisplayError(channelErr, book), 2)
+
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := latest.Books[0].SourceMetadata
+	if metadata["fetchRetryable"] != true {
+		t.Fatalf("fetchRetryable=%v, want true (metadata=%#v)", metadata["fetchRetryable"], metadata)
+	}
+	if !strings.Contains(fmt.Sprint(metadata["fetchError"]), "无法读取") {
+		t.Fatalf("fetchError=%v, want the user-facing explanation", metadata["fetchError"])
+	}
+}

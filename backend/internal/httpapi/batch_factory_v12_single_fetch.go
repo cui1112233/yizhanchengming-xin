@@ -373,7 +373,13 @@ func persistBatchFetchFailure(ctx context.Context, store batchfactoryv11.Store, 
 		delete(metadata, "fetchTechnicalError")
 		technicalErr = err
 	}
-	metadata["fetchRetryable"] = retryableBatchFetchError(technicalErr)
+	// 可重试判定要看原始错误：technicalErr 可能只是 JSON 解码的
+	// "invalid character '<'"，丢掉外层“上游返回异常”的语义。
+	retryable := retryableBatchFetchError(err)
+	if !retryable {
+		retryable = retryableBatchFetchError(technicalErr)
+	}
+	metadata["fetchRetryable"] = retryable
 	metadata["fetchAttempts"] = attempts
 	metadata["fetchFailedAt"] = time.Now().UTC()
 	// 失败登记本身也可能因为重试期间 revision 已变化而写不进去；先回读最新
@@ -415,8 +421,8 @@ func (e *batchFetchUserError) Error() string { return e.message }
 func (e *batchFetchUserError) Unwrap() error { return e.cause }
 
 // batchFetchDisplayError turns the upstream's technical 400 into an action the
-// user can actually take. A missing book-info record is deterministic: retrying
-// the same book ID and platform cannot repair it.
+// user can actually take. “获取书籍信息失败”既可能是书号/书城不匹配，也可能是
+// 上游某个书城渠道临时不可用，所以文案要同时给出“稍后重试”和“换书号/贴正文”。
 func batchFetchDisplayError(err error, book batchfactoryv11.Book) error {
 	if err == nil || !strings.Contains(err.Error(), "获取书籍信息失败") {
 		return err
@@ -430,7 +436,7 @@ func batchFetchDisplayError(err error, book batchfactoryv11.Book) error {
 		platformName = strings.TrimSpace(book.Platform)
 	}
 	return &batchFetchUserError{
-		message: fmt.Sprintf("书号 %s 在%s无法读取：请检查ID是否正确，可能是书号与书名/书城不匹配，或该书已经下架。请更换正确书号，或打开“编辑内容”粘贴正文后重试", bookID, platformName),
+		message: fmt.Sprintf("书号 %s 在%s无法读取：可能是书号与书名/书城不匹配、该书已下架，或该平台渠道暂时不可用。可稍后重试；若持续失败请更换书号，或打开“编辑内容”粘贴正文后重试", bookID, platformName),
 		cause:   err,
 	}
 }
@@ -439,11 +445,28 @@ func retryableBatchFetchError(err error) bool {
 	if err == nil {
 		return false
 	}
-	message := strings.ToLower(err.Error())
+	// 展示层错误（batchFetchUserError）会把上游原因包在 cause 里；只测外层
+	// 文案会把可自愈的上游故障误判成永久失败，所以两层都要判断。
+	if retryableBatchFetchMessage(err.Error()) {
+		return true
+	}
+	if cause := errors.Unwrap(err); cause != nil {
+		return retryableBatchFetchMessage(cause.Error())
+	}
+	return false
+}
+
+func retryableBatchFetchMessage(message string) bool {
+	message = strings.ToLower(message)
 	return strings.Contains(message, "timed out") ||
 		strings.Contains(message, "request failed") ||
 		strings.Contains(message, "http status 5") ||
-		strings.Contains(message, "returned invalid json")
+		strings.Contains(message, "returned invalid json") ||
+		strings.Contains(message, "不是 json") ||
+		// 121 的“获取书籍信息失败”既可能是书号/书城不匹配，也可能是上游某个
+		// 书城渠道临时故障（例如番茄免费渠道 PHP 告警）。它只重试一次，代价
+		// 很低，但能把渠道恢复后的书自动救回来。
+		strings.Contains(message, "获取书籍信息失败")
 }
 
 func classifyFetchedBatchBook(ctx context.Context, owner string, bookInfo novelfetchworkshop.BookInfo, sourceText string, metadata map[string]any, classification batchFetchClassification) map[string]any {

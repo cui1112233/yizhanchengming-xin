@@ -159,6 +159,44 @@ func TestUpstreamFetchRejectsNonJSONWithoutBody(t *testing.T) {
 	}
 }
 
+// 121 在输出 JSON 前会先 print PHP Warning/HTML。这里必须跳过前缀继续解析，
+// 否则正常正文会被误判成 invalid JSON。
+func TestUpstreamFetchSkipsHTMLWarningPrefixBeforeJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<br />
+<b>Warning</b>:  Undefined array key "app_type_permission_status" in <b>/www/wwwroot/txt.121w.com/class/changduiaa.php</b> on line <b>107</b><br />
+{"code":200,"msg":"获取章节内容成功","data":"正文内容","bookinfo":{"book_name":"书名"}}`))
+	}))
+	defer server.Close()
+
+	result, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "7", 4000)
+	if err != nil {
+		t.Fatalf("err = %v; want the JSON after the HTML warning to be parsed", err)
+	}
+	if result.OriginalRaw != "正文内容" || result.BookInfo.WorkTitle != "书名" {
+		t.Fatalf("result = %#v; want parsed payload", result)
+	}
+}
+
+// 业务失败时前缀同样存在，必须把真正的上游错误抛出来，而不是首个字符 '<'。
+func TestUpstreamFetchReportsBusinessErrorBehindHTMLWarning(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<br />
+<b>Warning</b>:  Undefined array key "app_type_permission_status" in <b>/www/wwwroot/txt.121w.com/class/changduiaa.php</b> on line <b>107</b><br />
+书籍 7707248192760319001 数据解析失败
+{"code":400,"msg":"获取书籍信息失败","data":null}`))
+	}))
+	defer server.Close()
+
+	_, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "7707248192760319001", "7", 4000)
+	if err == nil || !strings.Contains(err.Error(), "获取书籍信息失败") {
+		t.Fatalf("err = %v; want the upstream business error behind the HTML warning", err)
+	}
+	if strings.Contains(err.Error(), "invalid character") {
+		t.Fatalf("err = %v; must not surface the JSON decoder error", err)
+	}
+}
+
 func TestUpstreamFetchRejectsHTTP500WithoutBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

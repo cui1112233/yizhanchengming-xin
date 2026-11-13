@@ -1,6 +1,7 @@
 package novelfetchworkshop
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -111,12 +112,48 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 		return FetchResult{}, fmt.Errorf("121 upstream HTTP status %d", response.StatusCode)
 	}
 
-	var payload upstreamResponse
-	if err := json.NewDecoder(io.LimitReader(response.Body, 16<<20)).Decode(&payload); err != nil {
+	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("121 upstream response read failed: %w", err)
+	}
+	payload, err := decodeUpstreamPayload(body)
+	if err != nil {
 		return FetchResult{}, fmt.Errorf("121 upstream returned invalid JSON: %w", err)
 	}
 	if payload.Code != http.StatusOK {
 		return FetchResult{}, fmt.Errorf("121 upstream business error %d: %s（bookid=%s platform=%s）", payload.Code, strings.TrimSpace(payload.Message), bookID, platformID)
 	}
 	return FetchResult{Code: payload.Code, Message: payload.Message, OriginalRaw: payload.Data, BookInfo: payload.BookInfo}, nil
+}
+
+// decodeUpstreamPayload 容忍 121 在 JSON 前输出的 PHP 告警/HTML 片段。
+// 对方接口报错时会把 Warning 直接 print 在 json_encode 之前，严格按 JSON
+// 解码只会看到首个字符 '<'，真正的业务错误（如“获取书籍信息失败”）被丢掉。
+func decodeUpstreamPayload(body []byte) (upstreamResponse, error) {
+	var payload upstreamResponse
+	if err := json.Unmarshal(bytes.TrimSpace(body), &payload); err == nil {
+		return payload, nil
+	}
+	start := bytes.IndexByte(body, '{')
+	if start < 0 {
+		return payload, fmt.Errorf("上游返回的不是 JSON：%s", upstreamBodySnippet(body))
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(body[start:]), &payload); err == nil {
+		return payload, nil
+	}
+	return payload, fmt.Errorf("上游返回的不是 JSON：%s", upstreamBodySnippet(body))
+}
+
+// upstreamBodySnippet 只保留一小段可读文本，避免把整页 HTML 写进错误信息。
+func upstreamBodySnippet(body []byte) string {
+	const limit = 160
+	text := strings.Join(strings.Fields(string(body)), " ")
+	runes := []rune(text)
+	if len(runes) > limit {
+		return string(runes[:limit]) + "…"
+	}
+	if text == "" {
+		return "（空响应）"
+	}
+	return text
 }
