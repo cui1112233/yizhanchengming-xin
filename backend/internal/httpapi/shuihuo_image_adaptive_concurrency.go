@@ -9,6 +9,18 @@ import (
 
 const shuihuoAdaptiveRecoverySuccesses = 8
 
+// shuihuoClampHostConcurrency 与单本书的出图路数（最多 4）分开：
+// 这里限制的是整条网关的并发，允许自适应爬到 30 路。
+func shuihuoClampHostConcurrency(value int) int {
+	if value < 1 {
+		return 1
+	}
+	if value > 30 {
+		return 30
+	}
+	return value
+}
+
 type shuihuoAdaptiveHostState struct {
 	limit     int
 	failures  int
@@ -26,15 +38,15 @@ func newShuihuoAdaptiveImageConcurrency() *shuihuoAdaptiveImageConcurrency {
 }
 
 func (c *shuihuoAdaptiveImageConcurrency) state(host string, configured int) *shuihuoAdaptiveHostState {
-	configured = shuihuoClampImageConcurrency(configured)
+	configured = shuihuoClampHostConcurrency(configured)
 	host = strings.ToLower(strings.TrimSpace(host))
 	state := c.hosts[host]
 	if state == nil {
 		// 图片网关在冷启动时直接压 4 路，实测会出现四条连接一起不返回。
-		// 每个域名先从稳定的 2 路开始，连续成功后再逐级升到用户配置值。
-		initial := configured
-		if initial > shuihuoImageConcurrencyDefault {
-			initial = shuihuoImageConcurrencyDefault
+		// 每个域名先从稳定的 2 路开始，连续成功后再逐级升到天花板。
+		initial := 2
+		if initial > configured {
+			initial = configured
 		}
 		state = &shuihuoAdaptiveHostState{limit: initial, semaphore: newShuihuoImageSemaphore(initial)}
 		c.hosts[host] = state
@@ -56,7 +68,7 @@ func (c *shuihuoAdaptiveImageConcurrency) report(host string, configured int, ou
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	state := c.state(host, configured)
-	configured = shuihuoClampImageConcurrency(configured)
+	configured = shuihuoClampHostConcurrency(configured)
 	switch outcome {
 	case "reset", "unexpected_eof", "body_stalled", "tls_timeout":
 		state.successes = 0

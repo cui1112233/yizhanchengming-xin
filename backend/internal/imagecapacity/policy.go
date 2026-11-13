@@ -67,12 +67,12 @@ func imageCount(n int) int {
 	return n
 }
 
-// 出图并发不再由用户配置：上限按全站自动判定，起始值取较宽的 20 路，
-// 遇到 429/连续瞬时失败时由运行时的自适应逻辑自动降档，恢复后逐级回升。
+// 出图并发不再由用户配置：从保守的 8 路起步，由运行时的自适应阶梯按
+// 真实成功/限流结果逐级探测，上限 30 路；不同网关会各自收敛到能承受的值。
 const (
 	AutoAccountLimit = 30
 	AutoModelLimit   = 30
-	AutoInitialLimit = 20
+	AutoInitialLimit = 8
 )
 
 // upstreamHostKey 只按上游主机归组，不包含密钥：同一网关的不同密钥共享

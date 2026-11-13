@@ -1,4 +1,4 @@
-package httpapi
+﻿package httpapi
 
 import (
 	"archive/zip"
@@ -77,6 +77,22 @@ func shuihuoClampImageConcurrency(value int) int {
 	}
 	if value > shuihuoImageConcurrencyMax {
 		return shuihuoImageConcurrencyMax
+	}
+	return value
+}
+
+// shuihuoImageHostConcurrencyCeiling 是单一上游网关的并发天花板，只作为
+// 自适应阶梯的上限，不代表一开始就跑这么多路：每个域名从 2 路起步，
+// 连续成功才 +1，连续失败立刻降回 2 路，最终各自收敛到该网关能承受的值。
+func shuihuoImageHostConcurrencyCeiling() int {
+	const fallback = 30
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_IMAGE_HOST_CONCURRENCY"))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 || value > 30 {
+		return fallback
 	}
 	return value
 }
@@ -3932,9 +3948,17 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		attemptStart := time.Now()
 		var headerElapsed, bodyElapsed, downloadElapsed, saveElapsed time.Duration
 		configuredConcurrency := shuihuoImageConcurrencyFromContext(ctx)
+		// 全站共享网关的并发不由单本书的出图路数决定：每本书默认 4 路，
+		// 若把 4 当成整条网关的上限，全站就永远只有 4 张图在跑。
+		// 这里改为按网关自适应阶梯：从 2 路起，连续成功后逐级升，最多到
+		// QIANTIE_IMAGE_HOST_CONCURRENCY（默认 30），连续失败立即降回 2 路。
+		hostCeiling := shuihuoImageHostConcurrencyCeiling()
+		if hostCeiling < configuredConcurrency {
+			hostCeiling = configuredConcurrency
+		}
 		parsedEndpoint, _ := url.Parse(strings.TrimSpace(endpoint))
 		adaptiveHost := strings.ToLower(strings.TrimSpace(parsedEndpoint.Host))
-		adaptiveLimit := shuihuoAdaptiveImageLimiter.limit(adaptiveHost, configuredConcurrency)
+		adaptiveLimit := shuihuoAdaptiveImageLimiter.limit(adaptiveHost, hostCeiling)
 		slotCtx := context.WithValue(ctx, shuihuoImageConcurrencyContextKey{}, adaptiveLimit)
 		if taskSemaphore := shuihuoImageSemaphoreFromContext(slotCtx); taskSemaphore != nil {
 			taskSemaphore.setLimit(adaptiveLimit)
@@ -3976,7 +4000,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		if err != nil {
 			releaseSlots()
 			errorKind := shuihuoImageAttemptKindOfError(err, 0)
-			shuihuoAdaptiveImageLimiter.report(adaptiveHost, configuredConcurrency, errorKind)
+			shuihuoAdaptiveImageLimiter.report(adaptiveHost, hostCeiling, errorKind)
 			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, queued: queued, header: headerElapsed, errorKind: errorKind, model: target.ModelID, detail: err.Error()})
 			return "", "", fmt.Errorf("%w: 图片通道请求失败：%w", batchfactoryv11.ErrUpstream, err)
 		}
@@ -4027,7 +4051,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 			if errorKind == "other" {
 				errorKind = "body_read_failed"
 			}
-			shuihuoAdaptiveImageLimiter.report(adaptiveHost, configuredConcurrency, errorKind)
+			shuihuoAdaptiveImageLimiter.report(adaptiveHost, hostCeiling, errorKind)
 			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, header: headerElapsed, body: bodyElapsed, errorKind: errorKind, model: target.ModelID, detail: wrapped.Error()})
 			if response.StatusCode == http.StatusOK && shuihuoImageDedupeBilledRetry() {
 				// 200 说明对面已经按成功计费。断流（BODY_STALLED）允许在页级/日预算内
@@ -4116,7 +4140,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 			}
 			return "", "", err
 		}
-		shuihuoAdaptiveImageLimiter.report(adaptiveHost, configuredConcurrency, "ok")
+		shuihuoAdaptiveImageLimiter.report(adaptiveHost, hostCeiling, "ok")
 		logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, header: headerElapsed, body: bodyElapsed, download: downloadElapsed, save: saveElapsed, errorKind: "ok", model: target.ModelID})
 		return mediaType, saved.StorageRef, nil
 	}
