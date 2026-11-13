@@ -25,11 +25,15 @@ func BuildComicBootstrapContract(book Book, snapshot DirectorSnapshot) (PromptCo
 		return PromptContract{}, NewConfigRequiredError("请先选择漫画资产提示词和漫画分镜提示词")
 	}
 
+	structureLock := comicPageStructureLock
+	if strings.TrimSpace(config.ID) == ComicPageIllustratedTextPresetID {
+		structureLock = comicIllustratedTextStructureLock
+	}
 	sections := []string{
 		prompt.ComicBootstrapProtocol,
 		"【当前漫画资产推导规则】\n" + strings.TrimSpace(config.Assets.Body),
 		"【当前漫画分页与页面提示词规则】\n" + expandRecoveredComicPreset(strings.TrimSpace(config.Body), book, strings.TrimSpace(book.SourceText), !AssetImagesEnabled(snapshot.Effective)),
-		comicPromptTextForAspect(comicPageStructureLock, EffectiveImageAspectRatio(snapshot.Effective)),
+		comicPromptTextForAspect(structureLock, EffectiveImageAspectRatio(snapshot.Effective)),
 	}
 	if body := strings.TrimSpace(config.ImageDerivation.Body); body != "" {
 		sections = append(sections, "【图片描述词推导规则】\n"+body)

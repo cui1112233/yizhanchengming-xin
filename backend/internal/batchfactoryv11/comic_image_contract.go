@@ -108,7 +108,11 @@ func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, 
 		appendFixed(prefix)
 	}
 	if purpose == ComicImagePurposePage {
-		appendFixed(comicPromptTextForAspect(comicPageStructureLock, EffectiveImageAspectRatio(settings)))
+		lock := comicPageStructureLock
+		if strings.TrimSpace(config.ID) == ComicPageIllustratedTextPresetID {
+			lock = comicIllustratedTextStructureLock
+		}
+		appendFixed(comicPromptTextForAspect(lock, EffectiveImageAspectRatio(settings)))
 	} else {
 		appendFixed("保留资产参考图中的身份、脸型、发型、服装、配饰或物体结构；忽略原始参考图的摄影、渲染和画风，最终画风严格遵循本书画风预设。")
 	}

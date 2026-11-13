@@ -275,6 +275,69 @@ func comicPageLiteralTestSettings(t *testing.T, presetID string) SettingsPatch {
 	}
 }
 
+func illustratedTextPromptSettings(t *testing.T, presetID string) SettingsPatch {
+	t.Helper()
+	return SettingsPatch{
+		"productionMode":     rawSetting(t, "comic"),
+		"assetImagesEnabled": rawSetting(t, false),
+		"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+			"enabled":  true,
+			"presetId": presetID,
+			"body":     "单页图文卡：上半文字区按原文排版，下半插画，不分格，不画气泡。",
+			"style": map[string]any{
+				"presetId": "batch-comic-style-08",
+				"body":     "韩漫条漫画风",
+			},
+		}}),
+	}
+}
+
+func TestIllustratedTextPresetUsesCardStructureLock(t *testing.T) {
+	book := Book{ID: "book_1", Title: "测试书", SourceText: "第一页正文。第二页正文。"}
+	videos := []Video{{ID: "video_1", Label: "漫画页 01", VideoPrompt: "第一页正文。"}}
+	contract, err := BuildComicPromptContract(book, videos, 0, DirectorSnapshot{Effective: illustratedTextPromptSettings(t, ComicPageIllustratedTextPresetID)})
+	if err != nil {
+		t.Fatalf("build contract: %v", err)
+	}
+	if !strings.Contains(contract.SystemPrompt, "【单页图文卡结构约束】") {
+		t.Fatalf("文字插画版必须使用图文卡版式锁:\n%s", contract.SystemPrompt)
+	}
+	if strings.Contains(contract.SystemPrompt, "【漫画页面结构约束】") {
+		t.Fatalf("文字插画版不能注入分格漫画版式锁:\n%s", contract.SystemPrompt)
+	}
+	if strings.Contains(contract.SystemPrompt, "漫画文字密度") {
+		t.Fatalf("文字插画版不能注入 45-70 字密度规则:\n%s", contract.SystemPrompt)
+	}
+	if !strings.Contains(contract.SystemPrompt, "上半为文字区") {
+		t.Fatalf("文字插画版必须声明上半文字区/下半插画区:\n%s", contract.SystemPrompt)
+	}
+}
+
+func TestPanelPresetKeepsPanelStructureLock(t *testing.T) {
+	book := Book{ID: "book_1", Title: "测试书", SourceText: "第一页正文。"}
+	videos := []Video{{ID: "video_1", Label: "漫画页 01", VideoPrompt: "第一页正文。"}}
+	contract, err := BuildComicPromptContract(book, videos, 0, DirectorSnapshot{Effective: illustratedTextPromptSettings(t, "batch-comic-page")})
+	if err != nil {
+		t.Fatalf("build contract: %v", err)
+	}
+	if !strings.Contains(contract.SystemPrompt, "【漫画页面结构约束】") || !strings.Contains(contract.SystemPrompt, "漫画文字密度") {
+		t.Fatalf("分格漫画预设必须保留原版式锁和密度规则:\n%s", contract.SystemPrompt)
+	}
+}
+
+func TestIllustratedTextPresetImageContractUsesCardLock(t *testing.T) {
+	contract, err := BuildComicImageContract(illustratedTextPromptSettings(t, ComicPageIllustratedTextPresetID), ComicImagePurposePage, "", "上半文字区，下半插画。", nil, nil)
+	if err != nil {
+		t.Fatalf("build image contract: %v", err)
+	}
+	if !strings.Contains(contract.Prompt, "【单页图文卡结构约束】") {
+		t.Fatalf("文字插画版最终出图 prompt 必须是图文卡结构:\n%s", contract.Prompt)
+	}
+	if strings.Contains(contract.Prompt, "【漫画页面结构约束】") {
+		t.Fatalf("文字插画版最终出图 prompt 不能出现分格版式锁:\n%s", contract.Prompt)
+	}
+}
+
 func TestComicPageIllustratedTextPresetGatesOnlyIllustratedText(t *testing.T) {
 	if !ComicPageIllustratedTextPreset(comicPageLiteralTestSettings(t, ComicPageIllustratedTextPresetID)) {
 		t.Fatal("CM·文字插画版必须开启原文注入")

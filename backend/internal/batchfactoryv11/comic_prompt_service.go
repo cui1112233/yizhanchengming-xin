@@ -76,6 +76,11 @@ func comicPromptConcurrencyFromContext(ctx context.Context) int {
 // supplied by the selected comic style and must never be fixed here.
 const comicPageStructureLock = "【漫画页面结构约束】成图为{{image_aspect_ratio}}{{image_orientation}}的中文漫画页：保留清楚外留边和等宽格间距，格线清晰；根据剧情选择合适格数，阅读顺序固定为从上到下、同一行从左到右。旁白使用矩形框，对白使用圆形或椭圆气泡，简体中文短句不得遮挡脸部、手部或关键道具。具体线稿、上色、材质、人物比例和渲染方式只听所选画风预设，不得固定为其他画风。禁止水印、乱码、倾斜分格、无序拼贴、单张海报或后期拼图。"
 
+// comicIllustratedTextStructureLock 是「CM·文字插画版」专用的版式锁：单页
+// 图文卡，上半文字区逐字排版、下半插画，不分格、不画气泡。它替代分格漫画
+// 的 comicPageStructureLock，否则模型会被强制回多格漫画。
+const comicIllustratedTextStructureLock = "【单页图文卡结构约束】成图为{{image_aspect_ratio}}{{image_orientation}}的中文单页图文卡：上半部分是文字区，按原文逐字排版，手写感楷体、深墨色、行距舒展；下半部分是插画区，画本页人物、动作、场景、光影与机位。两区自然过渡，留白充分；不画分格线、不做海报式拼贴、不出现对白气泡，画面内不出现任何文字、标题、页码、水印或签名。具体线稿、上色、材质、人物比例和渲染方式只听所选画风预设，不得固定为其他画风。"
+
 func comicPromptTextForAspect(value, aspectRatio string) string {
 	orientation := ImageAspectRatioOrientation(aspectRatio)
 	value = strings.ReplaceAll(value, "1440×1920 或等比例 3:4", "与 "+aspectRatio+" 画幅匹配的高清分辨率")
@@ -117,6 +122,10 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 	}
 	video := videos[pageIndex]
 	config := aiReasoningPromptConfig(snapshot.Effective)
+	// 文字插画版是「单页图文卡」：上半文字区逐字排版、下半插画，不分格、
+	// 不画气泡。它和分格漫画的版式锁、文字密度规则直接冲突，必须换一套，
+	// 否则模型会被强约束回多格漫画。
+	illustratedText := config.Comic.ID == ComicPageIllustratedTextPresetID
 	if !config.Comic.appliesTo(book) {
 		return PromptContract{}, NewConfigRequiredError("请先在 AI 推理中选择漫画提示词")
 	}
@@ -132,9 +141,13 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 		"你是 Batch Factory 的漫画页面导演。只输出合法 JSON，不要输出 Markdown、标题或解释。",
 		`JSON 必须包含 screen_prompt、image_prompt、roles、scene_presets。screen_prompt 是本页导演说明；image_prompt 是可直接交给图片模型的最终中文提示词；roles 只列本页画面真实出现的人物；scene_presets 只列本页实际使用的场景。`,
 		comicAssetIdentityRule,
-		"本页必须生成一张完整" + aspectRatio + ImageAspectRatioOrientation(aspectRatio) + "漫画页，直接包含分格、角色、场景、动作、表情、旁白框、对话气泡及必须出现的中文文案。禁止后期拼图或另行叠字。",
-		"不得包含视频时长、运镜、镜头推进、音频、配音或视频生成指令。",
 	}
+	if illustratedText {
+		parts = append(parts, "本页必须生成一张完整"+aspectRatio+"单页图文卡：上半为文字区、下半为插画区，两区自然过渡；不画分格线、不出现对白气泡、画面内不出现任何文字。禁止后期拼图。")
+	} else {
+		parts = append(parts, "本页必须生成一张完整"+aspectRatio+ImageAspectRatioOrientation(aspectRatio)+"漫画页，直接包含分格、角色、场景、动作、表情、旁白框、对话气泡及必须出现的中文文案。禁止后期拼图或另行叠字。")
+	}
+	parts = append(parts, "不得包含视频时长、运镜、镜头推进、音频、配音或视频生成指令。")
 	if style := strings.TrimSpace(config.Comic.Style.Body); style != "" {
 		parts = append(parts, "本书画风预设：\n"+comicPromptTextForAspect(style, aspectRatio))
 	}
@@ -154,12 +167,19 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 	}
 	localContext := comicLocalContext(videos, pageIndex)
 	pagePreset = expandRecoveredComicPreset(comicPromptTextForAspect(pagePreset, aspectRatio), book, localContext, !assetImages)
+	structureLock := comicPageStructureLock
+	if illustratedText {
+		structureLock = comicIllustratedTextStructureLock
+	}
 	parts = append(parts,
-		comicPromptTextForAspect(comicPageStructureLock, aspectRatio),
+		comicPromptTextForAspect(structureLock, aspectRatio),
 		"漫画提示词预设：\n"+pagePreset,
-		comicTextDensityRule,
-		"当前页内容边界：image_prompt 只能描述 current_page 当前页实际发生的画面、人物、动作、场景和当前页必须出现的文字。previous_page、next_page 和 source_text 仅用于理解人物与剧情连续性，禁止把其中的对白、旁白、事件、场景或文字复制到当前页。不得自行补写当前页没有的台词、旁白或剧情。",
 	)
+	// 分格漫画才有 45-70 字上限；图文卡要求原文逐字排版，不能被密度规则压缩。
+	if !illustratedText {
+		parts = append(parts, comicTextDensityRule)
+	}
+	parts = append(parts, "当前页内容边界：image_prompt 只能描述 current_page 当前页实际发生的画面、人物、动作、场景和当前页必须出现的文字。previous_page、next_page 和 source_text 仅用于理解人物与剧情连续性，禁止把其中的对白、旁白、事件、场景或文字复制到当前页。不得自行补写当前页没有的台词、旁白或剧情。")
 	if derivation := strings.TrimSpace(config.Comic.ImageDerivation.Body); derivation != "" {
 		parts = append(parts, "图片描述词推导规则：\n"+comicPromptTextForAspect(derivation, aspectRatio))
 	}
