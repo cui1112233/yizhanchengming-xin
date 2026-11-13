@@ -1,6 +1,7 @@
 .batch-factory-novel-list-row > .batch-factory-priority-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 4px;
   padding-block: 6px;
   white-space: normal;
