@@ -7,8 +7,8 @@ html[data-scheme='glass'][data-theme] {
   --frost-inset: rgba(255, 255, 255, .045);
   --frost-workspace: #151c27;
   --frost-edge: rgba(226, 236, 255, .22);
-  --frost-shadow: 0 16px 48px rgba(0, 0, 0, .28);
-  --frost-mask: rgba(6, 10, 18, .42);
+  --frost-shadow: 0 16px 48px rgba(0, 0, 0, .20);
+  --frost-mask: rgba(6, 10, 18, .24);
   --frost-card-blur: none;
   --frost-floating-blur: none;
   --frost-dialog-blur: none;
@@ -21,22 +21,22 @@ html[data-scheme='glass'][data-theme='light'] {
   --frost-workspace: #edf1f7;
   --frost-edge: rgba(255, 255, 255, .78);
   --frost-shadow: 0 16px 48px rgba(30, 45, 66, .16);
-  --frost-mask: rgba(30, 40, 58, .24);
+  --frost-mask: rgba(30, 40, 58, .12);
 }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-scheme='glass'][data-theme] {
-    --frost-card: rgba(30, 39, 52, .56);
-    --frost-floating: rgba(34, 44, 59, .88);
-    --frost-dialog: rgba(29, 38, 52, .94);
+    --frost-card: rgba(30, 39, 52, .34);
+    --frost-floating: rgba(34, 44, 59, .60);
+    --frost-dialog: rgba(29, 38, 52, .70);
     --frost-workspace: rgba(16, 23, 34, .90);
-    --frost-card-blur: blur(16px) saturate(110%);
-    --frost-floating-blur: blur(24px) saturate(115%);
-    --frost-dialog-blur: blur(30px) saturate(110%);
+    --frost-card-blur: blur(18px) saturate(110%);
+    --frost-floating-blur: blur(28px) saturate(115%);
+    --frost-dialog-blur: blur(36px) saturate(110%);
   }
   html[data-scheme='glass'][data-theme='light'] {
-    --frost-card: rgba(247, 250, 255, .70);
-    --frost-floating: rgba(247, 250, 255, .92);
-    --frost-dialog: rgba(250, 252, 255, .96);
+    --frost-card: rgba(247, 250, 255, .50);
+    --frost-floating: rgba(247, 250, 255, .72);
+    --frost-dialog: rgba(250, 252, 255, .80);
     --frost-workspace: rgba(237, 243, 250, .94);
   }
 }
