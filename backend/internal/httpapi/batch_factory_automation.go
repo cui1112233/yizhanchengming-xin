@@ -3832,6 +3832,19 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						// 等待期间持续刷新整本心跳，避免排队被误判成停滞而取消。
 						if c.comicRunSlots != nil {
 							waitTicker := time.NewTicker(time.Minute)
+							waitStarted := c.now()
+							// 排队等待期间必须把状态写回前端，否则界面一直显示
+							// “正在逐页生成”却没有任何页产出；耐久层也会因为长时间
+							// 没有写入把正常排队的 job 误判成僵尸。
+							writeQueueWait := func() {
+								entryLogMu.Lock()
+								entry["message"] = fmt.Sprintf("正在排队等待出图槽位（同一时间只生成一本书，已等待 %d 分钟）",
+									int(c.now().Sub(waitStarted).Minutes()))
+								entry["updatedAt"] = c.now()
+								persist()
+								entryLogMu.Unlock()
+							}
+							writeQueueWait()
 							for waiting := true; waiting; {
 								select {
 								case c.comicRunSlots <- struct{}{}:
@@ -3840,6 +3853,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 									if generationLease != nil {
 										generationLease.touch(comicGenerationIdleExtend)
 									}
+									writeQueueWait()
 								case <-generateCtx.Done():
 									waitTicker.Stop()
 									return batchfactoryv11.ComicCollection{}, generateCtx.Err()
