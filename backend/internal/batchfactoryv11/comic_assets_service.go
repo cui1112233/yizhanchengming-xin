@@ -151,7 +151,7 @@ func (s *DirectorService) RunComicAssetExtraction(ctx context.Context, owner, ba
 			SystemPrompt:        contract.SystemPrompt + "\n上一轮输出因长度截断。请只保留原文实际出现的人物、场景和关键道具，名称与提示词都使用更紧凑的短语并减少输出量；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
 			UserPrompt:          contract.UserPrompt,
 			Temperature:         0.2,
-			MaxTokens:           contract.MaxTokens,
+			MaxTokens:           truncationRetryMaxTokens(contract.MaxTokens),
 			DisableJSONResponse: true,
 		})
 		if retryErr != nil {

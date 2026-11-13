@@ -43,6 +43,22 @@ func IsModelOutputTruncated(err error) bool {
 		strings.Contains(err.Error(), "director provider output truncated (finish_reason=length)")
 }
 
+// truncationRetryMaxTokens 给“截断后重试”一个更大的输出预算。
+// 部分 OpenAI 兼容中转会把思考 token 计入 max_tokens，用同一个预算重试
+// 仍然会在同一位置截断，所以重试至少给到 12000，最多 32000。
+func truncationRetryMaxTokens(current int) int {
+	const minimum = 12000
+	const maximum = 32000
+	next := current * 2
+	if next < minimum {
+		next = minimum
+	}
+	if next > maximum {
+		next = maximum
+	}
+	return next
+}
+
 // Error 只把中文结论交给界面；状态码、模型名、上游 JSON 与 request id 全部
 // 放到第二行「上游原文」里，由前端折叠到「展开原始信息」。
 func (e *DirectorHTTPError) Error() string {

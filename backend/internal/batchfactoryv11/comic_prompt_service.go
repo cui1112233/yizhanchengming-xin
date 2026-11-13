@@ -657,7 +657,7 @@ func (s *DirectorService) completeComicPagePrompt(ctx context.Context, contract 
 			SystemPrompt:        contract.SystemPrompt + "\n上一轮输出因长度截断。保留当前页必要的分格、人物、动作、场景和关键文字；使用更紧凑的短语，screen_prompt 与 image_prompt 都不要重复描述；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
 			UserPrompt:          contract.UserPrompt,
 			Temperature:         0.2,
-			MaxTokens:           contract.MaxTokens,
+			MaxTokens:           truncationRetryMaxTokens(contract.MaxTokens),
 			DisableJSONResponse: true,
 		})
 	}

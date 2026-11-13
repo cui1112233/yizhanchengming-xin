@@ -257,6 +257,21 @@ func TestOpenAICompatibleProviderReportsTruncatedStructuredOutput(t *testing.T) 
 	}
 }
 
+func TestTruncationRetryMaxTokensRaisesBudgetWithinCap(t *testing.T) {
+	cases := []struct{ current, want int }{
+		{4000, 12000},
+		{4800, 12000},
+		{12000, 24000},
+		{20000, 32000},
+		{32000, 32000},
+	}
+	for _, tc := range cases {
+		if got := truncationRetryMaxTokens(tc.current); got != tc.want {
+			t.Fatalf("truncationRetryMaxTokens(%d)=%d, want %d", tc.current, got, tc.want)
+		}
+	}
+}
+
 func TestOpenAICompatibleProviderRetainsUpstreamBodyAndClassifies400(t *testing.T) {
 	var calls int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
