@@ -18,24 +18,24 @@
 
 Files: backend/internal/httpapi/*screenplay*.go; backend/internal/screenplay/{mysql_store,memory_store,assets_service,storyboard_service}.go; focused tests.
 
-- [ ] 先写失败测试：无项目解析 TXT/DOCX；创建即持久化 sourceText；画风列表使用现有预设；选中标识解析后端描述并在资产和分镜请求中出现。
-- [ ] 实现 GET /api/comic-screenplays/styles，返回 styles[{id,name,previewUrl}]；POST /api/comic-screenplays/source/parse，返回既有解析格式。
-- [ ] 创建/更新 selectedStyle 为预设 ID，styleDesc 由后端解析，保留历史名称兼容；确保生成请求包含选中画风。
-- [ ] 相关后端测试通过，提供前端接口契约和字段。
+- [x] 先写失败测试：无项目解析 TXT/DOCX；创建即持久化 sourceText；画风列表使用现有预设；选中标识解析后端描述并在资产和分镜请求中出现。
+- [x] 实现 GET /api/comic-screenplays/styles，返回 styles[{id,name,previewUrl}]；POST /api/comic-screenplays/source/parse，返回既有解析格式。
+- [x] 创建/更新 selectedStyle 为预设 ID，styleDesc 由后端解析，保留历史名称兼容；确保生成请求包含选中画风。
+- [x] 相关后端测试通过，提供前端接口契约和字段。
 
 ### Task 2: 新建与设置界面
 
 Files: frontend/src/shared/api/comicScreenplay.js; frontend/src/user/pages/ComicScreenplayPage.jsx; comic-screenplay.css; helpers and tests.
 
-- [ ] 先写行为测试：文本校验、导入前不创建、草稿与现有作品原文隔离、选择画风持久化字段。
-- [ ] 直接输入/上传切换，默认直接输入；上传后可编辑、字数提示、失败不建空项目，防止旧解析结果覆盖新草稿。
-- [ ] 四档有名称、真实范围说明、勾选及明显选中边框，支持键盘、深浅主题。
-- [ ] 画风库真实图片、当前选择、清除、搜索、空/失败反馈；项目设置也能更新画风。
-- [ ] 相关测试及前端生产构建通过。
+- [x] 先写行为测试：文本校验、导入前不创建、草稿与现有作品原文隔离、选择画风持久化字段。
+- [x] 直接输入/上传切换，默认直接输入；上传后可编辑、字数提示、失败不建空项目，防止旧解析结果覆盖新草稿。
+- [x] 四档有名称、真实范围说明、勾选及明显选中边框，支持键盘、深浅主题。
+- [x] 画风库真实图片、当前选择、清除、搜索、空/失败反馈；项目设置也能更新画风。
+- [x] 相关测试及前端生产构建通过。
 
 ### Task 3: 审查与本地交付
 
-- [ ] 独立审查边界及持久化和生成链路，修复发现。
-- [ ] 只提交本次源码；冻结当前基线与构建资源，生成 Go embed 本地程序。
-- [ ] 确认本地任务空闲后启动并验证版本，真实页面检查新建窗口、选择和持久化；不用付费生成。
-- [ ] 保存截图及验收记录，向用户展示可见结果及公网状态。
+- [x] 独立审查边界及持久化和生成链路，修复发现。
+- [x] 只提交本次源码；冻结当前基线与构建资源，生成 Go embed 本地程序。
+- [x] 确认本地任务空闲后启动并验证版本，真实页面检查新建窗口、选择和持久化；不用付费生成。
+- [x] 保存截图及验收记录，向用户展示可见结果及公网状态。
