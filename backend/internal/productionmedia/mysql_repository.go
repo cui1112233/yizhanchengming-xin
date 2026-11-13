@@ -26,7 +26,10 @@ func (r *MySQLRepository) Enqueue(ctx context.Context, item Object) error {
 	if item.MediaType == "" {
 		item.MediaType = "application/octet-stream"
 	}
-	_, err := r.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_media_objects(owner_username,media_kind,media_type,local_storage_ref,object_key,state,attempt_count,retention_days,created_at,updated_at) VALUES(?,?,?,?,?,'pending',0,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE media_type=VALUES(media_type),retention_days=VALUES(retention_days),updated_at=CURRENT_TIMESTAMP(6)`, item.Owner, item.MediaKind, item.MediaType, item.LocalStorageRef, item.ObjectKey, NormalizeRetentionDays(item.RetentionDays))
+	// Scanner 每分钟都会把仍在本地缓存里的对象重新入队一次。这里只有在
+	// media_type / retention_days 真正变化时才写行；否则 ON DUPLICATE KEY
+	// UPDATE 产生 0 行变更，不会向 binlog 追加无意义记录。
+	_, err := r.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_media_objects(owner_username,media_kind,media_type,local_storage_ref,object_key,state,attempt_count,retention_days,created_at,updated_at) VALUES(?,?,?,?,?,'pending',0,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE media_type=IF(media_type<>VALUES(media_type),VALUES(media_type),media_type),retention_days=IF(retention_days<>VALUES(retention_days),VALUES(retention_days),retention_days)`, item.Owner, item.MediaKind, item.MediaType, item.LocalStorageRef, item.ObjectKey, NormalizeRetentionDays(item.RetentionDays))
 	return err
 }
 

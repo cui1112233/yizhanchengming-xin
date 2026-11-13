@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -684,5 +685,18 @@ func TestBilledSaveFailureNeverRetriesAndNeedsManual(t *testing.T) {
 	}
 	if got := automationStringValue(record["lastError"], ""); got != automationBilledNotRetrievedSaveMessage {
 		t.Fatalf("lastError=%q, want disk save message", got)
+	}
+}
+
+// 没有经过写保护的 ENOSPC 也必须转人工：否则会被当成瞬时错误无限重试，
+// 页面只会一直显示“执行中”，既看不到磁盘原因也无法重试。
+func TestRawNoSpaceErrorIsManualInfrastructure(t *testing.T) {
+	err := fmt.Errorf("save comic page image: %w", syscall.ENOSPC)
+	disp := classifyAutomationFailure(err, "comic_images")
+	if disp.Code != automationCodeInfrastructure || disp.Class != automationFailureManual {
+		t.Fatalf("disposition=%#v, want infrastructure/manual", disp)
+	}
+	if automationManualReasonText(disp.Code) == automationCodeInfrastructure {
+		t.Fatal("manual reason must be translated to user-facing text")
 	}
 }

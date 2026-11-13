@@ -50,6 +50,17 @@ if [ -d "$ARTIFACT_DIR" ]; then
   [ "$freed" -gt 0 ] && log "removed $freed media files older than ${MEDIA_RETENTION_DAYS}d"
 fi
 
+# 5b. 漫画缩略图只是派生缓存，原图在 TOS 且可随时重新生成；单独用短保留期
+#     清理，避免小磁盘被首屏缩略图长期占满。
+THUMB_DIR="$ARTIFACT_DIR/comic-thumbnails"
+if [ -d "$THUMB_DIR" ]; then
+  thumbs=0
+  while IFS= read -r -d '' file; do
+    rm -f "$file" && thumbs=$((thumbs + 1))
+  done < <(find "$THUMB_DIR" -type f -mtime +3 -print0 2>/dev/null)
+  [ "$thumbs" -gt 0 ] && log "removed $thumbs comic thumbnails older than 3d"
+fi
+
 percent="$(usage_percent)"
 log "disk usage ${percent}%"
 if [ "$percent" -ge "$DISK_LIMIT_PERCENT" ]; then

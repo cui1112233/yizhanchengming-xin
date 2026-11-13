@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 var (
@@ -25,6 +26,15 @@ var (
 )
 
 var safeArtifactID = regexp.MustCompile(`^[A-Za-z0-9_-]{3,96}$`)
+
+// diskPressureError 把底层“磁盘已满”IO 错误统一成 ErrDiskPressure。没有这层
+// 归一，ENOSPC 会被当成普通瞬时错误反复重试，页面上只会一直显示“执行中”。
+func diskPressureError(err error) error {
+	if err == nil || !errors.Is(err, syscall.ENOSPC) {
+		return err
+	}
+	return fmt.Errorf("%w: %v", ErrDiskPressure, err)
+}
 
 type Artifact struct {
 	ID         string
@@ -100,7 +110,7 @@ func (s *Store) SaveMP4(id string, src io.Reader) (artifact Artifact, err error)
 		return Artifact{}, err
 	}
 	if err := os.MkdirAll(s.root, 0o750); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	finalName := id + ".mp4"
 	finalPath := filepath.Join(s.root, finalName)
@@ -112,7 +122,7 @@ func (s *Store) SaveMP4(id string, src io.Reader) (artifact Artifact, err error)
 
 	tmp, err := os.CreateTemp(s.root, ".upload-*.tmp")
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	tmpName := tmp.Name()
 	committed := false
@@ -139,25 +149,25 @@ func (s *Store) SaveMP4(id string, src io.Reader) (artifact Artifact, err error)
 	hash := sha256.New()
 	writer := io.MultiWriter(tmp, hash)
 	if _, err := writer.Write(first); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	remainingLimit := s.maxBytes - int64(len(first)) + 1
 	copied, err := io.Copy(writer, io.LimitReader(src, remainingLimit))
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	total := int64(len(first)) + copied
 	if total > s.maxBytes {
 		return Artifact{}, ErrTooLarge
 	}
 	if err := tmp.Sync(); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	if err := tmp.Close(); err != nil {
 		return Artifact{}, err
 	}
 	if err := os.Rename(tmpName, finalPath); err != nil {
-		return Artifact{}, fmt.Errorf("commit artifact: %w", err)
+		return Artifact{}, fmt.Errorf("commit artifact: %w", diskPressureError(err))
 	}
 	committed = true
 	return Artifact{
@@ -182,7 +192,7 @@ func (s *Store) SaveImage(id, mediaType string, src io.Reader) (artifact Artifac
 		return Artifact{}, err
 	}
 	if err := os.MkdirAll(s.root, 0o750); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	finalName := id + extension
 	finalPath := filepath.Join(s.root, finalName)
@@ -194,7 +204,7 @@ func (s *Store) SaveImage(id, mediaType string, src io.Reader) (artifact Artifac
 
 	tmp, err := os.CreateTemp(s.root, ".image-upload-*.tmp")
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	tmpName := tmp.Name()
 	committed := false
@@ -221,25 +231,25 @@ func (s *Store) SaveImage(id, mediaType string, src io.Reader) (artifact Artifac
 	hash := sha256.New()
 	writer := io.MultiWriter(tmp, hash)
 	if _, err := writer.Write(first); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	remainingLimit := s.maxBytes - int64(len(first)) + 1
 	copied, err := io.Copy(writer, io.LimitReader(src, remainingLimit))
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	total := int64(len(first)) + copied
 	if total > s.maxBytes {
 		return Artifact{}, ErrTooLarge
 	}
 	if err := tmp.Sync(); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	if err := tmp.Close(); err != nil {
 		return Artifact{}, err
 	}
 	if err := os.Rename(tmpName, finalPath); err != nil {
-		return Artifact{}, fmt.Errorf("commit image artifact: %w", err)
+		return Artifact{}, fmt.Errorf("commit image artifact: %w", diskPressureError(err))
 	}
 	committed = true
 	return Artifact{ID: id, MediaType: mediaType, ByteSize: total, SHA256: hex.EncodeToString(hash.Sum(nil)), StorageRef: finalName}, nil
@@ -266,7 +276,7 @@ func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artif
 		return Artifact{}, ErrInvalidID
 	}
 	if err := os.MkdirAll(s.root, 0o750); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	finalName := id + "." + extension
 	finalPath := filepath.Join(s.root, finalName)
@@ -300,13 +310,13 @@ func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artif
 		return Artifact{}, ErrTooLarge
 	}
 	if err := tmp.Sync(); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	if err := tmp.Close(); err != nil {
 		return Artifact{}, err
 	}
 	if err := os.Rename(tmpName, finalPath); err != nil {
-		return Artifact{}, fmt.Errorf("commit media artifact: %w", err)
+		return Artifact{}, fmt.Errorf("commit media artifact: %w", diskPressureError(err))
 	}
 	committed = true
 	return Artifact{ID: id, MediaType: mediaType, ByteSize: count, SHA256: hex.EncodeToString(hash.Sum(nil)), StorageRef: finalName}, nil

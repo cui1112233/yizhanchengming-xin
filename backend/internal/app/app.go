@@ -46,6 +46,13 @@ type novelFetchRewriteAdapter struct {
 	provider *batchfactoryv11.OpenAICompatibleProvider
 }
 
+func (a novelFetchRewriteAdapter) ModelIdentity() string {
+	if a.provider == nil {
+		return ""
+	}
+	return strings.TrimSpace(a.provider.Model)
+}
+
 type ownerTextProvider struct {
 	fallback batchfactoryv11.DirectorProvider
 	resolve  func(context.Context, string) (batchfactoryv11.DirectorProvider, error)
@@ -530,6 +537,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			return nil
 		}
 	}
+	// 磁盘写保护与是否配置 TOS 无关：写满时必须在落盘前拒绝，否则错误会
+	// 退化成普通 IO 失败，页面只会显示“执行中”，既看不到磁盘原因也无法重试。
+	usage := func() (float64, error) { return productionmedia.DiskUsagePercent(artifactStore.Root()) }
+	artifactStore.SetWriteGuard(productionmedia.NewDiskWriteGuard(usage))
 	productionMediaEnabled := strings.TrimSpace(cfg.ProductionMediaTOSEndpoint) != "" || strings.TrimSpace(cfg.ProductionMediaTOSBucket) != ""
 	if productionMediaEnabled {
 		if err := os.MkdirAll(artifactStore.Root(), 0o750); err != nil {
@@ -545,8 +556,6 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		repository := productionmedia.NewMySQLRepository(db)
 		resolver := &productionmedia.Resolver{Repository: repository, Local: artifactStore, Remote: remote}
 		artifactStore.SetMissingRestorer(resolver)
-		usage := func() (float64, error) { return productionmedia.DiskUsagePercent(artifactStore.Root()) }
-		artifactStore.SetWriteGuard(productionmedia.NewDiskWriteGuard(usage))
 		retentionDays := func(owner string) int {
 			settings, err := userConfigStore.GetConfig(context.Background(), owner)
 			if err != nil {

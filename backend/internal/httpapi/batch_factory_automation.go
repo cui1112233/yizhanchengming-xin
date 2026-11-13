@@ -277,6 +277,14 @@ func comicGenerationFailureStage(err error) (string, string) {
 	return "comic_images", "整本漫画出图失败"
 }
 
+// automationHeartbeatOnlyMessage 判断一条进度是否只是等待心跳：这类文案只
+// 改变秒数/分钟数，不代表任何阶段或产物变化，可以合并落库。
+func automationHeartbeatOnlyMessage(message string) bool {
+	return strings.Contains(message, "上游响应较慢") ||
+		strings.Contains(message, "正在排队等待出图槽位") ||
+		strings.Contains(message, "正在等待出图槽位")
+}
+
 // comicSlowPageHeartbeat 在单页出图期间每 30 秒回报一次“上游响应慢”，
 // 让前端能区分“正在出图但上游慢”和“任务假死”，而不是只看到页数不动。
 func comicSlowPageHeartbeat(ctx context.Context, label string) func() {
@@ -1308,9 +1316,10 @@ func (c *BatchAutomationCoordinator) saveLocked(state automationStateFile) error
 		if err := c.automationStore.Save(context.Background(), state); err != nil {
 			return err
 		}
-	}
-	if c.automationStore != nil {
 		c.automationState = &state
+		// MySQL 是权威存储时不再把每个 job 文件重写到磁盘：这些文件只在
+		// 没有数据库的旧部署里用于加载，继续写只会增加磁盘 IO 和写放大。
+		return nil
 	}
 	if strings.TrimSpace(c.path) == "" {
 		return nil
@@ -1369,6 +1378,12 @@ func (c *BatchAutomationCoordinator) setJobLocked(owner, batchID, jobID string, 
 		state.Jobs[jobID] = job
 		if automationStringValue(job["state"], "") == "scheduled" || automationJobHasRetryRequest(job) {
 			c.dispatchNextCheckSet = false
+		}
+		// 进度事件只改一个 job：优先走单行 upsert。全量 Save 会把所有任务的
+		// job_json 重新写一遍，MySQL binlog 随之成倍增长。
+		if partial, ok := c.automationStore.(AutomationJobSaver); ok {
+			c.automationState = &state
+			return partial.SaveJobs(context.Background(), map[string]map[string]any{jobID: job})
 		}
 		return c.saveLocked(state)
 	}
@@ -3526,6 +3541,16 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					stallLast.Store(now)
 					stallStage.Store(stage)
 					delete(entry, "retryAt")
+					// “本页已等待 N 秒”这类纯等待文案每秒都在变，但没有任何状态
+					// 变化。逐条持久化只会把同一个 job 反复写进 binlog，因此最多
+					// 每分钟落库一次；真实进度（页完成、阶段切换）仍然立即保存。
+					if automationHeartbeatOnlyMessage(message) {
+						if last, _ := persistedHeartbeat.Load().(time.Time); now.Sub(last) < time.Minute {
+							entryLogMu.Unlock()
+							return
+						}
+					}
+					persistedHeartbeat.Store(now)
 					appendAutomationBookLog(entry, now, stage, message)
 					persist()
 					entryLogMu.Unlock()

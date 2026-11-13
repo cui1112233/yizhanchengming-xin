@@ -25,6 +25,14 @@ type AutomationStateStore interface {
 	Save(context.Context, automationStateFile) error
 }
 
+// AutomationJobSaver is implemented by stores that can upsert individual jobs.
+// The coordinator writes one book progress event at a time; rewriting the
+// whole jobs table for each event multiplies MySQL binlog volume by the job
+// count and was the main reason binlogs grew by ~100MB every two minutes.
+type AutomationJobSaver interface {
+	SaveJobs(context.Context, map[string]map[string]any) error
+}
+
 type mysqlAutomationStateStore struct {
 	db *sql.DB
 }
@@ -124,6 +132,13 @@ func (s *mysqlAutomationStateStore) loadJobsByID(ctx context.Context, jobs map[s
 }
 
 func (s *mysqlAutomationStateStore) Save(ctx context.Context, state automationStateFile) error {
+	return s.SaveJobs(ctx, state.Jobs)
+}
+
+// SaveJobs upserts only the jobs that actually changed. Callers must pass the
+// complete job document for each id; unrelated rows are left untouched, so one
+// book heartbeat no longer rewrites every other job's JSON.
+func (s *mysqlAutomationStateStore) SaveJobs(ctx context.Context, jobs map[string]map[string]any) error {
 	if s == nil || s.db == nil {
 		return nil
 	}
@@ -138,7 +153,7 @@ func (s *mysqlAutomationStateStore) Save(ctx context.Context, state automationSt
  scheduled_at=VALUES(scheduled_at), next_retry_at=VALUES(next_retry_at), job_json=VALUES(job_json),
  created_at=VALUES(created_at), updated_at=VALUES(updated_at)`
 	now := time.Now().UTC()
-	for id, job := range state.Jobs {
+	for id, job := range jobs {
 		if strings.TrimSpace(id) == "" {
 			continue
 		}

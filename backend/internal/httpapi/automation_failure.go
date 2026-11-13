@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
@@ -94,6 +95,7 @@ var automationManualCodeLabels = map[string]string{
 	automationCodePromptFailed:       "漫画提示词生成失败，可重试",
 	automationCodePageRejected:       "上游拒绝了该页请求，需要人工处理",
 	automationCodePageShortage:       "漫画页数量不足，需要人工检查",
+	automationCodeInfrastructure:     "服务器磁盘空间不足，已停止写入；请清理磁盘后手动重试",
 }
 
 // automationManualReasonText 支持用 "/" 连接多个原因码，逐段翻译。
@@ -215,9 +217,11 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 			MaxAttempts: 0, BaseBackoff: 30 * time.Second,
 			MaxBackoff: 5 * time.Minute, BudgetKey: budget,
 		}
-	case errors.Is(err, localartifact.ErrDiskPressure):
+	case errors.Is(err, localartifact.ErrDiskPressure), errors.Is(err, syscall.ENOSPC),
+		strings.Contains(msg, "no space left on device"):
 		// 磁盘写满时上游可能已经出图计费，重试只会重复扣费；固定为人工处理，
-		// 等磁盘清理后由用户手动重试。
+		// 等磁盘清理后由用户手动重试。未经过写保护的 ENOSPC 也必须走这里，
+		// 否则会被当成瞬时错误无限重试，页面一直显示“执行中”。
 		return automationFailureDisposition{
 			Code: automationCodeInfrastructure, Class: automationFailureManual,
 			MaxAttempts: 1, BudgetKey: budget,
