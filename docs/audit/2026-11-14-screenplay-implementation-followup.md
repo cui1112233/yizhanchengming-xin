@@ -1,8 +1,8 @@
-# 漫剧制作补齐进展：实现记录初稿
+# 漫剧制作补齐进展：实现与本地验收记录
 
 日期：2026-11-14。原始审计保留，本文件只追加当前 V88 工作区实现与证据。**不能称全量一比一；没有付费供应商全链或像素一致性结论。**
 
-源码、模拟测试、Go embed构建、本地页面验收、供应商实跑分别记录。本稿逐行的“测试”链接表示对应测试源码；完整冻结回归、最终构建身份和本地4001现场验收由主任务后补。
+源码、模拟测试、Go embed构建、本地页面验收、供应商实跑分别记录。逐行“测试”链接表示测试源码。下方补记记录最终冻结身份与本地验收；其余项目仍区分实现和供应商实跑。
 
 已观察前端相关35项测试通过；已观察HTTP Screenplay相关测试通过。后台生产同事报告模块连续10轮通过。后续新增工具仍需最终集成回归。这些证据均不能替代实际供应商执行。
 
@@ -77,12 +77,15 @@
 | Q08 | 生产完成口径 | 部分 | 源码及模拟接通 | 无成片只能clips_ready，completed必须有Finalize产物和可访问交付地址；页面区分镜头就绪与成片交付，仍需真实媒体实跑验收。 | [源码](../../backend/internal/screenplay/production_runtime.go)、[测试](../../backend/internal/screenplay/production_recovery_test.go) |
 | Q09 | 相同样例全链路效果一致 | 未验证 | 未验证 | 未运行相同样例的两边付费模型/媒体/字幕/导入恢复全链；原软件内部页面像素对照未完成。不得称全量一比一或给完成百分比。 | [源码](../../backend/internal/screenplay/production_runtime.go)、[测试](../../backend/internal/screenplay/production_recovery_test.go) |
 
-完整源码与测试路径、原审计SHA256及各项验证标记见[同名JSON](2026-11-14-screenplay-implementation-followup.json)。逐项 `local_runtime_verified` 当前均为false，不能把待验收内容写成现场已完成。
+完整源码与测试路径、原审计SHA256及各项验证标记见[同名JSON](2026-11-14-screenplay-implementation-followup.json)。JSON中只对实际验收范围标记 `local_runtime_verified` 并写明范围；其余仍为false。
 
-## 本地构建与运行补记（主任务填写）
+## 本地构建与运行验收
 
-- 最终源码提交/冻结身份：待补。
-- 前端与Go embed构建：待补。
-- 本地4001进程路径、版本和资源身份：待补。
-- 登录后真实控件保存/刷新/权限/导出验收：待补。
-- 仍无付费供应商全链验证；仍无原软件内部页面完整像素对照。
+- 应用源码：`817cca3bb18645e28912952ef493660d7aca72a1`；核心实现`7a863f62`，真实MySQL修复`900026ab`。
+- 本地Go embed程序：`_local-archive-20261028/screenplay-input-style/candidate-817cca3b/qiantie-screenplay-local.exe`，4001 PID64004；前端`/assets/user-p7TYt-Jj.js`；health正常，运行身份一致。
+- 相关Go三个包测试通过；前端34项测试、React构建、冻结Go embed构建通过。没有宣称全部仓库测试或vet通过；storage既有传锁告警未改。
+- 真实MySQL首次验收捕获JSON参数字符集错误；修复后22项API验收通过，覆盖章节发布、编号原文、分镜导入及批量时长、显示偏好、排期/取消、归档/恢复、媒体读取及旁白绑定。
+- 登录页面改章节标题并保存、选镜头改5秒、切换经典/完整布局并保存；重启后标题、时长、字号及布局均保留。
+- [页面截图](../../_local-archive-20261028/screenplay-input-style/workflow-final-chapters.png)、[API记录](../../_local-archive-20261028/screenplay-input-style/workflow-runtime-acceptance.json)、[最终记录](../../_local-archive-20261028/screenplay-input-style/workflow-final-acceptance.json)。示例作品为“漫剧流程验收 · 窗外的故事”。
+- 模型付费调用0次，未推送Git、未发布公网。镜头生产/参考图/TTS/ASR/成片合成等供应商过程仍主要以模拟适配器和本地文件测试验证；未做新的付费整链实跑，剪映新版导入及完整像素对照未验证。
+- 冻结包保留原工作区其他既有改动，清单在candidate目录`existing-dirty-baseline.txt`；没有把这些变动混入本任务提交。

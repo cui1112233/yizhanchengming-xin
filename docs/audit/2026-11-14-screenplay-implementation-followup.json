@@ -3,16 +3,37 @@
   "scope": "漫剧制作全流程（洛水剧本创作，不包括整个软件）",
   "baseline": "docs/audit/2026-11-14-luoshui-screenplay-full-parity.json",
   "baseline_sha256": "83c18f2147f8aab38717cbd0ba35c18f97a77c0059d03865fa56116b5c2a0124",
-  "document_kind": "implementation_followup_draft",
-  "snapshot": "当前v88工作区源码，最终冻结版本与本地运行身份由主任务补记",
+  "document_kind": "implementation_followup",
+  "snapshot": "应用源码 817cca3bb18645e28912952ef493660d7aca72a1；仅本地4001验收，未发布公网",
   "feature_count": 57,
   "full_parity": false,
   "paid_e2e_verified": false,
   "pixel_parity_verified": false,
   "local_runtime_acceptance": {
-    "status": "pending_root_verification",
-    "build_identity": null,
-    "notes": "主任务负责Go embed重建、本地4001真实页面与运行身份验收；本稿不使用源码测试替代现场验收。"
+    "status": "verified_scoped_no_paid_calls",
+    "build_identity": {
+      "bridge_hits": 0,
+      "bridge_paths": {},
+      "frontend_entry": "/assets/user-p7TYt-Jj.js",
+      "git_sha": "817cca3b",
+      "media_engine": {
+        "ffmpeg_path": "F:\\脚本测试\\一战晟铭-v88\\.tools\\ffmpeg\\ffmpeg.exe",
+        "ffmpeg_version": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+        "ffprobe_path": "F:\\脚本测试\\temp_20261022_01\\video-batch-studio\\tools\\ffmpeg-9.0.2-essentials_build\\bin\\ffprobe.exe",
+        "ffprobe_version": "ffprobe version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers",
+        "available": true
+      },
+      "runtime": "go",
+      "runtime_manifest_sha": "817cca3bb18645e28912952ef493660d7aca72a1",
+      "service": "go-api"
+    },
+    "binary": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\screenplay-input-style\\candidate-817cca3b\\qiantie-screenplay-local.exe",
+    "pid": 64004,
+    "api_checks": 22,
+    "api_evidence": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\screenplay-input-style\\workflow-runtime-acceptance.json",
+    "final_evidence": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\screenplay-input-style\\workflow-final-acceptance.json",
+    "screenshot": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\screenplay-input-style\\workflow-final-chapters.png",
+    "notes": "真实MySQL、Redis和登录页面。UI改章节、改分镜时长、布局切换保存；重启后内容保留。付费模型调用0次。供应商完整生成和像素一致性仍未验证。冻结包保留原工作区其他已有改动，未将其混入本任务提交。"
   },
   "verification_observed": [
     {
@@ -26,7 +47,11 @@
     {
       "command": "go test ./internal/screenplay -count=10",
       "result": "生产任务同事报告通过；属于模拟/内存/SQL契约测试，不是供应商实跑"
-    }
+    },
+    "最终相关Go测试：go test ./internal/screenplay ./internal/httpapi ./internal/storage -run Screenplay|Production|Authoring|AppMigrations -count=1 通过。",
+    "npm run test:comic-screenplay：34项通过。npm run build与冻结Go embed构建通过。",
+    "真实MySQL首次验收发现JSON二进制参数错误，900026ab修复并新增SQL参数类型回归；之后22项真实API检查通过。",
+    "原有storage go vet存在bridge_users.go按值传锁告警，本轮没有宣称全仓vet通过。"
   ],
   "limitations": [
     "逐项状态代表当前独立实现范围，不代表原软件完全等价。",
@@ -51,9 +76,10 @@
         "backend/internal/httpapi/screenplay_routes_test.go",
         "frontend/src/shared/api/comicScreenplay.test.js"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "登录项目库读取、打开示例作品，重启后仍可打开。"
     },
     {
       "id": "P02",
@@ -107,9 +133,10 @@
         "backend/internal/httpapi/screenplay_authoring_workflow_test.go",
         "backend/internal/httpapi/screenplay_authoring_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "真实API归档、隐藏、归档列表、恢复；恢复后生产仍为暂停。"
     },
     {
       "id": "P05",
@@ -128,9 +155,10 @@
         "backend/internal/screenplay/authoring_mysql_test.go",
         "backend/internal/httpapi/screenplay_authoring_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "登录页面保存经典布局，步骤栏消失；恢复studio布局并持久保存。"
     },
     {
       "id": "P06",
@@ -241,9 +269,10 @@
         "backend/internal/screenplay/authoring_mysql_test.go",
         "backend/internal/httpapi/screenplay_authoring_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "字号15与打开章节页偏好实际保存；刷新及重启后保留。"
     },
     {
       "id": "S01",
@@ -281,9 +310,10 @@
         "backend/internal/screenplay/authoring_mysql_test.go",
         "backend/internal/httpapi/screenplay_authoring_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "API保存章节后发布到主剧本和场次；页面改标题保存，重启后保留。"
     },
     {
       "id": "S03",
@@ -380,9 +410,10 @@
         "frontend/src/shared/api/comicScreenplay.test.js",
         "backend/internal/httpapi/screenplay_files_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "真实编号原文读取、摘要校验和分镜文件导入；编号引用仍由用户核对。"
     },
     {
       "id": "S08",
@@ -441,9 +472,10 @@
         "backend/internal/httpapi/screenplay_authoring_workflow_test.go",
         "backend/internal/httpapi/screenplay_authoring_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "改章节后旧下游标记需更新，生产保持暂停；不是自动AI修复实跑。"
     },
     {
       "id": "A01",
@@ -555,9 +587,10 @@
         "backend/internal/httpapi/screenplay_media_workbench_test.go",
         "backend/internal/screenplay/media_store_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "旁白音色ID已写真实媒体状态并读回；未调用TTS实际生成。"
     },
     {
       "id": "A07",
@@ -673,9 +706,10 @@
         "backend/internal/screenplay/authoring_mysql_test.go",
         "backend/internal/httpapi/screenplay_authoring_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "页面勾选镜头并统一时长，版本4变5，第一镜头实际保存为5秒。"
     },
     {
       "id": "B06",
@@ -1099,9 +1133,10 @@
         "backend/internal/screenplay/production_background_test.go",
         "backend/internal/httpapi/screenplay_production_routes_test.go"
       ],
-      "local_runtime_verified": false,
+      "local_runtime_verified": true,
       "paid_supplier_e2e_verified": false,
-      "pixel_parity_verified": false
+      "pixel_parity_verified": false,
+      "local_runtime_scope": "真实Redis和MySQL保存未来排期、查询scheduled、取消后paused且run_at清空；未让排期触发付费模型。"
     },
     {
       "id": "Q08",
