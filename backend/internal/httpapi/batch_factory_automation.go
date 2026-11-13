@@ -90,9 +90,10 @@ func newAutomationComicSlotQueue(capacity int) *automationComicSlotQueue {
 	return &automationComicSlotQueue{capacity: capacity}
 }
 
-// acquire 阻塞直到拿到槽位。排队期间每分钟调用一次 onWait（用于写排队心跳），
-// ctx 取消时把自己从队列里摘掉；若取消瞬间槽位已经发放，则把它还给队列。
-func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func()) error {
+// acquire 阻塞直到拿到槽位。排队期间每分钟调用一次 onWait（用于写排队心跳，
+// 参数是前面还有几本书），ctx 取消时把自己从队列里摘掉；若取消瞬间槽位已经
+// 发放，则把它还给队列。
+func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func(position int)) error {
 	q.mu.Lock()
 	if q.active < q.capacity && len(q.waiters) == 0 {
 		q.active++
@@ -101,10 +102,11 @@ func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func()) e
 	}
 	ready := make(chan struct{})
 	q.waiters = append(q.waiters, ready)
+	ahead := len(q.waiters) - 1
 	q.mu.Unlock()
 
 	if onWait != nil {
-		onWait()
+		onWait(ahead)
 	}
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -114,7 +116,7 @@ func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func()) e
 			return nil
 		case <-ticker.C:
 			if onWait != nil {
-				onWait()
+				onWait(q.positionOf(ready))
 			}
 		case <-ctx.Done():
 			if !q.removeWaiter(ready) {
@@ -124,6 +126,18 @@ func (q *automationComicSlotQueue) acquire(ctx context.Context, onWait func()) e
 			return ctx.Err()
 		}
 	}
+}
+
+// positionOf 返回仍然排在自己前面的书数；已经不在队列里时按 0 处理。
+func (q *automationComicSlotQueue) positionOf(ready chan struct{}) int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for index, waiter := range q.waiters {
+		if waiter == ready {
+			return index
+		}
+	}
+	return 0
 }
 
 // release 释放槽位；有等待者时直接把槽位交给队首（active 不变）。
@@ -158,7 +172,8 @@ func (q *automationComicSlotQueue) removeWaiter(ready chan struct{}) bool {
 // 真实进展（上游不回包、页图不落库），就主动中止并释放槽位，让队列里的下一本
 // 先出图；本书按失败处理、可以直接重试，不会让整批一直卡在同一本上。
 // 排队等待、响应头返回和正文传输都会刷新心跳，正常慢图不会被误判。
-const comicSlotStallTimeout = 10 * time.Minute
+// 单页正常耗时 30-60 秒，3 分钟无任何页完成即视为卡死，避免一本书拖住整队。
+const comicSlotStallTimeout = 3 * time.Minute
 
 // comicBookGenerationConcurrency 默认 3：同时在出图的书本数。设成 1 虽然
 // 单本收口最快，但通道经常处于半空转（一本书在跑提示词时没人出图），总吞吐
@@ -260,6 +275,31 @@ func comicGenerationFailureStage(err error) (string, string) {
 		return "comic_asset_images", "漫画资产参考图生成失败"
 	}
 	return "comic_images", "整本漫画出图失败"
+}
+
+// comicSlowPageHeartbeat 在单页出图期间每 30 秒回报一次“上游响应慢”，
+// 让前端能区分“正在出图但上游慢”和“任务假死”，而不是只看到页数不动。
+func comicSlowPageHeartbeat(ctx context.Context, label string) func() {
+	report := comicGenerationProgressFromContext(ctx)
+	if report == nil {
+		return func() {}
+	}
+	done := make(chan struct{})
+	start := time.Now()
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				report("comic_images", fmt.Sprintf("%s 出图中，上游响应较慢（本页已等待 %d 秒）",
+					label, int(time.Since(start).Seconds())))
+			}
+		}
+	}()
+	return func() { close(done) }
 }
 
 type automationStateFile struct {
@@ -2857,6 +2897,13 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	// 和其它阶段都会 revision+1，继续用快照的旧 revision 写会把自己制造的写入判成
 	// 冲突。每次进入本阶段先回读最新快照，后续写入再由 _withRetry 兜底。
 	book = c.refreshAutomationBook(ctx, owner, batchID, book)
+	if isBatchCustomCopy(book) {
+		original, err := reuseCustomCopyOriginal(ctx, c.store, owner, batchID, book)
+		if err != nil {
+			return book, err
+		}
+		book = original
+	}
 	if strings.EqualFold(stringValue(book.SourceMetadata["processingStatus"]), "failed") && strings.TrimSpace(book.TxtText) != "" {
 		maxTxt := int(targetNumber(book.SourceMetadata["maxTxt"]))
 		fetched := batchFetchResultFromStoredRaw(book, maxTxt)
@@ -3921,10 +3968,15 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							// 排队等待期间必须把状态写回前端，否则界面一直显示
 							// “正在逐页生成”却没有任何页产出；耐久层也会因为长时间
 							// 没有写入把正常排队的 job 误判成僵尸。
-							writeQueueWait := func() {
+							writeQueueWait := func(position int) {
 								entryLogMu.Lock()
-								entry["message"] = fmt.Sprintf("正在排队等待出图槽位（按顺序排队，已等待 %d 分钟）",
-									int(c.now().Sub(waitStarted).Minutes()))
+								if position > 0 {
+									entry["message"] = fmt.Sprintf("正在排队等待出图槽位（前面还有 %d 本，已等待 %d 分钟）",
+										position, int(c.now().Sub(waitStarted).Minutes()))
+								} else {
+									entry["message"] = fmt.Sprintf("正在等待出图槽位（下一本开始，已等待 %d 分钟）",
+										int(c.now().Sub(waitStarted).Minutes()))
+								}
 								entry["updatedAt"] = c.now()
 								if generationLease != nil {
 									generationLease.touch(comicGenerationIdleExtend)

@@ -279,14 +279,14 @@ func TestImageBodyTimeoutAligned(t *testing.T) {
 // 线上供应商会先返回 200，再持续传输较大的图片正文；默认停滞窗口负责识别
 // 真正断流，总上限则必须覆盖慢速但仍在前进的大图响应。
 func TestImageRequestDefaultsAllowSlowProviderBody(t *testing.T) {
-	if shuihuoImageResponseHeaderTimeout != 3*time.Minute {
-		t.Fatalf("response header timeout=%s, want 3m", shuihuoImageResponseHeaderTimeout)
+	if shuihuoImageResponseHeaderTimeout != time.Minute {
+		t.Fatalf("response header timeout=%s, want 1m", shuihuoImageResponseHeaderTimeout)
 	}
 	if shuihuoImageRequestTimeout != 0 {
 		t.Fatalf("request timeout=%s, want disabled", shuihuoImageRequestTimeout)
 	}
-	if shuihuoImageBodyStallTimeoutURL != 180*time.Second || shuihuoImageBodyStallTimeoutBase64 != 180*time.Second {
-		t.Fatalf("body stall timeouts=%s/%s, want 180s/180s", shuihuoImageBodyStallTimeoutURL, shuihuoImageBodyStallTimeoutBase64)
+	if shuihuoImageBodyStallTimeoutURL != 120*time.Second || shuihuoImageBodyStallTimeoutBase64 != 120*time.Second {
+		t.Fatalf("body stall timeouts=%s/%s, want 120s/120s", shuihuoImageBodyStallTimeoutURL, shuihuoImageBodyStallTimeoutBase64)
 	}
 	if shuihuoImageBodyTotalTimeoutURL != 0 || shuihuoImageBodyTotalTimeoutBase64 != 0 {
 		t.Fatalf("body total timeouts=%s/%s, want disabled", shuihuoImageBodyTotalTimeoutURL, shuihuoImageBodyTotalTimeoutBase64)

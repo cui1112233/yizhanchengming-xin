@@ -4129,10 +4129,13 @@ var (
 	// 单页/交互请求排队上限。通道只有 1~2 个真实并发时，多本书同时出图会让
 	// 排队深度达到十几二十个；排队上限过短会让请求在轮到自己之前就到期重排，
 	// 表现为整本书一直卡在“缺几页”，永远到不了发布。
-	shuihuoImageQueueWaitTimeout       = 15 * time.Minute
-	shuihuoImageResponseHeaderTimeout  = 3 * time.Minute
-	shuihuoImageBodyStallTimeoutURL    = 180 * time.Second
-	shuihuoImageBodyStallTimeoutBase64 = 180 * time.Second
+	shuihuoImageQueueWaitTimeout = 15 * time.Minute
+	// 正常响应头 5-6 秒返回；60 秒还不回包说明连接已经挂死，快速失败重试
+	// 比一直占着出图名额更划算（原来 3 分钟会让一本卡住时整队陪等）。
+	shuihuoImageResponseHeaderTimeout = 60 * time.Second
+	// 正常正文 30-60 秒；120 秒内一个字节都没有说明流已断，交给重试。
+	shuihuoImageBodyStallTimeoutURL    = 120 * time.Second
+	shuihuoImageBodyStallTimeoutBase64 = 120 * time.Second
 	// HTTP 200 后对方已可能计费。只要正文还有字节持续返回，
 	// 就不再用绝对总时长丢弃已付费图片；真断流由上面的 stall 窗口拦截。
 	shuihuoImageBodyTotalTimeoutURL    time.Duration

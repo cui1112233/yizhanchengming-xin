@@ -1133,7 +1133,9 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			log.Printf("comic page literal text deduped batch=%s book=%s video=%s", batchID, bookID, videoID)
 		}
 	}
+	stopSlowPageHeartbeat := comicSlowPageHeartbeat(ctx, selectedPage.Label)
 	mediaType, storageRef, source, err := generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, generationPrompt, contract.ReferenceImageURLs, g.localExecutors)
+	stopSlowPageHeartbeat()
 	if errors.Is(err, errShuihuoImageContentPolicy) {
 		// 两次降级仍被审核拒绝后，不要拿原提示词反复重试，而是先用文本模型
 		// 把整页提示词改写成合规版本（允许改构图/主体/场景），再生成一次。
