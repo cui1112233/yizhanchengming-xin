@@ -2,6 +2,11 @@ function nodeWidth(node) {
   return Number(node.measured?.width ?? node.width ?? 168);
 }
 
+export function retainCanvasNodeSelection(nodes, selectedIds) {
+  const selected = new Set(selectedIds || []);
+  return (nodes || []).map(node => ({ ...node, selected: selected.has(node.id) }));
+}
+
 export const CANVAS_SHORTCUTS = Object.freeze([
   { command: 'undo', keys: 'Ctrl/⌘ + Z', label: '撤销' },
   { command: 'redo', keys: 'Ctrl/⌘ + Shift + Z', label: '重做' },

@@ -12,7 +12,7 @@ import { createContext, forwardRef, lazy, Suspense, useCallback, useContext, use
 import {
   alignCanvasNodes, canvasGroupBounds, canvasKeyboardCommand, commandAvailability,
   connectCanvasNodes, distributeCanvasNodes, groupCanvasNodes,
-  isCanvasMultiSelectionEvent, moveCanvasGroup, removeCanvasEdges, sameCanvasSelection, selectCanvasNodes, ungroupCanvasNodes
+  isCanvasMultiSelectionEvent, moveCanvasGroup, removeCanvasEdges, retainCanvasNodeSelection, sameCanvasSelection, selectCanvasNodes, ungroupCanvasNodes
 } from '../pages/agent-canvas-commands';
 import { createCanvasHistory } from '../pages/agent-canvas-history';
 import { useCanvasPetService } from './useCanvasPetService.jsx';
@@ -847,12 +847,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pet
     const mappedNodes = (currentCanvas.nodes || []).map(toFlowNode);
     const nextAppearance = normalizeCanvasAppearance(currentCanvas.appearance);
     const nextEdges = (currentCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
-    const nextNodes = syncCanvasEffectiveReferences(mappedNodes, nextEdges);
+    const nextNodes = retainCanvasNodeSelection(syncCanvasEffectiveReferences(mappedNodes, nextEdges), selectedIds);
     const nextViewport = currentCanvas.viewport || { x: 0, y: 0, zoom: 1 };
     if (canvasSignature(nextNodes, nextEdges, nextViewport, nextAppearance) === signatureRef.current) return;
     setNodes(nextNodes);
     setEdges(nextEdges);
-    setSelectedIds([]);
+    setSelectedIds(nextNodes.filter(node => node.selected).map(node => node.id));
     setSelectedEdgeIds([]);
     setContextMenu(null);
     setActiveEditorNodeID(current => retainCanvasEditorNodeID(current, nextNodes));
