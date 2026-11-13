@@ -74,7 +74,7 @@ export default function ImageCapacityControl({ modelId, aspectRatio = '9:16', ac
   };
   const patch = value => setDraft(previous => ({ ...previous, ...value }));
   const cooling = state?.coolingUntil && new Date(state.coolingUntil).getTime() > Date.now();
-  return <section className="batch-factory-engine-field" style={{ gridColumn: '1 / -1' }}>
+  return <section className="batch-factory-engine-field" style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8, minWidth: 0 }}>
     <Space wrap><b>出图并发</b><span>自动分配</span><Button size="small" loading={busy} disabled={!modelId || !active} onClick={() => setRefresh(value => value + 1)}>刷新</Button></Space>
     <span style={{ fontSize: 12 }}>所有用户和书籍共享通道额度，空闲时自动使用，繁忙时排队。</span>
     {!modelId ? <span>请先选择图片模型</span> : <>
