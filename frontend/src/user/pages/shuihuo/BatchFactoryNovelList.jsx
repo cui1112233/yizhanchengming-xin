@@ -332,6 +332,7 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
   const [busy, setBusy] = useState(false);
   const [giantItems, setGiantItems] = useState([]);
   const [giantBusy, setGiantBusy] = useState(false);
+  const [giantDirectFirst, setGiantDirectFirst] = useState(false);
   const options = useMemo(() => {
     const base = Array.isArray(platformOptions) && platformOptions.length
       ? platformOptions
@@ -410,7 +411,7 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
           : item));
         const missingBook = finalItems.find(item => !item.book);
         if (missingBook) { message.warning(`请为素材 ${missingBook.id} 选择具体书目`); return; }
-        await onAddGiantBooks(finalItems, allowDuplicate);
+        await onAddGiantBooks(finalItems, allowDuplicate, giantDirectFirst);
       } else {
         await onAddBooks(parsed, platform, allowDuplicate);
       }
@@ -447,6 +448,11 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks, onAddGiantBooks 
               </> : ` · 解析失败：${item.error}`}
             </div>)}
           </div> : null}
+        </div> : null}
+        {giantMode ? <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Switch size="small" checked={giantDirectFirst} onChange={setGiantDirectFirst} />
+          <span style={{ fontSize: 12 }}>直接获取正文（书城直取）</span>
+          <small style={{ fontSize: 12, opacity: 0.65 }}>{giantDirectFirst ? '不走执行器，按书号直接取正文；失败需手动重试' : '默认由巨量素材执行器 OCR 读取'}</small>
         </div> : null}
         {duplicates.length ? <Alert type="warning" showIcon message={`发现 ${duplicates.length} 本已存在的书`} description={duplicates.join('、')} /> : null}
         <Checkbox checked={allowDuplicate} onChange={event => setAllowDuplicate(event.target.checked)}>重复 ID 仍然添加</Checkbox>
@@ -3954,7 +3960,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   }
   // 「添加新书」的巨量获取：前端先解析素材并让用户确认，这里把解析结果登记
   // 成占位书追加进当前批次，再给执行器派发 OCR 任务；正文由执行器回填。
-  async function addGiantBooksToBatch(parsedItems, allowDuplicate) {
+  async function addGiantBooksToBatch(parsedItems, allowDuplicate, directFirst = false) {
     if (!batch?.id) throw new Error('当前批次尚未加载完成，请刷新后重试');
     const items = (Array.isArray(parsedItems) ? parsedItems : []).filter(item => item?.status === 'resolved' && item?.material && item?.book);
     if (!items.length) throw new Error('没有可添加的巨量素材');
@@ -3970,18 +3976,20 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       const duplicates = entries.filter(entry => existingKeys.has(entry.giantMaterialId) || existingKeys.has(String(entry.book.platformBookId || entry.book.bookId || '').trim()));
       if (duplicates.length) throw new Error(`发现 ${duplicates.length} 本已在当前批次，请勾选“重复 ID 仍然添加”后再提交`);
     }
-    const executorResponse = await listGiantMaterialExecutors();
-    const executors = Array.isArray(executorResponse?.executors)
-      ? executorResponse.executors
-      : Array.isArray(executorResponse?.data?.executors) ? executorResponse.data.executors : [];
-    if (!executors.some(executor => executor?.online === true)) {
-      throw new Error('巨量素材执行器未安装或未登录，请先在「设置 → 执行器状态」完成配对');
+    if (!directFirst) {
+      const executorResponse = await listGiantMaterialExecutors();
+      const executors = Array.isArray(executorResponse?.executors)
+        ? executorResponse.executors
+        : Array.isArray(executorResponse?.data?.executors) ? executorResponse.data.executors : [];
+      if (!executors.some(executor => executor?.online === true)) {
+        throw new Error('巨量素材执行器未安装或未登录，请先在「设置 → 执行器状态」完成配对，或开启“直接获取正文”');
+      }
     }
     const inheritedContent = inheritedContentSettingsForNewBook(books, contentRangeLines, contentCaptureCharacters);
     const failures = [];
     const intakeResult = await createNovelFetchIntake(buildGiantMaterialPlaceholderIntakes(
       entries.map(entry => ({ giantMaterialId: entry.giantMaterialId, material: entry.material, book: entry.book })),
-      { contentRangeLines: inheritedContent.contentRangeLines, originalReadStrategy: 'ocr_first' }
+      { contentRangeLines: inheritedContent.contentRangeLines, originalReadStrategy: directFirst ? 'direct_first' : 'ocr_first' }
     ));
     const intake = resultData(intakeResult, 'intake');
     if (!intake?.id) throw new Error('新增书籍暂存失败');
@@ -3991,6 +3999,39 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     for (const entry of entries) {
       const book = findRegisteredGiantMaterialBook(latestBatch?.books, entry.giantMaterialId);
       if (!book?.id) { failures.push(`${entry.giantMaterialId}: 已加入但未找到占位书`); continue; }
+      // 直接获取：跳过执行器 OCR，按书号请求书城原文；失败标成可重试的 failed。
+      if (directFirst) {
+        try {
+          await updateBookMetadata(batch.id, book.id, {
+            metadata: { ...(book.sourceMetadata || {}), originalReadStage: 'direct', originalReadError: '', contentPending: true },
+            expectedRevision: Number(book.revision || 0)
+          });
+          await fetchBookOriginal(batch.id, book.id);
+          latestBatch = resultData(await getBatch(batch.id), 'batch');
+          const refreshedBook = findRegisteredGiantMaterialBook(latestBatch?.books, entry.giantMaterialId);
+          if (refreshedBook?.id) {
+            await updateBookMetadata(batch.id, refreshedBook.id, {
+              metadata: { ...(refreshedBook.sourceMetadata || {}), contentPending: false, originalReadStage: 'direct', originalReadError: '' },
+              expectedRevision: Number(refreshedBook.revision || 0)
+            });
+            try { await classifyBookPublishMetadata(batch.id, refreshedBook.id, { force: false }); } catch (_) { /* 分类可在工作区单独重试 */ }
+          }
+          addedBookIDs.push(String(book.id));
+        } catch (directError) {
+          try {
+            latestBatch = resultData(await getBatch(batch.id), 'batch');
+            const failedBook = findRegisteredGiantMaterialBook(latestBatch?.books, entry.giantMaterialId);
+            if (failedBook?.id) {
+              await updateBookMetadata(batch.id, failedBook.id, {
+                metadata: { ...(failedBook.sourceMetadata || {}), originalReadStage: 'failed', originalReadError: directError?.message || '书城直取失败', contentPending: false },
+                expectedRevision: Number(failedBook.revision || 0)
+              });
+            }
+          } catch (_) { /* 记录失败状态失败时保留原始错误 */ }
+          failures.push(`${entry.giantMaterialId}: ${directError?.message || '书城直取失败'}`);
+        }
+        continue;
+      }
       try {
         const createdResponse = await createGiantMaterialJob({
           materialId: entry.giantMaterialId,
