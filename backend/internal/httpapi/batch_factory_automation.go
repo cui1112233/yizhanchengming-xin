@@ -3541,14 +3541,17 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					stallLast.Store(now)
 					stallStage.Store(stage)
 					delete(entry, "retryAt")
-					// “本页已等待 N 秒”这类纯等待文案每秒都在变，但没有任何状态
-					// 变化。逐条持久化只会把同一个 job 反复写进 binlog，因此最多
-					// 每分钟落库一次；真实进度（页完成、阶段切换）仍然立即保存。
+					// 纯等待文案（“已等待 N 秒/分钟”）没有状态变化，最多每分钟
+					// 落库一次；真实进度（页完成、阶段切换）合并到每 15 秒一次。
+					// 单条 job_json 约 400KB，且 binlog 以 FULL 行镜像记录前后两份，
+					// 逐事件写库会把 binlog 放大到每分钟几十兆。
+					window := 15 * time.Second
 					if automationHeartbeatOnlyMessage(message) {
-						if last, _ := persistedHeartbeat.Load().(time.Time); now.Sub(last) < time.Minute {
-							entryLogMu.Unlock()
-							return
-						}
+						window = time.Minute
+					}
+					if last, _ := persistedHeartbeat.Load().(time.Time); now.Sub(last) < window {
+						entryLogMu.Unlock()
+						return
 					}
 					persistedHeartbeat.Store(now)
 					appendAutomationBookLog(entry, now, stage, message)
