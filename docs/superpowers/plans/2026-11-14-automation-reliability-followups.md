@@ -147,6 +147,16 @@
    - `reaper_log_lines=0`、`panic_log_lines=0`、`artifact_restore_lines=0`。
    - 结论：观测窗口内没有僵尸回收事件，reaper 未产生写入；当前 binlog 增长约 216KB/分钟，远低于“全量重写 6.4MB/次”的旧行为，说明单行保存持续生效。阶段 1 仍值得做，但它属于低频优化，不是当前主要写放大来源。
 
+### 2026-11-14 阶段 1 执行结果
+
+- `75c45576`：新增 `saveJobsLocked`，reaper、dispatcher、启动恢复、加载规范化统一按 `changedIDs` 走 `SaveJobs` 单任务 upsert；状态读取修复路径同样只保存被修复任务。
+- 测试：新增 `TestReapZombieJobsSavesOnlyReclaimedJobs`、`TestRecoverInterruptedJobsSavesOnlyRunningJobs`、`TestStatusRepairSavesOnlyRepairedJobs`；`httpapi` 自动化相关回归 46s 全通过。
+- 本地 4011 启动成功，`git_sha=75c45576`，未登录接口返回 401。
+- 生产发布：`qiantie-202611141247`，二进制 SHA256 `16907d27…`，`git_sha` 与 `runtime_manifest_sha` 均为 `75c45576`。
+- 前端入口变为 `user-pA6972Cj.js`（包含并行会话 12:14 构建的未提交前端，经用户确认后随本次发布）。
+- 浏览器验收：登录页完整渲染、工作台可达、控制台无错误。
+- 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141247-75c45576`（上一版本 `qiantie-202611141214`）。
+
 ### 2026-11-14 阶段 2 / 阶段 3 执行结果
 
 - `d87146d3` 阶段 2a：`OpenContext` / `PathContext`、`ErrRestoreTimeout`、默认 2 分钟上限、回源日志、`QIANTIE_ARTIFACT_RESTORE_TIMEOUT`。
