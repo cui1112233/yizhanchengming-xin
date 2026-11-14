@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"path"
@@ -151,11 +152,16 @@ func (s Scanner) Start(interval time.Duration) {
 		interval = time.Minute
 	}
 	go func() {
-		_, _ = s.RunOnce(context.Background())
+		run := func() {
+			if _, err := s.RunOnce(context.Background()); err != nil {
+				log.Printf("production media scanner failed: %v", err)
+			}
+		}
+		run()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			_, _ = s.RunOnce(context.Background())
+			run()
 		}
 	}()
 }

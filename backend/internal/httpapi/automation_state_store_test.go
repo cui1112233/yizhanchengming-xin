@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -189,6 +190,88 @@ func TestPersistAutomationBookEntryUpsertsOnlyThatJob(t *testing.T) {
 	}
 	if store.lastJobs["job-2"] != nil {
 		t.Fatal("unchanged job must not be rewritten")
+	}
+}
+
+type failingPartialAutomationStore struct {
+	memoryAutomationStateStore
+	saveErr  error
+	saveJobs int
+}
+
+func (s *failingPartialAutomationStore) SaveJobs(_ context.Context, _ map[string]map[string]any) error {
+	s.saveJobs++
+	return s.saveErr
+}
+
+func TestSetJobKeepsCachedStateWhenPartialSaveFails(t *testing.T) {
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	store := &failingPartialAutomationStore{
+		memoryAutomationStateStore: memoryAutomationStateStore{
+			found: true,
+			state: automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+				"job-1": {"id": "job-1", "owner": "alice", "batchId": "batch-1", "state": "running", "updatedAt": now},
+			}},
+		},
+		saveErr: errors.New("mysql unavailable"),
+	}
+	coordinator := &BatchAutomationCoordinator{automationStore: store, now: func() time.Time { return now }}
+	if _, err := coordinator.loadLocked(); err != nil {
+		t.Fatal(err)
+	}
+	updated := map[string]any{"id": "job-1", "owner": "alice", "batchId": "batch-1", "state": "completed", "updatedAt": now}
+	if err := coordinator.setJob("alice", "batch-1", "job-1", updated); err == nil {
+		t.Fatal("expected the partial save to fail")
+	}
+	if store.saveJobs != 1 {
+		t.Fatalf("saveJobs=%d, want 1", store.saveJobs)
+	}
+	cached, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := automationStringValue(cached.Jobs["job-1"]["state"], ""); got != "running" {
+		t.Fatalf("cached job state=%q, want previous persisted state running", got)
+	}
+}
+
+func TestFailAutomationBooksAfterPanicNormalizesRunningBooks(t *testing.T) {
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	job := map[string]any{
+		"id": "job-1", "state": "running",
+		"books": map[string]any{
+			"done":  map[string]any{"status": "completed"},
+			"live":  map[string]any{"status": "running", "retryAt": "2026-11-14T12:05:00Z"},
+			"wait":  map[string]any{"status": "queued"},
+			"later": map[string]any{"status": "scheduled"},
+		},
+	}
+	failAutomationBooksAfterPanic(job, now, "执行异常中断")
+	if got := automationStringValue(job["state"], ""); got != "failed" {
+		t.Fatalf("job state=%q, want failed", got)
+	}
+	if got := automationStringValue(job["lastError"], ""); got == "" {
+		t.Fatal("panic reason must be persisted")
+	}
+	books := job["books"].(map[string]any)
+	for _, id := range []string{"live", "wait"} {
+		entry := books[id].(map[string]any)
+		if got := automationStringValue(entry["status"], ""); got != "failed" {
+			t.Fatalf("%s status=%q, want failed", id, got)
+		}
+		if _, ok := entry["retryAt"]; ok {
+			t.Fatalf("%s must not keep a retry mark", id)
+		}
+	}
+	if got := automationStringValue(books["done"].(map[string]any)["status"], ""); got != "completed" {
+		t.Fatalf("completed book status=%q, want completed", got)
+	}
+	if got := automationStringValue(books["later"].(map[string]any)["status"], ""); got != "scheduled" {
+		t.Fatalf("scheduled book status=%q, want scheduled", got)
+	}
+	counts := job["counts"].(map[string]any)
+	if counts["failed"] != 2 || counts["ready"] != 1 || counts["pending"] != 1 {
+		t.Fatalf("counts=%#v, want failed=2 ready=1 pending=1", counts)
 	}
 }
 

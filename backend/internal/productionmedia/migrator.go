@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"time"
 
@@ -110,11 +111,16 @@ func (m Migrator) Start(interval time.Duration) {
 		interval = time.Minute
 	}
 	go func() {
-		_, _ = m.RunOnce(context.Background())
+		run := func() {
+			if _, err := m.RunOnce(context.Background()); err != nil {
+				log.Printf("production media migrator failed: %v", err)
+			}
+		}
+		run()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			_, _ = m.RunOnce(context.Background())
+			run()
 		}
 	}()
 }

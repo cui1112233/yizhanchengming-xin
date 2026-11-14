@@ -1376,16 +1376,29 @@ func (c *BatchAutomationCoordinator) setJobLocked(owner, batchID, jobID string, 
 		if automationStringValue(job["batchId"], "") == "" {
 			job["batchId"] = batchID
 		}
-		state.Jobs[jobID] = job
 		if automationStringValue(job["state"], "") == "scheduled" || automationJobHasRetryRequest(job) {
 			c.dispatchNextCheckSet = false
 		}
 		// 进度事件只改一个 job：优先走单行 upsert。全量 Save 会把所有任务的
 		// job_json 重新写一遍，MySQL binlog 随之成倍增长。
-		if partial, ok := c.automationStore.(AutomationJobSaver); ok {
-			c.automationState = &state
-			return partial.SaveJobs(context.Background(), map[string]map[string]any{jobID: job})
+		//
+		// loadLocked 返回的 state.Jobs 与 c.automationState 共享同一个顶层 map，
+		// 直接赋值等于在 MySQL 落库前就改到了内存缓存。这里先在副本上写入目标
+		// job，保存成功后再替换缓存；失败时缓存保持上一次已持久化的内容。
+		nextJobs := make(map[string]map[string]any, len(state.Jobs)+1)
+		for id, existing := range state.Jobs {
+			nextJobs[id] = existing
 		}
+		nextJobs[jobID] = job
+		if partial, ok := c.automationStore.(AutomationJobSaver); ok {
+			if err := partial.SaveJobs(context.Background(), map[string]map[string]any{jobID: job}); err != nil {
+				return err
+			}
+			state.Jobs = nextJobs
+			c.automationState = &state
+			return nil
+		}
+		state.Jobs = nextJobs
 		return c.saveLocked(state)
 	}
 	if strings.TrimSpace(c.path) == "" {
@@ -2283,7 +2296,9 @@ func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job
 				if !c.isCurrentRun(jobID, epoch) {
 					return
 				}
-				job["state"], job["lastError"], job["updatedAt"] = "failed", fmt.Sprintf("panic: %v", recovered), c.now()
+				now := c.now()
+				reason := fmt.Sprintf("执行异常中断（panic: %v），可直接重试", recovered)
+				failAutomationBooksAfterPanic(job, now, reason)
 				_ = c.setJob(owner, batchID, jobID, job)
 			}
 		}()
@@ -2301,6 +2316,38 @@ func (c *BatchAutomationCoordinator) runSuperseded(jobID string, epoch int64) bo
 	c.controlMu.Lock()
 	defer c.controlMu.Unlock()
 	return c.runEpochs[jobID] > epoch
+}
+
+// failAutomationBooksAfterPanic 把 panic 中断时仍在执行的书收口成失败。
+// 只处理 running/queued：已完成的书必须保留结果，scheduled/pending_confirmation
+// 属于等待态，继续交给用户或重试逻辑处理。否则会出现“任务已 failed、书仍显示
+// 执行中”，用户既看不到失败原因也无法重试。
+func failAutomationBooksAfterPanic(job map[string]any, now time.Time, reason string) {
+	books, _ := job["books"].(map[string]any)
+	converted := false
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "running", "queued":
+			entry["status"] = "failed"
+			entry["message"] = reason
+			entry["updatedAt"] = now
+			delete(entry, "retryAt")
+			entry["autoContinue"] = map[string]any{"reason": "任务执行异常中断，等待重试", "willContinue": false}
+			converted = true
+		}
+	}
+	if len(books) > 0 {
+		normalizeAutomationJobCounts(job, books)
+	}
+	if converted || len(books) == 0 {
+		job["state"] = "failed"
+		job["lastError"] = reason
+	}
+	job["updatedAt"] = now
 }
 
 func (c *BatchAutomationCoordinator) cancelRun(jobID string) {

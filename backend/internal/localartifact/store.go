@@ -287,7 +287,7 @@ func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artif
 	}
 	tmp, err := os.CreateTemp(s.root, ".media-upload-*.tmp")
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	tmpName := tmp.Name()
 	committed := false
@@ -301,7 +301,7 @@ func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artif
 	writer := io.MultiWriter(tmp, hash)
 	count, err := io.Copy(writer, io.LimitReader(src, s.maxBytes+1))
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	if count == 0 {
 		return Artifact{}, ErrInvalidMP4
@@ -313,7 +313,7 @@ func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artif
 		return Artifact{}, diskPressureError(err)
 	}
 	if err := tmp.Close(); err != nil {
-		return Artifact{}, err
+		return Artifact{}, diskPressureError(err)
 	}
 	if err := os.Rename(tmpName, finalPath); err != nil {
 		return Artifact{}, fmt.Errorf("commit media artifact: %w", diskPressureError(err))
@@ -389,12 +389,15 @@ func (s *Store) Restore(storageRef string, source io.Reader, expectedSize int64,
 	if s == nil || filepath.Base(storageRef) != storageRef || source == nil || expectedSize < 0 || expectedSize > s.maxBytes || !regexp.MustCompile(`^[a-fA-F0-9]{64}$`).MatchString(expectedSHA256) {
 		return ErrInvalidID
 	}
-	if err := os.MkdirAll(s.root, 0o750); err != nil {
+	if err := s.checkWriteAllowed(); err != nil {
 		return err
+	}
+	if err := os.MkdirAll(s.root, 0o750); err != nil {
+		return diskPressureError(err)
 	}
 	tmp, err := os.CreateTemp(s.root, ".restore-*.tmp")
 	if err != nil {
-		return err
+		return diskPressureError(err)
 	}
 	tmpName := tmp.Name()
 	committed := false
@@ -407,19 +410,19 @@ func (s *Store) Restore(storageRef string, source io.Reader, expectedSize int64,
 	hash := sha256.New()
 	written, err := io.Copy(io.MultiWriter(tmp, hash), io.LimitReader(source, expectedSize+1))
 	if err != nil {
-		return err
+		return diskPressureError(err)
 	}
 	if written != expectedSize || !strings.EqualFold(hex.EncodeToString(hash.Sum(nil)), expectedSHA256) {
 		return ErrRemoteIntegrity
 	}
 	if err := tmp.Sync(); err != nil {
-		return err
+		return diskPressureError(err)
 	}
 	if err := tmp.Close(); err != nil {
-		return err
+		return diskPressureError(err)
 	}
 	if err := os.Rename(tmpName, filepath.Join(s.root, storageRef)); err != nil {
-		return err
+		return diskPressureError(err)
 	}
 	committed = true
 	return nil

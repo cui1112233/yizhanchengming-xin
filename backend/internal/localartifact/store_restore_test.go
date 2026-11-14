@@ -77,3 +77,17 @@ func TestSaveMediaStopsBeforeWritingWhenDiskGuardRejects(t *testing.T) {
 		t.Fatalf("SaveMedia error=%v, want ErrDiskPressure", err)
 	}
 }
+
+func TestRestoreStopsBeforeWritingWhenDiskGuardRejects(t *testing.T) {
+	store := NewStore(t.TempDir(), 1<<20)
+	store.SetWriteGuard(func() error { return ErrDiskPressure })
+	body := "remote-media"
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
+	err := store.Restore("clip_789.mp4", strings.NewReader(body), int64(len(body)), digest)
+	if err != ErrDiskPressure {
+		t.Fatalf("Restore error=%v, want ErrDiskPressure", err)
+	}
+	if _, statErr := os.Stat(store.root + string(os.PathSeparator) + "clip_789.mp4"); !os.IsNotExist(statErr) {
+		t.Fatalf("restore wrote a file despite disk pressure: %v", statErr)
+	}
+}

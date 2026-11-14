@@ -3,6 +3,7 @@ package productionmedia
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"qiantie/backend/internal/localartifact"
@@ -72,11 +73,16 @@ func (s CleanupSupervisor) Start(interval time.Duration) {
 		interval = time.Hour
 	}
 	go func() {
-		_, _ = s.RunOnce(context.Background())
+		run := func() {
+			if _, err := s.RunOnce(context.Background()); err != nil {
+				log.Printf("production media cleanup failed: %v", err)
+			}
+		}
+		run()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			_, _ = s.RunOnce(context.Background())
+			run()
 		}
 	}()
 }
