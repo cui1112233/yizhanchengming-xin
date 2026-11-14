@@ -5359,8 +5359,12 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 	// 才可能成功，所以按批次记录的当前 source_book_id 判断是否值得重新抓取；
 	// 读不到批次时沿用旧规则，不阻塞重试。
 	currentSourceBookIDs := map[string]string{}
+	// 顺手保留批次快照：下面要在改动 job 状态之前确认书还在批次里。
+	var prefetchedBatch batchfactoryv11.Batch
+	prefetchedBatchOK := false
 	if c.store != nil {
 		if currentBatch, readErr := c.store.GetBatch(ctx, owner, batchID); readErr == nil {
+			prefetchedBatch, prefetchedBatchOK = currentBatch, true
 			for _, book := range currentBatch.Books {
 				currentSourceBookIDs[book.ID] = book.BookID
 			}
@@ -5372,6 +5376,21 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 	if len(selected) == 0 {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 没有需要重试的书，已完成或正在执行的书不会重复执行", batchfactoryv11.ErrConflict)
+	}
+	// 书可能已从批次里删除，而 job 仍保留旧账本。若先改成 running 再发现批次
+	// 里没有可执行的书，就会留下一个没有执行协程的假 running，只能等僵尸
+	// 回收器 2 分钟后改判失败。先在改动状态前校验范围。
+	if prefetchedBatchOK {
+		scopedCount := 0
+		for _, book := range prefetchedBatch.Books {
+			if selected[book.ID] {
+				scopedCount++
+			}
+		}
+		if scopedCount == 0 {
+			c.mu.Unlock()
+			return nil, fmt.Errorf("%w: 批次中已不存在这些书，可能已被删除，无法重试", batchfactoryv11.ErrConflict)
+		}
 	}
 	target["state"], target["updatedAt"] = "running", c.now()
 	if reopened {
@@ -5412,9 +5431,13 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 	// concurrent map read and map write，并直接杀死整个 Go 进程。
 	response := publicAutomationJob(target)
 	c.mu.Unlock()
-	batch, err := c.store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return nil, err
+	batch := prefetchedBatch
+	if !prefetchedBatchOK {
+		loaded, err := c.store.GetBatch(ctx, owner, batchID)
+		if err != nil {
+			return nil, err
+		}
+		batch = loaded
 	}
 	if c.providerSync != nil {
 		if err := c.providerSync(ctx, owner); err != nil {
