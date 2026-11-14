@@ -17,6 +17,12 @@ type MySQLStore struct{ db *sql.DB }
 func NewMySQLStore(db *sql.DB) *MySQLStore { return &MySQLStore{db: db} }
 
 func (s *MySQLStore) CreateProject(ctx context.Context, project Project) (Project, error) {
+	if project.AspectRatio == "" {
+		project.AspectRatio = "9:16"
+	}
+	if !ValidCreativeAspectRatio(project.AspectRatio) {
+		return Project{}, fmt.Errorf("%w: 不支持的剧本比例%s", ErrInvalidArgument, project.AspectRatio)
+	}
 	project.ID = strings.TrimSpace(project.ID)
 	if project.ID == "" || strings.TrimSpace(project.OwnerUsername) == "" {
 		return Project{}, fmt.Errorf("%w: 项目 ID 与 owner 不能为空", ErrInvalidArgument)
@@ -80,6 +86,9 @@ FROM screenplay_projects WHERE owner_username = ? AND deleted_at IS NULL ORDER B
 }
 
 func (s *MySQLStore) UpdateProject(ctx context.Context, owner, id string, changes Project, expectedRevision int64) (Project, error) {
+	if changes.AspectRatio != "" && !ValidCreativeAspectRatio(changes.AspectRatio) {
+		return Project{}, fmt.Errorf("%w: 不支持的剧本比例%s", ErrInvalidArgument, changes.AspectRatio)
+	}
 	current, err := s.GetProject(ctx, owner, id)
 	if err != nil {
 		return Project{}, err

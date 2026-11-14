@@ -156,14 +156,8 @@ func RegisterScreenplayCreativeRoutes(mux *http.ServeMux, auth BridgeAuth, store
 			writeScreenplayError(w, e)
 			return
 		}
-		c := p.CreativeConfig
-		if c == nil {
-			c = &screenplay.CreativeConfig{ScriptPromptID: p.PromptID}
-			if p.SelectedStyle != "" || p.StyleDesc != "" {
-				c.Style = &screenplay.CreativeStyleSnapshot{ID: p.SelectedStyle, Name: p.ArtStyle, Prompt: p.StyleDesc, Images: []string{}}
-			}
-		}
-		writeJSON(w, 200, map[string]any{"creative_config": c, "revision": p.Revision})
+		c := screenplay.EffectiveCreativeConfig(p)
+		writeJSON(w, 200, map[string]any{"creative_config": c, "aspect_ratio": p.AspectRatio, "revision": p.Revision, "options": map[string]any{"aspect_ratios": screenplay.CreativeAspectRatios, "image_resolutions": []string{"1K", "2K", "4K"}, "asset_prompt_types": []string{"general", "western"}, "voice_design_models": []string{"minimax", "qwen-tts"}}})
 	})
 	// A final wildcard avoids ServeMux's overlapping /styles/{styleId} pattern.
 	// Only the documented creative-config action is accepted here.
@@ -200,15 +194,7 @@ func RegisterScreenplayCreativeRoutes(mux *http.ServeMux, auth BridgeAuth, store
 			writeScreenplayError(w, screenplay.ErrRevisionConflict)
 			return
 		}
-		c := screenplay.CreativeConfig{}
-		if p.CreativeConfig != nil {
-			c = *p.CreativeConfig
-		} else {
-			c.ScriptPromptID = p.PromptID
-			if p.SelectedStyle != "" || p.StyleDesc != "" {
-				c.Style = &screenplay.CreativeStyleSnapshot{ID: p.SelectedStyle, Name: p.ArtStyle, Prompt: p.StyleDesc, Images: []string{}}
-			}
-		}
+		c := screenplay.EffectiveCreativeConfig(p)
 		if c.PromptSnapshots == nil {
 			c.PromptSnapshots = map[string]screenplay.CreativePromptSnapshot{}
 		}
@@ -221,7 +207,7 @@ func RegisterScreenplayCreativeRoutes(mux *http.ServeMux, auth BridgeAuth, store
 			writeScreenplayError(w, e)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"creative_config": saved.CreativeConfig, "revision": saved.Revision})
+		writeJSON(w, 200, map[string]any{"creative_config": saved.CreativeConfig, "aspect_ratio": saved.AspectRatio, "revision": saved.Revision})
 	})
 }
 
@@ -278,6 +264,14 @@ func serveCreativeConfigMutation(w http.ResponseWriter, r *http.Request, actor s
 }
 
 type creativeConfigPatch struct {
+	AspectRatio             *string         `json:"aspect_ratio"`
+	ImageResolution         *string         `json:"image_resolution"`
+	AssetPromptType         *string         `json:"asset_prompt_type"`
+	AssetProcessPrompt      *string         `json:"asset_process_prompt"`
+	VoiceDesignModel        *string         `json:"voice_design_model"`
+	ShowOriginalText        *bool           `json:"show_original_text"`
+	CharacterImageMode      *string         `json:"character_image_mode"`
+	SceneImageMode          *string         `json:"scene_image_mode"`
 	ExpectedRevision        *int64          `json:"expected_revision"`
 	ScriptPromptID          *string         `json:"script_prompt_id"`
 	StoryboardPromptID      *string         `json:"storyboard_prompt_id"`
@@ -290,6 +284,70 @@ type creativeConfigPatch struct {
 }
 
 func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor string, c *screenplay.CreativeConfig, in creativeConfigPatch) error {
+	if in.AspectRatio != nil {
+		if !screenplay.ValidCreativeAspectRatio(*in.AspectRatio) {
+			return fmt.Errorf("不支持的剧本比例%s", *in.AspectRatio)
+		}
+		c.AspectRatio = *in.AspectRatio
+	}
+	if in.ImageResolution != nil {
+		v := strings.ToUpper(strings.TrimSpace(*in.ImageResolution))
+		if v != "1K" && v != "2K" && v != "4K" {
+			return fmt.Errorf("出图分辨率只支持1K、2K、4K")
+		}
+		c.ImageResolution = v
+	}
+	if in.AssetPromptType != nil {
+		if *in.AssetPromptType != "general" && *in.AssetPromptType != "western" {
+			return fmt.Errorf("资产类型只支持通用或海外")
+		}
+		c.AssetPromptType = *in.AssetPromptType
+	}
+	if in.AssetProcessPrompt != nil {
+		if len([]rune(*in.AssetProcessPrompt)) > 100000 {
+			return fmt.Errorf("资产处理提示词最多10万字")
+		}
+		c.AssetProcessPrompt = *in.AssetProcessPrompt
+		c.AssetProcessPromptCleared = strings.TrimSpace(*in.AssetProcessPrompt) == ""
+	}
+	if in.VoiceDesignModel != nil {
+		if *in.VoiceDesignModel != "minimax" && *in.VoiceDesignModel != "qwen-tts" {
+			return fmt.Errorf("音色设计模型只支持minimax或qwen-tts")
+		}
+		c.VoiceDesignModel = *in.VoiceDesignModel
+	}
+	if in.ShowOriginalText != nil {
+		c.ShowOriginalText = *in.ShowOriginalText
+	}
+	// The four existing prompt selectors remain compatible with the typed image modes.
+	if in.CharacterImageMode != nil {
+		mode, id, e := screenplay.NormalizeCreativeImageMode(*in.CharacterImageMode, "character-design")
+		if e != nil {
+			return e
+		}
+		if id != "" && in.CharacterDesignPromptID != nil && screenplay.CreativePromptAlias(*in.CharacterDesignPromptID) != id {
+			return fmt.Errorf("角色出图模式与人设提示词不一致")
+		}
+		c.CharacterImageMode = mode
+		if id != "" {
+			c.CharacterDesignPromptID = id
+			in.CharacterDesignPromptID = &id
+		}
+	}
+	if in.SceneImageMode != nil {
+		mode, id, e := screenplay.NormalizeCreativeImageMode(*in.SceneImageMode, "scene-design")
+		if e != nil {
+			return e
+		}
+		if id != "" && in.SceneDesignPromptID != nil && screenplay.CreativePromptAlias(*in.SceneDesignPromptID) != id {
+			return fmt.Errorf("场景出图模式与场景提示词不一致")
+		}
+		c.SceneImageMode = mode
+		if id != "" {
+			c.SceneDesignPromptID = id
+			in.SceneDesignPromptID = &id
+		}
+	}
 	selections := []struct {
 		src     *string
 		dst     *string
@@ -298,7 +356,7 @@ func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor stri
 	for _, s := range selections {
 		id := strings.TrimSpace(*s.dst)
 		if s.src != nil {
-			id = strings.TrimSpace(*s.src)
+			id = screenplay.CreativePromptAlias(*s.src)
 		}
 		if id == "" && s.src == nil {
 			continue
@@ -313,6 +371,12 @@ func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor stri
 		}
 		*s.dst = id
 		c.PromptSnapshots[s.purpose] = p
+	}
+	if in.CharacterDesignPromptID != nil && in.CharacterImageMode == nil {
+		c.CharacterImageMode = "typedprompt:" + c.CharacterDesignPromptID
+	}
+	if in.SceneDesignPromptID != nil && in.SceneImageMode == nil {
+		c.SceneImageMode = "typedprompt:" + c.SceneDesignPromptID
 	}
 	if len(in.StyleID) > 0 {
 		var id *string
@@ -334,6 +398,7 @@ func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor stri
 			return fmt.Errorf("图片核心要求最多10万字")
 		}
 		c.ImageCoreInstruction = *in.ImageCoreInstruction
+		c.ImageCoreInstructionCleared = strings.TrimSpace(*in.ImageCoreInstruction) == ""
 	}
 	if in.ImageModelID != nil {
 		c.ImageModelID = strings.TrimSpace(*in.ImageModelID)
@@ -341,5 +406,6 @@ func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor stri
 	if in.ImageEditModelID != nil {
 		c.ImageEditModelID = strings.TrimSpace(*in.ImageEditModelID)
 	}
+	c.ConfigVersion = 1
 	return nil
 }

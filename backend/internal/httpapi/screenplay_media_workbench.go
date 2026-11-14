@@ -23,6 +23,7 @@ import (
 )
 
 type ScreenplayMediaWorkbench struct {
+	VoiceDesigner      screenplayVoiceDesigner
 	PositioningText    func(context.Context, string, screenplay.TextRequest) (screenplay.TextResponse, error)
 	Projects           screenplay.Store
 	Media              screenplay.MediaStore
@@ -40,23 +41,24 @@ type ScreenplayMediaWorkbench struct {
 	Files              *localartifact.Store
 }
 type screenplayMediaAction struct {
-	Rows             int                       `json:"rows"`
-	Columns          int                       `json:"columns"`
-	TargetIDs        []string                  `json:"targetIds"`
-	IdempotencyKey   string                    `json:"idempotencyKey"`
-	Action           string                    `json:"action"`
-	ItemID           string                    `json:"itemId"`
-	TargetID         string                    `json:"targetId"`
-	VoiceID          string                    `json:"voiceId"`
-	Text             string                    `json:"text"`
-	Speed            float64                   `json:"speed"`
-	ModelID          string                    `json:"modelId"`
-	Prompt           string                    `json:"prompt"`
-	Format           string                    `json:"format"`
-	ReferenceItemIDs []string                  `json:"referenceItemIds"`
-	ExpectedRevision int64                     `json:"expectedRevision"`
-	Clips            []screenplayMediaClip     `json:"clips"`
-	Subtitles        []screenplayMediaSubtitle `json:"subtitles"`
+	VoiceDesignDrafts []screenplay.VoiceDesignDraft `json:"items"`
+	Rows              int                           `json:"rows"`
+	Columns           int                           `json:"columns"`
+	TargetIDs         []string                      `json:"targetIds"`
+	IdempotencyKey    string                        `json:"idempotencyKey"`
+	Action            string                        `json:"action"`
+	ItemID            string                        `json:"itemId"`
+	TargetID          string                        `json:"targetId"`
+	VoiceID           string                        `json:"voiceId"`
+	Text              string                        `json:"text"`
+	Speed             float64                       `json:"speed"`
+	ModelID           string                        `json:"modelId"`
+	Prompt            string                        `json:"prompt"`
+	Format            string                        `json:"format"`
+	ReferenceItemIDs  []string                      `json:"referenceItemIds"`
+	ExpectedRevision  int64                         `json:"expectedRevision"`
+	Clips             []screenplayMediaClip         `json:"clips"`
+	Subtitles         []screenplayMediaSubtitle     `json:"subtitles"`
 }
 type screenplayMediaClip struct {
 	ItemID        string  `json:"itemId"`
@@ -141,6 +143,18 @@ func RegisterScreenplayMediaWorkbenchRoutes(mux *http.ServeMux, auth BridgeAuth,
 		capability := func(ok bool, why string) map[string]any { return map[string]any{"available": ok, "reason": why} }
 		caps := map[string]any{"split_grid": capability(s.Cut != nil && s.Objects != nil, "按明确行列拆分已保存图片"), "import": capability(s.Cut != nil && s.Objects != nil, "导入本系统媒体资料包"), "upload": capability(s.Objects != nil && s.Cut != nil, "需要素材存储"), "image": capability(s.Images != nil && s.Assets != nil && s.Objects != nil, "需要图片模型及素材存储"), "tts": capability(s.Objects != nil && s.Cut != nil, "使用当前账号配音设置"), "asr": capability(s.ASR != nil, "需要字幕识别服务"), "timeline": capability(s.Cut != nil, "需要剪辑服务"), "render": capability(s.Exports != nil, "需要剪辑导出队列"), "package": capability(s.Cut != nil && s.Objects != nil, "媒体与时间线资料包"), "retry_import": capability(s.Production != nil && s.Cut != nil && s.Objects != nil, "重新下载已生成视频，不提交生成任务"), "jianying": capability(s.Cut != nil && s.Objects != nil, "基础轨道兼容草稿，尚未验证新版剪映导入")}
 		out := map[string]any{"items": state.Items, "settings": state, "capabilities": caps, "aicutProjectId": p.ID}
+		caps["asset_process"] = capability(s.Images != nil && s.Assets != nil && s.Objects != nil && s.Cut != nil, "仅用于当前项目角色参考图的资产处理")
+		_, voiceErr := resolveScreenplayVoiceDesignTarget(r.Context(), s.Catalog, p.OwnerUsername, screenplay.EffectiveCreativeConfig(p).VoiceDesignModel)
+		voiceReason := "独立音色设计并保存试听音频，不自动绑定普通配音"
+		if voiceErr != nil {
+			voiceReason = voiceErr.Error()
+		} else if s.VoiceDesigner == nil {
+			voiceReason = "音色设计执行器未配置"
+		} else if s.Objects == nil || s.Cut == nil {
+			voiceReason = "试听音频素材存储未配置"
+		}
+		caps["voice_design"] = capability(voiceErr == nil && s.VoiceDesigner != nil && s.Objects != nil && s.Cut != nil, voiceReason)
+		caps["voice_analyze"] = capability(s.PositioningText != nil, "使用原版127提示词生成并保存音色描述，不自动生成音频")
 		if s.Cut != nil {
 			if _, e := s.Cut.Project(r.Context(), p.OwnerUsername, p.ID); e == nil {
 				tl, _ := s.Cut.Timeline(r.Context(), p.OwnerUsername, p.ID)
@@ -269,7 +283,7 @@ func RegisterScreenplayMediaWorkbenchRoutes(mux *http.ServeMux, auth BridgeAuth,
 		}
 		{
 			permission := "edit"
-			if in.Action == "image" || in.Action == "tts" || in.Action == "asr" || in.Action == "render" {
+			if in.Action == "image" || in.Action == "asset_process" || in.Action == "voice_design" || in.Action == "voice_analyze" || in.Action == "tts" || in.Action == "asr" || in.Action == "render" {
 				permission = "generate"
 			}
 			id, _ := BridgeIdentityFromContext(r.Context())
@@ -431,6 +445,12 @@ func (s *ScreenplayMediaWorkbench) action(ctx context.Context, p screenplay.Proj
 		return nil, e
 	}
 	switch in.Action {
+	case "voice_design_drafts":
+		return s.saveVoiceDesignDrafts(ctx, p, in)
+	case "voice_analyze":
+		return s.analyzeVoices(ctx, p, in)
+	case "voice_design":
+		return s.designVoice(ctx, p, in)
 	case "split_grid":
 		return s.splitGrid(ctx, p, in, st)
 	case "select":
@@ -494,7 +514,7 @@ func (s *ScreenplayMediaWorkbench) action(ctx context.Context, p screenplay.Proj
 			return nil, fmt.Errorf("角色和音色ID不能为空")
 		}
 		return s.Media.MutateMedia(ctx, p.OwnerUsername, p.ID, func(v *screenplay.MediaState) error { v.Voices[in.TargetID] = in.VoiceID; return nil })
-	case "tts", "image":
+	case "tts", "image", "asset_process":
 		return s.generate(ctx, p, in, st)
 	case "timeline":
 		return s.timeline(ctx, p, in, st)
@@ -574,19 +594,32 @@ func (s *ScreenplayMediaWorkbench) action(ctx context.Context, p screenplay.Proj
 	}
 }
 func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Project, in screenplayMediaAction, st screenplay.MediaState) (any, error) {
+	imageWork := in.Action == "image" || in.Action == "asset_process"
+	imageSize, imageResolution := "", ""
+	imageAspect := screenplay.EffectiveCreativeConfig(p).AspectRatio
 	if e := s.validTarget(ctx, p, in.TargetID); e != nil {
 		return nil, e
 	}
-	if in.Action == "image" && (s.Images == nil || s.Assets == nil || s.Objects == nil) {
+	if imageWork && (s.Images == nil || s.Assets == nil || s.Objects == nil || s.Cut == nil) {
 		return nil, fmt.Errorf("图片服务未配置")
 	}
 	if in.Action == "tts" && (strings.TrimSpace(in.Text) == "" || len([]rune(in.Text)) > 5000) {
 		return nil, fmt.Errorf("配音文本须为1到5000字")
 	}
-	if in.Action == "image" {
+	if imageWork {
+		if in.Action == "asset_process" {
+			if len(in.ReferenceItemIDs) == 0 {
+				if selected := st.Selected[in.TargetID]; selected != "" {
+					in.ReferenceItemIDs = []string{selected}
+				}
+			}
+			if len(in.ReferenceItemIDs) == 0 {
+				return nil, fmt.Errorf("%w: 资产处理须选择当前项目的参考图片", screenplay.ErrInvalidArgument)
+			}
+		}
 		if p.CreativeConfig != nil && strings.TrimSpace(in.ModelID) == "" {
 			in.ModelID = p.CreativeConfig.ImageModelID
-			if len(in.ReferenceItemIDs) > 0 {
+			if len(in.ReferenceItemIDs) > 0 && in.Action != "asset_process" {
 				in.ModelID = firstText(p.CreativeConfig.ImageEditModelID, in.ModelID)
 			}
 		}
@@ -594,7 +627,15 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 			return nil, fmt.Errorf("请选择图片模型")
 		}
 		var err error
-		in.Prompt, err = s.creativeImagePrompt(ctx, p, in.TargetID, in.Prompt)
+		if in.Action == "asset_process" {
+			in.Prompt, err = s.creativeAssetProcessPrompt(ctx, p, in.TargetID, in.Prompt)
+		} else {
+			in.Prompt, err = s.creativeImagePrompt(ctx, p, in.TargetID, in.Prompt)
+		}
+		if err != nil {
+			return nil, err
+		}
+		imageSize, imageResolution, err = screenplayImageDimensions(p, imageAspect)
 		if err != nil {
 			return nil, err
 		}
@@ -683,7 +724,10 @@ func (s *ScreenplayMediaWorkbench) generate(ctx context.Context, p screenplay.Pr
 			referenceURLs = append(referenceURLs, u)
 		}
 		if runErr == nil {
-			urls, _, runErr = s.Images(ctx, p.OwnerUsername, AgentImageGenerationInput{ProjectID: p.ID, ModelID: in.ModelID, Prompt: in.Prompt, Count: 1, AspectRatio: p.AspectRatio, ReferenceAssetIDs: refs, ReferenceImages: referenceURLs})
+			urls, _, runErr = s.Images(ctx, p.OwnerUsername, AgentImageGenerationInput{ProjectID: p.ID, ModelID: in.ModelID, Prompt: in.Prompt, Count: 1, AspectRatio: imageAspect, Size: imageSize, Resolution: imageResolution, ReferenceAssetIDs: refs, ReferenceImages: referenceURLs})
+			if ctx.Err() != nil {
+				runErr = ctx.Err()
+			}
 		}
 		if runErr == nil {
 			if len(urls) == 0 {

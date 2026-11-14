@@ -120,7 +120,7 @@ func (s *MySQLStore) SaveCreativeConfig(ctx context.Context, owner, id string, c
 	applyCreativeConfig(&p, c)
 	now := time.Now().UTC()
 	// The snapshot and compatibility fields are changed under the same project lock.
-	res, e := tx.ExecContext(ctx, `UPDATE screenplay_projects SET art_style=?,style_desc=?,selected_style=?,prompt_id=IF(?='',prompt_id,?),revision=revision+1,updated_at=? WHERE id=? AND owner_username=? AND revision=? AND deleted_at IS NULL`, p.ArtStyle, p.StyleDesc, p.SelectedStyle, c.ScriptPromptID, c.ScriptPromptID, now, id, owner, expected)
+	res, e := tx.ExecContext(ctx, `UPDATE screenplay_projects SET art_style=?,style_desc=?,selected_style=?,prompt_id=IF(?='',prompt_id,?),aspect_ratio=IF(?='',aspect_ratio,?),revision=revision+1,updated_at=? WHERE id=? AND owner_username=? AND revision=? AND deleted_at IS NULL`, p.ArtStyle, p.StyleDesc, p.SelectedStyle, c.ScriptPromptID, c.ScriptPromptID, c.AspectRatio, c.AspectRatio, now, id, owner, expected)
 	if e != nil {
 		return Project{}, e
 	}

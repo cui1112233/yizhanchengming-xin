@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/prompt/luoshui"
 )
 
@@ -86,6 +87,9 @@ func (s *AssetService) Extract(ctx context.Context, req AssetRequest) (AssetResu
 	systemPrompt, ok := s.prompts().RuntimeBody(promptID)
 	if !ok {
 		return AssetResult{}, fmt.Errorf("%w: 缺少提示词 %s", ErrInvalidArgument, promptID)
+	}
+	if project.CreativeConfig != nil && project.CreativeConfig.AssetPromptType == "western" {
+		systemPrompt = prompt.ScreenplayWesternAssetExtraction + "\n\n" + systemPrompt
 	}
 
 	concurrency := req.Concurrency

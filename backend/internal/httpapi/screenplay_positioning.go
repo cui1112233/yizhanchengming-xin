@@ -444,6 +444,7 @@ func (s *ScreenplayMediaWorkbench) generatePositioning(ctx context.Context, p sc
 		show = *in.ShowNames
 	}
 	text := prefix + "\n场景：" + item.SceneName + "\n角色（与参考图顺序一致）：" + strings.Join(item.Characters, "、") + "\n站位：" + item.PositionDetail
+	text = screenplayCorePrefix(p, text)
 	text += "\n备注：" + item.Remark
 	if purpose == "edit" {
 		text += "\n本次为站位图片编辑。第一张图片是当前站位图或用户标注图，只按以下修改要求编辑，保留其他内容：\n" + in.EditPrompt
@@ -549,7 +550,12 @@ func (s *ScreenplayMediaWorkbench) generatePositioning(ctx context.Context, p sc
 		})
 		return e
 	}
-	result, _, runErr := s.Images(ctx, p.OwnerUsername, AgentImageGenerationInput{ProjectID: p.ID, ModelID: model, Prompt: text, Count: 1, AspectRatio: "16:9", Size: "2560x1440", ReferenceAssetIDs: refs, ReferenceImages: urls})
+	size, resolution, sizeErr := screenplayImageDimensions(p, "16:9")
+	if sizeErr != nil {
+		_ = finish("failed", sizeErr, nil)
+		return zero, nil, sizeErr
+	}
+	result, _, runErr := s.Images(ctx, p.OwnerUsername, AgentImageGenerationInput{ProjectID: p.ID, ModelID: model, Prompt: text, Count: 1, AspectRatio: "16:9", Size: size, Resolution: resolution, ReferenceAssetIDs: refs, ReferenceImages: urls})
 	if ctx.Err() != nil {
 		runErr = ctx.Err()
 	}

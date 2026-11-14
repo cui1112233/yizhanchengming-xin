@@ -116,7 +116,7 @@ func TestPositioningRealImageRequestReferencesAndIdempotency(t *testing.T) {
 	s.Images = func(_ context.Context, owner string, in AgentImageGenerationInput) ([]string, int, error) {
 		calls++
 		want := []string{marked.AssetID, referenceIDs["乙"], referenceIDs["甲"], referenceIDs["房间"]}
-		if owner != "alice" || in.ModelID != "edit" || in.AspectRatio != "16:9" || in.Size != "2560x1440" || in.Count != 1 || strings.Join(in.ReferenceAssetIDs, ",") != strings.Join(want, ",") || len(in.ReferenceImages) != 4 || !strings.Contains(in.Prompt, "完整剧本内容") || !strings.Contains(in.Prompt, "不换座") || !strings.Contains(in.Prompt, "禁止复制人物") {
+		if owner != "alice" || in.ModelID != "edit" || in.AspectRatio != "16:9" || in.Size != "2048x1152" || in.Resolution != "2K" || in.Count != 1 || strings.Join(in.ReferenceAssetIDs, ",") != strings.Join(want, ",") || len(in.ReferenceImages) != 4 || !strings.Contains(in.Prompt, "完整剧本内容") || !strings.Contains(in.Prompt, "不换座") || !strings.Contains(in.Prompt, "禁止复制人物") {
 			t.Fatalf("owner=%s request=%+v", owner, in)
 		}
 		return []string{"data:image/png;base64," + base64.StdEncoding.EncodeToString(testImageToolPNG(t))}, 200, nil

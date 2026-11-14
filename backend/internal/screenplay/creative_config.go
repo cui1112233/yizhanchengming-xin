@@ -11,15 +11,26 @@ type CreativeStyleSnapshot struct {
 	Revision int64    `json:"revision"`
 }
 type CreativeConfig struct {
-	ScriptPromptID          string                            `json:"script_prompt_id"`
-	StoryboardPromptID      string                            `json:"storyboard_prompt_id"`
-	CharacterDesignPromptID string                            `json:"character_design_prompt_id"`
-	SceneDesignPromptID     string                            `json:"scene_design_prompt_id"`
-	ImageCoreInstruction    string                            `json:"image_core_instruction"`
-	ImageModelID            string                            `json:"image_model_id"`
-	ImageEditModelID        string                            `json:"image_edit_model_id"`
-	Style                   *CreativeStyleSnapshot            `json:"style,omitempty"`
-	PromptSnapshots         map[string]CreativePromptSnapshot `json:"-"`
+	ConfigVersion               int                               `json:"config_version"`
+	AspectRatio                 string                            `json:"aspect_ratio"`
+	ImageResolution             string                            `json:"image_resolution"`
+	AssetPromptType             string                            `json:"asset_prompt_type"`
+	AssetProcessPrompt          string                            `json:"asset_process_prompt"`
+	AssetProcessPromptCleared   bool                              `json:"asset_process_prompt_cleared"`
+	ImageCoreInstructionCleared bool                              `json:"image_core_instruction_cleared"`
+	VoiceDesignModel            string                            `json:"voice_design_model"`
+	ShowOriginalText            bool                              `json:"show_original_text"`
+	CharacterImageMode          string                            `json:"character_image_mode"`
+	SceneImageMode              string                            `json:"scene_image_mode"`
+	ScriptPromptID              string                            `json:"script_prompt_id"`
+	StoryboardPromptID          string                            `json:"storyboard_prompt_id"`
+	CharacterDesignPromptID     string                            `json:"character_design_prompt_id"`
+	SceneDesignPromptID         string                            `json:"scene_design_prompt_id"`
+	ImageCoreInstruction        string                            `json:"image_core_instruction"`
+	ImageModelID                string                            `json:"image_model_id"`
+	ImageEditModelID            string                            `json:"image_edit_model_id"`
+	Style                       *CreativeStyleSnapshot            `json:"style,omitempty"`
+	PromptSnapshots             map[string]CreativePromptSnapshot `json:"-"`
 }
 
 func selectedScriptPrompt(p Project) string {

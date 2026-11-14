@@ -1,0 +1,2 @@
+# The verified source body is byte-sensitive; do not convert its line endings.
+screenplay_voice_design_127.txt -text

@@ -1,0 +1,35 @@
+.comic-screenplay-asset-dialog.ant-modal{top:5vh;padding-bottom:0;max-height:90vh}
+.comic-screenplay-asset-dialog .ant-modal-content{display:flex;flex-direction:column;max-height:90vh}
+.comic-screenplay-asset-dialog .ant-modal-header,.comic-screenplay-asset-dialog .ant-modal-footer{flex-shrink:0}
+.comic-screenplay-asset-dialog .ant-modal-body{min-height:0;overflow:auto}
+.comic-screenplay-asset-dialog .ant-modal-content{border-radius:18px;background:var(--surface-elevated,var(--glass-panel-bg,var(--panel-bg,#fff)));backdrop-filter:blur(24px);border:1px solid var(--glass-border,rgba(128,128,128,.2));box-shadow:0 24px 80px rgba(10,15,30,.22)}
+.comic-screenplay-asset-dialog .ant-modal-header,.comic-screenplay-asset-dialog .ant-modal-footer{background:transparent}
+.comic-screenplay-asset-dialog .ant-alert{margin:8px 0 14px}
+.comic-asset-dialog-fields{display:flex;flex-direction:column;gap:16px;min-width:0}
+.comic-asset-dialog-fields label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:500;min-width:0}
+.comic-asset-dialog-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.comic-asset-editor-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.65fr);gap:24px;max-height:65vh;overflow:auto;padding:4px 3px}
+.comic-asset-add-body{max-height:65vh;overflow:auto;padding:4px 3px}
+.comic-asset-editor-image{align-self:start;border:1px solid rgba(128,128,128,.18);border-radius:12px;padding:14px;background:rgba(128,128,128,.035);display:flex;flex-direction:column;gap:10px;position:sticky;top:0}
+.comic-asset-editor-image h4{margin:0;font-size:13px}.comic-asset-editor-image .ant-image img{max-height:370px;object-fit:contain;border-radius:8px}.comic-asset-editor-image p,.comic-asset-editor-image small,.comic-asset-dialog-note{font-size:11px;opacity:.65;line-height:1.7}
+.comic-asset-no-image{display:flex;min-height:210px;flex-direction:column;gap:14px;align-items:center;justify-content:center;background:rgba(128,128,128,.06);border-radius:8px;opacity:.5;font-size:12px}
+.comic-asset-mode-switch{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:rgba(128,128,128,.09);border-radius:12px}
+.comic-asset-mode-switch button{border:0;background:transparent;color:inherit;display:flex;justify-content:center;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:10px 5px;border-radius:9px;opacity:.65}
+.comic-asset-mode-switch button.is-active{background:var(--glass-panel-bg,rgba(255,255,255,.8));box-shadow:0 2px 8px rgba(20,20,30,.08);opacity:1}
+.comic-asset-dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.comic-asset-dialog-footer>.ant-select{width:220px;max-width:40%}
+.comic-asset-reference-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(75px,1fr));gap:8px;max-height:220px;overflow:auto}
+.comic-asset-reference-grid button{background:rgba(128,128,128,.03);border:1px solid rgba(128,128,128,.16);border-radius:8px;padding:0;overflow:hidden;text-align:center;cursor:pointer;color:inherit;min-width:0}
+.comic-asset-reference-grid button.is-selected{border:2px solid var(--brand-primary,#6366f1)}
+.comic-asset-reference-grid button img{width:100%;height:92px;object-fit:cover}.comic-asset-reference-grid button>span{font-size:10px;display:block;padding:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.comic-asset-upload-choice{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px;border:1px dashed rgba(128,128,128,.4);border-radius:12px}.comic-asset-upload-choice small{width:100%;font-size:11px;opacity:.65}
+.comic-voice-design-stage{padding:14px 0;min-width:0}.comic-voice-design-stage>.ant-alert{margin:8px 0}.comic-voice-design-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:8px 0 18px;font-size:12px}.comic-voice-design-summary small{opacity:.6}
+.comic-voice-description-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}.comic-voice-description-card{border:1px solid rgba(128,128,128,.2);background:var(--glass-card-bg,rgba(128,128,128,.035));border-radius:14px;padding:18px;min-width:0}
+.comic-voice-description-card>header{display:flex;gap:12px;align-items:center}.comic-voice-description-card>header>div:first-of-type{flex:1;min-width:0}.comic-voice-description-card header b{display:block;font-size:14px}.comic-voice-description-card header small{display:block;font-size:11px;opacity:.6;margin-top:3px}
+.comic-voice-description-copy{margin:16px 0}.comic-voice-description-copy label{font-size:11px;opacity:.55}.comic-voice-description-copy p{font-size:12px;line-height:1.75;white-space:pre-wrap;margin:4px 0 12px;overflow-wrap:anywhere}.comic-voice-description-card footer{display:flex;gap:10px;align-items:center}.comic-voice-description-card footer small{font-size:11px;opacity:.6}
+.comic-voice-designed-audio{margin-top:14px;display:flex;flex-direction:column;gap:8px;border-top:1px solid rgba(128,128,128,.15);padding-top:14px}.comic-voice-designed-audio audio{width:100%;height:36px}.comic-voice-designed-audio>span,.comic-voice-designed-audio small,.comic-voice-designed-audio details{font-size:11px;overflow-wrap:anywhere}.comic-voice-designed-audio details p{white-space:pre-wrap;line-height:1.65;opacity:.7}.comic-voice-designed-audio code{user-select:all}
+.comic-voice-design-progress{display:flex;gap:12px;align-items:center;padding:14px 0;font-size:12px}
+@media(max-width:760px){.comic-asset-editor-columns{grid-template-columns:1fr}.comic-asset-editor-image{position:static}.comic-asset-dialog-pair{grid-template-columns:1fr}.comic-voice-description-list{grid-template-columns:1fr}.comic-asset-dialog-footer{flex-wrap:wrap}.comic-asset-dialog-footer>.ant-select{max-width:100%;width:100%}}
+
+.comic-asset-batch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;max-height:48vh;overflow:auto}.comic-asset-batch-grid>button{position:relative;display:flex;flex-direction:column;gap:6px;align-items:stretch;border:1px solid rgba(128,128,128,.2);border-radius:10px;padding:8px;background:rgba(128,128,128,.03);color:inherit;text-align:center;cursor:pointer;min-width:0}.comic-asset-batch-grid>button.is-selected{border:2px solid var(--brand-primary,#6366f1)}.comic-asset-batch-grid img{width:100%;height:140px;object-fit:cover;border-radius:6px}.comic-asset-batch-grid .ant-checkbox-wrapper{position:absolute;top:10px;right:10px;pointer-events:none}.comic-asset-batch-grid b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.comic-asset-batch-grid small{font-size:10px;opacity:.6}
+
+.comic-asset-design-field-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.comic-asset-design-field-heading .ant-btn{font-size:11px}

@@ -28,6 +28,7 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 	references, _ := options.AgentAssetObjects.(agentworkspace.ReferenceURLProvider)
 	media := &ScreenplayMediaWorkbench{Projects: options.Screenplay, Media: mediaStore, Cut: options.AICut, Objects: options.AgentAssetObjects, Assets: options.AgentAssets, ReferencesProvider: references, Catalog: catalog, ASR: options.AICutASR, Exports: options.AICutExport, Authoring: authoring, Production: productionRepo, Executors: options.LocalExecutors, Files: options.LocalArtifacts}
 	media.Images = newAgentImageGenerator(options.Store, catalog, options.UserConfigStore, options.LocalExecutors, options.LocalArtifacts, options.AgentAssets, references)
+	media.VoiceDesigner = newScreenplayVoiceDesigner(catalog)
 	media.PositioningText = func(ctx context.Context, owner string, req screenplay.TextRequest) (screenplay.TextResponse, error) {
 		return (screenplayTextGenerator{owner: owner, resolver: resolver}).Generate(ctx, req)
 	}

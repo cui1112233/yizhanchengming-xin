@@ -258,6 +258,9 @@ func (m *MemoryStore) ListScenes(_ context.Context, owner, projectID, documentID
 func projectKey(owner, id string) string { return owner + "\x00" + id }
 
 func (m *MemoryStore) CreateProject(_ context.Context, project Project) (Project, error) {
+	if project.AspectRatio != "" && !ValidCreativeAspectRatio(project.AspectRatio) {
+		return Project{}, fmt.Errorf("%w: 不支持的剧本比例%s", ErrInvalidArgument, project.AspectRatio)
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	project.ID = strings.TrimSpace(project.ID)
@@ -312,6 +315,9 @@ func (m *MemoryStore) ListProjects(_ context.Context, owner string) ([]Project, 
 }
 
 func (m *MemoryStore) UpdateProject(_ context.Context, owner, id string, changes Project, expectedRevision int64) (Project, error) {
+	if changes.AspectRatio != "" && !ValidCreativeAspectRatio(changes.AspectRatio) {
+		return Project{}, fmt.Errorf("%w: 不支持的剧本比例%s", ErrInvalidArgument, changes.AspectRatio)
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := projectKey(owner, id)

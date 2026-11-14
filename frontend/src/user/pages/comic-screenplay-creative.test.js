@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyCreativeConfigToProject, comicProjectStyleName, comicImageModelSelection, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeConfigPayload, creativePromptOptions } from './comic-screenplay-creative.js';
+import { applyCreativeConfigToProject, comicProjectStyleName, comicImageModelSelection, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, creativePromptOptions } from './comic-screenplay-creative.js';
 import { loadComicCreativeLibrary, loadComicCreativeConfig, saveComicCreativeConfig, getComicStylePreview, createComicCreativeStyle } from '../../shared/api/comicScreenplay.js';
 const config = { script_prompt_id: 'script144', storyboard_prompt_id: 'story307', character_design_prompt_id: 'char213', scene_design_prompt_id: 'scene289', style: { id: 'own-style', name: '我的风格' }, image_core_instruction: '保留服装细节', image_model_id: 'image', image_edit_model_id: 'edit' };
 
@@ -140,4 +140,31 @@ test('创作配置读回或保存后同步项目画风名称与ID，清空不会
 test('作品卡片以已有创作配置为准，不从旧字段恢复已清空画风', () => {
   assert.equal(comicProjectStyleName({ art_style: '残留旧名称', creative_config: { style: null } }), '');
   assert.equal(comicProjectStyleName({ art_style: '历史名称' }), '历史名称');
+});
+
+
+test('模型配置完整读回后端默认值，空指令和false不会回填，比例随同一次PUT保存',()=>{
+ const draft=creativeConfigDraft({...config,config_version:1,aspect_ratio:'21:9',image_resolution:'4K',asset_prompt_type:'western',image_core_instruction:'',asset_process_prompt:'',voice_design_model:'qwen-tts',show_original_text:false,character_image_mode:'typedprompt:char213',scene_image_mode:'none'});
+ const patch=creativeConfigPayload(draft,15);
+ assert.equal(patch.aspect_ratio,'21:9');assert.equal(patch.image_resolution,'4K');assert.equal(patch.asset_process_prompt,'');assert.equal(patch.image_core_instruction,'');assert.equal(patch.show_original_text,false);assert.equal(patch.scene_image_mode,'none');assert.equal(patch.character_design_prompt_id,'char213');
+ assert.equal(creativeConfigPayload(creativeConfigDraft(config),15).asset_process_prompt,undefined);
+ assert.equal(applyCreativeConfigToProject({aspect_ratio:'9:16'},draft,16).aspect_ratio,'21:9');
+});
+
+
+test('三栏模型配置只保存本窗字段，不暗中保存其他阶段未确认的提示词或画风',()=>{
+ const patch=creativeModelConfigPayload({...creativeConfigDraft(config),script_prompt_id:'script-unsaved',storyboard_prompt_id:'story-unsaved',asset_process_prompt:'',show_original_text:false,aspect_ratio:'16:9'},20);
+ assert.equal(patch.script_prompt_id,undefined);assert.equal(patch.storyboard_prompt_id,undefined);assert.equal(patch.style_id,undefined);assert.equal(patch.character_design_prompt_id,'char213');assert.equal(patch.scene_design_prompt_id,'scene289');assert.equal(patch.asset_process_prompt,'');assert.equal(patch.show_original_text,false);assert.equal(patch.expected_revision,20);
+});
+
+
+test('新建未编辑核心与资产处理沿用后端默认，主动清空和已有项目空值仍显式保存',()=>{
+ const draft={...creativeCreationDraft(),script_prompt_id:'script144',storyboard_prompt_id:'story307',character_design_prompt_id:'char212',scene_design_prompt_id:'scene289'};
+ const untouched=creativeConfigPayload(draft,3);
+ assert.equal(Object.hasOwn(untouched,'image_core_instruction'),false);assert.equal(Object.hasOwn(untouched,'asset_process_prompt'),false);
+ const cleared=creativeConfigPayload({...draft,image_core_instruction:'',asset_process_prompt:''},3);
+ assert.equal(Object.hasOwn(cleared,'image_core_instruction'),true);assert.equal(cleared.image_core_instruction,'');assert.equal(cleared.asset_process_prompt,'');
+ const existing=creativeConfigPayload(creativeConfigDraft({...config,image_core_instruction:'',asset_process_prompt:''}),4);
+ assert.equal(existing.image_core_instruction,'');assert.equal(existing.asset_process_prompt,'');
+ const explicit213=creativeConfigPayload({...draft,character_design_prompt_id:'char213'},3);assert.equal(explicit213.character_design_prompt_id,'char213');assert.equal(Object.hasOwn(explicit213,'character_image_mode'),false);
 });

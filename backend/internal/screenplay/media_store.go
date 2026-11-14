@@ -10,20 +10,26 @@ import (
 )
 
 type MediaItem struct {
-	Name       string    `json:"name,omitempty"`
-	DurationMS int64     `json:"durationMs,omitempty"`
-	ID         string    `json:"id"`
-	Kind       string    `json:"kind"`
-	Status     string    `json:"status"`
-	URL        string    `json:"url,omitempty"`
-	AssetID    string    `json:"assetId,omitempty"`
-	ShotID     string    `json:"shotId,omitempty"`
-	TargetID   string    `json:"targetId,omitempty"`
-	Error      string    `json:"error,omitempty"`
-	ProviderID string    `json:"providerId,omitempty"`
-	CreatedAt  time.Time `json:"createdAt"`
+	VoiceID          string    `json:"voiceId,omitempty"`
+	VoiceEngine      string    `json:"voiceEngine,omitempty"`
+	VoiceTargetModel string    `json:"voiceTargetModel,omitempty"`
+	VoiceDescription string    `json:"voiceDescription,omitempty"`
+	VoicePreviewText string    `json:"voicePreviewText,omitempty"`
+	Name             string    `json:"name,omitempty"`
+	DurationMS       int64     `json:"durationMs,omitempty"`
+	ID               string    `json:"id"`
+	Kind             string    `json:"kind"`
+	Status           string    `json:"status"`
+	URL              string    `json:"url,omitempty"`
+	AssetID          string    `json:"assetId,omitempty"`
+	ShotID           string    `json:"shotId,omitempty"`
+	TargetID         string    `json:"targetId,omitempty"`
+	Error            string    `json:"error,omitempty"`
+	ProviderID       string    `json:"providerId,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 type MediaState struct {
+	VoiceDesign *VoiceDesignState `json:"voiceDesign,omitempty"`
 	Positioning *PositioningState `json:"positioning,omitempty"`
 	Revision    int64             `json:"revision"`
 	Items       []MediaItem       `json:"items"`

@@ -5,13 +5,21 @@ export const creativePromptFields = [
   { field: 'scene_design_prompt_id', purpose: 'scene_design', label: '场景设计提示词' },
 ];
 
+export const comicModelConfigFields = ['config_version','aspect_ratio','image_resolution','asset_prompt_type','asset_process_prompt','voice_design_model','show_original_text','character_image_mode','scene_image_mode'];
+
 export function emptyCreativeConfig() {
   return { script_prompt_id: '', storyboard_prompt_id: '', character_design_prompt_id: '', scene_design_prompt_id: '', style_id: null, style_name: '', image_core_instruction: '', image_model_id: '', image_edit_model_id: '' };
+}
+
+// 新建时未触碰的指令省略提交，让后端保留系统默认；输入后清空仍为显式空串。
+export function creativeCreationDraft() {
+  return {...emptyCreativeConfig(),image_core_instruction:undefined,asset_process_prompt:undefined};
 }
 
 export function creativeConfigDraft(config) {
   const draft = emptyCreativeConfig();
   for (const field of Object.keys(draft)) if (config?.[field] !== undefined) draft[field] = config[field];
+  for (const field of comicModelConfigFields) if (config?.[field] !== undefined) draft[field] = config[field];
   draft.style_id = config?.style?.id || null;
   draft.style_name = config?.style?.name || '';
   return draft;
@@ -23,7 +31,15 @@ export function creativeConfigPayload(draft, revision) {
     if (!draft[field]) throw new Error(`请选择${label}`);
     patch[field] = draft[field];
   }
-  for (const field of ['image_core_instruction', 'image_model_id', 'image_edit_model_id']) patch[field] = draft[field] || '';
+  for (const field of ['image_core_instruction', 'image_model_id', 'image_edit_model_id']) if(draft[field]!==undefined)patch[field] = draft[field] || '';
+  for (const field of comicModelConfigFields) if (field !== 'config_version' && draft[field] !== undefined) patch[field] = draft[field];
+  return patch;
+}
+
+export const comicModelConfigPatchFields = [...comicModelConfigFields.filter(field=>field!=='config_version'),'image_core_instruction','image_model_id','image_edit_model_id','character_design_prompt_id','scene_design_prompt_id'];
+export function creativeModelConfigPayload(draft, revision) {
+  const patch={expected_revision:revision};
+  for(const field of comicModelConfigPatchFields)if(draft[field]!==undefined)patch[field]=draft[field];
   return patch;
 }
 
@@ -84,7 +100,7 @@ export function comicImageModelSelection(config, { models = [], references = [],
 
 
 export function applyCreativeConfigToProject(project, config, revision = project?.revision) {
-  return { ...project, creative_config: config, revision, art_style: config?.style?.name || '', selected_style: config?.style?.id || '' };
+  return { ...project, ...(config?.aspect_ratio ? {aspect_ratio:config.aspect_ratio} : {}), creative_config: config, revision, art_style: config?.style?.name || '', selected_style: config?.style?.id || '' };
 }
 
 export function comicProjectStyleName(project) {

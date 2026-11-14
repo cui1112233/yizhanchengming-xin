@@ -69,6 +69,9 @@ func cloneCreativeConfig(c *CreativeConfig) *CreativeConfig {
 	return out
 }
 func applyCreativeConfig(p *Project, c CreativeConfig) {
+	if c.AspectRatio != "" {
+		p.AspectRatio = c.AspectRatio
+	}
 	p.CreativeConfig = cloneCreativeConfig(&c)
 	if c.Style == nil {
 		p.ArtStyle = ""
