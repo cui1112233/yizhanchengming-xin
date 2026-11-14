@@ -59,6 +59,13 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 	RegisterScreenplayPositioningRoutes(root, auth, media)
 	RegisterScreenplayVoiceBindingRoutes(root, auth, media)
 	RegisterScreenplayProductionRoutes(root, auth, runtime, authoring)
+	libraryRepo, _ := options.Screenplay.(screenplay.AssetLibraryRepository)
+	if libraryRepo == nil {
+		if _, memoryOnly := options.Screenplay.(*screenplay.MemoryStore); memoryOnly {
+			libraryRepo = screenplay.NewMemoryAssetLibraryRepository()
+		}
+	}
+	RegisterScreenplayAssetLibraryRoutes(root, auth, &ScreenplayAssetLibrary{Repository: libraryRepo, Media: media})
 	assetCheckRepo, _ := options.Screenplay.(screenplay.AssetCheckRepository)
 	assetChecks := &screenplay.AssetCheckRuntime{Store: options.Screenplay, Repository: assetCheckRepo, Authoring: authoring, BuildSteps: screenplay.BuildAssetCheckSteps, Generator: func(owner string) screenplay.TextGenerator {
 		return screenplayTextGenerator{owner: owner, resolver: resolver}

@@ -232,6 +232,19 @@ func RegisterScreenplayAssetLibraryRoutes(mux *http.ServeMux, auth BridgeAuth, s
 		}
 		writeJSON(w, 201, map[string]any{"entry": screenplayLibraryPublic(entry)})
 	})
+	register("POST /api/comic-screenplays/projects/{id}/asset-library/{entryID}/stage", func(w http.ResponseWriter, r *http.Request, actor string) {
+		var in screenplayLibraryStageInput
+		if !decodeAssetCheckRequest(w, r, &in, false) {
+			return
+		}
+		item, err := service.StageImage(r.Context(), actor, r.PathValue("id"), r.PathValue("entryID"), in)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		item.URL = aicutSignedAssetContentURL(auth, actor, r.PathValue("id"), item.AssetID, "content", time.Now())
+		writeJSON(w, http.StatusOK, map[string]any{"item": item})
+	})
 	register("GET /api/comic-screenplays/asset-library/{entryID}/image", func(w http.ResponseWriter, r *http.Request, actor string) {
 		entry, err := service.Repository.GetAssetLibraryEntry(r.Context(), actor, r.PathValue("entryID"))
 		if err != nil {

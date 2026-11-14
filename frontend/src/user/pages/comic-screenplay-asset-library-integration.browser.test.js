@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath,pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+const here=path.dirname(fileURLToPath(import.meta.url));
+const browser='C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
+test('真实资产DOM普通库链：取消零写入，保存后暂存再选图，失败原键重试与卡片只换图', {skip:!existsSync(browser)},async()=>{
+ const bundle=await build({stdin:{resolveDir:here,loader:'jsx',contents:`
+ import React from 'react';import{createRoot}from'react-dom/client';import Dialog from './ComicScreenplayAssetDialog.jsx';import Stage from './ComicScreenplayAssetStage.jsx';
+ const root=createRoot(document.getElementById('root')),tick=()=>new Promise(r=>setTimeout(r,110)),assert=(v,m)=>{if(!v)throw Error(m)};
+ let writes=[],reads=[],closed=0,failStage=false,denySource=false;let asset={id:'a',type:'character',name:'手写名称',identity:'手写身份',prompt:'手写提示词',voice:'手写声音',revision:2,extra:{keep:'保留'}};
+ const entry={id:'library-1',type:'character',name:'库中角色',description:'库中说明',category:'测试',image:{url:'/api/comic-screenplays/asset-library/library-1/image'},revision:3};let media={items:[{id:'old-image',targetId:'a',kind:'image',status:'ready',url:''}],settings:{revision:1,selected:{a:'old-image'}},capabilities:{image:{available:false}}};
+ window.fetch=async(url,options={})=>{url=String(url);let data={};const method=options.method||'GET';if(!url.startsWith('/api/'))throw Error('external forbidden');
+ if(url==='/api/client-errors')return new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});if(method!=='GET'){let body=JSON.parse(options.body);writes.push({url,method,body});
+ if(url.endsWith('/stage')){if(failStage){failStage=false;return new Response(JSON.stringify({message:'暂存测试失败'}),{status:503,headers:{'Content-Type':'application/json'}})}data={item:{id:'staged-image',targetId:body.targetId,kind:'image',status:'ready',url:''}};media.items=[...media.items.filter(i=>i.id!=='staged-image'),data.item];}
+ else if(url.endsWith('/media/actions')){assert(body.action==='select','model action forbidden');media.settings.selected[body.targetId]=body.itemId;data={};}
+ else if(url.endsWith('/asset-library')){if(denySource)return new Response(JSON.stringify({error:'共享来源不能存入个人库'}),{status:403,headers:{'Content-Type':'application/json'}});data={entry};}
+ else if(url.includes('/assets')){asset={...asset,...body,revision:asset.revision+1};data={asset};}
+ else throw Error('unexpected write '+url);
+ }else{reads.push(url);if(url.endsWith('/asset-library/library-1/image'))return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="blue"/></svg>',{status:200,headers:{'Content-Type':'image/svg+xml'}});data=url.includes('/asset-library?')?{entries:[entry]}:url.startsWith('/api/models')?{models:[]}:url.endsWith('/media')?media:{};}return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}})};
+ const btn=(s,scope=document)=>[...scope.querySelectorAll('button')].find(e=>e.textContent.replace(/\\s/g,'')===s),click=async(s,scope)=>{const e=btn(s,scope);assert(e&&!e.disabled,'button '+s);e.click();await tick();await tick()},card=()=>document.querySelector('.comic-library-card');
+ const mount=async(edit=true)=>{root.render(<Dialog key={Math.random()} projectId='p' workspace={{project:{}}} asset={edit?asset:undefined} type='character' media={structuredClone(media)} canGenerate={false} onClose={()=>{closed++;root.render(null)}} onSaved={()=>{}}/>);await tick();await tick()};
+ (async()=>{await mount();await click('从角色库选择');card().click();await tick();assert(writes.length===0,'binding wrote before save');assert(document.querySelector('.comic-library-preview img')?.src.startsWith('blob:'),'protected preview did not use authenticated blob');await click('取消');assert(writes.length===0,'editor cancel wrote');
+ await mount();await click('从角色库选择');card().click();await tick();failStage=true;await click('保存');assert(writes.length===2&&writes[0].url.endsWith('/assets/a')&&writes[1].url.endsWith('/stage'),'save order');assert(document.body.textContent.includes('暂存测试失败'),'stage error hidden');const key=writes[1].body.requestKey;await click('保存');assert(writes.filter(w=>w.url.endsWith('/stage')).at(-1).body.requestKey===key,'retry key changed');assert(writes.at(-1).body.action==='select'&&writes.at(-1).body.itemId==='staged-image','library id selected as media');assert(asset.name==='手写名称'&&asset.identity==='手写身份'&&asset.prompt==='手写提示词'&&asset.voice==='手写声音','binding overwrote text');
+ await mount();await click('保存到角色库');assert(writes.at(-1).body.expectedSelectedItemId==='staged-image','source image expectation missing');await click('取消');
+ await mount();denySource=true;await click('保存到角色库');assert(document.body.textContent.includes('共享来源不能存入个人库'),'source rejection hidden');denySource=false;await click('取消');
+ await mount(false);await click('从角色库选择');assert(document.querySelectorAll('[role=dialog]').length===1,'nested modal instead of inline');assert(document.body.textContent.includes('库来源：角色库'),'legacy source not labelled');card().click();await tick();assert(document.querySelector('[aria-label=角色名称]').value==='库中角色','name fallback');let before=writes.length;await click('取消');assert(writes.length===before,'new cancel wrote');
+ const original={...asset};await mount(false);await click('从角色库选择');card().click();await tick();const save=btn('保存');save.click();save.click();await tick();await tick();assert(writes.length===before+3&&writes[before].method==='POST'&&writes[before].url.endsWith('/assets')&&writes[before+1].url.endsWith('/stage')&&writes[before+2].body.action==='select','new save duplicate/order');assert(writes[before].body.identity==='库中说明'&&writes[before].body.prompt===''&&writes[before].body.voice==='','legacy copied prompt or voice');asset=original;before=writes.length;
+ root.render(<Stage projectId='p' workspace={{project:{revision:1},assets:[asset]}} readOnly={false} canGenerate={false} onChanged={()=>{}}/>);await tick();await tick();document.querySelector('[aria-label="更换手写名称图片"]').click();await tick();card().click();await tick();await click('取消');assert(writes.length===before,'replace cancel wrote');document.querySelector('[aria-label="更换手写名称图片"]').click();await tick();card().click();await tick();await click('确认更换');assert(writes.length===before+2&&writes.at(-2).url.endsWith('/stage')&&writes.at(-1).body.action==='select','replace updated setting/needs model permission');assert(!writes.slice(before).some(w=>w.url.includes('/assets')),'replace wrote asset');document.body.dataset.result='passed';})().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
+ `},bundle:true,jsx:'automatic',write:false,format:'iife',platform:'browser',loader:{'.css':'empty'}});
+ const archive=path.resolve(here,'../../../../_local-archive-20261028/luoshui-screenplay-contract-20261114/ui-reconstruction');mkdirSync(archive,{recursive:true});const dir=mkdtempSync(path.join(archive,'ordinary-library-integration-'));writeFileSync(path.join(dir,'test.js'),bundle.outputFiles[0].text);const html=path.join(dir,'test.html');writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="test.js"></script>');
+ const output=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--host-resolver-rules=MAP * ~NOTFOUND','--virtual-time-budget=14000','--user-data-dir='+path.join(dir,'profile'),'--dump-dom',pathToFileURL(html).href],{encoding:'utf8',timeout:60000,windowsHide:true,stdio:['ignore','pipe','pipe'],maxBuffer:4000000});
+ assert.ok(/data-result="passed"/.test(output),output.match(/data-error="([^"]*)"/)?.[1]||'browser did not finish');
+});
+
+test('更换图片暂存晚回包被项目代次隔离，不继续旧项目选图或污染新项目', {skip:!existsSync(browser)},async()=>{
+ const bundle=await build({stdin:{resolveDir:here,loader:'jsx',contents:`
+ import React from 'react';import{createRoot}from'react-dom/client';import Stage from './ComicScreenplayAssetStage.jsx';
+ const root=createRoot(document.getElementById('root')),tick=()=>new Promise(r=>setTimeout(r,100)),assert=(v,m)=>{if(!v)throw Error(m)};let calls=[],release,changed=[];
+ const entry={id:'lib',type:'character',name:'库图片',revision:1,image:{url:''}},response=data=>new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
+ window.fetch=async(url,options={})=>{url=String(url);calls.push({url,method:options.method||'GET'});assert(url.startsWith('/api/'),'external request');
+ if(url.endsWith('/stage'))return new Promise(resolve=>release=()=>resolve(response({item:{id:'old-copy',targetId:'a',kind:'image',status:'ready',url:'/api/old-project-image'}})));
+ if(options.method)throw Error('old project select must not run');
+ if(url.includes('/asset-library?'))return response({entries:[entry]});
+ return response({items:[],settings:{selected:{},revision:1},capabilities:{image:{available:false}}});};
+ const mount=async id=>{root.render(<Stage projectId={id} workspace={{project:{revision:1},assets:[{id:'a',type:'character',name:id}]}} readOnly={false} canGenerate={false} onChanged={()=>changed.push(id)}/>);await tick();await tick()};
+ (async()=>{await mount('old');document.querySelector('[aria-label="更换old图片"]').click();await tick();await tick();document.querySelector('.comic-library-card').click();await tick();[...document.querySelectorAll('button')].find(e=>e.textContent.replace(/\\s/g,'')==='确认更换').click();await tick();assert(release,'stage did not start');
+ await mount('new');assert(!document.querySelector('[role=dialog]'),'old picker stayed open');assert(!document.querySelector('[aria-label="更换new图片"]').disabled,'new project retained replacement lock');const before=calls.length;release();await tick();await tick();await tick();
+ assert(calls.slice(before).every(c=>!c.url.includes('/projects/old/')),'late old stage continued select or refresh');assert(changed.length===0,'old completion notified new project');assert(!calls.some(c=>c.url==='/api/old-project-image'),'old media image inserted into new page');assert(!document.body.textContent.includes('更换图片失败'),'old error polluted new project');assert(!document.querySelector('[aria-label="更换new图片"]').disabled,'old finally changed current lock');document.body.dataset.result='passed';
+ })().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
+ `},bundle:true,jsx:'automatic',write:false,format:'iife',platform:'browser',loader:{'.css':'empty'}});
+ const archive=path.resolve(here,'../../../../_local-archive-20261028/luoshui-screenplay-contract-20261114/ui-reconstruction');mkdirSync(archive,{recursive:true});const dir=mkdtempSync(path.join(archive,'ordinary-library-project-race-'));writeFileSync(path.join(dir,'test.js'),bundle.outputFiles[0].text);const html=path.join(dir,'test.html');writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="test.js"></script>');
+ const output=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--host-resolver-rules=MAP * ~NOTFOUND','--virtual-time-budget=6000','--user-data-dir='+path.join(dir,'profile'),'--dump-dom',pathToFileURL(html).href],{encoding:'utf8',timeout:60000,windowsHide:true,stdio:['ignore','pipe','pipe'],maxBuffer:4000000});
+ assert.ok(/data-result="passed"/.test(output),output.match(/data-error="([^"]*)"/)?.[1]||'browser did not finish');
+});
