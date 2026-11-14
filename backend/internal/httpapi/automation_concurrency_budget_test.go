@@ -1,6 +1,9 @@
 package httpapi
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestAutomationConcurrencyBudgetReportsGatewayColdStart(t *testing.T) {
 	budget := automationConcurrencyBudget(map[string]any{"concurrency": 6, "imageGlobalConcurrency": 8})
@@ -31,6 +34,15 @@ func TestAutomationConcurrencyBudgetReportsTaskLimit(t *testing.T) {
 	}
 	if got := automationNumberValue(budget["comicBookSlots"], 0); got != comicBookGenerationConcurrency() {
 		t.Fatalf("comicBookSlots=%d, want %d", got, comicBookGenerationConcurrency())
+	}
+}
+
+func TestAutomationConcurrencyBudgetLineExplainsLayers(t *testing.T) {
+	line := automationConcurrencyBudgetLine(map[string]any{"concurrency": 3, "imageGlobalConcurrency": 8})
+	for _, want := range []string{"书 3/4 路", "本任务出图 8 路", "网关冷启动 2 路", "上限 30 路"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("budget line=%q, want %q", line, want)
+		}
 	}
 }
 

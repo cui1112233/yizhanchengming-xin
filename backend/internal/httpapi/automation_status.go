@@ -56,6 +56,16 @@ func automationConcurrencyBudget(job map[string]any) map[string]any {
 	}
 }
 
+// automationConcurrencyBudgetLine 把并发预算压成一行中文，追加到书籍的
+// 执行日志里。前端日志区已经会渲染这本书的 logs，所以不用改页面也能看到
+// “为什么只跑 2 路”。
+func automationConcurrencyBudgetLine(job map[string]any) string {
+	budget := automationConcurrencyBudget(job)
+	return fmt.Sprintf("并发预算：书 %v/%v 路 · 本任务出图 %v 路 · 同时出图书 %v 本 · 网关冷启动 %v 路（上限 %v 路）；实际并发取各层最小值",
+		budget["bookWorkers"], budget["bookWorkerCeiling"], budget["taskImageConcurrency"],
+		budget["comicBookSlots"], budget["gatewayColdStart"], budget["gatewayCeiling"])
+}
+
 type FileAutomationStatusReader struct {
 	path       string
 	stateStore AutomationStateStore
@@ -585,8 +595,8 @@ func publicAutomationJob(job map[string]any) map[string]any {
 		"runMode": job["runMode"], "scheduleMode": job["scheduleMode"], "concurrency": job["concurrency"], "preset": job["preset"],
 		"scheduledAt": job["scheduledAt"], "createdAt": job["createdAt"], "startedAt": job["startedAt"],
 		"updatedAt": job["updatedAt"], "completedAt": job["completedAt"], "lastError": job["lastError"],
-		"counts":          job["counts"],
-		"priorityBookIds": automationPriorityIDs(job),
+		"counts":            job["counts"],
+		"priorityBookIds":   automationPriorityIDs(job),
 		"concurrencyBudget": automationConcurrencyBudget(job),
 	}
 	if result["autoPublish"] == nil {

@@ -4116,6 +4116,15 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 								return batchfactoryv11.ComicCollection{}, err
 							}
 							defer c.comicRunSlots.release()
+							// 拿到槽位后记录一次并发预算，解释当前为什么是这个路数。
+							// 只在本书首次出图时记一条，重试不重复刷。
+							entryLogMu.Lock()
+							if !automationBoolValue(entry["concurrencyBudgetLogged"]) {
+								entry["concurrencyBudgetLogged"] = true
+								appendAutomationBookLog(entry, c.now(), "comic_images", automationConcurrencyBudgetLine(job))
+								persist()
+							}
+							entryLogMu.Unlock()
 						}
 						// 出图槽位看门狗：占着槽位却长时间没有任何真实进展时，主动
 						// 中止本次尝试并立刻释放槽位，让下一本先出图；本书按失败处理，
