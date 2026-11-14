@@ -17,6 +17,44 @@ func (fn screenplayProviderFunc) Complete(ctx context.Context, req batchfactoryv
 	return fn(ctx, req)
 }
 
+func TestScreenplayMissingAssetCheckRoutePreservesCards(t *testing.T) {
+	now := time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
+	store := screenplay.NewMemoryStore()
+	_, err := store.CreateProject(context.Background(), screenplay.Project{ID: "missing-check", OwnerUsername: "alice", PermissionMode: screenplay.PermissionBypass})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := store.CreateAsset(context.Background(), screenplay.Asset{ProjectID: "missing-check", OwnerUsername: "alice", Type: screenplay.AssetCharacter, Name: "甲", Prompt: "用户保存的提示词"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	provider := screenplayProviderFunc(func(context.Context, batchfactoryv11.TextCompletionRequest) (string, error) {
+		calls++
+		return `{"characters":[{"name":"甲","prompt":"不能覆盖旧内容"},{"name":"乙","prompt":"新人物"}]}`, nil
+	})
+	mux := http.NewServeMux()
+	RegisterScreenplayRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, store, func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) { return provider, nil }, func() time.Time { return now })
+	for i := 0; i < 2; i++ {
+		r := signedJSONRequest(t, mux, now, "alice", "POST", "/api/comic-screenplays/projects/missing-check/assets/extract", map[string]any{"type": "character", "degree": "standard", "model": "own-text", "content": "甲遇见乙。", "missingOnly": true, "confirmed": true})
+		if r.Code != 200 {
+			t.Fatalf("%d %s", r.Code, r.Body.String())
+		}
+		rows, _ := store.ListAssets(context.Background(), "alice", "missing-check", screenplay.AssetCharacter)
+		if len(rows) != 2 {
+			t.Fatalf("duplicate cards: %+v", rows)
+		}
+		for _, a := range rows {
+			if a.Name == "甲" && (a.ID != old.ID || a.Prompt != old.Prompt || a.Revision != old.Revision) {
+				t.Fatalf("overwritten: %+v", a)
+			}
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("mock calls=%d", calls)
+	}
+}
+
 func TestScreenplayRoutesProjectGenerateAndWorkspace(t *testing.T) {
 	now := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
 	store := screenplay.NewMemoryStore()

@@ -56,6 +56,30 @@ func newAssetService(t *testing.T, mode PermissionMode) (*AssetService, *MemoryS
 	return &AssetService{Store: store, Generator: generator}, store, generator
 }
 
+func TestExtractMissingOnlyPreservesExistingAsset(t *testing.T) {
+	s, store, _ := newAssetService(t, PermissionBypass)
+	old, err := store.CreateAsset(context.Background(), Asset{ProjectID: "p1", OwnerUsername: "alice", Type: AssetCharacter, Name: "顾苒苒", Prompt: "用户手写，不得覆盖"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.Extract(context.Background(), AssetRequest{Owner: "alice", ProjectID: "p1", Type: AssetCharacter, Degree: DegreeStandard, Content: "第1集 顾苒苒与吴姐", MissingOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Assets) != 1 || result.Assets[0].Name != "吴姐" {
+		t.Fatalf("should add only missing: %+v", result.Assets)
+	}
+	rows, _ := store.ListAssets(context.Background(), "alice", "p1", AssetCharacter)
+	if len(rows) != 2 {
+		t.Fatalf("assets=%d", len(rows))
+	}
+	for _, a := range rows {
+		if a.Name == old.Name && (a.ID != old.ID || a.Prompt != old.Prompt || a.Revision != old.Revision) {
+			t.Fatalf("existing overwritten: %+v", a)
+		}
+	}
+}
+
 func TestExtractCharactersFourDegreesUseExpectedPrompts(t *testing.T) {
 	cases := map[AssetDegree]string{
 		DegreeStandard:   "asset_character_standard_v5",
