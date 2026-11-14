@@ -1,6 +1,7 @@
 ﻿param(
   [string]$OutputDir = '',
   [switch]$SkipFrontendBuild,
+  [switch]$RequireCleanFrontend,
   [switch]$Deploy,
   [string]$TargetHost = '',
   [string]$TargetUser = 'deploy',
@@ -40,6 +41,19 @@ function Invoke-Checked {
   }
 }
 
+# 前端产物来源校验：发布包必须能说明前端源码是否干净、嵌入的是哪个构建。
+# 默认只记录状态；显式传入 -RequireCleanFrontend 时，源码有未提交改动或
+# dist 落后于源码都会直接拒绝构建，避免把其他会话的半成品页面带上线。
+$frontendSourceChanges = @(& git -C $repo status --porcelain -- frontend/src)
+if ($LASTEXITCODE -ne 0) {
+  throw '无法读取 frontend/src 的 Git 状态，停止生成来源不明的发布包。'
+}
+$frontendSourceState = if ($frontendSourceChanges.Count -eq 0) { 'clean' } else { 'dirty' }
+if ($RequireCleanFrontend -and $frontendSourceState -ne 'clean') {
+  $preview = ($frontendSourceChanges | Select-Object -First 8) -join '; '
+  throw "frontend/src 存在未提交改动（$($frontendSourceChanges.Count) 项）：$preview。请先提交前端源码，或去掉 -RequireCleanFrontend。"
+}
+
 if (-not $SkipFrontendBuild) {
   Write-Host '1/5 构建 React 前端源码...'
   Invoke-Checked 'npm' @('--prefix', $frontendDir, 'run', 'build')
@@ -47,6 +61,23 @@ if (-not $SkipFrontendBuild) {
 
 if (-not (Test-Path -LiteralPath (Join-Path $frontendDist 'index.html'))) {
   throw "前端构建结果不存在：$frontendDist/index.html。请先构建 frontend，或去掉 -SkipFrontendBuild。"
+}
+
+$indexPath = Join-Path $frontendDist 'index.html'
+$indexHtml = Get-Content -LiteralPath $indexPath -Raw
+$entryMatch = [regex]::Match($indexHtml, 'src="(/assets/[^"]+\.js)"')
+$frontendEntry = if ($entryMatch.Success) { $entryMatch.Groups[1].Value } else { '' }
+if ($RequireCleanFrontend -and [string]::IsNullOrWhiteSpace($frontendEntry)) {
+  throw "无法从 $indexPath 识别入口脚本，停止发布无法校验的前端产物。"
+}
+if ($RequireCleanFrontend -and $SkipFrontendBuild) {
+  $newestSource = Get-ChildItem -LiteralPath (Join-Path $frontendDir 'src') -Recurse -File -Include *.ts,*.tsx,*.css,*.json |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+  $indexTime = (Get-Item -LiteralPath $indexPath).LastWriteTimeUtc
+  if ($null -ne $newestSource -and $newestSource.LastWriteTimeUtc -gt $indexTime) {
+    throw "frontend/dist 落后于源码（$($newestSource.FullName) 晚于 index.html），请重新构建前端或去掉 -SkipFrontendBuild。"
+  }
 }
 
 Write-Host '2/5 同步前端产物到 Go embed 目录...'
@@ -89,6 +120,10 @@ $metadata = [ordered]@{
   sha256 = $hash
   built_at = (Get-Date).ToUniversalTime().ToString('o')
   frontend_source = 'frontend/src'
+  frontend_source_state = $frontendSourceState
+  frontend_entry = $frontendEntry
+  frontend_index_sha256 = (Get-FileHash -LiteralPath $indexPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  frontend_built_at = (Get-Item -LiteralPath $indexPath).LastWriteTimeUtc.ToString('o')
   embedded_assets = 'backend/web/dist'
   service = $ServiceName
 }
@@ -99,6 +134,7 @@ Copy-Item -LiteralPath (Join-Path $releaseDir 'release.json') -Destination (Join
 Write-Host "4/5 本地发布包已生成：$releaseDir"
 Write-Host "Git SHA：$gitSha"
 Write-Host "SHA-256：$hash"
+Write-Host "前端源码状态：$frontendSourceState；入口：$frontendEntry"
 
 if ($Deploy) {
   Write-Host '5/5 上传并原子替换远端二进制...'

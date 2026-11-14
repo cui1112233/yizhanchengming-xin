@@ -147,6 +147,20 @@
    - `reaper_log_lines=0`、`panic_log_lines=0`、`artifact_restore_lines=0`。
    - 结论：观测窗口内没有僵尸回收事件，reaper 未产生写入；当前 binlog 增长约 216KB/分钟，远低于“全量重写 6.4MB/次”的旧行为，说明单行保存持续生效。阶段 1 仍值得做，但它属于低频优化，不是当前主要写放大来源。
 
+### 2026-11-14 阶段 4 执行结果
+
+- [deploy-go-embedded.ps1](file:///f:/脚本测试/一战晟铭-v88/scripts/deploy-go-embedded.ps1) 新增 `-RequireCleanFrontend`：
+  - `frontend/src` 有未提交改动时拒绝构建，并列出前 8 项；
+  - 同时使用 `-SkipFrontendBuild` 时，若 `frontend/dist/index.html` 早于最新源码文件，拒绝发布；
+  - 无法识别入口脚本时拒绝发布。
+- `release.json` 新增字段：`frontend_source_state`、`frontend_entry`、`frontend_index_sha256`、`frontend_built_at`。
+- 新增 [verify-release.ps1](file:///f:/脚本测试/一战晟铭-v88/scripts/verify-release.ps1)：比对发布记录与 `/api/runtime-build-info` 的 `git_sha`、`runtime_manifest_sha`，生产未上报入口时改为校验首页是否引用发布包入口。
+- 验证：
+  - `-RequireCleanFrontend` 在当前 39 项未提交前端改动下正确拒绝构建；
+  - 默认构建产出的 `release.json` 记录 `frontend_source_state=dirty`、`frontend_entry=/assets/user-pA6972Cj.js`；
+  - `verify-release.ps1` 对 HEAD 发布记录返回 FAIL（生产仍为 `75c45576`），对匹配的 `75c45576` 发布记录返回 PASS。
+- 本阶段只改脚本与文档，不改变线上二进制；生产保持 `qiantie-202611141247`（`75c45576`）。
+
 ### 2026-11-14 阶段 1 执行结果
 
 - `75c45576`：新增 `saveJobsLocked`，reaper、dispatcher、启动恢复、加载规范化统一按 `changedIDs` 走 `SaveJobs` 单任务 upsert；状态读取修复路径同样只保存被修复任务。
