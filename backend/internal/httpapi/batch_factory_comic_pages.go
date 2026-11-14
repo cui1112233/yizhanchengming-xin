@@ -1884,7 +1884,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
-		serveComicZip(w, files, plan, "comic-prompts.zip")
+		serveComicZip(r.Context(), w, files, plan, "comic-prompts.zip")
 	})
 	mux.HandleFunc("GET "+imagesZip, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -1897,7 +1897,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
-		serveComicZip(w, files, plan, "comic-images.zip")
+		serveComicZip(r.Context(), w, files, plan, "comic-images.zip")
 	})
 	mux.HandleFunc("GET "+douyinZip, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -1910,7 +1910,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
-		serveComicZip(w, files, plan, "douyin-publish.zip")
+		serveComicZip(r.Context(), w, files, plan, "douyin-publish.zip")
 	})
 	mux.HandleFunc("PUT "+page, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -2323,7 +2323,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 					writeJSON(w, http.StatusNotFound, map[string]string{"error": "image bytes are not stored locally"})
 					return
 				}
-				file, openErr := files.Open(candidate.StorageRef)
+				file, openErr := files.OpenContext(r.Context(), candidate.StorageRef)
 				if openErr != nil {
 					writeJSON(w, http.StatusNotFound, map[string]string{"error": "image file not found"})
 					return
@@ -2424,7 +2424,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
-		serveComicZip(w, files, plan, "comic-collection.zip")
+		serveComicZip(r.Context(), w, files, plan, "comic-collection.zip")
 	})
 	mux.HandleFunc("GET "+collections, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -2580,7 +2580,7 @@ func planComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Stor
 		if strings.TrimSpace(item.StorageRef) == "" {
 			return comicZipPlan{}, fmt.Errorf("%w: 第 %d 页主图不可下载", batchfactoryv11.ErrNotFound, pageNumber)
 		}
-		file, openErr := files.Open(item.StorageRef)
+		file, openErr := files.OpenContext(ctx, item.StorageRef)
 		if openErr != nil {
 			return comicZipPlan{}, fmt.Errorf("%w: 第 %d 页主图文件不存在", batchfactoryv11.ErrNotFound, pageNumber)
 		}
@@ -2636,7 +2636,7 @@ func planComicPageImagesZip(ctx context.Context, store batchfactoryv11.Store, co
 		if !ok || strings.TrimSpace(primary.StorageRef) == "" {
 			continue
 		}
-		file, openErr := files.Open(primary.StorageRef)
+		file, openErr := files.OpenContext(ctx, primary.StorageRef)
 		if openErr != nil {
 			continue
 		}
@@ -2744,7 +2744,7 @@ func planComicDouyinPublishZip(ctx context.Context, store batchfactoryv11.Store,
 		}
 		for _, page := range selected {
 			fileName := fmt.Sprintf("图片/%02d.jpg", page.index)
-			sourceWidth, sourceHeight, imageErr := writeDouyinPublishImage(writer, files, page.storageRef, fileName)
+			sourceWidth, sourceHeight, imageErr := writeDouyinPublishImage(ctx, writer, files, page.storageRef, fileName)
 			if imageErr != nil {
 				manifest.Skipped = append(manifest.Skipped, douyinPublishSkippedPage{Index: page.index, VideoID: page.videoID, Reason: imageErr.Error()})
 				continue
@@ -2766,8 +2766,8 @@ func planComicDouyinPublishZip(ctx context.Context, store batchfactoryv11.Store,
 
 // writeDouyinPublishImage 逐页解码后等比缩放并补白到 1080×1440（3:4），
 // 再以 JPEG 写出。这里只做等比缩放、不裁切，避免切掉对白与关键画面。
-func writeDouyinPublishImage(writer *zip.Writer, files *localartifact.Store, storageRef, name string) (int, int, error) {
-	file, err := files.Open(storageRef)
+func writeDouyinPublishImage(ctx context.Context, writer *zip.Writer, files *localartifact.Store, storageRef, name string) (int, int, error) {
+	file, err := files.OpenContext(ctx, storageRef)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -3122,7 +3122,7 @@ func planComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comicS
 			return
 		}
 		// 只校验可打开；读不到的图片沿用原有“跳过”语义，不让整包失败。
-		file, openErr := files.Open(storageRef)
+		file, openErr := files.OpenContext(ctx, storageRef)
 		if openErr != nil {
 			return
 		}
@@ -3174,7 +3174,7 @@ func planComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comicS
 
 // writeComicZipStream 边压边写：zip.NewWriter 直接落到响应 writer，条目按
 // 顺序 io.Copy，内存占用只跟单个读缓冲有关。
-func writeComicZipStream(w io.Writer, files *localartifact.Store, plan comicZipPlan) error {
+func writeComicZipStream(ctx context.Context, w io.Writer, files *localartifact.Store, plan comicZipPlan) error {
 	writer := zip.NewWriter(w)
 	if plan.custom != nil {
 		if err := plan.custom(writer); err != nil {
@@ -3196,7 +3196,7 @@ func writeComicZipStream(w io.Writer, files *localartifact.Store, plan comicZipP
 		}
 	}
 	for _, entry := range plan.entries {
-		file, openErr := files.Open(entry.storageRef)
+		file, openErr := files.OpenContext(ctx, entry.storageRef)
 		if openErr != nil {
 			_ = writer.Close()
 			return openErr
@@ -3218,11 +3218,11 @@ func writeComicZipStream(w io.Writer, files *localartifact.Store, plan comicZipP
 // 错误（缺图、权限、不存在），所以这里出现 I/O 错误只可能是流中断。此时
 // 状态码已经发出，主动断开连接让客户端明确看到下载失败，而不是收到一个
 // 看似成功但内容截断的 ZIP。
-func serveComicZip(w http.ResponseWriter, files *localartifact.Store, plan comicZipPlan, asciiName string) {
+func serveComicZip(ctx context.Context, w http.ResponseWriter, files *localartifact.Store, plan comicZipPlan, asciiName string) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+asciiName+"\"; filename*=UTF-8''"+url.QueryEscape(plan.filename))
 	w.WriteHeader(http.StatusOK)
-	if err := writeComicZipStream(w, files, plan); err != nil {
+	if err := writeComicZipStream(ctx, w, files, plan); err != nil {
 		log.Printf("stream comic zip %s: %v", plan.filename, err)
 		panic(http.ErrAbortHandler)
 	}

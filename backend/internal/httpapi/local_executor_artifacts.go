@@ -95,7 +95,7 @@ func RegisterLocalExecutorArtifactRoutes(root *http.ServeMux, auth BridgeAuth, s
 			writeArtifactDomainError(w, err)
 			return
 		}
-		file, err := files.Open(artifact.StorageRef)
+		file, err := files.OpenContext(req.Context(), artifact.StorageRef)
 		if err != nil {
 			if errors.Is(err, localartifact.ErrInvalidID) {
 				writeExecutorError(w, http.StatusInternalServerError, "invalid artifact storage reference")
@@ -126,7 +126,7 @@ func RegisterLocalExecutorArtifactRoutes(root *http.ServeMux, auth BridgeAuth, s
 			writeArtifactDomainError(w, err)
 			return
 		}
-		file, err := files.Open(artifact.StorageRef)
+		file, err := files.OpenContext(req.Context(), artifact.StorageRef)
 		if err != nil {
 			if errors.Is(err, localartifact.ErrInvalidID) {
 				writeExecutorError(w, http.StatusInternalServerError, "invalid artifact storage reference")

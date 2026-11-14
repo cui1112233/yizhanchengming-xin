@@ -67,7 +67,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 					continue
 				}
 				artifactID := strings.TrimPrefix(strings.TrimSpace(job.OutputURL), prefix)
-				path, pathErr := files.Path(artifactID + ".mp4")
+				path, pathErr := files.PathContext(r.Context(), artifactID+".mp4")
 				if pathErr != nil {
 					continue // already remote or a separately retained legacy artifact
 				}
@@ -177,7 +177,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			return
 		}
 		coverRef := artifactID + ".jpg"
-		cover, openErr := files.Open(coverRef)
+		cover, openErr := files.OpenContext(r.Context(), coverRef)
 		if openErr != nil {
 			coverBytes, renderErr := renderMergeCover(r.Context(), files, remote, artifactID)
 			if renderErr != nil {
@@ -189,7 +189,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 				writeStoreError(w, batchfactoryv11.ErrUnavailable)
 				return
 			}
-			cover, openErr = files.Open(coverRef)
+			cover, openErr = files.OpenContext(r.Context(), coverRef)
 			if openErr != nil {
 				writeStoreError(w, batchfactoryv11.ErrUnavailable)
 				return

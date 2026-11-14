@@ -192,7 +192,7 @@ func handleComicPageThumbnail(comicStore batchfactoryv11.ComicPageStore, files *
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "image bytes are not stored locally"})
 			return
 		}
-		original, err := files.Open(imageRecord.StorageRef)
+		original, err := files.OpenContext(r.Context(), imageRecord.StorageRef)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "image file not found"})
 			return

@@ -2401,7 +2401,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 					writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
 					return
 				}
-				file, openErr := files.Open(selected.StorageRef)
+				file, openErr := files.OpenContext(r.Context(), selected.StorageRef)
 				if openErr != nil {
 					writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
 					return
@@ -2499,7 +2499,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 							writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
 							return
 						}
-						file, openErr := files.Open(image.StorageRef)
+						file, openErr := files.OpenContext(r.Context(), image.StorageRef)
 						if openErr != nil {
 							writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
 							return
@@ -2566,7 +2566,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 					return
 				}
 				storageRef, _ := media[index]["storageRef"].(string)
-				file, openErr := files.Open(storageRef)
+				file, openErr := files.OpenContext(r.Context(), storageRef)
 				if openErr != nil {
 					writeJSON(w, http.StatusNotFound, map[string]string{"error": "media file not found"})
 					return
@@ -3069,7 +3069,7 @@ func writeShuihuoProjectExport(w http.ResponseWriter, r *http.Request, files *lo
 		if strings.TrimSpace(storageRef) == "" || strings.TrimSpace(mediaID) == "" {
 			continue
 		}
-		file, openErr := files.Open(storageRef)
+		file, openErr := files.OpenContext(r.Context(), storageRef)
 		if openErr != nil {
 			continue
 		}
@@ -3751,7 +3751,7 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 		if claimErr != nil {
 			log.Printf("shuihuo image cache unavailable owner=%s model=%s: %v", owner, target.ModelID, claimErr)
 		} else if outcome == imagegenerationcache.ClaimReady {
-			file, openErr := files.Open(entry.StorageRef)
+			file, openErr := files.OpenContext(ctx, entry.StorageRef)
 			if openErr == nil {
 				_ = file.Close()
 				return entry.MediaType, entry.StorageRef, "provider", nil
@@ -3773,7 +3773,7 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 					break
 				}
 				if outcome == imagegenerationcache.ClaimReady {
-					if file, openErr := files.Open(entry.StorageRef); openErr == nil {
+					if file, openErr := files.OpenContext(ctx, entry.StorageRef); openErr == nil {
 						_ = file.Close()
 						return entry.MediaType, entry.StorageRef, "provider", nil
 					}

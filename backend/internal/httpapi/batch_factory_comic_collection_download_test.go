@@ -172,7 +172,7 @@ func TestComicZipStreamWritesIncrementally(t *testing.T) {
 	}
 
 	sink := &countingWriter{}
-	if err := writeComicZipStream(sink, files, plan); err != nil {
+	if err := writeComicZipStream(context.Background(), sink, files, plan); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("streamed zip: writes=%d firstChunk=%dB total=%dB", sink.writes, sink.firstChunk, sink.buffer.Len())

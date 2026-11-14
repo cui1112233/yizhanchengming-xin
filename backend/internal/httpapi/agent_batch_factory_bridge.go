@@ -44,7 +44,7 @@ type agentBatchFactoryBridgeMedia struct {
 
 func (m agentBatchFactoryBridgeMedia) openMerge(ctx context.Context, artifactID string) (io.ReadCloser, error) {
 	if m.Local != nil {
-		file, err := m.Local.Open(artifactID + ".mp4")
+		file, err := m.Local.OpenContext(ctx, artifactID+".mp4")
 		if err == nil {
 			return file, nil
 		}
