@@ -357,7 +357,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		}()
 	}
 	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
-		provider, providerErr := resolveCatalogTextProvider(ctx, owner)
+		provider, providerErr := resolveCatalogTextProviderWithSelection(ctx, owner, novelfetchworkshop.ProcessTextModel(ctx))
 		if providerErr != nil {
 			return nil, providerErr
 		}
@@ -367,7 +367,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		return novelFetchRewrite, nil
 	}
 	novelFetchAIGenderJudgeResolver = func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
-		provider, providerErr := resolveCatalogTextProvider(ctx, owner)
+		provider, providerErr := resolveCatalogTextProviderWithSelection(ctx, owner, novelfetchworkshop.ProcessTextModel(ctx))
 		if providerErr != nil {
 			return nil, providerErr
 		}

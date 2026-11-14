@@ -61,7 +61,7 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		case "input_ready", "":
 			status = "waiting_retry"
 		}
-		if status == "failed" && novelFetchAutomationEnabled(settings) && meta["manualOnly"] != true && meta["manual_only"] != true && meta["rewriteValidationHold"] != true {
+		if status == "failed" && novelFetchAutomationEnabled(settings) && meta["manualOnly"] != true && meta["manual_only"] != true && meta["rewriteValidationHold"] != true && !novelFetchRetryScheduleHasManualHold(meta) {
 			status = "waiting_retry"
 		}
 		states[status]++

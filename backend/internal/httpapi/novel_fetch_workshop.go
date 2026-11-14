@@ -569,6 +569,7 @@ func (worker *workshopProcessWorker) bookCancelled(ctx context.Context, owner, b
 }
 
 func (worker *workshopProcessWorker) execute(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
+	ctx = novelfetchworkshop.WithProcessTextModel(ctx, job.TextModelID)
 	if job.AutoSubmit && len(job.BookIDs) == 1 {
 		if document, err := worker.store.GetDocument(ctx, job.Owner, job.BookIDs[0]); err == nil && document.Meta["autoSubmitReady"] == true && firstText(document.Meta["autoSubmitReadyFingerprint"]) == novelFetchUploadReadyFingerprint(ctx, worker.store, job.Owner, document, job.SelectedVersions) {
 			_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, job.BookIDs[0], "upload_resume", "正文已完成，跳过原文和改文生成，仅继续上传")
@@ -1135,6 +1136,9 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		}
 		if dispatchErr == nil {
 			_, dispatchErr = workshopProcessResult(ctx, store, owner, inputText, platformID, batchID, maxTxt)
+		}
+		if dispatchErr == nil {
+			dispatchErr = novelFetchSnapshotBeforeQueue(ctx, store, job)
 		}
 		if dispatchErr == nil {
 			if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
@@ -2231,6 +2235,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		processJob := novelfetchworkshop.ProcessJob{ID: id, Owner: identity.Username, BatchID: batchID, BookIDs: bookIDs, PlatformID: input.PlatformID, MaxTxt: input.MaxTxt, SensitiveAIEnabled: input.SensitiveAIEnabled, AutoSubmit: result["auto_queue_enabled"] == true, SelectedVersions: input.SelectedVersions, RewriteMethods: input.RewriteMethods, TextModelID: textModelID}
+		if err := novelFetchSnapshotBeforeQueue(req.Context(), store, processJob); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存执行参数失败"})
+			return
+		}
 		if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
 			if err := cancellationQueue.ClearCancelledBooks(req.Context(), identity.Username, bookIDs); err != nil {
 				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 取消状态清理失败"})

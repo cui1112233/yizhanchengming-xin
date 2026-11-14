@@ -188,6 +188,9 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 		meta = map[string]any{}
 	}
 	status := strings.ToLower(firstText(meta["status"], meta["queueState"], meta["taskStatus"]))
+	if status == "stopped" || status == "cancelled" || status == "canceled" {
+		return false
+	}
 	// 自动重试预算耗尽后必须由人工介入，不能因为 status=failed 又被扫描器
 	// 立刻捡回队列，否则“停止自动重试”实际上没有任何效果。
 	if meta["manualOnly"] == true || meta["manual_only"] == true {
@@ -422,8 +425,17 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	batchID := ""
 	platformID := "2"
 	maxTxt := 4000
+	var selectedJob novelfetchworkshop.ProcessJob
+	groupKey := ""
 	for _, document := range documents {
 		if len(bookIDs) >= 50 {
+			continue
+		}
+		cancelled, cancelErr := reconcileNovelFetchCancellation(ctx, store, queue, owner, document)
+		if cancelErr != nil {
+			return nil, cancelErr
+		}
+		if cancelled {
 			continue
 		}
 		waitingFetchRetry := strings.EqualFold(firstText(document.Meta["originalStatus"], document.Meta["original_status"]), "waiting_fetch_retry")
@@ -451,14 +463,19 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		if !eligible {
 			continue
 		}
-		bookIDs = append(bookIDs, document.BookID)
-		if batchID == "" {
-			batchID = firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"])
-			platformID = novelFetchResolvedPlatformID(settings, document.Meta)
-			if document.MaxTxt > 0 {
-				maxTxt = document.MaxTxt
-			}
+		candidate := novelFetchRecoveryJob(document, settings, owner, true)
+		candidateKey := novelFetchRecoveryGroup(candidate)
+		if groupKey != "" && candidateKey != groupKey {
+			continue
 		}
+		if groupKey == "" {
+			selectedJob = candidate
+			groupKey = candidateKey
+			batchID = candidate.BatchID
+			platformID = candidate.PlatformID
+			maxTxt = candidate.MaxTxt
+		}
+		bookIDs = append(bookIDs, document.BookID)
 	}
 	if len(bookIDs) == 0 {
 		return nil, nil
@@ -471,6 +488,14 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		ID: fmt.Sprintf("queue_%d_%x", now.UnixMilli(), stamp&0xffffffff), Owner: owner, BatchID: batchID,
 		BookIDs: bookIDs, PlatformID: platformID, MaxTxt: maxTxt, SensitiveAIEnabled: novelFetchSensitiveAIEnabled(settings), AutoSubmit: true,
 		SelectedVersions: novelFetchAutomationVersions(settings), TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定"),
+	}
+	job.ScheduleID = selectedJob.ScheduleID
+	job.SelectedVersions = selectedJob.SelectedVersions
+	job.RewriteMethods = selectedJob.RewriteMethods
+	job.TextModelID = selectedJob.TextModelID
+	job.SensitiveAIEnabled = selectedJob.SensitiveAIEnabled
+	if err := novelFetchSnapshotBeforeQueue(ctx, store, job); err != nil {
+		return nil, err
 	}
 	var enqueueErr error
 	if uniqueQueue, ok := queue.(novelfetchworkshop.ProcessBookDedupQueue); ok {

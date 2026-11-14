@@ -95,21 +95,20 @@ func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store,
 				continue
 			}
 		}
-		versions := []string{}
-		for index := 1; index <= workshopAIRequestedCount(document, settings, 0); index++ {
-			versions = append(versions, fmt.Sprintf("ai%d", index))
+		job := novelFetchRecoveryJob(document, settings, owner, autoSubmit)
+		job.ID = fmt.Sprintf("retry_%d", time.Now().UnixNano())
+		job.BookIDs = []string{bookID}
+		if job.BatchID == "" {
+			job.BatchID = "retry-batch"
 		}
-		if autoSubmit {
-			versions = cleanStrings(append(novelFetchAutomationVersions(settings), versions...))
+		if sensitiveAI {
+			job.SensitiveAIEnabled = true
 		}
-		batchID := firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"], "retry-batch")
-		job := novelfetchworkshop.ProcessJob{ID: fmt.Sprintf("retry_%d", time.Now().UnixNano()), Owner: owner, BatchID: batchID, BookIDs: []string{bookID}, PlatformID: novelFetchResolvedPlatformID(settings, document.Meta), MaxTxt: document.MaxTxt, SensitiveAIEnabled: sensitiveAI || novelFetchSensitiveAIEnabled(settings), AutoSubmit: autoSubmit, SelectedVersions: versions, TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定")}
-		if job.MaxTxt <= 0 {
-			job.MaxTxt = 4000
-		}
-		job.RewriteMethods = map[string]string{}
-		for version, method := range mapOrEmpty(mapOrEmpty(mapOrEmpty(settings["appConfig"])["rewrite"])["ai_slot_methods"]) {
-			job.RewriteMethods[version] = firstText(method)
+		batchID := job.BatchID
+		if err := novelFetchSnapshotBeforeQueue(ctx, store, job); err != nil {
+			result.Failed++
+			result.Errors[bookID] = "保存重试执行参数失败"
+			continue
 		}
 		started := time.Now().UTC().Format(time.RFC3339Nano)
 		if err := store.PutRun(ctx, owner, novelfetchworkshop.RunRecord{RunID: job.ID, BookID: batchID, Stage: "novel_fetch_process", Status: "queued", TextModelID: job.TextModelID, ModelID: "novel-fetch-workshop", ModelDisplayName: "批量测书后台重试", StartedAt: started}); err != nil {
