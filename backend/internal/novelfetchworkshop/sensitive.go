@@ -203,6 +203,11 @@ func EnsureSensitiveRuleReplacements(settings map[string]any) int {
 			if find == "" {
 				continue
 			}
+			// A user-confirmed empty replacement means deletion. Only missing
+			// defaults should be auto-filled; preserve explicit import choices.
+			if _, supplied := item["replace"].(string); supplied && item["replace_explicit"] == true {
+				continue
+			}
 			existing := strings.TrimSpace(fmt.Sprint(item["replace"]))
 			replacement := safeSensitiveReplacement(find)
 			// A previous version could persist the original word as its own
