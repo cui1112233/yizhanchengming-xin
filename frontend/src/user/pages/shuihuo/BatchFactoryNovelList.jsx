@@ -5624,6 +5624,14 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     published: totals.published + Number(summary?.comicPublishedCollectionCount || 0)
   }), { imageReady: 0, imageTotal: 0, collections: 0, collectionPages: 0, published: 0 });
 
+  // 工具条插队按钮的可用性和原因只依赖当前选中的一本书。把结果提到
+  // 渲染前，按钮本身、悬停提示和旁侧原因文案都复用同一份判断，避免三处
+  // 各自计算后出现“按钮灰了但看不到为什么”的情况。
+  const singleSelectedBookId = selectedBookIds.length === 1 ? selectedBookIds[0] : '';
+  const toolbarPriorityAction = priorityAction(singleSelectedBookId);
+  const priorityDisabledReason = selectedBookIds.length !== 1
+    ? (selectedBookIds.length ? '一次只能插队一本，请只选中一本' : '请先选中一本书')
+    : toolbarPriorityAction.reason;
   // 自动化状态提示：列表打开时作为头部状态行渲染（不再整宽压住列表内容），
   // 生产表视图下才作为表格上方的状态行。
   const automationStatusNode = automationState !== 'idle' ? (() => {
@@ -5636,6 +5644,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     const assetStageCount = runningBooks.filter(book => String(book?.stage || '').includes('asset')).length;
     const pageStageCount = runningBooks.filter(book => book?.stage === 'comic_images').length;
     const lastError = String(automationStatus?.lastError || '').trim();
+    // 并发预算由后端随状态返回，直接展示各层限制，用户不用翻执行日志也能
+    // 知道当前为什么只跑这几路。
+    const budget = automationStatus?.concurrencyBudget;
+    const budgetText = budget && Number(budget.bookWorkerCeiling || 0) > 0
+      ? `，并发预算：书 ${budget.bookWorkers}/${budget.bookWorkerCeiling} 路 · 出图 ${budget.taskImageConcurrency} 路 · 同时出图书 ${budget.comicBookSlots} 本 · 网关 ${budget.gatewayColdStart}→${budget.gatewayCeiling} 路`
+      : '';
     const nextPriorityId = automationStatus?.priorityBookIds?.[0];
     const nextPriorityTitle = books.find(book => book.id === nextPriorityId)?.title || nextPriorityId;
     return (
@@ -5650,6 +5664,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         {nextPriorityTitle ? `，待优先：${nextPriorityTitle}` : ''}
         {problemCount > 0 ? `，失败/阻塞 ${problemCount} 本` : ''}
         {runningBooks.length > 0 ? `，出图中 ${runningBooks.length} 本（资产图 ${assetStageCount} 本 / 漫画页 ${pageStageCount} 本）` : ''}
+        {budgetText}
         {batchRetryCount > 0 ? `，已跳过 ${batchRetryCount} 本等待批末回补` : ''}
         {lastError ? `，最近错误：${lastError}` : ''}
       </button>
@@ -5662,7 +5677,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       <div className="shuihuo-workbench-toolbar" role="toolbar" aria-label="批量工厂工具栏">
         <Button type={novelListOpen ? 'primary' : 'text'} icon={<BarsOutlined />} onClick={() => setNovelListOpen(current => !current)}>{novelListOpen ? '返回生产表' : '小说列表'}</Button>
         <Button type="text" icon={<SettingOutlined />} onClick={() => setUnifiedSettingsOpen(true)}>统一配置</Button>
-        <Button title={priorityAction(selectedBookIds.length === 1 ? selectedBookIds[0] : '').reason} disabled={selectedBookIds.length !== 1 || !priorityAction(selectedBookIds[0]).enabled || Boolean(priorityBusyId)} loading={Boolean(priorityBusyId)} onClick={() => prioritizeBook(selectedBookIds[0])}>{selectedBookIds.length === 1 ? priorityAction(selectedBookIds[0]).label : '插队'}</Button>
+        <Tooltip title={toolbarPriorityAction.enabled ? '不打断正在处理的书，优先取得下一个生产空位' : `插队不可用：${priorityDisabledReason}`}><span><Button disabled={selectedBookIds.length !== 1 || !toolbarPriorityAction.enabled || Boolean(priorityBusyId)} loading={Boolean(priorityBusyId)} onClick={() => prioritizeBook(selectedBookIds[0])}>{selectedBookIds.length === 1 ? toolbarPriorityAction.label : '插队'}</Button></span></Tooltip>
+        {selectedBookIds.length === 1 && !toolbarPriorityAction.enabled ? <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>插队不可用：{priorityDisabledReason}</span> : null}
         <Dropdown menu={{ items: automationMenuItems, onClick: handleAutomationMenu }}><Button type="text" loading={Boolean(automationBusy)} disabled={automationState === 'idle' && automationStartBlocked}>{automationLabel}</Button></Dropdown>
         <Dropdown menu={{ items: agentMenuItems, onClick: ({ key }) => key === 'all' ? openBatchInAgent() : openSelectedInAgent() }}><Button type="text" disabled={Boolean(actionBusy)} loading={actionBusy === 'agent-all' || actionBusy?.startsWith?.('agent-')}>Agent 优化</Button></Dropdown>
         <Dropdown menu={{ items: batchMenuItems, onClick: async ({ key }) => { if (key === 'selected-production') return runSelectedProduction(); if (key === 'production') return runProduction(); if (key === 'merge') return runMerge(); if (key === 'comic-pages') { setAutomationRunMode('storyboard_only'); return openAutomationStart(); } if (key === 'comic-collection') { setAutomationRunMode('video_no_submit'); return openAutomationStart(); } } }}><Button className="shuihuo-batch-button" type="text" icon={<PictureOutlined />} loading={actionBusy === 'production' || actionBusy === 'selected-production' || actionBusy === 'merge'}>批量操作</Button></Dropdown>
@@ -5909,6 +5925,26 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     {stageBadge ? (
                       <span className={`batch-factory-stage-badge is-${stageBadge.tone}`} title={stageBadge.detail}>{stageBadge.label}</span>
                     ) : null}
+                    {String(automationBook?.status || '') === 'queued' ? (() => {
+                      // 行内插队：排队中的书不必先勾选再回工具条点一次。按钮禁用时
+                      // 悬停直接显示原因，避免“灰着但不知道为什么”。
+                      const rowPriority = priorityAction(book.id);
+                      return (
+                        <Tooltip title={rowPriority.reason}>
+                          <span onClick={event => event.stopPropagation()}>
+                            <Button
+                              size="small"
+                              type="link"
+                              disabled={!rowPriority.enabled || Boolean(priorityBusyId)}
+                              loading={priorityBusyId === book.id}
+                              onClick={event => { event.stopPropagation(); prioritizeBook(book.id); }}
+                            >
+                              {rowPriority.label}
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      );
+                    })() : null}
                   </div>
                   <span>
                     bookId：{book.bookId || "—"} · 书城：
