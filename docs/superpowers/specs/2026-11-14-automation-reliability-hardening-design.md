@@ -159,6 +159,8 @@ Go 版原先在原文抓取、自动调度、批量重试三处直接 `firstText
 - 只提交本任务涉及的文件，禁止 `git add .`。
 - 使用 `scripts/deploy-go-embedded.ps1` 走 Go embed 发布，不恢复 Node 链路。
 - 上一稳定版本作为回滚点，发布后校验 `/healthz` 与服务状态。
+- 旧版本文件不归“制作文件保留时长”管理。发布成功后由 `scripts/prune-qiantie-releases.sh` 清理：保留当前软链版本、`runtime-release.json` 记录的回滚版本和最近 N 个历史版本（默认 N=1）。`scripts/deploy-go-embedded.ps1 -Deploy` 会自动调用，可用 `-KeepOldReleases` 关闭，或用 `-KeepPreviousReleases` 调整保留数量。
+- 2026-11-14 已按该规则清理一次：`/opt/www/qiantie` 从 15 个二进制（2.7G）降到 3 个（621M），磁盘占用从 73% 降到 62%，当前版本与服务健康不受影响。
 
 ## 5. 本轮发布记录（2026-11-14）
 

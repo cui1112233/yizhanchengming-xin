@@ -8,7 +8,10 @@
   [int]$SshPort = 22,
   [string]$TargetPath = '/opt/qiantie/releases/v88/qiantie-server',
   [string]$ServiceName = 'qiantie-v88',
-  [switch]$KeepBuildDirectory
+  [switch]$KeepBuildDirectory,
+  # 发布成功后保留多少个历史版本（当前版本不计入）。默认 1，即当前版 + 上一版。
+  [int]$KeepPreviousReleases = 1,
+  [switch]$KeepOldReleases
 )
 
 $ErrorActionPreference = 'Stop'
@@ -144,6 +147,30 @@ if ($Deploy) {
   $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
   Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $remoteCommand)
   Write-Host "远端服务已重启并通过 systemd 健康检查：$ServiceName"
+
+  # 旧版本二进制不会自动消失，每次发布都会多留一个约 174MB 的文件。发布成功后
+  # 按“当前版本 + 最近 N 个历史版本 + runtime-release.json 记录的回滚版本”清理，
+  # 避免服务器磁盘被历史构建占满。
+  if (-not $KeepOldReleases) {
+    $pruneScript = Join-Path $PSScriptRoot 'prune-qiantie-releases.sh'
+    if (-not (Test-Path -LiteralPath $pruneScript)) {
+      throw "版本清理脚本不存在：$pruneScript"
+    }
+    $remoteRoot = ($TargetPath -replace '/[^/]+$', '')
+    if ([string]::IsNullOrWhiteSpace($remoteRoot)) { $remoteRoot = '/' }
+    $remotePrune = "/tmp/qiantie-prune-$timestamp.sh"
+    $tempPrune = Join-Path ([System.IO.Path]::GetTempPath()) "qiantie-prune-$timestamp.sh"
+    $pruneCode = (Get-Content -LiteralPath $pruneScript -Raw) -replace "`r", ""
+    [System.IO.File]::WriteAllText($tempPrune, $pruneCode, (New-Object System.Text.UTF8Encoding($false)))
+    try {
+      Invoke-Checked 'scp' @('-P', "$SshPort", $tempPrune, "${remote}:$remotePrune")
+      $pruneCommand = "set -eu; QIANTIE_RELEASE_ROOT='$remoteRoot' sh '$remotePrune' $KeepPreviousReleases; rm -f '$remotePrune'"
+      Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $pruneCommand)
+      Write-Host "旧版本已清理：保留当前版本和最近 $KeepPreviousReleases 个历史版本。"
+    } finally {
+      Remove-Item -LiteralPath $tempPrune -Force -ErrorAction SilentlyContinue
+    }
+  }
 } else {
   Write-Host '5/5 未执行远端部署：如需上传，请明确传入 -Deploy -TargetHost。'
 }
