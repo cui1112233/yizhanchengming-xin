@@ -1,0 +1,170 @@
+[
+  {
+    "input": " 甲 ",
+    "output": "甲"
+  },
+  {
+    "input": "@甲",
+    "output": "甲"
+  },
+  {
+    "input": "@@甲",
+    "output": "甲"
+  },
+  {
+    "input": "@xxx.甲",
+    "output": "xxx.甲"
+  },
+  {
+    "input": "[甲]",
+    "output": "[甲]"
+  },
+  {
+    "input": "【甲】",
+    "output": "【甲】"
+  },
+  {
+    "input": "\"甲\"",
+    "output": "\"甲\""
+  },
+  {
+    "input": "'甲'",
+    "output": "'甲'"
+  },
+  {
+    "input": "（甲）",
+    "output": "（甲）"
+  },
+  {
+    "input": "甲（青年）",
+    "output": "甲（青年）"
+  },
+  {
+    "input": "甲(青年)",
+    "output": "甲(青年)"
+  },
+  {
+    "input": "无",
+    "output": ""
+  },
+  {
+    "input": "none",
+    "output": ""
+  },
+  {
+    "input": "None",
+    "output": ""
+  },
+  {
+    "input": "null",
+    "output": ""
+  },
+  {
+    "input": "N/A",
+    "output": ""
+  },
+  {
+    "input": "未知",
+    "output": ""
+  },
+  {
+    "input": "旁白",
+    "output": "旁白"
+  },
+  {
+    "input": "甲、乙",
+    "output": "甲、乙"
+  },
+  {
+    "input": "  @甲  ",
+    "output": "甲"
+  },
+  {
+    "input": "甲[青年]",
+    "output": "甲[青年]"
+  },
+  {
+    "input": "甲-青年",
+    "output": "甲-青年"
+  },
+  {
+    "input": "甲/乙",
+    "output": "甲/乙"
+  },
+  {
+    "input": "甲：乙",
+    "output": "甲：乙"
+  },
+  {
+    "input": "甲\n乙",
+    "output": "甲\n乙"
+  },
+  {
+    "input": "NONE",
+    "output": ""
+  },
+  {
+    "input": "NULL",
+    "output": ""
+  },
+  {
+    "input": "n/a",
+    "output": ""
+  },
+  {
+    "input": "NIL",
+    "output": "NIL"
+  },
+  {
+    "input": "nan",
+    "output": "nan"
+  },
+  {
+    "input": "-",
+    "output": ""
+  },
+  {
+    "input": "--",
+    "output": ""
+  },
+  {
+    "input": "暂无",
+    "output": ""
+  },
+  {
+    "input": "不详",
+    "output": "不详"
+  },
+  {
+    "input": "无人物",
+    "output": "无人物"
+  },
+  {
+    "input": "无场景",
+    "output": "无场景"
+  },
+  {
+    "input": "无道具",
+    "output": "无道具"
+  },
+  {
+    "input": "@ 无",
+    "output": ""
+  },
+  {
+    "input": "@ 甲",
+    "output": "甲"
+  },
+  {
+    "input": "未提及",
+    "output": "未提及"
+  },
+  {
+    "input": "无名",
+    "output": "无名"
+  },
+  {
+    "input": "None.",
+    "output": "None."
+  }
+]

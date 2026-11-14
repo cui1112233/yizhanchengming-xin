@@ -2,3 +2,4 @@
 screenplay_voice_design_127.txt -text
 recovered/*.txt -text -whitespace
 screenplay_recovered_catalog.json -text -whitespace
+assetcheck/*.txt -text -whitespace

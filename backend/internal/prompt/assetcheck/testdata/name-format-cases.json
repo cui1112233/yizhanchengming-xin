@@ -1,0 +1,156 @@
+[
+  {
+    "variant": "empty",
+    "mode": "general",
+    "inputs": {
+      "characters": [],
+      "scenes": [],
+      "props": []
+    },
+    "output": [
+      "【已有资产清单 — 必须遵守】\n下面是当前项目中已经存在的资产名称。这些资产已经收录进资产库。\n你只能从本集剧本中找出「清单里还没有」的条目，并为它们生成完整结构化信息；禁止重复输出已有名称，也禁止用近义改名规避。\n\n已有人物：（暂无）\n已有场景：（暂无）\n已有道具：（暂无）\n\n本次只处理「人物」：只返回新增人物，不要输出场景或道具。\n\n硬性规则：\n1. 只返回清单中不存在的新增条目；名称已存在的一律跳过。\n2. 不要把旁白、画外音、OS、镜头术语当成人物/场景/道具。\n3. 返回字段必须完整可用：\n   - 人物：name、identity、prompt、voice（voice 需完整听感描写，末尾【标签：标准标签名】）\n   - 场景：name、description、prompt\n   - 道具：name、description、prompt\n4. prompt 只写可见外观/空间/物体信息，不要写画面风格或渲染词。\n5. 若本集没有需要新增的内容，必须返回空数组。\n6. 只返回合法 JSON，禁止解释、分析过程和 markdown 代码块。\n7. 剧本场景标题若写成「地点A/地点B」（如「14-2 校医室/校医室门口 日」），代表两个独立场景。清单里若还没有拆开后的名字，必须分别新增；禁止把「校医室/校医室门口」当成一个场景名输出。\n\n\n【任务】\n请对照本集剧本，只提取并补全「尚未存在」的人物。\n\n【本集剧本】\nCM固定合成正文\n\n【输出格式】\n{\n  \"characters\": [\n    {\"name\":\"角色名\",\"identity\":\"身份/年龄/时期/状态与外观描述\",\"prompt\":\"完整角色提示词\",\"voice\":\"完整音色描写，末尾【标签：标准标签名】\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "empty",
+    "mode": "western",
+    "inputs": {
+      "characters": [],
+      "scenes": [],
+      "props": []
+    },
+    "output": [
+      "[Existing Assets Overlay — MUST FOLLOW]\nThe following assets already exist in the project library.\nOnly find and generate entries that are NOT already listed. Do not rename to bypass duplicates.\nReturn characters only.\n\nExisting characters: （暂无）\nExisting scenes: （暂无）\nExisting props: （暂无）\n\n[Episode Script]\nCM固定合成正文\n\n[Hard Requirements]\n1. Return only NEW missing assets. If none, return an empty array.\n2. Keep full structured fields required by the system prompt.\n3. Return valid JSON only.\n\n[Output Format]\n{\n  \"characters\": [\n    {\"name\":\"Character name\",\"identity\":\"Identity / age stage / period / state summary\",\"prompt\":\"Complete character prompt\",\"voice\":\"Complete voice description\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "ordered",
+    "mode": "general",
+    "inputs": {
+      "characters": [
+        "乙",
+        "甲",
+        "乙"
+      ],
+      "scenes": [
+        "南房",
+        "北房"
+      ],
+      "props": [
+        "铜灯",
+        "竹笛"
+      ]
+    },
+    "output": [
+      "【已有资产清单 — 必须遵守】\n下面是当前项目中已经存在的资产名称。这些资产已经收录进资产库。\n你只能从本集剧本中找出「清单里还没有」的条目，并为它们生成完整结构化信息；禁止重复输出已有名称，也禁止用近义改名规避。\n\n已有人物：乙、甲\n已有场景：南房、北房\n已有道具：铜灯、竹笛\n\n本次只处理「人物」：只返回新增人物，不要输出场景或道具。\n\n硬性规则：\n1. 只返回清单中不存在的新增条目；名称已存在的一律跳过。\n2. 不要把旁白、画外音、OS、镜头术语当成人物/场景/道具。\n3. 返回字段必须完整可用：\n   - 人物：name、identity、prompt、voice（voice 需完整听感描写，末尾【标签：标准标签名】）\n   - 场景：name、description、prompt\n   - 道具：name、description、prompt\n4. prompt 只写可见外观/空间/物体信息，不要写画面风格或渲染词。\n5. 若本集没有需要新增的内容，必须返回空数组。\n6. 只返回合法 JSON，禁止解释、分析过程和 markdown 代码块。\n7. 剧本场景标题若写成「地点A/地点B」（如「14-2 校医室/校医室门口 日」），代表两个独立场景。清单里若还没有拆开后的名字，必须分别新增；禁止把「校医室/校医室门口」当成一个场景名输出。\n\n\n【任务】\n请对照本集剧本，只提取并补全「尚未存在」的人物。\n\n【本集剧本】\nCM固定合成正文\n\n【输出格式】\n{\n  \"characters\": [\n    {\"name\":\"角色名\",\"identity\":\"身份/年龄/时期/状态与外观描述\",\"prompt\":\"完整角色提示词\",\"voice\":\"完整音色描写，末尾【标签：标准标签名】\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "ordered",
+    "mode": "western",
+    "inputs": {
+      "characters": [
+        "乙",
+        "甲",
+        "乙"
+      ],
+      "scenes": [
+        "南房",
+        "北房"
+      ],
+      "props": [
+        "铜灯",
+        "竹笛"
+      ]
+    },
+    "output": [
+      "[Existing Assets Overlay — MUST FOLLOW]\nThe following assets already exist in the project library.\nOnly find and generate entries that are NOT already listed. Do not rename to bypass duplicates.\nReturn characters only.\n\nExisting characters: 乙、甲\nExisting scenes: 南房、北房\nExisting props: 铜灯、竹笛\n\n[Episode Script]\nCM固定合成正文\n\n[Hard Requirements]\n1. Return only NEW missing assets. If none, return an empty array.\n2. Keep full structured fields required by the system prompt.\n3. Return valid JSON only.\n\n[Output Format]\n{\n  \"characters\": [\n    {\"name\":\"Character name\",\"identity\":\"Identity / age stage / period / state summary\",\"prompt\":\"Complete character prompt\",\"voice\":\"Complete voice description\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "trim",
+    "mode": "general",
+    "inputs": {
+      "characters": [
+        "  甲  ",
+        "甲",
+        "",
+        "甲\n乙",
+        "@丙"
+      ],
+      "scenes": [],
+      "props": []
+    },
+    "output": [
+      "【已有资产清单 — 必须遵守】\n下面是当前项目中已经存在的资产名称。这些资产已经收录进资产库。\n你只能从本集剧本中找出「清单里还没有」的条目，并为它们生成完整结构化信息；禁止重复输出已有名称，也禁止用近义改名规避。\n\n已有人物：甲、甲\n乙、丙\n已有场景：（暂无）\n已有道具：（暂无）\n\n本次只处理「人物」：只返回新增人物，不要输出场景或道具。\n\n硬性规则：\n1. 只返回清单中不存在的新增条目；名称已存在的一律跳过。\n2. 不要把旁白、画外音、OS、镜头术语当成人物/场景/道具。\n3. 返回字段必须完整可用：\n   - 人物：name、identity、prompt、voice（voice 需完整听感描写，末尾【标签：标准标签名】）\n   - 场景：name、description、prompt\n   - 道具：name、description、prompt\n4. prompt 只写可见外观/空间/物体信息，不要写画面风格或渲染词。\n5. 若本集没有需要新增的内容，必须返回空数组。\n6. 只返回合法 JSON，禁止解释、分析过程和 markdown 代码块。\n7. 剧本场景标题若写成「地点A/地点B」（如「14-2 校医室/校医室门口 日」），代表两个独立场景。清单里若还没有拆开后的名字，必须分别新增；禁止把「校医室/校医室门口」当成一个场景名输出。\n\n\n【任务】\n请对照本集剧本，只提取并补全「尚未存在」的人物。\n\n【本集剧本】\nCM固定合成正文\n\n【输出格式】\n{\n  \"characters\": [\n    {\"name\":\"角色名\",\"identity\":\"身份/年龄/时期/状态与外观描述\",\"prompt\":\"完整角色提示词\",\"voice\":\"完整音色描写，末尾【标签：标准标签名】\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "trim",
+    "mode": "western",
+    "inputs": {
+      "characters": [
+        "  甲  ",
+        "甲",
+        "",
+        "甲\n乙",
+        "@丙"
+      ],
+      "scenes": [],
+      "props": []
+    },
+    "output": [
+      "[Existing Assets Overlay — MUST FOLLOW]\nThe following assets already exist in the project library.\nOnly find and generate entries that are NOT already listed. Do not rename to bypass duplicates.\nReturn characters only.\n\nExisting characters: 甲、甲\n乙、丙\nExisting scenes: （暂无）\nExisting props: （暂无）\n\n[Episode Script]\nCM固定合成正文\n\n[Hard Requirements]\n1. Return only NEW missing assets. If none, return an empty array.\n2. Keep full structured fields required by the system prompt.\n3. Return valid JSON only.\n\n[Output Format]\n{\n  \"characters\": [\n    {\"name\":\"Character name\",\"identity\":\"Identity / age stage / period / state summary\",\"prompt\":\"Complete character prompt\",\"voice\":\"Complete voice description\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "objects",
+    "mode": "general",
+    "inputs": {
+      "characters": [
+        {
+          "name": " 甲 ",
+          "identity": "NOT_INCLUDED"
+        },
+        {
+          "name": "乙",
+          "prompt": "NOT_INCLUDED"
+        }
+      ],
+      "scenes": [],
+      "props": []
+    },
+    "output": [
+      "【已有资产清单 — 必须遵守】\n下面是当前项目中已经存在的资产名称。这些资产已经收录进资产库。\n你只能从本集剧本中找出「清单里还没有」的条目，并为它们生成完整结构化信息；禁止重复输出已有名称，也禁止用近义改名规避。\n\n已有人物：甲、乙\n已有场景：（暂无）\n已有道具：（暂无）\n\n本次只处理「人物」：只返回新增人物，不要输出场景或道具。\n\n硬性规则：\n1. 只返回清单中不存在的新增条目；名称已存在的一律跳过。\n2. 不要把旁白、画外音、OS、镜头术语当成人物/场景/道具。\n3. 返回字段必须完整可用：\n   - 人物：name、identity、prompt、voice（voice 需完整听感描写，末尾【标签：标准标签名】）\n   - 场景：name、description、prompt\n   - 道具：name、description、prompt\n4. prompt 只写可见外观/空间/物体信息，不要写画面风格或渲染词。\n5. 若本集没有需要新增的内容，必须返回空数组。\n6. 只返回合法 JSON，禁止解释、分析过程和 markdown 代码块。\n7. 剧本场景标题若写成「地点A/地点B」（如「14-2 校医室/校医室门口 日」），代表两个独立场景。清单里若还没有拆开后的名字，必须分别新增；禁止把「校医室/校医室门口」当成一个场景名输出。\n\n\n【任务】\n请对照本集剧本，只提取并补全「尚未存在」的人物。\n\n【本集剧本】\nCM固定合成正文\n\n【输出格式】\n{\n  \"characters\": [\n    {\"name\":\"角色名\",\"identity\":\"身份/年龄/时期/状态与外观描述\",\"prompt\":\"完整角色提示词\",\"voice\":\"完整音色描写，末尾【标签：标准标签名】\"}\n  ]\n}",
+      "characters"
+    ]
+  },
+  {
+    "variant": "objects",
+    "mode": "western",
+    "inputs": {
+      "characters": [
+        {
+          "name": " 甲 ",
+          "identity": "NOT_INCLUDED"
+        },
+        {
+          "name": "乙",
+          "prompt": "NOT_INCLUDED"
+        }
+      ],
+      "scenes": [],
+      "props": []
+    },
+    "output": [
+      "[Existing Assets Overlay — MUST FOLLOW]\nThe following assets already exist in the project library.\nOnly find and generate entries that are NOT already listed. Do not rename to bypass duplicates.\nReturn characters only.\n\nExisting characters: 甲、乙\nExisting scenes: （暂无）\nExisting props: （暂无）\n\n[Episode Script]\nCM固定合成正文\n\n[Hard Requirements]\n1. Return only NEW missing assets. If none, return an empty array.\n2. Keep full structured fields required by the system prompt.\n3. Return valid JSON only.\n\n[Output Format]\n{\n  \"characters\": [\n    {\"name\":\"Character name\",\"identity\":\"Identity / age stage / period / state summary\",\"prompt\":\"Complete character prompt\",\"voice\":\"Complete voice description\"}\n  ]\n}",
+      "characters"
+    ]
+  }
+]

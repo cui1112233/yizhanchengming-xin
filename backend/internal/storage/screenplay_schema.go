@@ -9,6 +9,7 @@ package storage
 //   - 资产解析批次与合并结果分表，先写批次再原子合并。
 func ScreenplayMigrations() []Migration {
 	return []Migration{
+		screenplayAssetCheckMigration(),
 		screenplayStoryboardProtocolMigration(),
 		screenplayAssetColumnsMigration(),
 		screenplayStoryboardGenerationMigration(),

@@ -59,6 +59,18 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 	RegisterScreenplayPositioningRoutes(root, auth, media)
 	RegisterScreenplayVoiceBindingRoutes(root, auth, media)
 	RegisterScreenplayProductionRoutes(root, auth, runtime, authoring)
+	assetCheckRepo, _ := options.Screenplay.(screenplay.AssetCheckRepository)
+	assetChecks := &screenplay.AssetCheckRuntime{Store: options.Screenplay, Repository: assetCheckRepo, Authoring: authoring, BuildSteps: screenplay.BuildAssetCheckSteps, Generator: func(owner string) screenplay.TextGenerator {
+		return screenplayTextGenerator{owner: owner, resolver: resolver}
+	}}
+	if redis, err := mergeworker.NewRedisStore(options.RedisURL, "qiantie:screenplay:asset-check"); err == nil {
+		assetChecks.RedisDo = redis.Do
+	}
+	RegisterScreenplayAssetCheckRoutes(root, auth, assetChecks, authoring)
+	if options.AgentImageWorkerContext != nil && assetCheckRepo != nil && assetChecks.RedisDo != nil {
+		go assetChecks.Run(options.AgentImageWorkerContext)
+	}
+
 	if options.AgentImageWorkerContext != nil && productionRepo != nil && runtime.RedisDo != nil {
 		go runtime.Run(options.AgentImageWorkerContext)
 	}

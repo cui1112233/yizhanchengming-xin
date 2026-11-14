@@ -13,6 +13,7 @@ import (
 // MemoryStore 是进程内 Store 实现，用于单测与本地串联。
 // 它刻意复刻 MySQL 实现的两个并发语义：revision 冲突与显式互斥锁。
 type MemoryStore struct {
+	assetCheckJobs        map[string]AssetCheckJob
 	storyboardGenerations map[string]StoryboardGenerationState
 	storyboardPreferences map[string]StoryboardPreferences
 	mu                    sync.Mutex

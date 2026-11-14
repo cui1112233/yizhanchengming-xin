@@ -1,0 +1,128 @@
+[
+  {
+    "run": "general-character",
+    "system_file": "general-character-system.txt",
+    "user_file": "general-character-user.txt",
+    "system_sha256": "a967638678f77b29a9862aefb7b17860ede6bbf497c323216a8b101d697df445",
+    "user_sha256": "59287e3f788966918854b6795a524154ccd37b91f8713315f69044c3a8b96b71",
+    "constructor_options": {
+      "model": "cm-offline-model",
+      "request_timeout_sec": 300,
+      "max_retries": 3,
+      "http_transport_retries": 3,
+      "min_request_interval_sec": 3,
+      "settings": {}
+    },
+    "generation_kwargs": {
+      "is_continue": false
+    },
+    "matching_original_constants": [
+      "CHARACTER_PARSE_AGENT_PROMPT_V2"
+    ]
+  },
+  {
+    "run": "general-scene",
+    "system_file": "general-scene-system.txt",
+    "user_file": "general-scene-user.txt",
+    "system_sha256": "3b90877751890870f1b67858953e030721244f8f1aa96c8fc046a17bf0e67923",
+    "user_sha256": "b6c132747377e84f06827eb3e26c7a87ad070faf5a9254294f4fd8f26a911452",
+    "constructor_options": {
+      "model": "cm-offline-model",
+      "request_timeout_sec": 300,
+      "max_retries": 3,
+      "http_transport_retries": 3,
+      "min_request_interval_sec": 3,
+      "settings": {}
+    },
+    "generation_kwargs": {
+      "is_continue": false
+    },
+    "matching_original_constants": [
+      "SCENE_PARSE_AGENT_PROMPT_V2"
+    ]
+  },
+  {
+    "run": "general-prop",
+    "system_file": "general-prop-system.txt",
+    "user_file": "general-prop-user.txt",
+    "system_sha256": "1e1d9027a2c54037d3a0c069821486f6d910b31bb2130b39855e4fbfd32a7ede",
+    "user_sha256": "1f85d0252ca3161bce9f03008f310e6da3a0b1be3605721910da81b9ce7187a1",
+    "constructor_options": {
+      "model": "cm-offline-model",
+      "request_timeout_sec": 300,
+      "max_retries": 3,
+      "http_transport_retries": 3,
+      "min_request_interval_sec": 3,
+      "settings": {}
+    },
+    "generation_kwargs": {
+      "is_continue": false
+    },
+    "matching_original_constants": [
+      "PROP_PARSE_AGENT_PROMPT_V2"
+    ]
+  },
+  {
+    "run": "western-character",
+    "system_file": "western-character-system.txt",
+    "user_file": "western-character-user.txt",
+    "system_sha256": "f5cefd6af9efafdfc12191751ea1cdb63075a5147c741a4684df694ec97905af",
+    "user_sha256": "6dd7ce31a44db4dfdc11ccafd0f5f35c2e68e0c9639645710f46743e973db1be",
+    "constructor_options": {
+      "model": "cm-offline-model",
+      "request_timeout_sec": 300,
+      "max_retries": 3,
+      "http_transport_retries": 3,
+      "min_request_interval_sec": 3,
+      "settings": {}
+    },
+    "generation_kwargs": {
+      "is_continue": false
+    },
+    "matching_original_constants": [
+      "CHARACTER_PARSE_AGENT_PROMPT_V2_WESTERN"
+    ]
+  },
+  {
+    "run": "western-scene",
+    "system_file": "western-scene-system.txt",
+    "user_file": "western-scene-user.txt",
+    "system_sha256": "e68e4e96f6c5571e2d85e4ef9cd49da7a951b8e4cb135cfcefd3aa8c98ed20a8",
+    "user_sha256": "9352d44fa53324f901d44a3b7adbc4606a690e4e31725ce3219e0146351b44ee",
+    "constructor_options": {
+      "model": "cm-offline-model",
+      "request_timeout_sec": 300,
+      "max_retries": 3,
+      "http_transport_retries": 3,
+      "min_request_interval_sec": 3,
+      "settings": {}
+    },
+    "generation_kwargs": {
+      "is_continue": false
+    },
+    "matching_original_constants": [
+      "SCENE_PARSE_AGENT_PROMPT_V2_WESTERN"
+    ]
+  },
+  {
+    "run": "western-prop",
+    "system_file": "western-prop-system.txt",
+    "user_file": "western-prop-user.txt",
+    "system_sha256": "299ec7d4eecbcd54f272faf83a7ecb433b90b8d6e963c4e747f4c70c3abdf647",
+    "user_sha256": "151abbe3f56154433733522d610f9519e6bdc70a00e9604d75914506fd157e59",
+    "constructor_options": {
+      "model": "cm-offline-model",
+      "request_timeout_sec": 300,
+      "max_retries": 3,
+      "http_transport_retries": 3,
+      "min_request_interval_sec": 3,
+      "settings": {}
+    },
+    "generation_kwargs": {
+      "is_continue": false
+    },
+    "matching_original_constants": [
+      "PROP_PARSE_AGENT_PROMPT_V2_WESTERN"
+    ]
+  }
+]

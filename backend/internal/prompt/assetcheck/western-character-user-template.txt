@@ -1,0 +1,23 @@
+[Existing Assets Overlay — MUST FOLLOW]
+The following assets already exist in the project library.
+Only find and generate entries that are NOT already listed. Do not rename to bypass duplicates.
+Return characters only.
+
+Existing characters: {{CHARACTERS}}
+Existing scenes: {{SCENES}}
+Existing props: {{PROPS}}
+
+[Episode Script]
+{{CONTENT}}
+
+[Hard Requirements]
+1. Return only NEW missing assets. If none, return an empty array.
+2. Keep full structured fields required by the system prompt.
+3. Return valid JSON only.
+
+[Output Format]
+{
+  "characters": [
+    {"name":"Character name","identity":"Identity / age stage / period / state summary","prompt":"Complete character prompt","voice":"Complete voice description"}
+  ]
+}
