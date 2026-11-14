@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -54,6 +55,50 @@ func TestRetryBuildsPublicResponseBeforeWorkerMutatesJob(t *testing.T) {
 			t.Fatalf("attempt %d: response id = %v, want %s", attempt, result["id"], jobID)
 		}
 		coordinator.cancelRun(jobID)
+	}
+}
+
+// 回归：批次里的书已被删除、job 仍保留失败账本时，重试必须在改动状态前
+// 返回冲突。旧实现会先把 job 改成 running 再发现批次里没有可执行的书，
+// 留下一个没有执行协程的假 running，只能等 2 分钟后的僵尸回收器改判失败。
+func TestRetryRejectsDeletedBatchBookWithoutFakeRunning(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "batch",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "book", SourceText: "正文"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-1": {
+			"id": "job-1", "owner": "alice", "batchId": batch.ID, "state": "failed",
+			"books": map[string]any{
+				"book-gone": map[string]any{"bookId": "book-gone", "status": "failed", "stage": "video"},
+			},
+		},
+	}}
+	coordinator := &BatchAutomationCoordinator{
+		store:           store,
+		automationStore: &memoryAutomationStateStore{state: state, found: true},
+		now:             func() time.Time { return time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC) },
+	}
+	if _, err := coordinator.Retry(ctx, "alice", batch.ID, []string{"book-gone"}); !errors.Is(err, batchfactoryv11.ErrConflict) {
+		t.Fatalf("Retry() error = %v, want ErrConflict", err)
+	}
+	loaded, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := loaded.Jobs["job-1"]
+	if automationStringValue(job["state"], "") != "failed" {
+		t.Fatalf("job state = %v, want failed（不得留下假 running）", job["state"])
+	}
+	books, _ := job["books"].(map[string]any)
+	entry, _ := books["book-gone"].(map[string]any)
+	if automationStringValue(entry["status"], "") != "failed" {
+		t.Fatalf("book status = %v, want failed", entry["status"])
 	}
 }
 
