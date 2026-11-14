@@ -87,8 +87,12 @@ func novelFetchAIManualRetryRequired(err error) bool {
 	if err == nil {
 		return false
 	}
+	// 模型输出格式错误属于本次输出问题，参考实现允许立即重试而不是转人工。
+	if novelFetchAIErrorIsOutputRejection(err) {
+		return false
+	}
 	message := strings.ToLower(err.Error())
-	for _, keyword := range []string{"文本模型输出被长度截断", "长度截断", "content policy", "内容审核", "模型拒绝", "refusal"} {
+	for _, keyword := range []string{"文本模型输出被长度截断", "长度截断", "content policy", "内容审核", "模型拒绝", "refusal", "ai请求在自动尝试", "ai服务暂不可用", "ai凭证暂时熔断", "ai凭证正在执行恢复探测"} {
 		if strings.Contains(message, keyword) {
 			return true
 		}
@@ -114,6 +118,9 @@ func markNovelFetchAIManualRetry(ctx context.Context, store novelfetchworkshop.S
 	document.Meta["manualAiRetryRequired"] = true
 	document.Meta["error"] = reason
 	delete(document.Meta, "automationNextRetryAt")
+	// 同步写入阶段重试表，保持与参考实现一致的 manual_only 记录，前端和
+	// 运维可以直接看到卡在改文阶段。
+	scheduleNovelFetchTaskRetry(document.Meta, novelFetchRetryStageRewrite, failure, 0, now)
 	appendNovelFetchDocumentLog(&document, "queue_failed", reason, now)
 	return store.PutDocument(ctx, owner, document)
 }
@@ -144,6 +151,7 @@ func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworks
 		document.Meta["originalFetchLastError"] = firstText(fetchErr)
 		document.Meta["error"] = reason
 		delete(document.Meta, "originalFetchNextRetryAt")
+		clearNovelFetchTaskRetry(document.Meta, novelFetchRetryStageOriginalFetch)
 		appendNovelFetchDocumentLog(&document, "queue_failed", reason, now)
 		return store.PutDocument(ctx, owner, document)
 	}
@@ -154,6 +162,8 @@ func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworks
 	document.Meta["originalFetchNextRetryAt"] = now.Add(delay).UTC().Format(time.RFC3339Nano)
 	document.Meta["originalFetchLastError"] = firstText(fetchErr)
 	document.Meta["error"] = firstText(fetchErr)
+	// 阶段重试表同时记录原文抓取退避，便于统一判断“是否已到重试时间”。
+	scheduleNovelFetchTaskRetry(document.Meta, novelFetchRetryStageOriginalFetch, fetchErr, delay, now)
 	return store.PutDocument(ctx, owner, document)
 }
 
@@ -168,6 +178,7 @@ func clearNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchwork
 	for _, key := range []string{"originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError"} {
 		delete(document.Meta, key)
 	}
+	clearNovelFetchTaskRetry(document.Meta, "")
 	return store.PutDocument(ctx, owner, document)
 }
 
@@ -180,6 +191,15 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 	// 自动重试预算耗尽后必须由人工介入，不能因为 status=failed 又被扫描器
 	// 立刻捡回队列，否则“停止自动重试”实际上没有任何效果。
 	if meta["manualOnly"] == true || meta["manual_only"] == true {
+		return false
+	}
+	// 阶段重试表里的 manual_only 与 manualOnly 等价：模型确定性失败、AI
+	// 服务持续不可用都要等人工处理，不能因为 status=failed 又被捡回队列。
+	if novelFetchRetryScheduleHasManualHold(meta) {
+		return false
+	}
+	// 退避未到期前不重复入队；不同阶段各自维护到期时间。
+	if !novelFetchTaskRetryDue(meta, "", now) {
 		return false
 	}
 	if meta["rewriteValidationHold"] == true {
@@ -434,7 +454,7 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		bookIDs = append(bookIDs, document.BookID)
 		if batchID == "" {
 			batchID = firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"])
-			platformID = firstText(document.Meta["platformId"], document.Meta["platform_id"], "2")
+			platformID = novelFetchResolvedPlatformID(settings, document.Meta)
 			if document.MaxTxt > 0 {
 				maxTxt = document.MaxTxt
 			}

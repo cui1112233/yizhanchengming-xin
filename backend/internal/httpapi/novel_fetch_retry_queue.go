@@ -31,11 +31,17 @@ func resetNovelFetchAutomationRetryState(document *novelfetchworkshop.Document) 
 		return false
 	}
 	changed := false
-	for _, key := range []string{"manualOnly", "manual_only", "automationEnqueueAttempts", "automationNextRetryAt", "manualOriginalFetchRequired", "originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError"} {
+	for _, key := range []string{"manualOnly", "manual_only", "automationEnqueueAttempts", "automationNextRetryAt", "manualOriginalFetchRequired", "originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError", "manualAiRetryRequired", "manual_ai_retry_required", "manual_ai_retry_stage", "manual_ai_retry_error"} {
 		if _, ok := document.Meta[key]; ok {
 			delete(document.Meta, key)
 			changed = true
 		}
+	}
+	// 用户主动重试代表重新开始一轮处理，阶段重试表和退避时间必须一起清掉；
+	// 否则扫描器仍会被旧的 next_retry_at 或 manual_only 挡住。
+	if len(novelFetchRetrySchedule(document.Meta)) > 0 {
+		clearNovelFetchTaskRetry(document.Meta, "")
+		changed = true
 	}
 	return changed
 }
@@ -97,7 +103,7 @@ func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store,
 			versions = cleanStrings(append(novelFetchAutomationVersions(settings), versions...))
 		}
 		batchID := firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"], "retry-batch")
-		job := novelfetchworkshop.ProcessJob{ID: fmt.Sprintf("retry_%d", time.Now().UnixNano()), Owner: owner, BatchID: batchID, BookIDs: []string{bookID}, PlatformID: firstText(document.Meta["platformId"], document.Meta["platform_id"], "2"), MaxTxt: document.MaxTxt, SensitiveAIEnabled: sensitiveAI || novelFetchSensitiveAIEnabled(settings), AutoSubmit: autoSubmit, SelectedVersions: versions, TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定")}
+		job := novelfetchworkshop.ProcessJob{ID: fmt.Sprintf("retry_%d", time.Now().UnixNano()), Owner: owner, BatchID: batchID, BookIDs: []string{bookID}, PlatformID: novelFetchResolvedPlatformID(settings, document.Meta), MaxTxt: document.MaxTxt, SensitiveAIEnabled: sensitiveAI || novelFetchSensitiveAIEnabled(settings), AutoSubmit: autoSubmit, SelectedVersions: versions, TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定")}
 		if job.MaxTxt <= 0 {
 			job.MaxTxt = 4000
 		}

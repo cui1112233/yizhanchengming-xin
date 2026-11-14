@@ -30,6 +30,27 @@ var novelFetchVersionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 // Keep that range here so short but valid platform IDs are not discarded
 // before the fetch stage gets a chance to handle them.
 var novelFetchNumericIDPattern = regexp.MustCompile(`\d{5,25}`)
+
+// 参考实现 safe_book_id 的提取顺序：先识别 u_<scope>_<digits> 复合书号，
+// 再从链接参数 bookid/book_id/bookId 中取值，最后才回退到任意 5-25 位数字。
+// 直接取第一段数字会把链接里的章节号等参数误当书号。
+var novelFetchBookIDURLPattern = regexp.MustCompile(`(?i)(?:bookid|book_id|bookId)\s*=\s*(\d{5,25})`)
+var novelFetchScopedBookIDPattern = regexp.MustCompile(`^u_[A-Za-z0-9_-]+_\d{5,25}$`)
+
+func novelFetchSafeBookID(value string) string {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return ""
+	}
+	if novelFetchScopedBookIDPattern.MatchString(text) {
+		return text
+	}
+	if match := novelFetchBookIDURLPattern.FindStringSubmatch(text); len(match) > 1 {
+		return match[1]
+	}
+	return novelFetchNumericIDPattern.FindString(text)
+}
+
 var novelFetchBearerSecretPattern = regexp.MustCompile(`(?i)(authorization\s*:\s*bearer\s+)[^\s,;]+`)
 var novelFetchCookieSecretPattern = regexp.MustCompile(`(?i)(cookie\s*:\s*)[^;\r\n]+`)
 var novelFetchNamedSecretPattern = regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*)[^,\s;]+`)
@@ -337,6 +358,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			} else if errors.Is(result.err, errNovelFetchClassificationPending) {
 				classificationPendingCount++
 				status = "waiting_classification"
+				// 记录分类阶段的等待状态，确认分类后由重试队列统一清理。
+				_ = scheduleNovelFetchDocumentRetry(ctx, worker.store, job.Owner, bookID, novelFetchRetryStageClassify, result.err, time.Now().UTC())
 			} else if errors.Is(result.err, errNovelFetchOriginalFetch) {
 				retryBookIDs = append(retryBookIDs, bookID)
 				deferredOriginalFetchRetry = true
@@ -353,8 +376,12 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			} else if retry {
 				retryBookIDs = append(retryBookIDs, bookID)
 				status = "waiting_retry"
+				_ = scheduleNovelFetchDocumentRetry(ctx, worker.store, job.Owner, bookID, novelFetchRetryStageForError(result.err), result.err, time.Now().UTC())
 				_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
 			} else {
+				// 队列自身重试次数用尽后仍然写阶段退避时间，交给自动扫描器在
+				// 到期后重新接管；否则状态 failed 会被立刻重新入队，形成死循环。
+				_ = scheduleNovelFetchDocumentRetry(ctx, worker.store, job.Owner, bookID, novelFetchRetryStageForError(result.err), result.err, time.Now().UTC())
 				_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
 			}
 			progress = append(progress, workshopProgressItem("error", "处理失败："+result.err.Error(), bookID, bookName))
@@ -1816,10 +1843,10 @@ func executeWorkshopDocumentFetch(ctx context.Context, store novelfetchworkshop.
 		}
 	} else {
 		_ = appendWorkshopTaskLog(ctx, store, owner, bookID, "fetch_started", "开始获取原文")
-		platformID := "2"
-		if value, ok := document.Meta["platformId"].(string); ok && strings.TrimSpace(value) != "" {
-			platformID = strings.TrimSpace(value)
-		}
+		// 平台 ID 可能只以名称形式存在（历史导入/批量工厂），这里按平台目录
+		// 自动换算，避免把任务发到默认书城后拿到错误的 400。
+		fetchSettings, _ := store.GetConfig(ctx, owner)
+		platformID := novelFetchResolvedPlatformID(fetchSettings, document.Meta)
 		result, err = fetchNovelWithSettings(ctx, store, owner, fetcher, bookID, platformID, maxTxt)
 		if err != nil {
 			_ = appendWorkshopTaskLog(ctx, store, owner, bookID, "fetch_failed", err.Error())
@@ -3780,7 +3807,12 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 	parsed, emptyIDs, duplicates := 0, 0, 0
 	for _, rawLine := range lines {
 		line := strings.TrimSpace(rawLine)
-		if line == "" || strings.Contains(line, "书籍ID") || strings.Contains(strings.ToLower(line), "book_id") {
+		if line == "" {
+			continue
+		}
+		lowerLine := strings.ToLower(line)
+		// 表头需要跳过，但带 book_id=123456 的链接本身不是表头，不能一起丢掉。
+		if strings.Contains(line, "书籍ID") || (strings.Contains(lowerLine, "book_id") && !novelFetchBookIDURLPattern.MatchString(line)) {
 			continue
 		}
 		parsed++
@@ -3790,8 +3822,8 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 		}
 		bookID := ""
 		for _, cell := range cells {
-			if match := novelFetchNumericIDPattern.FindString(cell); match != "" {
-				bookID = match
+			if candidate := novelFetchSafeBookID(cell); candidate != "" {
+				bookID = candidate
 				break
 			}
 		}
@@ -3805,9 +3837,11 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 		}
 		seen[bookID] = struct{}{}
 		bookName, gender := "", ""
+		idFromURL := novelFetchBookIDURLPattern.MatchString(line)
 		// 常用输入是“ID + 若干空格 + 书名”。先从原始行移除 ID 和
-		// 紧随其后的空白/分隔符，避免把 ID 一并保存成书名。
-		if idIndex := strings.Index(line, bookID); idIndex >= 0 {
+		// 紧随其后的空白/分隔符，避免把 ID 一并保存成书名。链接输入不参与
+		// 书名推断，否则查询参数会被误存成书名。
+		if idIndex := strings.Index(line, bookID); idIndex >= 0 && !idFromURL {
 			remainder := strings.TrimLeftFunc(line[idIndex+len(bookID):], func(r rune) bool {
 				return unicode.IsSpace(r) || r == '|' || r == ','
 			})
@@ -3822,7 +3856,7 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 			}
 		}
 		for _, cell := range cells {
-			if cell == bookID || strings.Contains(cell, "男频") || strings.Contains(cell, "女频") {
+			if strings.Contains(cell, bookID) || strings.Contains(cell, "男频") || strings.Contains(cell, "女频") {
 				if strings.Contains(cell, "男频") {
 					gender = "男频"
 				} else if strings.Contains(cell, "女频") {

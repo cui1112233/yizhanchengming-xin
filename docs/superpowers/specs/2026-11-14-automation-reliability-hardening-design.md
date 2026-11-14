@@ -114,6 +114,37 @@ Go 版补同等语义：
 - 未达上限继续按配置间隔退避，保留源站临时故障的自动恢复能力。
 - 人工批量重试时同时清除 `originalFetchRetryAttempts`、`originalFetchNextRetryAt`、`originalFetchLastError`，让计数从零开始。
 
+### 2.12 阶段化重试表、书号解析与平台名称回退
+
+逐项对照参考实现 `批量原文改文系统_源码/main.py`，补齐 Go 侧仍然缺失的三类能力，并修正一处平台来源错误。
+
+**（1）阶段化重试表 `retry_schedule`（参考 `schedule_task_retry` / `clear_task_retry` / `release_ai_manual_retry_hold` / `task_retry_due`）**
+
+- 新增 `novel_fetch_retry_schedule.go`，按 `original_fetch`、`sensitive`、`classify`、`rewrite`、`pipeline` 五个阶段分别记录 `attempt`、`next_retry_at`、`error`、`manual_only`、`updated_at`。
+- 退避序列与参考实现一致：`30s / 120s / 300s / 900s / 1800s`；模型输出格式错误（`ai_output_rejected`、`invalid_json`、`incomplete_prose`）使用 `0s` 立即重试。
+- 汇总结论字段与参考实现一致：`retry_stage`、`retry_count`、`next_retry_at`、`last_retry_error`，以及人工保持字段 `manual_ai_retry_required` / `manual_ai_retry_stage` / `manual_ai_retry_error`。
+- 原文抓取失败、分类待确认、敏感词失败、改文失败都会写入对应阶段；队列自身重试次数用尽后也写入退避时间，避免 `status=failed` 被扫描器立刻重新入队。
+- `novelFetchAutomationEligible` 在入口检查阶段退避：未到期或存在 `manual_only` 阶段时拒绝自动入队。
+- 用户主动重试时由 `resetNovelFetchAutomationRetryState` 清空整张重试表，并删除人工保持字段。
+- 任务成功完成时由 `clearNovelFetchOriginalFetchRetry` 顺带清空整张重试表。
+
+**（2）书号提取 `safe_book_id` / `book_id_from_url`**
+
+- 新增 `novelFetchSafeBookID`，提取顺序与参考实现一致：先保留 `u_<scope>_<digits>` 复合书号；再从链接参数 `bookid` / `book_id` / `bookId` 取值；最后回退到任意 5-25 位数字。
+- `parseWorkshopDocuments` 改用该函数，避免把链接里的 `chapterId` 等其他数字参数误当书号。
+- 含 `book_id=` 的链接行不再被当成表头丢弃；链接行也不再从查询参数推断书名。
+
+**（3）AI 重试延迟提示 `ai_retry_delay_hint_seconds`**
+
+- 新增 `novelFetchAIRetryDelayHintSeconds`，从错误文本中提取“约/请 X 秒后重试”的等待时间，作为阶段退避的下限。
+- 参考实现的该文案来自其 AI 熔断器；Go 侧当前没有熔断文案，因此取不到时返回 0，退避仍按标准序列执行，不引入额外状态机。
+
+**（4）平台自动识别（修正）**
+
+参考实现没有 `platformAutoDetected` 字段，也没有从链接推断平台；它使用的是 `web_platform_id(meta)`：优先 `platform_id`，缺失时按 `platform_name` 在平台目录中反查 ID。
+
+Go 版原先在原文抓取、自动调度、批量重试三处直接 `firstText(platformId, platform_id, "2")`，只有平台名称的任务会被错误地发到默认书城（`2`）。现新增 `novelFetchResolvedPlatformID` 并替换上述三处：显式 ID 优先，其次按平台目录名称匹配，最后才回退 `2`。
+
 ## 3. 验收
 
 1. `localartifact`：写保护开启时 `Restore` 返回 `ErrDiskPressure` 且不产生可见文件；校验失败仍返回 `ErrRemoteIntegrity`。
