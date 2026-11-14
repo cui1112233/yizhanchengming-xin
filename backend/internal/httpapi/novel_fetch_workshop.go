@@ -995,13 +995,14 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		}
 		runAt, err := parseNovelFetchScheduleTime(firstText(item["run_at"], item["runAt"]))
 		if err != nil {
+			item["status"] = "failed"
+			item["error"] = "定时任务时间无效，请重新设置时间后再执行"
 			if recovering {
-				item["status"] = "failed"
 				item["error"] = "定时派发时间信息不完整，已停止自动恢复"
-				item["updatedAt"] = now.UTC().Format(time.RFC3339Nano)
-				if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
-					return err
-				}
+			}
+			item["updatedAt"] = now.UTC().Format(time.RFC3339Nano)
+			if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
+				return err
 			}
 			continue
 		}

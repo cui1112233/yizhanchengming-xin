@@ -1,0 +1,3675 @@
+[
+  {
+    "tag": "button",
+    "line": 16,
+    "attributes": {
+      "class": "tab active",
+      "data-tab": "work"
+    },
+    "text": "处理",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 17,
+    "attributes": {
+      "class": "tab",
+      "data-tab": "tasks"
+    },
+    "text": "任务",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 18,
+    "attributes": {
+      "class": "tab",
+      "data-tab": "config"
+    },
+    "text": "配置",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 19,
+    "attributes": {
+      "class": "tab",
+      "data-tab": "knowledge"
+    },
+    "text": "知识库",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 20,
+    "attributes": {
+      "class": "tab",
+      "data-tab": "rules"
+    },
+    "text": "处理规则",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 21,
+    "attributes": {
+      "class": "tab",
+      "data-tab": "siteSubmit"
+    },
+    "text": "网站提交",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 22,
+    "attributes": {
+      "class": "tab admin-only",
+      "data-tab": "accounts"
+    },
+    "text": "账号管理",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 23,
+    "attributes": {
+      "class": "tab",
+      "data-tab": "logs"
+    },
+    "text": "日志",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "button",
+    "line": 24,
+    "attributes": {
+      "id": "logoutBtn",
+      "class": "visitor-only hidden",
+      "type": "button"
+    },
+    "text": "退出",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4144,
+        "evidence": "if ($(\"logoutBtn\")) $(\"logoutBtn\").onclick = logout;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 33,
+    "attributes": {
+      "id": "loginUsername",
+      "autocomplete": "username"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 235,
+        "evidence": "username: $(\"loginUsername\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 37,
+    "attributes": {
+      "id": "loginPassword",
+      "type": "password",
+      "autocomplete": "current-password"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 236,
+        "evidence": "password: $(\"loginPassword\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 40,
+    "attributes": {
+      "class": "primary",
+      "type": "submit"
+    },
+    "text": "登录",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "select",
+    "line": 57,
+    "attributes": {
+      "id": "platformSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 394,
+        "evidence": "platform_id: $(\"platformSelect\")?.value || \"\","
+      },
+      {
+        "line": 449,
+        "evidence": "const platformSelect = $(\"platformSelect\");"
+      },
+      {
+        "line": 450,
+        "evidence": "if (saved.platform_id && [...platformSelect.options].some((option) => option.value === String(saved.platform_id))) {"
+      },
+      {
+        "line": 451,
+        "evidence": "platformSelect.value = String(saved.platform_id);"
+      },
+      {
+        "line": 466,
+        "evidence": "for (const id of [\"platformSelect\", \"parseModeSelect\", \"columnPresetSelect\"]) {"
+      },
+      {
+        "line": 523,
+        "evidence": "const platformSelect = $(\"platformSelect\");"
+      },
+      {
+        "line": 524,
+        "evidence": "platformSelect.innerHTML = \"\";"
+      },
+      {
+        "line": 529,
+        "evidence": "platformSelect.appendChild(option);"
+      },
+      {
+        "line": 1796,
+        "evidence": "const id = $(\"platformSelect\").value;"
+      },
+      {
+        "line": 3199,
+        "evidence": "platform_id: $(\"platformSelect\").value,"
+      },
+      {
+        "line": 3427,
+        "evidence": "platform_id: $(\"platformSelect\").value,"
+      },
+      {
+        "line": 4219,
+        "evidence": "$(\"platformSelect\").onchange = updatePlatformHint;"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 61,
+    "attributes": {
+      "id": "parseModeSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 395,
+        "evidence": "parse_mode: $(\"parseModeSelect\")?.value || \"smart\","
+      },
+      {
+        "line": 453,
+        "evidence": "const parseModeSelect = $(\"parseModeSelect\");"
+      },
+      {
+        "line": 454,
+        "evidence": "if (saved.parse_mode && [...parseModeSelect.options].some((option) => option.value === String(saved.parse_mode))) {"
+      },
+      {
+        "line": 455,
+        "evidence": "parseModeSelect.value = String(saved.parse_mode);"
+      },
+      {
+        "line": 466,
+        "evidence": "for (const id of [\"platformSelect\", \"parseModeSelect\", \"columnPresetSelect\"]) {"
+      },
+      {
+        "line": 532,
+        "evidence": "renderOptions($(\"parseModeSelect\"), state.config.parse_modes || [{ id: \"smart\", name: \"智能识别\" }]);"
+      },
+      {
+        "line": 533,
+        "evidence": "$(\"parseModeSelect\").value = appCfg.parser?.default_parse_mode || \"smart\";"
+      },
+      {
+        "line": 3201,
+        "evidence": "parse_mode: $(\"parseModeSelect\").value,"
+      },
+      {
+        "line": 3429,
+        "evidence": "parse_mode: $(\"parseModeSelect\").value,"
+      },
+      {
+        "line": 3787,
+        "evidence": "default_parse_mode: $(\"parseModeSelect\").value || \"smart\","
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 65,
+    "attributes": {
+      "id": "columnPresetSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 396,
+        "evidence": "column_preset_id: $(\"columnPresetSelect\")?.value || \"\","
+      },
+      {
+        "line": 457,
+        "evidence": "const columnPresetSelect = $(\"columnPresetSelect\");"
+      },
+      {
+        "line": 458,
+        "evidence": "if ([...columnPresetSelect.options].some((option) => option.value === String(saved.column_preset_id || \"\"))) {"
+      },
+      {
+        "line": 459,
+        "evidence": "columnPresetSelect.value = String(saved.column_preset_id || \"\");"
+      },
+      {
+        "line": 466,
+        "evidence": "for (const id of [\"platformSelect\", \"parseModeSelect\", \"columnPresetSelect\"]) {"
+      },
+      {
+        "line": 535,
+        "evidence": "$(\"columnPresetSelect\").innerHTML = `<option value=\"\">不使用预设</option>`;"
+      },
+      {
+        "line": 540,
+        "evidence": "$(\"columnPresetSelect\").appendChild(option);"
+      },
+      {
+        "line": 542,
+        "evidence": "$(\"columnPresetSelect\").value = appCfg.parser?.default_column_preset_id || \"sample_input\";"
+      },
+      {
+        "line": 3202,
+        "evidence": "column_preset_id: $(\"columnPresetSelect\").value,"
+      },
+      {
+        "line": 3430,
+        "evidence": "column_preset_id: $(\"columnPresetSelect\").value,"
+      },
+      {
+        "line": 3788,
+        "evidence": "default_column_preset_id: $(\"columnPresetSelect\").value || \"\","
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 69,
+    "attributes": {
+      "id": "columnOrderInput",
+      "value": "书籍ID,书名,推荐理由,男女频,标签,评级"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 397,
+        "evidence": "column_order: $(\"columnOrderInput\")?.value || DEFAULT_COLUMN_ORDER,"
+      },
+      {
+        "line": 461,
+        "evidence": "if (typeof saved.column_order === \"string\") $(\"columnOrderInput\").value = saved.column_order || DEFAULT_COLUMN_ORDER;"
+      },
+      {
+        "line": 470,
+        "evidence": "for (const id of [\"columnOrderInput\", \"inputText\"]) {"
+      },
+      {
+        "line": 543,
+        "evidence": "$(\"columnOrderInput\").value = appCfg.parser?.custom_column_order || DEFAULT_COLUMN_ORDER;"
+      },
+      {
+        "line": 3203,
+        "evidence": "column_order: $(\"columnOrderInput\").value,"
+      },
+      {
+        "line": 3431,
+        "evidence": "column_order: $(\"columnOrderInput\").value,"
+      },
+      {
+        "line": 3789,
+        "evidence": "custom_column_order: $(\"columnOrderInput\").value || DEFAULT_COLUMN_ORDER,"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 72,
+    "attributes": {
+      "id": "inputText",
+      "class": "input-area",
+      "spellcheck": "false"
+    },
+    "text": "7674515088685943832 剧毒老实人想要侵犯小姑？重回5岁我在相亲局杀疯了 污蔑,打脸虐渣,复仇,自己家人出事,反转 女频 现代世情,爽文,重生,擦边 S",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 398,
+        "evidence": "input_text: $(\"inputText\")?.value || \"\","
+      },
+      {
+        "line": 462,
+        "evidence": "if (typeof saved.input_text === \"string\") $(\"inputText\").value = saved.input_text;"
+      },
+      {
+        "line": 470,
+        "evidence": "for (const id of [\"columnOrderInput\", \"inputText\"]) {"
+      },
+      {
+        "line": 3179,
+        "evidence": "const inputText = $(\"inputText\")?.value || \"\";"
+      },
+      {
+        "line": 3185,
+        "evidence": "if (!inputText.trim()) {"
+      },
+      {
+        "line": 3187,
+        "evidence": "$(\"inputText\")?.focus();"
+      },
+      {
+        "line": 3200,
+        "evidence": "input_text: inputText,"
+      },
+      {
+        "line": 3428,
+        "evidence": "input_text: $(\"inputText\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 74,
+    "attributes": {
+      "id": "processBtn",
+      "class": "primary"
+    },
+    "text": "开始处理",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3415,
+        "evidence": "const button = $(\"processBtn\");"
+      },
+      {
+        "line": 4145,
+        "evidence": "$(\"processBtn\").onclick = processInput;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 75,
+    "attributes": {
+      "id": "refreshBtn"
+    },
+    "text": "刷新任务",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4146,
+        "evidence": "$(\"refreshBtn\").onclick = () => loadTasks({ force: true });"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 80,
+    "attributes": {
+      "id": "scheduleRunAt",
+      "type": "datetime-local"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3178,
+        "evidence": "const runAt = $(\"scheduleRunAt\")?.value || \"\";"
+      },
+      {
+        "line": 3182,
+        "evidence": "$(\"scheduleRunAt\")?.focus();"
+      },
+      {
+        "line": 4147,
+        "evidence": "if ($(\"scheduleRunAt\")) $(\"scheduleRunAt\").value = localDateTimeInputValue();"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 82,
+    "attributes": {
+      "id": "createScheduleBtn"
+    },
+    "text": "添加定时处理",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3191,
+        "evidence": "const button = $(\"createScheduleBtn\");"
+      },
+      {
+        "line": 4148,
+        "evidence": "if ($(\"createScheduleBtn\")) $(\"createScheduleBtn\").onclick = createSchedule;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 83,
+    "attributes": {
+      "id": "toggleSchedulesBtn"
+    },
+    "text": "查看定时处理",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3210,
+        "evidence": "if ($(\"toggleSchedulesBtn\")) $(\"toggleSchedulesBtn\").textContent = \"隐藏定时处理\";"
+      },
+      {
+        "line": 3288,
+        "evidence": "if ($(\"toggleSchedulesBtn\")) $(\"toggleSchedulesBtn\").textContent = state.schedulesVisible ? \"隐藏定时处理\" : \"查看定时处理\";"
+      },
+      {
+        "line": 4149,
+        "evidence": "if ($(\"toggleSchedulesBtn\")) $(\"toggleSchedulesBtn\").onclick = toggleSchedules;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 84,
+    "attributes": {
+      "id": "cancelSelectedScheduleBtn",
+      "disabled": null,
+      "title": "先在定时列表里选择一条可取消的记录"
+    },
+    "text": "取消选中定时",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3099,
+        "evidence": "const cancelBtn = $(\"cancelSelectedScheduleBtn\");"
+      },
+      {
+        "line": 4150,
+        "evidence": "if ($(\"cancelSelectedScheduleBtn\")) $(\"cancelSelectedScheduleBtn\").onclick = cancelSelectedSchedule;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 85,
+    "attributes": {
+      "id": "deleteSelectedScheduleBtn",
+      "class": "danger",
+      "disabled": null,
+      "title": "只能删除已取消、已完成或失败的定时记录，任务会保留"
+    },
+    "text": "删除定时记录",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3100,
+        "evidence": "const deleteBtn = $(\"deleteSelectedScheduleBtn\");"
+      },
+      {
+        "line": 4151,
+        "evidence": "if ($(\"deleteSelectedScheduleBtn\")) $(\"deleteSelectedScheduleBtn\").onclick = deleteSelectedSchedule;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 111,
+    "attributes": {
+      "id": "stopProcessBtn",
+      "class": "danger"
+    },
+    "text": "暂停全自动",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4168,
+        "evidence": "$(\"stopProcessBtn\").onclick = stopCurrentProcess;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 112,
+    "attributes": {
+      "id": "startQueueBtn",
+      "class": "primary"
+    },
+    "text": "开启全自动",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4169,
+        "evidence": "$(\"startQueueBtn\").onclick = startQueueProcess;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 113,
+    "attributes": {
+      "id": "taskRefreshBtn"
+    },
+    "text": "刷新",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4152,
+        "evidence": "$(\"taskRefreshBtn\").onclick = () => loadTasks({ force: true });"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 114,
+    "attributes": {
+      "id": "selectAllBtn"
+    },
+    "text": "全选",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4162,
+        "evidence": "$(\"selectAllBtn\").onclick = selectAllVisibleTasks;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 115,
+    "attributes": {
+      "id": "clearSelectedBtn"
+    },
+    "text": "清空",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4163,
+        "evidence": "$(\"clearSelectedBtn\").onclick = clearSelectedTasks;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 116,
+    "attributes": {
+      "id": "retrySelectedBtn"
+    },
+    "text": "立即重试选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3638,
+        "evidence": "const retryButtons = [$(\"retrySelectedBtn\"), $(\"retryFailedBtn\")].filter(Boolean);"
+      },
+      {
+        "line": 4164,
+        "evidence": "$(\"retrySelectedBtn\").onclick = () => batchRetry(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 117,
+    "attributes": {
+      "id": "retryFailedBtn"
+    },
+    "text": "重试失败",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3638,
+        "evidence": "const retryButtons = [$(\"retrySelectedBtn\"), $(\"retryFailedBtn\")].filter(Boolean);"
+      },
+      {
+        "line": 4165,
+        "evidence": "$(\"retryFailedBtn\").onclick = () => batchRetry(\"failed\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 118,
+    "attributes": {
+      "id": "submitTaskSelectedBtn",
+      "class": "primary"
+    },
+    "text": "提交选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4166,
+        "evidence": "$(\"submitTaskSelectedBtn\").onclick = () => submitWebSubmit(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 119,
+    "attributes": {
+      "id": "submitTaskAllBtn"
+    },
+    "text": "提交全部",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4167,
+        "evidence": "$(\"submitTaskAllBtn\").onclick = () => submitWebSubmit(\"all\");"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 122,
+    "attributes": {
+      "id": "batchAiCount",
+      "type": "number",
+      "min": "1",
+      "max": "5",
+      "value": "1"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 589,
+        "evidence": "if ($(\"batchAiCount\")) $(\"batchAiCount\").value = rewrite.default_ai_count || 1;"
+      },
+      {
+        "line": 3673,
+        "evidence": "const count = Math.max(1, Math.min(Number($(\"batchAiCount\")?.value || 1), Number(state.config?.app_config?.rewrite?.max_ai_count || 5), 20));"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 124,
+    "attributes": {
+      "id": "updateAiCountSelectedBtn"
+    },
+    "text": "调整选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4170,
+        "evidence": "$(\"updateAiCountSelectedBtn\").onclick = () => batchUpdateAiCount(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 125,
+    "attributes": {
+      "id": "updateAiCountPendingBtn"
+    },
+    "text": "调整待处理",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4171,
+        "evidence": "$(\"updateAiCountPendingBtn\").onclick = () => batchUpdateAiCount(\"failed\");"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 126,
+    "attributes": {
+      "id": "ruleApplyScope",
+      "aria-label": "规则处理范围"
+    },
+    "text": "规则处理原文+AI 只处理原文 只处理AI",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3761,
+        "evidence": "scope: $(\"ruleApplyScope\").value || \"both\","
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 131,
+    "attributes": {
+      "id": "applyRulesSelectedBtn"
+    },
+    "text": "规则处理选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4172,
+        "evidence": "$(\"applyRulesSelectedBtn\").onclick = () => applyRules(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 132,
+    "attributes": {
+      "id": "applyRulesAllBtn"
+    },
+    "text": "规则处理全部",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4173,
+        "evidence": "$(\"applyRulesAllBtn\").onclick = () => applyRules(\"all\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 133,
+    "attributes": {
+      "type": "button",
+      "id": "deleteSelectedBtn",
+      "class": "danger"
+    },
+    "text": "删除选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4174,
+        "evidence": "$(\"deleteSelectedBtn\").onclick = () => batchDelete(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 134,
+    "attributes": {
+      "type": "button",
+      "id": "permanentDeleteSelectedBtn",
+      "class": "danger local-admin-only"
+    },
+    "text": "永久删除选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4175,
+        "evidence": "$(\"permanentDeleteSelectedBtn\").onclick = () => batchDelete(\"selected\", true);"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 135,
+    "attributes": {
+      "type": "button",
+      "id": "deleteFailedBtn",
+      "class": "danger"
+    },
+    "text": "删除失败",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4176,
+        "evidence": "$(\"deleteFailedBtn\").onclick = () => batchDelete(\"failed\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 136,
+    "attributes": {
+      "type": "button",
+      "id": "deleteAllBtn",
+      "class": "danger"
+    },
+    "text": "删除全部",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4177,
+        "evidence": "$(\"deleteAllBtn\").onclick = () => batchDelete(\"all\");"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 144,
+    "attributes": {
+      "id": "taskIdSearchInput",
+      "type": "search",
+      "inputmode": "numeric",
+      "placeholder": "输入书籍ID"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 151,
+        "evidence": "if ($(\"taskIdSearchInput\")) $(\"taskIdSearchInput\").value = state.taskIdQuery || \"\";"
+      },
+      {
+        "line": 155,
+        "evidence": "state.taskIdQuery = String($(\"taskIdSearchInput\")?.value || \"\").trim();"
+      },
+      {
+        "line": 4154,
+        "evidence": "if ($(\"taskIdSearchInput\")) $(\"taskIdSearchInput\").addEventListener(\"keydown\", (event) => {"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 146,
+    "attributes": {
+      "id": "taskIdSearchBtn"
+    },
+    "text": "查询",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4153,
+        "evidence": "if ($(\"taskIdSearchBtn\")) $(\"taskIdSearchBtn\").onclick = applyTaskIdSearch;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 147,
+    "attributes": {
+      "id": "taskDateInput",
+      "type": "date"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 150,
+        "evidence": "if ($(\"taskDateInput\")) $(\"taskDateInput\").value = state.taskViewDate || localDateString();"
+      },
+      {
+        "line": 4160,
+        "evidence": "$(\"taskDateViewBtn\").onclick = () => setTaskView(\"date\", $(\"taskDateInput\").value || localDateString());"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 148,
+    "attributes": {
+      "id": "taskTodayBtn"
+    },
+    "text": "今天",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4157,
+        "evidence": "$(\"taskTodayBtn\").onclick = () => setTaskView(\"date\", localDateString());"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 149,
+    "attributes": {
+      "id": "taskPrevDayBtn"
+    },
+    "text": "前一天",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4158,
+        "evidence": "$(\"taskPrevDayBtn\").onclick = () => setTaskView(\"date\", shiftDateText(state.taskViewDate || localDateString(), -1));"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 150,
+    "attributes": {
+      "id": "taskNextDayBtn"
+    },
+    "text": "后一天",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4159,
+        "evidence": "$(\"taskNextDayBtn\").onclick = () => setTaskView(\"date\", shiftDateText(state.taskViewDate || localDateString(), 1));"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 151,
+    "attributes": {
+      "id": "taskDateViewBtn"
+    },
+    "text": "查看日期",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4160,
+        "evidence": "$(\"taskDateViewBtn\").onclick = () => setTaskView(\"date\", $(\"taskDateInput\").value || localDateString());"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 152,
+    "attributes": {
+      "id": "taskDefaultViewBtn"
+    },
+    "text": "默认视图",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4161,
+        "evidence": "$(\"taskDefaultViewBtn\").onclick = () => setTaskView(\"default\", localDateString());"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 159,
+    "attributes": {
+      "id": "selectAllTasks",
+      "type": "checkbox",
+      "aria-label": "全选任务"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 2152,
+        "evidence": "const allBox = $(\"selectAllTasks\");"
+      },
+      {
+        "line": 4118,
+        "evidence": "if (input.id === \"selectAllTasks\") {"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 188,
+    "attributes": {
+      "id": "fetchEndpoint"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 574,
+        "evidence": "$(\"fetchEndpoint\").value = fetch.endpoint || \"https://txt.121w.com/api.php\";"
+      },
+      {
+        "line": 3805,
+        "evidence": "endpoint: $(\"fetchEndpoint\").value.trim() || \"https://txt.121w.com/api.php\","
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 192,
+    "attributes": {
+      "id": "fetchMaxTxt",
+      "type": "number",
+      "min": "1",
+      "value": "4000"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 575,
+        "evidence": "$(\"fetchMaxTxt\").value = fetch.default_max_txt || 4000;"
+      },
+      {
+        "line": 3806,
+        "evidence": "default_max_txt: numberValue(\"fetchMaxTxt\", 4000),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 196,
+    "attributes": {
+      "id": "workflowMinOriginalChars",
+      "type": "number",
+      "min": "0",
+      "value": "2000"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 576,
+        "evidence": "if ($(\"workflowMinOriginalChars\")) $(\"workflowMinOriginalChars\").value = workflow.min_original_chars || 2000;"
+      },
+      {
+        "line": 3799,
+        "evidence": "min_original_chars: numberValue(\"workflowMinOriginalChars\", 2000),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 200,
+    "attributes": {
+      "id": "aiCountDefault",
+      "type": "number",
+      "min": "1",
+      "max": "20",
+      "value": "1"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 587,
+        "evidence": "$(\"aiCountDefault\").value = rewrite.default_ai_count || 1;"
+      },
+      {
+        "line": 3831,
+        "evidence": "default_ai_count: numberValue(\"aiCountDefault\", 1),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 204,
+    "attributes": {
+      "id": "aiCountMax",
+      "type": "number",
+      "min": "1",
+      "max": "20",
+      "value": "5"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 588,
+        "evidence": "$(\"aiCountMax\").value = rewrite.max_ai_count || 5;"
+      },
+      {
+        "line": 3832,
+        "evidence": "max_ai_count: numberValue(\"aiCountMax\", 5),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 208,
+    "attributes": {
+      "id": "fetchConcurrency",
+      "type": "number",
+      "min": "1",
+      "value": "4"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 579,
+        "evidence": "$(\"fetchConcurrency\").value = fetch.concurrency || 4;"
+      },
+      {
+        "line": 3807,
+        "evidence": "concurrency: numberValue(\"fetchConcurrency\", 4),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 212,
+    "attributes": {
+      "id": "fetchRetries",
+      "type": "number",
+      "min": "0",
+      "value": "1"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 580,
+        "evidence": "$(\"fetchRetries\").value = fetch.retries ?? 1;"
+      },
+      {
+        "line": 3808,
+        "evidence": "retries: numberValue(\"fetchRetries\", 1),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 216,
+    "attributes": {
+      "id": "fetchTimeout",
+      "type": "number",
+      "min": "1",
+      "value": "30"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 581,
+        "evidence": "$(\"fetchTimeout\").value = fetch.timeout_seconds || 30;"
+      },
+      {
+        "line": 3809,
+        "evidence": "timeout_seconds: numberValue(\"fetchTimeout\", 30),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 220,
+    "attributes": {
+      "id": "autoSubmitBatchSize",
+      "type": "number",
+      "min": "1",
+      "max": "100",
+      "value": "12"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 577,
+        "evidence": "if ($(\"autoSubmitBatchSize\")) $(\"autoSubmitBatchSize\").value = workflow.auto_submit_batch_size || 12;"
+      },
+      {
+        "line": 3800,
+        "evidence": "auto_submit_batch_size: numberValue(\"autoSubmitBatchSize\", 12),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 224,
+    "attributes": {
+      "id": "autoSubmitFlushSeconds",
+      "type": "number",
+      "min": "1",
+      "max": "60",
+      "value": "5"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 578,
+        "evidence": "if ($(\"autoSubmitFlushSeconds\")) $(\"autoSubmitFlushSeconds\").value = workflow.auto_submit_flush_seconds || 5;"
+      },
+      {
+        "line": 3801,
+        "evidence": "auto_submit_flush_seconds: numberValue(\"autoSubmitFlushSeconds\", 5),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 228,
+    "attributes": {
+      "id": "processLineCount",
+      "type": "number",
+      "min": "1",
+      "value": "5"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 590,
+        "evidence": "$(\"processLineCount\").value = rewrite.process_line_count || 5;"
+      },
+      {
+        "line": 3833,
+        "evidence": "process_line_count: numberValue(\"processLineCount\", 5),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 232,
+    "attributes": {
+      "id": "anchorLineCount",
+      "type": "number",
+      "min": "0",
+      "value": "5"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 591,
+        "evidence": "$(\"anchorLineCount\").value = rewrite.anchor_line_count || 5;"
+      },
+      {
+        "line": 3834,
+        "evidence": "anchor_line_count: numberValue(\"anchorLineCount\", 5),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 236,
+    "attributes": {
+      "id": "rewriteTemp",
+      "type": "number",
+      "step": "0.01",
+      "min": "0",
+      "max": "2",
+      "value": "0.45"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 592,
+        "evidence": "$(\"rewriteTemp\").value = rewrite.temperature ?? 0.45;"
+      },
+      {
+        "line": 1115,
+        "evidence": "const selectedRewriteTemplateId = $(\"rewriteTemplateSelect\").value || \"\";"
+      },
+      {
+        "line": 1679,
+        "evidence": "const select = $(\"rewriteTemplateSelect\");"
+      },
+      {
+        "line": 3835,
+        "evidence": "temperature: numberValue(\"rewriteTemp\", 0.45),"
+      },
+      {
+        "line": 3839,
+        "evidence": "default_template_id: $(\"rewriteTemplateSelect\").value || \"\","
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 240,
+    "attributes": {
+      "id": "rewriteStrategy"
+    },
+    "text": "指令改文 开头词 + 指令改文 高仿文章改文",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 593,
+        "evidence": "$(\"rewriteStrategy\").value = rewrite.strategy || \"instruction\";"
+      },
+      {
+        "line": 3836,
+        "evidence": "strategy: $(\"rewriteStrategy\").value || \"instruction\","
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 248,
+    "attributes": {
+      "id": "methodSequenceInput",
+      "placeholder": "high_imitation,opening_instruction,instruction"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 594,
+        "evidence": "$(\"methodSequenceInput\").value = Array.isArray(rewrite.method_sequence)"
+      },
+      {
+        "line": 3837,
+        "evidence": "method_sequence: $(\"methodSequenceInput\").value.split(/[\\s,，、|\\/]+/).map((item) => item.trim()).filter(Boolean),"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 256,
+    "attributes": {
+      "id": "rewriteTemplateSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1115,
+        "evidence": "const selectedRewriteTemplateId = $(\"rewriteTemplateSelect\").value || \"\";"
+      },
+      {
+        "line": 1679,
+        "evidence": "const select = $(\"rewriteTemplateSelect\");"
+      },
+      {
+        "line": 3839,
+        "evidence": "default_template_id: $(\"rewriteTemplateSelect\").value || \"\","
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 260,
+    "attributes": {
+      "id": "openingPhraseMode"
+    },
+    "text": "自动匹配 不使用",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 598,
+        "evidence": "$(\"openingPhraseMode\").value = rewrite.opening_phrase_mode || \"auto\";"
+      },
+      {
+        "line": 3840,
+        "evidence": "opening_phrase_mode: $(\"openingPhraseMode\").value || \"auto\","
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 267,
+    "attributes": {
+      "id": "highImitationMode"
+    },
+    "text": "自动匹配 不使用",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 599,
+        "evidence": "$(\"highImitationMode\").value = rewrite.high_imitation_mode || \"auto\";"
+      },
+      {
+        "line": 3841,
+        "evidence": "high_imitation_mode: $(\"highImitationMode\").value || \"auto\","
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 274,
+    "attributes": {
+      "id": "workflowAutoClassify",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 565,
+        "evidence": "$(\"workflowAutoClassify\").checked = workflow.auto_classify_missing !== false;"
+      },
+      {
+        "line": 3793,
+        "evidence": "auto_classify_missing: $(\"workflowAutoClassify\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 275,
+    "attributes": {
+      "id": "workflowAutoFetch",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 566,
+        "evidence": "$(\"workflowAutoFetch\").checked = workflow.auto_fetch_original !== false;"
+      },
+      {
+        "line": 3794,
+        "evidence": "auto_fetch_original: $(\"workflowAutoFetch\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 276,
+    "attributes": {
+      "id": "workflowAutoRewrite",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 567,
+        "evidence": "$(\"workflowAutoRewrite\").checked = workflow.auto_rewrite_after_fetch !== false;"
+      },
+      {
+        "line": 3795,
+        "evidence": "auto_rewrite_after_fetch: $(\"workflowAutoRewrite\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 277,
+    "attributes": {
+      "id": "workflowAutoSubmit",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 568,
+        "evidence": "$(\"workflowAutoSubmit\").checked = workflow.auto_submit_after_rewrite !== false;"
+      },
+      {
+        "line": 3796,
+        "evidence": "auto_submit_after_rewrite: $(\"workflowAutoSubmit\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 278,
+    "attributes": {
+      "id": "workflowAutoSyncStyles",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 569,
+        "evidence": "$(\"workflowAutoSyncStyles\").checked = workflow.auto_sync_site_styles !== false;"
+      },
+      {
+        "line": 3797,
+        "evidence": "auto_sync_site_styles: $(\"workflowAutoSyncStyles\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 279,
+    "attributes": {
+      "id": "workflowAutoReclassifyStyle",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 570,
+        "evidence": "$(\"workflowAutoReclassifyStyle\").checked = workflow.auto_reclassify_invalid_style !== false;"
+      },
+      {
+        "line": 3798,
+        "evidence": "auto_reclassify_invalid_style: $(\"workflowAutoReclassifyStyle\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 280,
+    "attributes": {
+      "id": "storageAutoCleanup",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 571,
+        "evidence": "$(\"storageAutoCleanup\").checked = storage.auto_cleanup_enabled !== false;"
+      },
+      {
+        "line": 3825,
+        "evidence": "auto_cleanup_enabled: $(\"storageAutoCleanup\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 285,
+    "attributes": {
+      "id": "integrationWorkbenchPushEnabled",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 582,
+        "evidence": "if ($(\"integrationWorkbenchPushEnabled\")) $(\"integrationWorkbenchPushEnabled\").checked = integrations.workbench_push_enabled !== false;"
+      },
+      {
+        "line": 3814,
+        "evidence": "workbench_push_enabled: $(\"integrationWorkbenchPushEnabled\") ? $(\"integrationWorkbenchPushEnabled\").checked : true,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 286,
+    "attributes": {
+      "id": "integrationBookIdFetchEnabled",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 583,
+        "evidence": "if ($(\"integrationBookIdFetchEnabled\")) $(\"integrationBookIdFetchEnabled\").checked = integrations.bookid_fetch_enabled === true;"
+      },
+      {
+        "line": 3815,
+        "evidence": "bookid_fetch_enabled: $(\"integrationBookIdFetchEnabled\") ? $(\"integrationBookIdFetchEnabled\").checked : false,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 291,
+    "attributes": {
+      "id": "bookIdFetchUrl"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 584,
+        "evidence": "if ($(\"bookIdFetchUrl\")) $(\"bookIdFetchUrl\").value = integrations.bookid_fetch_url || \"http://changdu.author.121w.com/bookid.txt\";"
+      },
+      {
+        "line": 2736,
+        "evidence": "url: $(\"bookIdFetchUrl\") ? $(\"bookIdFetchUrl\").value.trim() : \"\","
+      },
+      {
+        "line": 3816,
+        "evidence": "bookid_fetch_url: $(\"bookIdFetchUrl\") ? $(\"bookIdFetchUrl\").value.trim() : \"http://changdu.author.121w.com/bookid.txt\","
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 295,
+    "attributes": {
+      "id": "bookIdFetchPlatformId",
+      "value": "2"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 586,
+        "evidence": "if ($(\"bookIdFetchPlatformId\")) $(\"bookIdFetchPlatformId\").value = integrations.bookid_fetch_platform_id || \"2\";"
+      },
+      {
+        "line": 2737,
+        "evidence": "platform_id: $(\"bookIdFetchPlatformId\") ? $(\"bookIdFetchPlatformId\").value.trim() : \"\","
+      },
+      {
+        "line": 3818,
+        "evidence": "bookid_fetch_platform_id: $(\"bookIdFetchPlatformId\") ? $(\"bookIdFetchPlatformId\").value.trim() || \"2\" : \"2\","
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 299,
+    "attributes": {
+      "id": "bookIdFetchInterval",
+      "type": "number",
+      "min": "1",
+      "value": "5"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 585,
+        "evidence": "if ($(\"bookIdFetchInterval\")) $(\"bookIdFetchInterval\").value = integrations.bookid_fetch_interval_minutes || 5;"
+      },
+      {
+        "line": 3817,
+        "evidence": "bookid_fetch_interval_minutes: numberValue(\"bookIdFetchInterval\", 5),"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 303,
+    "attributes": {
+      "id": "runBookIdFetchBtn",
+      "type": "button"
+    },
+    "text": "立即获取一次",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4185,
+        "evidence": "if ($(\"runBookIdFetchBtn\")) $(\"runBookIdFetchBtn\").onclick = runBookIdFetchNow;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 310,
+    "attributes": {
+      "id": "cleanupKeepDays",
+      "type": "number",
+      "min": "1",
+      "max": "365",
+      "value": "3"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 572,
+        "evidence": "$(\"cleanupKeepDays\").value = storage.cleanup_keep_days || 3;"
+      },
+      {
+        "line": 3826,
+        "evidence": "cleanup_keep_days: numberValue(\"cleanupKeepDays\", 3),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 314,
+    "attributes": {
+      "id": "cleanupIntervalDays",
+      "type": "number",
+      "min": "1",
+      "max": "365",
+      "value": "3"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 573,
+        "evidence": "$(\"cleanupIntervalDays\").value = storage.cleanup_interval_days || 3;"
+      },
+      {
+        "line": 3827,
+        "evidence": "cleanup_interval_days: numberValue(\"cleanupIntervalDays\", 3),"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 319,
+    "attributes": {
+      "id": "rewritePrompt",
+      "class": "small-area",
+      "spellcheck": "false"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 601,
+        "evidence": "$(\"rewritePrompt\").value = rewrite.prompt || \"\";"
+      },
+      {
+        "line": 3842,
+        "evidence": "prompt: $(\"rewritePrompt\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 322,
+    "attributes": {
+      "id": "saveWorkflowBtn",
+      "class": "primary"
+    },
+    "text": "保存自动处理配置",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4182,
+        "evidence": "$(\"saveWorkflowBtn\").onclick = saveConfig;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 331,
+    "attributes": {
+      "id": "aiBaseUrl"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1754,
+        "evidence": "$(\"aiBaseUrl\").value = settings.base_url || \"\";"
+      },
+      {
+        "line": 1775,
+        "evidence": "base_url: $(\"aiBaseUrl\").value.trim(),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 335,
+    "attributes": {
+      "id": "aiApiKey",
+      "type": "password",
+      "autocomplete": "off"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1755,
+        "evidence": "$(\"aiApiKey\").value = settings.api_key || \"\";"
+      },
+      {
+        "line": 1776,
+        "evidence": "api_key: $(\"aiApiKey\").value.trim(),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 339,
+    "attributes": {
+      "id": "aiModel"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1756,
+        "evidence": "$(\"aiModel\").value = settings.model || \"\";"
+      },
+      {
+        "line": 1777,
+        "evidence": "model: $(\"aiModel\").value.trim(),"
+      },
+      {
+        "line": 3887,
+        "evidence": "const name = $(\"presetName\").value.trim() || $(\"aiModel\").value.trim() || `预设${presets.length + 1}`;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 343,
+    "attributes": {
+      "id": "aiTimeout",
+      "type": "number",
+      "min": "1",
+      "value": "180"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1757,
+        "evidence": "$(\"aiTimeout\").value = settings.timeout_seconds || 180;"
+      },
+      {
+        "line": 1778,
+        "evidence": "timeout_seconds: numberValue(\"aiTimeout\", 180),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 347,
+    "attributes": {
+      "id": "aiConcurrency",
+      "type": "number",
+      "min": "1",
+      "value": "6"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1758,
+        "evidence": "$(\"aiConcurrency\").value = settings.max_concurrency || 6;"
+      },
+      {
+        "line": 1779,
+        "evidence": "max_concurrency: numberValue(\"aiConcurrency\", 6),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 351,
+    "attributes": {
+      "id": "aiRetries",
+      "type": "number",
+      "min": "0",
+      "value": "2"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1759,
+        "evidence": "$(\"aiRetries\").value = settings.retry_times ?? 2;"
+      },
+      {
+        "line": 1780,
+        "evidence": "retry_times: numberValue(\"aiRetries\", 2),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 355,
+    "attributes": {
+      "id": "aiMaxTokens",
+      "type": "number",
+      "min": "1",
+      "value": "1200"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1762,
+        "evidence": "$(\"aiMaxTokens\").value = settings.max_tokens || 1200;"
+      },
+      {
+        "line": 1783,
+        "evidence": "max_tokens: numberValue(\"aiMaxTokens\", 1200),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 359,
+    "attributes": {
+      "id": "aiTemperature",
+      "type": "number",
+      "step": "0.01",
+      "min": "0",
+      "max": "2",
+      "value": "0.45"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1763,
+        "evidence": "$(\"aiTemperature\").value = settings.temperature ?? 0.45;"
+      },
+      {
+        "line": 1784,
+        "evidence": "temperature: numberValue(\"aiTemperature\", 0.45),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 363,
+    "attributes": {
+      "id": "aiTopP",
+      "type": "number",
+      "step": "0.01",
+      "min": "0",
+      "max": "1",
+      "value": "0.9"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1764,
+        "evidence": "$(\"aiTopP\").value = settings.top_p ?? 0.9;"
+      },
+      {
+        "line": 1785,
+        "evidence": "top_p: numberValue(\"aiTopP\", 0.9),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 367,
+    "attributes": {
+      "id": "aiPresence",
+      "type": "number",
+      "step": "0.01",
+      "value": "0"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1765,
+        "evidence": "$(\"aiPresence\").value = settings.presence_penalty ?? 0;"
+      },
+      {
+        "line": 1786,
+        "evidence": "presence_penalty: numberValue(\"aiPresence\", 0),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 371,
+    "attributes": {
+      "id": "aiFrequency",
+      "type": "number",
+      "step": "0.01",
+      "value": "0"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1766,
+        "evidence": "$(\"aiFrequency\").value = settings.frequency_penalty ?? 0;"
+      },
+      {
+        "line": 1787,
+        "evidence": "frequency_penalty: numberValue(\"aiFrequency\", 0),"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 375,
+    "attributes": {
+      "id": "aiStream",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1760,
+        "evidence": "$(\"aiStream\").checked = Boolean(settings.stream);"
+      },
+      {
+        "line": 1781,
+        "evidence": "stream: $(\"aiStream\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 376,
+    "attributes": {
+      "id": "aiJsonMode",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1761,
+        "evidence": "$(\"aiJsonMode\").checked = Boolean(settings.json_mode);"
+      },
+      {
+        "line": 1782,
+        "evidence": "json_mode: $(\"aiJsonMode\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 377,
+    "attributes": {
+      "id": "aiEnableThinking",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1767,
+        "evidence": "$(\"aiEnableThinking\").checked = Boolean(settings.enable_thinking);"
+      },
+      {
+        "line": 1788,
+        "evidence": "enable_thinking: $(\"aiEnableThinking\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 378,
+    "attributes": {
+      "id": "aiDisableThinking",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1768,
+        "evidence": "$(\"aiDisableThinking\").checked = Boolean(settings.disable_thinking);"
+      },
+      {
+        "line": 1789,
+        "evidence": "disable_thinking: $(\"aiDisableThinking\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 379,
+    "attributes": {
+      "id": "aiForceSerial",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1769,
+        "evidence": "$(\"aiForceSerial\").checked = Boolean(settings.force_serial_batch);"
+      },
+      {
+        "line": 1790,
+        "evidence": "force_serial_batch: $(\"aiForceSerial\").checked,"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 387,
+    "attributes": {
+      "id": "aiExtraJson",
+      "class": "small-area mono",
+      "spellcheck": "false"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1770,
+        "evidence": "$(\"aiExtraJson\").value = settings.extra_body_json || \"\";"
+      },
+      {
+        "line": 1791,
+        "evidence": "extra_body_json: $(\"aiExtraJson\").value.trim(),"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 390,
+    "attributes": {
+      "id": "saveAiConfigBtn",
+      "class": "primary"
+    },
+    "text": "保存AI配置",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4183,
+        "evidence": "$(\"saveAiConfigBtn\").onclick = saveConfig;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 391,
+    "attributes": {
+      "id": "testAiBtn"
+    },
+    "text": "测试接口",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4188,
+        "evidence": "$(\"testAiBtn\").onclick = testAi;"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 401,
+    "attributes": {
+      "id": "presetSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1730,
+        "evidence": "const presetSelect = $(\"presetSelect\");"
+      },
+      {
+        "line": 1731,
+        "evidence": "presetSelect.innerHTML = \"\";"
+      },
+      {
+        "line": 1733,
+        "evidence": "presetSelect.innerHTML = `<option value=\"\">暂无预设</option>`;"
+      },
+      {
+        "line": 1739,
+        "evidence": "presetSelect.appendChild(option);"
+      },
+      {
+        "line": 3886,
+        "evidence": "const selectedId = $(\"presetSelect\").value;"
+      },
+      {
+        "line": 3901,
+        "evidence": "$(\"presetSelect\").value = id;"
+      },
+      {
+        "line": 3907,
+        "evidence": "const id = $(\"presetSelect\").value;"
+      },
+      {
+        "line": 3916,
+        "evidence": "const id = $(\"presetSelect\").value;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 405,
+    "attributes": {
+      "id": "presetName",
+      "placeholder": "例如：分类模型1"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3887,
+        "evidence": "const name = $(\"presetName\").value.trim() || $(\"aiModel\").value.trim() || `预设${presets.length + 1}`;"
+      },
+      {
+        "line": 3911,
+        "evidence": "$(\"presetName\").value = preset.name || \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 409,
+    "attributes": {
+      "id": "classifierSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1744,
+        "evidence": "renderOptions($(\"classifierSelect\"), assignmentOptions);"
+      },
+      {
+        "line": 1748,
+        "evidence": "$(\"classifierSelect\").value = assignments.classifier || \"__current__\";"
+      },
+      {
+        "line": 3846,
+        "evidence": "classifier: $(\"classifierSelect\").value || \"__current__\","
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 413,
+    "attributes": {
+      "id": "rewriteSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1745,
+        "evidence": "renderOptions($(\"rewriteSelect\"), assignmentOptions);"
+      },
+      {
+        "line": 1749,
+        "evidence": "$(\"rewriteSelect\").value = assignments.rewrite || \"__current__\";"
+      },
+      {
+        "line": 3847,
+        "evidence": "rewrite: $(\"rewriteSelect\").value || \"__current__\","
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 417,
+    "attributes": {
+      "id": "sensitiveFixSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1746,
+        "evidence": "if ($(\"sensitiveFixSelect\")) renderOptions($(\"sensitiveFixSelect\"), assignmentOptions);"
+      },
+      {
+        "line": 1750,
+        "evidence": "if ($(\"sensitiveFixSelect\")) $(\"sensitiveFixSelect\").value = assignments.sensitive_fix || \"__current__\";"
+      },
+      {
+        "line": 3848,
+        "evidence": "sensitive_fix: $(\"sensitiveFixSelect\")?.value || \"__current__\","
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 421,
+    "attributes": {
+      "id": "applyPresetBtn"
+    },
+    "text": "应用预设",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4186,
+        "evidence": "$(\"applyPresetBtn\").onclick = applySelectedPreset;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 422,
+    "attributes": {
+      "id": "savePresetBtn"
+    },
+    "text": "保存当前为预设",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4184,
+        "evidence": "$(\"savePresetBtn\").onclick = saveCurrentPreset;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 423,
+    "attributes": {
+      "id": "deletePresetBtn"
+    },
+    "text": "删除当前预设",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4187,
+        "evidence": "$(\"deletePresetBtn\").onclick = deleteSelectedPreset;"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 429,
+    "attributes": {
+      "id": "platformsText",
+      "class": "json-area",
+      "spellcheck": "false"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 553,
+        "evidence": "$(\"platformsText\").value = pretty(state.config.platforms || []);"
+      },
+      {
+        "line": 3861,
+        "evidence": "platforms: JSON.parse($(\"platformsText\").value),"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 434,
+    "attributes": {
+      "id": "stylesText",
+      "class": "json-area",
+      "spellcheck": "false"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 554,
+        "evidence": "$(\"stylesText\").value = pretty(state.config.styles || []);"
+      },
+      {
+        "line": 3862,
+        "evidence": "styles: JSON.parse($(\"stylesText\").value),"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 438,
+    "attributes": {
+      "id": "saveConfigBtn",
+      "class": "primary"
+    },
+    "text": "保存配置",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4179,
+        "evidence": "$(\"saveConfigBtn\").onclick = saveConfig;"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 457,
+    "attributes": {
+      "id": "libraryTypeSelect"
+    },
+    "text": "高仿文章库 爆款开头词库 批量改文指令库",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1028,
+        "evidence": "const type = $(\"libraryTypeSelect\")?.value || \"high_imitation\";"
+      },
+      {
+        "line": 1078,
+        "evidence": "const type = $(\"libraryTypeSelect\")?.value || \"high_imitation\";"
+      },
+      {
+        "line": 1090,
+        "evidence": "const type = $(\"libraryTypeSelect\").value;"
+      },
+      {
+        "line": 1100,
+        "evidence": "const type = $(\"libraryTypeSelect\").value;"
+      },
+      {
+        "line": 1123,
+        "evidence": "const type = $(\"libraryTypeSelect\").value;"
+      },
+      {
+        "line": 1137,
+        "evidence": "const type = $(\"libraryTypeSelect\").value;"
+      },
+      {
+        "line": 4008,
+        "evidence": "$(\"libraryTypeSelect\").value = \"opening_phrases\";"
+      },
+      {
+        "line": 4022,
+        "evidence": "$(\"libraryTypeSelect\").value = \"opening_phrases\";"
+      },
+      {
+        "line": 4189,
+        "evidence": "$(\"libraryTypeSelect\").onchange = () => renderLibraryManager(0);"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 465,
+    "attributes": {
+      "id": "librarySearchInput",
+      "placeholder": "按名称、分类、标签查找"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1032,
+        "evidence": "const keyword = ($(\"librarySearchInput\")?.value || \"\").trim().toLowerCase();"
+      },
+      {
+        "line": 4190,
+        "evidence": "$(\"librarySearchInput\").oninput = () => renderLibraryManager(Number($(\"libraryItemSelect\").value || 0));"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 468,
+    "attributes": {
+      "id": "libraryItemSelect",
+      "class": "list-select",
+      "size": "14"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1025,
+        "evidence": "const select = $(\"libraryItemSelect\");"
+      },
+      {
+        "line": 1075,
+        "evidence": "const select = $(\"libraryItemSelect\");"
+      },
+      {
+        "line": 1103,
+        "evidence": "const index = Number($(\"libraryItemSelect\").value);"
+      },
+      {
+        "line": 1117,
+        "evidence": "renderLibraryManager(Number($(\"libraryItemSelect\").value || 0));"
+      },
+      {
+        "line": 1126,
+        "evidence": "const index = Number($(\"libraryItemSelect\").value);"
+      },
+      {
+        "line": 1140,
+        "evidence": "const index = Number($(\"libraryItemSelect\").value);"
+      },
+      {
+        "line": 4071,
+        "evidence": "if (button.dataset.tab === \"knowledge\") renderLibraryManager(Number($(\"libraryItemSelect\")?.value || 0));"
+      },
+      {
+        "line": 4106,
+        "evidence": "if (target.id === \"libraryItemSelect\") renderLibraryManager(Number(target.value || 0));"
+      },
+      {
+        "line": 4190,
+        "evidence": "$(\"librarySearchInput\").oninput = () => renderLibraryManager(Number($(\"libraryItemSelect\").value || 0));"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 470,
+    "attributes": {
+      "id": "addLibraryItemBtn"
+    },
+    "text": "新增条目",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4191,
+        "evidence": "$(\"addLibraryItemBtn\").onclick = addLibraryItem;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 471,
+    "attributes": {
+      "id": "duplicateLibraryItemBtn"
+    },
+    "text": "复制条目",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4192,
+        "evidence": "$(\"duplicateLibraryItemBtn\").onclick = duplicateLibraryItem;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 472,
+    "attributes": {
+      "id": "deleteLibraryItemBtn",
+      "class": "danger"
+    },
+    "text": "删除条目",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4194,
+        "evidence": "$(\"deleteLibraryItemBtn\").onclick = deleteLibraryItem;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 475,
+    "attributes": {
+      "id": "normalizeOpeningBtn"
+    },
+    "text": "矫正旧开头词库",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4199,
+        "evidence": "$(\"normalizeOpeningBtn\").onclick = normalizeOpeningLibrary;"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 487,
+    "attributes": {
+      "id": "promptImproveGoal",
+      "class": "small-area",
+      "spellcheck": "false",
+      "placeholder": "例如：让用户提示词更适合短视频小说开头改文，保留变量，不要让AI只返回一小段"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1149,
+        "evidence": "goal: $(\"promptImproveGoal\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 490,
+    "attributes": {
+      "id": "saveLibraryItemBtn",
+      "class": "primary"
+    },
+    "text": "保存当前条目",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4193,
+        "evidence": "$(\"saveLibraryItemBtn\").onclick = () => saveLibraryItem(false);"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 491,
+    "attributes": {
+      "id": "optimizeLibraryItemBtn"
+    },
+    "text": "AI帮我优化",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4195,
+        "evidence": "$(\"optimizeLibraryItemBtn\").onclick = optimizeLibraryItem;"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 503,
+    "attributes": {
+      "id": "openingAnalyzeStyle"
+    },
+    "text": "AI自动选择适用风格",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1059,
+        "evidence": "const select = $(\"openingAnalyzeStyle\");"
+      },
+      {
+        "line": 3971,
+        "evidence": "style: $(\"openingAnalyzeStyle\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 509,
+    "attributes": {
+      "id": "openingAnalyzeExtra",
+      "placeholder": "例如：更适合短视频小说开头，保留槽位，不要写成正文"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3972,
+        "evidence": "extra_requirement: $(\"openingAnalyzeExtra\").value,"
+      },
+      {
+        "line": 4032,
+        "evidence": "$(\"openingAnalyzeExtra\").value = \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 514,
+    "attributes": {
+      "id": "openingSourceText",
+      "class": "large-area",
+      "spellcheck": "false",
+      "placeholder": "粘贴爆款文案，AI会拆成可入库的开头词骨架"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3970,
+        "evidence": "source_text: $(\"openingSourceText\").value,"
+      },
+      {
+        "line": 4031,
+        "evidence": "$(\"openingSourceText\").value = \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 518,
+    "attributes": {
+      "id": "openingAnalyzeResult",
+      "class": "large-area",
+      "spellcheck": "false",
+      "placeholder": "AI拆解后会显示在这里，确认后加入开头词库"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3961,
+        "evidence": "const resultBox = $(\"openingAnalyzeResult\");"
+      },
+      {
+        "line": 3990,
+        "evidence": "item = JSON.parse($(\"openingAnalyzeResult\").value || \"{}\");"
+      },
+      {
+        "line": 4033,
+        "evidence": "$(\"openingAnalyzeResult\").value = \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 521,
+    "attributes": {
+      "id": "openingAnalyzeBtn",
+      "class": "primary"
+    },
+    "text": "AI拆解开头词",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 3959,
+        "evidence": "const button = $(\"openingAnalyzeBtn\");"
+      },
+      {
+        "line": 4196,
+        "evidence": "$(\"openingAnalyzeBtn\").onclick = analyzeOpeningPhrase;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 522,
+    "attributes": {
+      "id": "openingSaveAnalyzedBtn"
+    },
+    "text": "确认加入开头词库",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4197,
+        "evidence": "$(\"openingSaveAnalyzedBtn\").onclick = saveAnalyzedOpeningPhrase;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 523,
+    "attributes": {
+      "id": "openingClearAnalyzeBtn"
+    },
+    "text": "清空",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4198,
+        "evidence": "$(\"openingClearAnalyzeBtn\").onclick = clearOpeningAnalyzer;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 527,
+    "attributes": {
+      "id": "saveKnowledgeConfigBtn",
+      "class": "primary"
+    },
+    "text": "保存知识库配置",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4180,
+        "evidence": "$(\"saveKnowledgeConfigBtn\").onclick = saveConfig;"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 541,
+    "attributes": {
+      "id": "ruleTypeSelect"
+    },
+    "text": "敏感词规则 批量排版规则 章节清洗：整行删除 章节清洗：行内命中 字位符号规则 成对补符号规则",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1236,
+        "evidence": "const type = $(\"ruleTypeSelect\")?.value || \"sensitive\";"
+      },
+      {
+        "line": 1411,
+        "evidence": "const type = $(\"ruleTypeSelect\")?.value || \"sensitive\";"
+      },
+      {
+        "line": 1499,
+        "evidence": "const type = $(\"ruleTypeSelect\").value;"
+      },
+      {
+        "line": 1566,
+        "evidence": "const type = $(\"ruleTypeSelect\").value || \"sensitive\";"
+      },
+      {
+        "line": 1631,
+        "evidence": "const type = suggestions.rule_type || $(\"ruleTypeSelect\").value || \"sensitive\";"
+      },
+      {
+        "line": 4048,
+        "evidence": "scope: $(\"ruleTypeSelect\").value === \"sensitive\" ? \"original\" : \"ai\","
+      },
+      {
+        "line": 4200,
+        "evidence": "$(\"ruleTypeSelect\").onchange = () => renderRuleEditor(0);"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 552,
+    "attributes": {
+      "id": "ruleHelpText",
+      "value": "添加规则后点保存规则，再点保存配置",
+      "disabled": null
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1237,
+        "evidence": "$(\"ruleHelpText\").value = ruleHelp(type);"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 564,
+    "attributes": {
+      "id": "saveRuleEditorBtn",
+      "class": "primary"
+    },
+    "text": "保存当前规则",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4201,
+        "evidence": "$(\"saveRuleEditorBtn\").onclick = () => saveRuleEditor(false);"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 565,
+    "attributes": {
+      "id": "previewRuleBtn"
+    },
+    "text": "预览处理效果",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4202,
+        "evidence": "$(\"previewRuleBtn\").onclick = previewRuleResult;"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 578,
+    "attributes": {
+      "id": "ruleAiSample",
+      "class": "large-area",
+      "spellcheck": "false",
+      "placeholder": "粘贴一段需要分析的原文或AI文案"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1225,
+        "evidence": "if ($(\"ruleAiSample\")) $(\"ruleAiSample\").placeholder = meta.sample || \"粘贴样本文案\";"
+      },
+      {
+        "line": 1575,
+        "evidence": "sample_text: $(\"ruleAiSample\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 582,
+    "attributes": {
+      "id": "ruleAiGoal",
+      "class": "small-area",
+      "spellcheck": "false",
+      "placeholder": "例如：帮我提取需要删除的敏感词；或识别章节序号规则；或建议排版参数"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1226,
+        "evidence": "if ($(\"ruleAiGoal\")) $(\"ruleAiGoal\").placeholder = meta.goal || \"填写AI处理要求\";"
+      },
+      {
+        "line": 1576,
+        "evidence": "goal: $(\"ruleAiGoal\").value,"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 585,
+    "attributes": {
+      "id": "ruleAiSuggestBtn",
+      "class": "primary"
+    },
+    "text": "AI生成当前规则",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4203,
+        "evidence": "$(\"ruleAiSuggestBtn\").onclick = suggestCurrentRuleWithAi;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 586,
+    "attributes": {
+      "id": "ruleAiApplyBtn"
+    },
+    "text": "加入对应规则",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4204,
+        "evidence": "$(\"ruleAiApplyBtn\").onclick = applyRuleSuggestions;"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 592,
+    "attributes": {
+      "id": "rulePreviewInput",
+      "class": "input-area",
+      "spellcheck": "false",
+      "placeholder": "粘贴一段原文或AI文案，保存配置后可预览规则处理效果"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4040,
+        "evidence": "const input = $(\"rulePreviewInput\").value;"
+      }
+    ]
+  },
+  {
+    "tag": "textarea",
+    "line": 596,
+    "attributes": {
+      "id": "rulePreviewOutput",
+      "class": "input-area",
+      "spellcheck": "false",
+      "readonly": null
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4041,
+        "evidence": "$(\"rulePreviewOutput\").value = \"处理中...\";"
+      },
+      {
+        "line": 4051,
+        "evidence": "$(\"rulePreviewOutput\").value = result.processed || \"\";"
+      },
+      {
+        "line": 4053,
+        "evidence": "$(\"rulePreviewOutput\").value = error.message;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 601,
+    "attributes": {
+      "id": "saveRulesConfigBtn",
+      "class": "primary"
+    },
+    "text": "保存处理规则配置",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4181,
+        "evidence": "$(\"saveRulesConfigBtn\").onclick = saveConfig;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 615,
+    "attributes": {
+      "id": "webBaseUrl",
+      "placeholder": "http://two.121w.com/tttadmin/booklist.php"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1802,
+        "evidence": "if (!$(\"webBaseUrl\")) return;"
+      },
+      {
+        "line": 1805,
+        "evidence": "$(\"webBaseUrl\").value = cfg.base_url || \"\";"
+      },
+      {
+        "line": 1847,
+        "evidence": "cfg.base_url = $(\"webBaseUrl\").value.trim() || \"http://two.121w.com/tttadmin/booklist.php\";"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 619,
+    "attributes": {
+      "id": "webUsername"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1806,
+        "evidence": "$(\"webUsername\").value = cfg.username || \"\";"
+      },
+      {
+        "line": 1848,
+        "evidence": "cfg.username = $(\"webUsername\").value.trim();"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 623,
+    "attributes": {
+      "id": "webPassword",
+      "type": "password",
+      "placeholder": "留空表示不修改已保存密码"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1807,
+        "evidence": "$(\"webPassword\").value = \"\";"
+      },
+      {
+        "line": 1834,
+        "evidence": "$(\"webPasswordState\").textContent = cfg.password_masked ? \"已保存\" : \"未保存\";"
+      },
+      {
+        "line": 1849,
+        "evidence": "cfg.password = $(\"webPassword\").value.trim();"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 627,
+    "attributes": {
+      "id": "webBrowserMode"
+    },
+    "text": "后台执行 可视化执行",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1808,
+        "evidence": "$(\"webBrowserMode\").value = cfg.browser_mode || \"headless\";"
+      },
+      {
+        "line": 1852,
+        "evidence": "cfg.browser_mode = $(\"webBrowserMode\").value || \"headless\";"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 634,
+    "attributes": {
+      "id": "webPythonPath"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1809,
+        "evidence": "$(\"webPythonPath\").value = cfg.python_path || \"\";"
+      },
+      {
+        "line": 1850,
+        "evidence": "cfg.python_path = $(\"webPythonPath\").value.trim();"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 638,
+    "attributes": {
+      "id": "webBrowserPath",
+      "placeholder": "可留空，或指向 chrome.exe"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1810,
+        "evidence": "$(\"webBrowserPath\").value = cfg.browser_executable_path || \"\";"
+      },
+      {
+        "line": 1851,
+        "evidence": "cfg.browser_executable_path = $(\"webBrowserPath\").value.trim();"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 642,
+    "attributes": {
+      "id": "webWorkers",
+      "type": "number",
+      "min": "1",
+      "max": "4"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1811,
+        "evidence": "$(\"webWorkers\").value = cfg.parallel_upload_workers || 1;"
+      },
+      {
+        "line": 1854,
+        "evidence": "cfg.parallel_upload_workers = numberValue(\"webWorkers\", 1);"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 646,
+    "attributes": {
+      "id": "webRetries",
+      "type": "number",
+      "min": "0",
+      "max": "5"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1812,
+        "evidence": "$(\"webRetries\").value = cfg.retries ?? 1;"
+      },
+      {
+        "line": 1855,
+        "evidence": "cfg.retries = numberValue(\"webRetries\", 1);"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 650,
+    "attributes": {
+      "id": "webMinFileSize",
+      "type": "number",
+      "min": "0"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1813,
+        "evidence": "$(\"webMinFileSize\").value = cfg.min_file_size ?? 3072;"
+      },
+      {
+        "line": 1856,
+        "evidence": "cfg.min_file_size = numberValue(\"webMinFileSize\", 3072);"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 654,
+    "attributes": {
+      "id": "webProfileSelect"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1818,
+        "evidence": "$(\"webProfileSelect\").innerHTML = webProfileOptionsHtml(profiles, cfg.selected_profile, false);"
+      },
+      {
+        "line": 1820,
+        "evidence": "$(\"webProfileSelect\").value = cfg.selected_profile;"
+      },
+      {
+        "line": 1858,
+        "evidence": "cfg.selected_profile = $(\"webProfileSelect\").value || \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 657,
+    "attributes": {
+      "id": "webEnabled",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1814,
+        "evidence": "$(\"webEnabled\").checked = cfg.enabled !== false;"
+      },
+      {
+        "line": 1846,
+        "evidence": "cfg.enabled = $(\"webEnabled\").checked;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 661,
+    "attributes": {
+      "id": "webSkipSubmitted",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 1815,
+        "evidence": "$(\"webSkipSubmitted\").checked = cfg.skip_submitted !== false;"
+      },
+      {
+        "line": 1857,
+        "evidence": "cfg.skip_submitted = $(\"webSkipSubmitted\").checked;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 666,
+    "attributes": {
+      "class": "web-version",
+      "value": "original",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "input",
+    "line": 667,
+    "attributes": {
+      "class": "web-version",
+      "value": "ai1",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "input",
+    "line": 668,
+    "attributes": {
+      "class": "web-version",
+      "value": "ai2",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "input",
+    "line": 669,
+    "attributes": {
+      "class": "web-version",
+      "value": "ai3",
+      "type": "checkbox"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": []
+  },
+  {
+    "tag": "select",
+    "line": 675,
+    "attributes": {
+      "id": "webBindOriginal"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 753,
+        "evidence": "{ version: \"original\", id: \"webBindOriginal\" },"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 679,
+    "attributes": {
+      "id": "webBindAi1"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 754,
+        "evidence": "{ version: \"ai1\", id: \"webBindAi1\", alias: \"ai\" },"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 683,
+    "attributes": {
+      "id": "webBindAi2"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 755,
+        "evidence": "{ version: \"ai2\", id: \"webBindAi2\" },"
+      }
+    ]
+  },
+  {
+    "tag": "select",
+    "line": 687,
+    "attributes": {
+      "id": "webBindAi3"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 756,
+        "evidence": "{ version: \"ai3\", id: \"webBindAi3\" },"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 692,
+    "attributes": {
+      "id": "saveWebSubmitConfigBtn",
+      "class": "primary"
+    },
+    "text": "保存网站提交配置",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4205,
+        "evidence": "$(\"saveWebSubmitConfigBtn\").onclick = () => saveWebSubmitConfig(false);"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 693,
+    "attributes": {
+      "id": "webEnvCheckBtn"
+    },
+    "text": "环境自检",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4206,
+        "evidence": "$(\"webEnvCheckBtn\").onclick = checkWebEnvironment;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 694,
+    "attributes": {
+      "id": "testVisibleWebBtn"
+    },
+    "text": "有头测试网站流程",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4207,
+        "evidence": "$(\"testVisibleWebBtn\").onclick = testVisibleWebFlow;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 695,
+    "attributes": {
+      "id": "syncWebProfilesBtn"
+    },
+    "text": "同步网站配置档",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4208,
+        "evidence": "$(\"syncWebProfilesBtn\").onclick = () => syncWebSubmit(\"configs\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 696,
+    "attributes": {
+      "id": "syncWebStylesBtn"
+    },
+    "text": "同步网站风格类型",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4209,
+        "evidence": "$(\"syncWebStylesBtn\").onclick = () => syncWebSubmit(\"styles\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 697,
+    "attributes": {
+      "id": "previewWebSelectedBtn"
+    },
+    "text": "预览选中分组",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4210,
+        "evidence": "$(\"previewWebSelectedBtn\").onclick = () => previewWebSubmit(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 698,
+    "attributes": {
+      "id": "previewWebAllBtn"
+    },
+    "text": "预览全部分组",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4211,
+        "evidence": "$(\"previewWebAllBtn\").onclick = () => previewWebSubmit(\"all\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 699,
+    "attributes": {
+      "id": "clearWebPreviewBtn"
+    },
+    "text": "隐藏预览",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4212,
+        "evidence": "$(\"clearWebPreviewBtn\").onclick = clearWebPreview;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 700,
+    "attributes": {
+      "id": "submitWebSelectedBtn",
+      "class": "primary"
+    },
+    "text": "提交选中",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4213,
+        "evidence": "$(\"submitWebSelectedBtn\").onclick = () => submitWebSubmit(\"selected\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 701,
+    "attributes": {
+      "id": "submitWebAllBtn"
+    },
+    "text": "提交全部",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4214,
+        "evidence": "$(\"submitWebAllBtn\").onclick = () => submitWebSubmit(\"all\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 702,
+    "attributes": {
+      "id": "retryWebFailedBtn"
+    },
+    "text": "重试提交失败",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4215,
+        "evidence": "$(\"retryWebFailedBtn\").onclick = () => submitWebSubmit(\"failed\");"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 717,
+    "attributes": {
+      "id": "clearAdminSwitchBtn"
+    },
+    "text": "退出切换",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 200,
+        "evidence": "if ($(\"clearAdminSwitchBtn\")) {"
+      },
+      {
+        "line": 201,
+        "evidence": "$(\"clearAdminSwitchBtn\").disabled = !(auth.admin_impersonating && auth.impersonating_user);"
+      },
+      {
+        "line": 365,
+        "evidence": "const button = $(\"clearAdminSwitchBtn\");"
+      },
+      {
+        "line": 4218,
+        "evidence": "if ($(\"clearAdminSwitchBtn\")) $(\"clearAdminSwitchBtn\").onclick = clearAdminSwitch;"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 726,
+    "attributes": {
+      "id": "accountUsername"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 284,
+        "evidence": "if (!$(\"accountUsername\") || !$(\"accountPassword\")) return;"
+      },
+      {
+        "line": 285,
+        "evidence": "const username = $(\"accountUsername\").value.trim();"
+      },
+      {
+        "line": 290,
+        "evidence": "$(\"accountUsername\").focus();"
+      },
+      {
+        "line": 310,
+        "evidence": "$(\"accountUsername\").value = \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 730,
+    "attributes": {
+      "id": "accountDisplayName"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 286,
+        "evidence": "const displayName = $(\"accountDisplayName\").value.trim();"
+      },
+      {
+        "line": 311,
+        "evidence": "$(\"accountDisplayName\").value = \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "input",
+    "line": 734,
+    "attributes": {
+      "id": "accountPassword",
+      "type": "password"
+    },
+    "text": "",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 284,
+        "evidence": "if (!$(\"accountUsername\") || !$(\"accountPassword\")) return;"
+      },
+      {
+        "line": 287,
+        "evidence": "const password = $(\"accountPassword\").value;"
+      },
+      {
+        "line": 295,
+        "evidence": "$(\"accountPassword\").focus();"
+      },
+      {
+        "line": 312,
+        "evidence": "$(\"accountPassword\").value = \"\";"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 738,
+    "attributes": {
+      "id": "createAccountBtn",
+      "class": "primary"
+    },
+    "text": "新增账号",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 298,
+        "evidence": "const button = $(\"createAccountBtn\");"
+      },
+      {
+        "line": 4216,
+        "evidence": "if ($(\"createAccountBtn\")) $(\"createAccountBtn\").onclick = createAccount;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 739,
+    "attributes": {
+      "id": "refreshAccountsBtn"
+    },
+    "text": "刷新账号",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4217,
+        "evidence": "if ($(\"refreshAccountsBtn\")) $(\"refreshAccountsBtn\").onclick = loadAccounts;"
+      }
+    ]
+  },
+  {
+    "tag": "button",
+    "line": 764,
+    "attributes": {
+      "id": "logsRefreshBtn"
+    },
+    "text": "刷新",
+    "acceptance": "未运行验收",
+    "js_references": [
+      {
+        "line": 4178,
+        "evidence": "$(\"logsRefreshBtn\").onclick = loadLogs;"
+      }
+    ]
+  }
+]

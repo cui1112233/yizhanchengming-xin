@@ -1,0 +1,830 @@
+[
+  {
+    "file": "static/app.js",
+    "line": 75,
+    "evidence": "async function api(path, options = {}) {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 78,
+    "evidence": "response = await fetch(path, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 206,
+    "evidence": "await api(\"/api/auth/logout\", { method: \"POST\" });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 219,
+    "evidence": "const result = await api(\"/api/auth/me\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 232,
+    "evidence": "await api(\"/api/auth/login\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 250,
+    "evidence": "const result = await api(\"/api/admin/accounts\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 302,
+    "evidence": "await api(\"/api/admin/accounts\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 328,
+    "evidence": "await api(\"/api/admin/switch-user\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 336,
+    "evidence": "const result = await api(`/api/admin/accounts/${encodeURIComponent(userId)}`, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 343,
+    "evidence": "const result = await api(`/api/admin/accounts/${encodeURIComponent(userId)}`, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 352,
+    "evidence": "await api(`/api/admin/accounts/${encodeURIComponent(userId)}/reset-password`, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 369,
+    "evidence": "await api(\"/api/admin/switch-user/clear\", { method: \"POST\" });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 412,
+    "evidence": "api(\"/api/work-form\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 426,
+    "evidence": "await api(\"/api/work-form\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 468,
+    "evidence": "if (element) element.addEventListener(\"change\", saveWorkFormState);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 472,
+    "evidence": "if (element) element.addEventListener(\"input\", saveWorkFormState);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1144,
+    "evidence": "const result = await api(\"/api/knowledge/optimize\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1571,
+    "evidence": "const result = await api(\"/api/rules/ai-suggest\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1871,
+    "evidence": "const result = await api(\"/api/web-submit/config\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1892,
+    "evidence": "const result = await api(kind === \"styles\" ? \"/api/web-submit/sync-styles\" : \"/api/web-submit/sync-configs\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1913,
+    "evidence": "const result = await api(\"/api/web-submit/environment\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1937,
+    "evidence": "const result = await api(\"/api/web-submit/test-visible\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 1985,
+    "evidence": "const result = await api(\"/api/web-submit/preview\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2006,
+    "evidence": "const result = await api(\"/api/web-submit/submit\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2454,
+    "evidence": "$(\"detailFetchBtn\").onclick = () => refetchTask(meta.book_id || meta.id);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2455,
+    "evidence": "$(\"detailAiBtn\").onclick = () => generateAi(meta.book_id || meta.id);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2456,
+    "evidence": "$(\"detailTraceBtn\").onclick = () => showRulesTrace(meta.book_id || meta.id);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2458,
+    "evidence": "if (restoreBtn) restoreBtn.onclick = () => restoreOriginal(meta.book_id || meta.id);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2644,
+    "evidence": "state.config = await api(\"/api/config\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2706,
+    "evidence": "const data = await api(\"/api/integrations/changdu/bookid-fetch/status\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2714,
+    "evidence": "const data = await api(\"/api/config\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2732,
+    "evidence": "const data = await api(\"/api/integrations/changdu/bookid-fetch/run\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2761,
+    "evidence": "const latest = await api(\"/api/config\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2832,
+    "evidence": "const data = await api(currentTaskQueryPath(), { signal: controller.signal });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 2943,
+    "evidence": "const status = await api(\"/api/realtime/status\", { signal: controller.signal });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3012,
+    "evidence": "const data = await api(\"/api/logs\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3167,
+    "evidence": "const result = await api(\"/api/schedules\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3195,
+    "evidence": "const result = await api(\"/api/schedules\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3229,
+    "evidence": "const result = await api(`/api/schedules/${encodeURIComponent(scheduleId)}`, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3246,
+    "evidence": "const result = await api(`/api/schedules/${encodeURIComponent(scheduleId)}`, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3357,
+    "evidence": "return await api(path, { signal: controller.signal });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3433,
+    "evidence": "const job = await api(\"/api/process/start\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3460,
+    "evidence": "const summaryPromise = api(`/api/tasks/${id}/summary`, { signal: controller.signal });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3461,
+    "evidence": "const contentPromise = api(`/api/tasks/${id}/content`, { signal: controller.signal })",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3482,
+    "evidence": "const data = await api(`/api/tasks/${id}/sensitive-log`);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3489,
+    "evidence": "const data = await api(`/api/tasks/${id}/rules-trace`);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3496,
+    "evidence": "const data = await api(`/api/tasks/${id}/site-submit-log`);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3503,
+    "evidence": "await api(`/api/tasks/${id}/fetch`, { method: \"POST\", body: \"{}\" });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3511,
+    "evidence": "await api(`/api/tasks/${id}/restore-original`, { method: \"POST\", body: \"{}\" });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3519,
+    "evidence": "await api(`/api/tasks/${id}/generate-ai`, {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3579,
+    "evidence": "state.queueStatus = await api(\"/api/process/queue/status\", { signal: controller.signal });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3609,
+    "evidence": "const result = await api(permanent ? \"/api/tasks/permanent-delete\" : \"/api/tasks/batch-delete\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3644,
+    "evidence": "const result = await api(\"/api/tasks/batch-retry\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3677,
+    "evidence": "const result = await api(\"/api/tasks/batch-ai-count\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3697,
+    "evidence": "const result = await api(\"/api/process/stop\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3717,
+    "evidence": "const result = await api(\"/api/process/queue/start\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3756,
+    "evidence": "const result = await api(\"/api/tasks/apply-rules\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3866,
+    "evidence": "const data = await api(\"/api/config\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3932,
+    "evidence": "const result = await api(\"/api/ai/test\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3948,
+    "evidence": "const result = await api(\"/api/knowledge\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 3967,
+    "evidence": "const result = await api(\"/api/opening/analyze\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4002,
+    "evidence": "const result = await api(\"/api/opening/save\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4020,
+    "evidence": "const result = await api(\"/api/opening/normalize\", { method: \"POST\" });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4044,
+    "evidence": "const result = await api(\"/api/rules/preview\", {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4057,
+    "evidence": "document.addEventListener(\"click\", async (event) => {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4103,
+    "evidence": "document.addEventListener(\"change\", (event) => {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4115,
+    "evidence": "document.addEventListener(\"change\", (event) => {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4137,
+    "evidence": "window.addEventListener(\"DOMContentLoaded\", async () => {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4144,
+    "evidence": "if ($(\"logoutBtn\")) $(\"logoutBtn\").onclick = logout;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4145,
+    "evidence": "$(\"processBtn\").onclick = processInput;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4146,
+    "evidence": "$(\"refreshBtn\").onclick = () => loadTasks({ force: true });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4148,
+    "evidence": "if ($(\"createScheduleBtn\")) $(\"createScheduleBtn\").onclick = createSchedule;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4149,
+    "evidence": "if ($(\"toggleSchedulesBtn\")) $(\"toggleSchedulesBtn\").onclick = toggleSchedules;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4150,
+    "evidence": "if ($(\"cancelSelectedScheduleBtn\")) $(\"cancelSelectedScheduleBtn\").onclick = cancelSelectedSchedule;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4151,
+    "evidence": "if ($(\"deleteSelectedScheduleBtn\")) $(\"deleteSelectedScheduleBtn\").onclick = deleteSelectedSchedule;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4152,
+    "evidence": "$(\"taskRefreshBtn\").onclick = () => loadTasks({ force: true });",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4153,
+    "evidence": "if ($(\"taskIdSearchBtn\")) $(\"taskIdSearchBtn\").onclick = applyTaskIdSearch;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4154,
+    "evidence": "if ($(\"taskIdSearchInput\")) $(\"taskIdSearchInput\").addEventListener(\"keydown\", (event) => {",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4157,
+    "evidence": "$(\"taskTodayBtn\").onclick = () => setTaskView(\"date\", localDateString());",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4158,
+    "evidence": "$(\"taskPrevDayBtn\").onclick = () => setTaskView(\"date\", shiftDateText(state.taskViewDate || localDateString(), -1));",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4159,
+    "evidence": "$(\"taskNextDayBtn\").onclick = () => setTaskView(\"date\", shiftDateText(state.taskViewDate || localDateString(), 1));",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4160,
+    "evidence": "$(\"taskDateViewBtn\").onclick = () => setTaskView(\"date\", $(\"taskDateInput\").value || localDateString());",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4161,
+    "evidence": "$(\"taskDefaultViewBtn\").onclick = () => setTaskView(\"default\", localDateString());",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4162,
+    "evidence": "$(\"selectAllBtn\").onclick = selectAllVisibleTasks;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4163,
+    "evidence": "$(\"clearSelectedBtn\").onclick = clearSelectedTasks;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4164,
+    "evidence": "$(\"retrySelectedBtn\").onclick = () => batchRetry(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4165,
+    "evidence": "$(\"retryFailedBtn\").onclick = () => batchRetry(\"failed\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4166,
+    "evidence": "$(\"submitTaskSelectedBtn\").onclick = () => submitWebSubmit(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4167,
+    "evidence": "$(\"submitTaskAllBtn\").onclick = () => submitWebSubmit(\"all\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4168,
+    "evidence": "$(\"stopProcessBtn\").onclick = stopCurrentProcess;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4169,
+    "evidence": "$(\"startQueueBtn\").onclick = startQueueProcess;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4170,
+    "evidence": "$(\"updateAiCountSelectedBtn\").onclick = () => batchUpdateAiCount(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4171,
+    "evidence": "$(\"updateAiCountPendingBtn\").onclick = () => batchUpdateAiCount(\"failed\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4172,
+    "evidence": "$(\"applyRulesSelectedBtn\").onclick = () => applyRules(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4173,
+    "evidence": "$(\"applyRulesAllBtn\").onclick = () => applyRules(\"all\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4174,
+    "evidence": "$(\"deleteSelectedBtn\").onclick = () => batchDelete(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4175,
+    "evidence": "$(\"permanentDeleteSelectedBtn\").onclick = () => batchDelete(\"selected\", true);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4176,
+    "evidence": "$(\"deleteFailedBtn\").onclick = () => batchDelete(\"failed\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4177,
+    "evidence": "$(\"deleteAllBtn\").onclick = () => batchDelete(\"all\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4178,
+    "evidence": "$(\"logsRefreshBtn\").onclick = loadLogs;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4179,
+    "evidence": "$(\"saveConfigBtn\").onclick = saveConfig;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4180,
+    "evidence": "$(\"saveKnowledgeConfigBtn\").onclick = saveConfig;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4181,
+    "evidence": "$(\"saveRulesConfigBtn\").onclick = saveConfig;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4182,
+    "evidence": "$(\"saveWorkflowBtn\").onclick = saveConfig;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4183,
+    "evidence": "$(\"saveAiConfigBtn\").onclick = saveConfig;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4184,
+    "evidence": "$(\"savePresetBtn\").onclick = saveCurrentPreset;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4185,
+    "evidence": "if ($(\"runBookIdFetchBtn\")) $(\"runBookIdFetchBtn\").onclick = runBookIdFetchNow;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4186,
+    "evidence": "$(\"applyPresetBtn\").onclick = applySelectedPreset;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4187,
+    "evidence": "$(\"deletePresetBtn\").onclick = deleteSelectedPreset;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4188,
+    "evidence": "$(\"testAiBtn\").onclick = testAi;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4191,
+    "evidence": "$(\"addLibraryItemBtn\").onclick = addLibraryItem;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4192,
+    "evidence": "$(\"duplicateLibraryItemBtn\").onclick = duplicateLibraryItem;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4193,
+    "evidence": "$(\"saveLibraryItemBtn\").onclick = () => saveLibraryItem(false);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4194,
+    "evidence": "$(\"deleteLibraryItemBtn\").onclick = deleteLibraryItem;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4195,
+    "evidence": "$(\"optimizeLibraryItemBtn\").onclick = optimizeLibraryItem;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4196,
+    "evidence": "$(\"openingAnalyzeBtn\").onclick = analyzeOpeningPhrase;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4197,
+    "evidence": "$(\"openingSaveAnalyzedBtn\").onclick = saveAnalyzedOpeningPhrase;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4198,
+    "evidence": "$(\"openingClearAnalyzeBtn\").onclick = clearOpeningAnalyzer;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4199,
+    "evidence": "$(\"normalizeOpeningBtn\").onclick = normalizeOpeningLibrary;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4201,
+    "evidence": "$(\"saveRuleEditorBtn\").onclick = () => saveRuleEditor(false);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4202,
+    "evidence": "$(\"previewRuleBtn\").onclick = previewRuleResult;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4203,
+    "evidence": "$(\"ruleAiSuggestBtn\").onclick = suggestCurrentRuleWithAi;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4204,
+    "evidence": "$(\"ruleAiApplyBtn\").onclick = applyRuleSuggestions;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4205,
+    "evidence": "$(\"saveWebSubmitConfigBtn\").onclick = () => saveWebSubmitConfig(false);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4206,
+    "evidence": "$(\"webEnvCheckBtn\").onclick = checkWebEnvironment;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4207,
+    "evidence": "$(\"testVisibleWebBtn\").onclick = testVisibleWebFlow;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4208,
+    "evidence": "$(\"syncWebProfilesBtn\").onclick = () => syncWebSubmit(\"configs\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4209,
+    "evidence": "$(\"syncWebStylesBtn\").onclick = () => syncWebSubmit(\"styles\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4210,
+    "evidence": "$(\"previewWebSelectedBtn\").onclick = () => previewWebSubmit(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4211,
+    "evidence": "$(\"previewWebAllBtn\").onclick = () => previewWebSubmit(\"all\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4212,
+    "evidence": "$(\"clearWebPreviewBtn\").onclick = clearWebPreview;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4213,
+    "evidence": "$(\"submitWebSelectedBtn\").onclick = () => submitWebSubmit(\"selected\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4214,
+    "evidence": "$(\"submitWebAllBtn\").onclick = () => submitWebSubmit(\"all\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4215,
+    "evidence": "$(\"retryWebFailedBtn\").onclick = () => submitWebSubmit(\"failed\");",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4216,
+    "evidence": "if ($(\"createAccountBtn\")) $(\"createAccountBtn\").onclick = createAccount;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4217,
+    "evidence": "if ($(\"refreshAccountsBtn\")) $(\"refreshAccountsBtn\").onclick = loadAccounts;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4218,
+    "evidence": "if ($(\"clearAdminSwitchBtn\")) $(\"clearAdminSwitchBtn\").onclick = clearAdminSwitch;",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  },
+  {
+    "file": "static/app.js",
+    "line": 4222,
+    "evidence": "document.addEventListener(\"visibilitychange\", handlePageVisibilityChange);",
+    "verification": "定位线索；需展开回调、请求参数与返回处理"
+  }
+]

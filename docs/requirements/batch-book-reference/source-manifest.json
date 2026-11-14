@@ -1,0 +1,221 @@
+{
+  "source_directory": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\rea-batch-book-20261112\\批量原文改文系统_源码",
+  "method": "只读；未执行原程序；源码包无需反编译",
+  "files": [
+    {
+      "file": "check_queue_stall_regression.py",
+      "bytes": 12776,
+      "sha256": "efa86bdc085d0abb68acee7a2561195aab0d598ffe184bde9a5f09aa01b85917"
+    },
+    {
+      "file": "docs/TextLayoutToolAI三大知识库与排版规则搬运计划.md",
+      "bytes": 14488,
+      "sha256": "4452a82833bc49bc6004ad1033bc287bf188cd81f551bf69aac8bf0864860601"
+    },
+    {
+      "file": "docs/项目交接与维护手册.md",
+      "bytes": 9491,
+      "sha256": "8a8ccc4a39d81200e2e4b889aada069439613737af5152dcad50253b90e3b854"
+    },
+    {
+      "file": "dual_server.py",
+      "bytes": 4442,
+      "sha256": "9310c16317e6a5936d2bd15d102a7d7da7c1feabd67cf197872082f708fbb7f3"
+    },
+    {
+      "file": "main.py",
+      "bytes": 811588,
+      "sha256": "5c400add3ecfdc00211e562999ac2fbeea9c2534a6dcf4cf845d2596f87650d2"
+    },
+    {
+      "file": "README.md",
+      "bytes": 2105,
+      "sha256": "37dcff9a7b17e0b612802bd007e942d9e61cb9820fe8478be57d48e5eda675c2"
+    },
+    {
+      "file": "requirements.txt",
+      "bytes": 34,
+      "sha256": "d75b52fc6ceb66b70ff4b8577385782e0818b2231b65b7de2edec8c4a60dda45"
+    },
+    {
+      "file": "scripts/check_original_fetch.py",
+      "bytes": 4894,
+      "sha256": "e4848b6a056946a6c17cc1ab63a45e0bc7d8232a8445dd9d246ecdd9ed4b7048"
+    },
+    {
+      "file": "scripts/check_remote_book.py",
+      "bytes": 5127,
+      "sha256": "481dd35648fa2abc1cb37f5cb364ff7036a285f8637a2a25989bd316c5bfd620"
+    },
+    {
+      "file": "scripts/check_site_contract.py",
+      "bytes": 4564,
+      "sha256": "b352c3081c1ba202d6ebef9c10ba7193cf1ff13f6d3a4d07c69941ff969a88b8"
+    },
+    {
+      "file": "scripts/check_site_reconciliation.py",
+      "bytes": 3005,
+      "sha256": "9da18e01ecdd18442ca146240c701cd4893d59cf6dae1e0af5f91e9923c43460"
+    },
+    {
+      "file": "scripts/prepare_daily_recovery.py",
+      "bytes": 1739,
+      "sha256": "524f6081346ba2be2910dfc82ba71bacbb14272c699baa047e6425caebb4b2d0"
+    },
+    {
+      "file": "scripts/profile_history_chunks.py",
+      "bytes": 748,
+      "sha256": "c139299786e6afcc100b6cab0ba2f69a61c743b1b5871726ace5e644137b0750"
+    },
+    {
+      "file": "scripts/profile_queue_chunks.py",
+      "bytes": 1136,
+      "sha256": "45ef2a2db5930ea3926c3d28b596c0765a596512742d87a49ffb1f09d91ea483"
+    },
+    {
+      "file": "scripts/profile_queue_projection.py",
+      "bytes": 1780,
+      "sha256": "93d6c8a34e157bb92eca0e3052beeb67649fc90d4eb40c2814c44ae993d1c31a"
+    },
+    {
+      "file": "scripts/profile_realtime_tail.py",
+      "bytes": 1298,
+      "sha256": "b39842e9ad0c00966430e45493002fbf749c1c130fde67e4d945af4cbec7e0b7"
+    },
+    {
+      "file": "scripts/profile_startup_recovery.py",
+      "bytes": 1522,
+      "sha256": "245bb8a8ea9185764a219d9f197ca3aed89f61b63760b80130e30a65bcb12f57"
+    },
+    {
+      "file": "scripts/profile_task_list_cache.py",
+      "bytes": 2478,
+      "sha256": "84787cf3635f508c2cf4e3deaa9e7dd8ab50dc81c0db5a31443f8f400969fb6d"
+    },
+    {
+      "file": "scripts/restore_queue_switches.py",
+      "bytes": 2543,
+      "sha256": "bf316f3a4b9f7cc874122d5c58f48dc5f8a579bd3d2a2ee265ab1b5b037bac2b"
+    },
+    {
+      "file": "scripts/run_controlled_recovery.py",
+      "bytes": 16739,
+      "sha256": "7a2a00126b7da9a15dd958219c9e3fc78c438e26d0ab9bff14acd85e5bf16c94"
+    },
+    {
+      "file": "scripts/verify_daily_recovery.py",
+      "bytes": 7733,
+      "sha256": "86057ff7fbad8f133e33837d2c917fb9bd5dbb03847b2a02a36bb0309ed7f48f"
+    },
+    {
+      "file": "site_submit_helper.py",
+      "bytes": 107820,
+      "sha256": "02779b911e6742c1a5c3e75ae7562fbd6459c0dad76e1cfdd6f0ee5c6eada34e"
+    },
+    {
+      "file": "start.bat",
+      "bytes": 410,
+      "sha256": "3670b6be8c9f183e0d1a13fa75dbcc7c48c7c43e77bf7a75f31a5b4ca2f6aa52"
+    },
+    {
+      "file": "start.ps1",
+      "bytes": 801,
+      "sha256": "92f0abd7aba95e25c5fbc8f9bec3d13a2199b297c59e1e911294b87eec700c9e"
+    },
+    {
+      "file": "static/app.js",
+      "bytes": 177596,
+      "sha256": "47366df3abd9d72a40859c59b05a2ed32c61ebbe41993fccdd03045b3134ea42"
+    },
+    {
+      "file": "static/index.html",
+      "bytes": 33621,
+      "sha256": "b2a6d4045340e34cc0a4e6ad4ce10fdd7deec5e1c983c884670aaca879671f12"
+    },
+    {
+      "file": "static/styles.css",
+      "bytes": 13617,
+      "sha256": "f41fa67820c084879df834c8ffe305e68fb940f884cb1bc155fd898170c04307"
+    },
+    {
+      "file": "tests/audit_ai_output_guard_history.py",
+      "bytes": 2144,
+      "sha256": "9af4a87e3816c0d6782949840ddc51bad71f19ddb364f225eb7644ca3e8364c5"
+    },
+    {
+      "file": "tests/check_ai_output_guard.py",
+      "bytes": 20137,
+      "sha256": "fb3accf1c57540a14a022dc8b0e8797b9a3fb181227df8c740815edb9ffee127"
+    },
+    {
+      "file": "tests/check_ai_retry_control.py",
+      "bytes": 6962,
+      "sha256": "f84fee03b8de530a392b4c8c155de49ab1fa1403b2dbeb8bd1ffb5ad2cd31708"
+    },
+    {
+      "file": "tests/check_core.py",
+      "bytes": 129374,
+      "sha256": "c9dc818ae345f4f23990d54567bf2b681fb483935201373288c28154e717d3fb"
+    },
+    {
+      "file": "tests/check_duplicate_guard.py",
+      "bytes": 14206,
+      "sha256": "634efa9a9269fbe1db4fec50fddafce44c58af55827a1bf1ee41cb8c9ad162fd"
+    },
+    {
+      "file": "tests/check_hot_paths.py",
+      "bytes": 11850,
+      "sha256": "114ef2e4f489aae6441265479b6a90eefe26427979acce6874da0802e17ecaf4"
+    },
+    {
+      "file": "tests/check_live_polling.py",
+      "bytes": 4220,
+      "sha256": "5f3a3d5f0f711ddc80617421a2fcd66ebd52c748d307ea373b6ee11693c08c45"
+    },
+    {
+      "file": "tests/check_permanent_delete_scope.py",
+      "bytes": 3996,
+      "sha256": "40dff189d488fa82baead8db149e7278281204151721776aca71f11866814164"
+    },
+    {
+      "file": "tests/check_queue_flow.py",
+      "bytes": 21026,
+      "sha256": "beedf521d6dbf212697d142ce400d0a70a90759f850d3e3d998282c4acb3f4df"
+    },
+    {
+      "file": "tests/check_recovery_guards.py",
+      "bytes": 8619,
+      "sha256": "b6bed6e77d178c164c3917989b22ccaa51637f84f8e0c1357eab1efb2f0d9d5a"
+    },
+    {
+      "file": "tests/check_retry_link.py",
+      "bytes": 10203,
+      "sha256": "9766cd9ff53aeddf79bc4d7d2e60983c12687d7b46a306f39cce1a2bd7d499fb"
+    },
+    {
+      "file": "tests/check_site_submit_evidence.py",
+      "bytes": 18451,
+      "sha256": "676870afddac21728ebc96270a1ce2bab03d57af96ad833d72d248bd97a0bd62"
+    },
+    {
+      "file": "tests/run_check_core_frozen.py",
+      "bytes": 634,
+      "sha256": "ff3f6dcebfe7cb9d63e4abb45473d376fc588d022eb7228316193f00ec203c83"
+    },
+    {
+      "file": "一键部署依赖包.bat",
+      "bytes": 2085,
+      "sha256": "c6928f500c2a32c3f898312be87eff6b63502ed5e477c0a4a2c6ffae70609ff7"
+    },
+    {
+      "file": "启动本地网站.bat",
+      "bytes": 46,
+      "sha256": "65ffd6d5aeea54f416b466c2ee9d1b20bf55e6cd63cb11b4923bcb8fff0d89fe"
+    },
+    {
+      "file": "环境自检.bat",
+      "bytes": 446,
+      "sha256": "fd81b0afd3fb747402a9be51458284d93e28b072d0a155304474358c61e3e72a"
+    }
+  ]
+}

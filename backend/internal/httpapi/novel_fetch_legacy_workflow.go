@@ -215,7 +215,15 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		if err := decodeNovelFetchJSON(w, req, &item); err != nil {
 			return
 		}
-		cfg, _ := store.GetConfig(req.Context(), identity.Username)
+		cfg, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取定时任务配置失败"})
+			return
+		}
+		if err := normalizeNovelFetchScheduleInput(item, cfg); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
 		schedules, _ := cfg["novel_fetch_schedules"].([]any)
 		item["id"] = "schedule-" + time.Now().UTC().Format("20060102150405.000000000")
 		item["status"] = "scheduled"
@@ -469,6 +477,17 @@ func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchwo
 				found = m
 				continue
 			}
+			// Validate the edited time before changing the saved item. Rejected
+			// changes must leave the original schedule executable.
+			if _, snake := patch["run_at"]; snake || patch["runAt"] != nil {
+				runAt, err := parseNovelFetchScheduleTime(strings.TrimSpace(firstText(patch["run_at"], patch["runAt"])))
+				if err != nil {
+					writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请选择有效的定时处理时间"})
+					return
+				}
+				patch["run_at"] = runAt.UTC().Format(time.RFC3339Nano)
+			}
+			m = cloneAnyMap(m)
 			for k, val := range patch {
 				m[k] = val
 			}

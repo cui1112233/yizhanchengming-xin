@@ -1,0 +1,889 @@
+[
+  {
+    "method": "GET",
+    "original_route": "/api/auth/me",
+    "original_line": 18274,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/auth/login",
+    "original_line": 18304,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/auth/logout",
+    "original_line": 18326,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/admin/accounts",
+    "original_line": 18355,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/admin/accounts",
+    "original_line": 18361,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "PATCH",
+    "original_route": "/api/admin/accounts/{user_id}",
+    "original_line": 18368,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/admin/accounts/{user_id}/reset-password",
+    "original_line": 18387,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/admin/switch-user",
+    "original_line": 18400,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/admin/switch-user/clear",
+    "original_line": 18421,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/config",
+    "original_line": 18429,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/config",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 3248
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/config",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 44
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/config",
+    "original_line": 18445,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/config",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 3328
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/config",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 57
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/work-form",
+    "original_line": 18470,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/work-form",
+    "original_line": 18475,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/work-form",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 246
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/schedules",
+    "original_line": 18480,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/schedules",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 203
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/schedules",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 790
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/schedules",
+    "original_line": 18485,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/schedules",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 212
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/schedules",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 791
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "PATCH",
+    "original_route": "/api/schedules/{schedule_id}",
+    "original_line": 18490,
+    "exact_route_candidates": [
+      {
+        "method": "PATCH",
+        "route": "/api/novel-fetch-workshop/schedules/{id}",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 242
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "DELETE",
+    "original_route": "/api/schedules/{schedule_id}",
+    "original_line": 18498,
+    "exact_route_candidates": [
+      {
+        "method": "DELETE",
+        "route": "/api/novel-fetch-workshop/schedules/{id}",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 243
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/knowledge",
+    "original_line": 18503,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/knowledge/optimize",
+    "original_line": 18508,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/knowledge/optimize",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 246
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/knowledge/optimize",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 832
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/opening/analyze",
+    "original_line": 18516,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/opening/analyze",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 3030
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/opening/save",
+    "original_line": 18524,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/opening/save",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 3064
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/opening/normalize",
+    "original_line": 18534,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/opening/normalize",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 3092
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/ai/test",
+    "original_line": 18544,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/ai/test",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2761
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/process",
+    "original_line": 18552,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/process",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2080
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/process/start",
+    "original_line": 18569,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/process/start",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2157
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/process/start",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 856
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/process/stop",
+    "original_line": 18580,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/process/stop",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 201
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/process/stop",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 857
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/process/queue/start",
+    "original_line": 18585,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/process/queue/start",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 858
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/process/queue/status",
+    "original_line": 18590,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/process/queue/status",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 865
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/realtime/status",
+    "original_line": 18595,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/realtime/status",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2383
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/realtime/status",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 796
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/integrations/workbench/push",
+    "original_line": 18600,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/integrations/changdu/bookid-fetch/run",
+    "original_line": 18618,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/integrations/changdu/bookid-fetch/status",
+    "original_line": 18627,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/process/jobs/latest",
+    "original_line": 18633,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/process/jobs/latest",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2302
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/process/jobs/{job_id}",
+    "original_line": 18646,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/process/jobs/{jobId}",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2327
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks",
+    "original_line": 18657,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/tasks",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2394
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/tasks",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 75
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/batch-delete",
+    "original_line": 18664,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/tasks/batch-delete",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 183
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/permanent-delete",
+    "original_line": 18674,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/permanent_delete",
+    "original_line": 18674,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/batch-retry",
+    "original_line": 18690,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/tasks/batch-retry",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2418
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/batch-ai-count",
+    "original_line": 18695,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/tasks/batch-ai-count",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 292
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/tasks/batch-ai-count",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 831
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/apply-rules",
+    "original_line": 18700,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/tasks/apply-rules",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 293
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/tasks/apply-rules",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 829
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/web-submit/config",
+    "original_line": 18705,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/web-submit/config",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 271
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/web-submit/config",
+    "original_line": 18710,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/web-submit/config",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 328
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/web-submit/sync-configs",
+    "original_line": 18720,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/web-submit/sync-configs",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 561
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/web-submit/sync-styles",
+    "original_line": 18728,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/web-submit/sync-styles",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 473
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/web-submit/environment",
+    "original_line": 18736,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/web-submit/environment",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 344
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/web-submit/test-visible",
+    "original_line": 18741,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/web-submit/test-visible",
+        "file": "backend/internal/httpapi/web_submit_compat.go",
+        "line": 104
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/web-submit/preview",
+    "original_line": 18749,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/web-submit/preview",
+        "file": "backend/internal/httpapi/web_submit_preview_compat.go",
+        "line": 120
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/web-submit/submit",
+    "original_line": 18757,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/batch-rewrite/web-submit/submit",
+        "file": "backend/internal/httpapi/web_submit_submit_compat.go",
+        "line": 64
+      },
+      {
+        "method": "POST",
+        "route": "/api/web-submit/submit",
+        "file": "backend/internal/httpapi/web_submit_submit_compat.go",
+        "line": 65
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/rules/preview",
+    "original_line": 18765,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/rules/preview",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2815
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/rules/trace",
+    "original_line": 18773,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/rules/ai-suggest",
+    "original_line": 18781,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks/{book_id}/summary",
+    "original_line": 18789,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks/{book_id}/content",
+    "original_line": 18794,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [],
+    "conclusion": "无同名入口，需核实替代入口或缺失；不直接判定功能缺失"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks/{book_id}",
+    "original_line": 18799,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/tasks/{bookId}",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2525
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/tasks/{id}",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 92
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks/{book_id}/rules-trace",
+    "original_line": 18804,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/tasks/{id}/rules-trace",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 181
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks/{book_id}/sensitive-log",
+    "original_line": 18809,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/tasks/{id}/sensitive-log",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 180
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/tasks/{book_id}/site-submit-log",
+    "original_line": 18814,
+    "exact_route_candidates": [],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/tasks/{id}/site-submit-log",
+        "file": "backend/internal/httpapi/batch_rewrite_compat.go",
+        "line": 182
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/{book_id}/fetch",
+    "original_line": 18842,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/tasks/{bookId}/fetch",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2556
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/{book_id}/restore-original",
+    "original_line": 18851,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/tasks/{bookId}/restore-original",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2661
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "POST",
+    "original_route": "/api/tasks/{book_id}/generate-ai",
+    "original_line": 18863,
+    "exact_route_candidates": [
+      {
+        "method": "POST",
+        "route": "/api/novel-fetch-workshop/tasks/{bookId}/generate-ai",
+        "file": "backend/internal/httpapi/novel_fetch_workshop.go",
+        "line": 2707
+      }
+    ],
+    "compatibility_route_candidates": [],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  },
+  {
+    "method": "GET",
+    "original_route": "/api/logs",
+    "original_line": 18876,
+    "exact_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/novel-fetch-workshop/logs",
+        "file": "backend/internal/httpapi/novel_fetch_legacy_workflow.go",
+        "line": 26
+      }
+    ],
+    "compatibility_route_candidates": [
+      {
+        "method": "GET",
+        "route": "/api/batch-rewrite/logs",
+        "file": "backend/internal/httpapi/router.go",
+        "line": 789
+      }
+    ],
+    "conclusion": "仅入口同名或兼容入口存在，行为待逐项验收"
+  }
+]
