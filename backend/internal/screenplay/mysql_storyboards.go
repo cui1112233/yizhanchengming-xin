@@ -16,6 +16,17 @@ func (s *MySQLStore) SaveStoryboard(ctx context.Context, storyboard Storyboard) 
 		return Storyboard{}, err
 	}
 	defer tx.Rollback()
+	saved, err := saveStoryboardInTx(ctx, tx, storyboard)
+	if err != nil {
+		return Storyboard{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return Storyboard{}, err
+	}
+	return saved, nil
+}
+
+func saveStoryboardInTx(ctx context.Context, tx *sql.Tx, storyboard Storyboard) (Storyboard, error) {
 
 	now := time.Now().UTC()
 	if storyboard.CreatedAt.IsZero() {
@@ -29,7 +40,7 @@ func (s *MySQLStore) SaveStoryboard(ctx context.Context, storyboard Storyboard) 
 
 	var existingID string
 	var revision int64
-	err = tx.QueryRowContext(ctx, `SELECT id, revision FROM screenplay_storyboards
+	err := tx.QueryRowContext(ctx, `SELECT id, revision FROM screenplay_storyboards
 WHERE project_id = ? AND owner_username = ? AND episode_no = ? AND engine = ? FOR UPDATE`,
 		storyboard.ProjectID, storyboard.OwnerUsername, storyboard.EpisodeNo, string(storyboard.Engine)).
 		Scan(&existingID, &revision)
@@ -84,9 +95,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			shot.Duration, shot.Characters, shot.Scene, shot.Props, shot.VideoDesc, now, now); err != nil {
 			return Storyboard{}, err
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return Storyboard{}, err
 	}
 	return storyboard, nil
 }

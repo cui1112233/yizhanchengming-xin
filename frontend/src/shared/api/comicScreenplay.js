@@ -141,11 +141,13 @@ export async function parseComicScreenplaySource(projectId, file, request = apiR
 export async function generateComicScreenplay(projectId, input, request = apiRequest) {
   const content = String(input?.content || input?.novel || '').trim();
   if (!content) throw new Error('请先上传或输入原文');
-  return request(projectPath(projectId, '/generate'), { method: 'POST', timeoutMs: 0, signal: input?.signal, body: JSON.stringify({ ...input, content, confirmed: true }) });
+  const { signal, ...body } = input || {};
+  return request(projectPath(projectId, '/generate'), { method: 'POST', timeoutMs: 0, signal, body: JSON.stringify({ ...body, content, confirmed: true }) });
 }
 
 export async function extractComicAssets(projectId, input, request = apiRequest) {
-  return request(projectPath(projectId, '/assets/extract'), { method: 'POST', timeoutMs: 0, signal: input?.signal, body: JSON.stringify({ ...input, confirmed: true }) });
+  const { signal, ...body } = input || {};
+  return request(projectPath(projectId, '/assets/extract'), { method: 'POST', timeoutMs: 0, signal, body: JSON.stringify({ ...body, confirmed: true }) });
 }
 
 export async function createComicScreenplayAsset(projectId, input, request = apiRequest) {
@@ -165,7 +167,8 @@ export async function deleteComicScreenplayAsset(projectId, assetId, request = a
 }
 
 export async function generateComicStoryboard(projectId, input, request = apiRequest) {
-  return request(projectPath(projectId, '/storyboards/generate'), { method: 'POST', timeoutMs: 0, signal: input?.signal, body: JSON.stringify({ ...input, confirmed: true }) });
+  const { signal, ...body } = input || {};
+  return request(projectPath(projectId, '/storyboards/generate'), { method: 'POST', timeoutMs: 0, signal, body: JSON.stringify({ ...body, confirmed: body.confirmed === true }) });
 }
 
 export async function createComicStoryboardShot(projectId, engine, episodeNo, input, request = apiRequest) {

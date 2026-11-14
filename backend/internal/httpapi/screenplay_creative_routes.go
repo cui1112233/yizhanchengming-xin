@@ -264,26 +264,42 @@ func serveCreativeConfigMutation(w http.ResponseWriter, r *http.Request, actor s
 }
 
 type creativeConfigPatch struct {
-	AspectRatio             *string         `json:"aspect_ratio"`
-	ImageResolution         *string         `json:"image_resolution"`
-	AssetPromptType         *string         `json:"asset_prompt_type"`
-	AssetProcessPrompt      *string         `json:"asset_process_prompt"`
-	VoiceDesignModel        *string         `json:"voice_design_model"`
-	ShowOriginalText        *bool           `json:"show_original_text"`
-	CharacterImageMode      *string         `json:"character_image_mode"`
-	SceneImageMode          *string         `json:"scene_image_mode"`
-	ExpectedRevision        *int64          `json:"expected_revision"`
-	ScriptPromptID          *string         `json:"script_prompt_id"`
-	StoryboardPromptID      *string         `json:"storyboard_prompt_id"`
-	CharacterDesignPromptID *string         `json:"character_design_prompt_id"`
-	SceneDesignPromptID     *string         `json:"scene_design_prompt_id"`
-	StyleID                 json.RawMessage `json:"style_id"`
-	ImageCoreInstruction    *string         `json:"image_core_instruction"`
-	ImageModelID            *string         `json:"image_model_id"`
-	ImageEditModelID        *string         `json:"image_edit_model_id"`
+	PlanDensity                 json.RawMessage `json:"plan_density"`
+	StoryboardAutoSyncAssets    *bool           `json:"storyboard_auto_sync_assets"`
+	StoryboardUseContextHistory *bool           `json:"storyboard_use_context_history"`
+	AspectRatio                 *string         `json:"aspect_ratio"`
+	ImageResolution             *string         `json:"image_resolution"`
+	AssetPromptType             *string         `json:"asset_prompt_type"`
+	AssetProcessPrompt          *string         `json:"asset_process_prompt"`
+	VoiceDesignModel            *string         `json:"voice_design_model"`
+	ShowOriginalText            *bool           `json:"show_original_text"`
+	CharacterImageMode          *string         `json:"character_image_mode"`
+	SceneImageMode              *string         `json:"scene_image_mode"`
+	ExpectedRevision            *int64          `json:"expected_revision"`
+	ScriptPromptID              *string         `json:"script_prompt_id"`
+	StoryboardPromptID          *string         `json:"storyboard_prompt_id"`
+	CharacterDesignPromptID     *string         `json:"character_design_prompt_id"`
+	SceneDesignPromptID         *string         `json:"scene_design_prompt_id"`
+	StyleID                     json.RawMessage `json:"style_id"`
+	ImageCoreInstruction        *string         `json:"image_core_instruction"`
+	ImageModelID                *string         `json:"image_model_id"`
+	ImageEditModelID            *string         `json:"image_edit_model_id"`
 }
 
 func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor string, c *screenplay.CreativeConfig, in creativeConfigPatch) error {
+	if len(in.PlanDensity) > 0 {
+		var value any
+		if e := json.Unmarshal(in.PlanDensity, &value); e != nil {
+			return fmt.Errorf("规划密度无效")
+		}
+		c.PlanDensity = screenplay.NormalizePlanDensity(value)
+	}
+	if in.StoryboardAutoSyncAssets != nil {
+		c.StoryboardAutoSyncAssets = *in.StoryboardAutoSyncAssets
+	}
+	if in.StoryboardUseContextHistory != nil {
+		c.StoryboardUseContextHistory = *in.StoryboardUseContextHistory
+	}
 	if in.AspectRatio != nil {
 		if !screenplay.ValidCreativeAspectRatio(*in.AspectRatio) {
 			return fmt.Errorf("不支持的剧本比例%s", *in.AspectRatio)

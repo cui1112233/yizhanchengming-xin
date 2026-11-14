@@ -41,6 +41,7 @@ type ScreenplayMediaWorkbench struct {
 	Files              *localartifact.Store
 }
 type screenplayMediaAction struct {
+	SourceProjectID   string                        `json:"sourceProjectId"`
 	VoiceDesignDrafts []screenplay.VoiceDesignDraft `json:"items"`
 	Rows              int                           `json:"rows"`
 	Columns           int                           `json:"columns"`
@@ -155,6 +156,10 @@ func RegisterScreenplayMediaWorkbenchRoutes(mux *http.ServeMux, auth BridgeAuth,
 		}
 		caps["voice_design"] = capability(voiceErr == nil && s.VoiceDesigner != nil && s.Objects != nil && s.Cut != nil, voiceReason)
 		caps["voice_analyze"] = capability(s.PositioningText != nil, "使用原版127提示词生成并保存音色描述，不自动生成音频")
+		caps["voice_bind"] = capability(s.Cut != nil && s.Objects != nil, "仅保存参考音频或真实音色绑定，不自动改动普通配音")
+		caps["voice_upload"] = capability(s.Cut != nil && s.Objects != nil, "上传WAV或MP3参考音频，不生成音色ID")
+		actor, _ := BridgeIdentityFromContext(r.Context())
+		caps["voice_bind_cross_project"] = capability(actor.Username == p.OwnerUsername && s.Cut != nil && s.Objects != nil, "跨作品音色库仅当前作品所有者可用")
 		if s.Cut != nil {
 			if _, e := s.Cut.Project(r.Context(), p.OwnerUsername, p.ID); e == nil {
 				tl, _ := s.Cut.Timeline(r.Context(), p.OwnerUsername, p.ID)
@@ -445,6 +450,8 @@ func (s *ScreenplayMediaWorkbench) action(ctx context.Context, p screenplay.Proj
 		return nil, e
 	}
 	switch in.Action {
+	case "voice_bind":
+		return s.bindVoiceAudio(ctx, p, in)
 	case "voice_design_drafts":
 		return s.saveVoiceDesignDrafts(ctx, p, in)
 	case "voice_analyze":

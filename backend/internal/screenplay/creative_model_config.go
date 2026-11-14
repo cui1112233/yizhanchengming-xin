@@ -71,6 +71,7 @@ func EffectiveCreativeConfig(p Project) CreativeConfig {
 		}
 	}
 	c.AspectRatio = p.AspectRatio
+	c.PlanDensity = NormalizePlanDensity(c.PlanDensity)
 	if c.AspectRatio == "" {
 		c.AspectRatio = "9:16"
 	}

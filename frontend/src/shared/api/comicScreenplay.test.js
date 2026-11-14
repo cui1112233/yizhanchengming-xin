@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, generateComicScreenplay, listComicScreenplayPrompts, mergeComicStoryboardShot, moveComicScreenplayShot, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from './comicScreenplay.js';
+import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, extractComicAssets, generateComicStoryboard, generateComicScreenplay, listComicScreenplayPrompts, mergeComicStoryboardShot, moveComicScreenplayShot, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from './comicScreenplay.js';
 
 test('项目设置和原文都调用已有项目接口', async () => {
   const calls = [];
@@ -139,4 +139,26 @@ test('分镜条目拒绝空内容、无效时长和无效路径参数', async ()
   await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: 0, videoDesc: '内容' }, async () => ({})), /时长/);
   await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: 1, videoDesc: ' ' }, async () => ({})), /内容不能为空/);
   await assert.rejects(() => splitComicStoryboardShot('comic-1', 'bad engine', 1, 'sb-shot-1', async () => ({})), /分镜引擎无效/);
+});
+
+
+test('真实生成请求仅fetch接收取消信号，严格JSON不含signal；分镜确认须调用方明确true', async () => {
+  const signal = new AbortController().signal;
+  for (const generate of [generateComicScreenplay, extractComicAssets, generateComicStoryboard]) {
+    let options;
+    await generate('comic-1', { content: '完整正文', idempotencyKey: 'same-key', signal }, async (path, input) => { options = input; return {}; });
+    assert.equal(options.signal, signal);
+    const body = JSON.parse(options.body);
+    assert.equal(Object.hasOwn(body, 'signal'), false);
+    assert.equal(body.idempotencyKey, 'same-key');
+    assert.equal(body.confirmed, generate !== generateComicStoryboard);
+  }
+  for (const confirmed of [true, false, 'true', undefined]) {
+    await generateComicStoryboard('comic-1', { idempotencyKey: 'same-key', confirmed, signal }, async (path, options) => {
+      const body = JSON.parse(options.body);
+      assert.equal(body.confirmed, confirmed === true);
+      assert.equal(Object.hasOwn(body, 'signal'), false);
+      return {};
+    });
+  }
 });

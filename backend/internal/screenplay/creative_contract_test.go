@@ -54,7 +54,7 @@ func TestCreativeStoryboardSelected307FinalRequest(t *testing.T) {
 	if _, err = store.UpdateProject(context.Background(), "alice", "p1", p, p.Revision); err != nil {
 		t.Fatal(err)
 	}
-	out, err := svc.Generate(context.Background(), StoryboardRequest{Owner: "alice", ProjectID: "p1", Engine: EngineXiaoyunqueV3, PromptID: prompt.CreativeStoryboard307, Content: "# 第1集：家\n角色甲开门。"})
+	out, err := svc.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-creativecontracttestgo-1", Owner: "alice", ProjectID: "p1", Engine: EngineXiaoyunqueV3, PromptID: prompt.CreativeStoryboard307, Content: "# 第1集：家\n角色甲开门。"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestCreativeStoryboardSelected307FinalRequest(t *testing.T) {
 }
 func TestCreativeWrongStoryboardPurposeNoProviderCall(t *testing.T) {
 	svc, _, g := newStoryboardService(t, PermissionBypass)
-	_, err := svc.Generate(context.Background(), StoryboardRequest{Owner: "alice", ProjectID: "p1", PromptID: prompt.CreativeCharacter213, Content: "# 第1集：家\n角色甲"})
+	_, err := svc.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-creativecontracttestgo-2", Owner: "alice", ProjectID: "p1", PromptID: prompt.CreativeCharacter213, Content: "# 第1集：家\n角色甲"})
 	if err == nil || g.callCount() != 0 {
 		t.Fatalf("err=%v calls=%d", err, g.callCount())
 	}
@@ -105,7 +105,7 @@ func TestCreativeCanceledLateResponseDoesNotSave(t *testing.T) {
 			case "b":
 				_, runErr = (&ScreenplayService{Store: store, Generator: g}).GenerateB(ctx, BRequest{Owner: "o", ProjectID: "p", Novel: "原文"})
 			case "storyboard":
-				_, runErr = (&StoryboardService{Store: store, Generator: g}).Generate(ctx, StoryboardRequest{Owner: "o", ProjectID: "p", Content: "# 第1集：原文\n开门"})
+				_, runErr = (&StoryboardService{Store: store, Generator: g}).Generate(ctx, StoryboardRequest{IdempotencyKey: "test-creativecontracttestgo-3", Owner: "o", ProjectID: "p", Content: "# 第1集：原文\n开门"})
 			}
 			if !errors.Is(runErr, context.Canceled) {
 				t.Fatalf("error=%v", runErr)
@@ -152,7 +152,7 @@ func TestCreativeSelectedLegacyStoryboardCannotUseV9Validation(t *testing.T) {
 			t.Run(tc.id+"/"+source, func(t *testing.T) {
 				svc, store, g := newStoryboardService(t, PermissionBypass)
 				g.responses = []string{`{"storyboard":[{"id":1,"scene_id":1,"duration_sec":30,"characters":"甲","scene":"家","props":"无","video_desc":"画风: 水墨\n完整视频描述"}]}`}
-				req := StoryboardRequest{Owner: "alice", ProjectID: "p1", Engine: EngineXiaoluoV9, Content: "# 第1集：家\n角色甲开门。"}
+				req := StoryboardRequest{IdempotencyKey: "test-creativecontracttestgo-4", Owner: "alice", ProjectID: "p1", Engine: EngineXiaoluoV9, Content: "# 第1集：家\n角色甲开门。"}
 				if source == "request" {
 					req.PromptID = tc.id
 				} else {

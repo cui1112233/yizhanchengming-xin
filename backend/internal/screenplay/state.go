@@ -453,6 +453,9 @@ func MarkStale(b *Batch, stepKeys []string) int {
 		hit++
 	}
 	if hit > 0 {
+		if containsString(stepKeys, "5_storyboard") {
+			b.PlanVersion++
+		}
 		b.Status = aggregateStatus(b)
 		filtered := b.PendingActions[:0]
 		for _, action := range b.PendingActions {

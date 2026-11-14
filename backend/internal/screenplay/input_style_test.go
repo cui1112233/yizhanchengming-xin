@@ -21,7 +21,7 @@ func TestSelectedStyleDescriptionReachesAssetAndStoryboardRequests(t *testing.T)
 		}
 	}
 	for _, engine := range []StoryboardEngine{EngineXiaoluoV7, EngineXiaoyunqueV3} {
-		_, err = (&StoryboardService{Store: store, Generator: gen}).Generate(ctx, StoryboardRequest{Owner: "alice", ProjectID: "style", Engine: engine, Content: "# 第1集：测试\n正文", Style: "显示名称"})
+		_, err = (&StoryboardService{Store: store, Generator: gen}).Generate(ctx, StoryboardRequest{IdempotencyKey: "test-inputstyletestgo-" + string(engine), Owner: "alice", ProjectID: "style", Engine: engine, Content: "# 第1集：测试\n正文", Style: "显示名称"})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -33,9 +33,10 @@ export function ComicChaptersPanel({projectId,onSaved,readOnly=false,canGenerate
   </Spin></div>;
 }
 
-export function ComicAssistantPanel({projectId,onSaved,readOnly=false,canGenerate=true}){
+export function ComicAssistantPanel({projectId,onSaved,readOnly=false,canGenerate=true,initialRequest}){
   const {data,setData,loading,error,refresh}=useAuthoringResource(projectId,getComicAssistant);
   const [text,setText]=useState(''),[busy,setBusy]=useState('');
+  useEffect(()=>{if(initialRequest?.text)setText(initialRequest.text);},[initialRequest?.id,initialRequest?.text,projectId]);
   const state=data?.state||{};const messages=state.messages||state.conversation||[];const proposals=state.proposals||[];
   async function send(){if(!canGenerate||!text.trim()||busy||loading||error)return;setBusy('chat');try{setData(await sendComicAssistant(projectId,{message:text.trim(),expected_revision:state.revision||0}));setText('');}catch(err){errorMessage(err);}finally{setBusy('');}}
   async function apply(proposal){if(readOnly||busy||proposal.status!=='pending')return;setBusy(proposal.id);try{setData(await applyComicProposal(projectId,{proposal_id:proposal.id,expected_revision:state.revision||0,confirmed:true}));await onSaved?.();message.success('修改已应用并保存');}catch(err){errorMessage(err);}finally{setBusy('');}}

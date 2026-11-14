@@ -40,12 +40,12 @@ func TestResolveStoryboardEngine(t *testing.T) {
 func TestGenerateStoryboardTwoEnginesStoredSeparately(t *testing.T) {
 	service, store, generator := newStoryboardService(t, PermissionBypass)
 	ctx := context.Background()
-	if _, err := service.Generate(ctx, StoryboardRequest{
+	if _, err := service.Generate(ctx, StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-1",
 		Owner: "alice", ProjectID: "p1", Engine: EngineXiaoyunqueV3, Content: "# 第1集：A\n正文",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Generate(ctx, StoryboardRequest{
+	if _, err := service.Generate(ctx, StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-2",
 		Owner: "alice", ProjectID: "p1", Engine: EngineXiaoluoV7, Content: "# 第1集：A\n正文",
 	}); err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestGenerateStoryboardRendersPlaceholdersAndEpisodeContext(t *testing.T) {
 	}, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	_, err := service.Generate(context.Background(), StoryboardRequest{
+	_, err := service.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-3",
 		Owner: "alice", ProjectID: "p1", Engine: EngineXiaoyunqueV3,
 	})
 	if err != nil {
@@ -112,7 +112,7 @@ func TestGenerateStoryboardRendersPlaceholdersAndEpisodeContext(t *testing.T) {
 func TestGenerateStoryboardIdempotentOverwrite(t *testing.T) {
 	service, store, _ := newStoryboardService(t, PermissionBypass)
 	ctx := context.Background()
-	request := StoryboardRequest{Owner: "alice", ProjectID: "p1", Engine: EngineXiaoluoV7, Content: "# 第1集：A\n正文"}
+	request := StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-4", Owner: "alice", ProjectID: "p1", Engine: EngineXiaoluoV7, Content: "# 第1集：A\n正文"}
 	if _, err := service.Generate(ctx, request); err != nil {
 		t.Fatal(err)
 	}
@@ -120,6 +120,7 @@ func TestGenerateStoryboardIdempotentOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	request.IdempotencyKey = "explicit-regenerate-new-intent"
 	if _, err := service.Generate(ctx, request); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +141,7 @@ func TestGenerateStoryboardIdempotentOverwrite(t *testing.T) {
 
 func TestGenerateStoryboardEmptyContentRejected(t *testing.T) {
 	service, _, generator := newStoryboardService(t, PermissionBypass)
-	_, err := service.Generate(context.Background(), StoryboardRequest{
+	_, err := service.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-5",
 		Owner: "alice", ProjectID: "p1", Engine: EngineXiaoyunqueV3, Content: "   ",
 	})
 	if !errors.Is(err, ErrNoActiveScript) && !errors.Is(err, ErrEmptyContent) {
@@ -149,7 +150,7 @@ func TestGenerateStoryboardEmptyContentRejected(t *testing.T) {
 	if generator.callCount() != 0 {
 		t.Fatal("空输入不应调用模型")
 	}
-	_, err = service.Generate(context.Background(), StoryboardRequest{
+	_, err = service.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-6",
 		Owner: "alice", ProjectID: "p1", Episodes: map[int]string{1: "  "},
 	})
 	if !errors.Is(err, ErrEmptyContent) {
@@ -159,7 +160,7 @@ func TestGenerateStoryboardEmptyContentRejected(t *testing.T) {
 
 func TestGenerateStoryboardAutoPermissionReturnsPlanOnly(t *testing.T) {
 	service, _, generator := newStoryboardService(t, PermissionAuto)
-	result, err := service.Generate(context.Background(), StoryboardRequest{
+	result, err := service.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-7",
 		Owner: "alice", ProjectID: "p1", Content: "# 第1集：A\n正文",
 	})
 	if err != nil {
@@ -179,7 +180,7 @@ func TestGenerateStoryboardAutoPermissionReturnsPlanOnly(t *testing.T) {
 func TestGenerateStoryboardCanceled(t *testing.T) {
 	service, _, generator := newStoryboardService(t, PermissionBypass)
 	generator.err = context.Canceled
-	_, err := service.Generate(context.Background(), StoryboardRequest{
+	_, err := service.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-8",
 		Owner: "alice", ProjectID: "p1", Content: "# 第1集：A\n正文",
 	})
 	if !errors.Is(err, ErrUserCancelled) {
@@ -190,7 +191,7 @@ func TestGenerateStoryboardCanceled(t *testing.T) {
 func TestGenerateStoryboardPartialFailureReturnsFailedEpisode(t *testing.T) {
 	service, _, generator := newStoryboardService(t, PermissionBypass)
 	generator.responses = []string{storyboardJSON, "这不是 JSON"}
-	result, err := service.Generate(context.Background(), StoryboardRequest{
+	result, err := service.Generate(context.Background(), StoryboardRequest{IdempotencyKey: "test-storyboardservicetestgo-9",
 		Owner: "alice", ProjectID: "p1", Engine: EngineXiaoyunqueV3,
 		Episodes: map[int]string{1: "# 第1集：A\n正文", 2: "# 第2集：B\n正文"},
 	})

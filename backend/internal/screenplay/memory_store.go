@@ -13,20 +13,22 @@ import (
 // MemoryStore 是进程内 Store 实现，用于单测与本地串联。
 // 它刻意复刻 MySQL 实现的两个并发语义：revision 冲突与显式互斥锁。
 type MemoryStore struct {
-	mu           sync.Mutex
-	projects     map[string]Project
-	userStyles   map[string]UserStyle
-	documents    map[string][]Document
-	shots        map[string][]Shot
-	characters   map[string][]Character
-	scenes       map[string][]Scene
-	assets       map[string][]Asset
-	assetBatches map[string][]AssetBatch
-	storyboards  map[string][]Storyboard
-	batches      map[string]*Batch
-	logs         map[string][]BatchLog
-	locks        map[string]memoryLock
-	revision     int64
+	storyboardGenerations map[string]StoryboardGenerationState
+	storyboardPreferences map[string]StoryboardPreferences
+	mu                    sync.Mutex
+	projects              map[string]Project
+	userStyles            map[string]UserStyle
+	documents             map[string][]Document
+	shots                 map[string][]Shot
+	characters            map[string][]Character
+	scenes                map[string][]Scene
+	assets                map[string][]Asset
+	assetBatches          map[string][]AssetBatch
+	storyboards           map[string][]Storyboard
+	batches               map[string]*Batch
+	logs                  map[string][]BatchLog
+	locks                 map[string]memoryLock
+	revision              int64
 }
 
 type memoryLock struct {
@@ -663,6 +665,9 @@ func (m *MemoryStore) DeleteAsset(_ context.Context, owner, projectID, assetID s
 func (m *MemoryStore) SaveStoryboard(_ context.Context, storyboard Storyboard) (Storyboard, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.saveStoryboardLocked(storyboard)
+}
+func (m *MemoryStore) saveStoryboardLocked(storyboard Storyboard) (Storyboard, error) {
 	key := projectKey(storyboard.OwnerUsername, storyboard.ProjectID)
 	if m.storyboards == nil {
 		m.storyboards = map[string][]Storyboard{}

@@ -551,25 +551,36 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 	})
 	handle("POST /api/comic-screenplays/projects/{id}/storyboards/generate", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			Engine    screenplay.StoryboardEngine `json:"engine"`
-			EpisodeNo int                         `json:"episodeNo"`
-			Content   string                      `json:"content"`
-			Episodes  map[int]string              `json:"episodes"`
-			Style     string                      `json:"style"`
-			Synopsis  string                      `json:"synopsis"`
-			Model     string                      `json:"model"`
-			Confirmed bool                        `json:"confirmed"`
+			ChapterID                  string                      `json:"chapterId"`
+			IdempotencyKey             string                      `json:"idempotencyKey"`
+			RetryOf                    string                      `json:"retryOf"`
+			ConfirmedRetry             bool                        `json:"confirmedRetry"`
+			PlanningChapterID          string                      `json:"planningChapterId"`
+			UsePlanning                *bool                       `json:"usePlanning"`
+			UseOriginalContentDirectly bool                        `json:"useOriginalContentDirectly"`
+			Engine                     screenplay.StoryboardEngine `json:"engine"`
+			EpisodeNo                  int                         `json:"episodeNo"`
+			Content                    string                      `json:"content"`
+			Episodes                   map[int]string              `json:"episodes"`
+			Style                      string                      `json:"style"`
+			Synopsis                   string                      `json:"synopsis"`
+			Model                      string                      `json:"model"`
+			Confirmed                  bool                        `json:"confirmed"`
 		}
 		if !decode(w, req, &input) {
 			return
 		}
-		service := screenplay.StoryboardService{Store: store, Generator: screenplayTextGenerator{owner: owner, resolver: resolver}}
-		result, err := service.Generate(req.Context(), screenplay.StoryboardRequest{Owner: owner, ProjectID: req.PathValue("id"), Engine: input.Engine, EpisodeNo: input.EpisodeNo, Content: input.Content, Episodes: input.Episodes, Style: input.Style, Synopsis: input.Synopsis, Model: input.Model, Confirmed: input.Confirmed})
+		service := screenplay.StoryboardService{Store: store, Authoring: authors, Generator: screenplayTextGenerator{owner: owner, resolver: resolver}}
+		result, err := service.Generate(req.Context(), screenplay.StoryboardRequest{IdempotencyKey: input.IdempotencyKey, RetryOf: input.RetryOf, ConfirmedRetry: input.ConfirmedRetry, Owner: owner, ProjectID: req.PathValue("id"), ChapterID: input.ChapterID, PlanningChapterID: input.PlanningChapterID, UsePlanning: input.UsePlanning, UseOriginalContentDirectly: input.UseOriginalContentDirectly, Engine: input.Engine, EpisodeNo: input.EpisodeNo, Content: input.Content, Episodes: input.Episodes, Style: input.Style, Synopsis: input.Synopsis, Model: input.Model, Confirmed: input.Confirmed})
 		if err != nil {
 			// 部分剧集失败：已生成的剧集已经落库，返回 partial_failure 和
 			// failed_episodes，让前端能明确提示「第 N 集失败」。
 			if errors.Is(err, screenplay.ErrPartialFailure) {
 				writeJSON(w, http.StatusOK, result)
+				return
+			}
+			if result.GenerationAttempt != nil {
+				writeJSON(w, screenplayErrorStatus(err), map[string]any{"error": err.Error(), "attempt": result.GenerationAttempt, "result": result})
 				return
 			}
 			writeScreenplayError(w, err)

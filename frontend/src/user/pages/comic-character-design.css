@@ -1,0 +1,25 @@
+.comic-character-design-dialog .ant-modal-content{padding:0;max-height:min(820px,88vh);display:flex;flex-direction:column;overflow:hidden;border-radius:22px;background:var(--surface-elevated,var(--canvas-overlay,#fff));color:var(--text-primary,var(--canvas-text,#111827));border:1px solid var(--border-soft,var(--canvas-overlay-border,rgba(128,128,128,.16)));box-shadow:0 24px 64px rgba(15,23,42,.28);backdrop-filter:blur(24px)}
+.comic-character-design-dialog .ant-modal-body{display:flex;flex-direction:column;min-height:0;max-height:min(820px,88vh)}
+.comic-character-design-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 8px;flex-shrink:0}
+.comic-character-design-header h3{margin:0;font-size:18px;font-weight:650;color:inherit}
+.comic-character-design-icon-button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:none;border-radius:999px;background:transparent;color:var(--text-secondary,var(--canvas-muted,#6b7280));cursor:pointer}
+.comic-character-design-icon-button:hover{background:var(--canvas-accent-soft,rgba(128,128,128,.12));color:inherit}
+.comic-character-design-tabs{display:flex;align-items:center;gap:8px;padding:8px 16px 12px;overflow-x:auto;flex-shrink:0}
+.comic-character-design-tabs>[role=tab]{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border:none;border-radius:999px;background:transparent;color:var(--text-secondary,var(--canvas-muted,#4b5563));white-space:nowrap;cursor:pointer}
+.comic-character-design-tabs>[role=tab].is-active{background:var(--canvas-btn-primary-bg,var(--brand-primary,#111827));color:var(--canvas-btn-primary-text,#fff)}
+.comic-character-design-reset{margin-left:auto;flex-shrink:0}
+.comic-character-design-body{margin:0 16px;padding:16px;border-radius:18px;background:var(--canvas-node-inner,rgba(128,128,128,.06));border:1px solid var(--canvas-node-border,rgba(128,128,128,.12));overflow:auto;flex:1;min-height:min(360px,48vh)}
+.comic-character-design-section{display:grid;grid-template-columns:120px 1fr;gap:12px;margin-bottom:16px}
+.comic-character-design-section:last-child{margin-bottom:0}
+.comic-character-design-label{padding-top:8px;color:var(--text-secondary,var(--canvas-muted,#6b7280));font-size:13px;line-height:1.4}
+.comic-character-design-options{display:flex;flex-wrap:wrap;gap:8px}
+.comic-character-design-chip{display:inline-flex;align-items:center;gap:8px;min-height:34px;padding:0 12px;border:1px solid var(--canvas-node-border,rgba(128,128,128,.2));border-radius:999px;background:var(--canvas-node,rgba(128,128,128,.035));color:inherit;font-size:13px;cursor:pointer}
+.comic-character-design-chip:hover{border-color:var(--brand-primary,var(--canvas-accent,#6366f1))}
+.comic-character-design-chip.is-active{background:var(--canvas-btn-primary-bg,var(--brand-primary,#111827));border-color:var(--canvas-btn-primary-bg,var(--brand-primary,#111827));color:var(--canvas-btn-primary-text,#fff)}
+.comic-character-design-chip.is-color-chip{padding-right:14px}
+.comic-character-design-swatch{width:16px;height:16px;border-radius:999px;border:1px solid rgba(128,128,128,.25);flex-shrink:0}
+.comic-character-design-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px 18px;flex-shrink:0}
+.comic-character-design-footer button{min-width:88px;height:36px;padding:0 18px;border:1px solid var(--canvas-node-border,rgba(128,128,128,.25));border-radius:999px;background:var(--canvas-node,rgba(128,128,128,.035));color:inherit;cursor:pointer}
+.comic-character-design-footer button:hover{background:var(--canvas-accent-soft,rgba(128,128,128,.1))}
+.comic-character-design-footer button.is-primary{border-color:var(--canvas-btn-primary-bg,var(--brand-primary,#111827));background:var(--canvas-btn-primary-bg,var(--brand-primary,#111827));color:var(--canvas-btn-primary-text,#fff)}
+@media(max-width:720px){.comic-character-design-section{grid-template-columns:1fr;gap:8px}.comic-character-design-label{padding-top:0}}

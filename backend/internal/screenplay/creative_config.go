@@ -11,6 +11,9 @@ type CreativeStyleSnapshot struct {
 	Revision int64    `json:"revision"`
 }
 type CreativeConfig struct {
+	PlanDensity                 string                            `json:"plan_density"`
+	StoryboardAutoSyncAssets    bool                              `json:"storyboard_auto_sync_assets"`
+	StoryboardUseContextHistory bool                              `json:"storyboard_use_context_history"`
 	ConfigVersion               int                               `json:"config_version"`
 	AspectRatio                 string                            `json:"aspect_ratio"`
 	ImageResolution             string                            `json:"image_resolution"`

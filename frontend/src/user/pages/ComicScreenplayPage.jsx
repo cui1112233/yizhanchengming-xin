@@ -14,6 +14,7 @@ import ComicScreenplayStoryStage from './ComicScreenplayStoryStage.jsx';
 import ComicScreenplayAssetStage from './ComicScreenplayAssetStage.jsx';
 import ComicScreenplayStoryboardStage from './ComicScreenplayStoryboardStage.jsx';
 import ComicScreenplayModelConfig from './ComicScreenplayModelConfig.jsx';
+import { prepareStoryboardGenerationRequest, completeStoryboardGenerationRequest, reconcileStoryboardGenerationRequest, markStoryboardGenerationNotStarted } from './comic-screenplay-storyboard-attempts.js';
 import { comicStages, comicStageLocation, comicNextState } from './comic-screenplay-stages.js';
 import ComicScreenplayFileTools from './ComicScreenplayFileTools.jsx';
 import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-creation.js';
@@ -99,6 +100,7 @@ export default function ComicScreenplayPage() {
   const [activeTab,setActiveTab] = useState('source');
   const [settingsOpen,setSettingsOpen] = useState(false), [promptSettingsOpen,setPromptSettingsOpen] = useState(false), [agentOpen,setAgentOpen] = useState(false), [tool,setTool] = useState(''), [openedTools,setOpenedTools] = useState({}), [mediaContext,setMediaContext] = useState({}), [editingEpisode,setEditingEpisode] = useState(0), [modelSearchOpen,setModelSearchOpen] = useState(false), [modelQuery,setModelQuery] = useState('');
   const [creativeOptions,setCreativeOptions] = useState({});
+  const [agentDraftRequest,setAgentDraftRequest] = useState(null);
   const settingsSnapshot = useRef(null), settingsRequest = useRef(0);
   function navigateStage(key) { const location = comicStageLocation(key); setActiveTab(location.stage); if (location.tool) { setTool(location.tool); setOpenedTools(current=>({...current,[location.tool]:true})); } if (location.agent) setAgentOpen(true); }
   function openSettings() { settingsSnapshot.current = { form: { ...form }, creative: { ...creative }, storyboardEngine }; setSettingsOpen(true); void listAvailableModels('text').then(setModels).catch(error=>message.error(error.message)); }
@@ -140,8 +142,8 @@ export default function ComicScreenplayPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [documentDraft, setDocumentDraft] = useState('');
-  const abortRef = useRef(null),sourceSavePromise=useRef(null);
-  const libraryRequest=useRef(0),projectRequest=useRef(0),selectedProject=useRef(''),libraryScope=useRef(scope);libraryScope.current=scope;
+  const abortRef = useRef(null),sourceSavePromise=useRef(null),storyboardPending=useRef(false);
+  const libraryRequest=useRef(0),projectRequest=useRef(0),projectNavigation=useRef(0),selectedProject=useRef(''),libraryScope=useRef(scope);libraryScope.current=scope;
 
   async function refreshProjects() {
     if(scope!==libraryScope.current)return;
@@ -151,7 +153,7 @@ export default function ComicScreenplayPage() {
     finally { if(ticket===libraryRequest.current)setLoading(false); }
   }
 
-  useEffect(() => {setProjects([]);void refreshProjects(); return () => {libraryRequest.current+=1; abortRef.current?.abort(); sourceImportGate.current.cancel(); }; }, [scope]);
+  useEffect(() => {setProjects([]);void refreshProjects(); return () => {libraryRequest.current+=1; projectNavigation.current+=1; abortRef.current?.abort(); sourceImportGate.current.cancel(); }; }, [scope]);
   useEffect(() => { setDocumentDraft(workspace?.document?.content || ''); }, [workspace?.document?.id]);
   useEffect(()=>{if(!selectedId)return;window.dispatchEvent(new CustomEvent('qiantie:comic-workspace',{detail:{open:true}}));return()=>window.dispatchEvent(new CustomEvent('qiantie:comic-workspace',{detail:{open:false}}));},[selectedId]);
 
@@ -203,7 +205,7 @@ export default function ComicScreenplayPage() {
     const ticket=++projectRequest.current;
     const switching=id!==selectedProject.current;
     selectedProject.current=id;setSelectedId(id);setLoading(true);
-    if(switching){settingsRequest.current+=1;settingsPending.current=false;setSettingsSaving(false);setSettingsOpen(false);setPromptSettingsOpen(false);setAgentOpen(false);setTool('');setOpenedTools({});setCreative(emptyCreativeConfig());setCreativeReady(false);setWorkspace(null);setAccess(null);setSelectedShots({});setShotEditor(null);setAssetEditor(null);setStoryboardShotEditor(null);setTeamOpen(false);setDisplayOpen(false);}
+    if(switching){projectNavigation.current+=1;settingsRequest.current+=1;settingsPending.current=false;setSettingsSaving(false);setSettingsOpen(false);setPromptSettingsOpen(false);setAgentOpen(false);setAgentDraftRequest(null);setTool('');setOpenedTools({});setCreative(emptyCreativeConfig());setCreativeReady(false);setWorkspace(null);setAccess(null);setSelectedShots({});setShotEditor(null);setAssetEditor(null);setStoryboardShotEditor(null);setTeamOpen(false);setDisplayOpen(false);}
     try {
       const [data,authoring]=await Promise.all([loadComicScreenplayWorkspace(id),getComicDisplay(id)]);
       if(ticket!==projectRequest.current||selectedProject.current!==id)return;
@@ -345,37 +347,46 @@ export default function ComicScreenplayPage() {
   }
 
   async function runTask(key, task) {
-    if(!canGenerate){message.info('尚未获准使用作品拥有者的生成服务');return;}
-    if (working) return;
+    if(!canGenerate){message.info('尚未获准使用作品拥有者的生成服务');return false;}
+    if (working) return false;
     const controller = new AbortController(); abortRef.current = controller; setWorking(key); setTaskWarnings([]);
     try {
       const result = await task(controller.signal);
-      if(selectedProject.current!==selectedId)return;await refreshCurrentProject(selectedId);
+      if(selectedProject.current!==selectedId)return false;await refreshCurrentProject(selectedId);
+      if (result?.requires_confirmation) { message.info('尚未确认使用作品拥有者的生成服务，本次未生成'); return { requires_confirmation: true, not_started: true }; }
       const warnings = collectWarnings(result);
       const partialFailure = describePartialFailure(result);
       if (partialFailure) {
         setTaskWarnings(warnings);
         message.error(`${partialFailure}，已成功生成的部分已保存；请检查失败内容后重试`);
+        return false;
       } else if (warnings.length) {
         setTaskWarnings(warnings);
         message.warning(`处理完成，但有 ${warnings.length} 条警告`);
       } else {
         message.success('处理完成');
       }
+      return true;
     }
     catch (error) {
       if (error?.name === 'AbortError') message.info('已停止等待，请刷新核对已保存结果后再决定是否重试');
       else message.error(error.message || '处理失败');
+      return false;
     }
     finally { if (abortRef.current === controller) abortRef.current = null; setWorking(''); }
   }
 
-  function startStoryboard(episodeNo = storyboardEpisode) {
+  async function startStoryboard(episodeNo = storyboardEpisode, options = {}) {
+    if (storyboardPending.current || working || !canGenerate) return false;
+    storyboardPending.current = true;
+    const navigationTicket = projectNavigation.current;
+    const isCurrent = () => selectedProject.current === selectedId && projectNavigation.current === navigationTicket;
+    try {
     const episodes = splitDocumentEpisodes(workspace?.document?.content);
     const fallback = String(workspace?.document?.content || source || '').trim();
-    if (!episodes.length && !fallback) { message.error('请先生成或输入剧本'); return; }
+    if (!episodes.length && !fallback) { message.error('请先生成或输入剧本'); return false; }
     const project = workspace?.project || {};
-    if(!String(project.model_id||'').trim()){message.error('请先在页头选择并保存文本模型');return;}
+    if(!String(project.model_id||'').trim()){message.error('请先在页头选择并保存文本模型');return false;}
     const payload = { engine: comicStoryboardEngine(project.creative_config?.storyboard_prompt_id, storyboardEngine), style: project.art_style || '', synopsis: project.synopsis || '', model: project.model_id };
     if (!episodes.length) {
       payload.episodeNo = 1; payload.content = fallback;
@@ -385,7 +396,50 @@ export default function ComicScreenplayPage() {
       const selected = episodes.find(item => item.no === episodeNo) || episodes[0];
       payload.episodeNo = selected.no; payload.content = selected.content;
     }
-    return runTask('storyboard', signal => generateComicStoryboard(selectedId, { ...payload, signal }));
+    const planningOptions=Object.fromEntries(['chapterId','planningChapterId','usePlanning','useOriginalContentDirectly','idempotencyKey','retryOf','confirmedRetry'].filter(key=>Object.prototype.hasOwnProperty.call(options,key)).map(key=>[key,options[key]]));
+    async function executeStoryboard(body, signal) {
+      const result = await generateComicStoryboard(selectedId, { ...body, signal });
+      if (!result?.requires_confirmation) return result;
+      const confirmed = await new Promise(resolve => Modal.confirm({
+        title: '确认使用生成服务', content: '此作品要求确认后才能使用拥有者的模型服务；继续可能消耗模型额度。',
+        okText: '确认生成', cancelText: '取消', onOk: () => resolve(true), onCancel: () => resolve(false),
+      }));
+      if (!confirmed || signal.aborted || !isCurrent()) return { ...result, not_started: true };
+      return generateComicStoryboard(selectedId, { ...body, confirmed: true, signal });
+    }
+    // The preparation dialog supplies its own durable request; the older editor uses the same recovery helper.
+    if (planningOptions.idempotencyKey) return await runTask('storyboard', signal => executeStoryboard({ ...payload, ...planningOptions }, signal));
+    if (working || !canGenerate) return false;
+    try {
+      const prepared = await prepareStoryboardGenerationRequest({
+        projectId: selectedId, engine: payload.engine,
+        episodeNumbers: payload.episodes ? Object.keys(payload.episodes).map(Number) : [payload.episodeNo],
+        options: { ...payload, ...planningOptions }, explicitNewOperation: true,
+        confirmRetry: attempt => new Promise(resolve => {
+          const dialog = Modal.confirm({
+            title: '处理未完成的分镜', content: '续跑会保留已成功集数；如果已修改正文或设置，可按当前输入新建。两种操作都可能消耗模型额度。',
+            okText: '续跑未完成部分', cancelText: '取消', onOk: () => resolve(true), onCancel: () => resolve(false),
+            footer: (_, { OkBtn, CancelBtn }) => <><Button onClick={() => { resolve('fresh'); dialog.destroy(); }}>按当前输入新建</Button><CancelBtn/><OkBtn/></>,
+          });
+        }),
+      });
+      if (!prepared.allowed) { if (prepared.message) message.info(prepared.message); return false; }
+      if (!isCurrent()) return false;
+      const ok = await runTask('storyboard', signal => executeStoryboard({ ...payload, ...planningOptions, ...prepared.requestOptions }, signal));
+      if (ok?.not_started) { markStoryboardGenerationNotStarted(prepared.cacheKey); return ok; }
+      if (ok === true) completeStoryboardGenerationRequest(prepared.cacheKey);
+      else {
+        const attempt = await reconcileStoryboardGenerationRequest({ projectId: selectedId, cacheKey: prepared.cacheKey, idempotencyKey: prepared.requestOptions.idempotencyKey });
+        if (attempt.status === 'succeeded' && isCurrent()) {
+          await refreshCurrentProject(selectedId);
+          if (!isCurrent()) return false;
+          completeStoryboardGenerationRequest(prepared.cacheKey);
+          message.success('已核对：分镜已保存，无需再次生成'); return true;
+        }
+      }
+      return ok;
+    } catch (error) { message.error(error.message || '无法核对分镜任务，请稍后再试'); return false; }
+    } finally { storyboardPending.current = false; }
   }
 
   async function downloadExport() {
@@ -589,15 +643,15 @@ export default function ComicScreenplayPage() {
       if(current())setActiveTab(next.next);
     }
     return <div className={`comic-screenplay-page comic-screenplay-workbench comic-three-stage-workbench layout-${display.editor_version||'studio'} ${display.sidebar_collapsed?'sidebar-collapsed':''} ${display.show_descriptions===false?'hide-descriptions':''}`} style={{'--comic-body-size':`${display.font_size||14}px`}}>
-      <header className="comic-original-titlebar"><button type="button" aria-label="返回项目库" title="返回项目库" onClick={() => {abortRef.current?.abort();projectRequest.current+=1;creativeTicket.current+=1;selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);void refreshProjects();}}><OriginalIcon name="ArrowBackOutline" size={18}/></button><h1>AI 推理分析</h1><span>{project.title || '新项目'}</span><div className="comic-title-tools">{working && abortRef.current ? <Button size="small" danger onClick={()=>abortRef.current?.abort()}>取消任务</Button>:null}<Dropdown menu={{items:[{key:'refresh',label:'刷新作品'},{key:'display',label:'显示设置'},...(access?.owner?[{key:'team',label:'团队权限'}]:[])],onClick:({key})=>{if(key==='refresh')void openProject(selectedId);if(key==='display')setDisplayOpen(true);if(key==='team')setTeamOpen(true);}}}><Button size="small">更多</Button></Dropdown></div></header>
+      <header className="comic-original-titlebar"><button type="button" aria-label="返回项目库" title="返回项目库" onClick={() => {abortRef.current?.abort();projectNavigation.current+=1;projectRequest.current+=1;creativeTicket.current+=1;selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);void refreshProjects();}}><OriginalIcon name="ArrowBackOutline" size={18}/></button><h1>AI 推理分析</h1><span>{project.title || '新项目'}</span><div className="comic-title-tools">{working && abortRef.current ? <Button size="small" danger onClick={()=>abortRef.current?.abort()}>取消任务</Button>:null}<Dropdown menu={{items:[{key:'source-tools',label:'原文与剧本工具'},{key:'chapter-tools',label:'章节规划'},{key:'history-tools',label:'版本历史'},{type:'divider'},{key:'refresh',label:'刷新作品'},{key:'display',label:'显示设置'},...(access?.owner?[{key:'team',label:'团队权限'}]:[])],onClick:({key})=>{if(key==='source-tools')openTool('source');if(key==='chapter-tools')openTool('chapters');if(key==='history-tools')openTool('history');if(key==='refresh')void openProject(selectedId);if(key==='display')setDisplayOpen(true);if(key==='team')setTeamOpen(true);}}}><Button size="small">更多</Button></Dropdown></div></header>
       <div className="comic-top-main-tab-row"><div className="comic-top-config-bar"><button type="button" className="comic-model-trigger" title={project.model_id || '选择文本模型'} disabled={readOnly||settingsSaving} onClick={()=>{setModelQuery('');setModelSearchOpen(true);void listAvailableModels('text').then(setModels).catch(error=>message.error(error.message));}}><ComicScreenplayModelIcon modelId={models.find(model=>model.id===project.model_id)?.modelId||project.model_id} size={18}/><span>{models.find(model=>model.id===project.model_id)?.displayName || project.model_id || '选择模型'}</span><OriginalIcon name="ChevronDownOutline" size={11}/></button><button type="button" className="comic-top-pill" title="模型配置" onClick={openSettings}><OriginalIcon name="SettingsOutline" size={13}/><span>模型配置</span><OriginalIcon name="ChevronDownOutline" size={12}/></button><ComicStylePicker compact value={savedStyle} onChange={savePillStyle} styles={creativeLibrary.styles} disabled={readOnly||settingsSaving||!creativeReady} onLibraryChange={readCreativeLibrary}/><button type="button" className={`comic-top-pill${agentOpen?' is-active':''}`} aria-pressed={agentOpen} title="Agent" onClick={()=>setAgentOpen(value=>!value)}><span>Agent</span></button></div><nav className="comic-top-step-tabs" aria-label="创作阶段">{comicStages.map((stage,index)=><span className="comic-top-step-slot" key={stage.key}>{index>0?<span className="comic-top-step-connector"/>:null}<button type="button" aria-current={activeTab===stage.key?'step':undefined} className={`comic-top-step-tab${activeTab===stage.key?' is-active':''}`} onClick={()=>setActiveTab(stage.key)}><i>{index+1}</i><span>{stage.label}</span></button></span>)}</nav><div aria-hidden="true" className="comic-top-row-spacer"/></div>
       <div className="comic-three-stage-body"><main className="comic-stage-main"><div className="comic-stage-scroll">
       {taskWarnings.length?<Alert type="warning" showIcon closable onClose={()=>setTaskWarnings([])} message={`本次处理有 ${taskWarnings.length} 条警告`} description={<ul>{taskWarnings.map((item,index)=><li key={index}>{item}</li>)}</ul>}/>:null}
       <div hidden={activeTab!=='source'}><ComicScreenplayStoryStage key={selectedId} project={project} synopsisResult={workspace?.synopsis_result||workspace?.synopsis} document={workspace?.document} draft={documentDraft} onDraft={setDocumentDraft} onSave={saveDocumentDraft} onTools={openTool} readOnly={readOnly} working={working}/></div>
       <div hidden={activeTab!=='assets'}><ComicScreenplayAssetStage projectId={selectedId} workspace={workspace} onChanged={()=>refreshCurrentProject(selectedId)} readOnly={readOnly} canGenerate={canGenerate} working={working} degree={form.degree} onSaveDegree={saveAssetDegree} degreeSaving={settingsSaving} onDegree={degree=>setForm(current=>({...current,degree}))} onAdd={type=>setAssetEditor({type,degree:form.degree,name:'',identity:'',description:'',prompt:'',voice:'',episodes:'',tag:''})} onEdit={asset=>setAssetEditor({id:asset.id,revision:asset.revision,type:asset.type,degree:asset.degree,name:asset.name,identity:asset.identity||'',description:asset.description||'',prompt:asset.prompt||'',voice:asset.voice||'',episodes:asset.episodes||'',tag:asset.tag||''})} onDelete={id=>Modal.confirm({title:'删除这个资产？',content:'删除后不可恢复。',okText:'删除',cancelText:'取消',onOk:()=>removeAsset(id)})} onExtract={type=>runTask(type,signal=>extractComicAssets(selectedId,{type,degree:form.degree,content:workspace?.document?.content,model:project.model_id,signal}))} onMedia={context=>openTool('media',context)}/></div>
-      {activeTab==='storyboard'?<ComicScreenplayStoryboardStage engine={comicStoryboardEngine(project.creative_config?.storyboard_prompt_id,storyboardEngine)} modelId={project.model_id} workspace={workspace} canGenerate={canGenerate} working={working} promptName={creativeLibrary.prompts.find(item=>item.id===project.creative_config?.storyboard_prompt_id)?.name} onGenerate={startStoryboard} onEditor={episode=>{setEditingEpisode(episode);openTool('storyboard-editor');}} onTools={openTool} onView={episode=>Modal.info({title:`第${episode.no}集 · ${episode.title}`,width:800,content:<pre className="comic-numbered-source">{episode.content}</pre>})}/>:null}
+      {activeTab==='storyboard'?<ComicScreenplayStoryboardStage readOnly={readOnly} onChanged={()=>refreshCurrentProject(selectedId)} onCreativeSaved={saved=>{if(selectedProject.current!==selectedId||!saved?.creative_config)return;const cfg=saved.creative_config;setWorkspace(current=>current?.project?.id===selectedId?{...current,project:applyCreativeConfigToProject(current.project,cfg,saved.revision)}:current);setCreativeRevision(saved.revision);setCreative(current=>({...current,...Object.fromEntries(['storyboard_prompt_id','plan_density','storyboard_auto_sync_assets','storyboard_use_context_history'].filter(key=>cfg[key]!==undefined).map(key=>[key,cfg[key]]))}));setStoryboardEngine(current=>comicStoryboardEngine(cfg.storyboard_prompt_id,current));}} onAgent={request=>{setAgentDraftRequest({id:Date.now(),text:String(request?.requestText||request?.summary||'')});setAgentOpen(true);}} engine={comicStoryboardEngine(project.creative_config?.storyboard_prompt_id,storyboardEngine)} modelId={project.model_id} workspace={workspace} canGenerate={canGenerate} working={working} promptName={creativeLibrary.prompts.find(item=>item.id===project.creative_config?.storyboard_prompt_id)?.name} onGenerate={startStoryboard} onEditor={episode=>{setEditingEpisode(episode);openTool('storyboard-editor');}} onTools={openTool} onView={episode=>Modal.info({title:`第${episode.no}集 · ${episode.title}`,width:800,content:<pre className="comic-numbered-source">{episode.content}</pre>})}/>:null}
       </div>{next?<div className="comic-flow-next-bar"><span className="comic-flow-next-mark"><OriginalIcon name="SparklesOutline" size={16}/></span><div><b>{next.title}</b><small>{next.subtitle}</small></div><button type="button" onClick={nextStage}>下一步 <span aria-hidden="true">→</span></button></div>:null}</main>
-      {agentOpen?<aside className="comic-stage-agent"><header><b>创作 Agent</b><Button size="small" type="text" aria-label="关闭Agent" icon={<X size={15}/>} onClick={()=>setAgentOpen(false)}/></header><ComicAssistantPanel key={selectedId} projectId={selectedId} readOnly={readOnly} canGenerate={canGenerate} onSaved={()=>refreshCurrentProject(selectedId)}/></aside>:null}</div>
+      {agentOpen?<aside className="comic-stage-agent"><header><b>创作 Agent</b><Button size="small" type="text" aria-label="关闭Agent" icon={<X size={15}/>} onClick={()=>setAgentOpen(false)}/></header><ComicAssistantPanel key={selectedId} initialRequest={agentDraftRequest} projectId={selectedId} readOnly={readOnly} canGenerate={canGenerate} onSaved={()=>refreshCurrentProject(selectedId)}/></aside>:null}</div>
       <Modal closeIcon={<OriginalIcon name="CloseOutline" size={16}/>} className="comic-model-config-modal" width={1176} style={{maxWidth:'96vw'}} title="模型配置" open={settingsOpen} onCancel={closeSettings} footer={<><Button disabled={settingsSaving} onClick={closeSettings}>取消</Button><Button type="primary" loading={settingsSaving} disabled={readOnly||!creativeReady||creativeLoading||!!creativeError} aria-label="保存配置" onClick={()=>saveSettings()}>保存</Button></>}>{settingsFields}</Modal>
       <Modal title="分镜提示词" open={promptSettingsOpen} onCancel={closePromptSettings} footer={<><Button disabled={settingsSaving} onClick={closePromptSettings}>取消</Button><Button type="primary" loading={settingsSaving} disabled={readOnly||!creativeReady||creativeLoading||!!creativeError} onClick={()=>saveSettings('prompts')}>保存分镜提示词</Button></>}><label className="comic-prompt-setting">分镜提示词<Select aria-label="分镜提示词" value={creative.storyboard_prompt_id} options={creativePromptOptions(creativeLibrary.prompts,'storyboard',creative.storyboard_prompt_id)} disabled={readOnly||settingsSaving||!creativeReady} onChange={id=>patchCreative({storyboard_prompt_id:id})}/></label><p className="comic-helper-text">保存后使用对应分镜协议；切换模板不会自动生成分镜。</p></Modal>
       <Modal className="comic-original-model-dialog" width={420} style={{maxWidth:'92vw'}} closable={false} title={<div className="comic-original-model-search"><span className="comic-icon-sr-only">选择文本模型</span><OriginalIcon name="SearchOutline" size={16} style={{opacity:.4}}/><Input variant="borderless" value={modelQuery} onChange={event=>setModelQuery(event.target.value)} placeholder="搜索模型..." allowClear/><button type="button" aria-label="关闭模型选择" onClick={()=>setModelSearchOpen(false)}><OriginalIcon name="InlineModelDialogClose" size={14}/></button></div>} open={modelSearchOpen} onCancel={()=>setModelSearchOpen(false)} footer={null}><div className="comic-model-options">{models.filter(model=>`${model.displayName||model.name||''} ${model.id}`.toLowerCase().includes(modelQuery.toLowerCase())).map(model=><button type="button" key={model.id} disabled={settingsSaving||readOnly} onClick={()=>savePillModel(model.id)}><ComicScreenplayModelIcon modelId={model.modelId||model.id} size={24}/><span>{model.displayName||model.name||model.id}</span>{project.model_id===model.id?<OriginalIcon name="CheckmarkOutline" size={16} style={{color:'#3b82f6'}}/>:null}</button>)}</div>{!models.length?<Empty description="暂无可用文本模型"/>:null}</Modal>

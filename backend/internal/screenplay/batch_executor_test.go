@@ -96,6 +96,50 @@ func TestBatchExecutorRunsPersistedProjectToCompletion(t *testing.T) {
 	}
 }
 
+func TestBatchExecutorStoryboardExplicitRebuildContinuesTerminalAttempt(t *testing.T) {
+	ctx := context.Background()
+	_, store, generator := newStoryboardService(t, PermissionBypass)
+	generator.responses = []string{"not-json", storyboardJSON}
+	if _, err := store.SaveScreenplay(ctx, Document{ID: "batch-retry-doc", ProjectID: "p1", OwnerUsername: "alice", Source: "b", Content: "# 第1集\n完整剧本", EpisodeCount: 1}, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	batch := NewBatch("batch-retry", "p1", "alice", "session", PermissionBypass)
+	for _, def := range StepDefinitions[:5] {
+		batch.Steps[def.Key].Status = StepDone
+	}
+	batch.CurrentStep = "5_storyboard"
+	batch.Step("5_storyboard").TotalEpisodes = 1
+	if err := store.CreateBatch(ctx, batch); err != nil {
+		t.Fatal(err)
+	}
+	executor := BatchExecutor{Store: store, Generator: generator}
+	if _, err := executor.RunNext(ctx, "alice", "p1"); err == nil || generator.callCount() != 1 {
+		t.Fatal("first invalid model response must fail", err, generator.callCount())
+	}
+	if _, err := executor.RunNext(ctx, "alice", "p1"); err == nil || generator.callCount() != 1 {
+		t.Fatal("ordinary retry must replay failure without paying", err, generator.callCount())
+	}
+	if _, err := store.MutateBatch(ctx, "alice", "p1", func(b *Batch) error {
+		MarkStale(b, []string{"5_storyboard"})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := executor.RunNext(ctx, "alice", "p1")
+	if err != nil || generator.callCount() != 2 || len(result.Artifacts) != 1 {
+		t.Fatal("explicit rebuild must continue known failed attempt", result, err, generator.callCount())
+	}
+	state, err := store.LoadStoryboardGenerations(ctx, "alice", "p1")
+	if err != nil || len(state.Attempts) != 2 {
+		t.Fatal(state, err)
+	}
+	for _, attempt := range state.Attempts {
+		if attempt.Status == "succeeded" && attempt.RetryOf == "" {
+			t.Fatal("explicit rebuild did not retain request lineage")
+		}
+	}
+}
+
 func TestBatchExecutorFailsHonestlyWhenMediaRunnerIsMissing(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

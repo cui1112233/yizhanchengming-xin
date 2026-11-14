@@ -266,10 +266,25 @@ func (e BatchExecutor) executeUnit(ctx context.Context, owner, projectID string,
 		if e.Generator == nil {
 			return batchUnitOutcome{}, fmt.Errorf("%w: 未配置文本模型，无法生成分镜", ErrInvalidState)
 		}
-		result, generateErr := (&StoryboardService{Store: e.Store, Generator: e.Generator}).Generate(ctx, StoryboardRequest{
-			Owner: owner, ProjectID: projectID, Engine: EngineXiaoyunqueV3, EpisodeNo: episode,
+		batch, keyErr := e.Store.GetBatch(ctx, owner, projectID)
+		if keyErr != nil {
+			return batchUnitOutcome{}, keyErr
+		}
+		generationKey := "batch-" + contentDigest(fmt.Sprintf("%s:%d:%d:%d", batch.ID, batch.PlanVersion, episode, project.Revision))
+		service := &StoryboardService{Store: e.Store, Generator: e.Generator}
+		request := StoryboardRequest{
+			IdempotencyKey: generationKey,
+			Owner:          owner, ProjectID: projectID, Engine: EngineXiaoyunqueV3, EpisodeNo: episode,
 			Style: project.ArtStyle, Synopsis: project.Synopsis, Model: project.ModelID, Confirmed: true,
-		})
+		}
+		result, generateErr := service.Generate(ctx, request)
+		// Only an explicit rebuild may continue a known terminal attempt with a
+		// new stable batch key. Ordinary retries replay their original attempt.
+		if generateErr != nil && regenerate && result.GenerationAttempt != nil && result.GenerationAttempt.CanRetry && result.GenerationAttempt.RequestKey != generationKey {
+			request.RetryOf = result.GenerationAttempt.RequestKey
+			request.ConfirmedRetry = true
+			result, generateErr = service.Generate(ctx, request)
+		}
 		if generateErr != nil {
 			return batchUnitOutcome{}, generateErr
 		}

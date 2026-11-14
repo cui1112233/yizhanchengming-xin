@@ -51,9 +51,13 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 	}
 	RegisterScreenplayWorkflowRoutes(root, auth, options.Screenplay, resolver, options.Now, options.PresetCatalog, authoring, runner)
 	RegisterScreenplayAuthoringRoutes(root, auth, options.Screenplay, authoringRepo, resolver)
+	RegisterScreenplayStoryboardPreferenceRoutes(root, auth, options.Screenplay, authoring)
+	RegisterScreenplayStoryboardPlanRoutes(root, auth, authoring, resolver)
+	RegisterScreenplayStoryboardGenerationRoutes(root, auth, options.Screenplay, authoring)
 	registerScreenplayFileRoutes(root, auth, authoring)
 	RegisterScreenplayMediaWorkbenchRoutes(root, auth, media)
 	RegisterScreenplayPositioningRoutes(root, auth, media)
+	RegisterScreenplayVoiceBindingRoutes(root, auth, media)
 	RegisterScreenplayProductionRoutes(root, auth, runtime, authoring)
 	if options.AgentImageWorkerContext != nil && productionRepo != nil && runtime.RedisDo != nil {
 		go runtime.Run(options.AgentImageWorkerContext)

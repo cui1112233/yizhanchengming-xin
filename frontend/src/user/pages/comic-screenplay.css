@@ -194,3 +194,10 @@
 @media(max-width:1000px){.comic-assets-heading-row{flex-wrap:wrap}.comic-source-project-settings{grid-template-columns:1fr}}
 
 .comic-config-ratios{gap:4px;padding:4px;border-radius:14px;background:var(--surface-elevated)}.comic-config-ratios button{gap:6px;height:58px;padding:6px 4px 8px;border:0;border-radius:12px;font-size:11px;line-height:1}.comic-config-ratios button:hover{background:color-mix(in srgb,var(--surface-panel) 45%,transparent)}.comic-config-ratios i{border-radius:3px;box-sizing:border-box}.comic-config-ratios button.is-active{background:var(--surface-panel);color:var(--text-primary);font-weight:700;box-shadow:0 1px 3px #0f172a14}
+
+/* Keep the reference three panels at the same bottom and fill both option tracks. */
+.comic-model-config-columns{align-items:stretch}.comic-config-column{align-content:start}.comic-config-segments{width:100%}.comic-config-segments button{flex:1;min-width:0;border:1px solid transparent}.comic-config-ratios button{border:1px solid transparent}.comic-config-segments button.is-active,.comic-config-ratios button.is-active{background:color-mix(in srgb,var(--text-primary) 16%,var(--surface-panel));border-color:color-mix(in srgb,var(--text-primary) 65%,transparent);color:var(--text-primary)}.comic-config-column p,.comic-config-column label>small{color:var(--text-primary);font-weight:400}
+
+.comic-config-control-group{display:grid;gap:8px;font-size:12px;font-weight:500}
+
+.comic-config-control-group>small{font-weight:400;color:var(--text-primary);font-size:12px;line-height:1.65}

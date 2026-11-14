@@ -40,11 +40,32 @@ func CreativePromptOptions() []CreativePromptMetadata {
 			out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest})
 		}
 	}
+	if records, e := screenplayTypedEntries(); e == nil {
+		for _, r := range records {
+			id := typedCreativeID(r)
+			if id == CreativeCharacter213 || id == CreativeScene289 {
+				continue
+			}
+			kind := "character-design"
+			if r.Type == "场景设计" {
+				kind = "scene-design"
+			}
+			if p, e := ResolveCreativePrompt(id, kind); e == nil {
+				out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest})
+			}
+		}
+	}
 	return out
 }
 func ResolveCreativePrompt(id, purpose string) (CreativePromptSnapshot, error) {
 	id = strings.TrimSpace(id)
+	id = CreativePromptAlias(id)
 	kind, ok := creativePromptTypes[id]
+	if !ok {
+		if p, found, e := resolveTypedCreativePrompt(id, purpose); e != nil || found {
+			return p, e
+		}
+	}
 	if !ok || kind != purpose {
 		return CreativePromptSnapshot{}, fmt.Errorf("提示词 %s 不适用于 %s", id, purpose)
 	}
