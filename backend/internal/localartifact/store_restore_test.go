@@ -3,11 +3,13 @@ package localartifact
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 type testMissingRestorer struct {
@@ -89,5 +91,64 @@ func TestRestoreStopsBeforeWritingWhenDiskGuardRejects(t *testing.T) {
 	}
 	if _, statErr := os.Stat(store.root + string(os.PathSeparator) + "clip_789.mp4"); !os.IsNotExist(statErr) {
 		t.Fatalf("restore wrote a file despite disk pressure: %v", statErr)
+	}
+}
+
+type ctxAwareRestorer struct {
+	store *Store
+	body  string
+	delay time.Duration
+}
+
+func (r *ctxAwareRestorer) RestoreStorageRef(ctx context.Context, storageRef string) error {
+	if r.delay > 0 {
+		select {
+		case <-time.After(r.delay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	body := []byte(r.body)
+	return r.store.Restore(storageRef, strings.NewReader(r.body), int64(len(body)), fmt.Sprintf("%x", sha256.Sum256(body)))
+}
+
+func TestOpenContextStopsWhenCallerCancels(t *testing.T) {
+	store := NewStore(t.TempDir(), 1<<20)
+	store.SetMissingRestorer(&ctxAwareRestorer{store: store, body: "remote-media", delay: 5 * time.Second})
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	start := time.Now()
+	file, err := store.OpenContext(ctx, "clip_cancel.mp4")
+	elapsed := time.Since(start)
+	if file != nil {
+		_ = file.Close()
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("OpenContext error=%v, want context.Canceled", err)
+	}
+	if elapsed > time.Second {
+		t.Fatalf("OpenContext waited %v after caller cancellation", elapsed)
+	}
+	if _, statErr := os.Stat(store.root + string(os.PathSeparator) + "clip_cancel.mp4"); !os.IsNotExist(statErr) {
+		t.Fatalf("cancelled restore left a visible file: %v", statErr)
+	}
+}
+
+func TestOpenAppliesRestoreTimeout(t *testing.T) {
+	store := NewStore(t.TempDir(), 1<<20)
+	store.SetRestoreTimeout(80 * time.Millisecond)
+	store.SetMissingRestorer(&ctxAwareRestorer{store: store, body: "remote-media", delay: 5 * time.Second})
+	file, err := store.Open("clip_timeout.mp4")
+	if file != nil {
+		_ = file.Close()
+	}
+	if !errors.Is(err, ErrRestoreTimeout) {
+		t.Fatalf("Open error=%v, want ErrRestoreTimeout", err)
+	}
+	if _, statErr := os.Stat(store.root + string(os.PathSeparator) + "clip_timeout.mp4"); !os.IsNotExist(statErr) {
+		t.Fatalf("timed out restore left a visible file: %v", statErr)
 	}
 }

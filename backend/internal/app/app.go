@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -541,6 +542,15 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	// 退化成普通 IO 失败，页面只会显示“执行中”，既看不到磁盘原因也无法重试。
 	usage := func() (float64, error) { return productionmedia.DiskUsagePercent(artifactStore.Root()) }
 	artifactStore.SetWriteGuard(productionmedia.NewDiskWriteGuard(usage))
+	// 回源超时：本地缓存缺失时从 TOS 恢复必须有上限，避免慢下载长期占用请求
+	// goroutine；大文件场景可用环境变量调高（内部上限 10 分钟）。
+	if raw := strings.TrimSpace(os.Getenv("QIANTIE_ARTIFACT_RESTORE_TIMEOUT")); raw != "" {
+		if timeout, err := time.ParseDuration(raw); err == nil && timeout > 0 {
+			artifactStore.SetRestoreTimeout(timeout)
+		} else {
+			log.Printf("ignore invalid QIANTIE_ARTIFACT_RESTORE_TIMEOUT=%q", raw)
+		}
+	}
 	productionMediaEnabled := strings.TrimSpace(cfg.ProductionMediaTOSEndpoint) != "" || strings.TrimSpace(cfg.ProductionMediaTOSBucket) != ""
 	if productionMediaEnabled {
 		if err := os.MkdirAll(artifactStore.Root(), 0o750); err != nil {
