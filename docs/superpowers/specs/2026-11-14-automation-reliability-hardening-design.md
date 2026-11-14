@@ -80,3 +80,14 @@
 - 只提交本任务涉及的文件，禁止 `git add .`。
 - 使用 `scripts/deploy-go-embedded.ps1` 走 Go embed 发布，不恢复 Node 链路。
 - 上一稳定版本作为回滚点，发布后校验 `/healthz` 与服务状态。
+
+## 5. 本轮发布记录（2026-11-14）
+
+- Git SHA：`3c6653aca5604a849b038e9245e5f41fa3045812`（`v88`）。
+- 发布编号：`qiantie-202611141140`，二进制 `/opt/www/qiantie/qiantie-202611141140`。
+- 二进制 SHA256：`2d100cd9eabfa5761cf91b23af288067cf45b1ef6d01e8e941b2e5cc8c74de80`。
+- 发布包：`.release/go-embedded/20261114-113652-3c6653aca560`（`-SkipFrontendBuild`，沿用此前已验收的前端产物）。
+- 本地验证：Go 单元/集成测试通过；本地 4011 实际启动，API 路由正常且未登录返回 401。
+- 生产验证：`systemctl is-active qiantie` = active；`/api/runtime-build-info` 返回 `git_sha`、`runtime_manifest_sha` 均匹配；公网 `https://yzcm.site/api/runtime-build-info` 200。
+- 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141140-3c6653ac`，上一版本 `qiantie-202611140410`。
+
