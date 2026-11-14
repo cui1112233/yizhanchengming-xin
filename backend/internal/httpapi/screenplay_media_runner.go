@@ -48,6 +48,12 @@ func (r *screenplayVideoRunner) ProduceEpisode(ctx context.Context, project scre
 		interval = 2 * time.Second
 	}
 	artifacts := make([]string, 0, len(storyboard.Shots))
+	// Reject incomplete source contracts before submitting any shot in the batch.
+	for _, shot := range storyboard.Shots {
+		if strings.TrimSpace(shot.VideoDesc) == "" || shot.Duration <= 0 {
+			return artifacts, fmt.Errorf("第%d集第%d镜头缺少视频提示词或已确认时长，请先在分镜编辑中补全", episode, shot.Seq)
+		}
+	}
 	for _, shot := range storyboard.Shots {
 		prompt := strings.TrimSpace(shot.VideoDesc)
 		if prompt == "" {

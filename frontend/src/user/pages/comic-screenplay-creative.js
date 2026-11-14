@@ -48,7 +48,8 @@ export function creativePromptOptions(prompts, purpose, selectedId) {
   const options = rows.map(item => {
     const version = String(item.version ?? '').trim();
     const displayVersion = /^[0-9a-f]{8,}$/i.test(version) ? '' : version;
-    return { value: item.id, label: `${item.name}${displayVersion ? ` · ${displayVersion}` : ''}` };
+    const unavailable = item.supported === false;
+    return { value: item.id, label: `${item.name}${displayVersion ? ` · ${displayVersion}` : ''}${unavailable ? `（${item.unsupported_reason || '暂不可执行'}）` : ''}`, disabled: unavailable };
   });
   if (selectedId && !rows.some(item => item.id === selectedId)) options.unshift({ value: selectedId, label: `已保存的选择（${selectedId}，当前不可用）`, disabled: true });
   return options;
@@ -78,6 +79,8 @@ export function createCreativeCreationFlow({ create, load, save }) {
 
 
 export function comicStoryboardEngine(promptId, fallback = '') {
+  const recovered = /^luoshui_storyboard_(\d+)$/.exec(promptId || '');
+  if (recovered) return `prompt_${recovered[1]}`;
   return ({
     luoshui_storyboard_v9_30s_307: 'xiaoluo_v9_30s',
     storyboard_xiaoluo_v7_15s: 'xiaoluo_v7_15s',

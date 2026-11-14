@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/screenplay"
 	"testing"
 	"time"
@@ -93,4 +94,69 @@ func (s *screenplayFileOwnerRaceStore) AcquireLock(ctx context.Context, name, to
 		fn()
 	}
 	return s.MemoryStore.AcquireLock(ctx, name, token, ttl)
+}
+
+func TestScreenplayFilesRecoveredProtocolRoundTripAndUntimedImage(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	store := screenplay.NewMemoryStore()
+	if _, err := store.CreateProject(ctx, screenplay.Project{ID: "protocol-files", OwnerUsername: "alice", SourceText: "原文"}); err != nil {
+		t.Fatal(err)
+	}
+	authors := &screenplay.AuthoringService{Store: store, Repository: screenplay.NewMemoryAuthoringRepository()}
+	mux := http.NewServeMux()
+	registerScreenplayFileRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, authors)
+	hash, _ := numberedScreenplaySource("原文")
+	for mode := 0; mode < 3; mode++ {
+		imageOnly := mode == 1
+		episode := 1
+		duration := float64(3)
+		video := "视频词"
+		if imageOnly {
+			episode = 2
+			duration = 0
+			video = ""
+		}
+		shot := screenplay.StoryboardShot{Duration: duration, Characters: "甲", Scene: "家", Props: "信", VideoDesc: video, ImagePrompt: "图片词", VoiceActor: "甲", Emotion: "平静", Line: "这是台词", SourceElements: json.RawMessage(`{"lines":[1,2]}`), SourceSceneIndex: 2, SourceSceneLocalOrder: 1, ProtocolFields: json.RawMessage(`{"camera":"wide","scene_id":"source-A"}`)}
+		if mode == 2 {
+			episode = 3
+			duration = 0
+			shot.Duration = 0
+			selected, err := prompt.ResolveCreativePrompt("luoshui_storyboard_137", "storyboard")
+			if err != nil {
+				t.Fatal(err)
+			}
+			shot.ProtocolFields, _ = json.Marshal(map[string]any{"video_desc": shot.VideoDesc, "_cm_contract": map[string]any{"prompt_id": selected.ID, "prompt_digest": selected.Digest, "output_protocol": selected.OutputProtocol, "parser_version": selected.ParserVersion}})
+		}
+		input := map[string]any{"expected_revision": 0, "source_sha256": hash, "storyboard": screenplay.Storyboard{Engine: screenplay.StoryboardEngine("prompt_137"), EpisodeNo: episode, Shots: []screenplay.StoryboardShot{shot}}}
+		result := signedJSONRequest(t, mux, now, "alice", "POST", "/api/comic-screenplays/projects/protocol-files/storyboards/import", input)
+		if result.Code != 200 {
+			t.Fatalf("import imageOnly=%v %d %s", imageOnly, result.Code, result.Body.String())
+		}
+		var exported struct {
+			Board screenplay.Storyboard `json:"storyboard"`
+		}
+		if err := json.Unmarshal(result.Body.Bytes(), &exported); err != nil {
+			t.Fatal(err)
+		}
+		got := exported.Board.Shots[0]
+		if got.ImagePrompt != shot.ImagePrompt || got.VoiceActor != shot.VoiceActor || got.Emotion != shot.Emotion || got.Line != shot.Line || got.SourceSceneIndex != 2 || got.SourceSceneLocalOrder != 1 || got.Duration != duration || got.VideoDesc != video || string(got.SourceElements) != string(shot.SourceElements) || string(got.ProtocolFields) != string(shot.ProtocolFields) {
+			t.Fatalf("fields lost: %+v", got)
+		}
+		// The downloaded file contains this complete board. Import the JSON-decoded
+		// export again to prove no field disappears at the file boundary.
+		input["expected_revision"] = exported.Board.Revision
+		input["storyboard"] = exported.Board
+		again := signedJSONRequest(t, mux, now, "alice", "POST", "/api/comic-screenplays/projects/protocol-files/storyboards/import", input)
+		if again.Code != 200 {
+			t.Fatalf("reimport %d %s", again.Code, again.Body.String())
+		}
+		reloaded, err := store.GetStoryboard(ctx, "alice", "protocol-files", episode, screenplay.StoryboardEngine("prompt_137"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reloaded.Shots[0].ImagePrompt != "图片词" || reloaded.Shots[0].VoiceActor != "甲" || reloaded.Shots[0].Line != "这是台词" || string(reloaded.Shots[0].ProtocolFields) != string(shot.ProtocolFields) {
+			t.Fatal(reloaded.Shots[0])
+		}
+	}
 }

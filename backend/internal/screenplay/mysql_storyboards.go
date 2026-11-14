@@ -3,6 +3,7 @@ package screenplay
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -88,11 +89,15 @@ WHERE storyboard_id = ? AND project_id = ? AND owner_username = ?`,
 		shot.StoryboardID = storyboard.ID
 		shot.ProjectID = storyboard.ProjectID
 		shot.OwnerUsername = storyboard.OwnerUsername
+		protocol, err := marshalStoryboardProtocol(*shot)
+		if err != nil {
+			return Storyboard{}, err
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO screenplay_storyboard_shots
-(id, storyboard_id, project_id, owner_username, seq, scene_id, duration_sec, characters_text, scene_name, props_text, video_desc, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+(id, storyboard_id, project_id, owner_username, seq, scene_id, duration_sec, characters_text, scene_name, props_text, video_desc, protocol_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			shot.ID, shot.StoryboardID, shot.ProjectID, shot.OwnerUsername, shot.Seq, shot.SceneID,
-			shot.Duration, shot.Characters, shot.Scene, shot.Props, shot.VideoDesc, now, now); err != nil {
+			shot.Duration, shot.Characters, shot.Scene, shot.Props, shot.VideoDesc, protocol, now, now); err != nil {
 			return Storyboard{}, err
 		}
 	}
@@ -157,7 +162,7 @@ WHERE project_id = ? AND owner_username = ?`
 
 func (s *MySQLStore) listStoryboardShots(ctx context.Context, owner, projectID, storyboardID string) ([]StoryboardShot, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, storyboard_id, project_id, owner_username, seq,
-scene_id, duration_sec, characters_text, scene_name, props_text, video_desc
+scene_id, duration_sec, characters_text, scene_name, props_text, video_desc, protocol_json
 FROM screenplay_storyboard_shots WHERE storyboard_id = ? AND project_id = ? AND owner_username = ?
 ORDER BY seq`, storyboardID, projectID, owner)
 	if err != nil {
@@ -167,10 +172,18 @@ ORDER BY seq`, storyboardID, projectID, owner)
 	shots := make([]StoryboardShot, 0)
 	for rows.Next() {
 		var shot StoryboardShot
+		var protocol []byte
 		if err := rows.Scan(&shot.ID, &shot.StoryboardID, &shot.ProjectID, &shot.OwnerUsername,
 			&shot.Seq, &shot.SceneID, &shot.Duration, &shot.Characters, &shot.Scene, &shot.Props,
-			&shot.VideoDesc); err != nil {
+			&shot.VideoDesc, &protocol); err != nil {
 			return nil, err
+		}
+		if len(protocol) > 0 {
+			var fields storyboardProtocol
+			if err := json.Unmarshal(protocol, &fields); err != nil {
+				return nil, fmt.Errorf("分镜扩展字段读取失败: %w", err)
+			}
+			fields.apply(&shot)
 		}
 		shots = append(shots, shot)
 	}
@@ -187,4 +200,31 @@ func scanStoryboard(scanner storyboardScanner) (Storyboard, error) {
 		&storyboard.EpisodeNo, &storyboard.Engine, &storyboard.Status, &storyboard.SourceSHA256,
 		&storyboard.ShotCount, &storyboard.Revision, &storyboard.CreatedAt, &storyboard.UpdatedAt)
 	return storyboard, err
+}
+
+// Only the protocol extension lives in JSON; legacy fields remain authoritative.
+type storyboardProtocol struct {
+	ImagePrompt           string          `json:"image_prompt"`
+	SourceElements        json.RawMessage `json:"source_elements,omitempty"`
+	VoiceActor            string          `json:"voice_actor"`
+	Emotion               string          `json:"emotion"`
+	Line                  string          `json:"line"`
+	SourceSceneIndex      int             `json:"_scene_index,omitempty"`
+	SourceSceneLocalOrder int             `json:"_scene_local_order,omitempty"`
+	ProtocolFields        json.RawMessage `json:"protocol_fields,omitempty"`
+}
+
+func marshalStoryboardProtocol(s StoryboardShot) (string, error) {
+	raw, err := json.Marshal(storyboardProtocol{s.ImagePrompt, s.SourceElements, s.VoiceActor, s.Emotion, s.Line, s.SourceSceneIndex, s.SourceSceneLocalOrder, s.ProtocolFields})
+	return string(raw), err
+}
+func (p storyboardProtocol) apply(s *StoryboardShot) {
+	s.ImagePrompt = p.ImagePrompt
+	s.SourceElements = p.SourceElements
+	s.VoiceActor = p.VoiceActor
+	s.Emotion = p.Emotion
+	s.Line = p.Line
+	s.SourceSceneIndex = p.SourceSceneIndex
+	s.SourceSceneLocalOrder = p.SourceSceneLocalOrder
+	s.ProtocolFields = p.ProtocolFields
 }

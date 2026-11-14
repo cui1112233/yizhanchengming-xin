@@ -977,7 +977,17 @@ func (s *ScreenplayMediaWorkbench) Finalize(ctx context.Context, p screenplay.Pr
 	}
 	current := map[string]bool{}
 	selectedBoards := map[int]screenplay.Storyboard{}
+	var selectedEngine screenplay.StoryboardEngine
+	if p.CreativeConfig != nil && p.CreativeConfig.StoryboardPromptID != "" {
+		selectedEngine, e = screenplay.StoryboardEngineForPrompt(p.CreativeConfig.StoryboardPromptID)
+		if e != nil {
+			return nil, e
+		}
+	}
 	for _, board := range boards {
+		if selectedEngine != "" && board.Engine != selectedEngine {
+			continue
+		}
 		old, exists := selectedBoards[board.EpisodeNo]
 		if !exists || (board.Engine == screenplay.EngineXiaoyunqueV3 && old.Engine != screenplay.EngineXiaoyunqueV3) {
 			selectedBoards[board.EpisodeNo] = board

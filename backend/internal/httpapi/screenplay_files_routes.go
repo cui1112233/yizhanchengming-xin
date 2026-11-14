@@ -82,7 +82,7 @@ func registerScreenplayFileRoutes(mux *http.ServeMux, auth BridgeAuth, authors *
 				return fmt.Errorf("%w: 原文已变化，请重新导出编号原文后核对", screenplay.ErrRevisionConflict)
 			}
 			b := in.Board
-			if b.Engine != screenplay.EngineXiaoluoV7 && b.Engine != screenplay.EngineXiaoyunqueV3 && b.Engine != screenplay.EngineXiaoluoV9 {
+			if !screenplay.ValidStoryboardEngine(b.Engine) {
 				return screenplay.ErrInvalidArgument
 			}
 			if b.EpisodeNo < 1 || len(b.Shots) == 0 || len(b.Shots) > 2000 {
@@ -95,7 +95,7 @@ func registerScreenplayFileRoutes(mux *http.ServeMux, auth BridgeAuth, authors *
 			b.Status = "done"
 			for i := range b.Shots {
 				sh := &b.Shots[i]
-				if sh.Duration <= 0 || sh.Duration > 600 || math.IsNaN(sh.Duration) || math.IsInf(sh.Duration, 0) || strings.TrimSpace(sh.VideoDesc) == "" {
+				if screenplay.ValidateStoryboardShotInput(*sh) != nil || sh.Duration > 600 || math.IsNaN(sh.Duration) || math.IsInf(sh.Duration, 0) {
 					return screenplay.ErrInvalidArgument
 				}
 				sh.ID = ""

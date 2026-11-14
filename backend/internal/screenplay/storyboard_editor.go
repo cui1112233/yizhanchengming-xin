@@ -2,7 +2,9 @@ package screenplay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"qiantie/backend/internal/prompt"
 	"strings"
 )
 
@@ -41,10 +43,11 @@ func UpdateStoryboardShot(ctx context.Context, store Store, owner, projectID str
 	if index < 0 {
 		return Storyboard{}, fmt.Errorf("%w: 分镜镜头 %s", ErrNotFound, shotID)
 	}
-	if err := validateStoryboardShotInput(changes); err != nil {
+	clean := cleanStoryboardShot(changes)
+	preserveStoryboardProtocol(&clean, storyboard.Shots[index])
+	if err := validateStoryboardShotInput(clean); err != nil {
 		return Storyboard{}, err
 	}
-	clean := cleanStoryboardShot(changes)
 	clean.ID = storyboard.Shots[index].ID
 	clean.StoryboardID = storyboard.Shots[index].StoryboardID
 	storyboard.Shots[index] = clean
@@ -101,6 +104,33 @@ func MergeStoryboardShotWithNext(ctx context.Context, store Store, owner, projec
 		return Storyboard{}, fmt.Errorf("%w: 最后一条分镜没有下一条可以合并", ErrInvalidState)
 	}
 	next := storyboard.Shots[index+1]
+	first := &storyboard.Shots[index]
+	mergedFields := map[string]any{}
+	if len(first.ProtocolFields) > 0 {
+		if err := json.Unmarshal(first.ProtocolFields, &mergedFields); err != nil {
+			return Storyboard{}, err
+		}
+	}
+	if mergedFields == nil {
+		mergedFields = map[string]any{}
+	}
+	mergedFields["merged_shots"] = []StoryboardShot{*first, next}
+	merged, err := json.Marshal(mergedFields)
+	if err != nil {
+		return Storyboard{}, err
+	}
+	first.ProtocolFields = merged
+	first.ImagePrompt = mergeStoryboardText(first.ImagePrompt, next.ImagePrompt, "\n")
+	first.Line = mergeStoryboardText(first.Line, next.Line, "\n")
+	first.VoiceActor = mergeStoryboardText(first.VoiceActor, next.VoiceActor, "；")
+	first.Emotion = mergeStoryboardText(first.Emotion, next.Emotion, "；")
+	if len(next.SourceElements) > 0 {
+		if len(first.SourceElements) == 0 {
+			first.SourceElements = next.SourceElements
+		} else if string(first.SourceElements) != string(next.SourceElements) {
+			first.SourceElements, _ = json.Marshal([]json.RawMessage{first.SourceElements, next.SourceElements})
+		}
+	}
 	storyboard.Shots[index].Duration += next.Duration
 	storyboard.Shots[index].Characters = mergeStoryboardText(storyboard.Shots[index].Characters, next.Characters, "；")
 	storyboard.Shots[index].Scene = mergeStoryboardText(storyboard.Shots[index].Scene, next.Scene, "；")
@@ -126,10 +156,11 @@ func saveEditedStoryboard(ctx context.Context, store Store, storyboard Storyboar
 }
 
 func validateStoryboardShotInput(shot StoryboardShot) error {
-	if shot.Duration <= 0 {
+	imageOnly := strings.TrimSpace(shot.VideoDesc) == "" && strings.TrimSpace(shot.ImagePrompt) != ""
+	if shot.Duration < 0 || (shot.Duration == 0 && !imageOnly && !storyboardProtocolOmitsDuration(shot.ProtocolFields)) {
 		return fmt.Errorf("%w: 镜头时长必须大于 0 秒", ErrInvalidArgument)
 	}
-	if strings.TrimSpace(shot.VideoDesc) == "" && strings.TrimSpace(shot.Characters) == "" && strings.TrimSpace(shot.Scene) == "" && strings.TrimSpace(shot.Props) == "" {
+	if strings.TrimSpace(shot.VideoDesc) == "" && strings.TrimSpace(shot.Characters) == "" && strings.TrimSpace(shot.Scene) == "" && strings.TrimSpace(shot.Props) == "" && strings.TrimSpace(shot.ImagePrompt) == "" && strings.TrimSpace(shot.Line) == "" {
 		return fmt.Errorf("%w: 分镜内容不能为空", ErrInvalidArgument)
 	}
 	return nil
@@ -165,4 +196,72 @@ func mergeStoryboardText(first, second, separator string) string {
 		return first
 	}
 	return first + separator + second
+}
+
+// Absent extension fields in older/manual clients retain the saved protocol.
+// Explicitly supplied editable strings can be cleared by sending an empty string.
+func preserveStoryboardProtocol(dst *StoryboardShot, src StoryboardShot) {
+	edited := map[string]bool{}
+	for _, key := range dst.EditedProtocolFields {
+		edited[key] = true
+	}
+	if !edited["image_prompt"] && dst.ImagePrompt == "" {
+		dst.ImagePrompt = src.ImagePrompt
+	}
+	if !edited["voice_actor"] && dst.VoiceActor == "" {
+		dst.VoiceActor = src.VoiceActor
+	}
+	if !edited["emotion"] && dst.Emotion == "" {
+		dst.Emotion = src.Emotion
+	}
+	if !edited["line"] && dst.Line == "" {
+		dst.Line = src.Line
+	}
+	if len(dst.SourceElements) == 0 {
+		dst.SourceElements = src.SourceElements
+	}
+	if len(dst.ProtocolFields) == 0 {
+		dst.ProtocolFields = src.ProtocolFields
+	}
+	if dst.SourceSceneIndex == 0 {
+		dst.SourceSceneIndex = src.SourceSceneIndex
+	}
+	if dst.SourceSceneLocalOrder == 0 {
+		dst.SourceSceneLocalOrder = src.SourceSceneLocalOrder
+	}
+	dst.EditedProtocolFields = nil
+}
+
+// ValidateStoryboardShotInput shares editor content rules with file import.
+func ValidateStoryboardShotInput(shot StoryboardShot) error { return validateStoryboardShotInput(shot) }
+
+// An untimed video row is editable only when its saved protocol matches the
+// current supported catalog and that contract does not supply or require time.
+func storyboardProtocolOmitsDuration(raw json.RawMessage) bool {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return false
+	}
+	if _, present := fields["duration_sec"]; present {
+		return false
+	}
+	var contract struct {
+		PromptID string `json:"prompt_id"`
+		Digest   string `json:"prompt_digest"`
+		Protocol string `json:"output_protocol"`
+		Parser   string `json:"parser_version"`
+	}
+	if json.Unmarshal(fields["_cm_contract"], &contract) != nil {
+		return false
+	}
+	selected, err := prompt.ResolveCreativePrompt(contract.PromptID, "storyboard")
+	if err != nil || !selected.Supported || selected.SourceID == 0 || selected.Digest != contract.Digest || selected.OutputProtocol != contract.Protocol || selected.ParserVersion != contract.Parser || selected.FixedDurationSec != 0 {
+		return false
+	}
+	for _, field := range selected.RequiredFields {
+		if field == "duration_sec" {
+			return false
+		}
+	}
+	return true
 }

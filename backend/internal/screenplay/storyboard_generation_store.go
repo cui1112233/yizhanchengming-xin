@@ -16,6 +16,7 @@ type StoryboardGenerationCall struct {
 	Error       string `json:"error,omitempty"`
 }
 type StoryboardGenerationEpisode struct {
+	SceneCount    int                                 `json:"scene_count,omitempty"`
 	EpisodeNo     int                                 `json:"episode_no"`
 	Status        string                              `json:"status"`
 	Error         string                              `json:"error,omitempty"`
@@ -26,6 +27,10 @@ type StoryboardGenerationEpisode struct {
 	PendingAssets []Asset                             `json:"pending_assets,omitempty"`
 }
 type StoryboardGenerationAttempt struct {
+	PromptID          string                               `json:"prompt_id,omitempty"`
+	PromptDigest      string                               `json:"prompt_digest,omitempty"`
+	OutputProtocol    string                               `json:"output_protocol,omitempty"`
+	ParserVersion     string                               `json:"parser_version,omitempty"`
 	RequestKey        string                               `json:"request_key"`
 	RetryOf           string                               `json:"retry_of,omitempty"`
 	InputDigest       string                               `json:"input_digest"`

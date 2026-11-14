@@ -1,6 +1,7 @@
 package screenplay
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -238,19 +239,28 @@ type Storyboard struct {
 	Shots         []StoryboardShot `json:"shots"`
 }
 
-// StoryboardShot 是分镜六字段契约。JSON 的 id 字段按 1 起序号写入 Seq。
+// StoryboardShot 保存通用分镜字段和原始协议扩展。源 JSON 的数字 id 按 1 起序号写入 Seq。
 type StoryboardShot struct {
-	ID            string  `json:"id"`
-	StoryboardID  string  `json:"storyboard_id"`
-	ProjectID     string  `json:"project_id"`
-	OwnerUsername string  `json:"owner_username"`
-	Seq           int     `json:"seq"`
-	SceneID       int     `json:"scene_id"`
-	Duration      float64 `json:"duration_sec"`
-	Characters    string  `json:"characters"`
-	Scene         string  `json:"scene"`
-	Props         string  `json:"props"`
-	VideoDesc     string  `json:"video_desc"`
+	ID                    string          `json:"id"`
+	StoryboardID          string          `json:"storyboard_id"`
+	ProjectID             string          `json:"project_id"`
+	OwnerUsername         string          `json:"owner_username"`
+	Seq                   int             `json:"seq"`
+	SceneID               int             `json:"scene_id"`
+	Duration              float64         `json:"duration_sec"`
+	Characters            string          `json:"characters"`
+	Scene                 string          `json:"scene"`
+	Props                 string          `json:"props"`
+	VideoDesc             string          `json:"video_desc"`
+	ImagePrompt           string          `json:"image_prompt"`
+	SourceElements        json.RawMessage `json:"source_elements,omitempty"`
+	VoiceActor            string          `json:"voice_actor"`
+	Emotion               string          `json:"emotion"`
+	Line                  string          `json:"line"`
+	SourceSceneIndex      int             `json:"_scene_index,omitempty"`
+	SourceSceneLocalOrder int             `json:"_scene_local_order,omitempty"`
+	ProtocolFields        json.RawMessage `json:"protocol_fields,omitempty"`
+	EditedProtocolFields  []string        `json:"-"`
 }
 
 // ReviewIssue 对应医生输出的问题条目。

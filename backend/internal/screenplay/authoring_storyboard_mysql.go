@@ -80,11 +80,15 @@ WHERE storyboard_id = ? AND project_id = ? AND owner_username = ?`,
 		shot.StoryboardID = storyboard.ID
 		shot.ProjectID = storyboard.ProjectID
 		shot.OwnerUsername = storyboard.OwnerUsername
+		protocol, err := marshalStoryboardProtocol(*shot)
+		if err != nil {
+			return Storyboard{}, err
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO screenplay_storyboard_shots
-(id, storyboard_id, project_id, owner_username, seq, scene_id, duration_sec, characters_text, scene_name, props_text, video_desc, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+(id, storyboard_id, project_id, owner_username, seq, scene_id, duration_sec, characters_text, scene_name, props_text, video_desc, protocol_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			shot.ID, shot.StoryboardID, shot.ProjectID, shot.OwnerUsername, shot.Seq, shot.SceneID,
-			shot.Duration, shot.Characters, shot.Scene, shot.Props, shot.VideoDesc, now, now); err != nil {
+			shot.Duration, shot.Characters, shot.Scene, shot.Props, shot.VideoDesc, protocol, now, now); err != nil {
 			return Storyboard{}, err
 		}
 	}

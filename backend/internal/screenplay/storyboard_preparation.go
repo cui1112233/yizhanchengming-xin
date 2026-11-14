@@ -80,7 +80,7 @@ func (s *StoryboardService) storyboardChapterInput(req StoryboardRequest, state 
 	}
 	return req, nil
 }
-func storyboardPlanningText(req StoryboardRequest, state *AuthoringState, episode int) (string, error) {
+func storyboardPlanningText(req StoryboardRequest, state *AuthoringState, episode int, p Project) (string, error) {
 	if req.UsePlanning != nil && !*req.UsePlanning {
 		return "", nil
 	}
@@ -106,6 +106,13 @@ func storyboardPlanningText(req StoryboardRequest, state *AuthoringState, episod
 			}
 			if c.PlanningSourceSHA256 != "" && c.PlanningSourceSHA256 != contentDigest(source) {
 				return "", fmt.Errorf("%w: 规划来源已修改，请重新规划或选择不带规划生成", ErrInvalidState)
+			}
+			selected, configDigest, _, err := storyboardPlanningContext(p)
+			if err != nil {
+				return "", err
+			}
+			if c.PlanningPromptID != selected.ID || c.PlanningPromptDigest != contentDigest(selected.Body) || c.PlanningConfigDigest != configDigest {
+				return "", fmt.Errorf("%w: 分镜提示词、画风或规划密度已变化，请重新规划或选择不带规划生成", ErrInvalidState)
 			}
 			return c.PlanningText, nil
 		}

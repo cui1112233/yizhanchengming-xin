@@ -47,6 +47,9 @@ func typedCreativeID(r screenplayTypedRecord) string {
 	return "luoshui_scene_design_" + strconv.Itoa(r.ID)
 }
 func CreativePromptAlias(id string) string {
+	if recovered := recoveredCreativeAlias(id); recovered != id {
+		return recovered
+	}
 	records, e := screenplayTypedEntries()
 	if e == nil {
 		for _, r := range records {

@@ -15,6 +15,7 @@ const (
 )
 
 type CreativePromptMetadata struct {
+	CreativePromptContract
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Type    string `json:"type"`
@@ -22,6 +23,7 @@ type CreativePromptMetadata struct {
 	Digest  string `json:"digest"`
 }
 type CreativePromptSnapshot struct {
+	CreativePromptContract
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Type    string `json:"type"`
@@ -34,25 +36,17 @@ var creativePromptTypes = map[string]string{CreativeScript144: "script", Creativ
 
 func CreativePromptOptions() []CreativePromptMetadata {
 	out := []CreativePromptMetadata{}
-	for _, id := range []string{CreativeScript144, CreativeStoryboard307, CreativeCharacter213, CreativeScene289, "a1_novel_to_screenplay", "b_director_screenplay", "storyboard_xiaoluo_v7_15s", "storyboard_xiaoyunque_v3"} {
-		p, e := ResolveCreativePrompt(id, creativePromptTypes[id])
-		if e == nil {
-			out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest})
+	if records, err := RecoveredCreativePromptCatalog(); err == nil {
+		for _, r := range records {
+			if r.Type != "voice-design" {
+				out = append(out, r)
+			}
 		}
 	}
-	if records, e := screenplayTypedEntries(); e == nil {
-		for _, r := range records {
-			id := typedCreativeID(r)
-			if id == CreativeCharacter213 || id == CreativeScene289 {
-				continue
-			}
-			kind := "character-design"
-			if r.Type == "场景设计" {
-				kind = "scene-design"
-			}
-			if p, e := ResolveCreativePrompt(id, kind); e == nil {
-				out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest})
-			}
+	for _, id := range []string{"a1_novel_to_screenplay", "b_director_screenplay", "storyboard_xiaoluo_v7_15s", "storyboard_xiaoyunque_v3"} {
+		p, e := ResolveCreativePrompt(id, creativePromptTypes[id])
+		if e == nil {
+			out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest, CreativePromptContract: p.CreativePromptContract})
 		}
 	}
 	return out
@@ -60,6 +54,9 @@ func CreativePromptOptions() []CreativePromptMetadata {
 func ResolveCreativePrompt(id, purpose string) (CreativePromptSnapshot, error) {
 	id = strings.TrimSpace(id)
 	id = CreativePromptAlias(id)
+	if p, found, err := resolveRecoveredCreativePrompt(id, purpose); err != nil || found {
+		return p, err
+	}
 	kind, ok := creativePromptTypes[id]
 	if !ok {
 		if p, found, e := resolveTypedCreativePrompt(id, purpose); e != nil || found {
@@ -86,5 +83,21 @@ func ResolveCreativePrompt(id, purpose string) (CreativePromptSnapshot, error) {
 		body = entry.Body()
 	}
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
-	return CreativePromptSnapshot{ID: id, Name: entry.Name, Type: kind, Version: digest[:16], Body: body, Digest: digest}, nil
+	contract := CreativePromptContract{Purpose: kind, NormalizedDigest: fmt.Sprintf("%x", sha256.Sum256([]byte(strings.ReplaceAll(body, "\r\n", "\n")))), Source: "existing CM backend corpus", InputSource: "project_content_and_asset_libraries", Variables: []string{}, ModelCapabilities: []string{"text_generation"}, Supported: true}
+	switch id {
+	case "storyboard_xiaoluo_v7_15s":
+		contract.OutputProtocol = "storyboard_video_props_v1"
+		contract.ResponseMode = "json_object"
+		contract.MaxDurationSec = 15
+	case "storyboard_xiaoyunque_v3":
+		contract.OutputProtocol = "storyboard_video_props_v1"
+		contract.ResponseMode = "json_object"
+		contract.MinDurationSec = 10
+		contract.MaxDurationSec = 15
+	default:
+		contract.OutputProtocol = "legacy_script_text_v1"
+		contract.ResponseMode = "text"
+	}
+	contract.ParserVersion = contract.OutputProtocol
+	return CreativePromptSnapshot{ID: id, Name: strings.NewReplacer("小洛", "小Y", "洛水", "CM").Replace(entry.Name), Type: kind, Version: digest[:16], Body: body, Digest: digest, CreativePromptContract: contract}, nil
 }

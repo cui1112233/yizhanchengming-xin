@@ -13,6 +13,9 @@ import (
 var ErrAccessDenied = errors.New("没有此项目的操作权限")
 
 type Chapter struct {
+	PlanningPromptID      string `json:"planning_prompt_id,omitempty"`
+	PlanningPromptDigest  string `json:"planning_prompt_digest,omitempty"`
+	PlanningConfigDigest  string `json:"planning_config_digest,omitempty"`
 	PlanningRequestKey    string `json:"planning_request_key,omitempty"`
 	PlanningRequestDigest string `json:"planning_request_digest,omitempty"`
 	PlanningStatus        string `json:"planning_status,omitempty"`

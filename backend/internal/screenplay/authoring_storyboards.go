@@ -86,6 +86,7 @@ func EditStoryboardBatch(ctx context.Context, s Store, o, p string, episode int,
 				return b, ErrInvalidArgument
 			}
 			seen[sh.ID] = true
+			preserveStoryboardProtocol(&sh, b.Shots[i])
 			b.Shots[i] = sh
 		}
 	default:

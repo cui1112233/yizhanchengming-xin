@@ -1,6 +1,9 @@
 package screenplay
 
-import "qiantie/backend/internal/prompt"
+import (
+	"qiantie/backend/internal/prompt"
+	"strings"
+)
 
 type CreativePromptSnapshot = prompt.CreativePromptSnapshot
 type CreativeStyleSnapshot struct {
@@ -49,6 +52,11 @@ func ResolveProjectPrompt(p Project, id, purpose string) (CreativePromptSnapshot
 	}
 	if p.CreativeConfig != nil {
 		if frozen, ok := p.CreativeConfig.PromptSnapshots[purpose]; ok && frozen.ID == id && frozen.Type == purpose && frozen.Body != "" {
+			// Older snapshots contain only body and identity. Reuse the verified
+			// catalog contract only when the complete body still matches.
+			if frozen.OutputProtocol == "" && strings.ReplaceAll(frozen.Body, "\r\n", "\n") == strings.ReplaceAll(resolved.Body, "\r\n", "\n") {
+				frozen.CreativePromptContract = resolved.CreativePromptContract
+			}
 			return frozen, nil
 		}
 	}

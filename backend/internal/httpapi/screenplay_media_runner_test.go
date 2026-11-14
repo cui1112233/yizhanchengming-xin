@@ -103,7 +103,7 @@ func TestScreenplayVideoRunnerExplicitChangedRebuildPreservesHistory(t *testing.
 	service := &fakeScreenplayVideoService{}
 	r := &screenplayVideoRunner{service: service, configs: configs, repo: repo}
 	p := screenplay.Project{ID: "p", OwnerUsername: "alice"}
-	b := screenplay.Storyboard{ID: "b", Shots: []screenplay.StoryboardShot{{ID: "s", Seq: 1, VideoDesc: "旧镜头"}}}
+	b := screenplay.Storyboard{ID: "b", Shots: []screenplay.StoryboardShot{{ID: "s", Seq: 1, Duration: 5, VideoDesc: "旧镜头"}}}
 	if _, e := r.ProduceEpisode(ctx, p, 1, b); e != nil {
 		t.Fatal(e)
 	}
@@ -141,7 +141,7 @@ func TestScreenplayVideoRunnerStableReferencesSurviveSigningRefresh(t *testing.T
 		return []string{"tos:stable-object-key"}, nil
 	}}
 	p := screenplay.Project{ID: "p", OwnerUsername: "alice"}
-	b := screenplay.Storyboard{ID: "b", Shots: []screenplay.StoryboardShot{{Seq: 1, VideoDesc: "镜头"}}}
+	b := screenplay.Storyboard{ID: "b", Shots: []screenplay.StoryboardShot{{Seq: 1, Duration: 5, VideoDesc: "镜头"}}}
 	if _, e := r.ProduceEpisode(ctx, p, 1, b); e == nil {
 		t.Fatal("expected transient error")
 	}
@@ -166,7 +166,7 @@ func TestScreenplayVideoRunnerUnknownSubmissionDoesNotChargeAgain(t *testing.T) 
 	s := &unknownSubmitScreenplayService{}
 	r := &screenplayVideoRunner{service: s, configs: configs, repo: screenplay.NewMemoryProductionRepository()}
 	p := screenplay.Project{ID: "p", OwnerUsername: "alice"}
-	b := screenplay.Storyboard{ID: "b", Shots: []screenplay.StoryboardShot{{Seq: 1, VideoDesc: "镜头"}}}
+	b := screenplay.Storyboard{ID: "b", Shots: []screenplay.StoryboardShot{{Seq: 1, Duration: 5, VideoDesc: "镜头"}}}
 	for i := 0; i < 2; i++ {
 		if _, e := r.ProduceEpisode(ctx, p, 1, b); e == nil {
 			t.Fatal("unknown accepted")

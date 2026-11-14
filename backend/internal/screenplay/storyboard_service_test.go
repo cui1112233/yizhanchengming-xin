@@ -87,8 +87,8 @@ func TestGenerateStoryboardRendersPlaceholdersAndEpisodeContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if generator.callCount() != 2 {
-		t.Fatalf("调用次数 = %d, want 2（逐集一次）", generator.callCount())
+	if generator.callCount() != 3 {
+		t.Fatalf("调用次数 = %d, want 3（第一集两场，第二集一场）", generator.callCount())
 	}
 	first := generator.requests[0]
 	if strings.Contains(first.SystemPrompt, "{CURRENT_SCENE_CONTENT}") {
@@ -97,12 +97,12 @@ func TestGenerateStoryboardRendersPlaceholdersAndEpisodeContext(t *testing.T) {
 	if !strings.Contains(first.SystemPrompt, "第1集") || !strings.Contains(first.SystemPrompt, "蓝雨传媒28楼") {
 		t.Fatal("第一集内容未注入")
 	}
-	if !strings.Contains(first.SystemPrompt, "小河村·祖宅门口") {
-		t.Fatal("下一集内容应作为 NEXT_SCENE_CONTENT 注入")
+	if strings.Contains(first.SystemPrompt, "小河村·祖宅门口") {
+		t.Fatal("下一集不能当作相邻场景注入")
 	}
 	second := generator.requests[1]
 	if !strings.Contains(second.SystemPrompt, "蓝雨传媒28楼") {
-		t.Fatal("上一集内容应作为 PREVIOUS_SCENE_CONTENT 注入")
+		t.Fatal("同集上一场内容应作为 PREVIOUS_SCENE_CONTENT 注入")
 	}
 	if !strings.Contains(second.SystemPrompt, "画风") || !strings.Contains(second.SystemPrompt, "3D国漫") {
 		t.Fatal("style 占位符未注入")

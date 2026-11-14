@@ -7,15 +7,24 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
 var storyboardGenerationKeyRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$`)
 
 type StoryboardGenerationEpisodeSummary struct {
-	EpisodeNo int    `json:"episode_no"`
-	Status    string `json:"status"`
-	Error     string `json:"error,omitempty"`
+	Scenes    []StoryboardGenerationSceneSummary `json:"scenes,omitempty"`
+	EpisodeNo int                                `json:"episode_no"`
+	Status    string                             `json:"status"`
+	Error     string                             `json:"error,omitempty"`
+}
+
+type StoryboardGenerationSceneSummary struct {
+	Index  int    `json:"index"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
 }
 type StoryboardGenerationSummary struct {
 	RequestKey        string                               `json:"request_key"`
@@ -47,7 +56,28 @@ func (a StoryboardGenerationAttempt) Summary() StoryboardGenerationSummary {
 		if ep == nil {
 			continue
 		}
-		out.Episodes = append(out.Episodes, StoryboardGenerationEpisodeSummary{EpisodeNo: n, Status: ep.Status, Error: ep.Error})
+		scenes := []StoryboardGenerationSceneSummary{}
+		count := ep.SceneCount
+		for phase := range ep.Calls {
+			if strings.HasPrefix(phase, "storyboard_scene_") {
+				if i, e := strconv.Atoi(strings.TrimPrefix(phase, "storyboard_scene_")); e == nil && i > count {
+					count = i
+				}
+			}
+		}
+		for i := 1; i <= count; i++ {
+			phase := fmt.Sprintf("storyboard_scene_%d", i)
+			if count == 1 {
+				phase = "storyboard"
+			}
+			call, ok := ep.Calls[phase]
+			status := "pending"
+			if ok {
+				status = call.Status
+			}
+			scenes = append(scenes, StoryboardGenerationSceneSummary{Index: i, Status: status, Error: call.Error})
+		}
+		out.Episodes = append(out.Episodes, StoryboardGenerationEpisodeSummary{EpisodeNo: n, Status: ep.Status, Error: ep.Error, Scenes: scenes})
 		if ep.Status == "unknown" || ep.Status == "calling" || ep.Status == "saving" {
 			out.CanRetry = false
 		}
@@ -227,6 +257,10 @@ func beginStoryboardGeneration(ctx context.Context, store StoryboardGenerationSt
 		now := time.Now().UTC()
 		a := &StoryboardGenerationAttempt{RequestKey: req.IdempotencyKey, RetryOf: req.RetryOf, InputDigest: digest, Engine: engine, Status: "running", ChapterID: req.ChapterID, PlanningChapterID: req.PlanningChapterID, UseOriginal: req.UseOriginalContentDirectly, EpisodeNumbers: numbers, Episodes: map[int]*StoryboardGenerationEpisode{}, CreatedAt: now, UpdatedAt: now, Roles: roles, Scenes: scenes, Props: props, ExternalHistory: external}
 		a.UsePlanning = req.UsePlanning
+		a.PromptID, _ = base["prompt_id"].(string)
+		a.PromptDigest, _ = base["prompt_digest"].(string)
+		a.OutputProtocol, _ = base["output_protocol"].(string)
+		a.ParserVersion, _ = base["parser_version"].(string)
 		if planning, ok := base["planning"].(map[int]string); ok {
 			for _, text := range planning {
 				a.PlanningApplied = a.PlanningApplied || text != ""
@@ -234,15 +268,20 @@ func beginStoryboardGeneration(ctx context.Context, store StoryboardGenerationSt
 		}
 		for _, n := range numbers {
 			ep := &StoryboardGenerationEpisode{EpisodeNo: n, Status: "pending", Calls: map[string]StoryboardGenerationCall{}}
+			if counts, ok := base["scene_counts"].(map[int]int); ok {
+				ep.SceneCount = counts[n]
+			}
 			if req.RetryOf != "" {
 				parent := prior.Episodes[n]
 				if parent != nil && parent.Status == "succeeded" {
 					raw, _ := json.Marshal(parent)
 					_ = json.Unmarshal(raw, ep)
 				} else if parent != nil {
-					if call, ok := parent.Calls["storyboard"]; ok && call.Status == "received" {
-						if _, e := parseStoryboardJSON(call.RawResponse); e == nil {
-							ep.Calls["storyboard"] = call
+					for phase, call := range parent.Calls {
+						if (phase == "storyboard" || strings.HasPrefix(phase, "storyboard_scene_")) && call.Status == "received" {
+							if _, e := parseStoryboardJSON(call.RawResponse); e == nil {
+								ep.Calls[phase] = call
+							}
 						}
 					}
 					ep.AddedAssetIDs = append([]string{}, parent.AddedAssetIDs...)

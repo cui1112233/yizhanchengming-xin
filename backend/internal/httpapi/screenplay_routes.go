@@ -313,22 +313,12 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			return
 		}
 		payload["assets"] = assets
-		storyboardsV7, err := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV7)
+		storyboards, err := store.ListStoryboards(req.Context(), owner, project.ID, "")
 		if err != nil {
 			writeScreenplayError(w, err)
 			return
 		}
-		storyboardsV3, err := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoyunqueV3)
-		if err != nil {
-			writeScreenplayError(w, err)
-			return
-		}
-		storyboardsV9, err := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV9)
-		if err != nil {
-			writeScreenplayError(w, err)
-			return
-		}
-		payload["storyboards"] = append(append(storyboardsV7, storyboardsV3...), storyboardsV9...)
+		payload["storyboards"] = storyboards
 		if authors != nil {
 			identity, _ := BridgeIdentityFromContext(req.Context())
 			_, editErr := authors.Resolve(req.Context(), identity.Username, project.ID, "edit")
@@ -641,13 +631,21 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		writeJSON(w, http.StatusOK, map[string]any{"storyboards": append(append(first, second...), third...)})
 	})
 	type storyboardShotInput struct {
-		AfterShotID string  `json:"afterShotId"`
-		SceneID     int     `json:"sceneId"`
-		Duration    float64 `json:"durationSec"`
-		Characters  string  `json:"characters"`
-		Scene       string  `json:"scene"`
-		Props       string  `json:"props"`
-		VideoDesc   string  `json:"videoDesc"`
+		AfterShotID           string          `json:"afterShotId"`
+		SceneID               int             `json:"sceneId"`
+		Duration              float64         `json:"durationSec"`
+		Characters            string          `json:"characters"`
+		Scene                 string          `json:"scene"`
+		Props                 string          `json:"props"`
+		VideoDesc             string          `json:"videoDesc"`
+		ImagePrompt           *string         `json:"imagePrompt"`
+		VoiceActor            *string         `json:"voiceActor"`
+		Emotion               *string         `json:"emotion"`
+		Line                  *string         `json:"line"`
+		SourceElements        json.RawMessage `json:"sourceElements"`
+		SourceSceneIndex      int             `json:"sourceSceneIndex"`
+		SourceSceneLocalOrder int             `json:"sourceSceneLocalOrder"`
+		ProtocolFields        json.RawMessage `json:"protocolFields"`
 	}
 	storyboardPath := func(w http.ResponseWriter, req *http.Request) (string, int, screenplay.StoryboardEngine, bool) {
 		episode, err := strconv.Atoi(req.PathValue("episode"))
@@ -663,7 +661,18 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		return req.PathValue("id"), episode, engine, true
 	}
 	toStoryboardShot := func(input storyboardShotInput) screenplay.StoryboardShot {
-		return screenplay.StoryboardShot{SceneID: input.SceneID, Duration: input.Duration, Characters: input.Characters, Scene: input.Scene, Props: input.Props, VideoDesc: input.VideoDesc}
+		shot := screenplay.StoryboardShot{SceneID: input.SceneID, Duration: input.Duration, Characters: input.Characters, Scene: input.Scene, Props: input.Props, VideoDesc: input.VideoDesc, SourceElements: input.SourceElements, SourceSceneIndex: input.SourceSceneIndex, SourceSceneLocalOrder: input.SourceSceneLocalOrder, ProtocolFields: input.ProtocolFields}
+		for _, field := range []struct {
+			key    string
+			value  *string
+			target *string
+		}{{"image_prompt", input.ImagePrompt, &shot.ImagePrompt}, {"voice_actor", input.VoiceActor, &shot.VoiceActor}, {"emotion", input.Emotion, &shot.Emotion}, {"line", input.Line, &shot.Line}} {
+			if field.value != nil {
+				*field.target = *field.value
+				shot.EditedProtocolFields = append(shot.EditedProtocolFields, field.key)
+			}
+		}
+		return shot
 	}
 	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots", func(w http.ResponseWriter, req *http.Request, owner string) {
 		projectID, episode, engine, ok := storyboardPath(w, req)

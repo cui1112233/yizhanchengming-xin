@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/prompt/luoshui"
 )
 
@@ -70,8 +71,7 @@ type episodeInput struct {
 	Content string
 }
 
-// Generate 逐集调用分镜词提示词。每集一次调用，集内分段由模型内部完成
-// （规格 §6「一次一集；集内按场景片段分段」；agent.pyd step5 以「第{N}集」拼提示词）。
+// Generate 按章节内场次调用并分别保存原回包；失败续跑复用已完成场次。
 func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest) (out StoryboardResult, runErr error) {
 	if !storyboardGenerationKeyRe.MatchString(req.IdempotencyKey) {
 		return out, fmt.Errorf("%w: 请提供稳定的分镜生成idempotencyKey", ErrInvalidArgument)
@@ -102,6 +102,9 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if resolveErr != nil {
 		return StoryboardResult{}, fmt.Errorf("%w: %v", ErrInvalidArgument, resolveErr)
 	}
+	if !selected.Supported || selected.OutputProtocol == "" {
+		return out, fmt.Errorf("%w: 所选分镜模板未完成协议核验：%s", ErrInvalidArgument, selected.UnsupportedReason)
+	}
 	// The selected prompt defines the output protocol, including validation and
 	// persistence identity. A stale client engine must never widen its limits.
 	switch selected.ID {
@@ -112,7 +115,10 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	case "storyboard_xiaoyunque_v3":
 		engine = EngineXiaoyunqueV3
 	default:
-		return StoryboardResult{}, fmt.Errorf("%w: 分镜提示词 %s 的输出协议未登记", ErrInvalidArgument, selected.ID)
+		if selected.SourceID == 0 || !selected.Supported || !strings.HasPrefix(selected.OutputProtocol, "storyboard_") {
+			return StoryboardResult{}, fmt.Errorf("%w: 分镜提示词 %s 不可执行：%s", ErrInvalidArgument, selected.Name, selected.UnsupportedReason)
+		}
+		engine = StoryboardEngine(fmt.Sprintf("prompt_%d", selected.SourceID))
 	}
 	if project.PermissionMode == PermissionAuto && !req.Confirmed {
 		return StoryboardResult{
@@ -149,16 +155,26 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if len(episodes) == 0 {
 		return StoryboardResult{}, ErrEmptyContent
 	}
+	// Validate every selected source unit before reserving or calling a provider.
+	sceneInputs := map[int][]storyboardSceneInput{}
+	sceneCounts := map[int]int{}
+	for _, ep := range episodes {
+		units, e := storyboardScenesForEpisode(req, authoring, ep)
+		if e != nil {
+			return out, fmt.Errorf("第%d集：%w", ep.No, e)
+		}
+		sceneInputs[ep.No] = units
+		sceneCounts[ep.No] = len(units)
+	}
 	planningByEpisode := map[int]string{}
 	for _, episode := range episodes {
-		planning, e := storyboardPlanningText(req, authoring, episode.No)
+		planning, e := storyboardPlanningText(req, authoring, episode.No, project)
 		if e != nil {
 			return StoryboardResult{}, e
 		}
 		planningByEpisode[episode.No] = planning
 	}
 
-	systemPrompt := selected.Body
 	roles, scenes, props, err := s.libraryPlaceholders(ctx, req)
 	if err != nil {
 		return StoryboardResult{}, err
@@ -185,8 +201,12 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if EffectiveCreativeConfig(project).StoryboardUseContextHistory {
 		external = generationExternalHistory(currentBoards, numbers)
 	}
-	base := map[string]any{"owner": req.Owner, "project": req.ProjectID, "engine": engine, "model": firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), "prompt_id": selected.ID, "prompt_digest": contentDigest(selected.Body), "config": EffectiveCreativeConfig(project), "prefix": prefix, "episodes": episodes, "planning": planningByEpisode, "style": style, "synopsis": synopsis, "chapter_id": req.ChapterID, "planning_chapter_id": req.PlanningChapterID, "use_original": req.UseOriginalContentDirectly, "use_planning": req.UsePlanning, "external_history": external}
+	base := map[string]any{"owner": req.Owner, "project": req.ProjectID, "engine": engine, "model": firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), "prompt_id": selected.ID, "prompt_digest": contentDigest(selected.Body), "config": EffectiveCreativeConfig(project), "prefix": prefix, "episodes": episodes, "planning": planningByEpisode, "style": style, "synopsis": synopsis, "chapter_id": req.ChapterID, "planning_chapter_id": req.PlanningChapterID, "use_original": req.UseOriginalContentDirectly, "use_planning": req.UsePlanning, "external_history": external, "scene_contract": "chapter-scenes-v1"}
 	var replay *StoryboardGenerationAttempt
+	base["scene_counts"] = sceneCounts
+	base["scene_inputs"] = sceneInputs
+	base["output_protocol"] = selected.OutputProtocol
+	base["parser_version"] = selected.ParserVersion
 	session, replay, e = beginStoryboardGeneration(ctx, store, req, engine, numbers, base, assets, external, currentBoards)
 	if e != nil {
 		if replay != nil {
@@ -204,7 +224,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	result := StoryboardResult{EpisodeCount: len(episodes)}
 	known := libraryNameSets(roles, scenes, props)
 	var firstErr error
-	for index, episode := range episodes {
+	for _, episode := range episodes {
 		if completed := session.attempt.Episodes[episode.No]; completed.Status == "succeeded" && completed.Storyboard != nil {
 			result.Storyboards = append(result.Storyboards, *completed.Storyboard)
 			result.GroupCount += len(completed.Storyboard.Shots)
@@ -222,86 +242,20 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 			result.Warnings = append(result.Warnings, fmt.Sprintf("第 %d 集内容为空，已跳过", episode.No))
 			continue
 		}
-		vars := map[string]string{
-			"CURRENT_SCENE_CONTENT":   content,
-			"CURRENT_SCENE_POSITION":  strconv.Itoa(index + 1),
-			"TOTAL_SCENE_COUNT":       strconv.Itoa(len(episodes)),
-			"ROLES_PLACEHOLDER":       roles,
-			"SCENES_PLACEHOLDER":      scenes,
-			"PROPS_PLACEHOLDER":       props,
-			"style":                   style,
-			"synopsis":                synopsis,
-			"PREVIOUS_SCENE_POSITION": "",
-			"PREVIOUS_SCENE_CONTENT":  "",
-			"NEXT_SCENE_POSITION":     "",
-			"NEXT_SCENE_CONTENT":      "",
-		}
-		if index > 0 {
-			vars["PREVIOUS_SCENE_POSITION"] = strconv.Itoa(index)
-			vars["PREVIOUS_SCENE_CONTENT"] = strings.TrimSpace(episodes[index-1].Content)
-		}
-		if index+1 < len(episodes) {
-			vars["NEXT_SCENE_POSITION"] = strconv.Itoa(index + 2)
-			vars["NEXT_SCENE_CONTENT"] = strings.TrimSpace(episodes[index+1].Content)
-		}
-		planning := planningByEpisode[episode.No]
-		userPrompt := content
-		if planning != "" {
-			userPrompt += "\n\n【本次分镜规划】\n" + planning
-		}
-		if EffectiveCreativeConfig(project).StoryboardUseContextHistory {
-			history := session.history(episode.No)
-			if history != "" {
-				userPrompt += "\n\n【最近5条已生成分镜历史，仅供衔接参考，不重复输出】\n" + history
-			}
-		}
-		renderedSystem := luoshui.Render(systemPrompt, vars)
-		if strings.TrimSpace(prefix) != "" {
-			renderedSystem = prefix + "\n\n" + renderedSystem
-		}
-
-		response, callErr := s.generationCall(ctx, req, episode.No, "storyboard", TextRequest{
-			Model:        firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"),
-			SystemPrompt: renderedSystem,
-			UserPrompt:   userPrompt,
-			JSONResponse: true,
-		})
-		if callErr != nil {
-			wrapped := wrapAIError(callErr)
-			if checkpointErr := session.episodeError(episode.No, wrapped); checkpointErr != nil {
-				return result, checkpointErr
-			}
+		shots, sceneErr := s.generateSceneShots(ctx, req, episode, sceneInputs[episode.No], selected, roles, scenes, props, style, synopsis, prefix, planningByEpisode[episode.No], firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), EffectiveCreativeConfig(project).StoryboardUseContextHistory, EffectiveCreativeConfig(project).AspectRatio)
+		if sceneErr != nil {
 			if ctx.Err() != nil {
-				return result, wrapped
+				return result, wrapAIError(ctx.Err())
 			}
 			if firstErr == nil {
-				firstErr = wrapped
+				firstErr = sceneErr
 			}
 			result.FailedEpisodes = append(result.FailedEpisodes, episode.No)
-			result.Warnings = append(result.Warnings, fmt.Sprintf("第 %d 集生成失败：%v", episode.No, wrapped))
-			if session.attempt.Episodes[episode.No].Calls["storyboard"].Status == "unknown" {
-				return result, wrapped
+			result.Warnings = append(result.Warnings, sceneErr.Error())
+			if session.attempt.Episodes[episode.No].Status == "unknown" {
+				return result, sceneErr
 			}
 			continue
-		}
-
-		if ctx.Err() != nil {
-			return result, ctx.Err()
-		}
-		shots, parseErr := parseStoryboardJSON(strings.TrimSpace(response.Content))
-		if parseErr != nil {
-			if checkpointErr := session.episodeError(episode.No, parseErr); checkpointErr != nil {
-				return result, checkpointErr
-			}
-			if firstErr == nil {
-				firstErr = parseErr
-			}
-			result.FailedEpisodes = append(result.FailedEpisodes, episode.No)
-			result.Warnings = append(result.Warnings, fmt.Sprintf("第 %d 集分镜解析失败：%v", episode.No, parseErr))
-			continue
-		}
-		for i := range shots {
-			shots[i].ID = newScreenplayID("sb_shot")
 		}
 		if EffectiveCreativeConfig(project).StoryboardAutoSyncAssets {
 			syncReq := req
@@ -511,6 +465,13 @@ func nameSet(library string) map[string]bool {
 }
 
 func resolveStoryboardEngine(engine StoryboardEngine) (StoryboardEngine, string, error) {
+	if strings.HasPrefix(string(engine), "prompt_") {
+		p, e := prompt.ResolveCreativePrompt(strings.TrimPrefix(string(engine), "prompt_"), "storyboard")
+		if e == nil && p.Supported {
+			return engine, p.ID, nil
+		}
+		return "", "", fmt.Errorf("%w: 不可用分镜模板%s", ErrInvalidArgument, engine)
+	}
 	switch StoryboardEngine(strings.TrimSpace(string(engine))) {
 	case "", EngineXiaoyunqueV3:
 		// 批次默认走小云雀 v3（规格 §7）。
@@ -549,24 +510,42 @@ func parseStoryboardJSON(raw string) ([]StoryboardShot, error) {
 	for index, groupRaw := range groups {
 		group, ok := groupRaw.(map[string]any)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("%w: 第%d组必须是对象", ErrAIInvalidStoryboard, index+1)
 		}
 		videoDesc := anyString(group["video_desc"])
-		if strings.TrimSpace(videoDesc) == "" {
-			continue
+		imagePrompt := anyString(group["image_prompt"])
+		if imagePrompt == "" {
+			imagePrompt = anyString(group["image_desc"])
+		}
+		if strings.TrimSpace(videoDesc) == "" && strings.TrimSpace(imagePrompt) == "" {
+			return nil, fmt.Errorf("%w: 第%d组视频词和图片词均为空", ErrAIInvalidStoryboard, index+1)
+		}
+		protocolFields, marshalErr := json.Marshal(group)
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		var sourceElements json.RawMessage
+		if v, ok := group["source_elements"]; ok {
+			sourceElements, _ = json.Marshal(v)
 		}
 		seq := int(anyNumber(group["id"]))
 		if seq <= 0 {
 			seq = index + 1
 		}
 		shots = append(shots, StoryboardShot{
-			Seq:        seq,
-			SceneID:    int(anyNumber(group["scene_id"])),
-			Duration:   anyNumber(group["duration_sec"]),
-			Characters: anyString(group["characters"]),
-			Scene:      anyString(group["scene"]),
-			Props:      anyString(group["props"]),
-			VideoDesc:  videoDesc,
+			Seq:            seq,
+			SceneID:        int(anyNumber(group["scene_id"])),
+			Duration:       anyNumber(group["duration_sec"]),
+			Characters:     anyString(group["characters"]),
+			Scene:          anyString(group["scene"]),
+			Props:          anyString(group["props"]),
+			VideoDesc:      videoDesc,
+			ImagePrompt:    imagePrompt,
+			VoiceActor:     anyString(group["voice_actor"]),
+			Emotion:        anyString(group["emotion"]),
+			Line:           anyString(group["line"]),
+			SourceElements: sourceElements,
+			ProtocolFields: protocolFields,
 		})
 	}
 	if len(shots) == 0 {

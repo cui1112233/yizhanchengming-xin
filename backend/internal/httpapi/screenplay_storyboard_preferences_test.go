@@ -87,7 +87,7 @@ func TestScreenplayStoryboardAssistantDraftDoesNotCallOrPersist(t *testing.T) {
 func TestScreenplayStoryboardPlanAndGenerationHTTPConsumeSavedChoices(t *testing.T) {
 	ctx := context.Background()
 	projects := screenplay.NewMemoryStore()
-	_, _ = projects.CreateProject(ctx, screenplay.Project{ID: "e2-p", OwnerUsername: "alice", ModelID: "chosen-text", PermissionMode: screenplay.PermissionBypass})
+	_, _ = projects.CreateProject(ctx, screenplay.Project{ID: "e2-p", OwnerUsername: "alice", ModelID: "chosen-text", PermissionMode: screenplay.PermissionBypass, CreativeConfig: &screenplay.CreativeConfig{StoryboardPromptID: "storyboard_xiaoluo_v7_15s"}})
 	authors := &screenplay.AuthoringService{Store: projects, Repository: screenplay.NewMemoryAuthoringRepository()}
 	state, e := authors.Save(ctx, "alice", "e2-p", screenplay.AuthoringState{Chapters: []screenplay.Chapter{{ID: "c", Title: "目标", SourceText: "完整原文输入", ScriptText: "完整剧本输入"}}}, 0)
 	if e != nil {

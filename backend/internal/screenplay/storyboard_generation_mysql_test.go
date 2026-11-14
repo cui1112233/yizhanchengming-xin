@@ -46,7 +46,7 @@ func TestStoryboardGenerationMySQLSuccessCheckpointAndBoardCommitTogether(t *tes
 	m.ExpectQuery("SELECT id, revision FROM screenplay_storyboards").WithArgs("p1", "alice", 1, string(EngineXiaoluoV7)).WillReturnRows(sqlmock.NewRows([]string{"id", "revision"}))
 	m.ExpectExec("INSERT INTO screenplay_storyboards").WithArgs("board-new", "p1", "alice", 1, string(EngineXiaoluoV7), "done", "source-hash", 1, int64(1), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	m.ExpectExec("DELETE FROM screenplay_storyboard_shots").WithArgs("board-new", "p1", "alice").WillReturnResult(sqlmock.NewResult(0, 0))
-	m.ExpectExec("INSERT INTO screenplay_storyboard_shots").WithArgs("shot-new", "board-new", "p1", "alice", 1, 1, float64(12), "甲", "家", "无", "实际镜头", sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	m.ExpectExec("INSERT INTO screenplay_storyboard_shots").WithArgs("shot-new", "board-new", "p1", "alice", 1, 1, float64(12), "甲", "家", "无", "实际镜头", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	captured := ""
 	m.ExpectExec("UPDATE screenplay_storyboard_generations SET state_json").WithArgs(generationSuccessJSON{captured: &captured}, "alice", "p1").WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectCommit()

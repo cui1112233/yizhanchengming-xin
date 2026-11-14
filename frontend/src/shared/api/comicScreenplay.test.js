@@ -136,7 +136,7 @@ test('分镜条目新增、编辑、拆分、合并和删除调用真实接口',
 });
 
 test('分镜条目拒绝空内容、无效时长和无效路径参数', async () => {
-  await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: 0, videoDesc: '内容' }, async () => ({})), /时长/);
+  await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: -1, videoDesc: '内容' }, async () => ({})), /时长/);
   await assert.rejects(() => createComicStoryboardShot('comic-1', 'xiaoluo_v7_15s', 1, { durationSec: 1, videoDesc: ' ' }, async () => ({})), /内容不能为空/);
   await assert.rejects(() => splitComicStoryboardShot('comic-1', 'bad engine', 1, 'sb-shot-1', async () => ({})), /分镜引擎无效/);
 });
@@ -161,4 +161,15 @@ test('真实生成请求仅fetch接收取消信号，严格JSON不含signal；�
       return {};
     });
   }
+});
+
+
+test('图片分镜无时长也能保存，额外字段完整传回', async () => {
+  const input = { durationSec: 0, imagePrompt: '图片提示词', line: '旁白', voiceActor: '甲', emotion: '平静', sourceElements: ['L1'], protocolFields: { lens: 35 } };
+  let saved;
+  await updateComicStoryboardShot('comic-1', 'prompt_137', 1, 'shot-1', input, async (path, options) => { saved = JSON.parse(options.body); return { storyboard: { shots: [] } }; });
+  assert.deepEqual(saved, input);
+  await assert.rejects(() => createComicStoryboardShot('comic-1', 'prompt_137', 1, { ...input, durationSec: -1 }, async () => ({})), /时长/);
+  await createComicStoryboardShot('comic-1', 'prompt_137', 1, { ...input, videoDesc: '视频' }, async () => ({ storyboard: {} }));
+  await createComicStoryboardShot('comic-1', 'prompt_137', 1, { durationSec: 1, line: '台词' }, async () => ({ storyboard: {} }));
 });

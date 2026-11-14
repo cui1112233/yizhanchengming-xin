@@ -18,11 +18,11 @@ func TestRawChapterWithoutScriptKeepsSelectedSecondEpisode(t *testing.T) {
 	}
 	service.Authoring = authors
 	noPlan := false
-	result, err := service.Generate(ctx, StoryboardRequest{Owner: "alice", ProjectID: "p1", IdempotencyKey: "raw-second", Model:"own-text", Engine: EngineXiaoluoV7, EpisodeNo: 2, ChapterID: "b", UseOriginalContentDirectly: true, UsePlanning: &noPlan, Content: "客户端不应覆盖原文"})
+	result, err := service.Generate(ctx, StoryboardRequest{Owner: "alice", ProjectID: "p1", IdempotencyKey: "raw-second", Model: "own-text", Engine: EngineXiaoluoV7, EpisodeNo: 2, ChapterID: "b", UseOriginalContentDirectly: true, UsePlanning: &noPlan, Content: "客户端不应覆盖原文"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(generator.requests) != 1 || generator.requests[0].UserPrompt != "第二章真实原文" || generator.requests[0].Model!="own-text" {
+	if len(generator.requests) != 1 || generator.requests[0].UserPrompt != "第二章真实原文" || generator.requests[0].Model != "own-text" {
 		t.Fatalf("wrong original: %+v", generator.requests)
 	}
 	if len(result.Storyboards) != 1 || result.Storyboards[0].EpisodeNo != 2 {
@@ -95,6 +95,7 @@ func TestStoryboardPlanOnlyDensityIdempotencyAndFinalModes(t *testing.T) {
 	p, _ := store.GetProject(ctx, "alice", "p1")
 	cfg := EffectiveCreativeConfig(p)
 	cfg.PlanDensity = "sd25"
+	cfg.StoryboardPromptID = "storyboard_xiaoluo_v7_15s"
 	_, e = store.SaveCreativeConfig(ctx, "alice", "p1", cfg, p.Revision)
 	if e != nil {
 		t.Fatal(e)
@@ -202,7 +203,7 @@ func TestStoryboardAutoSyncAddsOnlyMissingAndKeepsExisting(t *testing.T) {
 func TestStoryboardPlannerCancelPreservesOldPlanAndSameFailedKeyCannotRebill(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()
-	_, _ = store.CreateProject(ctx, Project{ID: "plan-cancel", OwnerUsername: "alice", ModelID: "text-model"})
+	_, _ = store.CreateProject(ctx, Project{ID: "plan-cancel", OwnerUsername: "alice", ModelID: "text-model", CreativeConfig: &CreativeConfig{StoryboardPromptID: "storyboard_xiaoluo_v7_15s"}})
 	authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
 	state, e := authors.Save(ctx, "alice", "plan-cancel", AuthoringState{Chapters: []Chapter{{ID: "c", Title: "章节", SourceText: "原文", ScriptText: "剧本", PlanningText: "用户之前保存的规划", PlanDensity: "compact"}}}, 0)
 	if e != nil {
@@ -239,6 +240,7 @@ func TestStoryboardContextMultiEpisodeIsSequentialAndPreflightsMissingPlans(t *t
 	p, _ := store.GetProject(ctx, "alice", "p1")
 	cfg := EffectiveCreativeConfig(p)
 	cfg.StoryboardUseContextHistory = true
+	cfg.StoryboardPromptID = "storyboard_xiaoluo_v7_15s"
 	_, _ = store.SaveCreativeConfig(ctx, "alice", "p1", cfg, p.Revision)
 	_, e := service.Generate(ctx, StoryboardRequest{IdempotencyKey: "test-storyboardpreparationtestgo-5", Owner: "alice", ProjectID: "p1", Engine: EngineXiaoluoV7, Episodes: map[int]string{1: "第一集完整输入", 2: "第二集完整输入"}})
 	if e != nil {
@@ -248,7 +250,9 @@ func TestStoryboardContextMultiEpisodeIsSequentialAndPreflightsMissingPlans(t *t
 		t.Fatal(generator.requests)
 	}
 	authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
-	_, _ = authors.Save(ctx, "alice", "p1", AuthoringState{Chapters: []Chapter{{ID: "c1", Title: "1", SourceText: "服务端完整第一原文", ScriptText: "剧本1", PlanningText: "计划1"}, {ID: "c2", Title: "2", SourceText: "服务端完整第二原文", ScriptText: "剧本2"}}}, 0)
+	p, _ = store.GetProject(ctx, "alice", "p1")
+	selected, configDigest, _, _ := storyboardPlanningContext(p)
+	_, _ = authors.Save(ctx, "alice", "p1", AuthoringState{Chapters: []Chapter{{ID: "c1", Title: "1", SourceText: "服务端完整第一原文", ScriptText: "剧本1", PlanningText: "计划1", PlanningPromptID: selected.ID, PlanningPromptDigest: contentDigest(selected.Body), PlanningConfigDigest: configDigest}, {ID: "c2", Title: "2", SourceText: "服务端完整第二原文", ScriptText: "剧本2"}}}, 0)
 	service.Authoring = authors
 	yes := true
 	before := generator.callCount()

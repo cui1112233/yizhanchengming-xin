@@ -18,6 +18,9 @@ func BuildChapterTextRequest(p Project, c Chapter, instruction, contextJSON stri
 		if err != nil {
 			return TextRequest{}, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 		}
+		if !snap.Supported {
+			return TextRequest{}, fmt.Errorf("%w: 所选剧本提示词的输出协议尚未支持：%s", ErrInvalidArgument, snap.OutputProtocol)
+		}
 		system = snap.Body
 		// 144 requires JSON followed by an optional plain-text conversion report.
 		// JSON-only provider mode would contradict that documented output contract.

@@ -72,9 +72,14 @@ func RegisterScreenplayCreativeRoutes(mux *http.ServeMux, auth BridgeAuth, store
 			writeScreenplayError(w, e)
 			return
 		}
-		options := []map[string]string{}
+		options := []map[string]any{}
 		for _, p := range prompt.CreativePromptOptions() {
-			options = append(options, map[string]string{"id": p.ID, "name": p.Name, "purpose": strings.ReplaceAll(p.Type, "-", "_"), "version": p.Version, "sha256": p.Digest})
+			raw, _ := json.Marshal(p)
+			row := map[string]any{}
+			_ = json.Unmarshal(raw, &row)
+			row["purpose"] = strings.ReplaceAll(p.Type, "-", "_")
+			row["sha256"] = p.Digest
+			options = append(options, row)
 		}
 		writeJSON(w, 200, map[string]any{"styles": styles, "prompts": options})
 	})
@@ -373,6 +378,13 @@ func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor stri
 		id := strings.TrimSpace(*s.dst)
 		if s.src != nil {
 			id = screenplay.CreativePromptAlias(*s.src)
+			selected, e := prompt.ResolveCreativePrompt(id, s.purpose)
+			if e != nil {
+				return e
+			}
+			if !selected.Supported {
+				return fmt.Errorf("提示词%s暂不可执行：%s", selected.Name, selected.UnsupportedReason)
+			}
 		}
 		if id == "" && s.src == nil {
 			continue

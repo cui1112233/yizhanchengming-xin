@@ -4,6 +4,12 @@ import { applyCreativeConfigToProject, comicProjectStyleName, comicImageModelSel
 import { loadComicCreativeLibrary, loadComicCreativeConfig, saveComicCreativeConfig, getComicStylePreview, createComicCreativeStyle } from '../../shared/api/comicScreenplay.js';
 const config = { script_prompt_id: 'script144', storyboard_prompt_id: 'story307', character_design_prompt_id: 'char213', scene_design_prompt_id: 'scene289', style: { id: 'own-style', name: '我的风格' }, image_core_instruction: '保留服装细节', image_model_id: 'image', image_edit_model_id: 'edit' };
 
+test('未闭合模板显示原因并禁选，已支持模板映射独立引擎',()=>{
+  const options=creativePromptOptions([{id:'luoshui_storyboard_138',name:'分镜138',type:'storyboard',supported:false,unsupported_reason:'待接续写'},{id:'luoshui_storyboard_137',name:'分镜137',type:'storyboard',supported:true}], 'storyboard');
+  assert.equal(options[0].disabled,true);assert.match(options[0].label,/待接续写/);
+  assert.equal(options[1].disabled,false);assert.equal(comicStoryboardEngine('luoshui_storyboard_137'),'prompt_137');
+});
+
 test('恢复四步骤选择和私人画风，不用名称冒充 ID，不取目录首项', () => {
   const draft = creativeConfigDraft(config);
   assert.equal(draft.style_id, 'own-style');

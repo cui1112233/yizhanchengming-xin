@@ -79,7 +79,11 @@ func (s *ScreenplayMediaWorkbench) creativeImagePrompt(ctx context.Context, p sc
 		for _, board := range boards {
 			for _, shot := range board.Shots {
 				if shot.ID == target {
-					parts = append(parts, shot.VideoDesc)
+					imagePrompt := strings.TrimSpace(shot.ImagePrompt)
+					if imagePrompt == "" {
+						imagePrompt = shot.VideoDesc
+					}
+					parts = append(parts, imagePrompt)
 				}
 			}
 		}

@@ -39,8 +39,9 @@ function storyboardShotPath(projectId, engine, episodeNo, shotId = '', suffix = 
 }
 
 function validateStoryboardShotInput(input) {
-  if (!(Number(input?.durationSec) > 0)) throw new Error('镜头时长必须大于 0 秒');
-  if (![input?.characters, input?.scene, input?.props, input?.videoDesc].some(value => String(value || '').trim())) throw new Error('分镜内容不能为空');
+  const duration = Number(input?.durationSec);
+  if (!Number.isFinite(duration) || duration < 0) throw new Error('镜头时长不能小于 0 秒');
+  if (![input?.characters, input?.scene, input?.props, input?.videoDesc, input?.imagePrompt, input?.line].some(value => String(value || '').trim())) throw new Error('分镜内容不能为空');
 }
 
 function validateAssetInput(input) {

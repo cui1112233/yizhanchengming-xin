@@ -159,8 +159,13 @@ func TestStoryboardGenerationSavedConfigPrefixAndPlanningChangesRejectOldKey(t *
 		t.Run(kind, func(t *testing.T) {
 			service, store, generator := newStoryboardService(t, PermissionBypass)
 			ctx := context.Background()
+			p, _ := store.GetProject(ctx, "alice", "p1")
+			cfg := EffectiveCreativeConfig(p)
+			cfg.StoryboardPromptID = "storyboard_xiaoluo_v7_15s"
+			p, _ = store.SaveCreativeConfig(ctx, "alice", "p1", cfg, p.Revision)
+			selected, configDigest, _, _ := storyboardPlanningContext(p)
 			authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
-			_, _ = authors.Save(ctx, "alice", "p1", AuthoringState{Chapters: []Chapter{{ID: "c", Title: "章节", SourceText: "完整原文", ScriptText: "完整剧本", PlanningText: "已有规划"}}}, 0)
+			_, _ = authors.Save(ctx, "alice", "p1", AuthoringState{Chapters: []Chapter{{ID: "c", Title: "章节", SourceText: "完整原文", ScriptText: "完整剧本", PlanningText: "已有规划", PlanningPromptID: selected.ID, PlanningPromptDigest: contentDigest(selected.Body), PlanningConfigDigest: configDigest}}}, 0)
 			service.Authoring = authors
 			_, _ = store.MutateStoryboardPreferences(ctx, "alice", func(v *StoryboardPreferences) error {
 				v.PrefixPresets = []StoryboardPrefixPreset{{ID: "p", Name: "前缀", Content: "原前缀"}}

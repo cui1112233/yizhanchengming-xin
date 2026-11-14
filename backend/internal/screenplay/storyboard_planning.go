@@ -2,6 +2,7 @@ package screenplay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"qiantie/backend/internal/prompt"
 	"strings"
@@ -89,8 +90,12 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		if model == "" {
 			return fmt.Errorf("%w: 请选择文字模型", ErrInvalidArgument)
 		}
+		selected, configDigest, style, e := storyboardPlanningContext(p)
+		if e != nil {
+			return e
+		}
 		density := NormalizePlanDensity(EffectiveCreativeConfig(p).PlanDensity)
-		digest := contentDigest(fmt.Sprintf("%s\n%s\n%t\n%s", model, density, in.UseOriginal, content))
+		digest := contentDigest(fmt.Sprintf("%s\n%s\n%s\n%s\n%t\n%s", model, selected.ID, contentDigest(selected.Body), configDigest, in.UseOriginal, content))
 		if chapter.PlanningRequestKey == in.IdempotencyKey {
 			if chapter.PlanningRequestDigest != digest {
 				return fmt.Errorf("%w: 同一规划请求标识的输入已变化，请核对已有结果", ErrInvalidArgument)
@@ -117,7 +122,7 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 			return e
 		}
 		state = reserved
-		response, runErr := generator.Generate(ctx, TextRequest{Model: model, SystemPrompt: prompt.ScreenplayStoryboardPlanning + "\n" + prompt.ScreenplayStoryboardDensityRule(density), UserPrompt: content, MaxOutputTokens: 16000, Temperature: .4})
+		response, runErr := generator.Generate(ctx, TextRequest{Model: model, SystemPrompt: prompt.ScreenplayPlanningReference(selected.ID, selected.Name, selected.Body, density, style), UserPrompt: content, MaxOutputTokens: 16000, Temperature: .4})
 		if ctx.Err() != nil {
 			runErr = ctx.Err()
 		}
@@ -127,6 +132,9 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		}
 		if runErr == nil {
 			chapter.PlanningText = text
+			chapter.PlanningPromptID = selected.ID
+			chapter.PlanningPromptDigest = contentDigest(selected.Body)
+			chapter.PlanningConfigDigest = configDigest
 			chapter.PlanDensity = density
 			chapter.PlanningSourceSHA256 = contentDigest(content)
 			chapter.PlanningUseOriginal = in.UseOriginal
@@ -146,4 +154,27 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		return runErr
 	})
 	return out, err
+}
+
+// Planning context fingerprints every saved setting used by the planner. The
+// complete selected body is hashed directly, even when a stored digest is stale.
+func storyboardPlanningContext(p Project) (CreativePromptSnapshot, string, string, error) {
+	cfg := EffectiveCreativeConfig(p)
+	selected, err := ResolveProjectPrompt(p, cfg.StoryboardPromptID, "storyboard")
+	if err != nil {
+		return selected, "", "", fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+	if strings.TrimSpace(selected.Body) == "" {
+		return selected, "", "", fmt.Errorf("%w: 所选分镜提示词正文为空", ErrInvalidArgument)
+	}
+	style := firstNonEmpty(p.StyleDesc, p.ArtStyle)
+	if cfg.Style != nil {
+		style = cfg.Style.Prompt
+	}
+	raw, _ := json.Marshal(struct {
+		Density   string
+		Style     *CreativeStyleSnapshot
+		StyleText string
+	}{NormalizePlanDensity(cfg.PlanDensity), cfg.Style, style})
+	return selected, contentDigest(string(raw)), style, nil
 }

@@ -88,3 +88,18 @@ test('音色已成功但状态刷新失败时保留真实结果，下一次核�
  window.fetch=async(url,options={})=>{if(!options.method||options.method==='GET'){if(failedReads){failedReads--;return new Response(JSON.stringify({error:'状态读取中断'}),{status:503,headers:{'Content-Type':'application/json'}})}return response({items,settings:{revision,voiceDesign:{items:rows,status:'draft'}},capabilities:{voice_analyze:{available:true},voice_design:{available:true}}})}const body=JSON.parse(options.body);if(!body.action)return response({});window.writes.push(body);assert(body.action==='voice_design','wrong voice action');if(window.writes.length>1)assert(window.writes[0].idempotencyKey===body.idempotencyKey,'refresh failure discarded success key');const result={id:'real-audio',kind:'audio',targetId:'voice-draft:1',status:'succeeded',voiceId:'real-persisted-id',voiceEngine:'minimax',url:'/api/audio'};items=[result];revision++;if(window.writes.length===1)failedReads=2;return response(result)};
  (async()=>{createRoot(document.getElementById('root')).render(<Voice projectId="p" workspace={{project:{model_id:'text',creative_config:{voice_design_model:'minimax'}}}} canGenerate/>);await tick();await tick();await click('设计音色',document.querySelector('.comic-voice-description-card'));await click('设计音色',[...document.querySelectorAll('.ant-modal-confirm')].at(-1));assert(document.body.textContent.includes('音色已设计成功'),'successful response mislabeled as generation failure');assert(document.body.textContent.includes('real-persisted-id'),'known success metadata discarded');await click('重新设计',document.querySelector('.comic-voice-description-card'));await click('设计音色',[...document.querySelectorAll('.ant-modal-confirm')].at(-1));assert(window.writes.length===2,'unexpected voice request count '+window.writes.length);document.body.dataset.result='passed';})().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
 `));
+
+
+test('资产分析原文回退：显示真实来源并发送原文，空章保持序号并拒绝', { skip: !browser }, async () => runBrowser(`
+ import React from 'react';import{createRoot}from'react-dom/client';import Stage,{comicAssetAnalysisSource} from './ComicScreenplayAssetStage.jsx';
+ ${helpers}
+ window.fetch=async()=>response({items:[],settings:{revision:1}});
+ const workspace={project:{source_text:'项目保存原文'},authoringChapters:[{id:'one',source_text:'第一章全部原文'},{id:'two',source_text:'第二章全部原文'}],assets:[]};
+ (async()=>{
+ const raw=comicAssetAnalysisSource(workspace);assert(raw.content===['第一章全部原文','第二章全部原文'].join(String.fromCharCode(10,10)),'fallback lost chapter source/order');assert(raw.label==='章节原文','wrong source label');
+ const saved=comicAssetAnalysisSource({...workspace,document:{content:'已保存完整剧本'}});assert(saved.content==='已保存完整剧本','document priority changed');
+ const empty=comicAssetAnalysisSource({...workspace,authoringChapters:[workspace.authoringChapters[0],{id:'two',source_text:''},{id:'three',source_text:'第三章'}]});assert(!empty.content&&empty.error.includes('第2章'),'empty chapter silently skipped');
+ const root=createRoot(document.getElementById('root'));root.render(<Stage projectId="raw" workspace={workspace} canGenerate degree="standard" onExtract={()=>window.sent=comicAssetAnalysisSource(workspace).content}/>);await tick();await tick();
+ assert(document.body.textContent.includes('分析来源：章节原文'),'raw source not explicit');await click('资产分析');assert(window.sent===raw.content,'analysis did not receive real source');root.unmount();document.body.dataset.result='passed';
+ })().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
+`));
