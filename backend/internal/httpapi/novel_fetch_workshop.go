@@ -757,6 +757,10 @@ func markNovelFetchTaskQueued(ctx context.Context, store novelfetchworkshop.Stor
 		document.Meta["currentBatchId"] = batchID
 	}
 	delete(document.Meta, "error")
+	// 入队成功说明 Redis 已恢复，清掉入队失败留下的退避字段；否则下一次
+	// 扫描会被旧的 automationNextRetryAt 继续挡住。
+	delete(document.Meta, "automationEnqueueAttempts")
+	delete(document.Meta, "automationNextRetryAt")
 	appendNovelFetchDocumentLog(&document, "queue_queued", "任务已进入小说获取队列", at)
 	return store.PutDocument(ctx, owner, document)
 }

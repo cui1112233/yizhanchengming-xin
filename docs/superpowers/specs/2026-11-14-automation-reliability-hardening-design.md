@@ -66,6 +66,22 @@
 
 `Scanner.Start`、`Migrator.Start`、`CleanupSupervisor.Start` 的 `RunOnce` 错误不再丢弃，统一 `log.Printf` 记录，包含组件名，便于排查数据库不可用、TOS 校验失败、清理停滞。
 
+## 2.6 小说获取队列的僵尸 processing 回收
+
+现场证据（本地 Redis）：`qiantie:novel-fetch:pending = 0`，`processing = 7`，7 个 job 全部没有 lease key（`TTL = -2`），最早的是 10 月任务。消费者退出后 `BRPOPLPUSH` 已把 job 移入 processing，不会再有 `Ack/Fail`，因此这些 job 永久占用 processing 和书籍去重锁。
+
+修复：`RedisQueue.ReapStaleProcessing` 扫描 processing 列表，以 lease key 是否存在作为消费者存活信号；lease 不存在才调用现有 `RecoverStaleJob` 清理。持有效租约的任务一律跳过。调度入口 `dispatchNovelFetchAutomationOwner` 每轮先执行一次回收，并记录回收数量与错误。
+
+## 2.7 入队失败退避
+
+现状：`EnqueueUniqueBooks` 失败时直接把书写成 `waiting_retry`，但没有下次重试时间。扫描器每 20 秒重跑，Redis 持续不可用时会反复改写同一批文档。
+
+修复：新增 `markNovelFetchAutomationEnqueueRetry`，按 `automationEnqueueAttempts` 指数退避（30 秒起，上限 15 分钟），写入 `automationNextRetryAt`，并记录可读错误。`novelFetchAutomationEligible` 已有的截止时间判断会让这批书在到期前退出调度。入队成功时由 `markNovelFetchTaskQueued` 清除退避字段。
+
+## 2.8 队列计数口径
+
+`pending_count` 当前等于文档层 `queued + waiting_retry`，表示“待执行的书”，不等于 Redis `pending` 列表长度。两者本就不同：调度每轮最多提交 50 本，且等待重试的书有退避窗口。本轮不改前端展示，避免在无法完整验证 UI 的情况下引入回归；后端已具备在需要时补充真实 `queue_pending` 字段的位置。
+
 ## 3. 验收
 
 1. `localartifact`：写保护开启时 `Restore` 返回 `ErrDiskPressure` 且不产生可见文件；校验失败仍返回 `ErrRemoteIntegrity`。

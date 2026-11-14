@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var (
@@ -23,6 +25,14 @@ var (
 	ErrAlreadyExists   = errors.New("artifact already exists")
 	ErrRemoteIntegrity = errors.New("restored artifact failed integrity verification")
 	ErrDiskPressure    = errors.New("server disk pressure blocks new media writes")
+	ErrRestoreTimeout  = errors.New("artifact restore timed out")
+)
+
+// 回源超时默认 2 分钟：本地缓存缺失时从 TOS 重新下载必须有一个上限，否则
+// 一次慢回源会长期占住请求 goroutine。大文件场景可通过环境变量调高。
+const (
+	defaultRestoreTimeout = 2 * time.Minute
+	maxRestoreTimeout     = 10 * time.Minute
 )
 
 var safeArtifactID = regexp.MustCompile(`^[A-Za-z0-9_-]{3,96}$`)
@@ -50,6 +60,7 @@ type Store struct {
 	mu              sync.RWMutex
 	missingRestorer MissingRestorer
 	writeGuard      func() error
+	restoreTimeout  time.Duration
 }
 
 type MissingRestorer interface {
@@ -60,7 +71,7 @@ func NewStore(root string, maxBytes int64) *Store {
 	if maxBytes <= 0 {
 		maxBytes = 1 << 30
 	}
-	return &Store{root: filepath.Clean(root), maxBytes: maxBytes}
+	return &Store{root: filepath.Clean(root), maxBytes: maxBytes, restoreTimeout: defaultRestoreTimeout}
 }
 
 // Root returns the private directory that is mounted for local artifacts.
@@ -87,6 +98,36 @@ func (s *Store) SetWriteGuard(guard func() error) {
 	s.mu.Lock()
 	s.writeGuard = guard
 	s.mu.Unlock()
+}
+
+// SetRestoreTimeout 设置本地缓存缺失时的回源上限。非正值回退默认值，
+// 超过上限按上限处理，避免误配置成无限等待。
+func (s *Store) SetRestoreTimeout(timeout time.Duration) {
+	if s == nil {
+		return
+	}
+	if timeout <= 0 {
+		timeout = defaultRestoreTimeout
+	}
+	if timeout > maxRestoreTimeout {
+		timeout = maxRestoreTimeout
+	}
+	s.mu.Lock()
+	s.restoreTimeout = timeout
+	s.mu.Unlock()
+}
+
+func (s *Store) restoreTimeoutValue() time.Duration {
+	if s == nil {
+		return defaultRestoreTimeout
+	}
+	s.mu.RLock()
+	timeout := s.restoreTimeout
+	s.mu.RUnlock()
+	if timeout <= 0 {
+		return defaultRestoreTimeout
+	}
+	return timeout
 }
 
 func (s *Store) checkWriteAllowed() error {
@@ -359,11 +400,25 @@ func (s *Store) Remove(storageRef string) error {
 	return err
 }
 
+// Open 在本地缓存缺失时触发回源恢复。它使用默认回源超时，供后台 worker 等
+// 没有请求上下文的调用点使用；HTTP 请求应优先使用 OpenContext 传入请求 ctx。
 func (s *Store) Open(storageRef string) (*os.File, error) {
+	if s == nil {
+		return nil, ErrInvalidID
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.restoreTimeoutValue())
+	defer cancel()
+	return s.OpenContext(ctx, storageRef)
+}
+
+// OpenContext 与 Open 行为一致，但回源受调用方上下文约束：请求断开或取消时
+// 立即停止等待，不再让一个已经没人要的下载继续占用 goroutine。
+func (s *Store) OpenContext(ctx context.Context, storageRef string) (*os.File, error) {
 	if s == nil || filepath.Base(storageRef) != storageRef {
 		return nil, ErrInvalidID
 	}
-	file, err := os.Open(filepath.Join(s.root, storageRef))
+	path := filepath.Join(s.root, storageRef)
+	file, err := os.Open(path)
 	if err == nil || !os.IsNotExist(err) {
 		return file, err
 	}
@@ -373,13 +428,27 @@ func (s *Store) Open(storageRef string) (*os.File, error) {
 	if restorer == nil {
 		return nil, err
 	}
-	if restoreErr := restorer.RestoreStorageRef(context.Background(), storageRef); restoreErr != nil {
-		if errors.Is(restoreErr, os.ErrNotExist) {
-			return nil, os.ErrNotExist
-		}
-		return nil, restoreErr
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return os.Open(filepath.Join(s.root, storageRef))
+	start := time.Now()
+	restoreErr := restorer.RestoreStorageRef(ctx, storageRef)
+	elapsed := time.Since(start).Round(time.Millisecond)
+	if restoreErr != nil {
+		log.Printf("artifact restore ref=%s elapsed=%s err=%v", storageRef, elapsed, restoreErr)
+		switch {
+		case errors.Is(restoreErr, context.DeadlineExceeded):
+			return nil, fmt.Errorf("%w: %v", ErrRestoreTimeout, restoreErr)
+		case errors.Is(restoreErr, context.Canceled):
+			return nil, context.Canceled
+		case errors.Is(restoreErr, os.ErrNotExist):
+			return nil, os.ErrNotExist
+		default:
+			return nil, restoreErr
+		}
+	}
+	log.Printf("artifact restore ref=%s elapsed=%s result=ok", storageRef, elapsed)
+	return os.Open(path)
 }
 
 // Restore atomically rehydrates an exact logical reference from durable
@@ -432,11 +501,21 @@ func (s *Store) Restore(storageRef string, source io.Reader, expectedSize int64,
 // never accepts traversal or a missing object, so callers cannot upload an
 // arbitrary server file by crafting a storage reference.
 func (s *Store) Path(storageRef string) (string, error) {
+	if s == nil {
+		return "", ErrInvalidID
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.restoreTimeoutValue())
+	defer cancel()
+	return s.PathContext(ctx, storageRef)
+}
+
+// PathContext 与 Path 一致，但回源受调用方上下文约束。
+func (s *Store) PathContext(ctx context.Context, storageRef string) (string, error) {
 	path, err := s.LocalPath(storageRef)
 	if err == nil || !os.IsNotExist(err) {
 		return path, err
 	}
-	file, openErr := s.Open(storageRef)
+	file, openErr := s.OpenContext(ctx, storageRef)
 	if openErr != nil {
 		return "", openErr
 	}

@@ -255,6 +255,56 @@ func (q *RedisQueue) RecoverStaleJob(ctx context.Context, jobID string) (bool, e
 	return strings.TrimSpace(fmt.Sprint(recovered)) == "1", nil
 }
 
+// ReapStaleProcessing 回收失去租约的执行中任务。BRPOPLPUSH 会把 job 从
+// pending 移到 processing，但消费者进程退出后不会再有 Ack/Fail，job 就会
+// 永久留在 processing 并继续占用书籍去重锁。租约 key 是消费者仍然存活的
+// 唯一可靠信号：租约过期即视为孤儿，按“未执行”清理，让文档层的恢复逻辑
+// 把这些书重新排入等待重试。
+func (q *RedisQueue) ReapStaleProcessing(ctx context.Context) (int, error) {
+	value, err := q.command(ctx, "LRANGE", q.processingKey(), "0", "-1")
+	if err != nil {
+		return 0, err
+	}
+	ids := redisStringSlice(value)
+	reaped := 0
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		exists, existsErr := q.command(ctx, "EXISTS", q.leaseKey(id))
+		if existsErr != nil {
+			return reaped, existsErr
+		}
+		if strings.TrimSpace(fmt.Sprint(exists)) != "0" {
+			continue
+		}
+		recovered, recoverErr := q.RecoverStaleJob(ctx, id)
+		if recoverErr != nil {
+			return reaped, recoverErr
+		}
+		if recovered {
+			reaped++
+		}
+	}
+	return reaped, nil
+}
+
+func redisStringSlice(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return typed
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			out = append(out, fmt.Sprint(item))
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 func (q *RedisQueue) Ack(ctx context.Context, job ProcessJob) error {
 	if _, err := q.command(ctx, "LREM", q.processingKey(), "0", job.ID); err != nil {
 		return err

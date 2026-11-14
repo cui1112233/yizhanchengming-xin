@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -312,6 +313,15 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	if queue == nil {
 		return nil, nil
 	}
+	if reaper, ok := queue.(interface {
+		ReapStaleProcessing(context.Context) (int, error)
+	}); ok {
+		if reaped, reapErr := reaper.ReapStaleProcessing(ctx); reapErr != nil {
+			log.Printf("novel fetch automation: reap stale processing owner=%s: %v", owner, reapErr)
+		} else if reaped > 0 {
+			log.Printf("novel fetch automation: reaped %d stale processing jobs owner=%s", reaped, owner)
+		}
+	}
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
 		return nil, err
@@ -396,9 +406,8 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		enqueueErr = queue.Enqueue(ctx, job)
 	}
 	if enqueueErr != nil {
-		for _, bookID := range bookIDs {
-			_ = updateWorkshopTaskRuntimeState(ctx, store, owner, bookID, "waiting_retry", enqueueErr.Error())
-		}
+		log.Printf("novel fetch automation: enqueue failed owner=%s batch=%s books=%d: %v", owner, batchID, len(bookIDs), enqueueErr)
+		markNovelFetchAutomationEnqueueRetry(ctx, store, owner, bookIDs, now, enqueueErr)
 		return nil, enqueueErr
 	}
 	for _, bookID := range bookIDs {
@@ -410,6 +419,36 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		return nil, err
 	}
 	return &job, nil
+}
+
+// markNovelFetchAutomationEnqueueRetry 在入队失败时写入退避时间。Redis 持续
+// 不可用时扫描器每分钟都会重试同一批书；没有退避既会放大数据库写入，也会
+// 让“最后一次失败”永远停留在当前秒，无法判断是否已经恢复。
+func markNovelFetchAutomationEnqueueRetry(ctx context.Context, store novelfetchworkshop.Store, owner string, bookIDs []string, now time.Time, enqueueErr error) {
+	for _, bookID := range bookIDs {
+		document, err := store.GetDocument(ctx, owner, bookID)
+		if err != nil {
+			continue
+		}
+		if document.Meta == nil {
+			document.Meta = map[string]any{}
+		}
+		attempts := intValue(document.Meta["automationEnqueueAttempts"]) + 1
+		delay := 30 * time.Second
+		for step := 1; step < attempts && delay < 15*time.Minute; step++ {
+			delay *= 2
+		}
+		if delay > 15*time.Minute {
+			delay = 15 * time.Minute
+		}
+		document.Meta["status"] = "waiting_retry"
+		document.Meta["queueState"] = "waiting_retry"
+		document.Meta["error"] = firstText(enqueueErr)
+		document.Meta["automationEnqueueAttempts"] = attempts
+		document.Meta["automationNextRetryAt"] = now.Add(delay).UTC().Format(time.RFC3339Nano)
+		appendNovelFetchDocumentLog(&document, "process_waiting_retry", "入队失败："+firstText(enqueueErr), now)
+		_ = store.PutDocument(ctx, owner, document)
+	}
 }
 
 func markNovelFetchAutomationSubmitResult(ctx context.Context, store novelfetchworkshop.Store, owner string, bookIDs []string, submitErr error) {
