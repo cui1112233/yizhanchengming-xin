@@ -182,8 +182,14 @@
   jiansen、tanglu 的失败批次各 1 本）。
 - 修复：`normalizeQueuedBooksAtFinish` 在收尾时把 queued 标记为失败并写明原因，计入失败数；
   不触碰 scheduled / pending_confirmation。提交 `ed661719`，全量测试连续两次通过。
-- 发布状态：**暂缓**，等并行会话的前端源码提交后与前端一起构建发布，避免带入未完成页面。
-- 旧数据：4 本历史残留书需要用户点“重试失败小说”，或后续按需做一次性状态修复。
+- 发布状态：**已发布**。`qiantie-202611141904`（`ed661719`），`git_sha` 与
+  `runtime_manifest_sha` 均为 `ed661719bdbeebc888e6d1dd1c687a91cc52882f`，前端入口
+  `/assets/user-DQpfXXLl.js`（JS 资源 200，服务 active）；`verify-release.ps1` PASS。
+- 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141904-ed661719`（上一版本 `qiantie-202611141506`）。
+- 旧数据：已对生产 4 本历史残留书做一次性状态修复（只改 `queued`，不动其他状态）：
+  qiuwanjing / weimeixia / jiansen / tanglu 各 1 本改为 `failed`，写明“任务已结束，这本书未开始执行；请点击重试”，
+  并同步 `counts.queued-1`、`counts.failed+1`；修复前备份 `/tmp/queued-repair-backup.json`。
+  复核全库已无“任务非 running/paused 却仍有 queued 书”的残留（`stale_residual=0`）。
 
 #### 阶段 6 遗留：并发预算前端展示（已用任务日志替代上线）
 
