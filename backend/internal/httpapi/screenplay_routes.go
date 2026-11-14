@@ -277,22 +277,57 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			return
 		}
 		payload := map[string]any{"project": project, "documents": []screenplay.Document{}, "shots": []screenplay.Shot{}, "characters": []screenplay.Character{}, "scenes": []screenplay.Scene{}, "assets": []screenplay.Asset{}, "storyboards": []screenplay.Storyboard{}}
-		documents, _ := store.ListDocuments(req.Context(), owner, project.ID)
+		documents, err := store.ListDocuments(req.Context(), owner, project.ID)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
 		payload["documents"] = documents
 		if active, activeErr := store.ActiveDocument(req.Context(), owner, project.ID); activeErr == nil {
 			payload["document"] = active
-			shots, _ := store.ListShots(req.Context(), owner, project.ID, active.ID)
+			shots, err := store.ListShots(req.Context(), owner, project.ID, active.ID)
+			if err != nil {
+				writeScreenplayError(w, err)
+				return
+			}
 			payload["shots"] = shots
-			characters, _ := store.ListCharacters(req.Context(), owner, project.ID, active.ID)
+			characters, err := store.ListCharacters(req.Context(), owner, project.ID, active.ID)
+			if err != nil {
+				writeScreenplayError(w, err)
+				return
+			}
 			payload["characters"] = characters
-			scenes, _ := store.ListScenes(req.Context(), owner, project.ID, active.ID)
+			scenes, err := store.ListScenes(req.Context(), owner, project.ID, active.ID)
+			if err != nil {
+				writeScreenplayError(w, err)
+				return
+			}
 			payload["scenes"] = scenes
+		} else if !errors.Is(activeErr, screenplay.ErrNotFound) && !errors.Is(activeErr, screenplay.ErrNoActiveScript) {
+			writeScreenplayError(w, activeErr)
+			return
 		}
-		assets, _ := store.ListAssets(req.Context(), owner, project.ID, "")
+		assets, err := store.ListAssets(req.Context(), owner, project.ID, "")
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
 		payload["assets"] = assets
-		storyboardsV7, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV7)
-		storyboardsV3, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoyunqueV3)
-		storyboardsV9, _ := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV9)
+		storyboardsV7, err := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV7)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		storyboardsV3, err := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoyunqueV3)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		storyboardsV9, err := store.ListStoryboards(req.Context(), owner, project.ID, screenplay.EngineXiaoluoV9)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
 		payload["storyboards"] = append(append(storyboardsV7, storyboardsV3...), storyboardsV9...)
 		if authors != nil {
 			identity, _ := BridgeIdentityFromContext(req.Context())
