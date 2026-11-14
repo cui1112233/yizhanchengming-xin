@@ -518,7 +518,7 @@ func nullableFloat(v float64) any {
 }
 
 func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND EXISTS (SELECT 1 FROM batch_factory_v12_books vb WHERE vb.batch_id=b.id AND vb.owner_username=b.owner_username AND vb.hidden_at IS NULL) ORDER BY b.created_at DESC,b.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -542,7 +542,7 @@ func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, er
 		return out, nil
 	}
 
-	books, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,r.title,COALESCE(r.source_book_id,''),COALESCE(r.platform,''),b.revision FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`, owner)
+	books, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,r.title,COALESCE(r.source_book_id,''),COALESCE(r.platform,''),b.revision FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +576,7 @@ func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, er
 // Keeping this as two bulk queries prevents the library page from turning N
 // historical batches into thousands of SQL statements.
 func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([]Batch, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND EXISTS (SELECT 1 FROM batch_factory_v12_books vb WHERE vb.batch_id=b.id AND vb.owner_username=b.owner_username AND vb.hidden_at IS NULL) ORDER BY b.created_at DESC,b.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +598,7 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	}
 	rows.Close()
 
-	bookRows, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`, owner)
+	bookRows, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -620,7 +620,7 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	// A project card needs at most one already-generated cover. Reading that
 	// choice here in one bulk query prevents the browser from polling full
 	// production and merge histories for every old project after each reload.
-	coverRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,j.output_url FROM batch_factory_v12_merge_jobs j LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`, owner)
+	coverRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,j.output_url FROM batch_factory_v12_merge_jobs j LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' AND (b.id IS NULL OR b.hidden_at IS NULL) ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +839,7 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 	if err != nil {
 		return Batch{}, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,revision FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? ORDER BY ordinal,id`, id, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,revision FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? AND hidden_at IS NULL ORDER BY ordinal,id`, id, owner)
 	if err != nil {
 		return Batch{}, err
 	}
@@ -918,7 +918,7 @@ func (s *MySQLStore) ListBatchRecoveryIndex(ctx context.Context, owner string) (
 	// 两步查询：source_text / 草稿正文可能是整本小说，直接参与 ORDER BY 的
 	// filesort 会撑爆 sort_buffer_size（MySQL ERROR 1038）。先只对 book id
 	// 排序，再按 id 分批读取负载，顺序仍是 createdAt DESC, id DESC, ordinal, id。
-	const idQuery = `SELECT b.id,b.batch_id FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username WHERE b.owner_username=? AND JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.sourceMode'))='giant_material' ORDER BY ba.created_at DESC,ba.id DESC,b.ordinal,b.id`
+	const idQuery = `SELECT b.id,b.batch_id FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username WHERE b.owner_username=? AND b.hidden_at IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.sourceMode'))='giant_material' ORDER BY ba.created_at DESC,ba.id DESC,b.ordinal,b.id`
 	idRows, err := s.db.QueryContext(ctx, idQuery, owner)
 	if err != nil {
 		return nil, err
@@ -1101,22 +1101,31 @@ func (s *MySQLStore) DeleteBatchWithRetention(ctx context.Context, owner, batchI
 			return err
 		}
 	}
-	for _, stmt := range []string{
-		`DELETE a FROM batch_factory_v12_external_audits a JOIN batch_factory_v12_external_intents i ON i.id=a.intent_id WHERE i.owner_username=? AND i.batch_id=?`,
-		`DELETE FROM batch_factory_v12_external_intents WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v12_merge_sources WHERE owner_username=? AND job_id IN (SELECT id FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?)`,
-		`DELETE FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v12_settings_patches WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v12_config_snapshots WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v12_drafts WHERE owner_username=? AND scope=?`,
-		`DELETE FROM batch_factory_v12_batch_records WHERE batch_id=?`,
-		`DELETE FROM batch_factory_v12_batches WHERE id=? AND owner_username=?`,
-	} {
+	if err := deleteBatchTx(ctx, tx, owner, batchID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+var deleteBatchStmts = []string{
+	`DELETE a FROM batch_factory_v12_external_audits a JOIN batch_factory_v12_external_intents i ON i.id=a.intent_id WHERE i.owner_username=? AND i.batch_id=?`,
+	`DELETE FROM batch_factory_v12_external_intents WHERE owner_username=? AND batch_id=?`,
+	`DELETE FROM batch_factory_v12_merge_sources WHERE owner_username=? AND job_id IN (SELECT id FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?)`,
+	`DELETE FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?`,
+	`DELETE FROM batch_factory_v12_settings_patches WHERE owner_username=? AND batch_id=?`,
+	`DELETE FROM batch_factory_v12_config_snapshots WHERE owner_username=? AND batch_id=?`,
+	`DELETE FROM batch_factory_v12_drafts WHERE owner_username=? AND scope=?`,
+	`DELETE FROM batch_factory_v12_batch_records WHERE batch_id=?`,
+	`DELETE FROM batch_factory_v12_batches WHERE id=? AND owner_username=?`,
+}
+
+func deleteBatchTx(ctx context.Context, tx *sql.Tx, owner, batchID string) error {
+	for _, stmt := range deleteBatchStmts {
 		if err := execDeleteBatchStmt(ctx, tx, stmt, owner, batchID); err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func execDeleteBatchStmt(ctx context.Context, tx *sql.Tx, stmt, owner, batchID string) error {
@@ -1211,7 +1220,7 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 	b.Books = []Book{}
 	// 两步查询：source_text/txt_text 存整本小说，参与 ORDER BY 的 filesort 会
 	// 触发 MySQL ERROR 1038。先只排序 book id，再按 id 分批读取正文并保持顺序。
-	idRows, err := q.QueryContext(ctx, `SELECT id FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? ORDER BY ordinal,id`, b.ID, owner)
+	idRows, err := q.QueryContext(ctx, `SELECT id FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? AND hidden_at IS NULL ORDER BY ordinal,id`, b.ID, owner)
 	if err != nil {
 		return Batch{}, err
 	}

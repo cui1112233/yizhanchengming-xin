@@ -395,10 +395,10 @@ export function SettingsPage({ theme = '', themePreference = 'system', onThemeCh
           <Form.Item label="服务器归档路径" name="storageRoot" extra="必须是服务器可访问的绝对路径；留空表示关闭服务器归档。">
             <Input placeholder="例如 /data/qiantie-archive" />
           </Form.Item>
-          <Form.Item label="制作文件保留时长" name="productionRetentionDays" extra="制作时先保存在服务器；上传 TOS 并校验成功后，本地副本按所选时长清理。未上传或校验失败的文件绝不删除。">
+          <Form.Item label="作品保留时长" name="productionRetentionDays" extra="作品最后一次制作完成后开始计时；到期后先隐藏，24 小时后删除数据库记录、TOS 文件和本地缓存。修改天数会对所有未删除作品重新计算。">
             <Select options={[3, 7, 14, 30].map(days => ({ value: days, label: `${days} 天` }))} />
           </Form.Item>
-          <Typography.Paragraph type="secondary">默认保留 7 天；磁盘达到 75% 时会优先清理已在 TOS 校验成功的最旧本地副本，降到 65% 后停止。头像、账号、项目配置和 TOS 正式文件不受影响。</Typography.Paragraph>
+          <Typography.Paragraph type="secondary">默认保留 7 天；磁盘达到 75% 时会额外优先清理已在 TOS 校验成功的最旧本地副本，降到 65% 后停止。头像、账号和项目配置不受影响。</Typography.Paragraph>
           <div className="settings-section-footer settings-storage-actions">
             <Button type="primary" icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => saveSection('storage')} loading={savingSection === 'storage'}>保存存储设置</Button>
             <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={handleRestore} loading={restoring}>恢复</Button>

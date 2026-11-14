@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/volcengine/ve-tos-golang-sdk/v2/tos"
+	"github.com/volcengine/ve-tos-golang-sdk/v2/tos/codes"
 )
 
 const tosChecksumMetadataKey = "qiantie-sha256"
@@ -86,4 +88,19 @@ func (s *TOSStore) Open(ctx context.Context, key string) (io.ReadCloser, error) 
 		return nil, err
 	}
 	return result.Content, nil
+}
+
+// DeleteObject 删除一个已上传的素材对象。对象已经不存在时视为成功，这样作品
+// 清理可以安全重试而不会因为上一次删除只完成了一半而永久卡住。
+func (s *TOSStore) DeleteObject(ctx context.Context, key string) error {
+	if s == nil || s.client == nil || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("invalid production media object deletion")
+	}
+	if _, err := s.client.DeleteObjectV2(ctx, &tos.DeleteObjectV2Input{Bucket: s.bucket, Key: key}); err != nil {
+		if tos.Code(err) == codes.NoSuchKey || tos.StatusCode(err) == http.StatusNotFound {
+			return nil
+		}
+		return err
+	}
+	return nil
 }

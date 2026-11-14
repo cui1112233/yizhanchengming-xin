@@ -17,17 +17,17 @@ func TestListBatchSummaryIndexReadsOnlyProjectCardFields(t *testing.T) {
 	defer db.Close()
 
 	now := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND EXISTS (SELECT 1 FROM batch_factory_v12_books vb WHERE vb.batch_id=b.id AND vb.owner_username=b.owner_username AND vb.hidden_at IS NULL) ORDER BY b.created_at DESC,b.id DESC`)).
 		WithArgs("alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "revision", "created_at", "updated_at"}).
 			AddRow("batch-2", "第二批", int64(8), now, now).
 			AddRow("batch-1", "第一批", int64(3), now, now))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.batch_id,b.ordinal,b.id`)).
 		WithArgs("alice").
 		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "id", "book_id", "title", "platform"}).
 			AddRow("batch-1", "book-1", "558154", "后来情深情亦浅", "七猫").
 			AddRow("batch-2", "book-2", "1201790", "第二通电话", "七猫"))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT j.batch_id,j.output_url FROM batch_factory_v12_merge_jobs j LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT j.batch_id,j.output_url FROM batch_factory_v12_merge_jobs j LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' AND (b.id IS NULL OR b.hidden_at IS NULL) ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`)).
 		WithArgs("alice").
 		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "output_url"}).
 			AddRow("batch-1", "/api/batch-factory/v12/batches/batch-1/merge-media/merge_new").

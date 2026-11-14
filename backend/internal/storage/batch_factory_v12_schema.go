@@ -225,6 +225,21 @@ func V12Migrations() []Migration {
 		{Version: 1200108, SQL: V12SlotDigestStatements(), CallbackChecksum: "batch-factory-v12-slot-digest-v1"},
 		{Version: 1200109, SQL: V12AutomationPresetStatements(), CallbackChecksum: "batch-factory-v12-automation-presets-v1"},
 		{Version: 1200110, SQL: V12ComicPageLastErrorStatements(), CallbackChecksum: "batch-factory-v12-comic-page-last-error-v1"},
+		{Version: 1200111, SQL: V12BookRetentionStatements(), CallbackChecksum: "batch-factory-v12-book-retention-v1"},
+	}
+}
+
+// V12BookRetentionStatements adds the whole-book retention clock. A book is the
+// cleanup unit: once its last production activity is older than the configured
+// retention window it is hidden first, then permanently removed together with
+// its TOS objects and local cache after a 24-hour grace period.
+func V12BookRetentionStatements() []string {
+	return []string{
+		`ALTER TABLE batch_factory_v12_books ADD COLUMN completed_at DATETIME(6) NULL AFTER updated_at`,
+		`ALTER TABLE batch_factory_v12_books ADD COLUMN retention_expires_at DATETIME(6) NULL AFTER completed_at`,
+		`ALTER TABLE batch_factory_v12_books ADD COLUMN hidden_at DATETIME(6) NULL AFTER retention_expires_at`,
+		`ALTER TABLE batch_factory_v12_books ADD COLUMN purge_after DATETIME(6) NULL AFTER hidden_at`,
+		`ALTER TABLE batch_factory_v12_books ADD KEY idx_bfv12_books_retention (owner_username, hidden_at, retention_expires_at)`,
 	}
 }
 
