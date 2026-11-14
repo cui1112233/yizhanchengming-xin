@@ -24,3 +24,5 @@ Go资产提取和HTTP专项通过；HTTP模拟模型连续两次检查，旧卡�
 完整前端150/150通过，Go screenplay/httpapi/storage整包通过，前端构建通过。日志在案卷batch-tools-all-frontend.log、batch-tools-all-backend.log、batch-tools-build.log。
 
 已登录本地页面实际打开批量、检查、失败记录、失败说明四个入口。批量窗口正确读到章节绑定；检查选集后明确提示缺模型并禁用提交；持久任务记录为空时显示空态，不伪造失败。runtime-acceptance.json和batch-live/check-live/toolbar-live.png在案卷batch-tools-20261115。另调整工具栏标题宽度，防止统计被新增按钮挤断行。
+
+最终本地版本：功能23b21c2b、排版f187452e，4004 / PID46048 / candidate-003017 / user-C-VJmhKV.js。仅调整排版后的构建/嵌入/实际截图再次通过，统计完整单行；没有追加供应商调用。当前浏览器2/tab5停分镜页并保留。
