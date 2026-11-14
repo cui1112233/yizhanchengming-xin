@@ -147,6 +147,33 @@
    - `reaper_log_lines=0`、`panic_log_lines=0`、`artifact_restore_lines=0`。
    - 结论：观测窗口内没有僵尸回收事件，reaper 未产生写入；当前 binlog 增长约 216KB/分钟，远低于“全量重写 6.4MB/次”的旧行为，说明单行保存持续生效。阶段 1 仍值得做，但它属于低频优化，不是当前主要写放大来源。
 
+### 2026-11-14 阶段 6 执行结果
+
+任务状态接口新增 `concurrencyBudget`，只做展示，不参与调度：
+
+```json
+{
+  "bookWorkers": 3,
+  "bookWorkerCeiling": 4,
+  "taskImageConcurrency": 8,
+  "comicBookSlots": 3,
+  "comicBookSlotCeiling": 8,
+  "gatewayColdStart": 2,
+  "gatewayCeiling": 30,
+  "effectiveImageConcurrency": 2,
+  "limitingLayer": "gateway_cold_start",
+  "note": "实际并发取各层最小值；网关会从冷启动逐步升到天花板"
+}
+```
+
+- `automationBookWorkerCeiling=4`、`shuihuoAdaptiveMaxLimit=30` 提取为具名常量，运行时代码与展示共用，避免两处漂移。
+- 新增三个测试覆盖书籍上限、网关冷启动、任务级出图限制与公开视图字段。
+- 前端展示暂缓：`BatchFactoryWorkbenchPage.jsx` 与 `batchFactoryV12.js` 仍被并行会话改动，直接提交会把未完成前端一并带入；待前端会话提交后再接展示。
+- 验证：`go test ./...` 连续两次通过；本地 4011 `git_sha=0d2fc026`、未登录 401。
+- 生产发布：`qiantie-202611141318`，二进制 SHA256 `bf231f93…`，`git_sha` 与 `runtime_manifest_sha` 均为 `0d2fc026a029c585a0b3f5e00b9a71cb74d789f4`；`verify-release.ps1` PASS。
+- 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141318-0d2fc026`（上一版本 `qiantie-202611141247`）。
+- 本次发布包含并行会话已提交的 `3ae9747f`（小说抓取确定性失败转人工），全量测试覆盖通过。
+
 ### 2026-11-14 阶段 5 执行结果
 
 三项既有失败均已定位并修正，`go test ./...` 连续两次全绿：
