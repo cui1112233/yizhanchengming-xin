@@ -625,10 +625,12 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			writeJSON(w, http.StatusOK, map[string]any{"storyboards": rows})
 			return
 		}
-		first, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoluoV7)
-		second, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoyunqueV3)
-		third, _ := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), screenplay.EngineXiaoluoV9)
-		writeJSON(w, http.StatusOK, map[string]any{"storyboards": append(append(first, second...), third...)})
+		rows, err := store.ListStoryboards(req.Context(), owner, req.PathValue("id"), "")
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboards": rows})
 	})
 	type storyboardShotInput struct {
 		AfterShotID           string          `json:"afterShotId"`
@@ -838,10 +840,12 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			payload["shots"], payload["characters"], payload["scenes"] = shots, characters, scenes
 		}
 		assets, _ := store.ListAssets(req.Context(), owner, projectID, "")
-		storyboardsA, _ := store.ListStoryboards(req.Context(), owner, projectID, screenplay.EngineXiaoluoV7)
-		storyboardsB, _ := store.ListStoryboards(req.Context(), owner, projectID, screenplay.EngineXiaoyunqueV3)
-		storyboardsC, _ := store.ListStoryboards(req.Context(), owner, projectID, screenplay.EngineXiaoluoV9)
-		payload["assets"], payload["storyboards"] = assets, append(append(storyboardsA, storyboardsB...), storyboardsC...)
+		storyboards, err := store.ListStoryboards(req.Context(), owner, projectID, "")
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		payload["assets"], payload["storyboards"] = assets, storyboards
 		if batch, batchErr := store.GetBatch(req.Context(), owner, projectID); batchErr == nil {
 			payload["batch"] = batch
 		}
