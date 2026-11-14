@@ -1,8 +1,15 @@
-import { Button, Drawer, Empty, Form, Input, InputNumber, Modal, Progress, Select, Spin, Tabs, Tooltip, message } from 'antd';
-import { BarChart3, BookOpen, Bot, CalendarClock, CheckCircle2, CircleAlert, Download, FileText, LoaderCircle, Menu, NotebookPen, Plus, RotateCcw, Save, Send, Settings2, Sparkles, Square, WandSparkles } from 'lucide-react';
+import { Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Modal, Progress, Select, Spin, Switch, Tabs, Tooltip, message } from 'antd';
+import { BarChart3, BookOpen, Bot, CalendarClock, CheckCircle2, CircleAlert, Download, FileText, LoaderCircle, Menu, NotebookPen, Plus, RotateCcw, Save, Send, Settings2, Sparkles, Square, Trash2, WandSparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog.js';
-import { cancelNovelCreationRun, confirmNovelCreationRun, createNovelCreationProject, createNovelCreationSession, exportNovelCreationProject, getNovelCreationProjectSettings, getNovelCreationRun, listNovelCreationModes, listNovelCreationProjects, listNovelCreationSessions, retryNovelCreationRun, sendNovelCreationMessage, updateNovelCreationProjectSettings } from '../../shared/api/novelCreation.js';
+import {
+  cancelNovelCreationRun, confirmNovelCreationRun, createNovelCreationMaterial, createNovelCreationNote, createNovelCreationProject,
+  createNovelCreationSchedule, createNovelCreationSession, deleteNovelCreationMaterial, deleteNovelCreationNote, deleteNovelCreationSchedule,
+  exportNovelCreationProject, getNovelCreationDashboard, getNovelCreationProjectSettings, getNovelCreationRun, listNovelCreationMaterials,
+  listNovelCreationModes, listNovelCreationNotes, listNovelCreationProjects, listNovelCreationSchedules, listNovelCreationSessions,
+  retryNovelCreationRun, runNovelCreationSchedule, sendNovelCreationMessage, updateNovelCreationNote, updateNovelCreationProjectSettings,
+  updateNovelCreationSchedule
+} from '../../shared/api/novelCreation.js';
 import './NovelCreationPage.css';
 
 const ACTIVE_MODE_KEY = 'novel-creation-active-mode';
@@ -79,8 +86,19 @@ export default function NovelCreationPage() {
   const [checkpointOpen, setCheckpointOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [settings, setSettings] = useState(null);
+  const [materials, setMaterials] = useState([]);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [editingNoteId, setEditingNoteId] = useState('');
+  const [dashboard, setDashboard] = useState(null);
+  const [schedules, setSchedules] = useState([]);
   const [projectForm] = Form.useForm();
   const [settingsForm] = Form.useForm();
+  const [agentForm] = Form.useForm();
+  const [materialForm] = Form.useForm();
+  const [noteForm] = Form.useForm();
+  const [scheduleForm] = Form.useForm();
   const resizeRef = useRef(null);
   const currentProject = projects.find(item => item.id === projectId);
   const currentMode = modes.find(item => item.id === activeMode) || modes[0];
@@ -192,7 +210,7 @@ export default function NovelCreationPage() {
     setSending(true);
     try {
       const session = await ensureSession();
-      const result = await sendNovelCreationMessage(session.id, { projectId, content: draft.trim(), modelId, thinkingLevel, idempotencyKey: crypto.randomUUID(), modeInputs: payloadInputs });
+      const result = await sendNovelCreationMessage(session.id, { projectId, content: draft.trim(), modelId, thinkingLevel, idempotencyKey: crypto.randomUUID(), modeInputs: payloadInputs, knowledgeIds: selectedMaterialIds });
       setDraft('');
       setSnapshot({ project: currentProject, session, run: result.run, messages: [{ role: 'user', content: draft.trim() }], events: [] });
     } catch (error) {
@@ -261,13 +279,39 @@ export default function NovelCreationPage() {
     }
   }
 
+  async function loadSettings() {
+    const result = await getNovelCreationProjectSettings(projectId);
+    const current = result?.settings || {};
+    setSettings(current);
+    settingsForm.setFieldsValue({ styleProfile: current.styleProfile || '', rules: (current.rules || []).join('\n') });
+    agentForm.setFieldsValue({
+      targetChapterWords: current.agent?.targetChapterWords || currentProject?.targetChapterWords || 2000,
+      maxRevisionRounds: current.agent?.maxRevisionRounds || 2,
+      thinkingLevel: current.agent?.thinkingLevel || 'standard'
+    });
+  }
+
   async function openTool(label) {
     setToolDrawer(label);
-    if (label !== '写作风格' || !projectId) return;
+    if (!projectId) return;
     try {
-      const result = await getNovelCreationProjectSettings(projectId);
-      const settings = result?.settings || {};
-      settingsForm.setFieldsValue({ styleProfile: settings.styleProfile || '', rules: (settings.rules || []).join('\n') });
+      if (label === '写作风格' || label === 'Agent 设置') await loadSettings();
+      if (label === '导入素材') {
+        const result = await listNovelCreationMaterials(projectId);
+        setMaterials(Array.isArray(result?.materials) ? result.materials : []);
+      }
+      if (label === '备忘录') {
+        const result = await listNovelCreationNotes(projectId);
+        setNotes(Array.isArray(result?.notes) ? result.notes : []);
+      }
+      if (label === '数据看板') {
+        const result = await getNovelCreationDashboard(projectId);
+        setDashboard(result?.dashboard || null);
+      }
+      if (label === '定时写作') {
+        const result = await listNovelCreationSchedules(projectId);
+        setSchedules(Array.isArray(result?.schedules) ? result.schedules : []);
+      }
     } catch (error) {
       message.error(error.message);
     }
@@ -279,13 +323,139 @@ export default function NovelCreationPage() {
     try {
       const values = await settingsForm.validateFields();
       const rules = String(values.rules || '').split('\n').map(item => item.trim()).filter(Boolean);
-      await updateNovelCreationProjectSettings(projectId, { styleProfile: String(values.styleProfile || '').trim(), rules });
+      const result = await updateNovelCreationProjectSettings(projectId, {
+        styleProfile: String(values.styleProfile || '').trim(), rules, agent: settings?.agent || {}
+      });
+      setSettings(result?.settings || null);
       message.success('写作风格与规则已保存');
     } catch (error) {
       if (error?.errorFields) return;
       message.error(error.message);
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function saveAgentSettings() {
+    if (!projectId) { message.warning('请先选择作品'); return; }
+    setSavingSettings(true);
+    try {
+      const values = await agentForm.validateFields();
+      const result = await updateNovelCreationProjectSettings(projectId, {
+        styleProfile: settings?.styleProfile || '',
+        rules: settings?.rules || [],
+        agent: {
+          targetChapterWords: Number(values.targetChapterWords) || 0,
+          maxRevisionRounds: Number(values.maxRevisionRounds) || 0,
+          thinkingLevel: values.thinkingLevel
+        }
+      });
+      setSettings(result?.settings || null);
+      message.success('Agent 设置已保存');
+    } catch (error) {
+      if (error?.errorFields) return;
+      message.error(error.message);
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function addMaterial() {
+    if (!projectId) { message.warning('请先选择作品'); return; }
+    try {
+      const values = await materialForm.validateFields();
+      const result = await createNovelCreationMaterial(projectId, values);
+      setMaterials(current => [result.material, ...current]);
+      setSelectedMaterialIds(current => [result.material.id, ...current]);
+      materialForm.resetFields();
+      message.success('素材已导入');
+    } catch (error) {
+      if (error?.errorFields) return;
+      message.error(error.message);
+    }
+  }
+
+  async function removeMaterial(materialId) {
+    try {
+      await deleteNovelCreationMaterial(projectId, materialId);
+      setMaterials(current => current.filter(item => item.id !== materialId));
+      setSelectedMaterialIds(current => current.filter(id => id !== materialId));
+    } catch (error) {
+      message.error(error.message);
+    }
+  }
+
+  async function saveNote() {
+    if (!projectId) { message.warning('请先选择作品'); return; }
+    try {
+      const values = await noteForm.validateFields();
+      if (editingNoteId) {
+        const result = await updateNovelCreationNote(projectId, editingNoteId, values);
+        setNotes(current => current.map(item => item.id === editingNoteId ? result.note : item));
+      } else {
+        const result = await createNovelCreationNote(projectId, values);
+        setNotes(current => [result.note, ...current]);
+      }
+      setEditingNoteId('');
+      noteForm.resetFields();
+    } catch (error) {
+      if (error?.errorFields) return;
+      message.error(error.message);
+    }
+  }
+
+  async function removeNote(noteId) {
+    try {
+      await deleteNovelCreationNote(projectId, noteId);
+      setNotes(current => current.filter(item => item.id !== noteId));
+      if (editingNoteId === noteId) { setEditingNoteId(''); noteForm.resetFields(); }
+    } catch (error) {
+      message.error(error.message);
+    }
+  }
+
+  async function createSchedule(values) {
+    if (!projectId) { message.warning('请先选择作品'); return; }
+    try {
+      const session = await ensureSession();
+      const result = await createNovelCreationSchedule(projectId, { ...values, sessionId: session.id });
+      setSchedules(current => [result.schedule, ...current]);
+      scheduleForm.resetFields();
+      message.success('定时写作已创建');
+    } catch (error) {
+      if (error?.errorFields) return;
+      message.error(error.message);
+    }
+  }
+
+  async function toggleSchedule(schedule) {
+    try {
+      const result = await updateNovelCreationSchedule(projectId, schedule.id, {
+        sessionId: schedule.sessionId, intervalMinutes: schedule.intervalMinutes, enabled: !schedule.enabled,
+        prompt: schedule.prompt, modelId: schedule.modelId, thinkingLevel: schedule.thinkingLevel
+      });
+      setSchedules(current => current.map(item => item.id === schedule.id ? result.schedule : item));
+    } catch (error) {
+      message.error(error.message);
+    }
+  }
+
+  async function runScheduleNow(schedule) {
+    try {
+      const result = await runNovelCreationSchedule(projectId, schedule.id);
+      setSnapshot(current => ({ ...(current || {}), run: result.run, events: [] }));
+      message.success('已按该定时任务发起创作');
+    } catch (error) {
+      message.error(error.message);
+    }
+  }
+
+  async function removeSchedule(scheduleId) {
+    try {
+      await deleteNovelCreationSchedule(projectId, scheduleId);
+      setSchedules(current => current.filter(item => item.id !== scheduleId));
+    } catch (error) {
+      message.error(error.message);
     }
   }
 
@@ -303,6 +473,114 @@ export default function NovelCreationPage() {
   const toolbar = useMemo(() => [
     ['写作风格', FileText], ['导入素材', BookOpen], ['Agent 设置', Bot], ['定时写作', CalendarClock], ['数据看板', BarChart3], ['备忘录', NotebookPen]
   ], []);
+
+  const drawerBody = (() => {
+    if (toolDrawer === '写作风格') {
+      return <Form form={settingsForm} layout="vertical">
+        <p className="novel-creation-settings-hint">风格与规则按作品保存，会注入基础设定、章节计划、正文和审核。</p>
+        <Form.Item name="styleProfile" label="写作风格"><Input.TextArea rows={5} placeholder="例如：冷峻短句、克制对白、以环境推动情绪" /></Form.Item>
+        <Form.Item name="rules" label="创作规则（每行一条）"><Input.TextArea rows={6} placeholder="例如：不出现血腥描写&#10;主角不得无理由背叛同伴" /></Form.Item>
+        <Button type="primary" icon={<Save size={15} />} loading={savingSettings} disabled={!projectId} onClick={saveSettings}>保存风格与规则</Button>
+      </Form>;
+    }
+    if (toolDrawer === 'Agent 设置') {
+      return <Form form={agentForm} layout="vertical">
+        <p className="novel-creation-settings-hint">Agent 设置控制每章目标字数、审核后最多修订轮数和默认思考强度。</p>
+        <Form.Item name="targetChapterWords" label="每章目标字数"><InputNumber min={800} max={8000} step={100} /></Form.Item>
+        <Form.Item name="maxRevisionRounds" label="最多修订轮数"><InputNumber min={1} max={5} /></Form.Item>
+        <Form.Item name="thinkingLevel" label="默认思考强度">
+          <Select options={[{ value: 'fast', label: '快速' }, { value: 'standard', label: '标准思考' }, { value: 'deep', label: '深度思考' }]} />
+        </Form.Item>
+        <Button type="primary" icon={<Save size={15} />} loading={savingSettings} disabled={!projectId} onClick={saveAgentSettings}>保存 Agent 设置</Button>
+      </Form>;
+    }
+    if (toolDrawer === '导入素材') {
+      return <div className="novel-creation-tool-panel">
+        <p className="novel-creation-settings-hint">素材按作品保存，发送前勾选的素材会进入本次创作输入快照。</p>
+        <Form form={materialForm} layout="vertical">
+          <Form.Item name="title" label="素材标题"><Input placeholder="例如：城市雨夜参考段落" /></Form.Item>
+          <Form.Item name="content" label="素材内容" rules={[{ required: true, message: '请输入素材内容' }]}><Input.TextArea rows={6} /></Form.Item>
+          <Button type="primary" icon={<Plus size={15} />} onClick={addMaterial}>导入素材</Button>
+        </Form>
+        <div className="novel-creation-tool-list">
+          {materials.length ? materials.map(item => <div key={item.id} className="novel-creation-tool-item">
+            <Checkbox
+              checked={selectedMaterialIds.includes(item.id)}
+              onChange={event => setSelectedMaterialIds(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))}
+            >{item.title}</Checkbox>
+            <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => removeMaterial(item.id)} />
+          </div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未导入素材" />}
+        </div>
+      </div>;
+    }
+    if (toolDrawer === '备忘录') {
+      return <div className="novel-creation-tool-panel">
+        <p className="novel-creation-settings-hint">备忘录按作品保存，不会进入创作提示词。</p>
+        <Form form={noteForm} layout="vertical">
+          <Form.Item name="title" label="标题"><Input placeholder="例如：第三章伏笔清单" /></Form.Item>
+          <Form.Item name="content" label="内容"><Input.TextArea rows={3} /></Form.Item>
+          <div className="novel-creation-tool-actions">
+            <Button type="primary" icon={<Save size={15} />} onClick={saveNote}>{editingNoteId ? '保存修改' : '添加备忘录'}</Button>
+            {editingNoteId ? <Button onClick={() => { setEditingNoteId(''); noteForm.resetFields(); }}>取消编辑</Button> : null}
+          </div>
+        </Form>
+        <div className="novel-creation-tool-list">
+          {notes.length ? notes.map(note => <div key={note.id} className="novel-creation-tool-item column">
+            <button type="button" className="novel-creation-note-open" onClick={() => { setEditingNoteId(note.id); noteForm.setFieldsValue({ title: note.title, content: note.content }); }}>
+              <b>{note.title}</b><span>{note.content}</span>
+            </button>
+            <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => removeNote(note.id)} />
+          </div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无备忘录" />}
+        </div>
+      </div>;
+    }
+    if (toolDrawer === '数据看板') {
+      return <div className="novel-creation-tool-panel">
+        <p className="novel-creation-settings-hint">按当前作品汇总已保存章节与任务执行结果。</p>
+        {dashboard ? <div className="novel-creation-dashboard">
+          <div><span>章节数</span><b>{dashboard.chapterCount}</b></div>
+          <div><span>总字数</span><b>{dashboard.totalWords}</b></div>
+          <div><span>任务总数</span><b>{dashboard.runTotal}</b></div>
+          <div><span>成功率</span><b>{Number(dashboard.successRate || 0).toFixed(1)}%</b></div>
+          <div className="wide"><span>运行状态</span><p>{Object.entries(dashboard.runCounts || {}).map(([key, value]) => `${STATUS_LABELS[key] || key} ${value}`).join(' · ') || '暂无任务'}</p></div>
+        </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无看板数据" />}
+      </div>;
+    }
+    if (toolDrawer === '定时写作') {
+      return <div className="novel-creation-tool-panel">
+        <p className="novel-creation-settings-hint">开启后由服务端每分钟扫描到期任务，按当前会话和模型自动发起创作。</p>
+        <Form form={scheduleForm} layout="vertical" initialValues={{ intervalMinutes: 60, enabled: true, thinkingLevel: 'standard' }}>
+          <div className="novel-creation-form-grid">
+            <Form.Item name="intervalMinutes" label="间隔（分钟）"><InputNumber min={15} max={10080} step={15} /></Form.Item>
+            <Form.Item name="thinkingLevel" label="思考强度">
+              <Select options={[{ value: 'fast', label: '快速' }, { value: 'standard', label: '标准思考' }, { value: 'deep', label: '深度思考' }]} />
+            </Form.Item>
+          </div>
+          <Form.Item name="modelId" label="文本模型"><Select allowClear placeholder="留空使用作品模型" options={models} /></Form.Item>
+          <Form.Item name="prompt" label="写作指令" rules={[{ required: true, message: '请输入定时写作指令' }]}><Input.TextArea rows={3} placeholder="例如：继续写下一章，保持悬疑节奏" /></Form.Item>
+          <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>
+          <Button type="primary" icon={<Plus size={15} />} onClick={async () => {
+            try { await createSchedule(await scheduleForm.validateFields()); } catch (error) { if (!error?.errorFields) message.error(error.message); }
+          }}>创建定时任务</Button>
+        </Form>
+        <div className="novel-creation-tool-list">
+          {schedules.length ? schedules.map(schedule => <div key={schedule.id} className="novel-creation-tool-item column">
+            <div className="novel-creation-schedule-head">
+              <Switch size="small" checked={schedule.enabled} onChange={() => toggleSchedule(schedule)} />
+              <b>每 {schedule.intervalMinutes} 分钟</b>
+              <span>{schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : ''}</span>
+            </div>
+            <p>{schedule.prompt}</p>
+            <div className="novel-creation-tool-actions">
+              <Button size="small" onClick={() => runScheduleNow(schedule)}>立即执行</Button>
+              <Button size="small" danger icon={<Trash2 size={13} />} onClick={() => removeSchedule(schedule.id)}>删除</Button>
+            </div>
+          </div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无定时任务" />}
+        </div>
+      </div>;
+    }
+    return <div className="novel-creation-tool-placeholder"><Settings2 size={28} /><h3>{toolDrawer}</h3><p>该面板沿用当前作品和会话，不会另建一套数据。设置保存后会进入下一次创作任务的输入快照。</p></div>;
+  })();
 
   if (loading) return <div className="novel-creation-loading"><Spin size="large" /><span>正在打开小说创作</span></div>;
 
@@ -354,12 +632,7 @@ export default function NovelCreationPage() {
       <Input.TextArea className="novel-creation-blueprint-editor" value={blueprintDraft} onChange={event => setBlueprintDraft(event.target.value)} autoSize={{ minRows: 14, maxRows: 24 }} />
     </Modal>
     <Drawer open={Boolean(toolDrawer)} title={toolDrawer} width={520} onClose={() => setToolDrawer('')}>
-      {toolDrawer === '写作风格' ? <Form form={settingsForm} layout="vertical">
-        <p className="novel-creation-settings-hint">风格与规则按作品保存，会注入基础设定、章节计划、正文和审核。</p>
-        <Form.Item name="styleProfile" label="写作风格"><Input.TextArea rows={5} placeholder="例如：冷峻短句、克制对白、以环境推动情绪" /></Form.Item>
-        <Form.Item name="rules" label="创作规则（每行一条）"><Input.TextArea rows={6} placeholder="例如：不出现血腥描写&#10;主角不得无理由背叛同伴" /></Form.Item>
-        <Button type="primary" icon={<Save size={15} />} loading={savingSettings} disabled={!projectId} onClick={saveSettings}>保存风格与规则</Button>
-      </Form> : <div className="novel-creation-tool-placeholder"><Settings2 size={28} /><h3>{toolDrawer}</h3><p>该面板沿用当前作品和会话，不会另建一套数据。设置保存后会进入下一次创作任务的输入快照。</p></div>}
+      {drawerBody}
     </Drawer>
   </div>;
 }

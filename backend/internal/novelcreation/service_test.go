@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
@@ -700,5 +701,163 @@ func TestServiceExportProjectRendersMarkdownAndText(t *testing.T) {
 	}
 	if _, err := fixture.service.ExportProject(context.Background(), "alice", fixture.project.ID, "pdf"); !IsCode(err, ErrInputRequired) {
 		t.Fatalf("unsupported format err=%v", err)
+	}
+}
+
+func TestServiceKnowledgeMaterialsReachPipelineAndSnapshot(t *testing.T) {
+	runner := &stubPipelineRunner{}
+	fixture := newServiceFixture(t, runner)
+	material, err := fixture.service.CreateMaterial(context.Background(), "alice", fixture.project.ID, CreateMaterialInput{
+		Title: "雨夜参考", Content: "旧城排水系统在暴雨夜失效。",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := fixture.sendInput("knowledge-1")
+	input.KnowledgeIDs = []string{material.ID, material.ID}
+	run, err := fixture.service.SendMessage(context.Background(), "alice", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshot map[string]any
+	if err := json.Unmarshal(run.PromptSnapshot, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if ids, _ := snapshot["knowledge_ids"].([]any); len(ids) != 1 || ids[0] != material.ID {
+		t.Fatalf("knowledge_ids=%v", snapshot["knowledge_ids"])
+	}
+	if _, err := fixture.service.Run(context.Background(), "alice", run.ID); err != nil {
+		t.Fatal(err)
+	}
+	call := runner.lastCall()
+	if len(call.KnowledgeMaterials) != 1 || call.KnowledgeMaterials[0].Title != "雨夜参考" || !strings.Contains(call.KnowledgeMaterials[0].Content, "排水系统") {
+		t.Fatalf("pipeline knowledge=%+v", call.KnowledgeMaterials)
+	}
+}
+
+func TestServiceRejectsUnknownKnowledgeIDBeforePersistingMessage(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	input := fixture.sendInput("knowledge-missing")
+	input.KnowledgeIDs = []string{"material-missing"}
+	if _, err := fixture.service.SendMessage(context.Background(), "alice", input); !IsCode(err, ErrInputRequired) {
+		t.Fatalf("err=%v, want %s", err, ErrInputRequired)
+	}
+	messages, err := fixture.store.ListMessages(context.Background(), "alice", fixture.session.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("messages=%d, invalid knowledge must not persist", len(messages))
+	}
+}
+
+func TestServiceAgentSettingsClampAndReachPipeline(t *testing.T) {
+	runner := &stubPipelineRunner{}
+	fixture := newServiceFixture(t, runner)
+	settings, err := fixture.service.UpdateProjectSettings(context.Background(), "alice", fixture.project.ID, ProjectSettings{
+		Agent: AgentSettings{TargetChapterWords: 3200, MaxRevisionRounds: 9, ThinkingLevel: "deep"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Agent.TargetChapterWords != 3200 || settings.Agent.MaxRevisionRounds != maxMaxRevisionRounds || settings.Agent.ThinkingLevel != "deep" {
+		t.Fatalf("agent settings=%+v", settings.Agent)
+	}
+	run, err := fixture.service.SendMessage(context.Background(), "alice", SendMessageInput{
+		SessionID: fixture.session.ID, ProjectID: fixture.project.ID, Content: "写第一章",
+		ModelID: "text-1", IdempotencyKey: "agent-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.service.Run(context.Background(), "alice", run.ID); err != nil {
+		t.Fatal(err)
+	}
+	call := runner.lastCall()
+	if call.MaxRevisionRounds != maxMaxRevisionRounds || call.Project.TargetChapterWords != 3200 || call.Run.ThinkingLevel != "deep" {
+		t.Fatalf("pipeline agent input=%+v", call)
+	}
+}
+
+func TestServiceNotesCRUDAndDashboard(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	note, err := fixture.service.CreateNote(context.Background(), "alice", fixture.project.ID, ProjectNoteInput{Title: "伏笔", Content: "灯塔"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := fixture.service.UpdateNote(context.Background(), "alice", fixture.project.ID, note.ID, ProjectNoteInput{Title: "伏笔", Content: "灯塔与旧船票"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Content != "灯塔与旧船票" {
+		t.Fatalf("note=%+v", updated)
+	}
+	notes, err := fixture.service.ListNotes(context.Background(), "alice", fixture.project.ID)
+	if err != nil || len(notes) != 1 {
+		t.Fatalf("notes=%v err=%v", notes, err)
+	}
+	run, err := fixture.service.SendMessage(context.Background(), "alice", fixture.sendInput("dashboard-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.service.Run(context.Background(), "alice", run.ID); err != nil {
+		t.Fatal(err)
+	}
+	dashboard, err := fixture.service.GetDashboard(context.Background(), "alice", fixture.project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dashboard.ChapterCount != 1 || dashboard.TotalWords != 7 || dashboard.RunTotal != 1 || dashboard.SuccessRate != 100 {
+		t.Fatalf("dashboard=%+v", dashboard)
+	}
+	if err := fixture.service.DeleteNote(context.Background(), "alice", fixture.project.ID, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	notes, _ = fixture.service.ListNotes(context.Background(), "alice", fixture.project.ID)
+	if len(notes) != 0 {
+		t.Fatalf("notes after delete=%v", notes)
+	}
+}
+
+func TestServiceScheduleDispatchCreatesRunAndAdvancesNextRun(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	schedule, err := fixture.service.CreateSchedule(context.Background(), "alice", fixture.project.ID, ScheduleInput{
+		SessionID: fixture.session.ID, IntervalMinutes: 30, Enabled: true, Prompt: "继续写下一章",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	schedule.NextRunAt = now.Add(-time.Minute)
+	if _, err := fixture.store.UpdateSchedule(context.Background(), "alice", schedule); err != nil {
+		t.Fatal(err)
+	}
+	dispatched, err := fixture.service.DispatchDueSchedules(context.Background(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dispatched) != 1 || dispatched[0].Run.ID == "" {
+		t.Fatalf("dispatched=%+v", dispatched)
+	}
+	reloaded, err := fixture.store.GetSchedule(context.Background(), "alice", schedule.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.LastRunID != dispatched[0].Run.ID || !reloaded.NextRunAt.After(now) {
+		t.Fatalf("schedule after dispatch=%+v", reloaded)
+	}
+	second, err := fixture.service.DispatchDueSchedules(context.Background(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second) != 0 {
+		t.Fatalf("second dispatch=%+v, want none", second)
+	}
+	run, err := fixture.service.RunSchedule(context.Background(), "alice", fixture.project.ID, schedule.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.ID == "" || run.ProjectID != fixture.project.ID {
+		t.Fatalf("run=%+v", run)
 	}
 }

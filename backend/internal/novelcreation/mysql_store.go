@@ -781,12 +781,12 @@ func (s *MySQLStore) GetProjectSettings(ctx context.Context, owner, projectID st
 	projectID = strings.TrimSpace(projectID)
 	var settings ProjectSettings
 	var style sql.NullString
-	var rules []byte
-	err = s.db.QueryRowContext(ctx, `SELECT st.project_id, st.style_profile, st.rules_json, st.updated_at
+	var rules, agent []byte
+	err = s.db.QueryRowContext(ctx, `SELECT st.project_id, st.style_profile, st.rules_json, st.agent_json, st.updated_at
 FROM novel_project_settings st
 JOIN novel_projects p ON p.owner_username = st.owner_username AND p.project_id = st.project_id
 WHERE st.owner_username = ? AND st.project_id = ? AND p.deleted_at IS NULL`, owner, projectID).
-		Scan(&settings.ProjectID, &style, &rules, &settings.UpdatedAt)
+		Scan(&settings.ProjectID, &style, &rules, &agent, &settings.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		if _, projectErr := s.GetProject(ctx, owner, projectID); projectErr != nil {
 			return ProjectSettings{}, projectErr
@@ -806,6 +806,11 @@ WHERE st.owner_username = ? AND st.project_id = ? AND p.deleted_at IS NULL`, own
 	if settings.Rules == nil {
 		settings.Rules = []string{}
 	}
+	if len(agent) > 0 {
+		if unmarshalErr := json.Unmarshal(agent, &settings.Agent); unmarshalErr != nil {
+			settings.Agent = AgentSettings{}
+		}
+	}
 	return settings, nil
 }
 
@@ -823,13 +828,17 @@ func (s *MySQLStore) UpdateProjectSettings(ctx context.Context, owner, projectID
 	if err != nil {
 		return ProjectSettings{}, persistenceError(err)
 	}
+	agentJSON, err := json.Marshal(NormalizeAgentSettings(input.Agent, 0))
+	if err != nil {
+		return ProjectSettings{}, persistenceError(err)
+	}
 	now := time.Now().UTC()
 	_, err = s.db.ExecContext(ctx, `INSERT INTO novel_project_settings
-(owner_username, project_id, style_profile, rules_json, created_at, updated_at)
-SELECT ?, ?, ?, ?, ?, ?
+(owner_username, project_id, style_profile, rules_json, agent_json, created_at, updated_at)
+SELECT ?, ?, ?, ?, ?, ?, ?
 WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)
-ON DUPLICATE KEY UPDATE style_profile = VALUES(style_profile), rules_json = VALUES(rules_json), updated_at = VALUES(updated_at)`,
-		owner, projectID, nullableString(strings.TrimSpace(input.StyleProfile)), []byte(rulesJSON), now, now, owner, projectID)
+ON DUPLICATE KEY UPDATE style_profile = VALUES(style_profile), rules_json = VALUES(rules_json), agent_json = VALUES(agent_json), updated_at = VALUES(updated_at)`,
+		owner, projectID, nullableString(strings.TrimSpace(input.StyleProfile)), []byte(rulesJSON), []byte(agentJSON), now, now, owner, projectID)
 	if err != nil {
 		return ProjectSettings{}, persistenceError(err)
 	}
@@ -889,4 +898,381 @@ ON DUPLICATE KEY UPDATE snapshot_json = VALUES(snapshot_json), updated_at = VALU
 		return persistenceError(err)
 	}
 	return nil
+}
+
+func (s *MySQLStore) ListMaterials(ctx context.Context, owner, projectID string) ([]Material, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return nil, err
+	}
+	if _, projectErr := s.GetProject(ctx, owner, projectID); projectErr != nil {
+		return nil, projectErr
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT m.material_id, m.project_id, m.title, m.content, m.created_at, m.updated_at
+FROM novel_materials m
+JOIN novel_projects p ON p.owner_username = m.owner_username AND p.project_id = m.project_id
+WHERE m.owner_username = ? AND m.project_id = ? AND p.deleted_at IS NULL
+ORDER BY m.created_at DESC`, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	materials := make([]Material, 0)
+	for rows.Next() {
+		var material Material
+		if err := rows.Scan(&material.ID, &material.ProjectID, &material.Title, &material.Content, &material.CreatedAt, &material.UpdatedAt); err != nil {
+			return nil, persistenceError(err)
+		}
+		materials = append(materials, material)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return materials, nil
+}
+
+func (s *MySQLStore) CreateMaterial(ctx context.Context, owner, projectID string, input CreateMaterialInput) (Material, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Material{}, err
+	}
+	input, err = NormalizeMaterialInput(input)
+	if err != nil {
+		return Material{}, err
+	}
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return Material{}, &DomainError{Code: ErrInputRequired, Message: "projectId is required"}
+	}
+	now := time.Now().UTC()
+	material := Material{ID: novelID("material"), ProjectID: projectID, Title: input.Title, Content: input.Content, CreatedAt: now, UpdatedAt: now}
+	result, err := s.db.ExecContext(ctx, `INSERT INTO novel_materials
+(material_id, owner_username, project_id, title, content, created_at, updated_at)
+SELECT ?, ?, ?, ?, ?, ?, ?
+WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)`,
+		material.ID, owner, projectID, material.Title, material.Content, material.CreatedAt, material.UpdatedAt, owner, projectID)
+	if err != nil {
+		return Material{}, persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return Material{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	return material, nil
+}
+
+func (s *MySQLStore) DeleteMaterial(ctx context.Context, owner, projectID, materialID string) error {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `DELETE m FROM novel_materials m
+JOIN novel_projects p ON p.owner_username = m.owner_username AND p.project_id = m.project_id
+WHERE m.owner_username = ? AND m.project_id = ? AND m.material_id = ? AND p.deleted_at IS NULL`,
+		owner, strings.TrimSpace(projectID), strings.TrimSpace(materialID))
+	if err != nil {
+		return persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return &DomainError{Code: ErrProjectNotFound, Message: "material not found"}
+	}
+	return nil
+}
+
+func (s *MySQLStore) ListNotes(ctx context.Context, owner, projectID string) ([]ProjectNote, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return nil, err
+	}
+	if _, projectErr := s.GetProject(ctx, owner, projectID); projectErr != nil {
+		return nil, projectErr
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT n.note_id, n.project_id, n.title, n.content, n.created_at, n.updated_at
+FROM novel_project_notes n
+JOIN novel_projects p ON p.owner_username = n.owner_username AND p.project_id = n.project_id
+WHERE n.owner_username = ? AND n.project_id = ? AND p.deleted_at IS NULL
+ORDER BY n.updated_at DESC`, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	notes := make([]ProjectNote, 0)
+	for rows.Next() {
+		var note ProjectNote
+		if err := rows.Scan(&note.ID, &note.ProjectID, &note.Title, &note.Content, &note.CreatedAt, &note.UpdatedAt); err != nil {
+			return nil, persistenceError(err)
+		}
+		notes = append(notes, note)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return notes, nil
+}
+
+func (s *MySQLStore) CreateNote(ctx context.Context, owner, projectID string, input ProjectNoteInput) (ProjectNote, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return ProjectNote{}, err
+	}
+	input, err = NormalizeNoteInput(input)
+	if err != nil {
+		return ProjectNote{}, err
+	}
+	projectID = strings.TrimSpace(projectID)
+	now := time.Now().UTC()
+	note := ProjectNote{ID: novelID("note"), ProjectID: projectID, Title: input.Title, Content: input.Content, CreatedAt: now, UpdatedAt: now}
+	result, err := s.db.ExecContext(ctx, `INSERT INTO novel_project_notes
+(note_id, owner_username, project_id, title, content, created_at, updated_at)
+SELECT ?, ?, ?, ?, ?, ?, ?
+WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)`,
+		note.ID, owner, projectID, note.Title, note.Content, note.CreatedAt, note.UpdatedAt, owner, projectID)
+	if err != nil {
+		return ProjectNote{}, persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return ProjectNote{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	return note, nil
+}
+
+func (s *MySQLStore) UpdateNote(ctx context.Context, owner, projectID, noteID string, input ProjectNoteInput) (ProjectNote, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return ProjectNote{}, err
+	}
+	input, err = NormalizeNoteInput(input)
+	if err != nil {
+		return ProjectNote{}, err
+	}
+	projectID, noteID = strings.TrimSpace(projectID), strings.TrimSpace(noteID)
+	now := time.Now().UTC()
+	_, err = s.db.ExecContext(ctx, `UPDATE novel_project_notes n
+JOIN novel_projects p ON p.owner_username = n.owner_username AND p.project_id = n.project_id
+SET n.title = ?, n.content = ?, n.updated_at = ?
+WHERE n.owner_username = ? AND n.project_id = ? AND n.note_id = ? AND p.deleted_at IS NULL`,
+		input.Title, input.Content, now, owner, projectID, noteID)
+	if err != nil {
+		return ProjectNote{}, persistenceError(err)
+	}
+	var note ProjectNote
+	err = s.db.QueryRowContext(ctx, `SELECT n.note_id, n.project_id, n.title, n.content, n.created_at, n.updated_at
+FROM novel_project_notes n
+JOIN novel_projects p ON p.owner_username = n.owner_username AND p.project_id = n.project_id
+WHERE n.owner_username = ? AND n.project_id = ? AND n.note_id = ? AND p.deleted_at IS NULL`,
+		owner, projectID, noteID).
+		Scan(&note.ID, &note.ProjectID, &note.Title, &note.Content, &note.CreatedAt, &note.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ProjectNote{}, &DomainError{Code: ErrProjectNotFound, Message: "note not found"}
+	}
+	if err != nil {
+		return ProjectNote{}, persistenceError(err)
+	}
+	return note, nil
+}
+
+func (s *MySQLStore) DeleteNote(ctx context.Context, owner, projectID, noteID string) error {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `DELETE n FROM novel_project_notes n
+JOIN novel_projects p ON p.owner_username = n.owner_username AND p.project_id = n.project_id
+WHERE n.owner_username = ? AND n.project_id = ? AND n.note_id = ? AND p.deleted_at IS NULL`,
+		owner, strings.TrimSpace(projectID), strings.TrimSpace(noteID))
+	if err != nil {
+		return persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return &DomainError{Code: ErrProjectNotFound, Message: "note not found"}
+	}
+	return nil
+}
+
+func (s *MySQLStore) ListRuns(ctx context.Context, owner, projectID string) ([]Run, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+qualifiedRunColumns+`
+FROM novel_runs r JOIN novel_projects p ON p.owner_username = r.owner_username AND p.project_id = r.project_id
+WHERE r.owner_username = ? AND r.project_id = ? AND p.deleted_at IS NULL
+ORDER BY r.created_at DESC`, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	runs := make([]Run, 0)
+	for rows.Next() {
+		run, err := scanRun(rows)
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, run)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return runs, nil
+}
+
+const scheduleColumns = `s.schedule_id, s.owner_username, s.project_id, s.session_id, s.interval_minutes, s.enabled, s.prompt, s.model_id, s.thinking_level, s.next_run_at, s.last_run_at, COALESCE(s.last_run_id, ''), s.created_at, s.updated_at`
+
+type novelScheduleScanner interface{ Scan(...any) error }
+
+func scanSchedule(scanner novelScheduleScanner) (Schedule, error) {
+	var schedule Schedule
+	var lastRunAt sql.NullTime
+	err := scanner.Scan(&schedule.ID, &schedule.OwnerUsername, &schedule.ProjectID, &schedule.SessionID,
+		&schedule.IntervalMinutes, &schedule.Enabled, &schedule.Prompt, &schedule.ModelID, &schedule.ThinkingLevel,
+		&schedule.NextRunAt, &lastRunAt, &schedule.LastRunID, &schedule.CreatedAt, &schedule.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
+	}
+	if err != nil {
+		return Schedule{}, persistenceError(err)
+	}
+	if lastRunAt.Valid {
+		when := lastRunAt.Time
+		schedule.LastRunAt = &when
+	}
+	return schedule, nil
+}
+
+func (s *MySQLStore) ListSchedules(ctx context.Context, owner, projectID string) ([]Schedule, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+scheduleColumns+`
+FROM novel_schedules s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
+WHERE s.owner_username = ? AND s.project_id = ? AND p.deleted_at IS NULL
+ORDER BY s.created_at DESC`, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	schedules := make([]Schedule, 0)
+	for rows.Next() {
+		schedule, err := scanSchedule(rows)
+		if err != nil {
+			return nil, err
+		}
+		schedules = append(schedules, schedule)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return schedules, nil
+}
+
+func (s *MySQLStore) GetSchedule(ctx context.Context, owner, scheduleID string) (Schedule, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Schedule{}, err
+	}
+	return scanSchedule(s.db.QueryRowContext(ctx, `SELECT `+scheduleColumns+`
+FROM novel_schedules s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
+WHERE s.owner_username = ? AND s.schedule_id = ? AND p.deleted_at IS NULL`, owner, strings.TrimSpace(scheduleID)))
+}
+
+func (s *MySQLStore) CreateSchedule(ctx context.Context, owner string, schedule Schedule) (Schedule, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Schedule{}, err
+	}
+	schedule.ID, schedule.ProjectID, schedule.SessionID = strings.TrimSpace(schedule.ID), strings.TrimSpace(schedule.ProjectID), strings.TrimSpace(schedule.SessionID)
+	if schedule.ID == "" {
+		schedule.ID = novelID("schedule")
+	}
+	if schedule.ProjectID == "" || schedule.SessionID == "" {
+		return Schedule{}, &DomainError{Code: ErrInputRequired, Message: "schedule projectId and sessionId are required"}
+	}
+	now := time.Now().UTC()
+	if schedule.CreatedAt.IsZero() {
+		schedule.CreatedAt = now
+	}
+	schedule.UpdatedAt = now
+	result, err := s.db.ExecContext(ctx, `INSERT INTO novel_schedules
+(schedule_id, owner_username, project_id, session_id, interval_minutes, enabled, prompt, model_id, thinking_level, next_run_at, last_run_at, last_run_id, created_at, updated_at)
+SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)
+  AND EXISTS (SELECT 1 FROM novel_sessions WHERE owner_username = ? AND session_id = ? AND project_id = ?)`,
+		schedule.ID, owner, schedule.ProjectID, schedule.SessionID, schedule.IntervalMinutes, schedule.Enabled, schedule.Prompt,
+		schedule.ModelID, schedule.ThinkingLevel, schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID),
+		schedule.CreatedAt, schedule.UpdatedAt, owner, schedule.ProjectID, owner, schedule.SessionID, schedule.ProjectID)
+	if err != nil {
+		return Schedule{}, persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "project or session not found"}
+	}
+	schedule.OwnerUsername = owner
+	return schedule, nil
+}
+
+func (s *MySQLStore) UpdateSchedule(ctx context.Context, owner string, schedule Schedule) (Schedule, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Schedule{}, err
+	}
+	schedule.ID, schedule.ProjectID, schedule.SessionID = strings.TrimSpace(schedule.ID), strings.TrimSpace(schedule.ProjectID), strings.TrimSpace(schedule.SessionID)
+	if schedule.ID == "" || schedule.ProjectID == "" {
+		return Schedule{}, &DomainError{Code: ErrInputRequired, Message: "schedule id and projectId are required"}
+	}
+	now := time.Now().UTC()
+	_, err = s.db.ExecContext(ctx, `UPDATE novel_schedules s
+JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
+SET s.session_id = ?, s.interval_minutes = ?, s.enabled = ?, s.prompt = ?, s.model_id = ?, s.thinking_level = ?,
+    s.next_run_at = ?, s.last_run_at = ?, s.last_run_id = ?, s.updated_at = ?
+WHERE s.owner_username = ? AND s.schedule_id = ? AND s.project_id = ? AND p.deleted_at IS NULL`,
+		schedule.SessionID, schedule.IntervalMinutes, schedule.Enabled, schedule.Prompt, schedule.ModelID, schedule.ThinkingLevel,
+		schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID), now, owner, schedule.ID, schedule.ProjectID)
+	if err != nil {
+		return Schedule{}, persistenceError(err)
+	}
+	return s.GetSchedule(ctx, owner, schedule.ID)
+}
+
+func (s *MySQLStore) DeleteSchedule(ctx context.Context, owner, projectID, scheduleID string) error {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `DELETE s FROM novel_schedules s
+JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
+WHERE s.owner_username = ? AND s.project_id = ? AND s.schedule_id = ? AND p.deleted_at IS NULL`,
+		owner, strings.TrimSpace(projectID), strings.TrimSpace(scheduleID))
+	if err != nil {
+		return persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
+	}
+	return nil
+}
+
+func (s *MySQLStore) ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]Schedule, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+scheduleColumns+`
+FROM novel_schedules s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
+WHERE s.enabled = 1 AND s.next_run_at <= ? AND p.deleted_at IS NULL
+ORDER BY s.next_run_at LIMIT ?`, now.UTC(), limit)
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	schedules := make([]Schedule, 0)
+	for rows.Next() {
+		schedule, err := scanSchedule(rows)
+		if err != nil {
+			return nil, err
+		}
+		schedules = append(schedules, schedule)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return schedules, nil
 }

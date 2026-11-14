@@ -63,6 +63,25 @@ API；事件轮询；章节列表；规划→写作→审核→修订→事实�
 - 整本导出：`GET /api/novel-creation/projects/{id}/export?format=markdown|txt`，右栏章节页提供导出按钮。
 - 验证：`go test ./internal/novelcreation ./internal/storage ./internal/httpapi` 通过；前端源码测试 4/4；
   正式构建通过；本地 4011 新二进制 `/health` 正常、migration 已建表、新页面 chunk 含新增文案。
-- 未完成：P2 工具面板（导入素材/knowledgeIds、Agent 设置、备忘录、数据看板、定时写作）；
-  P3 批量续写、暂停/继续的多章编排、上游错误分类与重试提示。
+- 未完成（P1 阶段）：P2 工具面板、P3 批量续写、暂停/继续的多章编排、上游错误分类与重试提示。
+
+### 2026-11-15 P2 完成情况
+
+- 素材与 knowledgeIds：新增 `novel_materials` 与
+  `GET/POST /api/novel-creation/projects/{id}/materials`、`DELETE .../materials/{materialId}`；
+  `SendMessageInput.KnowledgeIDs` 校验归属并去重，快照写入 `knowledge_ids` 与有界
+  `knowledge_materials`（最多 8 个、单个 12000 字），注入基础设定、章节计划、正文和审核；
+  前端“导入素材”面板支持新增、删除与发送前勾选。
+- Agent 设置：`novel_project_settings.agent_json`（migration 8800302）保存每章目标字数、
+  最多修订轮数与默认思考强度；流水线用 `MaxRevisionRounds` 替换硬编码 2 轮；
+  “Agent 设置”面板可保存，默认思考强度在任务未显式指定时生效。
+- 备忘录：新增 `novel_project_notes` 与 `GET/POST/PUT/DELETE .../notes`；“备忘录”面板支持增删改。
+- 数据看板：`GET /api/novel-creation/projects/{id}/dashboard` 聚合章节数、总字数、任务状态计数、
+  成功率与最近任务时间；“数据看板”面板展示。
+- 定时写作：新增 `novel_schedules` 与 `GET/POST/PUT/DELETE .../schedules`、`POST .../schedules/{id}/run`；
+  `StartScheduler` 在 `app.Build` 启动，每分钟扫描到期任务并按会话/模型发起创作，支持立即执行与启停。
+- 验证：Go 专项测试覆盖素材归属、Agent 参数透传、备忘录 CRUD、看板聚合、到期调度与立即执行；
+  前端源码测试 4/4；正式构建通过；本地 4011 新二进制 `/health` 正常，migration 8800302 已应用，
+  `novel_materials / novel_project_notes / novel_schedules / agent_json` 均已建。
+- 未完成：P3 批量续写、暂停/继续的多章编排、上游错误分类与重试提示。
 

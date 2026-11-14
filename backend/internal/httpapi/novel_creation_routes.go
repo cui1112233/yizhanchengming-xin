@@ -121,6 +121,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 			ThinkingLevel string            `json:"thinkingLevel"`
 			Idempotency   string            `json:"idempotencyKey"`
 			ModeInputs    map[string]string `json:"modeInputs"`
+			KnowledgeIDs  []string          `json:"knowledgeIds"`
 		}
 		if !decode(w, req, &input) {
 			return
@@ -128,7 +129,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		run, err := service.SendMessage(req.Context(), owner, novelcreation.SendMessageInput{
 			SessionID: req.PathValue("sessionID"), ProjectID: input.ProjectID, Content: input.Content,
 			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, IdempotencyKey: input.Idempotency,
-			ModeInputs: input.ModeInputs,
+			ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs,
 		})
 		if err != nil {
 			writeNovelCreationError(w, err)
@@ -194,20 +195,160 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("PUT /api/novel-creation/projects/{projectID}/settings", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			StyleProfile string   `json:"styleProfile"`
-			Rules        []string `json:"rules"`
+			StyleProfile string                      `json:"styleProfile"`
+			Rules        []string                    `json:"rules"`
+			Agent        novelcreation.AgentSettings `json:"agent"`
 		}
 		if !decode(w, req, &input) {
 			return
 		}
 		settings, err := service.UpdateProjectSettings(req.Context(), owner, req.PathValue("projectID"), novelcreation.ProjectSettings{
-			StyleProfile: input.StyleProfile, Rules: input.Rules,
+			StyleProfile: input.StyleProfile, Rules: input.Rules, Agent: input.Agent,
 		})
 		if err != nil {
 			writeNovelCreationError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/materials", func(w http.ResponseWriter, req *http.Request, owner string) {
+		materials, err := service.ListMaterials(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"materials": materials})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/materials", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		material, err := service.CreateMaterial(req.Context(), owner, req.PathValue("projectID"), novelcreation.CreateMaterialInput{
+			Title: input.Title, Content: input.Content,
+		})
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"material": material})
+	})
+	handle("DELETE /api/novel-creation/projects/{projectID}/materials/{materialID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		if err := service.DeleteMaterial(req.Context(), owner, req.PathValue("projectID"), req.PathValue("materialID")); err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/notes", func(w http.ResponseWriter, req *http.Request, owner string) {
+		notes, err := service.ListNotes(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"notes": notes})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/notes", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		note, err := service.CreateNote(req.Context(), owner, req.PathValue("projectID"), novelcreation.ProjectNoteInput{
+			Title: input.Title, Content: input.Content,
+		})
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"note": note})
+	})
+	handle("PUT /api/novel-creation/projects/{projectID}/notes/{noteID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		note, err := service.UpdateNote(req.Context(), owner, req.PathValue("projectID"), req.PathValue("noteID"), novelcreation.ProjectNoteInput{
+			Title: input.Title, Content: input.Content,
+		})
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"note": note})
+	})
+	handle("DELETE /api/novel-creation/projects/{projectID}/notes/{noteID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		if err := service.DeleteNote(req.Context(), owner, req.PathValue("projectID"), req.PathValue("noteID")); err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/dashboard", func(w http.ResponseWriter, req *http.Request, owner string) {
+		dashboard, err := service.GetDashboard(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"dashboard": dashboard})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/schedules", func(w http.ResponseWriter, req *http.Request, owner string) {
+		schedules, err := service.ListSchedules(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"schedules": schedules})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/schedules", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input novelScheduleRequest
+		if !decode(w, req, &input) {
+			return
+		}
+		schedule, err := service.CreateSchedule(req.Context(), owner, req.PathValue("projectID"), input.toInput())
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"schedule": schedule})
+	})
+	handle("PUT /api/novel-creation/projects/{projectID}/schedules/{scheduleID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input novelScheduleRequest
+		if !decode(w, req, &input) {
+			return
+		}
+		schedule, err := service.UpdateSchedule(req.Context(), owner, req.PathValue("projectID"), req.PathValue("scheduleID"), input.toInput())
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"schedule": schedule})
+	})
+	handle("DELETE /api/novel-creation/projects/{projectID}/schedules/{scheduleID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		if err := service.DeleteSchedule(req.Context(), owner, req.PathValue("projectID"), req.PathValue("scheduleID")); err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/schedules/{scheduleID}/run", func(w http.ResponseWriter, req *http.Request, owner string) {
+		run, err := service.RunSchedule(req.Context(), owner, req.PathValue("projectID"), req.PathValue("scheduleID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		if starter != nil {
+			starter(context.Background(), owner, run.ID)
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"run": run})
 	})
 	handle("GET /api/novel-creation/projects/{projectID}/export", func(w http.ResponseWriter, req *http.Request, owner string) {
 		document, err := service.ExportProject(req.Context(), owner, req.PathValue("projectID"), req.URL.Query().Get("format"))
@@ -219,6 +360,28 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(document.Filename))
 		_, _ = w.Write([]byte(document.Content))
 	})
+}
+
+// novelScheduleRequest keeps "enabled" optional while defaulting it to true on
+// creation, matching the frontend switch.
+type novelScheduleRequest struct {
+	SessionID       string `json:"sessionId"`
+	IntervalMinutes int    `json:"intervalMinutes"`
+	Enabled         *bool  `json:"enabled"`
+	Prompt          string `json:"prompt"`
+	ModelID         string `json:"modelId"`
+	ThinkingLevel   string `json:"thinkingLevel"`
+}
+
+func (r novelScheduleRequest) toInput() novelcreation.ScheduleInput {
+	enabled := true
+	if r.Enabled != nil {
+		enabled = *r.Enabled
+	}
+	return novelcreation.ScheduleInput{
+		SessionID: r.SessionID, IntervalMinutes: r.IntervalMinutes, Enabled: enabled,
+		Prompt: r.Prompt, ModelID: r.ModelID, ThinkingLevel: r.ThinkingLevel,
+	}
 }
 
 func validNovelCreationMode(value string) bool {

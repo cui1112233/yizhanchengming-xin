@@ -34,15 +34,34 @@ type Store interface {
 	// project so later chapters reuse it instead of regenerating the outline.
 	GetFoundation(context.Context, string, string) (Foundation, bool, error)
 	SaveFoundation(context.Context, string, Foundation) error
+	// Materials are imported reference documents selected per run.
+	ListMaterials(context.Context, string, string) ([]Material, error)
+	CreateMaterial(context.Context, string, string, CreateMaterialInput) (Material, error)
+	DeleteMaterial(context.Context, string, string, string) error
+	// Notes are free-form project memos.
+	ListNotes(context.Context, string, string) ([]ProjectNote, error)
+	CreateNote(context.Context, string, string, ProjectNoteInput) (ProjectNote, error)
+	UpdateNote(context.Context, string, string, string, ProjectNoteInput) (ProjectNote, error)
+	DeleteNote(context.Context, string, string, string) error
+	// ListRuns returns project runs newest first for dashboard aggregation.
+	ListRuns(context.Context, string, string) ([]Run, error)
+	// Schedules are recurring writing tasks.
+	ListSchedules(context.Context, string, string) ([]Schedule, error)
+	GetSchedule(context.Context, string, string) (Schedule, error)
+	CreateSchedule(context.Context, string, Schedule) (Schedule, error)
+	UpdateSchedule(context.Context, string, Schedule) (Schedule, error)
+	DeleteSchedule(context.Context, string, string, string) error
+	ListDueSchedules(context.Context, time.Time, int) ([]Schedule, error)
 }
 
 // ProjectSettings holds the project-level writing style and hard rules that are
 // injected into every generation call.
 type ProjectSettings struct {
-	ProjectID    string    `json:"projectId"`
-	StyleProfile string    `json:"styleProfile"`
-	Rules        []string  `json:"rules"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ProjectID    string        `json:"projectId"`
+	StyleProfile string        `json:"styleProfile"`
+	Rules        []string      `json:"rules"`
+	Agent        AgentSettings `json:"agent"`
+	UpdatedAt    time.Time     `json:"updatedAt"`
 }
 
 // TxStore marks a Store that participates in a caller-managed transaction.

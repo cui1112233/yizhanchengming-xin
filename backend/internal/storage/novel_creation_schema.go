@@ -227,5 +227,56 @@ func NovelCreationMigrations() []Migration {
   CONSTRAINT fk_novel_project_settings_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id)
 ) ENGINE=InnoDB`,
 		},
+	}, {
+		Version:          8800302,
+		CallbackChecksum: "v88-novel-creation-materials-notes-schedules-v1",
+		SQL: []string{
+			`ALTER TABLE novel_project_settings ADD COLUMN agent_json JSON NULL`,
+			`CREATE TABLE IF NOT EXISTS novel_materials (
+  material_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  content LONGTEXT NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, material_id),
+  KEY idx_novel_materials_owner (owner_username, project_id, created_at),
+  CONSTRAINT fk_novel_materials_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id)
+) ENGINE=InnoDB`,
+			`CREATE TABLE IF NOT EXISTS novel_project_notes (
+  note_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  content LONGTEXT NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, note_id),
+  KEY idx_novel_project_notes_owner (owner_username, project_id, updated_at),
+  CONSTRAINT fk_novel_project_notes_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id)
+) ENGINE=InnoDB`,
+			`CREATE TABLE IF NOT EXISTS novel_schedules (
+  schedule_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  session_id VARCHAR(96) NOT NULL,
+  interval_minutes INT NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  prompt LONGTEXT NOT NULL,
+  model_id VARCHAR(96) NOT NULL DEFAULT '',
+  thinking_level VARCHAR(32) NOT NULL DEFAULT '',
+  next_run_at DATETIME(6) NOT NULL,
+  last_run_at DATETIME(6) NULL,
+  last_run_id VARCHAR(96) NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, schedule_id),
+  KEY idx_novel_schedules_owner (owner_username, project_id, updated_at),
+  KEY idx_novel_schedules_due (enabled, next_run_at),
+  CONSTRAINT fk_novel_schedules_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id),
+  CONSTRAINT fk_novel_schedules_session FOREIGN KEY (owner_username, session_id, project_id) REFERENCES novel_sessions(owner_username, session_id, project_id)
+) ENGINE=InnoDB`,
+		},
 	}}
 }

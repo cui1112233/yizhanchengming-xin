@@ -23,6 +23,9 @@ type MemoryStore struct {
 	chapterBundles map[string]ChapterBundle
 	settings       map[string]ProjectSettings
 	foundations    map[string]Foundation
+	materials      map[string]Material
+	notes          map[string]ProjectNote
+	schedules      map[string]Schedule
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -36,6 +39,9 @@ func NewMemoryStore() *MemoryStore {
 		chapterBundles: make(map[string]ChapterBundle),
 		settings:       make(map[string]ProjectSettings),
 		foundations:    make(map[string]Foundation),
+		materials:      make(map[string]Material),
+		notes:          make(map[string]ProjectNote),
+		schedules:      make(map[string]Schedule),
 	}
 }
 
@@ -454,9 +460,10 @@ func (s *MemoryStore) GetProjectSettings(_ context.Context, owner, projectID str
 	}
 	settings, exists := s.settings[memoryKey(owner, projectID)]
 	if !exists {
-		return ProjectSettings{ProjectID: projectID, Rules: []string{}}, nil
+		return ProjectSettings{ProjectID: projectID, Rules: []string{}, Agent: NormalizeAgentSettings(AgentSettings{}, project.TargetChapterWords)}, nil
 	}
 	settings.Rules = append([]string(nil), settings.Rules...)
+	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
 	return settings, nil
 }
 
@@ -469,7 +476,8 @@ func (s *MemoryStore) UpdateProjectSettings(_ context.Context, owner, projectID 
 	}
 	settings := ProjectSettings{
 		ProjectID: projectID, StyleProfile: strings.TrimSpace(input.StyleProfile),
-		Rules: append([]string(nil), input.Rules...), UpdatedAt: time.Now().UTC(),
+		Rules: append([]string(nil), input.Rules...),
+		Agent: NormalizeAgentSettings(input.Agent, project.TargetChapterWords), UpdatedAt: time.Now().UTC(),
 	}
 	s.settings[memoryKey(owner, projectID)] = settings
 	return settings, nil
@@ -512,4 +520,226 @@ func (s *MemoryStore) SaveFoundation(_ context.Context, owner string, foundation
 	foundation.Snapshot = cloneRawJSON(foundation.Snapshot)
 	s.foundations[memoryKey(owner, foundation.ProjectID)] = foundation
 	return nil
+}
+
+func (s *MemoryStore) ListMaterials(_ context.Context, owner, projectID string) ([]Material, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	materials := make([]Material, 0)
+	for _, material := range s.materials {
+		if material.ProjectID == projectID {
+			materials = append(materials, material)
+		}
+	}
+	sort.Slice(materials, func(i, j int) bool { return materials[i].CreatedAt.After(materials[j].CreatedAt) })
+	return materials, nil
+}
+
+func (s *MemoryStore) CreateMaterial(_ context.Context, owner, projectID string, input CreateMaterialInput) (Material, error) {
+	input, err := NormalizeMaterialInput(input)
+	if err != nil {
+		return Material{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return Material{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	now := time.Now().UTC()
+	material := Material{ID: s.newID("material"), ProjectID: projectID, Title: input.Title, Content: input.Content, CreatedAt: now, UpdatedAt: now}
+	s.materials[memoryKey(owner, material.ID)] = material
+	return material, nil
+}
+
+func (s *MemoryStore) DeleteMaterial(_ context.Context, owner, projectID, materialID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := memoryKey(owner, materialID)
+	material, ok := s.materials[key]
+	if !ok || material.ProjectID != projectID {
+		return &DomainError{Code: ErrProjectNotFound, Message: "material not found"}
+	}
+	delete(s.materials, key)
+	return nil
+}
+
+func (s *MemoryStore) ListNotes(_ context.Context, owner, projectID string) ([]ProjectNote, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	notes := make([]ProjectNote, 0)
+	for _, note := range s.notes {
+		if note.ProjectID == projectID {
+			notes = append(notes, note)
+		}
+	}
+	sort.Slice(notes, func(i, j int) bool { return notes[i].UpdatedAt.After(notes[j].UpdatedAt) })
+	return notes, nil
+}
+
+func (s *MemoryStore) CreateNote(_ context.Context, owner, projectID string, input ProjectNoteInput) (ProjectNote, error) {
+	input, err := NormalizeNoteInput(input)
+	if err != nil {
+		return ProjectNote{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return ProjectNote{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	now := time.Now().UTC()
+	note := ProjectNote{ID: s.newID("note"), ProjectID: projectID, Title: input.Title, Content: input.Content, CreatedAt: now, UpdatedAt: now}
+	s.notes[memoryKey(owner, note.ID)] = note
+	return note, nil
+}
+
+func (s *MemoryStore) UpdateNote(_ context.Context, owner, projectID, noteID string, input ProjectNoteInput) (ProjectNote, error) {
+	input, err := NormalizeNoteInput(input)
+	if err != nil {
+		return ProjectNote{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := memoryKey(owner, noteID)
+	note, ok := s.notes[key]
+	if !ok || note.ProjectID != projectID {
+		return ProjectNote{}, &DomainError{Code: ErrProjectNotFound, Message: "note not found"}
+	}
+	note.Title, note.Content, note.UpdatedAt = input.Title, input.Content, time.Now().UTC()
+	s.notes[key] = note
+	return note, nil
+}
+
+func (s *MemoryStore) DeleteNote(_ context.Context, owner, projectID, noteID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := memoryKey(owner, noteID)
+	note, ok := s.notes[key]
+	if !ok || note.ProjectID != projectID {
+		return &DomainError{Code: ErrProjectNotFound, Message: "note not found"}
+	}
+	delete(s.notes, key)
+	return nil
+}
+
+func (s *MemoryStore) ListRuns(_ context.Context, owner, projectID string) ([]Run, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	runs := make([]Run, 0)
+	for key, run := range s.runs {
+		if strings.HasPrefix(key, memoryKey(owner)+"\x00") && run.ProjectID == projectID {
+			runs = append(runs, cloneRun(run))
+		}
+	}
+	sort.Slice(runs, func(i, j int) bool { return runs[i].CreatedAt.After(runs[j].CreatedAt) })
+	return runs, nil
+}
+
+func (s *MemoryStore) ListSchedules(_ context.Context, owner, projectID string) ([]Schedule, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	schedules := make([]Schedule, 0)
+	for _, schedule := range s.schedules {
+		if schedule.ProjectID == projectID {
+			schedules = append(schedules, schedule)
+		}
+	}
+	sort.Slice(schedules, func(i, j int) bool { return schedules[i].CreatedAt.After(schedules[j].CreatedAt) })
+	return schedules, nil
+}
+
+func (s *MemoryStore) GetSchedule(_ context.Context, owner, scheduleID string) (Schedule, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	schedule, ok := s.schedules[memoryKey(owner, scheduleID)]
+	if !ok {
+		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
+	}
+	return schedule, nil
+}
+
+func (s *MemoryStore) CreateSchedule(_ context.Context, owner string, schedule Schedule) (Schedule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.projects[memoryKey(owner, schedule.ProjectID)]; !ok {
+		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	session, ok := s.sessions[memoryKey(owner, schedule.SessionID)]
+	if !ok || session.ProjectID != schedule.ProjectID {
+		return Schedule{}, &DomainError{Code: ErrSessionNotFound, Message: "session not found"}
+	}
+	if schedule.ID == "" {
+		schedule.ID = s.newID("schedule")
+	}
+	now := time.Now().UTC()
+	schedule.OwnerUsername = owner
+	if schedule.CreatedAt.IsZero() {
+		schedule.CreatedAt = now
+	}
+	schedule.UpdatedAt = now
+	s.schedules[memoryKey(owner, schedule.ID)] = schedule
+	return schedule, nil
+}
+
+func (s *MemoryStore) UpdateSchedule(_ context.Context, owner string, schedule Schedule) (Schedule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := memoryKey(owner, schedule.ID)
+	existing, ok := s.schedules[key]
+	if !ok || existing.ProjectID != schedule.ProjectID {
+		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
+	}
+	schedule.OwnerUsername = owner
+	schedule.CreatedAt = existing.CreatedAt
+	schedule.UpdatedAt = time.Now().UTC()
+	s.schedules[key] = schedule
+	return schedule, nil
+}
+
+func (s *MemoryStore) DeleteSchedule(_ context.Context, owner, projectID, scheduleID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := memoryKey(owner, scheduleID)
+	schedule, ok := s.schedules[key]
+	if !ok || schedule.ProjectID != projectID {
+		return &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
+	}
+	delete(s.schedules, key)
+	return nil
+}
+
+func (s *MemoryStore) ListDueSchedules(_ context.Context, now time.Time, limit int) ([]Schedule, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 20
+	}
+	due := make([]Schedule, 0)
+	for _, schedule := range s.schedules {
+		if schedule.Enabled && !schedule.NextRunAt.After(now) {
+			due = append(due, schedule)
+		}
+	}
+	sort.Slice(due, func(i, j int) bool { return due[i].NextRunAt.Before(due[j].NextRunAt) })
+	if len(due) > limit {
+		due = due[:limit]
+	}
+	return due, nil
 }

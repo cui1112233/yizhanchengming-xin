@@ -8,8 +8,8 @@ import (
 
 func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	if len(migrations) != 2 {
-		t.Fatalf("migrations=%d, want 2", len(migrations))
+	if len(migrations) != 3 {
+		t.Fatalf("migrations=%d, want 3", len(migrations))
 	}
 	migration := migrations[0]
 	if migration.Version != 8800300 {
@@ -46,6 +46,19 @@ func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	}
 	if !strings.Contains(settingsSQL, "PRIMARY KEY (owner_username, project_id)") {
 		t.Fatalf("novel_project_settings must be owner scoped")
+	}
+	p2 := migrations[2]
+	if p2.Version != 8800302 || p2.CallbackChecksum != "v88-novel-creation-materials-notes-schedules-v1" {
+		t.Fatalf("p2 migration=%+v", p2)
+	}
+	p2SQL := strings.Join(p2.SQL, "\n")
+	for _, table := range []string{"novel_materials", "novel_project_notes", "novel_schedules"} {
+		if !strings.Contains(p2SQL, "CREATE TABLE IF NOT EXISTS "+table) {
+			t.Fatalf("missing table %s", table)
+		}
+	}
+	if !strings.Contains(p2SQL, "ADD COLUMN agent_json JSON NULL") {
+		t.Fatalf("missing novel_project_settings.agent_json")
 	}
 }
 

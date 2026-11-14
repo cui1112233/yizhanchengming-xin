@@ -60,6 +60,10 @@ type RunContext struct {
 	// ConfirmedFoundation skips blueprint generation and reuses an existing or
 	// user-confirmed blueprint.
 	ConfirmedFoundation json.RawMessage
+	// KnowledgeMaterials is the bounded snapshot of user-selected materials.
+	KnowledgeMaterials []KnowledgeMaterial
+	// MaxRevisionRounds overrides the default audit-revision loop bound.
+	MaxRevisionRounds int
 }
 
 type Pipeline struct {
@@ -211,10 +215,11 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		return ChapterBundle{}, err
 	}
 	foundationPayload := map[string]any{
-		"creation_mode": modeContract(input.Session.Mode),
-		"mode_inputs":   input.ModeInputs,
-		"style_profile": input.StyleProfile,
-		"rules":         input.Rules,
+		"creation_mode":       modeContract(input.Session.Mode),
+		"mode_inputs":         input.ModeInputs,
+		"style_profile":       input.StyleProfile,
+		"rules":               input.Rules,
+		"knowledge_materials": input.KnowledgeMaterials,
 		"project_brief": map[string]any{
 			"title": input.Project.Title, "genre": input.Project.Genre,
 			"world": input.Project.World, "protagonist": input.Project.Protagonist,
@@ -254,14 +259,16 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	planRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 		definition: novelprompt.ChapterPlan, step: RunPlanning,
 		userPayload: map[string]any{
-			"creation_mode":   modeContract(input.Session.Mode),
-			"mode_inputs":     input.ModeInputs,
-			"style_profile":   input.StyleProfile,
-			"rules":           input.Rules,
-			"foundation_plan": foundation,
-			"chapter_number":  chapterNumber,
-			"memory_context":  rawJSONValue(input.PreviousMemory),
-			"user_message":    input.UserMessage,
+			"creation_mode":        modeContract(input.Session.Mode),
+			"mode_inputs":          input.ModeInputs,
+			"style_profile":        input.StyleProfile,
+			"rules":                input.Rules,
+			"knowledge_materials":  input.KnowledgeMaterials,
+			"foundation_plan":      foundation,
+			"chapter_number":       chapterNumber,
+			"target_chapter_words": input.Project.TargetChapterWords,
+			"memory_context":       rawJSONValue(input.PreviousMemory),
+			"user_message":         input.UserMessage,
 		},
 		temperature: 0.35, maxTokens: 3500,
 		validate: func() error { return validateChapterPlan(plan, chapterNumber, foundation.Volumes) },
@@ -281,13 +288,14 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	draftRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 		definition: novelprompt.ChapterDraft, step: RunWriting,
 		userPayload: map[string]any{
-			"creation_mode":   modeContract(input.Session.Mode),
-			"mode_inputs":     input.ModeInputs,
-			"style_profile":   input.StyleProfile,
-			"rules":           input.Rules,
-			"foundation_plan": foundation,
-			"chapter_plan":    plan,
-			"memory_context":  rawJSONValue(input.PreviousMemory),
+			"creation_mode":       modeContract(input.Session.Mode),
+			"mode_inputs":         input.ModeInputs,
+			"style_profile":       input.StyleProfile,
+			"rules":               input.Rules,
+			"knowledge_materials": input.KnowledgeMaterials,
+			"foundation_plan":     foundation,
+			"chapter_plan":        plan,
+			"memory_context":      rawJSONValue(input.PreviousMemory),
 		},
 		temperature: 0.75, maxTokens: 12000,
 		validate: func() error { return requireText("content", draft.Content) },
@@ -317,7 +325,11 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	bestAuditRaw := currentAuditRaw
 
 	revisingStageEmitted := false
-	for round := 1; !auditPasses(bestAudit, p.auditThreshold) && round <= p.maxRevisions; round++ {
+	maxRevisions := p.maxRevisions
+	if input.MaxRevisionRounds > 0 {
+		maxRevisions = input.MaxRevisionRounds
+	}
+	for round := 1; !auditPasses(bestAudit, p.auditThreshold) && round <= maxRevisions; round++ {
 		if len(bestAudit.Issues) == 0 {
 			break
 		}
@@ -432,11 +444,12 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 	raw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 		definition: novelprompt.ChapterAudit, step: RunAuditing,
 		userPayload: map[string]any{
-			"foundation_plan": foundation,
-			"chapter_plan":    plan,
-			"chapter_content": content,
-			"rules":           input.Rules,
-			"memory_context":  rawJSONValue(input.PreviousMemory),
+			"foundation_plan":     foundation,
+			"chapter_plan":        plan,
+			"chapter_content":     content,
+			"rules":               input.Rules,
+			"knowledge_materials": input.KnowledgeMaterials,
+			"memory_context":      rawJSONValue(input.PreviousMemory),
 		},
 		temperature: 0.2, maxTokens: 4500,
 		validate: func() error { return validateAudit(audit, p.auditThreshold) },

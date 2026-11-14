@@ -6,6 +6,15 @@ const (
 	defaultTargetChapterWords = 2000
 	minTargetChapterWords     = 800
 	maxTargetChapterWords     = 8000
+
+	defaultMaxRevisionRounds = 2
+	minMaxRevisionRounds     = 1
+	maxMaxRevisionRounds     = 5
+
+	maxKnowledgeMaterials      = 8
+	maxKnowledgeMaterialRunes  = 12000
+	minScheduleIntervalMinutes = 15
+	maxScheduleIntervalMinutes = 10080
 )
 
 func NormalizeCreateProjectInput(input CreateProjectInput) (CreateProjectInput, error) {
@@ -175,4 +184,119 @@ func isTerminalRunStatus(status RunStatus) bool {
 	default:
 		return false
 	}
+}
+
+// NormalizeKnowledgeIDs trims, deduplicates, and bounds selected materials.
+func NormalizeKnowledgeIDs(values []string) ([]string, error) {
+	normalized := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		id := strings.TrimSpace(value)
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	if len(normalized) > maxKnowledgeMaterials {
+		return nil, &DomainError{Code: ErrInputRequired, Message: "单次最多选择 8 个素材"}
+	}
+	return normalized, nil
+}
+
+// NormalizeAgentSettings clamps the project-level agent controls. A fallback
+// target word count keeps older projects aligned with their creation setting.
+func NormalizeAgentSettings(input AgentSettings, fallbackTargetWords int) AgentSettings {
+	target := input.TargetChapterWords
+	if target == 0 {
+		target = fallbackTargetWords
+	}
+	if target == 0 {
+		target = defaultTargetChapterWords
+	}
+	if target < minTargetChapterWords {
+		target = minTargetChapterWords
+	}
+	if target > maxTargetChapterWords {
+		target = maxTargetChapterWords
+	}
+	rounds := input.MaxRevisionRounds
+	if rounds == 0 {
+		rounds = defaultMaxRevisionRounds
+	}
+	if rounds < minMaxRevisionRounds {
+		rounds = minMaxRevisionRounds
+	}
+	if rounds > maxMaxRevisionRounds {
+		rounds = maxMaxRevisionRounds
+	}
+	return AgentSettings{TargetChapterWords: target, MaxRevisionRounds: rounds, ThinkingLevel: normalizeThinkingLevel(input.ThinkingLevel)}
+}
+
+func normalizeThinkingLevel(value string) string {
+	switch strings.TrimSpace(value) {
+	case "fast", "standard", "deep":
+		return strings.TrimSpace(value)
+	default:
+		return "standard"
+	}
+}
+
+func NormalizeMaterialInput(input CreateMaterialInput) (CreateMaterialInput, error) {
+	input.Title = strings.TrimSpace(input.Title)
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Content == "" {
+		return CreateMaterialInput{}, &DomainError{Code: ErrInputRequired, Message: "素材内容不能为空"}
+	}
+	if input.Title == "" {
+		input.Title = truncateRunes(input.Content, 40)
+	}
+	return input, nil
+}
+
+func NormalizeNoteInput(input ProjectNoteInput) (ProjectNoteInput, error) {
+	input.Title = strings.TrimSpace(input.Title)
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Title == "" && input.Content == "" {
+		return ProjectNoteInput{}, &DomainError{Code: ErrInputRequired, Message: "备忘录标题或内容不能为空"}
+	}
+	if input.Title == "" {
+		input.Title = truncateRunes(input.Content, 40)
+	}
+	return input, nil
+}
+
+func NormalizeScheduleInput(input ScheduleInput) (ScheduleInput, error) {
+	input.SessionID = strings.TrimSpace(input.SessionID)
+	input.Prompt = strings.TrimSpace(input.Prompt)
+	input.ModelID = strings.TrimSpace(input.ModelID)
+	input.ThinkingLevel = normalizeThinkingLevel(input.ThinkingLevel)
+	if input.SessionID == "" {
+		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "请选择定时任务使用的会话"}
+	}
+	if input.Prompt == "" {
+		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "定时写作指令不能为空"}
+	}
+	if input.IntervalMinutes == 0 {
+		input.IntervalMinutes = 60
+	}
+	if input.IntervalMinutes < minScheduleIntervalMinutes || input.IntervalMinutes > maxScheduleIntervalMinutes {
+		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "定时间隔必须在 15 到 10080 分钟之间"}
+	}
+	return input, nil
+}
+
+// truncateRunes keeps the snapshot and prompt bounded without splitting UTF-8.
+func truncateRunes(value string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit])
 }

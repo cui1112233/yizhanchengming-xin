@@ -100,6 +100,18 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
+	knowledgeIDs, err := NormalizeKnowledgeIDs(input.KnowledgeIDs)
+	if err != nil {
+		return Run{}, err
+	}
+	materials, err := s.store.ListMaterials(ctx, owner, input.ProjectID)
+	if err != nil {
+		return Run{}, err
+	}
+	knowledgeMaterials, err := selectKnowledgeMaterials(materials, knowledgeIDs)
+	if err != nil {
+		return Run{}, err
+	}
 	chapters, err := s.store.ListChapters(ctx, owner, input.ProjectID)
 	if err != nil {
 		return Run{}, err
@@ -122,6 +134,7 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	snapshotFields := map[string]any{
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": modeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
+		"knowledge_ids": knowledgeIDs, "knowledge_materials": knowledgeMaterials,
 		"previous_truth": map[string]any{}, "previous_memory": map[string]any{},
 		"message_id": message.ID,
 	}
@@ -180,14 +193,16 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
-		UserMessage         string            `json:"user_message"`
-		Mode                string            `json:"mode"`
-		ModeInputs          map[string]string `json:"mode_inputs"`
-		ChapterNumber       int               `json:"chapter_number"`
-		Checkpoint          bool              `json:"checkpoint"`
-		ConfirmedFoundation json.RawMessage   `json:"confirmed_foundation"`
-		PreviousTruth       json.RawMessage   `json:"previous_truth"`
-		PreviousMemory      json.RawMessage   `json:"previous_memory"`
+		UserMessage         string              `json:"user_message"`
+		Mode                string              `json:"mode"`
+		ModeInputs          map[string]string   `json:"mode_inputs"`
+		ChapterNumber       int                 `json:"chapter_number"`
+		Checkpoint          bool                `json:"checkpoint"`
+		ConfirmedFoundation json.RawMessage     `json:"confirmed_foundation"`
+		KnowledgeIDs        []string            `json:"knowledge_ids"`
+		KnowledgeMaterials  []KnowledgeMaterial `json:"knowledge_materials"`
+		PreviousTruth       json.RawMessage     `json:"previous_truth"`
+		PreviousMemory      json.RawMessage     `json:"previous_memory"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
@@ -195,6 +210,11 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	settings, err := s.store.GetProjectSettings(ctx, owner, run.ProjectID)
 	if err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "读取作品写作风格失败", err)
+	}
+	agent := NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	project.TargetChapterWords = agent.TargetChapterWords
+	if strings.TrimSpace(run.ThinkingLevel) == "" {
+		run.ThinkingLevel = agent.ThinkingLevel
 	}
 	sink := serviceEventSink{service: s, owner: owner}
 	bundle, runErr := s.pipeline.Run(ctx, RunContext{
@@ -204,6 +224,8 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		ModeInputs: prompt.ModeInputs, StyleProfile: settings.StyleProfile, Rules: settings.Rules,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
+		KnowledgeMaterials:  prompt.KnowledgeMaterials,
+		MaxRevisionRounds:   agent.MaxRevisionRounds,
 	}, sink)
 	if runErr != nil {
 		code, message := domainFailure(runErr)
@@ -504,17 +526,147 @@ func (s *Service) GetProjectSettings(ctx context.Context, owner, projectID strin
 	if s == nil || s.store == nil {
 		return ProjectSettings{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
-	return s.store.GetProjectSettings(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	settings, err := s.store.GetProjectSettings(ctx, owner, projectID)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+	project, err := s.store.GetProject(ctx, owner, projectID)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	return settings, nil
 }
 
 func (s *Service) UpdateProjectSettings(ctx context.Context, owner, projectID string, input ProjectSettings) (ProjectSettings, error) {
 	if s == nil || s.store == nil {
 		return ProjectSettings{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
-	return s.store.UpdateProjectSettings(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), ProjectSettings{
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	project, err := s.store.GetProject(ctx, owner, projectID)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+	return s.store.UpdateProjectSettings(ctx, owner, projectID, ProjectSettings{
 		StyleProfile: strings.TrimSpace(input.StyleProfile),
 		Rules:        normalizeRules(input.Rules),
+		Agent:        NormalizeAgentSettings(input.Agent, project.TargetChapterWords),
 	})
+}
+
+func selectKnowledgeMaterials(materials []Material, ids []string) ([]KnowledgeMaterial, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	byID := make(map[string]Material, len(materials))
+	for _, material := range materials {
+		byID[material.ID] = material
+	}
+	selected := make([]KnowledgeMaterial, 0, len(ids))
+	for _, id := range ids {
+		material, ok := byID[id]
+		if !ok {
+			return nil, &DomainError{Code: ErrInputRequired, Message: "所选素材不存在或不属于当前作品"}
+		}
+		selected = append(selected, KnowledgeMaterial{
+			ID: material.ID, Title: material.Title,
+			Content: truncateRunes(material.Content, maxKnowledgeMaterialRunes),
+		})
+	}
+	return selected, nil
+}
+
+func (s *Service) ListMaterials(ctx context.Context, owner, projectID string) ([]Material, error) {
+	if s == nil || s.store == nil {
+		return nil, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.ListMaterials(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
+}
+
+func (s *Service) CreateMaterial(ctx context.Context, owner, projectID string, input CreateMaterialInput) (Material, error) {
+	if s == nil || s.store == nil {
+		return Material{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.CreateMaterial(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), input)
+}
+
+func (s *Service) DeleteMaterial(ctx context.Context, owner, projectID, materialID string) error {
+	if s == nil || s.store == nil {
+		return &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.DeleteMaterial(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(materialID))
+}
+
+func (s *Service) ListNotes(ctx context.Context, owner, projectID string) ([]ProjectNote, error) {
+	if s == nil || s.store == nil {
+		return nil, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.ListNotes(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
+}
+
+func (s *Service) CreateNote(ctx context.Context, owner, projectID string, input ProjectNoteInput) (ProjectNote, error) {
+	if s == nil || s.store == nil {
+		return ProjectNote{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.CreateNote(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), input)
+}
+
+func (s *Service) UpdateNote(ctx context.Context, owner, projectID, noteID string, input ProjectNoteInput) (ProjectNote, error) {
+	if s == nil || s.store == nil {
+		return ProjectNote{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.UpdateNote(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(noteID), input)
+}
+
+func (s *Service) DeleteNote(ctx context.Context, owner, projectID, noteID string) error {
+	if s == nil || s.store == nil {
+		return &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.DeleteNote(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(noteID))
+}
+
+// GetDashboard aggregates chapter volume and run outcomes for the data panel.
+func (s *Service) GetDashboard(ctx context.Context, owner, projectID string) (Dashboard, error) {
+	if s == nil || s.store == nil {
+		return Dashboard{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	if _, err := s.store.GetProject(ctx, owner, projectID); err != nil {
+		return Dashboard{}, err
+	}
+	chapters, err := s.store.ListChapters(ctx, owner, projectID)
+	if err != nil {
+		return Dashboard{}, err
+	}
+	runs, err := s.store.ListRuns(ctx, owner, projectID)
+	if err != nil {
+		return Dashboard{}, err
+	}
+	dashboard := Dashboard{ProjectID: projectID, ChapterCount: len(chapters), RunCounts: make(map[string]int)}
+	for _, chapter := range chapters {
+		dashboard.TotalWords += chapter.WordCount
+	}
+	terminal, successful := 0, 0
+	for _, run := range runs {
+		dashboard.RunTotal++
+		dashboard.RunCounts[string(run.Status)]++
+		switch run.Status {
+		case RunSucceeded, RunSucceededWithWarnings:
+			terminal++
+			successful++
+		case RunFailed, RunCancelled:
+			terminal++
+		}
+		if dashboard.LastRunAt == nil || run.CreatedAt.After(*dashboard.LastRunAt) {
+			created := run.CreatedAt
+			dashboard.LastRunAt = &created
+		}
+	}
+	if terminal > 0 {
+		dashboard.SuccessRate = float64(successful) * 100 / float64(terminal)
+	}
+	return dashboard, nil
 }
 
 func normalizeRules(rules []string) []string {

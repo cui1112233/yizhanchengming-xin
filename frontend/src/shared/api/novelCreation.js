@@ -57,3 +57,55 @@ export function exportNovelCreationProject(projectId, format = 'markdown') {
     responseType: 'blob'
   });
 }
+
+export function listNovelCreationMaterials(projectId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/materials`);
+}
+
+export function createNovelCreationMaterial(projectId, input) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/materials`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function deleteNovelCreationMaterial(projectId, materialId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/materials/${encodeURIComponent(materialId)}`, { method: 'DELETE' });
+}
+
+export function listNovelCreationNotes(projectId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/notes`);
+}
+
+export function createNovelCreationNote(projectId, input) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/notes`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateNovelCreationNote(projectId, noteId, input) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/notes/${encodeURIComponent(noteId)}`, { method: 'PUT', body: JSON.stringify(input) });
+}
+
+export function deleteNovelCreationNote(projectId, noteId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/notes/${encodeURIComponent(noteId)}`, { method: 'DELETE' });
+}
+
+export function getNovelCreationDashboard(projectId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/dashboard`);
+}
+
+export function listNovelCreationSchedules(projectId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules`);
+}
+
+export function createNovelCreationSchedule(projectId, input) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateNovelCreationSchedule(projectId, scheduleId, input) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules/${encodeURIComponent(scheduleId)}`, { method: 'PUT', body: JSON.stringify(input) });
+}
+
+export function deleteNovelCreationSchedule(projectId, scheduleId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules/${encodeURIComponent(scheduleId)}`, { method: 'DELETE' });
+}
+
+export function runNovelCreationSchedule(projectId, scheduleId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules/${encodeURIComponent(scheduleId)}/run`, { method: 'POST', body: '{}' });
+}
