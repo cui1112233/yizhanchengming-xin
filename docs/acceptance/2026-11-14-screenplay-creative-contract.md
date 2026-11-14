@@ -67,3 +67,7 @@
 最新真实页面还验证：默认站位页无长前缀表单；卡片进入960px编辑窗；改变站位说明后取消重开仍为原文；新增取消仍1张卡；分析760px先选模式、批量936px先选条目，均取消未执行；分镜0结果编辑器禁用、缺文本模型有明确说明。已恢复正常窗口尺寸并保留预览。
 
 案卷final-ui-acceptance.json记录本地读回构建及逐项操作；final-ui-tests.log为根审65项输出。实图ui-story-final.png（1450参考宽度）、ui-standing-modal-final.png（站位编辑）、ui-review-final.png（恢复正常窗口尺寸）。图片是我们的真实页面，不能当成原版截图。
+
+## UI/icon后续更新
+
+2026-11-14追加原SVG图标和工具布局（74164055）及短视口弹窗修复（6d4de5fe），最新4004 PID55608、入口user-BGoeDwqT.js。66页面+5图标检查通过；实际图标尺寸、五资产、站位footer可见及截图见docs/audit/2026-11-14-screenplay-ui-icons.md。本节更新优先于前面的阶段性构建号，不扩大原版像素/Agent未完成范围。
