@@ -105,6 +105,15 @@ Go 版补同等语义：
 - 这类失败不再进入 `waiting_retry` 循环，用户点批量重试时由 2.9 的复位逻辑清除标记。
 - 网络抖动、限流等瞬态错误仍走原有自动重试，不改变行为。
 
+### 2.11 原文获取重试预算
+
+线上 131 本 `waiting_retry` 中，绝大多数是原文获取返回 `121 upstream business error 400: 获取书籍信息失败`。这类 400 属于确定性错误，但原先 `originalFetchRetryAttempts` 只增不减，会按 1 小时退避无限重试。
+
+- 新增 `novelFetchOriginalFetchMaxAttempts = 5`。
+- 达到上限写 `status=failed`、`manualOnly=true`、`manualOriginalFetchRequired=true` 和可读原因，并删除 `originalFetchNextRetryAt`。
+- 未达上限继续按配置间隔退避，保留源站临时故障的自动恢复能力。
+- 人工批量重试时同时清除 `originalFetchRetryAttempts`、`originalFetchNextRetryAt`、`originalFetchLastError`，让计数从零开始。
+
 ## 3. 验收
 
 1. `localartifact`：写保护开启时 `Restore` 返回 `ErrDiskPressure` 且不产生可见文件；校验失败仍返回 `ErrRemoteIntegrity`。

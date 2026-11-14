@@ -31,7 +31,7 @@ func resetNovelFetchAutomationRetryState(document *novelfetchworkshop.Document) 
 		return false
 	}
 	changed := false
-	for _, key := range []string{"manualOnly", "manual_only", "automationEnqueueAttempts", "automationNextRetryAt"} {
+	for _, key := range []string{"manualOnly", "manual_only", "automationEnqueueAttempts", "automationNextRetryAt", "manualOriginalFetchRequired", "originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError"} {
 		if _, ok := document.Meta[key]; ok {
 			delete(document.Meta, key)
 			changed = true

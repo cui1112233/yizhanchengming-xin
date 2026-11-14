@@ -133,6 +133,58 @@ func TestMarkNovelFetchAIManualRetryBlocksAutomation(t *testing.T) {
 	}
 }
 
+// 原文 400 是确定性错误，达到上限必须停止自动重试，避免每小时重复失败。
+func TestOriginalFetchRetryStopsAtBudget(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	seed := novelfetchworkshop.Document{BookID: "book-1", Meta: map[string]any{
+		"status":                     "processing",
+		"originalFetchRetryAttempts": 4,
+	}}
+	if err := store.PutDocument(ctx, "owner", seed); err != nil {
+		t.Fatalf("seed document: %v", err)
+	}
+	fetchErr := errors.New("原文获取失败: 121 upstream business error 400: 获取书籍信息失败")
+	if err := markNovelFetchOriginalFetchRetry(ctx, store, "owner", "book-1", fetchErr, time.Now().UTC()); err != nil {
+		t.Fatalf("mark original fetch retry: %v", err)
+	}
+	document, err := store.GetDocument(ctx, "owner", "book-1")
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if document.Meta["manualOnly"] != true || document.Meta["manualOriginalFetchRequired"] != true {
+		t.Fatalf("manual flags missing at budget: %#v", document.Meta)
+	}
+	if document.Meta["status"] != "failed" {
+		t.Fatalf("status must be failed at budget, got %v", document.Meta["status"])
+	}
+	if _, ok := document.Meta["originalFetchNextRetryAt"]; ok {
+		t.Fatal("next retry must be cleared once the budget is exhausted")
+	}
+	if novelFetchAutomationEligible(document, time.Now().UTC()) {
+		t.Fatal("a book awaiting manual fetch retry must not be picked up by automation")
+	}
+
+	// 未达上限仍保持自动退避，瞬态错误可以自行恢复。
+	below := novelfetchworkshop.Document{BookID: "book-2", Meta: map[string]any{
+		"status":                     "processing",
+		"originalFetchRetryAttempts": 1,
+	}}
+	if err := store.PutDocument(ctx, "owner", below); err != nil {
+		t.Fatalf("seed below-budget document: %v", err)
+	}
+	if err := markNovelFetchOriginalFetchRetry(ctx, store, "owner", "book-2", fetchErr, time.Now().UTC()); err != nil {
+		t.Fatalf("mark below-budget retry: %v", err)
+	}
+	belowDocument, err := store.GetDocument(ctx, "owner", "book-2")
+	if err != nil {
+		t.Fatalf("load below-budget document: %v", err)
+	}
+	if belowDocument.Meta["status"] != "waiting_retry" {
+		t.Fatalf("below budget must stay waiting_retry, got %v", belowDocument.Meta["status"])
+	}
+}
+
 // 用户主动重试后必须能重新回到自动调度，否则 manualOnly 会永久挡住它。
 func TestManualRetryClearsAutomationBlockers(t *testing.T) {
 	document := novelfetchworkshop.Document{

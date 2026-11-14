@@ -76,6 +76,10 @@ func novelFetchOriginalFetchRetryInterval(settings map[string]any) time.Duration
 	return time.Duration(minutes) * time.Minute
 }
 
+// novelFetchOriginalFetchMaxAttempts 是原文获取自动重试上限。原文 400 通常是
+// 书籍已下架或源站拒绝，无限退避既不会成功也会掩盖真实问题。
+const novelFetchOriginalFetchMaxAttempts = 5
+
 // novelFetchAIManualRetryRequired 判断错误是否属于模型确定性失败。参考实现
 // 对这类错误写 manual_ai_retry_required 并禁止自动重试：同一段超长文本反复
 // 提交只会重复截断，既消耗额度也不可能自行恢复。
@@ -126,11 +130,27 @@ func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworks
 	if document.Meta == nil {
 		document.Meta = map[string]any{}
 	}
+	attempts := intValue(document.Meta["originalFetchRetryAttempts"]) + 1
+	document.Meta["originalFetchRetryAttempts"] = attempts
+	// 原文获取 400（书籍信息不存在、源站拒绝）是确定性错误，无限退避重试
+	// 只会每小时重复一次失败。达到上限后转人工，保留瞬态错误自动恢复能力。
+	if attempts >= novelFetchOriginalFetchMaxAttempts {
+		reason := "原文连续获取失败已停止自动重试，请检查书籍来源是否有效后手动重试：" + firstText(fetchErr)
+		document.Meta["status"] = "failed"
+		document.Meta["queueState"] = "failed"
+		document.Meta["originalStatus"] = "waiting_manual_fetch"
+		document.Meta["manualOnly"] = true
+		document.Meta["manualOriginalFetchRequired"] = true
+		document.Meta["originalFetchLastError"] = firstText(fetchErr)
+		document.Meta["error"] = reason
+		delete(document.Meta, "originalFetchNextRetryAt")
+		appendNovelFetchDocumentLog(&document, "queue_failed", reason, now)
+		return store.PutDocument(ctx, owner, document)
+	}
 	delay := novelFetchOriginalFetchRetryInterval(settings)
 	document.Meta["status"] = "waiting_retry"
 	document.Meta["queueState"] = "waiting_retry"
 	document.Meta["originalStatus"] = "waiting_fetch_retry"
-	document.Meta["originalFetchRetryAttempts"] = intValue(document.Meta["originalFetchRetryAttempts"]) + 1
 	document.Meta["originalFetchNextRetryAt"] = now.Add(delay).UTC().Format(time.RFC3339Nano)
 	document.Meta["originalFetchLastError"] = firstText(fetchErr)
 	document.Meta["error"] = firstText(fetchErr)
