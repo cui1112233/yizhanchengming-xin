@@ -174,6 +174,14 @@
 - 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141318-0d2fc026`（上一版本 `qiantie-202611141247`）。
 - 本次发布包含并行会话已提交的 `3ae9747f`（小说抓取确定性失败转人工），全量测试覆盖通过。
 
+#### 阶段 6 遗留：并发预算前端展示（等待前端提交）
+
+- 触发条件：`frontend/src` 不再有并行会话的未提交改动（当前 20 项已修改、14 项未跟踪）。
+- 数据契约：任务状态响应中的 `concurrencyBudget`，字段含义见上。
+- 展示建议：在任务详情/状态卡片增加一行“并发预算”，展示 `bookWorkers / taskImageConcurrency / comicBookSlots`，并把 `gatewayColdStart → gatewayCeiling` 标为网关区间；当 `limitingLayer` 为 `gateway_cold_start` 时提示“网关冷启动受限，会逐步爬升”。
+- 验收：前端读取真实接口字段，不在前端重算；构建后本地 4001 打开任务详情核对字段与后端一致。
+- 该展示不改变调度，仅解释“为什么只有 2 路”。
+
 ### 2026-11-14 阶段 5 执行结果
 
 三项既有失败均已定位并修正，`go test ./...` 连续两次全绿：
