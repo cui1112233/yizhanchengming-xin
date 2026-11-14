@@ -8,8 +8,8 @@ import (
 
 func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	if len(migrations) != 3 {
-		t.Fatalf("migrations=%d, want 3", len(migrations))
+	if len(migrations) != 4 {
+		t.Fatalf("migrations=%d, want 4", len(migrations))
 	}
 	migration := migrations[0]
 	if migration.Version != 8800300 {
@@ -59,6 +59,16 @@ func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	}
 	if !strings.Contains(p2SQL, "ADD COLUMN agent_json JSON NULL") {
 		t.Fatalf("missing novel_project_settings.agent_json")
+	}
+	p3 := migrations[3]
+	if p3.Version != 8800303 || p3.CallbackChecksum != "v88-novel-creation-batches-v1" {
+		t.Fatalf("p3 migration=%+v", p3)
+	}
+	p3SQL := strings.Join(p3.SQL, "\n")
+	if !strings.Contains(p3SQL, "CREATE TABLE IF NOT EXISTS novel_batches") ||
+		!strings.Contains(p3SQL, "completed_chapters INT NOT NULL") ||
+		!strings.Contains(p3SQL, "KEY idx_novel_batches_active (status, updated_at)") {
+		t.Fatalf("novel_batches schema missing progress columns")
 	}
 }
 

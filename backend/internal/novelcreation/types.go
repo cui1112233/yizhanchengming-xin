@@ -26,15 +26,28 @@ const (
 )
 
 const (
-	ErrInputRequired     = "novel_input_required"
-	ErrProjectNotFound   = "novel_project_not_found"
-	ErrSessionNotFound   = "novel_session_not_found"
-	ErrRunInProgress     = "novel_run_in_progress"
-	ErrProjectLocked     = "novel_project_locked"
-	ErrInvalidTransition = "novel_invalid_transition"
-	ErrModelUnavailable  = "novel_model_unavailable"
-	ErrGenerationTimeout = "novel_generation_timeout"
-	ErrPersistenceFailed = "novel_persistence_failed"
+	ErrInputRequired       = "novel_input_required"
+	ErrProjectNotFound     = "novel_project_not_found"
+	ErrSessionNotFound     = "novel_session_not_found"
+	ErrRunInProgress       = "novel_run_in_progress"
+	ErrProjectLocked       = "novel_project_locked"
+	ErrInvalidTransition   = "novel_invalid_transition"
+	ErrModelUnavailable    = "novel_model_unavailable"
+	ErrGenerationTimeout   = "novel_generation_timeout"
+	ErrModelRateLimited    = "novel_model_rate_limited"
+	ErrModelOverloaded     = "novel_model_overloaded"
+	ErrModelAuthFailed     = "novel_model_auth_failed"
+	ErrModelConnectionLost = "novel_model_connection_lost"
+	ErrPersistenceFailed   = "novel_persistence_failed"
+)
+
+// Batch statuses for continuous chapter generation.
+const (
+	BatchRunning   = "running"
+	BatchPaused    = "paused"
+	BatchStopped   = "stopped"
+	BatchCompleted = "completed"
+	BatchFailed    = "failed"
 )
 
 type DomainError struct {
@@ -169,4 +182,32 @@ type Dashboard struct {
 	RunTotal     int            `json:"runTotal"`
 	SuccessRate  float64        `json:"successRate"`
 	LastRunAt    *time.Time     `json:"lastRunAt,omitempty"`
+}
+
+// Batch is a continuous chapter-generation task. Each chapter is a normal run,
+// so auditing, revision, chapter storage and retry keep working unchanged.
+type Batch struct {
+	ID                string    `json:"id"`
+	OwnerUsername     string    `json:"-"`
+	ProjectID         string    `json:"projectId"`
+	SessionID         string    `json:"sessionId"`
+	Status            string    `json:"status"`
+	TotalChapters     int       `json:"totalChapters"`
+	CompletedChapters int       `json:"completedChapters"`
+	CurrentRunID      string    `json:"currentRunId,omitempty"`
+	Attempt           int       `json:"-"`
+	Prompt            string    `json:"prompt"`
+	ModelID           string    `json:"modelId"`
+	ThinkingLevel     string    `json:"thinkingLevel"`
+	LastError         string    `json:"lastError,omitempty"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
+}
+
+type BatchInput struct {
+	SessionID     string
+	TotalChapters int
+	Prompt        string
+	ModelID       string
+	ThinkingLevel string
 }

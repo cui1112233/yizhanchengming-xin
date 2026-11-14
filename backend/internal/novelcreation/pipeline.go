@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -657,12 +658,49 @@ func mapModelError(err error) error {
 		return err
 	}
 	if errors.Is(err, context.Canceled) {
-		return &DomainError{Code: ErrRunCancelled, Message: "novel generation was cancelled", Cause: err}
+		return &DomainError{Code: ErrRunCancelled, Message: "小说创作已取消", Cause: err}
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return &DomainError{Code: ErrGenerationTimeout, Message: "novel generation timed out", Cause: err}
+		return &DomainError{Code: ErrGenerationTimeout, Message: "小说生成超时，请重试", Cause: err}
 	}
-	return &DomainError{Code: ErrModelUnavailable, Message: "novel model is unavailable", Cause: err}
+	if classified := classifyUpstreamModelError(err); classified != nil {
+		return classified
+	}
+	return &DomainError{Code: ErrModelUnavailable, Message: "模型调用失败，请稍后重试", Cause: err}
+}
+
+var (
+	upstreamHTTPStatus = regexp.MustCompile(`\b(429|502|503|504)\b`)
+	upstreamAuthStatus = regexp.MustCompile(`\b(401|403)\b`)
+)
+
+// classifyUpstreamModelError turns transport/API wording into actionable,
+// user-readable failures instead of one generic "model unavailable" message.
+func classifyUpstreamModelError(err error) error {
+	text := strings.ToLower(err.Error())
+	switch {
+	case upstreamAuthStatus.MatchString(text), containsAny(text, "unauthorized", "forbidden", "invalid api key", "incorrect api key", "authentication failed", "鉴权"):
+		return &DomainError{Code: ErrModelAuthFailed, Message: "文本模型鉴权失败，请到 API 配置检查", Cause: err}
+	case upstreamHTTPStatus.FindString(text) == "429", containsAny(text, "rate limit", "too many requests", "requests per minute", "限流"):
+		return &DomainError{Code: ErrModelRateLimited, Message: "模型服务限流，请稍后重试", Cause: err}
+	case upstreamHTTPStatus.MatchString(text),
+		containsAny(text, "bad gateway", "service unavailable", "overloaded", "overload", "过载", "上游服务不可用"):
+		return &DomainError{Code: ErrModelOverloaded, Message: "模型服务暂时不可用，请稍后重试", Cause: err}
+	case containsAny(text, "eof", "connection reset", "connection refused", "broken pipe", "no such host",
+		"tls handshake", "server closed", "connection closed", "连接中断", "网络连接"):
+		return &DomainError{Code: ErrModelConnectionLost, Message: "模型连接中断，请重试", Cause: err}
+	default:
+		return nil
+	}
+}
+
+func containsAny(value string, needles ...string) bool {
+	for _, needle := range needles {
+		if strings.Contains(value, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateFoundation(value foundationPlanOutput) error {

@@ -278,5 +278,32 @@ func NovelCreationMigrations() []Migration {
   CONSTRAINT fk_novel_schedules_session FOREIGN KEY (owner_username, session_id, project_id) REFERENCES novel_sessions(owner_username, session_id, project_id)
 ) ENGINE=InnoDB`,
 		},
+	}, {
+		Version:          8800303,
+		CallbackChecksum: "v88-novel-creation-batches-v1",
+		SQL: []string{
+			`CREATE TABLE IF NOT EXISTS novel_batches (
+  batch_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  session_id VARCHAR(96) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  total_chapters INT NOT NULL,
+  completed_chapters INT NOT NULL DEFAULT 0,
+  current_run_id VARCHAR(96) NULL,
+  attempt INT NOT NULL DEFAULT 1,
+  prompt LONGTEXT NOT NULL,
+  model_id VARCHAR(96) NOT NULL DEFAULT '',
+  thinking_level VARCHAR(32) NOT NULL DEFAULT '',
+  last_error VARCHAR(1024) NOT NULL DEFAULT '',
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, batch_id),
+  KEY idx_novel_batches_owner (owner_username, project_id, created_at),
+  KEY idx_novel_batches_active (status, updated_at),
+  CONSTRAINT fk_novel_batches_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id),
+  CONSTRAINT fk_novel_batches_session FOREIGN KEY (owner_username, session_id, project_id) REFERENCES novel_sessions(owner_username, session_id, project_id)
+) ENGINE=InnoDB`,
+		},
 	}}
 }

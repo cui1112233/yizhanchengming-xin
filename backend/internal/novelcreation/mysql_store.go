@@ -1276,3 +1276,141 @@ ORDER BY s.next_run_at LIMIT ?`, now.UTC(), limit)
 	}
 	return schedules, nil
 }
+
+const batchColumns = `b.batch_id, b.owner_username, b.project_id, b.session_id, b.status, b.total_chapters, b.completed_chapters, COALESCE(b.current_run_id, ''), b.attempt, b.prompt, b.model_id, b.thinking_level, b.last_error, b.created_at, b.updated_at`
+
+type novelBatchScanner interface{ Scan(...any) error }
+
+func scanBatch(scanner novelBatchScanner) (Batch, error) {
+	var batch Batch
+	err := scanner.Scan(&batch.ID, &batch.OwnerUsername, &batch.ProjectID, &batch.SessionID,
+		&batch.Status, &batch.TotalChapters, &batch.CompletedChapters, &batch.CurrentRunID, &batch.Attempt,
+		&batch.Prompt, &batch.ModelID, &batch.ThinkingLevel, &batch.LastError, &batch.CreatedAt, &batch.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "batch not found"}
+	}
+	if err != nil {
+		return Batch{}, persistenceError(err)
+	}
+	return batch, nil
+}
+
+func (s *MySQLStore) ListBatches(ctx context.Context, owner, projectID string) ([]Batch, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+batchColumns+`
+FROM novel_batches b JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
+WHERE b.owner_username = ? AND b.project_id = ? AND p.deleted_at IS NULL
+ORDER BY b.created_at DESC`, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	batches := make([]Batch, 0)
+	for rows.Next() {
+		batch, err := scanBatch(rows)
+		if err != nil {
+			return nil, err
+		}
+		batches = append(batches, batch)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return batches, nil
+}
+
+func (s *MySQLStore) GetBatch(ctx context.Context, owner, batchID string) (Batch, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Batch{}, err
+	}
+	return scanBatch(s.db.QueryRowContext(ctx, `SELECT `+batchColumns+`
+FROM novel_batches b JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
+WHERE b.owner_username = ? AND b.batch_id = ? AND p.deleted_at IS NULL`, owner, strings.TrimSpace(batchID)))
+}
+
+func (s *MySQLStore) CreateBatch(ctx context.Context, owner string, batch Batch) (Batch, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Batch{}, err
+	}
+	batch.ProjectID, batch.SessionID = strings.TrimSpace(batch.ProjectID), strings.TrimSpace(batch.SessionID)
+	if batch.ID == "" {
+		batch.ID = novelID("batch")
+	}
+	if batch.ProjectID == "" || batch.SessionID == "" {
+		return Batch{}, &DomainError{Code: ErrInputRequired, Message: "batch projectId and sessionId are required"}
+	}
+	now := time.Now().UTC()
+	if batch.CreatedAt.IsZero() {
+		batch.CreatedAt = now
+	}
+	batch.UpdatedAt = now
+	result, err := s.db.ExecContext(ctx, `INSERT INTO novel_batches
+(batch_id, owner_username, project_id, session_id, status, total_chapters, completed_chapters, current_run_id, attempt, prompt, model_id, thinking_level, last_error, created_at, updated_at)
+SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)
+  AND EXISTS (SELECT 1 FROM novel_sessions WHERE owner_username = ? AND session_id = ? AND project_id = ?)`,
+		batch.ID, owner, batch.ProjectID, batch.SessionID, batch.Status, batch.TotalChapters, batch.CompletedChapters,
+		nullableString(batch.CurrentRunID), batch.Attempt, batch.Prompt, batch.ModelID, batch.ThinkingLevel, batch.LastError,
+		batch.CreatedAt, batch.UpdatedAt, owner, batch.ProjectID, owner, batch.SessionID, batch.ProjectID)
+	if err != nil {
+		return Batch{}, persistenceError(err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "project or session not found"}
+	}
+	batch.OwnerUsername = owner
+	return batch, nil
+}
+
+func (s *MySQLStore) UpdateBatch(ctx context.Context, owner string, batch Batch) (Batch, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Batch{}, err
+	}
+	batch.ID, batch.ProjectID = strings.TrimSpace(batch.ID), strings.TrimSpace(batch.ProjectID)
+	if batch.ID == "" || batch.ProjectID == "" {
+		return Batch{}, &DomainError{Code: ErrInputRequired, Message: "batch id and projectId are required"}
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE novel_batches b
+JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
+SET b.status = ?, b.completed_chapters = ?, b.current_run_id = ?, b.attempt = ?, b.prompt = ?, b.model_id = ?,
+    b.thinking_level = ?, b.last_error = ?, b.updated_at = ?
+WHERE b.owner_username = ? AND b.batch_id = ? AND b.project_id = ? AND p.deleted_at IS NULL`,
+		batch.Status, batch.CompletedChapters, nullableString(batch.CurrentRunID), batch.Attempt, batch.Prompt,
+		batch.ModelID, batch.ThinkingLevel, batch.LastError, time.Now().UTC(), owner, batch.ID, batch.ProjectID)
+	if err != nil {
+		return Batch{}, persistenceError(err)
+	}
+	return s.GetBatch(ctx, owner, batch.ID)
+}
+
+func (s *MySQLStore) ListActiveBatches(ctx context.Context, limit int) ([]Batch, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+batchColumns+`
+FROM novel_batches b JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
+WHERE b.status = 'running' AND p.deleted_at IS NULL
+ORDER BY b.updated_at LIMIT ?`, limit)
+	if err != nil {
+		return nil, persistenceError(err)
+	}
+	defer rows.Close()
+	batches := make([]Batch, 0)
+	for rows.Next() {
+		batch, err := scanBatch(rows)
+		if err != nil {
+			return nil, err
+		}
+		batches = append(batches, batch)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, persistenceError(err)
+	}
+	return batches, nil
+}

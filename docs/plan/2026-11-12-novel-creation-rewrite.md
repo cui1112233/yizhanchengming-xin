@@ -85,3 +85,18 @@ API；事件轮询；章节列表；规划→写作→审核→修订→事实�
   `novel_materials / novel_project_notes / novel_schedules / agent_json` 均已建。
 - 未完成：P3 批量续写、暂停/继续的多章编排、上游错误分类与重试提示。
 
+### 2026-11-15 P3 完成情况
+
+- 批量续写与多章推进：新增 `novel_batches`（migration 8800303）与
+  `GET/POST /api/novel-creation/projects/{id}/batches`、`POST .../batches/{batchId}/pause|resume|stop`；
+  `StartBatchWorker` 每 5 秒推进一次，每章仍复用完整运行、审核、修订与章节保存链路，
+  完成后自动追加下一章，达到目标章数后标记完成。
+- 暂停/继续/停止：暂停在当前章结束后停止派发；继续从已完成章之后恢复；停止会取消当前章运行，
+  已保存章节保留；失败批次可通过“继续”用新幂等键重试，不重复生成已成功章节。
+- 上游错误分类：新增 `novel_model_rate_limited`、`novel_model_overloaded`、
+  `novel_model_auth_failed`、`novel_model_connection_lost`，识别 429/502/503/504、限流、过载、
+  EOF/连接重置与鉴权失败并映射为可读提示；前端在失败卡片显示对应重试建议。
+- 验证：Go 专项测试覆盖批量推进、暂停/继续/停止、失败后续写与错误分类；前端源码测试 4/4；
+  正式构建通过；本地 4011 新二进制 `/health` 正常，migration 8800303 已应用，
+  `novel_batches` 已建，新页面 chunk 含批量续写入口。
+

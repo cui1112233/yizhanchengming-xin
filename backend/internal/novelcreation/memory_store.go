@@ -26,6 +26,7 @@ type MemoryStore struct {
 	materials      map[string]Material
 	notes          map[string]ProjectNote
 	schedules      map[string]Schedule
+	batches        map[string]Batch
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -42,6 +43,7 @@ func NewMemoryStore() *MemoryStore {
 		materials:      make(map[string]Material),
 		notes:          make(map[string]ProjectNote),
 		schedules:      make(map[string]Schedule),
+		batches:        make(map[string]Batch),
 	}
 }
 
@@ -742,4 +744,88 @@ func (s *MemoryStore) ListDueSchedules(_ context.Context, now time.Time, limit i
 		due = due[:limit]
 	}
 	return due, nil
+}
+
+func (s *MemoryStore) ListBatches(_ context.Context, owner, projectID string) ([]Batch, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	batches := make([]Batch, 0)
+	for _, batch := range s.batches {
+		if batch.ProjectID == projectID {
+			batches = append(batches, batch)
+		}
+	}
+	sort.Slice(batches, func(i, j int) bool { return batches[i].CreatedAt.After(batches[j].CreatedAt) })
+	return batches, nil
+}
+
+func (s *MemoryStore) GetBatch(_ context.Context, owner, batchID string) (Batch, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	batch, ok := s.batches[memoryKey(owner, batchID)]
+	if !ok {
+		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "batch not found"}
+	}
+	return batch, nil
+}
+
+func (s *MemoryStore) CreateBatch(_ context.Context, owner string, batch Batch) (Batch, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.projects[memoryKey(owner, batch.ProjectID)]; !ok {
+		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	session, ok := s.sessions[memoryKey(owner, batch.SessionID)]
+	if !ok || session.ProjectID != batch.ProjectID {
+		return Batch{}, &DomainError{Code: ErrSessionNotFound, Message: "session not found"}
+	}
+	if batch.ID == "" {
+		batch.ID = s.newID("batch")
+	}
+	now := time.Now().UTC()
+	batch.OwnerUsername = owner
+	if batch.CreatedAt.IsZero() {
+		batch.CreatedAt = now
+	}
+	batch.UpdatedAt = now
+	s.batches[memoryKey(owner, batch.ID)] = batch
+	return batch, nil
+}
+
+func (s *MemoryStore) UpdateBatch(_ context.Context, owner string, batch Batch) (Batch, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := memoryKey(owner, batch.ID)
+	existing, ok := s.batches[key]
+	if !ok || existing.ProjectID != batch.ProjectID {
+		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "batch not found"}
+	}
+	batch.OwnerUsername = owner
+	batch.CreatedAt = existing.CreatedAt
+	batch.UpdatedAt = time.Now().UTC()
+	s.batches[key] = batch
+	return batch, nil
+}
+
+func (s *MemoryStore) ListActiveBatches(_ context.Context, limit int) ([]Batch, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 20
+	}
+	active := make([]Batch, 0)
+	for _, batch := range s.batches {
+		if batch.Status == BatchRunning {
+			active = append(active, batch)
+		}
+	}
+	sort.Slice(active, func(i, j int) bool { return active[i].UpdatedAt.Before(active[j].UpdatedAt) })
+	if len(active) > limit {
+		active = active[:limit]
+	}
+	return active, nil
 }

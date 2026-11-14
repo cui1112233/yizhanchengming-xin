@@ -861,3 +861,121 @@ func TestServiceScheduleDispatchCreatesRunAndAdvancesNextRun(t *testing.T) {
 		t.Fatalf("run=%+v", run)
 	}
 }
+
+func finishQueuedRun(t *testing.T, store *MemoryStore, owner string, run Run, status RunStatus, errorMessage string) {
+	t.Helper()
+	now := time.Now().UTC()
+	if _, err := store.UpdateRun(context.Background(), owner, RunUpdate{
+		ID: run.ID, Status: status, ErrorMessage: errorMessage, FinishedAt: &now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServiceBatchAdvancesChaptersAndCompletes(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	batch, err := fixture.service.CreateBatch(context.Background(), "alice", fixture.project.ID, BatchInput{
+		SessionID: fixture.session.ID, TotalChapters: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if batch.Status != BatchRunning || batch.CompletedChapters != 0 || batch.Prompt != defaultBatchPrompt {
+		t.Fatalf("batch=%+v", batch)
+	}
+	first, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(first) != 1 || first[0].Run.ID == "" {
+		t.Fatalf("first dispatch=%+v err=%v", first, err)
+	}
+	finishQueuedRun(t, fixture.store, "alice", first[0].Run, RunSucceeded, "")
+	second, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(second) != 1 || second[0].Run.ID == first[0].Run.ID {
+		t.Fatalf("second dispatch=%+v err=%v", second, err)
+	}
+	progress, err := fixture.store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil || progress.CompletedChapters != 1 {
+		t.Fatalf("progress=%+v err=%v", progress, err)
+	}
+	finishQueuedRun(t, fixture.store, "alice", second[0].Run, RunSucceededWithWarnings, "")
+	third, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(third) != 0 {
+		t.Fatalf("third dispatch=%+v err=%v", third, err)
+	}
+	completed, err := fixture.store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil || completed.Status != BatchCompleted || completed.CompletedChapters != 2 {
+		t.Fatalf("completed=%+v err=%v", completed, err)
+	}
+}
+
+func TestServiceBatchPauseResumeAndStop(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	batch, err := fixture.service.CreateBatch(context.Background(), "alice", fixture.project.ID, BatchInput{
+		SessionID: fixture.session.ID, TotalChapters: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(first) != 1 {
+		t.Fatalf("first dispatch=%+v err=%v", first, err)
+	}
+	paused, err := fixture.service.PauseBatch(context.Background(), "alice", fixture.project.ID, batch.ID)
+	if err != nil || paused.Status != BatchPaused {
+		t.Fatalf("paused=%+v err=%v", paused, err)
+	}
+	finishQueuedRun(t, fixture.store, "alice", first[0].Run, RunSucceeded, "")
+	if pending, err := fixture.service.AdvanceBatches(context.Background()); err != nil || len(pending) != 0 {
+		t.Fatalf("paused advance=%+v err=%v", pending, err)
+	}
+	if _, err := fixture.service.ResumeBatch(context.Background(), "alice", fixture.project.ID, batch.ID); err != nil {
+		t.Fatal(err)
+	}
+	second, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(second) != 1 {
+		t.Fatalf("resumed dispatch=%+v err=%v", second, err)
+	}
+	stopped, err := fixture.service.StopBatch(context.Background(), "alice", fixture.project.ID, batch.ID)
+	if err != nil || stopped.Status != BatchStopped {
+		t.Fatalf("stopped=%+v err=%v", stopped, err)
+	}
+	cancelled, err := fixture.store.GetRun(context.Background(), "alice", second[0].Run.ID)
+	if err != nil || cancelled.Status != RunCancelled {
+		t.Fatalf("cancelled run=%+v err=%v", cancelled, err)
+	}
+	if after, err := fixture.service.AdvanceBatches(context.Background()); err != nil || len(after) != 0 {
+		t.Fatalf("stopped advance=%+v err=%v", after, err)
+	}
+}
+
+func TestServiceBatchFailureThenResumeUsesNewRun(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	batch, err := fixture.service.CreateBatch(context.Background(), "alice", fixture.project.ID, BatchInput{
+		SessionID: fixture.session.ID, TotalChapters: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(first) != 1 {
+		t.Fatalf("first dispatch=%+v err=%v", first, err)
+	}
+	finishQueuedRun(t, fixture.store, "alice", first[0].Run, RunFailed, "模型服务限流，请稍后重试")
+	if _, err := fixture.service.AdvanceBatches(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	failed, err := fixture.store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil || failed.Status != BatchFailed || failed.LastError == "" {
+		t.Fatalf("failed batch=%+v err=%v", failed, err)
+	}
+	if _, err := fixture.service.ResumeBatch(context.Background(), "alice", fixture.project.ID, batch.ID); err != nil {
+		t.Fatal(err)
+	}
+	retried, err := fixture.service.AdvanceBatches(context.Background())
+	if err != nil || len(retried) != 1 || retried[0].Run.ID == first[0].Run.ID {
+		t.Fatalf("retried dispatch=%+v err=%v", retried, err)
+	}
+	reloaded, err := fixture.store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil || reloaded.Status != BatchRunning || reloaded.CompletedChapters != 0 {
+		t.Fatalf("reloaded batch=%+v err=%v", reloaded, err)
+	}
+}

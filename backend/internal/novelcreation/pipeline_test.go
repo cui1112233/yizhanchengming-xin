@@ -593,3 +593,38 @@ func TestPipelineInjectsModeInputsStyleAndRules(t *testing.T) {
 		}
 	}
 }
+
+func TestMapModelErrorClassifiesUpstreamFailures(t *testing.T) {
+	tests := []struct {
+		message  string
+		wantCode string
+	}{
+		{message: "HTTP 429 Too Many Requests", wantCode: ErrModelRateLimited},
+		{message: "rate limit exceeded, retry later", wantCode: ErrModelRateLimited},
+		{message: "502 Bad Gateway", wantCode: ErrModelOverloaded},
+		{message: "service unavailable", wantCode: ErrModelOverloaded},
+		{message: "unexpected EOF", wantCode: ErrModelConnectionLost},
+		{message: "read tcp: connection reset by peer", wantCode: ErrModelConnectionLost},
+		{message: "401 unauthorized", wantCode: ErrModelAuthFailed},
+		{message: "invalid api key", wantCode: ErrModelAuthFailed},
+		{message: "provider transport failed", wantCode: ErrModelUnavailable},
+	}
+	for _, test := range tests {
+		t.Run(test.message, func(t *testing.T) {
+			err := mapModelError(errors.New(test.message))
+			if !IsCode(err, test.wantCode) {
+				t.Fatalf("err=%v, want %s", err, test.wantCode)
+			}
+			var domainErr *DomainError
+			if errors.As(err, &domainErr) && strings.TrimSpace(domainErr.Message) == "" {
+				t.Fatal("classified error must carry a readable message")
+			}
+		})
+	}
+	if err := mapModelError(nil); err != nil {
+		t.Fatalf("nil err=%v", err)
+	}
+	if err := mapModelError(&DomainError{Code: ErrInvalidOutput, Message: "bad json"}); !IsCode(err, ErrInvalidOutput) {
+		t.Fatalf("domain error was not preserved: %v", err)
+	}
+}

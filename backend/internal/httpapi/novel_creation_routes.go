@@ -350,6 +350,59 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"run": run})
 	})
+	handle("GET /api/novel-creation/projects/{projectID}/batches", func(w http.ResponseWriter, req *http.Request, owner string) {
+		batches, err := service.ListBatches(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batches": batches})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/batches", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			SessionID     string `json:"sessionId"`
+			TotalChapters int    `json:"totalChapters"`
+			Prompt        string `json:"prompt"`
+			ModelID       string `json:"modelId"`
+			ThinkingLevel string `json:"thinkingLevel"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		batch, err := service.CreateBatch(req.Context(), owner, req.PathValue("projectID"), novelcreation.BatchInput{
+			SessionID: input.SessionID, TotalChapters: input.TotalChapters, Prompt: input.Prompt,
+			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel,
+		})
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"batch": batch})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/batches/{batchID}/pause", func(w http.ResponseWriter, req *http.Request, owner string) {
+		batch, err := service.PauseBatch(req.Context(), owner, req.PathValue("projectID"), req.PathValue("batchID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batch": batch})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/batches/{batchID}/resume", func(w http.ResponseWriter, req *http.Request, owner string) {
+		batch, err := service.ResumeBatch(req.Context(), owner, req.PathValue("projectID"), req.PathValue("batchID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batch": batch})
+	})
+	handle("POST /api/novel-creation/projects/{projectID}/batches/{batchID}/stop", func(w http.ResponseWriter, req *http.Request, owner string) {
+		batch, err := service.StopBatch(req.Context(), owner, req.PathValue("projectID"), req.PathValue("batchID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batch": batch})
+	})
 	handle("GET /api/novel-creation/projects/{projectID}/export", func(w http.ResponseWriter, req *http.Request, owner string) {
 		document, err := service.ExportProject(req.Context(), owner, req.PathValue("projectID"), req.URL.Query().Get("format"))
 		if err != nil {
@@ -408,8 +461,16 @@ func writeNovelCreationError(w http.ResponseWriter, err error) {
 			status = http.StatusConflict
 		case novelcreation.ErrModelUnavailable:
 			status = http.StatusUnprocessableEntity
+		case novelcreation.ErrModelAuthFailed:
+			status = http.StatusUnprocessableEntity
 		case novelcreation.ErrGenerationTimeout:
 			status = http.StatusGatewayTimeout
+		case novelcreation.ErrModelRateLimited:
+			status = http.StatusTooManyRequests
+		case novelcreation.ErrModelOverloaded:
+			status = http.StatusServiceUnavailable
+		case novelcreation.ErrModelConnectionLost:
+			status = http.StatusBadGateway
 		}
 	}
 	writeJSON(w, status, map[string]string{"error": message})

@@ -3,12 +3,12 @@ import { BarChart3, BookOpen, Bot, CalendarClock, CheckCircle2, CircleAlert, Dow
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog.js';
 import {
-  cancelNovelCreationRun, confirmNovelCreationRun, createNovelCreationMaterial, createNovelCreationNote, createNovelCreationProject,
+  cancelNovelCreationRun, confirmNovelCreationRun, createNovelCreationBatch, createNovelCreationMaterial, createNovelCreationNote, createNovelCreationProject,
   createNovelCreationSchedule, createNovelCreationSession, deleteNovelCreationMaterial, deleteNovelCreationNote, deleteNovelCreationSchedule,
-  exportNovelCreationProject, getNovelCreationDashboard, getNovelCreationProjectSettings, getNovelCreationRun, listNovelCreationMaterials,
-  listNovelCreationModes, listNovelCreationNotes, listNovelCreationProjects, listNovelCreationSchedules, listNovelCreationSessions,
-  retryNovelCreationRun, runNovelCreationSchedule, sendNovelCreationMessage, updateNovelCreationNote, updateNovelCreationProjectSettings,
-  updateNovelCreationSchedule
+  exportNovelCreationProject, getNovelCreationDashboard, getNovelCreationProjectSettings, getNovelCreationRun, listNovelCreationBatches,
+  listNovelCreationMaterials, listNovelCreationModes, listNovelCreationNotes, listNovelCreationProjects, listNovelCreationSchedules,
+  listNovelCreationSessions, pauseNovelCreationBatch, resumeNovelCreationBatch, retryNovelCreationRun, runNovelCreationSchedule,
+  sendNovelCreationMessage, stopNovelCreationBatch, updateNovelCreationNote, updateNovelCreationProjectSettings, updateNovelCreationSchedule
 } from '../../shared/api/novelCreation.js';
 import './NovelCreationPage.css';
 
@@ -31,6 +31,17 @@ const DEFAULT_MODES = [
 const TERMINAL = new Set(['succeeded', 'succeeded_with_warnings', 'failed', 'cancelled']);
 const STATUS_LABELS = {
   awaiting_confirmation: '创作蓝图待确认', queued: '排队中', planning: '生成创作蓝图', writing: '写作正文', normalizing: '整理正文', auditing: '审核章节', revising: '修订章节', settling: '结算人物与伏笔', indexing: '建立记忆索引', succeeded: '创作完成', succeeded_with_warnings: '完成，有审核提醒', failed: '创作失败', cancelled: '已取消'
+};
+const BATCH_STATUS_LABELS = { running: '连续创作中', paused: '已暂停', stopped: '已停止', completed: '已完成', failed: '已失败' };
+const ERROR_HINTS = {
+  novel_model_rate_limited: '上游限流，稍等片刻后点击“从失败处重试”',
+  novel_model_overloaded: '上游服务繁忙，稍后点击“从失败处重试”',
+  novel_model_auth_failed: '请到 API 配置检查文本模型密钥',
+  novel_model_connection_lost: '模型连接中断，可直接重试',
+  novel_generation_timeout: '生成超时，可直接重试',
+  novel_invalid_output: '模型输出未通过结构校验，建议换模型后重试',
+  novel_model_unavailable: '请到 API 配置检查所选文本模型',
+  novel_persistence_failed: '任务保存或排队失败，请稍后重试'
 };
 
 function parseJSONValue(value) {
@@ -93,12 +104,15 @@ export default function NovelCreationPage() {
   const [editingNoteId, setEditingNoteId] = useState('');
   const [dashboard, setDashboard] = useState(null);
   const [schedules, setSchedules] = useState([]);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batches, setBatches] = useState([]);
   const [projectForm] = Form.useForm();
   const [settingsForm] = Form.useForm();
   const [agentForm] = Form.useForm();
   const [materialForm] = Form.useForm();
   const [noteForm] = Form.useForm();
   const [scheduleForm] = Form.useForm();
+  const [batchForm] = Form.useForm();
   const resizeRef = useRef(null);
   const currentProject = projects.find(item => item.id === projectId);
   const currentMode = modes.find(item => item.id === activeMode) || modes[0];
@@ -166,6 +180,14 @@ export default function NovelCreationPage() {
     }, 1500);
     return () => { controller.abort(); window.clearInterval(timer); };
   }, [currentRun?.id, currentRun?.status]);
+
+  useEffect(() => {
+    if (!batchModalOpen || !projectId) return undefined;
+    const timer = window.setInterval(() => {
+      listNovelCreationBatches(projectId).then(result => setBatches(result?.batches || [])).catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [batchModalOpen, projectId]);
 
   useEffect(() => {
     const move = event => {
@@ -459,6 +481,43 @@ export default function NovelCreationPage() {
     }
   }
 
+  async function loadBatches() {
+    if (!projectId) { setBatches([]); return; }
+    const result = await listNovelCreationBatches(projectId);
+    setBatches(Array.isArray(result?.batches) ? result.batches : []);
+  }
+
+  async function openBatchModal() {
+    if (!projectId) { message.warning('请先选择作品'); return; }
+    setBatchModalOpen(true);
+    try { await loadBatches(); } catch (error) { message.error(error.message); }
+  }
+
+  async function startBatch(values) {
+    if (!projectId) { message.warning('请先选择作品'); return; }
+    try {
+      const session = await ensureSession();
+      const result = await createNovelCreationBatch(projectId, { ...values, sessionId: session.id });
+      setBatches(current => [result.batch, ...current]);
+      batchForm.resetFields();
+      message.success('批量续写已创建，正在生成下一章');
+    } catch (error) {
+      if (error?.errorFields) return;
+      message.error(error.message);
+    }
+  }
+
+  async function updateBatch(action, batch) {
+    try {
+      if (action === 'pause') await pauseNovelCreationBatch(projectId, batch.id);
+      if (action === 'resume') await resumeNovelCreationBatch(projectId, batch.id);
+      if (action === 'stop') await stopNovelCreationBatch(projectId, batch.id);
+      await loadBatches();
+    } catch (error) {
+      message.error(error.message);
+    }
+  }
+
   function createSessionFromButton() {
     if (!projectId) {
       setProjectModalOpen(true);
@@ -602,7 +661,7 @@ export default function NovelCreationPage() {
           {!messages.length && !currentRun ? <div className="novel-creation-welcome"><p>告诉我你想写什么——题材、世界观、主角、核心冲突。</p></div> : null}
           {messages.map(item => <article key={item.id || `${item.role}-${item.sequence}-${item.content}`} className={`novel-creation-message ${item.role}`}><b>{item.role === 'user' ? '我' : '创作 Agent'}</b><p>{item.content}</p></article>)}
           {events.filter(item => item.type === 'assistant.delta').map(item => <article key={item.eventId} className="novel-creation-message assistant"><b>创作 Agent</b><p>{item.message}</p></article>)}
-          {currentRun ? <div className={`novel-creation-run-card ${currentRun.status}`}><div>{statusIcon(currentRun.status)}<strong>{STATUS_LABELS[currentRun.status] || currentRun.status}</strong><span>{runProgress(snapshot)}%</span></div><Progress percent={runProgress(snapshot)} showInfo={false} /><p>{events.at(-1)?.message || currentRun.errorMessage || '任务已创建，等待执行'}</p>{currentRun.errorMessage ? <div className="novel-creation-error">{currentRun.errorMessage}</div> : null}{currentRun.status === 'awaiting_confirmation' ? <div className="novel-creation-checkpoint"><div><b>{blueprint?.title || '创作蓝图'}</b><p>{blueprint?.coreConflict || '请确认基础设定后再写正文'}</p></div><div className="novel-creation-run-actions"><Button type="primary" icon={<CheckCircle2 size={14} />} onClick={() => confirmBlueprint(null)}>确认蓝图</Button><Button icon={<FileText size={14} />} onClick={openBlueprintEditor}>修改蓝图</Button></div></div> : null}<div className="novel-creation-run-actions">{['failed', 'cancelled', 'succeeded_with_warnings'].includes(currentRun.status) ? <Button icon={<RotateCcw size={14} />} onClick={retry}>从失败处重试</Button> : null}{!TERMINAL.has(currentRun.status) && currentRun.status !== 'awaiting_confirmation' ? <Button icon={<Square size={13} />} onClick={cancel}>停止</Button> : null}</div></div> : null}
+          {currentRun ? <div className={`novel-creation-run-card ${currentRun.status}`}><div>{statusIcon(currentRun.status)}<strong>{STATUS_LABELS[currentRun.status] || currentRun.status}</strong><span>{runProgress(snapshot)}%</span></div><Progress percent={runProgress(snapshot)} showInfo={false} /><p>{events.at(-1)?.message || currentRun.errorMessage || '任务已创建，等待执行'}</p>{currentRun.errorMessage ? <div className="novel-creation-error"><span>{currentRun.errorMessage}</span>{ERROR_HINTS[currentRun.errorCode] ? <small>{ERROR_HINTS[currentRun.errorCode]}</small> : null}</div> : null}{currentRun.status === 'awaiting_confirmation' ? <div className="novel-creation-checkpoint"><div><b>{blueprint?.title || '创作蓝图'}</b><p>{blueprint?.coreConflict || '请确认基础设定后再写正文'}</p></div><div className="novel-creation-run-actions"><Button type="primary" icon={<CheckCircle2 size={14} />} onClick={() => confirmBlueprint(null)}>确认蓝图</Button><Button icon={<FileText size={14} />} onClick={openBlueprintEditor}>修改蓝图</Button></div></div> : null}<div className="novel-creation-run-actions">{['failed', 'cancelled', 'succeeded_with_warnings'].includes(currentRun.status) ? <Button icon={<RotateCcw size={14} />} onClick={retry}>从失败处重试</Button> : null}{!TERMINAL.has(currentRun.status) && currentRun.status !== 'awaiting_confirmation' ? <Button icon={<Square size={13} />} onClick={cancel}>停止</Button> : null}</div></div> : null}
         </div>
         <div className="novel-creation-composer">{modeFields.length ? <div className="novel-creation-mode-inputs">{modeFields.map(field => <label key={field.key}><span>{field.label}</span><Input.TextArea rows={2} value={modeInputs[field.key] || ''} placeholder={field.placeholder} onChange={event => setModeInputs(current => ({ ...current, [field.key]: event.target.value }))} /></label>)}</div> : null}<Input.TextArea value={draft} onChange={event => setDraft(event.target.value)} autoSize={{ minRows: 3, maxRows: 9 }} placeholder="输入指令… 可在模型列表中设置思考强度 (Enter 发送，Shift+Enter 换行)" onPressEnter={event => { if (!event.shiftKey) { event.preventDefault(); send(); } }} /><div className="novel-creation-composer-controls"><Select value={modelId || undefined} placeholder="选择文本模型" options={models} onChange={setModelId} /><Select value={thinkingLevel} onChange={setThinkingLevel} options={[{ value: 'fast', label: '快速' }, { value: 'standard', label: '标准思考' }, { value: 'deep', label: '深度思考' }]} /><span>{currentMode?.name}</span><Button type="primary" icon={<Send size={15} />} loading={sending} onClick={send}>开始创作</Button></div></div>
       </section>
@@ -612,7 +671,7 @@ export default function NovelCreationPage() {
         <Tabs defaultActiveKey="progress" items={[
           { key: 'progress', label: '创作进度', children: <div className="novel-creation-inspector-panel"><h3>实时执行链</h3>{events.length ? <ol className="novel-creation-timeline">{events.filter(item => item.type !== 'assistant.delta').map(item => <li key={item.eventId} className={item.status}><span /> <div><b>{STATUS_LABELS[item.status] || item.step || item.type}</b><p>{item.message}</p></div></li>)}</ol> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="开始创作后显示每一步状态" />}</div> },
           { key: 'outline', label: '大纲', children: <div className="novel-creation-inspector-panel"><h3>作品设定</h3>{currentProject ? <dl><dt>题材</dt><dd>{currentProject.genre}</dd><dt>世界</dt><dd>{currentProject.world || '等待补充'}</dd><dt>主角</dt><dd>{currentProject.protagonist || '等待补充'}</dd><dt>核心冲突</dt><dd>{currentProject.coreConflict || '等待补充'}</dd></dl> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请先选择作品" />}</div> },
-          { key: 'chapter', label: `章节${chapters.length ? ` (${chapters.length})` : ''}`, children: <div className="novel-creation-inspector-panel"><div className="novel-creation-chapter-tools"><span>{chapters.length ? `已保存 ${chapters.length} 章` : '尚无章节'}</span><Button size="small" icon={<Download size={13} />} loading={exporting} disabled={!chapters.length} onClick={exportBook}>导出整本</Button></div>{chapters.length ? <><div className="novel-creation-chapter-list">{chapters.map(item => <button type="button" key={item.id} className={item.id === chapter?.id ? 'active' : ''} onClick={() => setSelectedChapterId(item.id)}><b>{item.title}</b><span>{item.wordCount} 字</span></button>)}</div>{chapter ? <article className="novel-creation-chapter-body"><h3>{chapter.title}</h3><small>{chapter.wordCount} 字</small><p>{chapter.content}</p></article> : null}</> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={currentRun?.status === 'succeeded' ? '本次没有保存章节正文' : '完成创作后在这里查看章节'} />}</div> }
+          { key: 'chapter', label: `章节${chapters.length ? ` (${chapters.length})` : ''}`, children: <div className="novel-creation-inspector-panel"><div className="novel-creation-chapter-tools"><span>{chapters.length ? `已保存 ${chapters.length} 章` : '尚无章节'}</span><Button size="small" icon={<BookOpen size={13} />} disabled={!projectId} onClick={openBatchModal}>批量续写</Button><Button size="small" icon={<Download size={13} />} loading={exporting} disabled={!chapters.length} onClick={exportBook}>导出整本</Button></div>{chapters.length ? <><div className="novel-creation-chapter-list">{chapters.map(item => <button type="button" key={item.id} className={item.id === chapter?.id ? 'active' : ''} onClick={() => setSelectedChapterId(item.id)}><b>{item.title}</b><span>{item.wordCount} 字</span></button>)}</div>{chapter ? <article className="novel-creation-chapter-body"><h3>{chapter.title}</h3><small>{chapter.wordCount} 字</small><p>{chapter.content}</p></article> : null}</> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={currentRun?.status === 'succeeded' ? '本次没有保存章节正文' : '完成创作后在这里查看章节'} />}</div> }
         ]} />
       </aside>
     </main>
@@ -630,6 +689,38 @@ export default function NovelCreationPage() {
     <Modal open={checkpointOpen} title="确认或修改创作蓝图" okText="确认蓝图" cancelText="取消" width={760} onCancel={() => setCheckpointOpen(false)} onOk={submitBlueprint}>
       <p className="novel-creation-settings-hint">蓝图会被保存并在后续章节复用。只修改需要调整的字段，保存后立即进入正文写作。</p>
       <Input.TextArea className="novel-creation-blueprint-editor" value={blueprintDraft} onChange={event => setBlueprintDraft(event.target.value)} autoSize={{ minRows: 14, maxRows: 24 }} />
+    </Modal>
+    <Modal open={batchModalOpen} title="批量续写" width={720} footer={null} onCancel={() => setBatchModalOpen(false)}>
+      <Form form={batchForm} layout="vertical" initialValues={{ totalChapters: 3, thinkingLevel: 'standard' }}>
+        <p className="novel-creation-settings-hint">按当前会话连续生成多章，每章仍走完整审核与修订；随时可以暂停、继续或停止。</p>
+        <div className="novel-creation-form-grid">
+          <Form.Item name="totalChapters" label="连续生成章节数"><InputNumber min={1} max={50} /></Form.Item>
+          <Form.Item name="thinkingLevel" label="思考强度">
+            <Select options={[{ value: 'fast', label: '快速' }, { value: 'standard', label: '标准思考' }, { value: 'deep', label: '深度思考' }]} />
+          </Form.Item>
+        </div>
+        <Form.Item name="modelId" label="文本模型"><Select allowClear placeholder="留空使用作品模型" options={models} /></Form.Item>
+        <Form.Item name="prompt" label="每章写作指令"><Input.TextArea rows={2} placeholder="留空则默认继续写下一章，保持已有设定、人物关系和文风" /></Form.Item>
+        <Button type="primary" icon={<Plus size={15} />} onClick={async () => {
+          try { await startBatch(await batchForm.validateFields()); } catch (error) { if (!error?.errorFields) message.error(error.message); }
+        }}>开始批量续写</Button>
+      </Form>
+      <div className="novel-creation-batch-list">
+        {batches.length ? batches.map(batch => <div key={batch.id} className={`novel-creation-batch-item ${batch.status}`}>
+          <div className="novel-creation-batch-head">
+            <b>{BATCH_STATUS_LABELS[batch.status] || batch.status}</b>
+            <span>{batch.completedChapters}/{batch.totalChapters} 章</span>
+          </div>
+          <Progress percent={Math.round((Number(batch.completedChapters) / Math.max(1, Number(batch.totalChapters))) * 100)} showInfo={false} />
+          <p>{batch.prompt}</p>
+          {batch.lastError ? <small>{batch.lastError}</small> : null}
+          <div className="novel-creation-tool-actions">
+            {batch.status === 'running' ? <Button size="small" onClick={() => updateBatch('pause', batch)}>暂停</Button> : null}
+            {['paused', 'failed'].includes(batch.status) ? <Button size="small" type="primary" onClick={() => updateBatch('resume', batch)}>继续</Button> : null}
+            {['running', 'paused', 'failed'].includes(batch.status) ? <Button size="small" danger onClick={() => updateBatch('stop', batch)}>停止</Button> : null}
+          </div>
+        </div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无批量续写任务" />}
+      </div>
     </Modal>
     <Drawer open={Boolean(toolDrawer)} title={toolDrawer} width={520} onClose={() => setToolDrawer('')}>
       {drawerBody}

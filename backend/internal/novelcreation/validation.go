@@ -15,6 +15,9 @@ const (
 	maxKnowledgeMaterialRunes  = 12000
 	minScheduleIntervalMinutes = 15
 	maxScheduleIntervalMinutes = 10080
+	minBatchChapters           = 1
+	maxBatchChapters           = 50
+	defaultBatchPrompt         = "继续写下一章，保持已有设定、人物关系和文风。"
 )
 
 func NormalizeCreateProjectInput(input CreateProjectInput) (CreateProjectInput, error) {
@@ -265,6 +268,23 @@ func NormalizeNoteInput(input ProjectNoteInput) (ProjectNoteInput, error) {
 	}
 	if input.Title == "" {
 		input.Title = truncateRunes(input.Content, 40)
+	}
+	return input, nil
+}
+
+func NormalizeBatchInput(input BatchInput) (BatchInput, error) {
+	input.SessionID = strings.TrimSpace(input.SessionID)
+	input.Prompt = strings.TrimSpace(input.Prompt)
+	input.ModelID = strings.TrimSpace(input.ModelID)
+	input.ThinkingLevel = normalizeThinkingLevel(input.ThinkingLevel)
+	if input.SessionID == "" {
+		return BatchInput{}, &DomainError{Code: ErrInputRequired, Message: "请选择批量续写使用的会话"}
+	}
+	if input.TotalChapters < minBatchChapters || input.TotalChapters > maxBatchChapters {
+		return BatchInput{}, &DomainError{Code: ErrInputRequired, Message: "批量续写章节数必须在 1 到 50 之间"}
+	}
+	if input.Prompt == "" {
+		input.Prompt = defaultBatchPrompt
 	}
 	return input, nil
 }

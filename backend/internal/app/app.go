@@ -359,6 +359,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	// The scheduler is a process-lifetime worker: Build's ctx is a startup
 	// timeout, not a server lifecycle context.
 	novelcreation.StartScheduler(context.Background(), novelCreationService, novelCreationRunStarter, time.Minute)
+	novelcreation.StartBatchWorker(context.Background(), novelCreationService, novelCreationRunStarter, 5*time.Second)
 	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
 		provider, providerErr := resolveCatalogTextProviderWithSelection(ctx, owner, novelfetchworkshop.ProcessTextModel(ctx))
 		if providerErr != nil {

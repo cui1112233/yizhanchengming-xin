@@ -109,3 +109,23 @@ export function deleteNovelCreationSchedule(projectId, scheduleId) {
 export function runNovelCreationSchedule(projectId, scheduleId) {
   return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/schedules/${encodeURIComponent(scheduleId)}/run`, { method: 'POST', body: '{}' });
 }
+
+export function listNovelCreationBatches(projectId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/batches`);
+}
+
+export function createNovelCreationBatch(projectId, input) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/batches`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function pauseNovelCreationBatch(projectId, batchId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/batches/${encodeURIComponent(batchId)}/pause`, { method: 'POST', body: '{}' });
+}
+
+export function resumeNovelCreationBatch(projectId, batchId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/batches/${encodeURIComponent(batchId)}/resume`, { method: 'POST', body: '{}' });
+}
+
+export function stopNovelCreationBatch(projectId, batchId) {
+  return apiRequest(`/api/novel-creation/projects/${encodeURIComponent(projectId)}/batches/${encodeURIComponent(batchId)}/stop`, { method: 'POST', body: '{}' });
+}

@@ -52,6 +52,12 @@ type Store interface {
 	UpdateSchedule(context.Context, string, Schedule) (Schedule, error)
 	DeleteSchedule(context.Context, string, string, string) error
 	ListDueSchedules(context.Context, time.Time, int) ([]Schedule, error)
+	// Batches drive continuous multi-chapter generation.
+	ListBatches(context.Context, string, string) ([]Batch, error)
+	GetBatch(context.Context, string, string) (Batch, error)
+	CreateBatch(context.Context, string, Batch) (Batch, error)
+	UpdateBatch(context.Context, string, Batch) (Batch, error)
+	ListActiveBatches(context.Context, int) ([]Batch, error)
 }
 
 // ProjectSettings holds the project-level writing style and hard rules that are
