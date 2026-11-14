@@ -147,6 +147,20 @@
    - `reaper_log_lines=0`、`panic_log_lines=0`、`artifact_restore_lines=0`。
    - 结论：观测窗口内没有僵尸回收事件，reaper 未产生写入；当前 binlog 增长约 216KB/分钟，远低于“全量重写 6.4MB/次”的旧行为，说明单行保存持续生效。阶段 1 仍值得做，但它属于低频优化，不是当前主要写放大来源。
 
+### 2026-11-14 阶段 5 执行结果
+
+三项既有失败均已定位并修正，`go test ./...` 连续两次全绿：
+
+| 用例 | 原因 | 处理 |
+|---|---|---|
+| `TestPromptDefinitionsKeepExpectedIDsAndVersions` | `agent.director-plan` 已在 `a3024dcd` 升到 v2，测试仍期待 v1 | 断言更新为 v2 |
+| `TestNovelCreationRoutesExposeSixModesAndProjectRunChain` | 路由自 `1f587561` 起返回“番外创作”，测试仍期待“同人创作” | 断言改为“番外创作” |
+| `TestGPTImageConcurrencyIsProcessWideAcrossTasks` | 默认单书并发已改为 4，但网关冷启动仍是 2 路，断言与自适应策略不一致 | 新增 `shuihuoAdaptiveInitialLimit=2` 常量，断言冷启动上限并校验不超过默认值 |
+
+- 未放宽任何真实约束：并发用例仍验证进程级共享上限，只是把“冷启动 2 路”明确成常量。
+- 本阶段改动为测试与常量命名，不改变线上行为；生产保持 `qiantie-202611141247`（`75c45576`）。
+- 后续发布门禁：`go test ./...` 连续两次通过后再构建发布包。
+
 ### 2026-11-14 阶段 4 执行结果
 
 - [deploy-go-embedded.ps1](file:///f:/脚本测试/一战晟铭-v88/scripts/deploy-go-embedded.ps1) 新增 `-RequireCleanFrontend`：

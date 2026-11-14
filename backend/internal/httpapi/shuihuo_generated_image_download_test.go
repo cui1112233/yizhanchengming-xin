@@ -559,7 +559,7 @@ func TestGPTImageConcurrencyIsProcessWideAcrossTasks(t *testing.T) {
 		},
 	}
 	// 设计意图：出图并发是「进程级 + 按图片域名共享」的，不是每本书各算一份。
-	// 同一图片域名冷启动只放 shuihuoImageConcurrencyDefault（当前 2）路，连续成功
+	// 同一图片域名冷启动只放 shuihuoAdaptiveInitialLimit（当前 2）路，连续成功
 	// 后才按自适应阶梯升到调用方配置值；所以两本书各自配置 2 路时，同一域名
 	// 同时最多仍是 2 个请求，而不是 4 个，避免多个批次把慢速 Base64 响应压垮。
 	// 以后要调整并发策略，改 backend/internal/httpapi/shuihuo_image_adaptive_concurrency.go
@@ -589,8 +589,11 @@ func TestGPTImageConcurrencyIsProcessWideAcrossTasks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := maximum.Load(); got != shuihuoImageConcurrencyDefault {
-		t.Fatalf("maximum simultaneous gpt-image requests=%d, want process-safe %d", got, shuihuoImageConcurrencyDefault)
+	if got := maximum.Load(); got != shuihuoAdaptiveInitialLimit {
+		t.Fatalf("maximum simultaneous gpt-image requests=%d, want process-wide cold-start %d", got, shuihuoAdaptiveInitialLimit)
+	}
+	if maximum.Load() > int32(shuihuoImageConcurrencyDefault) {
+		t.Fatalf("cold-start concurrency=%d exceeds configured default %d", maximum.Load(), shuihuoImageConcurrencyDefault)
 	}
 }
 

@@ -9,6 +9,11 @@ import (
 
 const shuihuoAdaptiveRecoverySuccesses = 8
 
+// shuihuoAdaptiveInitialLimit 是每个图片域名冷启动时的并发上限。图片网关在
+// 冷启动直接压满多路时会出现连接一起不返回，所以先从 2 路开始，连续成功
+// 后再逐级爬升；这是进程级共享的起点，不随单本书配置放大。
+const shuihuoAdaptiveInitialLimit = 2
+
 // shuihuoClampHostConcurrency 与单本书的出图路数（最多 4）分开：
 // 这里限制的是整条网关的并发，允许自适应爬到 30 路。
 func shuihuoClampHostConcurrency(value int) int {
@@ -44,7 +49,7 @@ func (c *shuihuoAdaptiveImageConcurrency) state(host string, configured int) *sh
 	if state == nil {
 		// 图片网关在冷启动时直接压 4 路，实测会出现四条连接一起不返回。
 		// 每个域名先从稳定的 2 路开始，连续成功后再逐级升到天花板。
-		initial := 2
+		initial := shuihuoAdaptiveInitialLimit
 		if initial > configured {
 			initial = configured
 		}

@@ -24,7 +24,7 @@ func TestNovelCreationRoutesExposeSixModesAndProjectRunChain(t *testing.T) {
 	if modes.Code != http.StatusOK {
 		t.Fatalf("modes status=%d body=%s", modes.Code, modes.Body.String())
 	}
-	for _, want := range []string{"长篇原创", "短篇原创", "仿写长篇", "仿写短篇", "同人创作", "续写"} {
+	for _, want := range []string{"长篇原创", "短篇原创", "仿写长篇", "仿写短篇", "番外创作", "续写"} {
 		if !containsText(modes.Body.String(), want) {
 			t.Fatalf("modes body missing %q: %s", want, modes.Body.String())
 		}

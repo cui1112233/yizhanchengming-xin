@@ -36,7 +36,7 @@ func TestFirstAgentPromptDefinitionsHaveStableContracts(t *testing.T) {
 func TestPromptDefinitionsKeepExpectedIDsAndVersions(t *testing.T) {
 	expected := map[string]int{
 		"agent.workspace-chat":    1,
-		"agent.director-plan":     1,
+		"agent.director-plan":     2,
 		"agent.text-node":         1,
 		"asset.context-reference": 1,
 		"asset.visual-reference":  1,
