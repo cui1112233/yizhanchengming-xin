@@ -170,3 +170,14 @@ Go 版原先在原文抓取、自动调度、批量重试三处直接 `firstText
 - 生产验证：`systemctl is-active qiantie` = active；`/api/runtime-build-info` 返回 `git_sha`、`runtime_manifest_sha` 均匹配；公网 `https://yzcm.site/api/runtime-build-info` 200。
 - 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141140-3c6653ac`，上一版本 `qiantie-202611140410`。
 
+### 5.1 阶段化重试表发布记录（2026-11-14）
+
+- Git SHA：`3500e244dce18672a6c7518715c1d61e096e17bd`（`v88`）。
+- 发布编号：`qiantie-202611141502`，二进制 `/opt/www/qiantie/qiantie-202611141502`。
+- 二进制 SHA256：`c1d0fa1e4ed2f58e1b02fe5444ba79d4ff61531f51a6875f552544333428a408`。
+- 发布包：`.release/go-embedded/20261114-145846-3500e244dce1`（`-SkipFrontendBuild`，前端源码未改）。
+- 本地验证：`go build ./...` 通过；`go test ./internal/httpapi/ -run "NovelFetch|Workshop|Automation"` 通过；本地 4001 重启后 `/healthz` 200，`/api/runtime-build-info` 的 `git_sha`、`runtime_manifest_sha` 均为 `3500e244`。
+- 生产验证：`systemctl is-active qiantie` = active；`/healthz` 200；`/api/runtime-build-info` 的 `git_sha` 为 `3500e244dce1…`、`runtime_manifest_sha` 为 `3500e244`；公网 `https://yzcm.site/api/runtime-build-info` 200。
+- 回滚点：`/opt/www/qiantie/qiantie-202611141410`（上一稳定版本，保留在原路径），`runtime-release.json` 的 `rollbackBinary` 已记录该版本。
+
+
