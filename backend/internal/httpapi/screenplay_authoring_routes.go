@@ -139,6 +139,17 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 				}
 				st.Members = in.Members
 			}
+			if path == "chapters" {
+				for _, chapter := range st.Chapters {
+					if strings.TrimSpace(chapter.ScriptText) != "" {
+						if e = screenplay.ValidateChapterCollection(st.Chapters); e != nil {
+							authoringError(w, e)
+							return
+						}
+						break
+					}
+				}
+			}
 			st, e = svc.Save(r.Context(), o, st.ProjectID, st, in.Expected)
 			if e == nil && path == "chapters" {
 				for _, c := range st.Chapters {
@@ -383,7 +394,7 @@ func authoringError(w http.ResponseWriter, e error) {
 		status = 404
 	case errors.Is(e, screenplay.ErrRevisionConflict), errors.Is(e, screenplay.ErrLockBusy):
 		status = 409
-	case errors.Is(e, screenplay.ErrInvalidArgument), errors.Is(e, screenplay.ErrEmptyContent):
+	case errors.Is(e, screenplay.ErrInvalidArgument), errors.Is(e, screenplay.ErrEmptyContent), errors.Is(e, screenplay.ErrArtifactInvalid):
 		status = 400
 	case errors.Is(e, screenplay.ErrAPIKeyMissing), errors.Is(e, screenplay.ErrInvalidState):
 		status = 422

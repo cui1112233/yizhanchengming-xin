@@ -213,3 +213,29 @@ func TestAuthoringArchivePausesRunningAndScheduledWithoutRestoreGeneration(t *te
 		})
 	}
 }
+
+func TestAuthoringInvalidChapterFormatDoesNotPersistBeforeError(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	store := screenplay.NewMemoryStore()
+	_, _ = store.CreateProject(ctx, screenplay.Project{ID: "format", OwnerUsername: "alice", Title: "格式验收"})
+	repo := screenplay.NewMemoryAuthoringRepository()
+	mux := http.NewServeMux()
+	RegisterScreenplayAuthoringRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, store, repo, nil)
+	base := "/api/comic-screenplays/projects/format/chapters"
+	res := signedJSONRequest(t, mux, now, "alice", "PUT", base, map[string]any{"expected_revision": 0, "chapters": []map[string]any{{"id": "c", "title": "第一章", "script_text": "没有集场标题的正文"}}})
+	if res.Code != 400 || !strings.Contains(res.Body.String(), "集/场") {
+		t.Fatalf("invalid chapter: %d %s", res.Code, res.Body.String())
+	}
+	state, err := (screenplay.AuthoringService{Store: store, Repository: repo}).Load(ctx, "alice", "format")
+	if err != nil || state.Revision != 0 || len(state.Chapters) != 0 {
+		t.Fatalf("error persisted partial chapters: %+v %v", state, err)
+	}
+	res = signedJSONRequest(t, mux, now, "alice", "PUT", base, map[string]any{"expected_revision": 0, "chapters": []map[string]any{{"id": "c", "title": "第一章", "script_text": "## 1-1：日 内 房间\n人物：林晚\n林晚：你好。"}}})
+	if res.Code != 200 {
+		t.Fatalf("same-revision corrected retry: %d %s", res.Code, res.Body.String())
+	}
+	if _, err = store.ActiveDocument(ctx, "alice", "format"); err != nil {
+		t.Fatal(err)
+	}
+}
