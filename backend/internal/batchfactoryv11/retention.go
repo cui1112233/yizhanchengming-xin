@@ -217,7 +217,9 @@ func (s *MySQLStore) ClaimDueRetentionBook(ctx context.Context) (RetentionBook, 
 	}
 	defer tx.Rollback()
 	var book RetentionBook
-	err = tx.QueryRowContext(ctx, `SELECT id,batch_id,owner_username FROM batch_factory_v12_books WHERE hidden_at IS NOT NULL AND purge_after<=CURRENT_TIMESTAMP(6) ORDER BY purge_after,id LIMIT 1 FOR UPDATE SKIP LOCKED`).
+	// 清理时间统一按 UTC 写入，因此这里也必须用 UTC_TIMESTAMP 比较；数据库
+	// 会话时区是本地时间时，CURRENT_TIMESTAMP 会提前 8 小时触发删除。
+	err = tx.QueryRowContext(ctx, `SELECT id,batch_id,owner_username FROM batch_factory_v12_books WHERE hidden_at IS NOT NULL AND purge_after<=UTC_TIMESTAMP(6) ORDER BY purge_after,id LIMIT 1 FOR UPDATE SKIP LOCKED`).
 		Scan(&book.ID, &book.BatchID, &book.Owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		if commitErr := tx.Commit(); commitErr != nil {
