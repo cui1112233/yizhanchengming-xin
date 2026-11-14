@@ -23,6 +23,23 @@ type workshopRetryQueueResult struct {
 	OK             bool              `json:"ok"`
 }
 
+// resetNovelFetchAutomationRetryState 在用户主动重试时清掉自动重试留下的
+// 人工标记和退避字段。用户点击重试代表重新开始一轮自动处理；如果保留
+// manualOnly，这一轮结束失败后扫描器仍然不会接管，任务会一直停住。
+func resetNovelFetchAutomationRetryState(document *novelfetchworkshop.Document) bool {
+	if document == nil || document.Meta == nil {
+		return false
+	}
+	changed := false
+	for _, key := range []string{"manualOnly", "manual_only", "automationEnqueueAttempts", "automationNextRetryAt"} {
+		if _, ok := document.Meta[key]; ok {
+			delete(document.Meta, key)
+			changed = true
+		}
+	}
+	return changed
+}
+
 // This function only persists work in the existing queue. Provider calls and
 // body processing belong to the worker, whose context outlives the HTTP call.
 func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, ids []string, sensitiveAI bool) (workshopRetryQueueResult, error) {
@@ -57,6 +74,13 @@ func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store,
 		}
 		if !queueReady {
 			return result, fmt.Errorf("重试队列未配置或不支持防重复入队，未执行生成，请检查 Redis 队列")
+		}
+		if resetNovelFetchAutomationRetryState(&document) {
+			if err := store.PutDocument(ctx, owner, document); err != nil {
+				result.Failed++
+				result.Errors[bookID] = "重置自动重试状态失败"
+				continue
+			}
 		}
 		if cancelled, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
 			if err := cancelled.ClearCancelledBooks(ctx, owner, []string{bookID}); err != nil {

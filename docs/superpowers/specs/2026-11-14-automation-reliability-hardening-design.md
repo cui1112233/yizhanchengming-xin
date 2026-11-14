@@ -91,7 +91,8 @@ Go 版原先只做退避，没有上限；而 `novelFetchAutomationEligible` 又
 - `novelFetchEnqueueMaxAttempts = 20`，入队失败达到上限后写 `status=failed`、`manualOnly=true`，并删除 `automationNextRetryAt`。
 - `novelFetchAutomationEligible` 在入口优先检查 `manualOnly`，为真直接返回 false，避免被扫描器立刻捡回。
 - 错误文案明确写“已停止自动重试”，便于用户判断需要人工介入。
-- 入队成功后仍清除退避字段与计数；人工重试时需由重试入口清除 `manualOnly`。
+- 入队成功后仍清除退避字段与计数。
+- 人工重试入口 `POST /api/novel-fetch-workshop/tasks/batch-retry` 在入队前清除 `manualOnly`、失败计数和退避时间，让用户主动重试后能重新进入自动调度；否则人工标记会永久残留。
 
 ## 3. 验收
 

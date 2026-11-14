@@ -96,6 +96,34 @@ func TestEnqueueFailureStopsRetryingAtBudget(t *testing.T) {
 	}
 }
 
+// 用户主动重试后必须能重新回到自动调度，否则 manualOnly 会永久挡住它。
+func TestManualRetryClearsAutomationBlockers(t *testing.T) {
+	document := novelfetchworkshop.Document{
+		BookID: "book-1",
+		Meta: map[string]any{
+			"status":                    "failed",
+			"manualOnly":                true,
+			"automationEnqueueAttempts": 20,
+			"automationNextRetryAt":     "2026-11-14T03:00:00Z",
+		},
+	}
+	if !resetNovelFetchAutomationRetryState(&document) {
+		t.Fatal("expected the retry state to be reset")
+	}
+	for _, key := range []string{"manualOnly", "automationEnqueueAttempts", "automationNextRetryAt"} {
+		if _, ok := document.Meta[key]; ok {
+			t.Fatalf("%s must be cleared on a manual retry", key)
+		}
+	}
+	document.Meta["status"] = "waiting_retry"
+	if !novelFetchAutomationEligible(document, time.Date(2026, 11, 14, 3, 0, 0, 0, time.UTC)) {
+		t.Fatal("a manually retried book must be eligible for automation again")
+	}
+	if resetNovelFetchAutomationRetryState(&document) {
+		t.Fatal("a clean document must not report a reset")
+	}
+}
+
 // 入队成功后必须清掉退避字段，否则下一次扫描会被旧的截止时间挡住。
 func TestMarkNovelFetchTaskQueuedClearsEnqueueBackoff(t *testing.T) {
 	ctx := context.Background()
