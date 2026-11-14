@@ -590,12 +590,12 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		// it can delete exclusively TOS-verified local copies.
 		cleanup.Start(time.Minute)
 		// 作品级保留：作品最后活动时间超过设置天数后先从列表隐藏，24 小时缓冲
-		// 期结束再删除 TOS 对象、本地缓存和数据库记录。修改设置后每轮巡检都会
-		// 重算未删除作品的到期时间，因此旧作品同样按新天数追溯。
+		// 期结束再删除 TOS 对象、本地缓存和数据库记录。每天 00:00 巡检一次，
+		// 并重算未删除作品的到期时间，因此修改天数可以追溯旧作品。
 		retention := batchfactoryv11.BookRetentionSupervisor{
 			Store: store.MySQLStore, Local: artifactStore, Remote: remote, RetentionDays: retentionDays,
 		}
-		retention.Start(10 * time.Minute)
+		retention.StartDaily(0, 0)
 	}
 	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
 	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。

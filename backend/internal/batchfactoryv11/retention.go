@@ -88,22 +88,22 @@ func (s BookRetentionSupervisor) RunOnce(ctx context.Context) error {
 	return nil
 }
 
-// Start 启动周期巡检。首轮立即执行，便于进程重启后补上错过的到期处理。
-func (s BookRetentionSupervisor) Start(interval time.Duration) {
-	if interval <= 0 {
-		interval = 10 * time.Minute
-	}
+// StartDaily 每天在指定本地时间执行一次巡检。清理和删除动作集中在凌晨，避免
+// 白天业务高峰期间批量删除文件影响正常使用。
+func (s BookRetentionSupervisor) StartDaily(hour, minute int) {
 	go func() {
-		run := func() {
+		for {
+			now := time.Now()
+			next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+			if !next.After(now) {
+				next = next.AddDate(0, 0, 1)
+			}
+			log.Printf("book retention next sweep at %s", next.Format("2006-01-02 15:04:05"))
+			timer := time.NewTimer(time.Until(next))
+			<-timer.C
 			if err := s.RunOnce(context.Background()); err != nil {
 				log.Printf("book retention sweep failed: %v", err)
 			}
-		}
-		run()
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for range ticker.C {
-			run()
 		}
 	}()
 }
