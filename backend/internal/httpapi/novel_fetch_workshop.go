@@ -344,6 +344,12 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				if retryErr := markNovelFetchOriginalFetchRetry(ctx, worker.store, job.Owner, bookID, result.err, time.Now().UTC()); retryErr != nil {
 					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
 				}
+			} else if novelFetchAIManualRetryRequired(result.err) {
+				// 对照参考实现：模型确定性失败写 manual_ai_retry_required，
+				// 不再自动重试。同一段超长文本反复提交只会重复截断。
+				if markErr := markNovelFetchAIManualRetry(ctx, worker.store, job.Owner, bookID, result.err, time.Now().UTC()); markErr != nil {
+					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
+				}
 			} else if retry {
 				retryBookIDs = append(retryBookIDs, bookID)
 				status = "waiting_retry"

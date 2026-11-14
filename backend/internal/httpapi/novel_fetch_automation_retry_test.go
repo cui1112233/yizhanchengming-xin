@@ -96,6 +96,43 @@ func TestEnqueueFailureStopsRetryingAtBudget(t *testing.T) {
 	}
 }
 
+// 对照参考实现的 manual_ai_retry_required：模型截断属于确定性失败，必须转人工。
+func TestNovelFetchAIManualRetryClassification(t *testing.T) {
+	if !novelFetchAIManualRetryRequired(errors.New("2104672163164852230：文本模型输出被长度截断，请重试或增大输出上限")) {
+		t.Fatal("a truncated model output must require manual retry")
+	}
+	if !novelFetchAIManualRetryRequired(errors.New("HTTP 403 · content policy violation")) {
+		t.Fatal("a content policy rejection must require manual retry")
+	}
+	if novelFetchAIManualRetryRequired(errors.New("dial tcp: connection reset")) {
+		t.Fatal("a transient network error must stay retryable")
+	}
+}
+
+func TestMarkNovelFetchAIManualRetryBlocksAutomation(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(ctx, "owner", novelfetchworkshop.Document{BookID: "book-1", Meta: map[string]any{"status": "processing"}}); err != nil {
+		t.Fatalf("seed document: %v", err)
+	}
+	if err := markNovelFetchAIManualRetry(ctx, store, "owner", "book-1", errors.New("文本模型输出被长度截断"), time.Now().UTC()); err != nil {
+		t.Fatalf("mark manual retry: %v", err)
+	}
+	document, err := store.GetDocument(ctx, "owner", "book-1")
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if document.Meta["manualOnly"] != true || document.Meta["manualAiRetryRequired"] != true {
+		t.Fatalf("manual flags missing: %#v", document.Meta)
+	}
+	if document.Meta["status"] != "failed" {
+		t.Fatalf("status must be failed, got %v", document.Meta["status"])
+	}
+	if novelFetchAutomationEligible(document, time.Now().UTC()) {
+		t.Fatal("a book awaiting manual AI retry must not be picked up by automation")
+	}
+}
+
 // 用户主动重试后必须能重新回到自动调度，否则 manualOnly 会永久挡住它。
 func TestManualRetryClearsAutomationBlockers(t *testing.T) {
 	document := novelfetchworkshop.Document{

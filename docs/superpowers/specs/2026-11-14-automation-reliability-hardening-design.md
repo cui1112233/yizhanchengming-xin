@@ -94,6 +94,17 @@ Go 版原先只做退避，没有上限；而 `novelFetchAutomationEligible` 又
 - 入队成功后仍清除退避字段与计数。
 - 人工重试入口 `POST /api/novel-fetch-workshop/tasks/batch-retry` 在入队前清除 `manualOnly`、失败计数和退避时间，让用户主动重试后能重新进入自动调度；否则人工标记会永久残留。
 
+### 2.10 模型确定性失败转人工（对照参考实现）
+
+参考实现 `Batch原文档改文` 的 `check_queue_stall_regression.py` 断言：AI 阶段确定性失败时必须写 `manual_only` 与 `manual_ai_retry_required`，并让 `task_auto_queue_allowed()` 返回 false，禁止自动队列继续重试。
+
+Go 版补同等语义：
+
+- `novelFetchAIManualRetryRequired` 识别长度截断、内容审核、模型拒答等确定性错误。
+- 命中后写 `status=failed`、`queueState=failed`、`manualOnly=true`、`manualAiRetryRequired=true` 和可读原因，并清除 `automationNextRetryAt`。
+- 这类失败不再进入 `waiting_retry` 循环，用户点批量重试时由 2.9 的复位逻辑清除标记。
+- 网络抖动、限流等瞬态错误仍走原有自动重试，不改变行为。
+
 ## 3. 验收
 
 1. `localartifact`：写保护开启时 `Restore` 返回 `ErrDiskPressure` 且不产生可见文件；校验失败仍返回 `ErrRemoteIntegrity`。

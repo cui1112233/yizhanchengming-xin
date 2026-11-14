@@ -76,6 +76,44 @@ func novelFetchOriginalFetchRetryInterval(settings map[string]any) time.Duration
 	return time.Duration(minutes) * time.Minute
 }
 
+// novelFetchAIManualRetryRequired 判断错误是否属于模型确定性失败。参考实现
+// 对这类错误写 manual_ai_retry_required 并禁止自动重试：同一段超长文本反复
+// 提交只会重复截断，既消耗额度也不可能自行恢复。
+func novelFetchAIManualRetryRequired(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	for _, keyword := range []string{"文本模型输出被长度截断", "长度截断", "content policy", "内容审核", "模型拒绝", "refusal"} {
+		if strings.Contains(message, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// markNovelFetchAIManualRetry 把模型确定性失败落成人工状态：写 manualOnly、
+// manualAiRetryRequired 和可读原因，让扫描器不再自动接管。用户点批量重试时
+// 由 resetNovelFetchAutomationRetryState 清除这些标记。
+func markNovelFetchAIManualRetry(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, failure error, now time.Time) error {
+	document, err := store.GetDocument(ctx, owner, bookID)
+	if err != nil {
+		return err
+	}
+	if document.Meta == nil {
+		document.Meta = map[string]any{}
+	}
+	reason := "文本模型无法完成本书，请更换输出上限更大的模型或减小单次文本量后重试：" + failure.Error()
+	document.Meta["status"] = "failed"
+	document.Meta["queueState"] = "failed"
+	document.Meta["manualOnly"] = true
+	document.Meta["manualAiRetryRequired"] = true
+	document.Meta["error"] = reason
+	delete(document.Meta, "automationNextRetryAt")
+	appendNovelFetchDocumentLog(&document, "queue_failed", reason, now)
+	return store.PutDocument(ctx, owner, document)
+}
+
 func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, fetchErr error, now time.Time) error {
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
