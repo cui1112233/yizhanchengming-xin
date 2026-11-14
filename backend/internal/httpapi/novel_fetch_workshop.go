@@ -308,6 +308,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	completed := 0
 	uploadFailures := make([]string, 0)
 	loginBlockedCount := 0
+	blockedUploadState := "waiting_login"
 	type bookProcessResult struct {
 		bookID   string
 		bookName string
@@ -422,13 +423,14 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				uploadFailures = append(uploadFailures, bookID+"："+err.Error())
 				failedBookIDs = append(failedBookIDs, bookID)
 				failureMessages = append(failureMessages, bookID+"：上传未完成："+err.Error())
-				if workshopSubmitRequiresLogin(err) {
+				if blockedStatus := workshopSubmitBlockedStatus(err); blockedStatus != "" {
 					loginBlockedCount++
-					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, "waiting_login", err.Error())
+					blockedUploadState = blockedStatus
+					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, blockedStatus, err.Error())
 				} else if retry {
 					retryBookIDs = append(retryBookIDs, bookID)
 				}
-				if !workshopSubmitRequiresLogin(err) {
+				if workshopSubmitBlockedStatus(err) == "" {
 					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, "upload_pending", err.Error())
 				}
 				_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, bookID, "auto_submit_pending", "上传未完成，重试仅继续上传："+err.Error())
@@ -470,8 +472,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			status = "upload_pending"
 		}
 		if loginBlockedCount == len(failedBookIDs) {
-			status = "waiting_login"
-			queueState = "waiting_login"
+			status = blockedUploadState
+			queueState = blockedUploadState
 		}
 		retryEnabled := retry && len(retryBookIDs) > 0
 		_ = updateWorkshopRun(worker.store, job, status, errorMessage, startedAt, !retryEnabled)
@@ -485,6 +487,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			progressMessage = "改文已暂停，等待确认分类后重试"
 		} else if status == "waiting_login" {
 			progressMessage = workshopLoginRequiredMessage
+		} else if status == "waiting_configuration" {
+			progressMessage = workshopContractChangedMessage
 		} else if status == "upload_pending" {
 			progressMessage = "正文已完成，上传未完成；重试仅继续上传"
 		} else if !retryEnabled {
@@ -569,6 +573,7 @@ func (worker *workshopProcessWorker) bookCancelled(ctx context.Context, owner, b
 }
 
 func (worker *workshopProcessWorker) execute(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
+	ctx = novelfetchworkshop.WithProcessTextModel(ctx, job.TextModelID)
 	if job.AutoSubmit && len(job.BookIDs) == 1 {
 		if document, err := worker.store.GetDocument(ctx, job.Owner, job.BookIDs[0]); err == nil && document.Meta["autoSubmitReady"] == true && firstText(document.Meta["autoSubmitReadyFingerprint"]) == novelFetchUploadReadyFingerprint(ctx, worker.store, job.Owner, document, job.SelectedVersions) {
 			_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, job.BookIDs[0], "upload_resume", "正文已完成，跳过原文和改文生成，仅继续上传")
@@ -979,6 +984,11 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			continue
 		}
 		status := strings.ToLower(strings.TrimSpace(firstText(item["status"])))
+		if handled, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
+			return err
+		} else if handled {
+			continue
+		}
 		recovering := status == "dispatching"
 		if status != "" && status != "scheduled" && status != "paused" && !recovering {
 			continue
@@ -1130,6 +1140,9 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		}
 		if dispatchErr == nil {
 			_, dispatchErr = workshopProcessResult(ctx, store, owner, inputText, platformID, batchID, maxTxt)
+		}
+		if dispatchErr == nil {
+			dispatchErr = novelFetchSnapshotBeforeQueue(ctx, store, job)
 		}
 		if dispatchErr == nil {
 			if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
@@ -2226,6 +2239,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		processJob := novelfetchworkshop.ProcessJob{ID: id, Owner: identity.Username, BatchID: batchID, BookIDs: bookIDs, PlatformID: input.PlatformID, MaxTxt: input.MaxTxt, SensitiveAIEnabled: input.SensitiveAIEnabled, AutoSubmit: result["auto_queue_enabled"] == true, SelectedVersions: input.SelectedVersions, RewriteMethods: input.RewriteMethods, TextModelID: textModelID}
+		if err := novelFetchSnapshotBeforeQueue(req.Context(), store, processJob); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存执行参数失败"})
+			return
+		}
 		if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
 			if err := cancellationQueue.ClearCancelledBooks(req.Context(), identity.Username, bookIDs); err != nil {
 				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 取消状态清理失败"})

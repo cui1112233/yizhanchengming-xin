@@ -8,6 +8,17 @@ import {
   novelFetchTaskSummaryItems
 } from './novel-fetch-task-detail.js';
 
+test('fetch retry detail shows persisted upstream error and its actual business code', () => {
+  const error = '121 upstream business error 400: 获取书籍信息失败';
+  for (const data of [{meta:{originalFetchLastError:error}}, {original_fetch_last_error:error}]) {
+    const summary = Object.fromEntries(novelFetchTaskSummaryItems(data).map(row => [row.label, row.value]));
+    assert.equal(summary['原文失败原因'], error);
+    assert.equal(summary['原文错误码'], '400');
+  }
+  const unknown = Object.fromEntries(novelFetchTaskSummaryItems({meta:{originalFetchLastError:'网络超时'}}).map(row => [row.label,row.value]));
+  assert.equal(unknown['原文错误码'], '—');
+});
+
 test('task detail reads persisted per-version rewrite evidence without inventing history', () => {
   const data = { versions: {ai1: '正文一', ai2: '正文二'}, meta: { rewriteModel: 'model-used', rewriteEvidenceByVersion: {
     ai1: {strategy_name: '方案一', template_name: '模板一'},

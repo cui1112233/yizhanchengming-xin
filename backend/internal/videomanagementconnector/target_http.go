@@ -23,9 +23,11 @@ import (
 // 而 http.Client 默认跟随跳转，最终仍是 HTTP 200 的登录页。因此会话状态
 // 必须同时看“响应正文是不是登录页”，否则状态接口会把已过期会话当成已登录。
 var (
-	ErrSessionMissing     = errors.New("视频后台尚未登录")
-	ErrSessionExpired     = errors.New("视频后台登录已失效")
-	ErrSessionUnavailable = errors.New("视频后台暂时无法连接")
+	ErrSessionMissing      = errors.New("视频后台尚未登录")
+	ErrSessionExpired      = errors.New("视频后台登录已失效")
+	ErrSessionUnavailable  = errors.New("视频后台暂时无法连接")
+	ErrSiteContractChanged = errors.New("视频管理系统接口结构已变化")
+	ErrSubmissionNotFound  = errors.New("视频管理系统尚未查到本书的提交记录，请稍后回读确认")
 )
 
 // VideoUploadService is the optional media step used by the batch publisher.
@@ -286,10 +288,20 @@ func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input S
 		return Submission{}, ErrSessionExpired
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusMethodNotAllowed || response.StatusCode == http.StatusGone {
+			return Submission{}, fmt.Errorf("%w: submit HTTP %d", ErrSiteContractChanged, response.StatusCode)
+		}
 		return Submission{}, fmt.Errorf("target site submit returned HTTP %d", response.StatusCode)
 	}
 	var result map[string]any
-	_ = json.Unmarshal(raw, &result)
+	decodeErr := json.Unmarshal(raw, &result)
+	if targetResponseSessionExpired(raw, result) {
+		return Submission{}, ErrSessionExpired
+	}
+	_, successKnown := result["success"].(bool)
+	if decodeErr != nil || !successKnown {
+		return Submission{}, ErrSiteContractChanged
+	}
 	if result["success"] != true {
 		if targetResponseSessionExpired(raw, result) {
 			return Submission{}, ErrSessionExpired
@@ -380,7 +392,15 @@ func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, 
 		return Submission{}, ErrSessionExpired
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusMethodNotAllowed || response.StatusCode == http.StatusGone {
+			return Submission{}, fmt.Errorf("%w: readback HTTP %d", ErrSiteContractChanged, response.StatusCode)
+		}
 		return Submission{}, fmt.Errorf("target site readback returned HTTP %d", response.StatusCode)
+	}
+	_, successKnown := result["success"].(bool)
+	_, dataKnown := result["data"].([]any)
+	if !successKnown || (result["success"] == true && !dataKnown) {
+		return Submission{}, ErrSiteContractChanged
 	}
 	if result["success"] != true {
 		return Submission{}, fmt.Errorf("视频管理系统查询未成功，提交结果尚未确认")
@@ -395,7 +415,7 @@ func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, 
 		}
 		return Submission{ID: recordID, Status: "readback", ReadbackRaw: record}, nil
 	}
-	return Submission{}, fmt.Errorf("视频管理系统尚未查到本书的提交记录，请稍后回读确认")
+	return Submission{}, ErrSubmissionNotFound
 }
 
 func (s *TargetHTTPService) base() (string, error) {

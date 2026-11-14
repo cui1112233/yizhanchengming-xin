@@ -68,7 +68,8 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		operationID = fmt.Sprintf("web-submit-%d", time.Now().UTC().UnixNano())
 	}
 	result := webSubmitExecution{OperationID: operationID, Results: []any{}}
-	release, guardErr := acquireWorkshopSubmit(ctx, request.Queue, owner, "")
+	session := readUploadTargetSession(usersDir, owner)
+	release, guardErr := acquireWorkshopSubmit(ctx, request.Queue, workshopExternalSubmitScope(session), "")
 	if guardErr != nil {
 		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "queued", guardErr.Error())
 		return result, &webSubmitRequestError{Status: http.StatusConflict, Message: guardErr.Error()}
@@ -83,7 +84,6 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "waiting_configuration", "网站提交尚未启用；请先保存账号并勾选启用网站提交")
 		return result, &webSubmitRequestError{Status: http.StatusBadRequest, Message: "网站提交尚未启用；请先保存账号并勾选启用网站提交"}
 	}
-	session := readUploadTargetSession(usersDir, owner)
 	cookie := strings.TrimSpace(toString(session["cookie"]))
 	if cookie == "" {
 		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "waiting_login", "视频管理系统未登录，请先登录后再提交")
@@ -95,7 +95,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		pauseTarget = targets[0]
 	}
 	if err := checkWorkshopSubmitPause(ctx, store, owner, session, pauseTarget); err != nil {
-		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, "waiting_login", err.Error())
+		recordWorkshopSubmitBlocked(ctx, store, owner, request.TaskIDs, operationID, workshopSubmitBlockedStatus(err), err.Error())
 		return result, err
 	}
 	if len(versions) == 0 {
@@ -127,6 +127,20 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		meta := doc.Meta
 		if meta == nil {
 			meta = map[string]any{}
+		}
+		blockContract := func() error {
+			meta["siteSubmitStatus"] = "waiting_configuration"
+			meta["siteSubmitPauseReason"] = "site_contract_changed"
+			meta["status"], meta["queueState"] = "waiting_configuration", "waiting_configuration"
+			doc.Meta = meta
+			appendNovelFetchDocumentLog(&doc, "upload_contract_changed", workshopContractChangedMessage, time.Now())
+			if err := store.PutDocument(ctx, owner, doc); err != nil {
+				return err
+			}
+			if err := pauseWorkshopSubmitContract(ctx, store, owner, session); err != nil {
+				return err
+			}
+			return workshopContractBlockedError()
 		}
 		if genderNeedsResolution(doc.Gender) && genderJudgeResolver != nil {
 			if judge, judgeErr := genderJudgeResolver(ctx, owner); judgeErr == nil {
@@ -213,6 +227,9 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, bookID)
 				if readbackErr != nil {
 					uncertainVersion("上传已接收，正在等待目标站回读确认", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version]))
+					if errors.Is(readbackErr, videomanagementconnector.ErrSiteContractChanged) {
+						return result, blockContract()
+					}
 					continue
 				}
 				attempt := mapOrEmpty(mapOrEmpty(meta["siteSubmitAttempts"])[version])
@@ -283,6 +300,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				}
 			}
 			if submitErr != nil {
+				if errors.Is(submitErr, videomanagementconnector.ErrSiteContractChanged) {
+					uncertainVersion("接口结构变化，提交结果待回读确认；不会重复上传", bookID)
+					return result, blockContract()
+				}
 				if errors.Is(submitErr, videomanagementconnector.ErrSessionExpired) || errors.Is(submitErr, videomanagementconnector.ErrSessionMissing) {
 					delete(mapOrEmpty(meta["siteSubmitPendingConfirmation"]), version)
 					markSubmissionFailure(meta, version, workshopLoginRequiredMessage)
@@ -304,6 +325,9 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 			confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, bookID)
 			if readbackErr != nil {
 				uncertainVersion("上传已接收，但目标站回读确认失败", submission.ID)
+				if errors.Is(readbackErr, videomanagementconnector.ErrSiteContractChanged) {
+					return result, blockContract()
+				}
 				continue
 			}
 			if !submissionMatchesAttempt(confirmed, firstText(submission.ID, bookID), firstText(mapOrEmpty(attempts[version])["started_at"])) {

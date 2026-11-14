@@ -62,6 +62,19 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器未配置"})
 			return
 		}
+		queue, _ := req.Context().Value(submitQueueKey{}).(novelfetchworkshop.ProcessQueue)
+		release, guardErr := acquireWorkshopSubmit(req.Context(), queue, workshopExternalSubmitScope(session), "")
+		if guardErr != nil {
+			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": guardErr.Error()})
+			return
+		}
+		defer release()
+		if workshop != nil {
+			if err := checkWorkshopSubmitPause(req.Context(), workshop, identity.Username, session, targets[0]); err != nil {
+				writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error()})
+				return
+			}
+		}
 		results := make([]map[string]any, 0, len(input.Items))
 		for _, item := range input.Items {
 			bookID := strings.TrimSpace(toString(item["bookId"]))

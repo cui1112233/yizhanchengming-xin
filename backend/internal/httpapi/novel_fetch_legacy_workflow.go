@@ -219,6 +219,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		schedules, _ := cfg["novel_fetch_schedules"].([]any)
 		item["id"] = "schedule-" + time.Now().UTC().Format("20060102150405.000000000")
 		item["status"] = "scheduled"
+		item["created_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 		// 定时处理的既定行为是处理完成后自动上传；普通立即处理不受影响。
 		item["auto_submit"] = true
 		item["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
