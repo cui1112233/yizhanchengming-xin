@@ -15,6 +15,47 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
+// automationBookWorkerCeiling 是单个任务内同时处理的书籍数上限。任务可以
+// 配置更小的 concurrency，但不能突破这个上限：再多的书同时跑只会把请求
+// 堆在网关队列里，反而拖慢整批收口。
+const automationBookWorkerCeiling = 4
+
+// automationConcurrencyBudget 把多层并发限制展开给前端，说明任务实际被哪
+// 一层卡住。只做展示，不参与调度；网关真实并发会在冷启动后自适应爬升，
+// 因此这里标注的是冷启动上限与天花板，而不是瞬时值。
+func automationConcurrencyBudget(job map[string]any) map[string]any {
+	bookWorkers := automationNumberValue(job["concurrency"], 1)
+	if bookWorkers < 1 {
+		bookWorkers = 1
+	}
+	if bookWorkers > automationBookWorkerCeiling {
+		bookWorkers = automationBookWorkerCeiling
+	}
+	images := automationNumberValue(job["imageGlobalConcurrency"], 8)
+	if images < 1 {
+		images = 1
+	}
+	coldStart := shuihuoAdaptiveInitialLimit
+	effective := images
+	limiting := "task_image_concurrency"
+	if coldStart < effective {
+		effective = coldStart
+		limiting = "gateway_cold_start"
+	}
+	return map[string]any{
+		"bookWorkers":               bookWorkers,
+		"bookWorkerCeiling":         automationBookWorkerCeiling,
+		"taskImageConcurrency":      images,
+		"comicBookSlots":            comicBookGenerationConcurrency(),
+		"comicBookSlotCeiling":      8,
+		"gatewayColdStart":          coldStart,
+		"gatewayCeiling":            shuihuoAdaptiveMaxLimit,
+		"effectiveImageConcurrency": effective,
+		"limitingLayer":             limiting,
+		"note":                      "实际并发取各层最小值；网关会从冷启动逐步升到天花板",
+	}
+}
+
 type FileAutomationStatusReader struct {
 	path       string
 	stateStore AutomationStateStore
@@ -546,6 +587,7 @@ func publicAutomationJob(job map[string]any) map[string]any {
 		"updatedAt": job["updatedAt"], "completedAt": job["completedAt"], "lastError": job["lastError"],
 		"counts":          job["counts"],
 		"priorityBookIds": automationPriorityIDs(job),
+		"concurrencyBudget": automationConcurrencyBudget(job),
 	}
 	if result["autoPublish"] == nil {
 		result["autoPublish"] = false

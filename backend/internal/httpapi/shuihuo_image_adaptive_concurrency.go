@@ -14,14 +14,17 @@ const shuihuoAdaptiveRecoverySuccesses = 8
 // 后再逐级爬升；这是进程级共享的起点，不随单本书配置放大。
 const shuihuoAdaptiveInitialLimit = 2
 
+// shuihuoAdaptiveMaxLimit 是单个上游域名自适应爬升的天花板。
+const shuihuoAdaptiveMaxLimit = 30
+
 // shuihuoClampHostConcurrency 与单本书的出图路数（最多 4）分开：
 // 这里限制的是整条网关的并发，允许自适应爬到 30 路。
 func shuihuoClampHostConcurrency(value int) int {
 	if value < 1 {
 		return 1
 	}
-	if value > 30 {
-		return 30
+	if value > shuihuoAdaptiveMaxLimit {
+		return shuihuoAdaptiveMaxLimit
 	}
 	return value
 }

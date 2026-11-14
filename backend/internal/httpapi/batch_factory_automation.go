@@ -3433,8 +3433,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		return automationMergeRequestID(jobID, bookID, retryAttempt, batchRetry)
 	}
 	concurrency := automationNumberValue(job["concurrency"], 1)
-	if concurrency > 4 {
-		concurrency = 4
+	if concurrency > automationBookWorkerCeiling {
+		concurrency = automationBookWorkerCeiling
 	}
 	// 每本书默认 4 路出图（可配置，上限 8），整个任务还需要一个总并发上限：
 	// 实测显示并发共享上游带宽会互相拖慢，12 路时慢图更容易撞总上限。恢复为
