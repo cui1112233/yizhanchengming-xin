@@ -272,9 +272,12 @@ func V12CanonicalTableRenameStatements() []string {
 	return statements
 }
 
-// Adopt makes a previously completed physical cutover safe to restart after
-// the migration ledger write was interrupted. It does not modify data.
+// Recover a partially completed physical cutover without replaying already
+// renamed tables. MySQL RENAME is DDL, so sql.Tx cannot roll back the previous
+// per-table statements. Validate the complete plan before making one atomic
+// rename of the remaining tables; never overwrite an existing target.
 func adoptV12CanonicalTableRename(ctx context.Context, tx *sql.Tx) (bool, error) {
+	pending := []string{}
 	for _, statement := range V12CanonicalTableRenameStatements() {
 		parts := strings.Fields(statement)
 		if len(parts) != 5 {
@@ -287,11 +290,19 @@ func adoptV12CanonicalTableRename(ctx context.Context, tx *sql.Tx) (bool, error)
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?`, parts[4]).Scan(&targetCount); err != nil {
 			return false, err
 		}
-		if sourceCount > 0 {
-			return false, nil
+		if sourceCount > 0 && targetCount > 0 {
+			return false, fmt.Errorf("canonical table conflict: both %s and %s exist; neither table was changed", parts[2], parts[4])
 		}
-		if targetCount == 0 {
+		if sourceCount == 0 && targetCount == 0 {
 			return false, fmt.Errorf("canonical table missing after partial cutover: %s", parts[4])
+		}
+		if sourceCount > 0 {
+			pending = append(pending, parts[2]+" TO "+parts[4])
+		}
+	}
+	if len(pending) > 0 {
+		if _, err := tx.ExecContext(ctx, "RENAME TABLE "+strings.Join(pending, ", ")); err != nil {
+			return false, err
 		}
 	}
 	return true, nil

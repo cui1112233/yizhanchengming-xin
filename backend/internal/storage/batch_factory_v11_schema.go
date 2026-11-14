@@ -934,7 +934,7 @@ func V11ComicSourceSegmentStatements() []string {
 func V11Migrations() []Migration {
 	return []Migration{
 		{Version: 1100001, SQL: V11FoundationStatements(), CallbackChecksum: "batch-factory-v11-foundation-v1"},
-		{Version: 1100002, SQL: V11SliceOneStatements(), CallbackChecksum: "batch-factory-v11-slice1-v1"},
+		{Version: 1100002, SQL: V11SliceOneStatements(), CallbackChecksum: "batch-factory-v11-slice1-v1", Adopt: adoptV11SliceOneLedger},
 		{Version: 1100003, SQL: V11ConfigVersionOwnershipStatements(), CallbackChecksum: "batch-factory-v11-slice1-config-version-ownership-v1"},
 		{Version: 1100004, SQL: V11DirectorStatements(), CallbackChecksum: "batch-factory-v11-director-v1"},
 		{Version: 1100005, SQL: V11ProductionStatements(), CallbackChecksum: "batch-factory-v11-production-v1"},

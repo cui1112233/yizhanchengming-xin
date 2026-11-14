@@ -45,7 +45,10 @@ func main() {
 	}
 	defer db.Close()
 	configureDatabasePool(db)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Startup includes durable MySQL DDL. A slow commit can exceed 30 seconds
+	// and leave an implicitly committed migration without its ledger entry.
+	// Keep a bounded startup budget without interrupting normal recovery.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	apiHandler, err := app.Build(ctx, cfg, db, nil)
 	if err != nil {

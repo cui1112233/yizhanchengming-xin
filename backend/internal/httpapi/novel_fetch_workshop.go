@@ -979,6 +979,11 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			continue
 		}
 		status := strings.ToLower(strings.TrimSpace(firstText(item["status"])))
+		if handled, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
+			return err
+		} else if handled {
+			continue
+		}
 		recovering := status == "dispatching"
 		if status != "" && status != "scheduled" && status != "paused" && !recovering {
 			continue

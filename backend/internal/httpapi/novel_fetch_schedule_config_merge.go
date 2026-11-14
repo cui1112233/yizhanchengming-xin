@@ -24,13 +24,16 @@ func saveNovelFetchScheduleItem(ctx context.Context, store novelfetchworkshop.St
 			if firstText(row["status"]) == "cancelled" {
 				return nil
 			}
+			if expected, ok := item["_expected_status"].(string); ok && firstText(row["status"]) != expected {
+				return nil
+			}
 			if firstText(item["status"]) == "queued" {
 				switch firstText(row["status"]) {
 				case "running", "completed", "failed", "stopped":
 					return nil
 				}
 			}
-			for _, key := range []string{"status", "error", "updatedAt", "dispatch_id", "job_id", "batch_id", "book_ids", "dispatch_started_at", "skipped_existing_book_ids", "existing_job_id"} {
+			for _, key := range []string{"status", "error", "updatedAt", "dispatch_id", "job_id", "batch_id", "book_ids", "dispatch_started_at", "skipped_existing_book_ids", "existing_job_id", "retry_tracking", "next_retry_at"} {
 				if value, ok := item[key]; ok {
 					row[key] = value
 				} else if key == "error" {
