@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as statusHelpers from './novel-fetch-status.js';
 
+test('scheduled books with preserved prose still display waiting for scheduled execution', () => {
+  const state = statusHelpers.novelFetchTaskStatus({status: 'scheduled_waiting', originalStatus: 'done', aiStatus: 'done'});
+  assert.equal(state.status, 'scheduled_waiting');
+  assert.equal(state.label, '等待定时执行');
+});
+
 test('queued retry acknowledgement does not claim processing has finished', () => {
   const text = statusHelpers.novelFetchBatchResultSummary({ queued: 2, failed: 1, skipped: 1, already_running: 1 });
   assert.match(text, /加入后台重试 2 项/);

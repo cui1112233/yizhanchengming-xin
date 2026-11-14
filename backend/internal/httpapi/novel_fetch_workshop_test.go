@@ -1515,7 +1515,7 @@ func TestDispatchDueNovelFetchSchedulesEnqueuesOnce(t *testing.T) {
 	}
 }
 
-func TestDispatchDueNovelFetchSchedulesSkipsBooksAlreadyInAnotherBatch(t *testing.T) {
+func TestDispatchDueNovelFetchSchedulesResumesExistingUnfinishedBooks(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
 	queue := novelfetchworkshop.NewMemoryQueue()
@@ -1531,16 +1531,21 @@ func TestDispatchDueNovelFetchSchedulesSkipsBooksAlreadyInAnotherBatch(t *testin
 	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
-		t.Fatalf("duplicate scheduled book was enqueued: %v", err)
+	job, err := queue.Claim(ctx, 20*time.Millisecond)
+	if err != nil || len(job.BookIDs) != 1 || job.BookIDs[0] != "12345678901" {
+		t.Fatalf("unfinished book not resumed: %#v %v", job, err)
 	}
 	settings, err := store.GetConfig(ctx, "tester")
 	if err != nil {
 		t.Fatal(err)
 	}
 	schedule := settings["novel_fetch_schedules"].([]any)[0].(map[string]any)
-	if schedule["status"] != "completed" || len(scheduleStringSlice(schedule["skipped_existing_book_ids"])) != 1 {
-		t.Fatalf("duplicate schedule was not completed with a skip reason: %#v", schedule)
+	if schedule["status"] != "queued" {
+		t.Fatalf("unfinished schedule falsely completed: %#v", schedule)
+	}
+	doc, _ := store.GetDocument(ctx, "tester", "12345678901")
+	if doc.OriginalRaw != "已保存原文" {
+		t.Fatal("existing original overwritten")
 	}
 }
 

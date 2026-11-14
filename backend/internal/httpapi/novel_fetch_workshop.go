@@ -790,6 +790,7 @@ func markNovelFetchTaskQueued(ctx context.Context, store novelfetchworkshop.Stor
 	}
 	document.Meta["status"] = "queued"
 	document.Meta["queueState"] = "queued"
+	delete(document.Meta, "scheduledHold")
 	document.Meta["currentProcessJobId"] = jobID
 	if strings.TrimSpace(batchID) != "" {
 		document.Meta["currentBatchId"] = batchID
@@ -990,7 +991,7 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			continue
 		}
 		recovering := status == "dispatching"
-		if status != "" && status != "scheduled" && status != "paused" && !recovering {
+		if status != "" && status != "scheduled" && status != "preparing" && status != "paused" && !recovering {
 			continue
 		}
 		runAt, err := parseNovelFetchScheduleTime(firstText(item["run_at"], item["runAt"]))
@@ -1005,6 +1006,15 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 				return err
 			}
 			continue
+		}
+		if !recovering && item["tasks_prepared"] != true {
+			if err := prepareNovelFetchScheduleTasks(ctx, store, owner, item, now); err != nil {
+				return err
+			}
+			status = firstText(item["status"])
+			if status != "scheduled" {
+				continue
+			}
 		}
 		if recovering {
 			updatedAt, parseErr := time.Parse(time.RFC3339Nano, strings.TrimSpace(firstText(item["updatedAt"], item["updated_at"])))
@@ -1042,31 +1052,32 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		if maxTxt <= 0 {
 			maxTxt = 4000
 		}
-		inputText := firstText(item["input_text"], item["inputText"])
 		platformID := firstText(item["platform_id"], item["platformId"], "2")
 		scheduleID := firstText(item["id"])
 		jobID := firstText(item["job_id"])
 		batchID := firstText(item["batch_id"])
 		bookIDs := scheduleStringSlice(item["book_ids"])
-		var skippedBookIDs []string
 		var dispatchErr error
 		if scheduleID == "" {
 			dispatchErr = errors.New("定时任务缺少唯一编号，无法安全派发")
 		}
 		if !recovering && dispatchErr == nil {
-			jobID, batchID = novelFetchScheduleDispatchIDs(owner, scheduleID, runAt)
-			documents, _, _, _ := parseWorkshopDocuments(inputText, maxTxt)
-			bookIDs, skippedBookIDs, dispatchErr = novelFetchNewBookIDs(ctx, store, owner, documents)
-			if dispatchErr == nil && len(bookIDs) == 0 && len(skippedBookIDs) > 0 {
-				item["status"] = "completed"
-				item["skipped_existing_book_ids"] = skippedBookIDs
-				item["batch_id"] = batchID
-				item["updatedAt"] = now.UTC().Format(time.RFC3339Nano)
+			var allComplete bool
+			bookIDs, allComplete, dispatchErr = filterDueScheduleBooks(ctx, store, owner, item)
+			if dispatchErr == nil && len(bookIDs) == 0 {
+				item["status"], item["error"] = "skipped_existing", "没有可派发任务，请查看每本书的跳过原因"
+				if allComplete {
+					item["status"] = "completed"
+					delete(item, "error")
+				}
+				item["book_ids"], item["updatedAt"] = bookIDs, now.UTC().Format(time.RFC3339Nano)
 				if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
 					return err
 				}
 				continue
 			}
+			newJobID, newBatchID := novelFetchScheduleDispatchIDs(owner, scheduleID, runAt)
+			jobID, batchID = newJobID, firstText(batchID, newBatchID)
 			item["status"] = "dispatching"
 			item["dispatch_id"] = "dispatch-" + strings.TrimPrefix(jobID, "go-schedule-")
 			item["job_id"] = jobID
@@ -1074,7 +1085,7 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			item["book_ids"] = append([]string(nil), bookIDs...)
 			item["dispatch_started_at"] = now.UTC().Format(time.RFC3339Nano)
 			item["updatedAt"] = now.UTC().Format(time.RFC3339Nano)
-			if err := store.PutConfig(ctx, owner, settings); err != nil {
+			if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
 				if errors.Is(err, novelfetchworkshop.ErrConfigConflict) {
 					return nil
 				}
@@ -1139,8 +1150,8 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		if dispatchErr == nil && len(bookIDs) == 0 {
 			dispatchErr = errors.New("定时任务没有有效书籍")
 		}
-		if dispatchErr == nil {
-			_, dispatchErr = workshopProcessResult(ctx, store, owner, inputText, platformID, batchID, maxTxt)
+		if dispatchErr == nil && recovering {
+			dispatchErr = ensureScheduleRecoveryDocuments(ctx, store, owner, item)
 		}
 		if dispatchErr == nil {
 			dispatchErr = novelFetchSnapshotBeforeQueue(ctx, store, job)

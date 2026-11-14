@@ -25,7 +25,7 @@ func TestWorkshopScheduleCancelCleansOnlyExplicitOwnedCreatedBooks(t *testing.T)
 	queue := novelfetchworkshop.NewMemoryQueue()
 	store.PutConfig(ctx, "alice", map[string]any{"novel_fetch_schedules": []any{map[string]any{"id": "s1", "status": "scheduled", "created_ids": []string{"owned", "existing", "foreign"}}}})
 	for _, row := range []struct{ owner, id, schedule string }{{"alice", "owned", "s1"}, {"alice", "existing", "other"}, {"bob", "foreign", "s1"}} {
-		store.PutDocument(ctx, row.owner, novelfetchworkshop.Document{BookID: row.id, Meta: map[string]any{"schedule_id": row.schedule}, Original: "saved"})
+		store.PutDocument(ctx, row.owner, novelfetchworkshop.Document{BookID: row.id, Meta: map[string]any{"schedule_id": row.schedule}})
 	}
 	res := scheduleControlRequest(store, queue, "alice", http.MethodPost, "/api/novel-fetch-workshop/schedules/s1/cancel")
 	if res.Code != http.StatusOK {

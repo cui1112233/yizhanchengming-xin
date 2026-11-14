@@ -23,7 +23,7 @@ import (
 func TestScheduledBookFullChainAndReadbackRecovery(t *testing.T) {
 	for _, failReadback := range []bool{false, true} {
 		t.Run(fmt.Sprintf("readback_failure_%v", failReadback), func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			const owner = "schedule-acceptance"
 			const bookID = "12345678901"
@@ -79,14 +79,29 @@ func TestScheduledBookFullChainAndReadbackRecovery(t *testing.T) {
 			defer target.Close()
 			store := novelfetchworkshop.NewMemoryStore()
 			queue := novelfetchworkshop.NewMemoryQueue()
-			due := time.Now().UTC().Add(150 * time.Millisecond)
+			due := time.Now().UTC().Add(time.Second)
 			err := store.PutConfig(ctx, owner, map[string]any{
 				"novel_fetch_automation": map[string]any{"enabled": true},
 				"appConfig":              map[string]any{"web_submit": map[string]any{"enabled": true, "submit_versions": []any{"ai1"}}},
-				"novel_fetch_schedules":  []any{map[string]any{"id": "full-chain", "status": "scheduled", "run_at": due.Format(time.RFC3339Nano), "input_text": bookID + "\t定时链路验证", "platform_id": "2", "selected_versions": []any{"ai1"}, "sensitive_ai_enabled": false, "max_txt": 4000}},
 			})
 			if err != nil {
 				t.Fatal(err)
+			}
+			// Go through the real save endpoint before dispatching, not a fixture
+			// schedule inserted directly into the database.
+			mux := http.NewServeMux()
+			registerNovelFetchLegacyWorkflowRoutes(mux, store, queue, "", nil)
+			payload, _ := json.Marshal(map[string]any{"run_at": due.Format(time.RFC3339Nano), "input_text": bookID + "\t定时链路验证", "platform_id": "2", "selected_versions": []string{"ai1"}, "sensitive_ai_enabled": false, "max_txt": 4000})
+			request := httptest.NewRequest(http.MethodPost, "/api/novel-fetch-workshop/schedules", strings.NewReader(string(payload)))
+			request = request.WithContext(context.WithValue(ctx, bridgeIdentityKey{}, BridgeIdentity{Username: owner}))
+			response := httptest.NewRecorder()
+			mux.ServeHTTP(response, request)
+			if response.Code != http.StatusOK {
+				t.Fatalf("save schedule: %d %s", response.Code, response.Body.String())
+			}
+			saved, err := store.GetDocument(ctx, owner, bookID)
+			if err != nil || saved.Meta["scheduledHold"] != true {
+				t.Fatalf("no held book after save: %#v %v", saved, err)
 			}
 			usersDir := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(usersDir, owner), 0700); err != nil {
@@ -119,7 +134,7 @@ func TestScheduledBookFullChainAndReadbackRecovery(t *testing.T) {
 				},
 			}
 			// Wall-clock execution: no job exists before due time.
-			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, owner, time.Now().UTC()); err != nil {
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, owner, due.Add(-time.Millisecond)); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := queue.Claim(ctx, time.Millisecond); err == nil {

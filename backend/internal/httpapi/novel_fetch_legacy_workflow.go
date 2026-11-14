@@ -226,7 +226,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		}
 		schedules, _ := cfg["novel_fetch_schedules"].([]any)
 		item["id"] = "schedule-" + time.Now().UTC().Format("20060102150405.000000000")
-		item["status"] = "scheduled"
+		item["status"] = "preparing"
 		item["created_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 		// 定时处理的既定行为是处理完成后自动上传；普通立即处理不受影响。
 		item["auto_submit"] = true
@@ -235,6 +235,10 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		cfg["novel_fetch_schedules"] = schedules
 		if err := store.PutConfig(req.Context(), identity.Username, cfg); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存定时任务失败"})
+			return
+		}
+		if err := prepareNovelFetchScheduleTasks(req.Context(), store, identity.Username, item, time.Now().UTC()); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "定时任务已保存，书籍准备中断，系统会继续恢复：" + err.Error(), "schedule_id": item["id"]})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"schedule": item})
@@ -553,11 +557,21 @@ func cancelWorkshopSchedule(w http.ResponseWriter, req *http.Request, store nove
 		// Running books retain their bodies: cancellation is cooperative. Only
 		// a never-dispatched schedule may clean explicitly owned created_ids.
 		deleted := 0
-		if status == "scheduled" || status == "" {
+		if status == "scheduled" || status == "preparing" || status == "paused" || status == "" {
 			owned := []string{}
-			for _, id := range scheduleStringSlice(item["created_ids"]) {
+			createdIDs := scheduleStringSlice(item["created_ids"])
+			for _, id := range uniqueStrings(append(scheduleStringSlice(item["book_ids"]), createdIDs...)) {
 				doc, getErr := store.GetDocument(req.Context(), identity.Username, id)
 				if getErr == nil && firstText(doc.Meta["schedule_id"], doc.Meta["scheduleId"]) == firstText(item["id"]) {
+					if !seenString(createdIDs, id) || strings.TrimSpace(doc.OriginalRaw) != "" || strings.TrimSpace(doc.Original) != "" || strings.TrimSpace(doc.ProcessedText) != "" || len(doc.Versions) > 0 || len(doc.BodyRefs) > 0 {
+						delete(doc.Meta, "scheduledHold")
+						doc.Meta["status"], doc.Meta["queueState"] = "stopped", "stopped"
+						if err := store.PutDocument(req.Context(), identity.Username, doc); err != nil {
+							writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保留定时书籍状态失败，请重试"})
+							return
+						}
+						continue
+					}
 					owned = append(owned, id)
 				}
 			}

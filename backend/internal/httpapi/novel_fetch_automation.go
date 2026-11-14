@@ -188,6 +188,9 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 		meta = map[string]any{}
 	}
 	status := strings.ToLower(firstText(meta["status"], meta["queueState"], meta["taskStatus"]))
+	if meta["scheduledHold"] == true || status == "scheduled_waiting" {
+		return false
+	}
 	if status == "stopped" || status == "cancelled" || status == "canceled" {
 		return false
 	}

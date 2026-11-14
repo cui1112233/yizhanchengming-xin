@@ -30,7 +30,7 @@ func normalizeNovelFetchScheduleInput(item, settings map[string]any) error {
 	if !platformFound {
 		return errors.New("所选平台不存在，请重新选择平台")
 	}
-	documents, _, _, _ := parseWorkshopDocuments(inputText, 4000)
+	documents, _, _, _ := parseScheduleDocuments(item)
 	if len(documents) == 0 {
 		return errors.New("书籍清单中没有有效书籍，请填写书籍 ID")
 	}

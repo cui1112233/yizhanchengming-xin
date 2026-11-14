@@ -1,4 +1,5 @@
 const labels = {
+  scheduled_waiting: '等待定时执行',
   input_ready: '分类信息已就绪',
   queued: '排队中',
   processing: '正在执行中…',
@@ -15,6 +16,7 @@ const labels = {
 };
 
 const colors = {
+  scheduled_waiting: 'blue',
   input_ready: 'blue',
   queued: 'gold',
   processing: 'processing',
@@ -218,6 +220,9 @@ export function mergeNovelFetchQueueStatus(previous = {}, next = {}) {
 
 export function novelFetchTaskStatus(row = {}) {
   const raw = text(row.status ?? row.taskStatus ?? row.task_status);
+  if (raw === 'scheduled_waiting' || row.scheduledHold === true) {
+    return { status: 'scheduled_waiting', label: labels.scheduled_waiting, color: colors.scheduled_waiting };
+  }
   const original = row.originalStatus ?? row.original_status;
   const ai = row.aiStatus ?? row.ai_status;
   const submit = row.siteSubmitStatus ?? row.site_submit_status;
