@@ -29,6 +29,7 @@ type AssetRequest struct {
 	Model       string      `json:"model"`
 	Concurrency int         `json:"concurrency"`
 	Confirmed   bool        `json:"confirmed"`
+	MissingOnly bool        `json:"missingOnly"`
 }
 
 type AssetResult struct {
@@ -182,7 +183,12 @@ func (s *AssetService) Extract(ctx context.Context, req AssetRequest) (AssetResu
 		merged[i].Degree = req.Degree
 		merged[i].Type = req.Type
 	}
-	saved, err := s.Store.MergeAssets(ctx, req.Owner, req.ProjectID, merged)
+	var saved []Asset
+	if req.MissingOnly {
+		saved, err = s.saveMissingAssets(ctx, req, merged)
+	} else {
+		saved, err = s.Store.MergeAssets(ctx, req.Owner, req.ProjectID, merged)
+	}
 	if err != nil {
 		return AssetResult{}, err
 	}
@@ -202,6 +208,47 @@ func (s *AssetService) Extract(ctx context.Context, req AssetRequest) (AssetResu
 		return result, fmt.Errorf("%w：第 %s 批资产提取失败，已保存 %d 条", ErrPartialFailure, strings.Join(numbers, "、"), len(saved))
 	}
 	return result, nil
+}
+
+// CreateAsset rejects an existing name atomically. A check never replaces an
+// existing card, even when another request creates it after the initial read.
+func (s *AssetService) saveMissingAssets(ctx context.Context, req AssetRequest, assets []Asset) ([]Asset, error) {
+	rows, err := s.Store.ListAssets(ctx, req.Owner, req.ProjectID, req.Type)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, a := range rows {
+		seen[strings.ToLower(strings.TrimSpace(a.Name))] = true
+	}
+	out := []Asset{}
+	for _, a := range assets {
+		key := strings.ToLower(strings.TrimSpace(a.Name))
+		if seen[key] {
+			continue
+		}
+		created, createErr := s.Store.CreateAsset(ctx, a)
+		if createErr != nil {
+			latest, readErr := s.Store.ListAssets(ctx, req.Owner, req.ProjectID, req.Type)
+			if readErr != nil {
+				return out, readErr
+			}
+			found := false
+			for _, row := range latest {
+				if strings.EqualFold(strings.TrimSpace(row.Name), strings.TrimSpace(a.Name)) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return out, createErr
+			}
+		} else {
+			out = append(out, created)
+		}
+		seen[key] = true
+	}
+	return out, nil
 }
 
 func (s *AssetService) prompts() *luoshui.Registry {
