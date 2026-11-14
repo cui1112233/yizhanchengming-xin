@@ -4575,6 +4575,11 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	} else if latest != nil {
 		job["priorityBookIds"] = automationPriorityIDs(latest)
 	}
+	// 任务收尾时仍未开始的书必须落成终态：否则页面一直显示“排队中”，
+	// 而插队要求任务处于 running/paused，用户只会看到按钮永远置灰。
+	if normalized := normalizeQueuedBooksAtFinish(books, c.now()); normalized > 0 {
+		appendAutomationJobLog(job, c.now(), fmt.Sprintf("任务结束时仍有 %d 本未开始执行，已标记为失败", normalized))
+	}
 	// Recount from persisted entries rather than only this goroutine's local
 	// failures. A retry run intentionally skips unrelated terminal books; those
 	// books must remain failed in the aggregate instead of being reported ready.
@@ -4625,6 +4630,25 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 		job["lastError"] = fmt.Sprintf("自动调度已停止：仍有 %d 本未完成；请人工处理或点“重试失败小说”继续", failedCount)
 	}
 	_ = c.setJob(owner, batchID, jobID, job)
+}
+
+// normalizeQueuedBooksAtFinish 把任务结束时仍未开始的书标成失败。只处理
+// queued，不碰 scheduled/pending_confirmation（这两类是在等定时或人工确认）。
+func normalizeQueuedBooksAtFinish(books map[string]any, now time.Time) int {
+	normalized := 0
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil || automationStringValue(entry["status"], "") != "queued" {
+			continue
+		}
+		entry["status"] = "failed"
+		entry["stage"] = automationStringValue(entry["stage"], "queued")
+		entry["message"] = "任务已结束，这本书未开始执行；请点击重试"
+		entry["error"] = "任务结束时仍未开始执行"
+		entry["updatedAt"] = now
+		normalized++
+	}
+	return normalized
 }
 
 func cloneAutomationEntry(entry map[string]any) map[string]any {
