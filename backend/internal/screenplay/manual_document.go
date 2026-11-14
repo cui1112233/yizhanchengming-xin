@@ -2,6 +2,7 @@ package screenplay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -14,6 +15,26 @@ func SaveManualDocument(ctx context.Context, store Store, owner, projectID, cont
 		return Document{}, fmt.Errorf("%w: 剧本内容不能为空", ErrEmptyContent)
 	}
 	active, err := store.ActiveDocument(ctx, owner, projectID)
+	if errors.Is(err, ErrNoActiveScript) {
+		if _, err = store.GetProject(ctx, owner, projectID); err != nil {
+			return Document{}, err
+		}
+		parsed := ParseScreenplayMarkdown(content)
+		documentID := newScreenplayID("doc")
+		for i := range parsed.Shots {
+			parsed.Shots[i].ID = newScreenplayID("shot")
+			parsed.Shots[i].DocumentID, parsed.Shots[i].ProjectID, parsed.Shots[i].OwnerUsername = documentID, projectID, owner
+		}
+		for i := range parsed.Characters {
+			parsed.Characters[i].ID = newScreenplayID("character")
+			parsed.Characters[i].DocumentID, parsed.Characters[i].ProjectID, parsed.Characters[i].OwnerUsername = documentID, projectID, owner
+		}
+		for i := range parsed.Scenes {
+			parsed.Scenes[i].ID = newScreenplayID("scene")
+			parsed.Scenes[i].DocumentID, parsed.Scenes[i].ProjectID, parsed.Scenes[i].OwnerUsername = documentID, projectID, owner
+		}
+		return store.SaveScreenplay(ctx, Document{ID: documentID, ProjectID: projectID, OwnerUsername: owner, Source: "manual", Content: content}, parsed.Shots, parsed.Characters, parsed.Scenes)
+	}
 	if err != nil {
 		return Document{}, err
 	}

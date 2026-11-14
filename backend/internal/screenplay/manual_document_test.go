@@ -78,3 +78,32 @@ func TestSaveManualDocumentRejectsEmptyContent(t *testing.T) {
 		t.Fatal("expected empty content error")
 	}
 }
+
+func TestSaveManualDocumentCreatesFirstScriptWithoutGeneration(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	_, _ = store.CreateProject(ctx, Project{ID: "first-manual", OwnerUsername: "alice", Title: "新作品"})
+	content := "# 第1集 窗边\n## 1-1：日 内 书房\n人物：林晚\n林晚：下一幕由我创造。"
+	saved, err := SaveManualDocument(ctx, store, "alice", "first-manual", content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Version != 1 || saved.Source != "manual" || saved.Content != content {
+		t.Fatal(saved)
+	}
+	active, err := store.ActiveDocument(ctx, "alice", "first-manual")
+	if err != nil || active.ID != saved.ID {
+		t.Fatal(active, err)
+	}
+	shots, _ := store.ListShots(ctx, "alice", "first-manual", saved.ID)
+	if len(shots) != 1 || shots[0].DocumentID != saved.ID || shots[0].OwnerUsername != "alice" {
+		t.Fatal(shots)
+	}
+	next, err := SaveManualDocument(ctx, store, "alice", "first-manual", content+"\n第二版。")
+	if err != nil || next.Version != 2 || next.ID == saved.ID {
+		t.Fatal(next, err)
+	}
+	if _, err = SaveManualDocument(ctx, store, "bob", "first-manual", content); err == nil {
+		t.Fatal("foreign owner created script")
+	}
+}

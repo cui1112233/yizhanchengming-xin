@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyCreativeConfigToProject, comicProjectStyleName, comicImageModelSelection, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, creativePromptOptions } from './comic-screenplay-creative.js';
+import { applyCreativeConfigToProject, comicProjectStyleName, comicImageModelSelection, comicStoryboardEngine, comicWorkspaceStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, creativePromptOptions } from './comic-screenplay-creative.js';
 import { loadComicCreativeLibrary, loadComicCreativeConfig, saveComicCreativeConfig, getComicStylePreview, createComicCreativeStyle } from '../../shared/api/comicScreenplay.js';
 const config = { script_prompt_id: 'script144', storyboard_prompt_id: 'story307', character_design_prompt_id: 'char213', scene_design_prompt_id: 'scene289', style: { id: 'own-style', name: '我的风格' }, image_core_instruction: '保留服装细节', image_model_id: 'image', image_edit_model_id: 'edit' };
 
@@ -168,3 +168,11 @@ test('新建未编辑核心与资产处理沿用后端默认，主动清空和�
  assert.equal(existing.image_core_instruction,'');assert.equal(existing.asset_process_prompt,'');
  const explicit213=creativeConfigPayload({...draft,character_design_prompt_id:'char213'},3);assert.equal(explicit213.character_design_prompt_id,'char213');assert.equal(Object.hasOwn(explicit213,'character_image_mode'),false);
 });
+
+ test('unconfigured project opens imported storyboard engine without changing selected prompt', () => {
+ const boards=[{engine:'xiaoluo_v9_30s',shots:[{id:'a'}]}];
+ assert.equal(comicWorkspaceStoryboardEngine({},boards,'xiaoluo_v7_15s'),'xiaoluo_v9_30s');
+ assert.equal(comicWorkspaceStoryboardEngine({creative_config:{storyboard_prompt_id:'storyboard_xiaoyunque_v3'}},boards,'xiaoluo_v7_15s'),'xiaoyunque_v3');
+ assert.equal(comicWorkspaceStoryboardEngine({},[],'xiaoluo_v7_15s'),'xiaoluo_v7_15s');
+ assert.equal(comicWorkspaceStoryboardEngine({},[...boards,{engine:'xiaoluo_v7_15s',shots:[{}]}],'xiaoluo_v7_15s'),'xiaoluo_v7_15s');
+ });
