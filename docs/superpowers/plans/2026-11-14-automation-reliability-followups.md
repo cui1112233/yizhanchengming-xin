@@ -132,4 +132,30 @@
 
 ## 验证结果
 
-（阶段 0 执行后在此追加数据记录。）
+### 2026-11-14 阶段 0 取证
+
+1. 回源不受调用方取消影响（本地探针）
+   - 调用前取消 caller ctx，`Store.Open` 仍执行完整回源：`open_elapsed_ms=1504`，`caller_ctx_err=context canceled`。
+   - 结论：请求取消不会传播到回源路径；需要 `OpenContext` 与默认超时。
+
+2. `MarkRehydrated` 失败后的本地/仓库状态（本地探针）
+   - `rehydrate_fail locality=local_file_present first_remote_opens=1 second_remote_opens=2 rehydrate_calls=2`。
+   - 结论：本地文件已落盘但仓库标记未更新；二次访问会重复下载。不会丢数据，但存在重复流量。
+
+3. reaper 写入频率（生产 3 分钟采样，2026-11-14 12:2x）
+   - `jobs=265 job_json_total=6684343 bytes`，`delta_bytes=664319`，`bytes_per_min=221439`。
+   - `reaper_log_lines=0`、`panic_log_lines=0`、`artifact_restore_lines=0`。
+   - 结论：观测窗口内没有僵尸回收事件，reaper 未产生写入；当前 binlog 增长约 216KB/分钟，远低于“全量重写 6.4MB/次”的旧行为，说明单行保存持续生效。阶段 1 仍值得做，但它属于低频优化，不是当前主要写放大来源。
+
+### 2026-11-14 阶段 2 / 阶段 3 执行结果
+
+- `d87146d3` 阶段 2a：`OpenContext` / `PathContext`、`ErrRestoreTimeout`、默认 2 分钟上限、回源日志、`QIANTIE_ARTIFACT_RESTORE_TIMEOUT`。
+- `afc4918f` 阶段 2b 第一批：漫画预览/缩略图/打包下载、合并封面、执行器产物、水果项目图片改用请求上下文。
+- `bc16b9a5` 阶段 2b 第二批：漫画参考图、素材、资产图、视频资产导入、音频与图片生成结果改用请求上下文。
+- `3687f8bd` 阶段 3：本地同尺寸文件跳过重复下载，`MarkRehydrated` 失败不再阻断读取，下次访问重试标记。
+- 测试：`localartifact`、`productionmedia`、`novelfetchworkshop` 全通过；`httpapi` 仅剩两个既有失败用例（`TestNovelCreationRoutesExposeSixModesAndProjectRunChain`、`TestGPTImageConcurrencyIsProcessWideAcrossTasks`），与本次改动无关。
+- 本地 4011 实际启动成功，`/api/runtime-build-info` 返回 `git_sha=bc16b9a5`，媒体相关路由未登录返回 401。
+- 生产发布：`qiantie-202611141214`，二进制 SHA256 `fb9c960d…`，`git_sha` 与 `runtime_manifest_sha` 均为 `bc16b9a5`，首页与 `/assets/user-BYj46LWB.js` 均 200。
+- 回滚点：`/opt/www/qiantie/rollback-qiantie-202611141214-bc16b9a5`（上一版本 `qiantie-202611141140`）。
+- 说明：本次发布包含同工作区另一会话已提交的 `01f259be`（小说抓取自动化与 Redis 队列），该提交的包测试已随上述命令通过。
+
