@@ -143,7 +143,7 @@ func RegisterScreenplayMediaWorkbenchRoutes(mux *http.ServeMux, auth BridgeAuth,
 		}
 		capability := func(ok bool, why string) map[string]any { return map[string]any{"available": ok, "reason": why} }
 		caps := map[string]any{"split_grid": capability(s.Cut != nil && s.Objects != nil, "按明确行列拆分已保存图片"), "import": capability(s.Cut != nil && s.Objects != nil, "导入本系统媒体资料包"), "upload": capability(s.Objects != nil && s.Cut != nil, "需要素材存储"), "image": capability(s.Images != nil && s.Assets != nil && s.Objects != nil, "需要图片模型及素材存储"), "tts": capability(s.Objects != nil && s.Cut != nil, "使用当前账号配音设置"), "asr": capability(s.ASR != nil, "需要字幕识别服务"), "timeline": capability(s.Cut != nil, "需要剪辑服务"), "render": capability(s.Exports != nil, "需要剪辑导出队列"), "package": capability(s.Cut != nil && s.Objects != nil, "媒体与时间线资料包"), "retry_import": capability(s.Production != nil && s.Cut != nil && s.Objects != nil, "重新下载已生成视频，不提交生成任务"), "jianying": capability(s.Cut != nil && s.Objects != nil, "基础轨道兼容草稿，尚未验证新版剪映导入")}
-		out := map[string]any{"items": state.Items, "settings": state, "capabilities": caps, "aicutProjectId": p.ID}
+		out := map[string]any{"items": state.Items, "settings": state, "capabilities": caps, "aicutProjectId": p.ID, "voiceDesignModels": s.voiceDesignModelOptions(r.Context(), p.OwnerUsername)}
 		caps["asset_process"] = capability(s.Images != nil && s.Assets != nil && s.Objects != nil && s.Cut != nil, "仅用于当前项目角色参考图的资产处理")
 		_, voiceErr := resolveScreenplayVoiceDesignTarget(r.Context(), s.Catalog, p.OwnerUsername, screenplay.EffectiveCreativeConfig(p).VoiceDesignModel)
 		voiceReason := "独立音色设计并保存试听音频，不自动绑定普通配音"

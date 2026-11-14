@@ -23,6 +23,43 @@ import (
 
 type voiceDesignTestTransport func(*http.Request) (*http.Response, error)
 
+func TestScreenplayVoiceDesignModelOptionsUseOwnerConfiguredServices(t *testing.T) {
+	s, p := positioningFixture(t)
+	ctx := context.Background()
+	s.Catalog = novelfetchworkshop.NewMemoryStore()
+	calls := 0
+	s.VoiceDesigner = func(context.Context, string, string, screenplayVoiceDesignInput) (screenplayVoiceDesignResult, error) {
+		calls++
+		return screenplayVoiceDesignResult{}, errors.New("must not call supplier while listing")
+	}
+	if got := s.voiceDesignModelOptions(ctx, p.OwnerUsername); len(got) != 0 {
+		t.Fatal(got)
+	}
+	_ = s.Catalog.PutConfig(ctx, p.OwnerUsername, map[string]any{"modelCatalog": []any{
+		map[string]any{"kind": "audio", "enabled": true, "endpoint": "https://tts.example/v1/audio/speech", "credential": "mock-tts", "modelId": "ordinary-tts"},
+		map[string]any{"kind": "audio", "enabled": true, "endpoint": "https://api.minimax.cn/v1/t2a_v2", "credential": "mock-secret", "modelId": "speech-2.6-hd"},
+		map[string]any{"kind": "audio", "enabled": true, "endpoint": "https://dashscope.aliyuncs.com/api/v1", "credential": "mock-qwen", "modelId": "qwen-audio-3.1-tts-vd-2025"},
+	}})
+	got := s.voiceDesignModelOptions(ctx, p.OwnerUsername)
+	if len(got) != 2 || got[0]["id"] != "minimax" || got[1]["id"] != "qwen-tts" {
+		t.Fatal(got)
+	}
+	encoded, _ := json.Marshal(got)
+	if strings.Contains(string(encoded), "secret") || strings.Contains(string(encoded), "https:") || strings.Contains(string(encoded), "ordinary-tts") {
+		t.Fatal("private configuration or TTS leaked", string(encoded))
+	}
+	if other := s.voiceDesignModelOptions(ctx, "bob"); len(other) != 0 {
+		t.Fatal("other owner sees services", other)
+	}
+	s.VoiceDesigner = nil
+	if unavailable := s.voiceDesignModelOptions(ctx, p.OwnerUsername); len(unavailable) != 0 {
+		t.Fatal("missing executor still selectable", unavailable)
+	}
+	if calls != 0 {
+		t.Fatal("listing called supplier", calls)
+	}
+}
+
 func (f voiceDesignTestTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestScreenplayVoiceDesignOfficialHTTPProtocols(t *testing.T) {

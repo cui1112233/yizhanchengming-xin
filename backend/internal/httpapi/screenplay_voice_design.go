@@ -27,6 +27,27 @@ type screenplayVoiceDesignResult struct {
 type screenplayVoiceDesigner func(context.Context, string, string, screenplayVoiceDesignInput) (screenplayVoiceDesignResult, error)
 type screenplayVoiceDesignTarget struct{ Engine, Endpoint, Credential, TargetModel string }
 
+// voiceDesignModelOptions uses the same owner configuration and executor checks as generation.
+// Normal TTS models are deliberately not returned as voice design services.
+func (s *ScreenplayMediaWorkbench) voiceDesignModelOptions(ctx context.Context, owner string) []map[string]string {
+	rows := []map[string]string{}
+	if s.VoiceDesigner == nil || s.Objects == nil || s.Cut == nil {
+		return rows
+	}
+	for _, engine := range []string{"minimax", "qwen-tts"} {
+		target, err := resolveScreenplayVoiceDesignTarget(ctx, s.Catalog, owner, engine)
+		if err != nil {
+			continue
+		}
+		label := map[string]string{"minimax": "MiniMax 音色设计", "qwen-tts": "Qwen 音色设计"}[engine]
+		if target.TargetModel != "" {
+			label += " · " + target.TargetModel
+		}
+		rows = append(rows, map[string]string{"id": engine, "label": label})
+	}
+	return rows
+}
+
 // Only configured official audio services are used; no request-supplied URL or credential is accepted.
 func resolveScreenplayVoiceDesignTarget(ctx context.Context, catalog novelfetchworkshop.Store, owner, engine string) (screenplayVoiceDesignTarget, error) {
 	var zero screenplayVoiceDesignTarget
