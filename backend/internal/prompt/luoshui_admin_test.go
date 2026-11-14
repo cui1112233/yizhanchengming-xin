@@ -70,7 +70,7 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 	}
 	for _, item := range LuoshuiAdminPresets() {
 		name, _ := item["name"].(string)
-		if (strings.Contains(name, "洛水") || strings.Contains(name, "小洛")) && item["corpusId"] != CreativeStoryboard307 {
+		if strings.Contains(name, "洛水") || strings.Contains(name, "小洛") {
 			t.Fatalf("后台名称不应出现旧产品名: %q", name)
 		}
 	}
@@ -79,13 +79,14 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 func TestMergeLuoshuiAdminPresetsPrefersOverrides(t *testing.T) {
 	items := LuoshuiAdminPresets()
 	override := map[string]any{
-		"id":       LuoshuiOverridePresetID("plugin_cover_design"),
-		"module":   LuoshuiAdminModule,
-		"name":     "封面设计",
-		"version":  1,
-		"revision": 2,
-		"status":   "draft",
-		"body":     "管理员草稿",
+		"id":          LuoshuiOverridePresetID("plugin_cover_design"),
+		"module":      LuoshuiAdminModule,
+		"name":        "洛水小洛封面设计",
+		"description": "洛水小罗工具",
+		"version":     1,
+		"revision":    2,
+		"status":      "draft",
+		"body":        "管理员草稿",
 	}
 	merged := MergeLuoshuiAdminPresets([]map[string]any{override})
 	if len(merged) != len(items) {
@@ -95,6 +96,12 @@ func TestMergeLuoshuiAdminPresetsPrefersOverrides(t *testing.T) {
 	for _, item := range merged {
 		if item["id"] == "luoshui.plugin_cover_design" {
 			found = true
+			if item["name"] != "CM小Y封面设计" || item["description"] != "CM小Y工具" {
+				t.Fatalf("旧名称未兼容: %+v", item)
+			}
+			if override["name"] != "洛水小洛封面设计" {
+				t.Fatal("合并不应修改输入记录")
+			}
 			if item["body"] != "管理员草稿" || item["status"] != "draft" {
 				t.Fatalf("覆盖未生效: %+v", item)
 			}

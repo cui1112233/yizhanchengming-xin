@@ -241,7 +241,23 @@ func MergeLuoshuiAdminPresets(overrides []map[string]any) []map[string]any {
 			result = append(result, base)
 		}
 	}
-	return append(result, extra...)
+	result = append(result, extra...)
+	// Existing published records may still have the previous display names.
+	// Keep IDs and prompt bodies intact so saved projects continue to resolve.
+	renames := strings.NewReplacer("小洛", "小Y", "小罗", "小Y", "洛水", "CM")
+	for i, item := range result {
+		copy := make(map[string]any, len(item))
+		for key, value := range item {
+			copy[key] = value
+		}
+		for _, field := range []string{"name", "description"} {
+			if text, ok := copy[field].(string); ok {
+				copy[field] = renames.Replace(text)
+			}
+		}
+		result[i] = copy
+	}
+	return result
 }
 
 // lockPresetSlot 保证已发布覆盖版本仍显示在代码固定的分区里；
