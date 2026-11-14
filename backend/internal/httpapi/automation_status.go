@@ -58,17 +58,24 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	if err != nil {
 		return nil, err
 	}
-	repaired := normalizeAlreadyUploadedAutomationState(&state)
-	if repairStaleRunningAutomationBooks(&state, time.Now()) {
+	changedIDs := map[string]struct{}{}
+	repaired := normalizeAlreadyUploadedAutomationStateInto(&state, changedIDs)
+	if repairStaleRunningAutomationBooksInto(&state, time.Now(), changedIDs) {
 		repaired = true
 	}
-	if reconcileTerminalAutomationJobs(&state, time.Now()) {
+	if reconcileTerminalAutomationJobsInto(&state, time.Now(), changedIDs) {
 		repaired = true
 	}
 	if repaired {
 		var writeErr error
 		if r.stateStore != nil {
-			writeErr = r.stateStore.Save(context.Background(), state)
+			if saver, ok := r.stateStore.(AutomationJobSaver); ok {
+				if jobs := automationJobsSubset(state, changedIDs); len(jobs) > 0 {
+					writeErr = saver.SaveJobs(context.Background(), jobs)
+				}
+			} else {
+				writeErr = r.stateStore.Save(context.Background(), state)
+			}
 		} else if splitLayout {
 			writeErr = writeSplitAutomationState(r.path, state)
 		} else {
@@ -117,16 +124,24 @@ var automationProcessStartedAt = time.Now().UTC()
 // 重试逻辑会把 running 当成“正在执行”而跳过，界面上的“重试失败小说”也会
 // 按 failed 计数显示 0，导致用户点了也没有任何效果。
 func repairStaleRunningAutomationBooks(state *automationStateFile, now time.Time) bool {
+	return repairStaleRunningAutomationBooksInto(state, now, nil)
+}
+
+// repairStaleRunningAutomationBooksInto 在修复的同时记录被改写的 jobID，
+// 调用方可以只落库这些任务，而不是重写全部 job_json。
+func repairStaleRunningAutomationBooksInto(state *automationStateFile, now time.Time, changedIDs map[string]struct{}) bool {
 	if state == nil {
 		return false
 	}
 	changed := false
-	for _, job := range state.Jobs {
+	for jobID, job := range state.Jobs {
 		if repairInterruptedRunningAutomationJob(job, now) {
 			changed = true
+			markAutomationJobChanged(changedIDs, jobID)
 		}
 		if repairStaleRunningAutomationJob(job, now) {
 			changed = true
+			markAutomationJobChanged(changedIDs, jobID)
 		}
 	}
 	return changed
@@ -219,13 +234,18 @@ func automationEntryUpdatedAt(entry map[string]any) (time.Time, bool) {
 // says running. The parent must never block Start/Retry after all child work is
 // finished.
 func reconcileTerminalAutomationJobs(state *automationStateFile, now time.Time) bool {
+	return reconcileTerminalAutomationJobsInto(state, now, nil)
+}
+
+func reconcileTerminalAutomationJobsInto(state *automationStateFile, now time.Time, changedIDs map[string]struct{}) bool {
 	if state == nil {
 		return false
 	}
 	changed := false
-	for _, job := range state.Jobs {
+	for jobID, job := range state.Jobs {
 		if reconcileTerminalAutomationJob(job, now) {
 			changed = true
+			markAutomationJobChanged(changedIDs, jobID)
 		}
 	}
 	return changed
@@ -327,16 +347,21 @@ func writeSplitAutomationState(path string, state automationStateFile) error {
 // response as a hard upload failure. Treating it as completed prevents a
 // second upload and makes the live log reflect the actual remote result.
 func normalizeAlreadyUploadedAutomationState(state *automationStateFile) bool {
+	return normalizeAlreadyUploadedAutomationStateInto(state, nil)
+}
+
+func normalizeAlreadyUploadedAutomationStateInto(state *automationStateFile, changedIDs map[string]struct{}) bool {
 	if state == nil {
 		return false
 	}
 	changed := false
-	for _, job := range state.Jobs {
+	for jobID, job := range state.Jobs {
 		books, _ := job["books"].(map[string]any)
 		if len(books) == 0 {
 			continue
 		}
 		jobChanged := false
+		jobTouched := false
 		for _, raw := range books {
 			entry, _ := raw.(map[string]any)
 			if entry == nil {
@@ -348,6 +373,7 @@ func normalizeAlreadyUploadedAutomationState(state *automationStateFile) bool {
 					delete(entry, "retryAt")
 					delete(entry, "retryReason")
 					changed = true
+					jobTouched = true
 				}
 				continue
 			}
@@ -367,9 +393,13 @@ func normalizeAlreadyUploadedAutomationState(state *automationStateFile) bool {
 			delete(entry, "retryAt")
 			changed = true
 			jobChanged = true
+			jobTouched = true
 		}
 		if jobChanged {
 			normalizeAutomationJobCounts(job, books)
+		}
+		if jobTouched {
+			markAutomationJobChanged(changedIDs, jobID)
 		}
 	}
 	return changed
@@ -380,6 +410,25 @@ func n8ImagesAlreadyUploadedError(text string) bool {
 	return strings.Contains(text, "IMAGE_ALREADY_IN_CAROUSEL") ||
 		strings.Contains(text, "ALREADY_IN_CAROUSEL") ||
 		strings.Contains(text, "图片已被其他轮播图集占用")
+}
+
+// automationJobsSubset 抽取需要落库的任务副本，用于单任务增量保存。
+func automationJobsSubset(state automationStateFile, changedIDs map[string]struct{}) map[string]map[string]any {
+	jobs := make(map[string]map[string]any, len(changedIDs))
+	for jobID := range changedIDs {
+		if job, ok := state.Jobs[jobID]; ok {
+			jobs[jobID] = job
+		}
+	}
+	return jobs
+}
+
+// markAutomationJobChanged 在收集器非空时记录被改写的 jobID。
+func markAutomationJobChanged(changedIDs map[string]struct{}, jobID string) {
+	if changedIDs == nil || jobID == "" {
+		return
+	}
+	changedIDs[jobID] = struct{}{}
 }
 
 func normalizeAutomationJobCounts(job map[string]any, books map[string]any) {

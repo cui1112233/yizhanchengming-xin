@@ -501,7 +501,11 @@ func (c *BatchAutomationCoordinator) ReapZombieJobs(ctx context.Context) error {
 		c.mu.Unlock()
 		return nil
 	}
-	if err := c.saveLocked(state); err != nil {
+	changedIDs := make(map[string]struct{}, len(reclaimed))
+	for _, jobID := range reclaimed {
+		changedIDs[jobID] = struct{}{}
+	}
+	if err := c.saveJobsLocked(state, changedIDs); err != nil {
 		c.mu.Unlock()
 		return err
 	}
@@ -602,7 +606,16 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 		changed = true
 	}
 	if changed {
-		err = c.saveLocked(state)
+		changedIDs := make(map[string]struct{}, len(reclaimed)+len(due))
+		for _, jobID := range reclaimed {
+			changedIDs[jobID] = struct{}{}
+		}
+		for _, item := range due {
+			if item.jobID != "" {
+				changedIDs[item.jobID] = struct{}{}
+			}
+		}
+		err = c.saveJobsLocked(state, changedIDs)
 	}
 	if next := automationNextDispatchAt(state, now); !next.IsZero() {
 		c.dispatchNextCheck = next
@@ -1199,8 +1212,8 @@ func (c *BatchAutomationCoordinator) loadLocked() (automationStateFile, error) {
 			if stored.Jobs == nil {
 				stored.Jobs = map[string]map[string]any{}
 			}
-			if normalizeAlreadyUploadedAutomationState(&stored) {
-				if err := c.automationStore.Save(context.Background(), stored); err != nil {
+			if changedIDs := map[string]struct{}{}; normalizeAlreadyUploadedAutomationStateInto(&stored, changedIDs) {
+				if err := c.saveJobsLocked(stored, changedIDs); err != nil {
 					return state, err
 				}
 			}
@@ -1306,6 +1319,29 @@ func (c *BatchAutomationCoordinator) loadSplitLocked() (automationStateFile, boo
 		state.Jobs[jobID] = job
 	}
 	return state, true, nil
+}
+
+// saveJobsLocked 只持久化 changedIDs 中仍然存在的任务。MySQL 权威存储实现
+// AutomationJobSaver 时逐 job upsert，避免一次回收/恢复把全部 job_json 重写；
+// 旧文件存储或测试实现不支持时回退到全量 saveLocked。调用方必须持有 c.mu。
+func (c *BatchAutomationCoordinator) saveJobsLocked(state automationStateFile, changedIDs map[string]struct{}) error {
+	if len(changedIDs) == 0 {
+		return nil
+	}
+	if c.automationStore != nil {
+		if saver, ok := c.automationStore.(AutomationJobSaver); ok {
+			jobs := automationJobsSubset(state, changedIDs)
+			if len(jobs) == 0 {
+				return nil
+			}
+			if err := saver.SaveJobs(context.Background(), jobs); err != nil {
+				return err
+			}
+			c.automationState = &state
+			return nil
+		}
+	}
+	return c.saveLocked(state)
 }
 
 func (c *BatchAutomationCoordinator) saveLocked(state automationStateFile) error {
@@ -1520,7 +1556,8 @@ func (c *BatchAutomationCoordinator) RecoverInterruptedJobs() error {
 		now = c.now()
 	}
 	changed := false
-	for _, job := range state.Jobs {
+	changedIDs := make(map[string]struct{})
+	for jobID, job := range state.Jobs {
 		if automationStringValue(job["state"], "") != "running" {
 			continue
 		}
@@ -1546,11 +1583,12 @@ func (c *BatchAutomationCoordinator) RecoverInterruptedJobs() error {
 		job["counts"] = automationCounts(len(books), 0, failed+stopped, ready)
 		clearAutomationRetryMarks(job)
 		changed = true
+		changedIDs[jobID] = struct{}{}
 	}
 	if !changed {
 		return nil
 	}
-	return c.saveLocked(state)
+	return c.saveJobsLocked(state, changedIDs)
 }
 
 const automationServiceRestartMessage = "服务重启，自动化已中断，请重新立即执行。"
@@ -1701,7 +1739,11 @@ func (c *BatchAutomationCoordinator) ResumeInterruptedJobs(ctx context.Context) 
 		changed = true
 	}
 	if changed {
-		err = c.saveLocked(state)
+		changedIDs := make(map[string]struct{}, len(resumable))
+		for _, item := range resumable {
+			changedIDs[item.jobID] = struct{}{}
+		}
+		err = c.saveJobsLocked(state, changedIDs)
 	}
 	c.mu.Unlock()
 	if err != nil {
