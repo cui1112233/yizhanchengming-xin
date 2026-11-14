@@ -204,3 +204,6 @@
 
 .comic-batch-episode-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--border-default)}
 .comic-batch-episode-row>.ant-select{width:260px;max-width:45%}.comic-batch-results{margin-top:20px;padding:12px;border-radius:12px;background:var(--surface-input)}
+
+.comic-storyboard-stage .comic-stage-title-row{align-items:flex-start;gap:20px}.comic-storyboard-stage .comic-stage-title-row>div:first-child{flex:0 0 auto;min-width:200px}.comic-storyboard-stage .comic-storyboard-original-toolbar{flex:1;min-width:0;justify-content:flex-end}
+@media(max-width:700px){.comic-storyboard-stage .comic-stage-title-row{flex-direction:column}.comic-storyboard-stage .comic-storyboard-original-toolbar{justify-content:flex-start;width:100%}}

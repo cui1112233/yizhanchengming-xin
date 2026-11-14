@@ -22,3 +22,5 @@ Go资产提取和HTTP专项通过；HTTP模拟模型连续两次检查，旧卡�
 本轮没有供应商调用、不消耗额度、不公网发布。资产检查使用现有资产提取提示词独立实现，不声称与原native补充算法逐字相同。所有任务顺序执行；关闭工作页会停止后续项，已完成保存保留，不宣称原版后台持续运行一致。批量原文选项仍需要存在可选的已保存剧本集与真实章节绑定，不宣称无剧本时自动识别任意长文集数。失败记录目前按集展示，不冒充原版每场景细粒度重试。
 
 完整前端150/150通过，Go screenplay/httpapi/storage整包通过，前端构建通过。日志在案卷batch-tools-all-frontend.log、batch-tools-all-backend.log、batch-tools-build.log。
+
+已登录本地页面实际打开批量、检查、失败记录、失败说明四个入口。批量窗口正确读到章节绑定；检查选集后明确提示缺模型并禁用提交；持久任务记录为空时显示空态，不伪造失败。runtime-acceptance.json和batch-live/check-live/toolbar-live.png在案卷batch-tools-20261115。另调整工具栏标题宽度，防止统计被新增按钮挤断行。
