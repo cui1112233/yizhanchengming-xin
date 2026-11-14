@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,41 @@ func TestEnqueueFailureBacksOffBeforeRetrying(t *testing.T) {
 	}
 }
 
+// 自动重试预算耗尽后必须转人工，不能无限停在“等待重试”。
+func TestEnqueueFailureStopsRetryingAtBudget(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(ctx, "alice", novelfetchworkshop.Document{
+		BookID: "book-1",
+		Meta: map[string]any{
+			"status":                    "waiting_retry",
+			"automationEnqueueAttempts": novelFetchEnqueueMaxAttempts - 1,
+			"automationNextRetryAt":     "2026-11-14T03:00:00Z",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 14, 3, 0, 0, 0, time.UTC)
+	markNovelFetchAutomationEnqueueRetry(ctx, store, "alice", []string{"book-1"}, now, errors.New("redis unavailable"))
+
+	document, err := store.GetDocument(ctx, "alice", "book-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := firstText(document.Meta["status"]); got != "failed" {
+		t.Fatalf("status=%q, want failed after retry budget is exhausted", got)
+	}
+	if _, ok := document.Meta["automationNextRetryAt"]; ok {
+		t.Fatal("a failed task must not keep a next retry time")
+	}
+	if !strings.Contains(firstText(document.Meta["error"]), "已停止自动重试") {
+		t.Fatalf("error=%q, want a manual-actionable reason", firstText(document.Meta["error"]))
+	}
+	if novelFetchAutomationEligible(document, now.Add(24*time.Hour)) {
+		t.Fatal("a task that exhausted its retry budget must not be re-queued automatically")
+	}
+}
+
 // 入队成功后必须清掉退避字段，否则下一次扫描会被旧的截止时间挡住。
 func TestMarkNovelFetchTaskQueuedClearsEnqueueBackoff(t *testing.T) {
 	ctx := context.Background()
@@ -67,9 +103,9 @@ func TestMarkNovelFetchTaskQueuedClearsEnqueueBackoff(t *testing.T) {
 	if err := store.PutDocument(ctx, "alice", novelfetchworkshop.Document{
 		BookID: "book-1",
 		Meta: map[string]any{
-			"status":                   "waiting_retry",
+			"status":                    "waiting_retry",
 			"automationEnqueueAttempts": 3,
-			"automationNextRetryAt":    "2026-11-14T03:30:00Z",
+			"automationNextRetryAt":     "2026-11-14T03:30:00Z",
 		},
 	}); err != nil {
 		t.Fatal(err)

@@ -119,6 +119,11 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 		meta = map[string]any{}
 	}
 	status := strings.ToLower(firstText(meta["status"], meta["queueState"], meta["taskStatus"]))
+	// 自动重试预算耗尽后必须由人工介入，不能因为 status=failed 又被扫描器
+	// 立刻捡回队列，否则“停止自动重试”实际上没有任何效果。
+	if meta["manualOnly"] == true || meta["manual_only"] == true {
+		return false
+	}
 	if meta["rewriteValidationHold"] == true {
 		return false
 	}
@@ -421,6 +426,11 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	return &job, nil
 }
 
+// novelFetchEnqueueMaxAttempts 是入队失败的自动重试上限。参考实现里重试
+// 预算耗尽后会把任务标记为需要人工处理，而不是无限等待；这里保持同样的
+// 语义，避免 Redis 长期不可用时任务永远停在“等待重试”。
+const novelFetchEnqueueMaxAttempts = 20
+
 // markNovelFetchAutomationEnqueueRetry 在入队失败时写入退避时间。Redis 持续
 // 不可用时扫描器每分钟都会重试同一批书；没有退避既会放大数据库写入，也会
 // 让“最后一次失败”永远停留在当前秒，无法判断是否已经恢复。
@@ -434,6 +444,18 @@ func markNovelFetchAutomationEnqueueRetry(ctx context.Context, store novelfetchw
 			document.Meta = map[string]any{}
 		}
 		attempts := intValue(document.Meta["automationEnqueueAttempts"]) + 1
+		document.Meta["automationEnqueueAttempts"] = attempts
+		if attempts >= novelFetchEnqueueMaxAttempts {
+			document.Meta["status"] = "failed"
+			document.Meta["queueState"] = "failed"
+			document.Meta["manualOnly"] = true
+			document.Meta["error"] = fmt.Sprintf("任务入队连续失败 %d 次，已停止自动重试：%s", attempts, firstText(enqueueErr))
+			delete(document.Meta, "automationNextRetryAt")
+			appendNovelFetchDocumentLog(&document, "queue_failed",
+				fmt.Sprintf("入队连续失败 %d 次，已转人工处理", attempts), now)
+			_ = store.PutDocument(ctx, owner, document)
+			continue
+		}
 		delay := 30 * time.Second
 		for step := 1; step < attempts && delay < 15*time.Minute; step++ {
 			delay *= 2
@@ -444,7 +466,6 @@ func markNovelFetchAutomationEnqueueRetry(ctx context.Context, store novelfetchw
 		document.Meta["status"] = "waiting_retry"
 		document.Meta["queueState"] = "waiting_retry"
 		document.Meta["error"] = firstText(enqueueErr)
-		document.Meta["automationEnqueueAttempts"] = attempts
 		document.Meta["automationNextRetryAt"] = now.Add(delay).UTC().Format(time.RFC3339Nano)
 		appendNovelFetchDocumentLog(&document, "process_waiting_retry", "入队失败："+firstText(enqueueErr), now)
 		_ = store.PutDocument(ctx, owner, document)

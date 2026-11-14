@@ -82,6 +82,17 @@
 
 `pending_count` 当前等于文档层 `queued + waiting_retry`，表示“待执行的书”，不等于 Redis `pending` 列表长度。两者本就不同：调度每轮最多提交 50 本，且等待重试的书有退避窗口。本轮不改前端展示，避免在无法完整验证 UI 的情况下引入回归；后端已具备在需要时补充真实 `queue_pending` 字段的位置。
 
+## 2.9 重试预算耗尽必须转人工
+
+对照运行正常的 Python 参考实现（`批量原文改文系统_源码`）：它用 `schedule_task_retry` 记录 `attempt` / `next_retry_at` / `manual_only`，重试预算耗尽后任务转为人工处理，而不是无限等待。
+
+Go 版原先只做退避，没有上限；而 `novelFetchAutomationEligible` 又把 `status=failed` 视为可再次入队，导致“停止自动重试”不成立。修复：
+
+- `novelFetchEnqueueMaxAttempts = 20`，入队失败达到上限后写 `status=failed`、`manualOnly=true`，并删除 `automationNextRetryAt`。
+- `novelFetchAutomationEligible` 在入口优先检查 `manualOnly`，为真直接返回 false，避免被扫描器立刻捡回。
+- 错误文案明确写“已停止自动重试”，便于用户判断需要人工介入。
+- 入队成功后仍清除退避字段与计数；人工重试时需由重试入口清除 `manualOnly`。
+
 ## 3. 验收
 
 1. `localartifact`：写保护开启时 `Restore` 返回 `ErrDiskPressure` 且不产生可见文件；校验失败仍返回 `ErrRemoteIntegrity`。
