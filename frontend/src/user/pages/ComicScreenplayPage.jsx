@@ -20,7 +20,7 @@ import { comicStages, comicStageLocation, comicNextState } from './comic-screenp
 import ComicScreenplayFileTools from './ComicScreenplayFileTools.jsx';
 import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-creation.js';
 import { ComicDegreeCards, ComicSourceInput, ComicStylePicker, ComicCreativeFields } from './ComicScreenplayCreationFields.jsx';
-import { applyCreativeConfigToProject, comicProjectStyleName, comicStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, comicModelConfigPatchFields, creativePromptOptions, emptyCreativeConfig } from './comic-screenplay-creative.js';
+import { applyCreativeConfigToProject, comicProjectStyleName, comicStoryboardEngine, comicWorkspaceStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, comicModelConfigPatchFields, creativePromptOptions, emptyCreativeConfig } from './comic-screenplay-creative.js';
 import { parseComicScreenplayDraftSource } from '../../shared/api/comicScreenplay.js';
 
 const ratioOptions = ['9:16', '16:9', '1:1', '4:3'].map(value => ({ value, label: value }));
@@ -212,7 +212,7 @@ export default function ComicScreenplayPage() {
       const [data,authoring]=await Promise.all([loadComicScreenplayWorkspace(id),getComicDisplay(id)]);
       if(ticket!==projectRequest.current||selectedProject.current!==id)return;
       void readProjectCreative(id);
-      setWorkspace(data);setAccess(authoring.access||data.access);setSource(data?.project?.source_text||'');
+      setWorkspace(data);setStoryboardEngine(current=>comicWorkspaceStoryboardEngine(data?.project,data?.storyboards,current));setAccess(authoring.access||data.access);setSource(data?.project?.source_text||'');
       if(switching){setTaskWarnings([]);const prefs=authoring.state?.display||{};setDisplay(prefs);navigateStage(prefs.active_tab||'source');}
       const episodes=splitDocumentEpisodes(data?.document?.content);
       setStoryboardEpisode(current=>episodes.some(item=>item.no===current)?current:episodes[0]?.no||1);

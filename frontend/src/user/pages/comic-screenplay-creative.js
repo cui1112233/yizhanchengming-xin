@@ -85,6 +85,13 @@ export function comicStoryboardEngine(promptId, fallback = '') {
   })[promptId] || fallback;
 }
 
+export function comicWorkspaceStoryboardEngine(project, boards, current = 'xiaoluo_v7_15s') {
+  const configured = comicStoryboardEngine(project?.creative_config?.storyboard_prompt_id);
+  if (configured) return configured;
+  const available = (boards || []).filter(board => board.shots?.length);
+  return available.some(board => board.engine === current) ? current : available[0]?.engine || current;
+}
+
 export function comicImageModelSelection(config, { models = [], references = [], override = '', loading = false, loadError = '' } = {}) {
   const editing = references.length > 0;
   const configuredId = editing ? config?.image_edit_model_id || config?.image_model_id || '' : config?.image_model_id || '';
