@@ -1,3 +1,4 @@
+import {useComicConfirmation} from './comic-screenplay-confirm.js';
 import { Alert, Button, Empty, Input, Modal, Spin, Upload } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { bindComicVoice, loadVoiceSwitchLibrary, readVoiceSwitchMedia, uploadComicVoiceReference } from '../../shared/api/comicVoiceSwitch.js';
@@ -9,6 +10,7 @@ import './comic-voice-switch.css';
 
 const itemKey=item=>`${item.project_id}:${item.media_item_id}`;
 export default function ComicVoiceSwitchDialog({projectId,row,snapshot,readOnly=false,onClose,onUpdated}) {
+  const confirmForProject=useComicConfirmation(projectId);
   const [tab,setTab]=useState('upload'),[file,setFile]=useState(null),[fileUrl,setFileUrl]=useState(''),[query,setQuery]=useState(''),[selected,setSelected]=useState(null),[library,setLibrary]=useState([]),[libraryLoading,setLibraryLoading]=useState(false),[libraryError,setLibraryError]=useState(''),[libraryLoaded,setLibraryLoaded]=useState(false);
   const [baseline,setBaseline]=useState(snapshot),[busy,setBusy]=useState(false),[error,setError]=useState(''),[conflict,setConflict]=useState(false),[uncertain,setUncertain]=useState(false),[committed,setCommitted]=useState(null),[playing,setPlaying]=useState('');
   const alive=useRef(true),saving=useRef(false),audio=useRef(null),previewSequence=useRef(0);
@@ -26,7 +28,7 @@ export default function ComicVoiceSwitchDialog({projectId,row,snapshot,readOnly=
     finally{saving.current=false;if(alive.current)setBusy(false);}
   }
   function reload(){if(committed){setBusy(true);void readSaved(committed).catch(e=>{if(alive.current)setError(e.message||'读取绑定失败');}).finally(()=>{if(alive.current)setBusy(false);});return;}
-    Modal.confirm({title:'重新载入当前绑定？',content:'读取最新版本并清除本次尚未保存的选择，之后需要再次明确点击更新。不会上传文件或绑定音色。',okText:'重新载入',cancelText:'保留当前选择',onOk:async()=>{const latest=await readVoiceSwitchMedia(projectId);if(!alive.current)return;setBaseline(latest);setFile(null);setSelected(null);setLibrary([]);setLibraryLoaded(false);setError('');setConflict(false);setUncertain(false);if(tab==='library')setTab('upload');}});
+    confirmForProject({title:'重新载入当前绑定？',content:'读取最新版本并清除本次尚未保存的选择，之后需要再次明确点击更新。不会上传文件或绑定音色。',okText:'重新载入',cancelText:'保留当前选择',onOk:async()=>{const latest=await readVoiceSwitchMedia(projectId);if(!alive.current)return;setBaseline(latest);setFile(null);setSelected(null);setLibrary([]);setLibraryLoaded(false);setError('');setConflict(false);setUncertain(false);if(tab==='library')setTab('upload');}});
   }
   const visible=filterVoiceSwitchLibrary(library,query),disabled=readOnly||busy||conflict||uncertain||!!committed;
   return <Modal open width={560} style={{maxWidth:'92vw'}} className="comic-voice-switch-dialog" title="切换音色" onCancel={()=>{if(!busy){stopPreview();onClose();}}} closable={!busy} maskClosable={!busy} keyboard={!busy} footer={<div className="comic-voice-switch-footer"><Button disabled={busy} onClick={()=>{stopPreview();onClose();}}>取消</Button><Button type="primary" loading={busy} disabled={disabled||tab==='upload'&&!file||tab==='library'&&!selected} onClick={update}>更新音色</Button></div>}>

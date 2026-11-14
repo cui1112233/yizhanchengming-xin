@@ -1,3 +1,4 @@
+import {useComicConfirmation} from './comic-screenplay-confirm.js';
 import { Alert, Button, Empty, Input, Modal, Space, Spin, Tag, message } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -11,6 +12,7 @@ import {voiceBindingPreview} from './comic-voice-switch.js';
 import './comic-screenplay-asset-dialog.css';
 
 export default function ComicScreenplayVoiceDesignStage({ projectId, workspace, readOnly = false, canGenerate = false, toolbarHost }) {
+  const confirmForProject=useComicConfirmation(`${projectId}:${readOnly}:${canGenerate}`);
   const [switchEditor,setSwitchEditor]=useState(null);
   const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(''), [progress, setProgress] = useState(''), [editor, setEditor] = useState(null), [editError, setEditError] = useState(''), [editConflict,setEditConflict]=useState(false);
   const alive = useRef(true), current = useRef(null), controller = useRef(null), busyRef = useRef(false), batchStop = useRef(false), keys = useRef(new Map()), ticket = useRef(0), editorBaseline=useRef(null);
@@ -63,14 +65,14 @@ export default function ComicScreenplayVoiceDesignStage({ projectId, workspace, 
     keys.current.delete(fingerprint);return result;
   }
   function requestAnalyze() {
-    Modal.confirm({ title: rows.length ? '重新分析角色音色？' : 'AI音色分析', content: rows.length ? '将读取作品原文重新分析，并替换当前描述列表。已生成的音频会保留。此操作调用文字模型。' : '读取作品原文分析人物音色，保存描述列表。此步骤调用文字模型，不设计音频。', okText: '开始分析', cancelText: '取消', onOk: () => perform('analyze', analyze) });
+    confirmForProject({ title: rows.length ? '重新分析角色音色？' : 'AI音色分析', content: rows.length ? '将读取作品原文重新分析，并替换当前描述列表。已生成的音频会保留。此操作调用文字模型。' : '读取作品原文分析人物音色，保存描述列表。此步骤调用文字模型，不设计音频。', okText: '开始分析', cancelText: '取消', onOk: () => perform('analyze', analyze) });
   }
   function requestDesign(row) {
-    Modal.confirm({ title: `设计「${row.name}」音色？`, content: `使用已保存的 ${engineName} 音色设计引擎，将按描述和试听文本生成新的音色及试听音频。`, okText: '设计音色', cancelText: '取消', onOk: () => perform(`design:${row.id}`, signal => design(row, signal)) });
+    confirmForProject({ title: `设计「${row.name}」音色？`, content: `使用已保存的 ${engineName} 音色设计引擎，将按描述和试听文本生成新的音色及试听音频。`, okText: '设计音色', cancelText: '取消', onOk: () => perform(`design:${row.id}`, signal => design(row, signal)) });
   }
   function requestBatch() {
     const pending = rows.filter(row => !voiceDesignAudio(items, row));
-    Modal.confirm({ title: '批量设计音色', content: `使用 ${engineName} 依次设计 ${pending.length} 个尚无音频的音色。失败时停止，已完成的结果会保留。`, okText: '开始设计', cancelText: '取消', onOk: () => perform('batch', async signal => { for (let i = 0; i < pending.length; i++) { if (batchStop.current || signal.aborted || !alive.current) break; setProgress(`${pending[i].name}（${i + 1}/${pending.length}）`); await design(pending[i], signal); } }) });
+    confirmForProject({ title: '批量设计音色', content: `使用 ${engineName} 依次设计 ${pending.length} 个尚无音频的音色。失败时停止，已完成的结果会保留。`, okText: '开始设计', cancelText: '取消', onOk: () => perform('batch', async signal => { for (let i = 0; i < pending.length; i++) { if (batchStop.current || signal.aborted || !alive.current) break; setProgress(`${pending[i].name}（${i + 1}/${pending.length}）`); await design(pending[i], signal); } }) });
   }
   async function saveEditor() {
     if (!editor?.name?.trim()) { setEditError('请输入音色名称'); return; }
@@ -78,9 +80,9 @@ export default function ComicScreenplayVoiceDesignStage({ projectId, workspace, 
     if(!baseline){setEditError('请重新打开音色编辑窗口');return;}
     return perform('save', async signal => { const previous = baseline.rows; const exists = previous.some(row => row.id === editor.id); const next = exists ? previous.map(row => row.id === editor.id ? { ...editor, name: editor.name.trim() } : row) : [...previous, { ...editor, name: editor.name.trim() }]; await saveRows(next, baseline.revision, signal); if (alive.current) { setEditor(null); message.success('音色描述已保存，尚未调用音频设计'); } });
   }
-  function removeRow(row) { const baseline={rows:[...rows],revision:Number(data?.settings?.revision||0)};Modal.confirm({ title: `删除「${row.name}」描述？`, content: '只删除描述条目；已经生成的音频文件仍保留在作品媒体中。', okText: '删除描述', cancelText: '取消', onOk: () => perform('save', signal => saveRows(baseline.rows.filter(item => item.id !== row.id), baseline.revision, signal)) }); }
+  function removeRow(row) { const baseline={rows:[...rows],revision:Number(data?.settings?.revision||0)};confirmForProject({ title: `删除「${row.name}」描述？`, content: '只删除描述条目；已经生成的音频文件仍保留在作品媒体中。', okText: '删除描述', cancelText: '取消', onOk: () => perform('save', signal => saveRows(baseline.rows.filter(item => item.id !== row.id), baseline.revision, signal)) }); }
   function edit(row) { setEditError('');setEditConflict(false);editorBaseline.current={rows:rows.map(item=>({...item})),revision:Number(data?.settings?.revision||0)}; setEditor(row ? { ...row } : { id: Math.max(0, ...rows.map(item => Number(item.id) || 0)) + 1, name: '', role: '', prompt: '', preview_text: '' }); }
-  function reloadEditor(){Modal.confirm({title:'放弃本地音色修改并重新载入？',content:'将读取服务器最新描述。',okText:'重新载入',cancelText:'保留本地修改',onOk:async()=>{const latest=await refresh();const next=latest.settings?.voiceDesign?.items||[];editorBaseline.current={rows:next.map(item=>({...item})),revision:Number(latest.settings?.revision||0)};setEditor(previous=>next.find(item=>item.id===previous?.id)?{...next.find(item=>item.id===previous.id)}:null);setEditError('');setEditConflict(false);}});}
+  function reloadEditor(){confirmForProject({title:'放弃本地音色修改并重新载入？',content:'将读取服务器最新描述。',okText:'重新载入',cancelText:'保留本地修改',onOk:async()=>{const latest=await refresh();const next=latest.settings?.voiceDesign?.items||[];editorBaseline.current={rows:next.map(item=>({...item})),revision:Number(latest.settings?.revision||0)};setEditor(previous=>next.find(item=>item.id===previous?.id)?{...next.find(item=>item.id===previous.id)}:null);setEditError('');setEditConflict(false);}});}
   function acceptVoiceBinding(result){if(result.media){current.current=result.media;setData(result.media);return;}setData(previous=>({...previous,items:[...(previous?.items||[]).filter(item=>item.id!==result.item?.id),...(result.item?[result.item]:[])],settings:{...previous?.settings,voiceBindings:{...previous?.settings?.voiceBindings,[voiceDraftTarget(switchEditor.row)]:result.binding}}}));}
   const ungenerated = rows.filter(row => !voiceDesignAudio(items, row));
   const toolbar = <Space size={8} wrap><Button size="small" icon={<OriginalIcon name="AddOutline" size={15} />} disabled={readOnly || !!busy || loading} onClick={() => edit(null)}>添加音色</Button><Button size="small" icon={<OriginalIcon name="SparklesOutline" size={15} />} loading={busy === 'analyze'} disabled={readOnly || !canGenerate || !!busy || !caps.voice_analyze?.available || !textModel} title={!textModel ? '请先选择并保存文字模型' : caps.voice_analyze?.reason} onClick={requestAnalyze}>AI音色分析</Button><Button size="small" icon={<OriginalIcon name="MusicalNotesOutline" size={15} />} loading={busy === 'batch'} disabled={readOnly || !canGenerate || !!busy || !caps.voice_design?.available || !ungenerated.length} title={caps.voice_design?.reason} onClick={requestBatch}>批量设计音色 {ungenerated.length || ''}</Button><Button size="small" disabled={!!busy} onClick={() => { setError(''); void refresh().catch(e => setError(e.message)); }}>刷新</Button>{busy ? <Button size="small" onClick={() => { batchStop.current = true; controller.current?.abort(); }}>取消当前请求</Button> : null}</Space>;

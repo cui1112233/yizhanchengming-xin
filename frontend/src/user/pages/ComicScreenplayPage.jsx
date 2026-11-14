@@ -1,3 +1,4 @@
+import {useComicConfirmation} from './comic-screenplay-confirm.js';
 import OriginalIcon, { ComicScreenplayModelIcon } from './ComicScreenplayIcon.jsx';
 import { formatWorkDateTime } from '../../shared/workDateTime.js';
 import { Alert, Button, Checkbox, Drawer, Dropdown, Empty, Input, InputNumber, message, Modal, Popconfirm, Select, Spin, Tabs, Upload } from 'antd';
@@ -112,6 +113,7 @@ export default function ComicScreenplayPage() {
   const [storyboardEngine,setStoryboardEngine] = useState('xiaoluo_v7_15s');
   const [selectedShots,setSelectedShots] = useState({}), [bulkDuration,setBulkDuration] = useState(3);
   const readOnly = !access?.edit, canGenerate = !!access?.generate;
+  const confirmForProject=useComicConfirmation(`${selectedId}:${readOnly}:${canGenerate}`);
   const [source, setSource] = useState('');
   const [createContent, setCreateContent] = useState('');
   const [sourceMode, setSourceMode] = useState('text');
@@ -400,7 +402,7 @@ export default function ComicScreenplayPage() {
     async function executeStoryboard(body, signal) {
       const result = await generateComicStoryboard(selectedId, { ...body, signal });
       if (!result?.requires_confirmation) return result;
-      const confirmed = await new Promise(resolve => Modal.confirm({
+      const confirmed = await new Promise(resolve => confirmForProject({
         title: '确认使用生成服务', content: '此作品要求确认后才能使用拥有者的模型服务；继续可能消耗模型额度。',
         okText: '确认生成', cancelText: '取消', onOk: () => resolve(true), onCancel: () => resolve(false),
       }));
@@ -416,7 +418,7 @@ export default function ComicScreenplayPage() {
         episodeNumbers: payload.episodes ? Object.keys(payload.episodes).map(Number) : [payload.episodeNo],
         options: { ...payload, ...planningOptions }, explicitNewOperation: true,
         confirmRetry: attempt => new Promise(resolve => {
-          const dialog = Modal.confirm({
+          const dialog = confirmForProject({
             title: '处理未完成的分镜', content: '续跑会保留已成功集数；如果已修改正文或设置，可按当前输入新建。两种操作都可能消耗模型额度。',
             okText: '续跑未完成部分', cancelText: '取消', onOk: () => resolve(true), onCancel: () => resolve(false),
             footer: (_, { OkBtn, CancelBtn }) => <><Button onClick={() => { resolve('fresh'); dialog.destroy(); }}>按当前输入新建</Button><CancelBtn/><OkBtn/></>,
@@ -638,7 +640,7 @@ export default function ComicScreenplayPage() {
       if(!next)return;
       const id=selectedId,ticket=projectRequest.current,current=()=>selectedProject.current===id&&ticket===projectRequest.current;
       if(activeTab==='assets'){
-        try{const media=await getComicMedia(id);if(!current())return;const missing=assets.filter(asset=>!media.settings?.selected?.[asset.id]&&!media.items?.some(item=>item.kind==='image'&&(item.targetId===asset.id||item.target_id===asset.id)&&['succeeded','ready','completed'].includes(item.status)));if(missing.length){Modal.confirm({title:'部分资产尚未生成',content:<div><p>这些资产缺少图片，后续仍可继续补充：</p><ul>{missing.map(asset=><li key={asset.id}>{asset.name}</li>)}</ul></div>,okText:'忽略，下一步',cancelText:'返回生成',onOk:()=>{if(current())setActiveTab('storyboard');}});return;}}catch(error){if(current())message.error(error.message||'资产图片核对失败，请重试');return;}
+        try{const media=await getComicMedia(id);if(!current())return;const missing=assets.filter(asset=>!media.settings?.selected?.[asset.id]&&!media.items?.some(item=>item.kind==='image'&&(item.targetId===asset.id||item.target_id===asset.id)&&['succeeded','ready','completed'].includes(item.status)));if(missing.length){confirmForProject({title:'部分资产尚未生成',content:<div><p>这些资产缺少图片，后续仍可继续补充：</p><ul>{missing.map(asset=><li key={asset.id}>{asset.name}</li>)}</ul></div>,okText:'忽略，下一步',cancelText:'返回生成',onOk:()=>{if(current())setActiveTab('storyboard');}});return;}}catch(error){if(current())message.error(error.message||'资产图片核对失败，请重试');return;}
       }
       if(current())setActiveTab(next.next);
     }
@@ -648,7 +650,7 @@ export default function ComicScreenplayPage() {
       <div className="comic-three-stage-body"><main className="comic-stage-main"><div className="comic-stage-scroll">
       {taskWarnings.length?<Alert type="warning" showIcon closable onClose={()=>setTaskWarnings([])} message={`本次处理有 ${taskWarnings.length} 条警告`} description={<ul>{taskWarnings.map((item,index)=><li key={index}>{item}</li>)}</ul>}/>:null}
       <div hidden={activeTab!=='source'}><ComicScreenplayStoryStage key={selectedId} project={project} synopsisResult={workspace?.synopsis_result||workspace?.synopsis} document={workspace?.document} draft={documentDraft} onDraft={setDocumentDraft} onSave={saveDocumentDraft} onTools={openTool} readOnly={readOnly} working={working}/></div>
-      <div hidden={activeTab!=='assets'}><ComicScreenplayAssetStage projectId={selectedId} workspace={workspace} onChanged={()=>refreshCurrentProject(selectedId)} readOnly={readOnly} canGenerate={canGenerate} working={working} degree={form.degree} onSaveDegree={saveAssetDegree} degreeSaving={settingsSaving} onDegree={degree=>setForm(current=>({...current,degree}))} onAdd={type=>setAssetEditor({type,degree:form.degree,name:'',identity:'',description:'',prompt:'',voice:'',episodes:'',tag:''})} onEdit={asset=>setAssetEditor({id:asset.id,revision:asset.revision,type:asset.type,degree:asset.degree,name:asset.name,identity:asset.identity||'',description:asset.description||'',prompt:asset.prompt||'',voice:asset.voice||'',episodes:asset.episodes||'',tag:asset.tag||''})} onDelete={id=>Modal.confirm({title:'删除这个资产？',content:'删除后不可恢复。',okText:'删除',cancelText:'取消',onOk:()=>removeAsset(id)})} onExtract={type=>runTask(type,signal=>extractComicAssets(selectedId,{type,degree:form.degree,content:workspace?.document?.content,model:project.model_id,signal}))} onMedia={context=>openTool('media',context)}/></div>
+      <div hidden={activeTab!=='assets'}><ComicScreenplayAssetStage projectId={selectedId} workspace={workspace} onChanged={()=>refreshCurrentProject(selectedId)} readOnly={readOnly} canGenerate={canGenerate} working={working} degree={form.degree} onSaveDegree={saveAssetDegree} degreeSaving={settingsSaving} onDegree={degree=>setForm(current=>({...current,degree}))} onAdd={type=>setAssetEditor({type,degree:form.degree,name:'',identity:'',description:'',prompt:'',voice:'',episodes:'',tag:''})} onEdit={asset=>setAssetEditor({id:asset.id,revision:asset.revision,type:asset.type,degree:asset.degree,name:asset.name,identity:asset.identity||'',description:asset.description||'',prompt:asset.prompt||'',voice:asset.voice||'',episodes:asset.episodes||'',tag:asset.tag||''})} onDelete={id=>confirmForProject({title:'删除这个资产？',content:'删除后不可恢复。',okText:'删除',cancelText:'取消',onOk:()=>removeAsset(id)})} onExtract={type=>runTask(type,signal=>extractComicAssets(selectedId,{type,degree:form.degree,content:workspace?.document?.content,model:project.model_id,signal}))} onMedia={context=>openTool('media',context)}/></div>
       {activeTab==='storyboard'?<ComicScreenplayStoryboardStage readOnly={readOnly} onChanged={()=>refreshCurrentProject(selectedId)} onCreativeSaved={saved=>{if(selectedProject.current!==selectedId||!saved?.creative_config)return;const cfg=saved.creative_config;setWorkspace(current=>current?.project?.id===selectedId?{...current,project:applyCreativeConfigToProject(current.project,cfg,saved.revision)}:current);setCreativeRevision(saved.revision);setCreative(current=>({...current,...Object.fromEntries(['storyboard_prompt_id','plan_density','storyboard_auto_sync_assets','storyboard_use_context_history'].filter(key=>cfg[key]!==undefined).map(key=>[key,cfg[key]]))}));setStoryboardEngine(current=>comicStoryboardEngine(cfg.storyboard_prompt_id,current));}} onAgent={request=>{setAgentDraftRequest({id:Date.now(),text:String(request?.requestText||request?.summary||'')});setAgentOpen(true);}} engine={comicStoryboardEngine(project.creative_config?.storyboard_prompt_id,storyboardEngine)} modelId={project.model_id} workspace={workspace} canGenerate={canGenerate} working={working} promptName={creativeLibrary.prompts.find(item=>item.id===project.creative_config?.storyboard_prompt_id)?.name} onGenerate={startStoryboard} onEditor={episode=>{setEditingEpisode(episode);openTool('storyboard-editor');}} onTools={openTool} onView={episode=>Modal.info({title:`第${episode.no}集 · ${episode.title}`,width:800,content:<pre className="comic-numbered-source">{episode.content}</pre>})}/>:null}
       </div>{next?<div className="comic-flow-next-bar"><span className="comic-flow-next-mark"><OriginalIcon name="SparklesOutline" size={16}/></span><div><b>{next.title}</b><small>{next.subtitle}</small></div><button type="button" onClick={nextStage}>下一步 <span aria-hidden="true">→</span></button></div>:null}</main>
       {agentOpen?<aside className="comic-stage-agent"><header><b>创作 Agent</b><Button size="small" type="text" aria-label="关闭Agent" icon={<X size={15}/>} onClick={()=>setAgentOpen(false)}/></header><ComicAssistantPanel key={selectedId} initialRequest={agentDraftRequest} projectId={selectedId} readOnly={readOnly} canGenerate={canGenerate} onSaved={()=>refreshCurrentProject(selectedId)}/></aside>:null}</div>
