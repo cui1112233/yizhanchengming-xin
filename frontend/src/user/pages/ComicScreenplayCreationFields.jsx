@@ -1,3 +1,4 @@
+import OriginalIcon from './ComicScreenplayIcon.jsx';
 import { Alert, Button, Empty, Input, Modal, Select, Spin, Upload } from 'antd';
 import { Check, FileText, ImageOff, Palette, Search, UploadCloud, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -40,7 +41,7 @@ function StylePreview({ src, name }) {
     : <span className="comic-style-placeholder"><ImageOff size={22} /><small>{failed ? '预览加载失败' : src ? '加载预览…' : '暂无预览图'}</small></span>;
 }
 
-export function ComicStylePicker({ value, onChange, styles = [], disabled = false, onLibraryChange }) {
+export function ComicStylePicker({ value, onChange, styles = [], disabled = false, onLibraryChange, compact = false }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(null);
   const [query, setQuery] = useState('');
@@ -60,11 +61,11 @@ export function ComicStylePicker({ value, onChange, styles = [], disabled = fals
   const filtered = styles.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   function choose() { setDraft({ ...value }); setQuery(''); setOpen(true); }
   return <>
-    <div className="comic-style-current"><button disabled={disabled} type="button" className="style-picker-trigger" onClick={choose}><Palette size={17} /><span>{value.style_name || '无画风（可选）'}</span><span className="comic-style-change">选择</span></button>
-      {value.style_id ? <Button disabled={disabled} type="text" size="small" aria-label="清除画风选择" icon={<X size={15} />} onClick={() => onChange({ style_name: '', style_id: null })} /> : null}</div>
+    <div className="comic-style-current"><button disabled={disabled} type="button" className="style-picker-trigger" onClick={choose}><OriginalIcon name="ColorPaletteOutline" size={compact ? 13 : 17} /><span>{value.style_name || '无画风（可选）'}</span>{compact?<OriginalIcon name="ChevronDownOutline" size={12}/>:null}<span className="comic-style-change">选择</span></button>
+      {value.style_id ? <Button disabled={disabled} type="text" size="small" aria-label="清除画风选择" icon={<OriginalIcon name="CloseOutline" size={14} />} onClick={() => onChange({ style_name: '', style_id: null })} /> : null}</div>
     <Modal className="screenplay-style-modal" title="选择我的画风" open={open} onCancel={() => setOpen(false)} footer={<><Button onClick={() => setOpen(false)}>取消</Button><Button type="primary" onClick={() => { onChange({ style_id: draft?.style_id || null, style_name: draft?.style_name || '' }); setOpen(false); }}>确认选择</Button></>} width={780}>
       <p className="comic-style-caption">画风来自你的私人画风库；不选择也可以保存作品。</p><Button onClick={() => { setNewName(''); setNewPrompt(''); setAddError(''); setAddOpen(true); }}>新增私人画风</Button>
-      <Input prefix={<Search size={15} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索画风名称" allowClear />
+      <Input prefix={<OriginalIcon name="SearchOutline" size={14} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索画风名称" allowClear />
       <div className="comic-style-selection">待确认：{draft?.style_name || '无画风'}<Button size="small" onClick={() => setDraft({ style_id: null, style_name: '' })}>不使用画风</Button></div>
       {draft?.style_id && !styles.some(item => item.id === draft.style_id) ? <Alert type="warning" showIcon message="已保存画风当前不在库中；原选择仍保留，可重新选择或清空。" /> : null}
       <div className="comic-style-library">{filtered.map(style => <button type="button" key={style.id} aria-pressed={draft?.style_id === style.id} className={draft?.style_id === style.id ? 'is-active' : ''} onClick={() => setDraft({ style_name: style.name, style_id: style.id })}>
