@@ -590,10 +590,10 @@ func markNovelFetchAutomationSubmitResult(ctx context.Context, store novelfetchw
 			delete(document.Meta, "automationSubmitAttempts")
 			delete(document.Meta, "automationNextRetryAt")
 			delete(document.Meta, "automationSubmitError")
-		} else if workshopSubmitRequiresLogin(submitErr) {
-			document.Meta["siteSubmitStatus"] = "waiting_login"
-			document.Meta["status"], document.Meta["queueState"] = "waiting_login", "waiting_login"
-			document.Meta["automationSubmitError"] = workshopLoginRequiredMessage
+		} else if blockedStatus := workshopSubmitBlockedStatus(submitErr); blockedStatus != "" {
+			document.Meta["siteSubmitStatus"] = blockedStatus
+			document.Meta["status"], document.Meta["queueState"] = blockedStatus, blockedStatus
+			document.Meta["automationSubmitError"] = submitErr.Error()
 			delete(document.Meta, "automationSubmitAttempts")
 			delete(document.Meta, "automationNextRetryAt")
 		} else if blocked := novelFetchAutomationConfigurationBlock(document, submitErr); blocked != "" {

@@ -97,6 +97,8 @@ export function novelFetchTaskSummaryItems(data = {}) {
   const hitCount = countValue(meta.sensitiveHitCount, meta.sensitive_hit_count, sensitiveHits.hit_count, sensitiveHits.hitCount, data.sensitiveHitCount, data.sensitive_hit_count);
   const fixedCount = countValue(meta.sensitiveFixedCount, meta.sensitive_fixed_count, sensitiveFixed.fixed_count, sensitiveFixed.fixedCount, data.sensitiveFixedCount, data.sensitive_fixed_count);
   const aiCount = countValue(meta.aiGeneratedCount, meta.ai_generated_count, data.aiGeneratedCount, data.ai_generated_count, versions.length);
+  const originalError = first(meta.originalError, meta.original_error, meta.originalFetchLastError, meta.original_fetch_last_error, data.original_fetch_last_error, meta.error);
+  const upstreamCode = /(?:business error|HTTP)\s+(\d{3})\b/i.exec(String(originalError || ''))?.[1];
   return [
     ['书籍 ID', first(data.bookId, data.book_id, meta.bookId, meta.book_id, meta.id)],
     ['书名', first(data.bookName, data.book_name, meta.bookName, meta.book_name, meta.title, bookInfo.workTitle, bookInfo.work_title)],
@@ -107,8 +109,8 @@ export function novelFetchTaskSummaryItems(data = {}) {
     ['分类模型', first(meta.classifierModel, meta.classifier_model)],
     ['分类失败原因', first(meta.classifyError, meta.classify_error)],
     ['原文状态', stageLabel(first(data.originalStatus, data.original_status, meta.originalStatus, meta.original_status))],
-    ['原文失败原因', first(meta.originalError, meta.original_error, meta.error)],
-    ['原文错误码', first(meta.originalErrorCode, meta.original_error_code, meta.originalUpstreamCode, meta.original_upstream_code)],
+    ['原文失败原因', originalError],
+    ['原文错误码', first(meta.originalErrorCode, meta.original_error_code, meta.originalUpstreamCode, meta.original_upstream_code, meta.originalFetchErrorCode, meta.original_fetch_error_code, upstreamCode)],
     ['处理字数', raw > 0 ? `${processed} / ${raw}` : (processed > 0 ? String(processed) : '—')],
     ['敏感词状态', stageLabel(first(data.sensitiveStatus, data.sensitive_status, meta.sensitiveStatus, meta.sensitive_status))],
     ['敏感词模型', first(meta.sensitiveModel, meta.sensitive_model, sensitiveFixed.model, sensitiveHits.model)],

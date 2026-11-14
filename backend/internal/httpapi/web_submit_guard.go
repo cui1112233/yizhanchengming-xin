@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"strings"
 )
 
 type submitQueueKey struct{}
@@ -19,6 +21,17 @@ func withWorkshopSubmitQueue(next http.Handler, queue novelfetchworkshop.Process
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), submitQueueKey{}, queue)))
 	})
+}
+
+// Serialize target-site writes across application owners and cookie rotation.
+// Older sessions may lack a target username, so conservatively lock the site
+// rather than let a known and an unknown session write the same account at once.
+func workshopExternalSubmitScope(session map[string]any) string {
+	base := strings.TrimRight(strings.TrimSpace(firstText(session["baseUrl"], "https://two.121w.com/tttadmin")), "/")
+	if parsed, err := url.Parse(base); err == nil && parsed.Host != "" {
+		base = strings.ToLower(parsed.Host)
+	}
+	return "external-site\n" + base
 }
 
 func acquireWorkshopSubmit(ctx context.Context, queue novelfetchworkshop.ProcessQueue, owner, book string) (func(), error) {

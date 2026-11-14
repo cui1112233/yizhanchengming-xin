@@ -308,6 +308,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	completed := 0
 	uploadFailures := make([]string, 0)
 	loginBlockedCount := 0
+	blockedUploadState := "waiting_login"
 	type bookProcessResult struct {
 		bookID   string
 		bookName string
@@ -422,13 +423,14 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				uploadFailures = append(uploadFailures, bookID+"："+err.Error())
 				failedBookIDs = append(failedBookIDs, bookID)
 				failureMessages = append(failureMessages, bookID+"：上传未完成："+err.Error())
-				if workshopSubmitRequiresLogin(err) {
+				if blockedStatus := workshopSubmitBlockedStatus(err); blockedStatus != "" {
 					loginBlockedCount++
-					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, "waiting_login", err.Error())
+					blockedUploadState = blockedStatus
+					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, blockedStatus, err.Error())
 				} else if retry {
 					retryBookIDs = append(retryBookIDs, bookID)
 				}
-				if !workshopSubmitRequiresLogin(err) {
+				if workshopSubmitBlockedStatus(err) == "" {
 					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, "upload_pending", err.Error())
 				}
 				_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, bookID, "auto_submit_pending", "上传未完成，重试仅继续上传："+err.Error())
@@ -470,8 +472,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			status = "upload_pending"
 		}
 		if loginBlockedCount == len(failedBookIDs) {
-			status = "waiting_login"
-			queueState = "waiting_login"
+			status = blockedUploadState
+			queueState = blockedUploadState
 		}
 		retryEnabled := retry && len(retryBookIDs) > 0
 		_ = updateWorkshopRun(worker.store, job, status, errorMessage, startedAt, !retryEnabled)
@@ -485,6 +487,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			progressMessage = "改文已暂停，等待确认分类后重试"
 		} else if status == "waiting_login" {
 			progressMessage = workshopLoginRequiredMessage
+		} else if status == "waiting_configuration" {
+			progressMessage = workshopContractChangedMessage
 		} else if status == "upload_pending" {
 			progressMessage = "正文已完成，上传未完成；重试仅继续上传"
 		} else if !retryEnabled {
