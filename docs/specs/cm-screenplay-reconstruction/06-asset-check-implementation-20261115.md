@@ -29,3 +29,11 @@
 原版窗口可读UIA，但截图超时且点击缺少几何，已留存 `asset-check-cm-browser/original-ui-independent-observation.json`。因此真实原版弹窗逐像素和点击对照仍为unverified。原生client后的真实HTTP与付费供应商输出本轮未执行，费用为0；不能据合成回放声称全部链路一致。本地4001交付记录另行绑定实际二进制身份。
 
 规格：[asset-check-background-spec.md](asset-check-background-spec.md)。全范围：[parity-ledger.md](parity-ledger.md)。
+
+## 本地4001实际交付
+
+代码提交 `af9f8a75`，运行PID `7036`，`/api/runtime-build-info` 同时返回git与manifest `af9f8a75`。原进程 `50548`/`ff376631` 的环境原样保留；重启前19个批次无运行生产。未push或公开发布。
+
+真实MySQL/Redis/HTTP离线验收10项通过、16次请求：新迁移建表、未知任务读取、服务后台解析已收到回包、确认前资产为空、同key找回、过期版本拒绝、确认入库、重复确认不重复、扩展字段保留、数据库重读。仅新增带明确“离线回包”标记的验收作品 `asset-check-offline-ec54e39b27`；模型请求为0，测试回包不冒充供应商产物。记录：`07-parity-execution/live-asset-check-acceptance.json`。
+
+已登录浏览器实际打开同一4001作品、由已保存原文建立章节，确认检查窗默认勾选1章、原文28字、读取完成且无错误、开始检查入口可见；未点击生成。截图：`07-parity-execution/4001-asset-check.png`。已有批量生成入口4项回归及新增检查5项浏览器/API检查通过。原版实时窗口与真实供应商验证仍未通过，不提升为compared_passed。
