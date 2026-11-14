@@ -120,7 +120,7 @@ func openComicReferenceImage(ctx context.Context, store batchfactoryv11.Store, f
 		if !found {
 			return nil, "", fmt.Errorf("%w: 漫画画风参考图不存在", batchfactoryv11.ErrNotFound)
 		}
-		return readComicReferenceArtifact(files, assetID, "")
+		return readComicReferenceArtifact(ctx, files, assetID, "")
 	case len(parts) == 5 && parts[0] == "api" && parts[1] == "local-executor" && parts[3] == "batch-comic-style-previews":
 		payload, mediaType, ok := prompt.OpenComicStylePreview(parts[4])
 		if !ok {
@@ -144,7 +144,7 @@ func openComicReferenceImage(ctx context.Context, store batchfactoryv11.Store, f
 		if !found {
 			return nil, "", fmt.Errorf("%w: 漫画画风参考图不存在", batchfactoryv11.ErrNotFound)
 		}
-		return readComicReferenceArtifact(files, assetID, "")
+		return readComicReferenceArtifact(ctx, files, assetID, "")
 	case len(parts) == 6 && parts[0] == "api" && parts[1] == "local-executor" && parts[3] == "batch-comic-references":
 		if store == nil {
 			return nil, "", fmt.Errorf("%w: 漫画参考图存储不可用", batchfactoryv11.ErrUnavailable)
@@ -152,7 +152,7 @@ func openComicReferenceImage(ctx context.Context, store batchfactoryv11.Store, f
 		if _, err := store.GetBatch(ctx, owner, parts[4]); err != nil {
 			return nil, "", err
 		}
-		return readComicReferenceArtifact(files, parts[5], "")
+		return readComicReferenceArtifact(ctx, files, parts[5], "")
 	case len(parts) == 8 && parts[0] == "api" && parts[1] == "local-executor" && parts[3] == "batch-book-asset-images":
 		if store == nil {
 			return nil, "", fmt.Errorf("%w: 漫画资产图存储不可用", batchfactoryv11.ErrUnavailable)
@@ -163,7 +163,7 @@ func openComicReferenceImage(ctx context.Context, store batchfactoryv11.Store, f
 		}
 		for _, image := range images {
 			if image.ID == parts[7] && strings.TrimSpace(image.StorageRef) != "" {
-				return readComicReferenceArtifact(files, image.StorageRef, image.MediaType)
+				return readComicReferenceArtifact(ctx, files, image.StorageRef, image.MediaType)
 			}
 		}
 		return nil, "", fmt.Errorf("%w: 漫画人物资产图不存在", batchfactoryv11.ErrNotFound)
@@ -172,7 +172,7 @@ func openComicReferenceImage(ctx context.Context, store batchfactoryv11.Store, f
 	}
 }
 
-func readComicReferenceArtifact(files *localartifact.Store, idOrStorageRef, mediaType string) ([]byte, string, error) {
+func readComicReferenceArtifact(ctx context.Context, files *localartifact.Store, idOrStorageRef, mediaType string) ([]byte, string, error) {
 	if files == nil {
 		return nil, "", fmt.Errorf("%w: 漫画参考图存储不可用", batchfactoryv11.ErrUnavailable)
 	}
@@ -181,7 +181,7 @@ func readComicReferenceArtifact(files *localartifact.Store, idOrStorageRef, medi
 		candidates = []string{candidates[0] + ".png", candidates[0] + ".jpg", candidates[0] + ".webp"}
 	}
 	for _, candidate := range candidates {
-		file, err := files.Open(candidate)
+		file, err := files.OpenContext(ctx, candidate)
 		if err != nil {
 			continue
 		}

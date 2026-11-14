@@ -178,7 +178,7 @@ func registerBookAssetRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "image bytes are not stored locally"})
 				return
 			}
-			file, err := files.Open(image.StorageRef)
+			file, err := files.OpenContext(r.Context(), image.StorageRef)
 			if err != nil {
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "image file not found"})
 				return
@@ -226,7 +226,7 @@ func handleBookAssetThumbnail(store batchfactoryv11.Store, files *localartifact.
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "image bytes are not stored locally"})
 				return
 			}
-			original, err := files.Open(image.StorageRef)
+			original, err := files.OpenContext(r.Context(), image.StorageRef)
 			if err != nil {
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "image file not found"})
 				return

@@ -50,7 +50,7 @@ func (r *batchFactoryProductionAudioReader) BatchFactoryAudioRecord(ctx context.
 		if duration <= 0 {
 			return agentworkspace.BatchFactoryAudioRecord{}, false, nil
 		}
-		file, openErr := r.files.Open(audioID + ".mp3")
+		file, openErr := r.files.OpenContext(ctx, audioID+".mp3")
 		if errors.Is(openErr, os.ErrNotExist) || errors.Is(openErr, localartifact.ErrInvalidID) {
 			return agentworkspace.BatchFactoryAudioRecord{}, false, nil
 		}

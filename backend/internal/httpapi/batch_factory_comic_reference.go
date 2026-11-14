@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -159,7 +160,7 @@ func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, sto
 			if candidate.ID != r.PathValue("imageId") || strings.TrimSpace(candidate.StorageRef) == "" {
 				continue
 			}
-			file, openErr := files.Open(candidate.StorageRef)
+			file, openErr := files.OpenContext(r.Context(), candidate.StorageRef)
 			if openErr != nil {
 				writeExecutorError(w, http.StatusNotFound, "asset image not found")
 				return
@@ -213,7 +214,7 @@ func serveBatchComicReference(w http.ResponseWriter, r *http.Request, store batc
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "漫画参考图不存在"})
 		return
 	}
-	file, err := files.Open(assetID + comicReferenceExtension(files, assetID))
+	file, err := files.OpenContext(r.Context(), assetID+comicReferenceExtension(r.Context(), files, assetID))
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "漫画参考图文件不存在"})
 		return
@@ -228,9 +229,9 @@ func serveBatchComicReference(w http.ResponseWriter, r *http.Request, store batc
 	http.ServeContent(w, r, assetID, batch.UpdatedAt, file)
 }
 
-func comicReferenceExtension(files *localartifact.Store, assetID string) string {
+func comicReferenceExtension(ctx context.Context, files *localartifact.Store, assetID string) string {
 	for _, extension := range []string{".png", ".jpg", ".webp"} {
-		file, err := files.Open(assetID + extension)
+		file, err := files.OpenContext(ctx, assetID+extension)
 		if err == nil {
 			_ = file.Close()
 			return extension

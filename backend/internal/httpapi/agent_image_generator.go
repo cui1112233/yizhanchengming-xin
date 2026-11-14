@@ -106,7 +106,7 @@ func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor
 	const maxAgentImageBytes = 32 << 20
 	results := make([]string, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		file, openErr := files.Open(artifact.StorageRef)
+		file, openErr := files.OpenContext(ctx, artifact.StorageRef)
 		if openErr != nil {
 			return nil, http.StatusBadGateway, fmt.Errorf("读取豆包图片结果失败: %w", openErr)
 		}

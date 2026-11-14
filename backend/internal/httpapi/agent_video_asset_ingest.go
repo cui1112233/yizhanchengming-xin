@@ -211,7 +211,7 @@ func (s *agentMediaAssetIngestor) SaveLocal(ctx context.Context, owner, projectI
 	if err != nil {
 		return agentworkspace.Asset{}, err
 	}
-	body, err := files.Open(artifact.StorageRef)
+	body, err := files.OpenContext(ctx, artifact.StorageRef)
 	if err != nil {
 		return agentworkspace.Asset{}, err
 	}

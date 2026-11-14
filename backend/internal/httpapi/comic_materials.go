@@ -16,7 +16,7 @@ func serveArtifactImage(w http.ResponseWriter, r *http.Request, files *localarti
 		return false
 	}
 	for _, extension := range []string{".png", ".jpg", ".webp"} {
-		file, err := files.Open(assetID + extension)
+		file, err := files.OpenContext(r.Context(), assetID+extension)
 		if err != nil {
 			continue
 		}
