@@ -8,7 +8,7 @@ import './comic-screenplay-storyboard-settings.css';
 
 export function StoryboardDensity({value,disabled,onChange,hint='更少更紧凑；标准默认；更多按细拆样本；SD2.5专项走 30 秒一组，不套 15 秒案例。'}){return <div className="comic-e1-density"><span>规划小节密度</span><div>{storyboardDensityOptions.map(item=><button type="button" key={item.value} disabled={disabled} aria-pressed={normalizeStoryDensity(value)===item.value} className={normalizeStoryDensity(value)===item.value?'is-active':''} onClick={()=>onChange(item.value)}><b>{item.label}</b><small>{item.caption}</small></button>)}</div><p>{hint}</p></div>;}
 const presetHelp='开启后，生成分镜脚本时会自动检测分镜中引用但尚未在预设中定义的角色、场景、道具，并通过 AI 自动补充到当前作品资产库，会增加 AI 文本调用。关闭时仅生成分镜，不会新增或修改作品资产。';
-const contextHelp='开启后，多场景生成分镜会按场景顺序执行，并把前面已生成分镜的最后 5 条作为历史参考传给下一场景。适合保持人物位置、镜头衔接和动作连续性；单场景时基本无影响，但会降低多场景生成速度。';
+const contextHelp='开启后，多集分镜会按集顺序生成，并把前面已保存分镜的最后 5 条作为历史参考传给下一集。适合保持跨集衔接；当前不会自动把一集拆成多个独立场景任务。';
 export default function ComicScreenplayStoryboardSettings({projectId,projectRevision,readOnly,onSaved,onState,controllerRef}){
  const [config,setConfig]=useState(null),[preferences,setPreferences]=useState(null),[prompts,setPrompts]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(''),[error,setError]=useState(''),[uncertain,setUncertain]=useState(false);
  const [picker,setPicker]=useState(false),[query,setQuery]=useState(''),[prefixOpen,setPrefixOpen]=useState(false),[prefixQuery,setPrefixQuery]=useState(''),[editor,setEditor]=useState(null),[editorError,setEditorError]=useState('');

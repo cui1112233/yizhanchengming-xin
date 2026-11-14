@@ -8,6 +8,35 @@ import (
 	"testing"
 )
 
+func TestRawChapterWithoutScriptKeepsSelectedSecondEpisode(t *testing.T) {
+	service, store, generator := newStoryboardService(t, PermissionBypass)
+	ctx := context.Background()
+	authors := &AuthoringService{Store: store, Repository: NewMemoryAuthoringRepository()}
+	_, err := authors.Save(ctx, "alice", "p1", AuthoringState{ProjectID: "p1", Chapters: []Chapter{{ID: "a", Title: "第一章", SourceText: "第一章原文"}, {ID: "b", Title: "第二章", SourceText: "第二章真实原文"}}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.Authoring = authors
+	noPlan := false
+	result, err := service.Generate(ctx, StoryboardRequest{Owner: "alice", ProjectID: "p1", IdempotencyKey: "raw-second", Model:"own-text", Engine: EngineXiaoluoV7, EpisodeNo: 2, ChapterID: "b", UseOriginalContentDirectly: true, UsePlanning: &noPlan, Content: "客户端不应覆盖原文"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(generator.requests) != 1 || generator.requests[0].UserPrompt != "第二章真实原文" || generator.requests[0].Model!="own-text" {
+		t.Fatalf("wrong original: %+v", generator.requests)
+	}
+	if len(result.Storyboards) != 1 || result.Storyboards[0].EpisodeNo != 2 {
+		t.Fatalf("wrong target: %+v", result.Storyboards)
+	}
+	if _, err = store.ActiveDocument(ctx, "alice", "p1"); !errors.Is(err, ErrNoActiveScript) {
+		t.Fatalf("raw generation fabricated a script: %v", err)
+	}
+	boards, err := store.ListStoryboards(ctx, "alice", "p1", "")
+	if err != nil || len(boards) != 1 || boards[0].EpisodeNo != 2 {
+		t.Fatalf("not saved to second episode: %+v %v", boards, err)
+	}
+}
+
 func TestStoryboardOwnerPreferencesCRUDImportRevisionAndIsolation(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
