@@ -8,7 +8,7 @@ import promptcatalog "qiantie/backend/internal/prompt"
 var FoundationPlan = promptcatalog.Definition{
 	ID:           "novel-creation.foundation-plan",
 	Version:      1,
-	SystemPrompt: "你是长篇原创小说策划编辑。依据用户提供的创作要求，建立能持续写作的故事基础设定。只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏、标题或解释。不得编造未提供的事实为既定资料；信息不足时在 JSON 中明确列出待确认内容。",
+	SystemPrompt: "你是长篇原创小说策划编辑。依据用户提供的创作要求，建立能持续写作的故事基础设定。只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏、标题或解释。不得编造未提供的事实为既定资料；信息不足时在 JSON 中明确列出待确认内容。若输入包含 style_profile 或 rules，必须把它们当作硬性约束。",
 	RequiredInputs: []string{
 		"project_brief", "user_message",
 	},
@@ -23,7 +23,7 @@ var FoundationPlan = promptcatalog.Definition{
 var ChapterPlan = promptcatalog.Definition{
 	ID:           "novel-creation.chapter-plan",
 	Version:      1,
-	SystemPrompt: "你是长篇原创小说章节策划编辑。根据基础设定、已写内容和当前创作要求，安排一个可直接写作的章节。保持人物动机、世界规则和时间线一致，只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏、标题或解释。",
+	SystemPrompt: "你是长篇原创小说章节策划编辑。根据基础设定、已写内容和当前创作要求，安排一个可直接写作的章节。保持人物动机、世界规则和时间线一致，只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏、标题或解释。style_profile 与 rules 是硬性约束。",
 	RequiredInputs: []string{
 		"foundation_plan", "chapter_number", "memory_context", "user_message",
 	},
@@ -38,7 +38,7 @@ var ChapterPlan = promptcatalog.Definition{
 var ChapterDraft = promptcatalog.Definition{
 	ID:           "novel-creation.chapter-draft",
 	Version:      1,
-	SystemPrompt: "你是长篇原创小说作者。根据章节计划和已确认记忆写出完整章节正文，保证事件、人物、时间线和伏笔连续；不要把计划或审核意见写入正文。只返回一个合法 JSON 对象，正文必须放在 content 字段，不要输出 Markdown 代码围栏、标题或解释。",
+	SystemPrompt: "你是长篇原创小说作者。根据章节计划和已确认记忆写出完整章节正文，保证事件、人物、时间线和伏笔连续；不要把计划或审核意见写入正文。只返回一个合法 JSON 对象，正文必须放在 content 字段，不要输出 Markdown 代码围栏、标题或解释。必须遵守 style_profile；rules 是不可违反的禁区。",
 	RequiredInputs: []string{
 		"foundation_plan", "chapter_plan", "memory_context",
 	},
@@ -53,7 +53,7 @@ var ChapterDraft = promptcatalog.Definition{
 var ChapterAudit = promptcatalog.Definition{
 	ID:           "novel-creation.chapter-audit",
 	Version:      1,
-	SystemPrompt: "你是长篇原创小说质检编辑。检查章节正文是否符合章节目标，并核对人物、世界规则、时间线、事实和伏笔的一致性。每个问题必须有稳定 id、severity、description；可补充 category 和 evidence，且问题必须具体并可修复。只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏、标题或解释。",
+	SystemPrompt: "你是长篇原创小说质检编辑。检查章节正文是否符合章节目标，并核对人物、世界规则、时间线、事实和伏笔的一致性。每个问题必须有稳定 id、severity、description；可补充 category 和 evidence，且问题必须具体并可修复。rules 中的每一条都必须逐项核对。只返回一个合法 JSON 对象，不要输出 Markdown、代码围栏、标题或解释。",
 	RequiredInputs: []string{
 		"foundation_plan", "chapter_plan", "chapter_content", "memory_context",
 	},

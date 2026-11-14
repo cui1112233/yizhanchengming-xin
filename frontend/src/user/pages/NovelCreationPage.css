@@ -1,0 +1,508 @@
+.novel-creation-page {
+  height: calc(100vh - var(--app-header-height, 0px));
+  min-height: 680px;
+  display: flex;
+  flex-direction: column;
+  background: #080d14;
+  color: #e8eef6;
+  overflow: hidden;
+}
+.novel-creation-launcher {
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid #263343;
+  background: #0d1520;
+}
+.novel-creation-launcher-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 13px;
+}
+.novel-creation-launcher-head strong {
+  font-size: 18px;
+}
+.novel-creation-mode-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.novel-creation-mode-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: max-content;
+  padding: 9px 15px;
+  border: 1px solid #2b3b4c;
+  border-radius: 9px;
+  color: #aebdcd;
+  background: #111c29;
+  cursor: pointer;
+}
+.novel-creation-mode-tabs button:hover,
+.novel-creation-mode-tabs button.active {
+  color: #eafdf8;
+  border-color: #47cdb5;
+  background: #153b38;
+}
+.novel-creation-title,
+.novel-creation-title > span,
+.novel-creation-toolbar,
+.novel-creation-conversation-head,
+.novel-creation-conversation-head > div,
+.novel-creation-run-card > div:first-child,
+.novel-creation-run-actions {
+  display: flex;
+  align-items: center;
+}
+.novel-creation-title {
+  gap: 9px;
+}
+.novel-creation-title strong {
+  font-size: 18px;
+}
+.novel-creation-title > span {
+  font-size: 12px;
+  color: #7f91a6;
+  margin-left: 4px;
+}
+.novel-creation-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #213040;
+}
+.novel-creation-toolbar .ant-btn {
+  justify-content: flex-start;
+  background: #121d2a;
+  border-color: #2a3a4c;
+  color: #c9d4e2;
+}
+.novel-creation-workbench {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 248px minmax(460px, 1fr) 5px var(
+      --novel-inspector-width
+    );
+  min-height: 0;
+}
+.novel-creation-sidebar {
+  background: #0c141f;
+  border-right: 1px solid #253344;
+  padding: 14px 12px;
+  overflow: auto;
+}
+.novel-creation-sidebar-head {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+}
+.novel-creation-project-select {
+  width: 100%;
+  margin: 4px 0 18px;
+}
+.novel-creation-mode-title {
+  font-size: 12px;
+  color: #73879d;
+  font-weight: 700;
+  margin: 8px 7px;
+  text-transform: uppercase;
+}
+.novel-creation-session-list {
+  margin-top: 8px;
+  border-top: 1px solid #213040;
+  padding-top: 10px;
+}
+.novel-creation-session-list > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #91a2b6;
+  cursor: pointer;
+}
+.novel-creation-session-list > button.active {
+  background: #152332;
+  color: #eef7ff;
+}
+.novel-creation-session-empty {
+  margin: 8px 8px 12px;
+  color: #74879b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.novel-creation-new-session.ant-btn {
+  width: 100%;
+  justify-content: center;
+  color: #d9e6f2;
+  border-color: #33475b;
+  background: #111c29;
+}
+.novel-creation-conversation {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #090f17;
+}
+.novel-creation-chat-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 28px clamp(20px, 7vw, 92px);
+}
+.novel-creation-welcome {
+  max-width: 650px;
+  margin: 12vh auto 0;
+  text-align: center;
+  color: #8ea0b5;
+}
+.novel-creation-welcome > div {
+  width: 62px;
+  height: 62px;
+  margin: auto;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #6ce1c8;
+  background: linear-gradient(145deg, #17374a, #17223a);
+}
+.novel-creation-welcome h2 {
+  max-width: 680px;
+  color: #eef4fb;
+  margin: 18px 0 6px;
+  font-size: clamp(20px, 2vw, 28px);
+  line-height: 1.45;
+}
+.novel-creation-suggestions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 28px;
+}
+.novel-creation-suggestions button {
+  padding: 12px;
+  border: 1px solid #27394d;
+  border-radius: 10px;
+  color: #aab9c9;
+  background: #101a26;
+  cursor: pointer;
+}
+.novel-creation-message {
+  max-width: 760px;
+  margin: 0 0 18px;
+  padding: 15px 17px;
+  border: 1px solid #26374a;
+  border-radius: 12px;
+  background: #101a26;
+}
+.novel-creation-message.user {
+  margin-left: auto;
+  background: #12312f;
+  border-color: #265b52;
+}
+.novel-creation-message b {
+  font-size: 12px;
+  color: #6fe1ca;
+}
+.novel-creation-message p {
+  white-space: pre-wrap;
+  line-height: 1.75;
+  margin: 8px 0 0;
+}
+.novel-creation-run-card {
+  max-width: 760px;
+  margin: 15px 0;
+  padding: 16px;
+  border: 1px solid #2b3b4d;
+  border-radius: 12px;
+  background: #101925;
+}
+.novel-creation-run-card.failed {
+  border-color: #7d3e48;
+}
+.novel-creation-run-card > div:first-child {
+  gap: 8px;
+}
+.novel-creation-run-card > div:first-child span {
+  margin-left: auto;
+  color: #8fa1b3;
+}
+.novel-creation-run-card .ant-progress {
+  margin-top: 9px;
+}
+.novel-creation-run-card p {
+  color: #9bacbd;
+}
+.novel-creation-error {
+  padding: 10px;
+  border-radius: 8px;
+  background: #361e25;
+  color: #ffacb5;
+}
+.novel-creation-run-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.novel-creation-spin {
+  animation: novel-creation-spin 1.3s linear infinite;
+}
+@keyframes novel-creation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.novel-creation-composer {
+  padding: 14px clamp(20px, 7vw, 92px) 18px;
+  border-top: 1px solid #223142;
+  background: #0c141e;
+}
+.novel-creation-composer .ant-input {
+  background: #111c29 !important;
+  border-color: #314256 !important;
+  color: #edf4fb !important;
+}
+.novel-creation-composer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.novel-creation-composer-controls .ant-select:first-child {
+  min-width: 210px;
+}
+.novel-creation-composer-controls .ant-select:nth-child(2) {
+  min-width: 120px;
+}
+.novel-creation-composer-controls span {
+  font-size: 11px;
+  color: #66798e;
+  margin-left: auto;
+}
+.novel-creation-resizer {
+  cursor: col-resize;
+  background: #172332;
+  border-left: 1px solid #283749;
+  border-right: 1px solid #283749;
+}
+.novel-creation-resizer:hover {
+  background: #52cdb8;
+}
+.novel-creation-resizing {
+  cursor: col-resize !important;
+  user-select: none;
+}
+.novel-creation-inspector {
+  background: #0d1621;
+  overflow: auto;
+}
+.novel-creation-inspector .ant-tabs-nav {
+  margin: 0;
+  padding: 0 16px;
+}
+.novel-creation-inspector-panel {
+  padding: 8px 20px 24px;
+}
+.novel-creation-inspector-panel h3 {
+  font-size: 14px;
+}
+.novel-creation-inspector-panel dl {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 12px;
+  font-size: 13px;
+}
+.novel-creation-inspector-panel dt {
+  color: #74879d;
+}
+.novel-creation-inspector-panel dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.novel-creation-timeline {
+  list-style: none;
+  padding: 0;
+}
+.novel-creation-timeline li {
+  display: flex;
+  gap: 11px;
+  padding: 0 0 18px;
+  position: relative;
+}
+.novel-creation-timeline li > span {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #5fdcc4;
+  box-shadow: 0 0 0 4px #163832;
+}
+.novel-creation-timeline li:not(:last-child):before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 16px;
+  bottom: 2px;
+  border-left: 1px solid #2a3b4d;
+}
+.novel-creation-timeline b {
+  font-size: 12px;
+}
+.novel-creation-timeline p {
+  font-size: 12px;
+  color: #8092a6;
+  margin: 4px 0;
+}
+.novel-creation-chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.novel-creation-chapter-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #26384b;
+  border-radius: 8px;
+  background: #101b28;
+  color: #dce7f2;
+  cursor: pointer;
+  text-align: left;
+}
+.novel-creation-chapter-list button.active {
+  border-color: #4fd3bd;
+  background: #14302f;
+}
+.novel-creation-chapter-list span,
+.novel-creation-chapter-body small {
+  font-size: 11px;
+  color: #7e91a6;
+}
+.novel-creation-chapter-body {
+  border-top: 1px solid #263648;
+  padding-top: 12px;
+}
+.novel-creation-chapter-body h3 {
+  margin: 0 0 4px;
+  color: #edf5fc;
+}
+.novel-creation-chapter-body p {
+  white-space: pre-wrap;
+  line-height: 1.85;
+  color: #c6d2df;
+}
+.novel-creation-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.novel-creation-tool-placeholder {
+  text-align: center;
+  margin-top: 20vh;
+  color: #8295aa;
+}
+.novel-creation-tool-placeholder h3 {
+  color: #e9f0f8;
+}
+.novel-creation-loading {
+  height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #8fa1b4;
+}
+.novel-creation-workbench {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+.novel-creation-workbench.has-run {
+  grid-template-columns: 260px minmax(360px, 1fr) 5px var(--novel-inspector-width);
+}
+.novel-creation-workbench:not(.has-run) > .novel-creation-resizer,
+.novel-creation-workbench:not(.has-run) > .novel-creation-inspector {
+  display: none;
+}
+.novel-creation-sidebar { padding: 12px; }
+.novel-creation-launcher { padding: 0 0 12px; background: transparent; }
+.novel-creation-launcher-head { padding: 3px 10px; }
+.novel-creation-launcher-head strong { font-size: 14px; }
+.novel-creation-mode-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: visible; }
+.novel-creation-mode-tabs button { min-width: 0; height: 70px; flex-direction: column; justify-content: center; padding: 8px; border-color: transparent; background: transparent; }
+.novel-creation-sidebar-head { margin-top: 8px; font-size: 13px; }
+.novel-creation-toolbar { grid-template-columns: 1fr; gap: 0; }
+.novel-creation-toolbar .ant-btn { height: 42px; border: 0; background: transparent; }
+.novel-creation-chat-scroll { padding: 28px 12px; }
+.novel-creation-welcome { max-width: none; margin: 68px auto 0; font-size: 14px; }
+.novel-creation-composer { padding: 12px; }
+.novel-creation-composer-controls { flex-wrap: wrap; }
+.novel-creation-composer-controls > span { flex: 1; }
+.novel-creation-composer-controls .ant-select span { margin-left: 0; }
+@media (max-width: 1200px) {
+  .novel-creation-workbench {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .novel-creation-workbench {
+    grid-template-columns: 190px 1fr;
+  }
+  .novel-creation-inspector,
+  .novel-creation-resizer {
+    display: none;
+  }
+  .novel-creation-mode-tabs {
+    padding-bottom: 4px;
+  }
+}
+.novel-creation-mode-inputs {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.novel-creation-mode-inputs label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #8fa1b4;
+}
+.novel-creation-checkpoint {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #3c5368;
+  border-radius: 10px;
+  background: #12202e;
+}
+.novel-creation-checkpoint b {
+  color: #edf5fc;
+}
+.novel-creation-checkpoint p {
+  margin: 4px 0 10px;
+  color: #9bacbd;
+}
+.novel-creation-chapter-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #7e91a6;
+}
+.novel-creation-settings-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #7e91a6;
+}
+.novel-creation-blueprint-editor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}

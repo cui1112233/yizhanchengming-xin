@@ -48,6 +48,18 @@ type RunContext struct {
 	PreviousTruth  json.RawMessage
 	PreviousMemory json.RawMessage
 	Runtime        Runtime
+	// ModeInputs is the validated mode-specific contract payload.
+	ModeInputs map[string]string
+	// StyleProfile and Rules are project-level writing constraints injected into
+	// every generation step.
+	StyleProfile string
+	Rules        []string
+	// Checkpoint pauses the run after the blueprint so the user can confirm or
+	// edit it before any chapter body is written.
+	Checkpoint bool
+	// ConfirmedFoundation skips blueprint generation and reuses an existing or
+	// user-confirmed blueprint.
+	ConfirmedFoundation json.RawMessage
 }
 
 type Pipeline struct {
@@ -200,6 +212,9 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	}
 	foundationPayload := map[string]any{
 		"creation_mode": modeContract(input.Session.Mode),
+		"mode_inputs":   input.ModeInputs,
+		"style_profile": input.StyleProfile,
+		"rules":         input.Rules,
 		"project_brief": map[string]any{
 			"title": input.Project.Title, "genre": input.Project.Genre,
 			"world": input.Project.World, "protagonist": input.Project.Protagonist,
@@ -209,13 +224,26 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		"user_message": input.UserMessage,
 	}
 	var foundation foundationPlanOutput
-	foundationRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-		definition: novelprompt.FoundationPlan, step: RunPlanning,
-		userPayload: foundationPayload, temperature: 0.4, maxTokens: 6000,
-		validate: func() error { return validateFoundation(foundation) },
-	}, &foundation)
-	if err != nil {
-		return ChapterBundle{}, err
+	var foundationRaw json.RawMessage
+	if len(input.ConfirmedFoundation) > 0 {
+		if err := decodeAndValidate(string(input.ConfirmedFoundation), &foundation, func() error {
+			return validateFoundation(foundation)
+		}); err != nil {
+			return ChapterBundle{}, &DomainError{Code: ErrInvalidOutput, Message: "confirmed foundation is invalid", Cause: err}
+		}
+		foundationRaw = cloneRawJSON(input.ConfirmedFoundation)
+	} else {
+		foundationRaw, err = p.callJSON(ctx, input, sink, provider, modelCallSpec{
+			definition: novelprompt.FoundationPlan, step: RunPlanning,
+			userPayload: foundationPayload, temperature: 0.4, maxTokens: 6000,
+			validate: func() error { return validateFoundation(foundation) },
+		}, &foundation)
+		if err != nil {
+			return ChapterBundle{}, err
+		}
+		if input.Checkpoint {
+			return checkpointBundle(input, foundationRaw)
+		}
 	}
 
 	chapterNumber := input.ChapterNumber
@@ -227,6 +255,9 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		definition: novelprompt.ChapterPlan, step: RunPlanning,
 		userPayload: map[string]any{
 			"creation_mode":   modeContract(input.Session.Mode),
+			"mode_inputs":     input.ModeInputs,
+			"style_profile":   input.StyleProfile,
+			"rules":           input.Rules,
 			"foundation_plan": foundation,
 			"chapter_number":  chapterNumber,
 			"memory_context":  rawJSONValue(input.PreviousMemory),
@@ -251,6 +282,9 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		definition: novelprompt.ChapterDraft, step: RunWriting,
 		userPayload: map[string]any{
 			"creation_mode":   modeContract(input.Session.Mode),
+			"mode_inputs":     input.ModeInputs,
+			"style_profile":   input.StyleProfile,
+			"rules":           input.Rules,
 			"foundation_plan": foundation,
 			"chapter_plan":    plan,
 			"memory_context":  rawJSONValue(input.PreviousMemory),
@@ -401,6 +435,7 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 			"foundation_plan": foundation,
 			"chapter_plan":    plan,
 			"chapter_content": content,
+			"rules":           input.Rules,
 			"memory_context":  rawJSONValue(input.PreviousMemory),
 		},
 		temperature: 0.2, maxTokens: 4500,
@@ -894,6 +929,30 @@ func newRevision(input RunContext, sequence int, revision chapterRevisionOutput,
 		Strategy: strings.TrimSpace(revision.Strategy), Content: strings.TrimSpace(revision.Content),
 		Snapshot: cloneRawJSON(raw), CreatedAt: time.Now().UTC(),
 	}
+}
+
+// checkpointBundle returns the blueprint as an awaiting-confirmation result
+// instead of continuing into chapter writing.
+func checkpointBundle(input RunContext, foundationRaw json.RawMessage) (ChapterBundle, error) {
+	now := time.Now().UTC()
+	snapshot, err := json.Marshal(map[string]any{"plan": json.RawMessage(foundationRaw)})
+	if err != nil {
+		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble checkpoint foundation", Cause: err}
+	}
+	runtimeSnapshot, err := json.Marshal(map[string]any{"foundationPlan": json.RawMessage(foundationRaw)})
+	if err != nil {
+		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble checkpoint runtime snapshot", Cause: err}
+	}
+	return ChapterBundle{
+		ProjectID: input.Project.ID,
+		RunID:     input.Run.ID,
+		Foundation: Foundation{
+			ID: input.Project.ID + "-foundation", ProjectID: input.Project.ID,
+			Snapshot: snapshot, CreatedAt: now, UpdatedAt: now,
+		},
+		FinalRunStatus:  RunAwaitingConfirmation,
+		RuntimeSnapshot: runtimeSnapshot,
+	}, nil
 }
 
 func buildChapterBundle(input RunContext, volume foundationVolume, foundationRaw json.RawMessage, plan chapterPlanOutput, planRaw json.RawMessage, content string, contentRaw, auditRaw, settlementRaw, memoryRaw json.RawMessage, audits []Audit, revisions []Revision, finalStatus RunStatus) (ChapterBundle, error) {

@@ -96,6 +96,22 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if _, err := s.store.GetProject(ctx, owner, input.ProjectID); err != nil {
 		return Run{}, err
 	}
+	modeInputs, err := NormalizeModeInputs(session.Mode, input.ModeInputs)
+	if err != nil {
+		return Run{}, err
+	}
+	chapters, err := s.store.ListChapters(ctx, owner, input.ProjectID)
+	if err != nil {
+		return Run{}, err
+	}
+	chapterNumber := len(chapters) + 1
+	var confirmedFoundation json.RawMessage
+	if foundation, found, findErr := s.store.GetFoundation(ctx, owner, input.ProjectID); findErr != nil {
+		return Run{}, findErr
+	} else if found {
+		confirmedFoundation = foundationPlanFromSnapshot(foundation.Snapshot)
+	}
+	checkpoint := len(confirmedFoundation) == 0 && modeUsesCheckpoint(session.Mode)
 	message, err := s.store.AppendMessage(ctx, owner, Message{
 		SessionID: input.SessionID, ProjectID: input.ProjectID, Role: "user", Content: input.Content,
 		Status: "accepted", ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel,
@@ -103,11 +119,16 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
-	promptSnapshot, _ := json.Marshal(map[string]any{
-		"version": 1, "user_message": input.Content, "chapter_number": 1,
+	snapshotFields := map[string]any{
+		"version": 1, "mode": session.Mode, "user_message": input.Content,
+		"mode_inputs": modeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
 		"previous_truth": map[string]any{}, "previous_memory": map[string]any{},
 		"message_id": message.ID,
-	})
+	}
+	if len(confirmedFoundation) > 0 {
+		snapshotFields["confirmed_foundation"] = json.RawMessage(confirmedFoundation)
+	}
+	promptSnapshot, _ := json.Marshal(snapshotFields)
 	run, err := s.store.CreateRun(ctx, owner, Run{
 		ProjectID: input.ProjectID, SessionID: input.SessionID, IdempotencyKey: input.IdempotencyKey,
 		Status: RunQueued, ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, PromptSnapshot: promptSnapshot,
@@ -159,19 +180,30 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
-		UserMessage    string          `json:"user_message"`
-		ChapterNumber  int             `json:"chapter_number"`
-		PreviousTruth  json.RawMessage `json:"previous_truth"`
-		PreviousMemory json.RawMessage `json:"previous_memory"`
+		UserMessage         string            `json:"user_message"`
+		Mode                string            `json:"mode"`
+		ModeInputs          map[string]string `json:"mode_inputs"`
+		ChapterNumber       int               `json:"chapter_number"`
+		Checkpoint          bool              `json:"checkpoint"`
+		ConfirmedFoundation json.RawMessage   `json:"confirmed_foundation"`
+		PreviousTruth       json.RawMessage   `json:"previous_truth"`
+		PreviousMemory      json.RawMessage   `json:"previous_memory"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
+	}
+	settings, err := s.store.GetProjectSettings(ctx, owner, run.ProjectID)
+	if err != nil {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "读取作品写作风格失败", err)
 	}
 	sink := serviceEventSink{service: s, owner: owner}
 	bundle, runErr := s.pipeline.Run(ctx, RunContext{
 		OwnerUsername: owner, Run: run, Project: project, Session: session,
 		UserMessage: prompt.UserMessage, ChapterNumber: prompt.ChapterNumber,
 		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, Runtime: s.runtime,
+		ModeInputs: prompt.ModeInputs, StyleProfile: settings.StyleProfile, Rules: settings.Rules,
+		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
+		ConfirmedFoundation: prompt.ConfirmedFoundation,
 	}, sink)
 	if runErr != nil {
 		code, message := domainFailure(runErr)
@@ -186,6 +218,9 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	} else if cancelled {
 		cancelledErr := &DomainError{Code: ErrRunCancelled, Message: "小说创作已取消", Cause: context.Canceled}
 		return s.finish(ctx, owner, run, RunCancelled, ErrRunCancelled, cancelledErr.Message, nil, cancelledErr)
+	}
+	if bundle.FinalRunStatus == RunAwaitingConfirmation {
+		return s.finishCheckpoint(ctx, owner, run, bundle)
 	}
 	if err := s.store.SaveChapterBundle(ctx, owner, bundle); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "保存章节失败", err)
@@ -367,4 +402,214 @@ func domainFailure(err error) (string, string) {
 		return ErrRunCancelled, "小说创作已取消"
 	}
 	return ErrModelUnavailable, fmt.Sprintf("模型调用失败：%v", err)
+}
+
+// finishCheckpoint persists the generated blueprint and leaves the run in
+// awaiting_confirmation so the user can confirm or edit it.
+func (s *Service) finishCheckpoint(ctx context.Context, owner string, run Run, bundle ChapterBundle) (Run, error) {
+	if err := s.store.SaveFoundation(ctx, owner, bundle.Foundation); err != nil {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "保存创作蓝图失败", err)
+	}
+	updated, err := s.store.UpdateRun(ctx, owner, RunUpdate{
+		ID: run.ID, Status: RunAwaitingConfirmation, RuntimeSnapshot: bundle.RuntimeSnapshot,
+	})
+	if err != nil {
+		return run, err
+	}
+	if _, err := s.appendEvent(ctx, owner, updated, "run.checkpoint", RunAwaitingConfirmation, "创作蓝图已生成，等待确认", 20, nil); err != nil {
+		return updated, err
+	}
+	return updated, nil
+}
+
+// ConfirmRun resumes a checkpointed run. An edited blueprint is validated and
+// persisted before the continuation run is queued.
+func (s *Service) ConfirmRun(ctx context.Context, owner, runID string, blueprint json.RawMessage) (Run, error) {
+	if s == nil || s.store == nil || s.runtime == nil {
+		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "小说创作运行服务尚未配置"}
+	}
+	owner, runID = strings.TrimSpace(owner), strings.TrimSpace(runID)
+	source, err := s.store.GetRun(ctx, owner, runID)
+	if err != nil {
+		return Run{}, err
+	}
+	if source.Status != RunAwaitingConfirmation {
+		return Run{}, &DomainError{Code: ErrInvalidTransition, Message: "当前任务不在蓝图确认状态"}
+	}
+	key := "confirm:" + source.ID
+	if existing, found, err := s.store.FindRunByIdempotencyKey(ctx, owner, key); err != nil {
+		return Run{}, err
+	} else if found {
+		return existing, nil
+	}
+	var snapshot map[string]any
+	if err := json.Unmarshal(source.PromptSnapshot, &snapshot); err != nil {
+		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "原任务输入快照损坏", Cause: err}
+	}
+	confirmed := blueprint
+	if len(confirmed) > 0 {
+		if err := validateFoundationDocument(confirmed); err != nil {
+			return Run{}, err
+		}
+		now := time.Now().UTC()
+		foundationSnapshot, marshalErr := json.Marshal(map[string]any{"plan": json.RawMessage(confirmed)})
+		if marshalErr != nil {
+			return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "创作蓝图保存失败", Cause: marshalErr}
+		}
+		if err := s.store.SaveFoundation(ctx, owner, Foundation{
+			ID: source.ProjectID + "-foundation", ProjectID: source.ProjectID,
+			Snapshot: foundationSnapshot, CreatedAt: now, UpdatedAt: now,
+		}); err != nil {
+			return Run{}, err
+		}
+	} else {
+		confirmed = foundationPlanFromRuntime(source.RuntimeSnapshot)
+		if len(confirmed) == 0 {
+			return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "创作蓝图缺失，请重新生成"}
+		}
+	}
+	snapshot["confirmed_foundation"] = json.RawMessage(confirmed)
+	snapshot["checkpoint"] = false
+	snapshot["confirmed_from_run_id"] = source.ID
+	promptSnapshot, err := json.Marshal(snapshot)
+	if err != nil {
+		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "确认快照保存失败", Cause: err}
+	}
+	run, err := s.store.CreateRun(ctx, owner, Run{
+		ProjectID: source.ProjectID, SessionID: source.SessionID, IdempotencyKey: key,
+		Status: RunQueued, ModelID: source.ModelID, ThinkingLevel: source.ThinkingLevel, PromptSnapshot: promptSnapshot,
+	})
+	if err != nil {
+		if IsCode(err, ErrRunInProgress) {
+			if existing, found, findErr := s.store.FindRunByIdempotencyKey(ctx, owner, key); findErr == nil && found {
+				return existing, nil
+			}
+		}
+		return Run{}, err
+	}
+	if _, updateErr := s.store.UpdateRun(ctx, owner, RunUpdate{ID: source.ID, Status: RunSucceeded}); updateErr != nil {
+		return run, updateErr
+	}
+	if _, err := s.appendEvent(ctx, owner, run, "run.queued", RunQueued, "蓝图已确认，开始写正文", 0, map[string]any{"confirmedFromRunId": source.ID}); err != nil {
+		return run, err
+	}
+	if err := s.runtime.Enqueue(ctx, run.ID); err != nil {
+		failed, _ := s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "确认任务入队失败", err)
+		return failed, &DomainError{Code: ErrPersistenceFailed, Message: "确认任务入队失败，请稍后重试", Cause: err}
+	}
+	return run, nil
+}
+
+func (s *Service) GetProjectSettings(ctx context.Context, owner, projectID string) (ProjectSettings, error) {
+	if s == nil || s.store == nil {
+		return ProjectSettings{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.GetProjectSettings(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
+}
+
+func (s *Service) UpdateProjectSettings(ctx context.Context, owner, projectID string, input ProjectSettings) (ProjectSettings, error) {
+	if s == nil || s.store == nil {
+		return ProjectSettings{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	return s.store.UpdateProjectSettings(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), ProjectSettings{
+		StyleProfile: strings.TrimSpace(input.StyleProfile),
+		Rules:        normalizeRules(input.Rules),
+	})
+}
+
+func normalizeRules(rules []string) []string {
+	normalized := make([]string, 0, len(rules))
+	for _, rule := range rules {
+		if value := strings.TrimSpace(rule); value != "" {
+			normalized = append(normalized, value)
+		}
+	}
+	return normalized
+}
+
+// ExportDocument is a rendered whole-book download.
+type ExportDocument struct {
+	Filename    string
+	ContentType string
+	Content     string
+}
+
+// ExportProject renders every stored chapter in reading order.
+func (s *Service) ExportProject(ctx context.Context, owner, projectID, format string) (ExportDocument, error) {
+	if s == nil || s.store == nil {
+		return ExportDocument{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
+	}
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	project, err := s.store.GetProject(ctx, owner, projectID)
+	if err != nil {
+		return ExportDocument{}, err
+	}
+	chapters, err := s.store.ListChapters(ctx, owner, projectID)
+	if err != nil {
+		return ExportDocument{}, err
+	}
+	normalized := strings.ToLower(strings.TrimSpace(format))
+	switch normalized {
+	case "", "markdown", "md":
+		normalized = "markdown"
+	case "txt", "text":
+		normalized = "txt"
+	default:
+		return ExportDocument{}, &DomainError{Code: ErrInputRequired, Message: "导出格式仅支持 markdown 或 txt"}
+	}
+	var builder strings.Builder
+	if normalized == "markdown" {
+		builder.WriteString("# " + project.Title + "\n\n")
+	}
+	for _, chapter := range chapters {
+		fmt.Fprintf(&builder, "第%d章 %s\n\n%s\n\n", chapter.Number, chapter.Title, strings.TrimSpace(chapter.Content))
+	}
+	content := builder.String()
+	if strings.TrimSpace(content) == "" {
+		content = "（暂无章节内容）\n"
+	}
+	document := ExportDocument{Filename: sanitizeExportFilename(project.Title) + ".md", ContentType: "text/markdown; charset=utf-8", Content: content}
+	if normalized == "txt" {
+		document.Filename = sanitizeExportFilename(project.Title) + ".txt"
+		document.ContentType = "text/plain; charset=utf-8"
+	}
+	return document, nil
+}
+
+func sanitizeExportFilename(title string) string {
+	replacer := strings.NewReplacer("\\", "_", "/", "_", ":", "_", "*", "_", "?", "_",
+		"\"", "_", "<", "_", ">", "_", "|", "_", "\n", "_", "\r", "_")
+	name := strings.TrimSpace(replacer.Replace(strings.TrimSpace(title)))
+	if name == "" {
+		return "小说"
+	}
+	return name
+}
+
+func foundationPlanFromSnapshot(raw json.RawMessage) json.RawMessage {
+	var wrapper struct {
+		Plan json.RawMessage `json:"plan"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &wrapper) != nil || !json.Valid(wrapper.Plan) {
+		return nil
+	}
+	return wrapper.Plan
+}
+
+func foundationPlanFromRuntime(raw json.RawMessage) json.RawMessage {
+	var wrapper struct {
+		FoundationPlan json.RawMessage `json:"foundationPlan"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &wrapper) != nil || !json.Valid(wrapper.FoundationPlan) {
+		return nil
+	}
+	return wrapper.FoundationPlan
+}
+
+func validateFoundationDocument(raw json.RawMessage) error {
+	var value foundationPlanOutput
+	if err := decodeAndValidate(string(raw), &value, func() error { return validateFoundation(value) }); err != nil {
+		return &DomainError{Code: ErrInputRequired, Message: "创作蓝图格式无效", Cause: err}
+	}
+	return nil
 }

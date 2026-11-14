@@ -212,5 +212,20 @@ func NovelCreationMigrations() []Migration {
   CONSTRAINT fk_novel_revisions_chapter FOREIGN KEY (owner_username, chapter_id) REFERENCES novel_chapters(owner_username, chapter_id)
 ) ENGINE=InnoDB`,
 		},
+	}, {
+		Version:          8800301,
+		CallbackChecksum: "v88-novel-creation-project-settings-v1",
+		SQL: []string{
+			`CREATE TABLE IF NOT EXISTS novel_project_settings (
+  owner_username VARCHAR(191) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  style_profile LONGTEXT NULL,
+  rules_json JSON NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, project_id),
+  CONSTRAINT fk_novel_project_settings_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id)
+) ENGINE=InnoDB`,
+		},
 	}}
 }

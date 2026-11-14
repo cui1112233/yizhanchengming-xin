@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -506,4 +507,198 @@ func TestServiceHasNoDesktopOrLocalProcessDependency(t *testing.T) {
 	}
 	// The complete workflow above uses only service contracts. A Windows path,
 	// local process, Electron bridge, or filesystem handle is never supplied.
+}
+
+func newLongFormSession(t *testing.T, fixture serviceFixture) Session {
+	t.Helper()
+	session, err := fixture.service.CreateSession(context.Background(), "alice", CreateSessionInput{
+		ProjectID: fixture.project.ID, Mode: "long_original", Title: "长篇创作",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return session
+}
+
+func checkpointRunner() *stubPipelineRunner {
+	runner := &stubPipelineRunner{}
+	runner.run = func(_ context.Context, input RunContext, _ EventSink) (ChapterBundle, error) {
+		if input.Checkpoint && len(input.ConfirmedFoundation) == 0 {
+			return checkpointBundle(input, json.RawMessage(foundationJSON))
+		}
+		return serviceTestBundle(input, RunSucceeded), nil
+	}
+	return runner
+}
+
+func TestServiceCheckpointPausesThenConfirmsIntoChapterRun(t *testing.T) {
+	fixture := newServiceFixture(t, checkpointRunner())
+	session := newLongFormSession(t, fixture)
+	run, err := fixture.service.SendMessage(context.Background(), "alice", SendMessageInput{
+		SessionID: session.ID, ProjectID: fixture.project.ID, Content: "写长篇第一章",
+		ModelID: "text-1", IdempotencyKey: "checkpoint-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paused, err := fixture.service.Run(context.Background(), "alice", run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paused.Status != RunAwaitingConfirmation || paused.FinishedAt != nil {
+		t.Fatalf("paused=%+v, want awaiting_confirmation without finish time", paused)
+	}
+	if len(fixture.store.chapterBundles) != 0 {
+		t.Fatal("checkpoint must not save a chapter body")
+	}
+	snapshot, err := fixture.service.GetSnapshot(context.Background(), "alice", run.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpointEvent := false
+	for _, event := range snapshot.Events {
+		if event.Type == "run.checkpoint" {
+			checkpointEvent = true
+		}
+	}
+	if !checkpointEvent {
+		t.Fatalf("events=%+v, want run.checkpoint", snapshot.Events)
+	}
+
+	confirmed, err := fixture.service.ConfirmRun(context.Background(), "alice", paused.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if confirmed.Status != RunQueued || confirmed.ID == paused.ID {
+		t.Fatalf("confirmed=%+v", confirmed)
+	}
+	completed, err := fixture.service.Run(context.Background(), "alice", confirmed.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Status != RunSucceeded {
+		t.Fatalf("completed=%+v", completed)
+	}
+	if len(fixture.runner.lastCall().ConfirmedFoundation) == 0 {
+		t.Fatal("continuation run must carry the confirmed blueprint")
+	}
+}
+
+func TestServiceConfirmRunValidatesAndPersistsEditedBlueprint(t *testing.T) {
+	fixture := newServiceFixture(t, checkpointRunner())
+	session := newLongFormSession(t, fixture)
+	run, err := fixture.service.SendMessage(context.Background(), "alice", SendMessageInput{
+		SessionID: session.ID, ProjectID: fixture.project.ID, Content: "写长篇第一章",
+		ModelID: "text-1", IdempotencyKey: "checkpoint-edited",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paused, err := fixture.service.Run(context.Background(), "alice", run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.service.ConfirmRun(context.Background(), "alice", paused.ID, json.RawMessage(`{"title":""}`)); !IsCode(err, ErrInputRequired) {
+		t.Fatalf("invalid blueprint err=%v, want %s", err, ErrInputRequired)
+	}
+	edited := strings.Replace(foundationJSON, "雨幕记者", "雨幕新记", 1)
+	if _, err := fixture.service.ConfirmRun(context.Background(), "alice", paused.ID, json.RawMessage(edited)); err != nil {
+		t.Fatal(err)
+	}
+	foundation, found, err := fixture.store.GetFoundation(context.Background(), "alice", fixture.project.ID)
+	if err != nil || !found {
+		t.Fatalf("foundation found=%v err=%v", found, err)
+	}
+	if !strings.Contains(string(foundation.Snapshot), "雨幕新记") {
+		t.Fatalf("edited blueprint not persisted: %s", foundation.Snapshot)
+	}
+}
+
+func TestServiceRejectsMissingModeInputBeforePersistingMessage(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	session, err := fixture.service.CreateSession(context.Background(), "alice", CreateSessionInput{
+		ProjectID: fixture.project.ID, Mode: "continuation",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.service.SendMessage(context.Background(), "alice", SendMessageInput{
+		SessionID: session.ID, ProjectID: fixture.project.ID, Content: "接着写",
+		ModelID: "text-1", IdempotencyKey: "missing-mode-input",
+	})
+	if !IsCode(err, ErrInputRequired) {
+		t.Fatalf("err=%v, want %s", err, ErrInputRequired)
+	}
+	messages, err := fixture.store.ListMessages(context.Background(), "alice", session.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("messages=%d, invalid mode input must not persist", len(messages))
+	}
+	run, err := fixture.service.SendMessage(context.Background(), "alice", SendMessageInput{
+		SessionID: session.ID, ProjectID: fixture.project.ID, Content: "接着写",
+		ModelID: "text-1", IdempotencyKey: "with-mode-input",
+		ModeInputs: map[string]string{"previousText": "  前文最后一段  "},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshot map[string]any
+	if err := json.Unmarshal(run.PromptSnapshot, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	modeInputs, _ := snapshot["mode_inputs"].(map[string]any)
+	if modeInputs["previousText"] != "前文最后一段" || snapshot["mode"] != "continuation" {
+		t.Fatalf("prompt snapshot=%v", snapshot)
+	}
+}
+
+func TestServiceInjectsProjectSettingsIntoPipelineRun(t *testing.T) {
+	runner := &stubPipelineRunner{}
+	fixture := newServiceFixture(t, runner)
+	if _, err := fixture.service.UpdateProjectSettings(context.Background(), "alice", fixture.project.ID, ProjectSettings{
+		StyleProfile: " 冷峻短句 ", Rules: []string{" 不写血腥 ", ""},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	run, err := fixture.service.SendMessage(context.Background(), "alice", fixture.sendInput("settings-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.service.Run(context.Background(), "alice", run.ID); err != nil {
+		t.Fatal(err)
+	}
+	call := runner.lastCall()
+	if call.StyleProfile != "冷峻短句" || !reflect.DeepEqual(call.Rules, []string{"不写血腥"}) {
+		t.Fatalf("pipeline input style=%q rules=%v", call.StyleProfile, call.Rules)
+	}
+}
+
+func TestServiceExportProjectRendersMarkdownAndText(t *testing.T) {
+	fixture := newServiceFixture(t, nil)
+	run, err := fixture.service.SendMessage(context.Background(), "alice", fixture.sendInput("export-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.service.Run(context.Background(), "alice", run.ID); err != nil {
+		t.Fatal(err)
+	}
+	markdown, err := fixture.service.ExportProject(context.Background(), "alice", fixture.project.ID, "markdown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if markdown.Filename != "雨幕记者.md" || !strings.Contains(markdown.Content, "# 雨幕记者") || !strings.Contains(markdown.Content, "雨水敲着窗。") {
+		t.Fatalf("markdown=%+v", markdown)
+	}
+	text, err := fixture.service.ExportProject(context.Background(), "alice", fixture.project.ID, "txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text.Filename != "雨幕记者.txt" || strings.Contains(text.Content, "# ") || !strings.Contains(text.Content, "第1章") {
+		t.Fatalf("text=%+v", text)
+	}
+	if _, err := fixture.service.ExportProject(context.Background(), "alice", fixture.project.ID, "pdf"); !IsCode(err, ErrInputRequired) {
+		t.Fatalf("unsupported format err=%v", err)
+	}
 }

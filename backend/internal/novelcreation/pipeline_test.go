@@ -533,3 +533,63 @@ func TestPipelineStopsBeforeResolverAndProviderWhenAlreadyCancelled(t *testing.T
 		t.Fatalf("cancelled run reached resolver=%v providerCalls=%d", resolverCalled, len(provider.requests))
 	}
 }
+
+func TestPipelineCheckpointStopsAfterBlueprint(t *testing.T) {
+	provider := &queuedPipelineProvider{responses: []string{foundationJSON}}
+	input := fixturePipelineRunContext(NewMemoryRuntime())
+	input.Checkpoint = true
+	bundle, err := pipelineWithProvider(provider).Run(context.Background(), input, &recordingEventSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.FinalRunStatus != RunAwaitingConfirmation {
+		t.Fatalf("status=%s, want %s", bundle.FinalRunStatus, RunAwaitingConfirmation)
+	}
+	if len(provider.requests) != 1 {
+		t.Fatalf("provider calls=%d, checkpoint must stop after the blueprint", len(provider.requests))
+	}
+	if strings.TrimSpace(bundle.Chapter.Content) != "" {
+		t.Fatalf("checkpoint must not produce chapter body: %q", bundle.Chapter.Content)
+	}
+	if !strings.Contains(string(bundle.Foundation.Snapshot), "雨幕记者") || !strings.Contains(string(bundle.RuntimeSnapshot), "foundationPlan") {
+		t.Fatalf("binding snapshot=%s runtime=%s", bundle.Foundation.Snapshot, bundle.RuntimeSnapshot)
+	}
+}
+
+func TestPipelineReusesConfirmedFoundationWithoutBlueprintCall(t *testing.T) {
+	provider := &queuedPipelineProvider{responses: []string{
+		chapterPlanJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON,
+	}}
+	input := fixturePipelineRunContext(NewMemoryRuntime())
+	input.ConfirmedFoundation = json.RawMessage(foundationJSON)
+	bundle, err := pipelineWithProvider(provider).Run(context.Background(), input, &recordingEventSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.FinalRunStatus != RunSucceeded {
+		t.Fatalf("status=%s", bundle.FinalRunStatus)
+	}
+	if len(provider.requests) != 5 {
+		t.Fatalf("provider calls=%d, confirmed foundation must skip blueprint generation", len(provider.requests))
+	}
+}
+
+func TestPipelineInjectsModeInputsStyleAndRules(t *testing.T) {
+	provider := &queuedPipelineProvider{responses: []string{
+		foundationJSON, chapterPlanJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON,
+	}}
+	input := fixturePipelineRunContext(NewMemoryRuntime())
+	input.ModeInputs = map[string]string{"referenceText": "参考段落"}
+	input.StyleProfile = "冷峻短句"
+	input.Rules = []string{"不得出现血腥描写"}
+	if _, err := pipelineWithProvider(provider).Run(context.Background(), input, &recordingEventSink{}); err != nil {
+		t.Fatal(err)
+	}
+	for index, request := range provider.requests[:3] {
+		for _, expected := range []string{"参考段落", "冷峻短句", "不得出现血腥描写"} {
+			if !strings.Contains(request.UserPrompt, expected) {
+				t.Fatalf("request[%d] missing %q: %s", index, expected, request.UserPrompt)
+			}
+		}
+	}
+}

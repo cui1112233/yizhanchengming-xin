@@ -26,6 +26,23 @@ type Store interface {
 	ListRunEvents(context.Context, string, string, int64) ([]RunEvent, error)
 	ListChapters(context.Context, string, string) ([]Chapter, error)
 	SaveChapterBundle(context.Context, string, ChapterBundle) error
+	// GetProjectSettings returns the project-level style profile and creation
+	// rules. A project without a saved row returns zero values, not an error.
+	GetProjectSettings(context.Context, string, string) (ProjectSettings, error)
+	UpdateProjectSettings(context.Context, string, string, ProjectSettings) (ProjectSettings, error)
+	// GetFoundation returns the newest confirmed or generated blueprint for a
+	// project so later chapters reuse it instead of regenerating the outline.
+	GetFoundation(context.Context, string, string) (Foundation, bool, error)
+	SaveFoundation(context.Context, string, Foundation) error
+}
+
+// ProjectSettings holds the project-level writing style and hard rules that are
+// injected into every generation call.
+type ProjectSettings struct {
+	ProjectID    string    `json:"projectId"`
+	StyleProfile string    `json:"styleProfile"`
+	Rules        []string  `json:"rules"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // TxStore marks a Store that participates in a caller-managed transaction.

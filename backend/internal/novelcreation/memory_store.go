@@ -21,6 +21,8 @@ type MemoryStore struct {
 	runByKey       map[string]string
 	runEvents      map[string][]RunEvent
 	chapterBundles map[string]ChapterBundle
+	settings       map[string]ProjectSettings
+	foundations    map[string]Foundation
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -32,6 +34,8 @@ func NewMemoryStore() *MemoryStore {
 		runByKey:       make(map[string]string),
 		runEvents:      make(map[string][]RunEvent),
 		chapterBundles: make(map[string]ChapterBundle),
+		settings:       make(map[string]ProjectSettings),
+		foundations:    make(map[string]Foundation),
 	}
 }
 
@@ -428,5 +432,84 @@ func (s *MemoryStore) SaveChapterBundle(_ context.Context, owner string, bundle 
 	}
 	bundle.Chapter.UpdatedAt = now
 	s.chapterBundles[memoryKey(owner, bundle.ProjectID, bundle.Chapter.ID)] = cloneChapterBundle(bundle)
+	if bundle.Foundation.ID != "" {
+		foundation := bundle.Foundation
+		foundation.ProjectID = bundle.ProjectID
+		if foundation.CreatedAt.IsZero() {
+			foundation.CreatedAt = now
+		}
+		foundation.UpdatedAt = now
+		foundation.Snapshot = cloneRawJSON(foundation.Snapshot)
+		s.foundations[memoryKey(owner, bundle.ProjectID)] = foundation
+	}
+	return nil
+}
+
+func (s *MemoryStore) GetProjectSettings(_ context.Context, owner, projectID string) (ProjectSettings, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return ProjectSettings{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	settings, exists := s.settings[memoryKey(owner, projectID)]
+	if !exists {
+		return ProjectSettings{ProjectID: projectID, Rules: []string{}}, nil
+	}
+	settings.Rules = append([]string(nil), settings.Rules...)
+	return settings, nil
+}
+
+func (s *MemoryStore) UpdateProjectSettings(_ context.Context, owner, projectID string, input ProjectSettings) (ProjectSettings, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return ProjectSettings{}, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	settings := ProjectSettings{
+		ProjectID: projectID, StyleProfile: strings.TrimSpace(input.StyleProfile),
+		Rules: append([]string(nil), input.Rules...), UpdatedAt: time.Now().UTC(),
+	}
+	s.settings[memoryKey(owner, projectID)] = settings
+	return settings, nil
+}
+
+func (s *MemoryStore) GetFoundation(_ context.Context, owner, projectID string) (Foundation, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[memoryKey(owner, projectID)]
+	if !ok || project.DeletedAt != nil {
+		return Foundation{}, false, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	foundation, exists := s.foundations[memoryKey(owner, projectID)]
+	if !exists {
+		return Foundation{}, false, nil
+	}
+	foundation.Snapshot = cloneRawJSON(foundation.Snapshot)
+	return foundation, true, nil
+}
+
+func (s *MemoryStore) SaveFoundation(_ context.Context, owner string, foundation Foundation) error {
+	if err := validateRawJSON("foundation snapshot", foundation.Snapshot); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	foundation.ProjectID = strings.TrimSpace(foundation.ProjectID)
+	if foundation.ProjectID == "" || strings.TrimSpace(foundation.ID) == "" {
+		return &DomainError{Code: ErrInputRequired, Message: "foundation id and projectId are required"}
+	}
+	project, ok := s.projects[memoryKey(owner, foundation.ProjectID)]
+	if !ok || project.DeletedAt != nil {
+		return &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+	}
+	now := time.Now().UTC()
+	if foundation.CreatedAt.IsZero() {
+		foundation.CreatedAt = now
+	}
+	foundation.UpdatedAt = now
+	foundation.Snapshot = cloneRawJSON(foundation.Snapshot)
+	s.foundations[memoryKey(owner, foundation.ProjectID)] = foundation
 	return nil
 }

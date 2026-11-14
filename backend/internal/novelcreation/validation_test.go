@@ -64,7 +64,9 @@ func TestNormalizeSendMessageInputTrimsAllStrings(t *testing.T) {
 		ThinkingLevel:  "balanced",
 		IdempotencyKey: "send-1",
 	}
-	if got != want {
+	if got.SessionID != want.SessionID || got.ProjectID != want.ProjectID || got.Content != want.Content ||
+		got.ModelID != want.ModelID || got.ThinkingLevel != want.ThinkingLevel || got.IdempotencyKey != want.IdempotencyKey ||
+		got.ModeInputs != nil {
 		t.Fatalf("got=%+v, want=%+v", got, want)
 	}
 }
@@ -118,6 +120,42 @@ func TestNormalizeCreateProjectInputRejectsTargetWordsOutsideRange(t *testing.T)
 func TestCanTransitionRejectsSucceededToWriting(t *testing.T) {
 	if CanTransition(RunSucceeded, RunWriting) {
 		t.Fatal("terminal run must not return to writing")
+	}
+}
+
+func TestNormalizeModeInputsRequiresModeSpecificFields(t *testing.T) {
+	tests := []struct{ mode, key string }{
+		{mode: "long_imitation", key: "referenceText"},
+		{mode: "short_imitation", key: "referenceText"},
+		{mode: "fanfiction", key: "existingSetting"},
+		{mode: "continuation", key: "previousText"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.mode, func(t *testing.T) {
+			if _, err := NormalizeModeInputs(tt.mode, nil); !IsCode(err, ErrInputRequired) {
+				t.Fatalf("missing input err=%v, want %s", err, ErrInputRequired)
+			}
+			got, err := NormalizeModeInputs(tt.mode, map[string]string{tt.key: "  内容  ", "unknown": "x"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got[tt.key] != "内容" || len(got) != 1 {
+				t.Fatalf("got=%v, want only %s", got, tt.key)
+			}
+		})
+	}
+}
+
+func TestNormalizeModeInputsDropsExtraInputsForPlainModes(t *testing.T) {
+	got, err := NormalizeModeInputs("long_original", map[string]string{"referenceText": "x"})
+	if err != nil || got != nil {
+		t.Fatalf("got=%v err=%v, plain modes ignore extra inputs", got, err)
+	}
+}
+
+func TestCanTransitionAllowsConfirmedCheckpointToSucceed(t *testing.T) {
+	if !CanTransition(RunAwaitingConfirmation, RunSucceeded) {
+		t.Fatal("confirmed checkpoint must be able to reach succeeded")
 	}
 }
 

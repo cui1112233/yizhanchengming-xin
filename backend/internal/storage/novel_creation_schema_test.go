@@ -8,8 +8,8 @@ import (
 
 func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	if len(migrations) != 1 {
-		t.Fatalf("migrations=%d, want 1", len(migrations))
+	if len(migrations) != 2 {
+		t.Fatalf("migrations=%d, want 2", len(migrations))
 	}
 	migration := migrations[0]
 	if migration.Version != 8800300 {
@@ -35,6 +35,17 @@ func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("missing required storage type %q", required)
 		}
+	}
+	settings := migrations[1]
+	if settings.Version != 8800301 || settings.CallbackChecksum != "v88-novel-creation-project-settings-v1" {
+		t.Fatalf("settings migration=%+v", settings)
+	}
+	settingsSQL := strings.Join(settings.SQL, "\n")
+	if !strings.Contains(settingsSQL, "CREATE TABLE IF NOT EXISTS novel_project_settings") {
+		t.Fatalf("missing novel_project_settings table")
+	}
+	if !strings.Contains(settingsSQL, "PRIMARY KEY (owner_username, project_id)") {
+		t.Fatalf("novel_project_settings must be owner scoped")
 	}
 }
 

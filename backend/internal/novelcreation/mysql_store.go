@@ -772,3 +772,121 @@ func validateChapterBundleBindings(bundle ChapterBundle) error {
 }
 
 var _ Store = (*MySQLStore)(nil)
+
+func (s *MySQLStore) GetProjectSettings(ctx context.Context, owner, projectID string) (ProjectSettings, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+	projectID = strings.TrimSpace(projectID)
+	var settings ProjectSettings
+	var style sql.NullString
+	var rules []byte
+	err = s.db.QueryRowContext(ctx, `SELECT st.project_id, st.style_profile, st.rules_json, st.updated_at
+FROM novel_project_settings st
+JOIN novel_projects p ON p.owner_username = st.owner_username AND p.project_id = st.project_id
+WHERE st.owner_username = ? AND st.project_id = ? AND p.deleted_at IS NULL`, owner, projectID).
+		Scan(&settings.ProjectID, &style, &rules, &settings.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		if _, projectErr := s.GetProject(ctx, owner, projectID); projectErr != nil {
+			return ProjectSettings{}, projectErr
+		}
+		return ProjectSettings{ProjectID: projectID, Rules: []string{}}, nil
+	}
+	if err != nil {
+		return ProjectSettings{}, persistenceError(err)
+	}
+	settings.StyleProfile = style.String
+	settings.Rules = []string{}
+	if len(rules) > 0 {
+		if unmarshalErr := json.Unmarshal(rules, &settings.Rules); unmarshalErr != nil {
+			settings.Rules = []string{}
+		}
+	}
+	if settings.Rules == nil {
+		settings.Rules = []string{}
+	}
+	return settings, nil
+}
+
+func (s *MySQLStore) UpdateProjectSettings(ctx context.Context, owner, projectID string, input ProjectSettings) (ProjectSettings, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+	projectID = strings.TrimSpace(projectID)
+	rules := input.Rules
+	if rules == nil {
+		rules = []string{}
+	}
+	rulesJSON, err := json.Marshal(rules)
+	if err != nil {
+		return ProjectSettings{}, persistenceError(err)
+	}
+	now := time.Now().UTC()
+	_, err = s.db.ExecContext(ctx, `INSERT INTO novel_project_settings
+(owner_username, project_id, style_profile, rules_json, created_at, updated_at)
+SELECT ?, ?, ?, ?, ?, ?
+WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)
+ON DUPLICATE KEY UPDATE style_profile = VALUES(style_profile), rules_json = VALUES(rules_json), updated_at = VALUES(updated_at)`,
+		owner, projectID, nullableString(strings.TrimSpace(input.StyleProfile)), []byte(rulesJSON), now, now, owner, projectID)
+	if err != nil {
+		return ProjectSettings{}, persistenceError(err)
+	}
+	if _, projectErr := s.GetProject(ctx, owner, projectID); projectErr != nil {
+		return ProjectSettings{}, projectErr
+	}
+	return s.GetProjectSettings(ctx, owner, projectID)
+}
+
+func (s *MySQLStore) GetFoundation(ctx context.Context, owner, projectID string) (Foundation, bool, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return Foundation{}, false, err
+	}
+	var foundation Foundation
+	var snapshot []byte
+	err = s.db.QueryRowContext(ctx, `SELECT f.foundation_id, f.project_id, f.snapshot_json, f.created_at, f.updated_at
+FROM novel_foundations f
+JOIN novel_projects p ON p.owner_username = f.owner_username AND p.project_id = f.project_id
+WHERE f.owner_username = ? AND f.project_id = ? AND p.deleted_at IS NULL
+ORDER BY f.updated_at DESC LIMIT 1`, owner, strings.TrimSpace(projectID)).
+		Scan(&foundation.ID, &foundation.ProjectID, &snapshot, &foundation.CreatedAt, &foundation.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Foundation{}, false, nil
+	}
+	if err != nil {
+		return Foundation{}, false, persistenceError(err)
+	}
+	foundation.Snapshot = cloneRawJSON(snapshot)
+	return foundation, true, nil
+}
+
+func (s *MySQLStore) SaveFoundation(ctx context.Context, owner string, foundation Foundation) error {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return err
+	}
+	if err := validateRawJSON("foundation snapshot", foundation.Snapshot); err != nil {
+		return err
+	}
+	foundation.ID, foundation.ProjectID = strings.TrimSpace(foundation.ID), strings.TrimSpace(foundation.ProjectID)
+	if foundation.ID == "" || foundation.ProjectID == "" {
+		return &DomainError{Code: ErrInputRequired, Message: "foundation id and projectId are required"}
+	}
+	if _, projectErr := s.GetProject(ctx, owner, foundation.ProjectID); projectErr != nil {
+		return projectErr
+	}
+	now := time.Now().UTC()
+	if foundation.CreatedAt.IsZero() {
+		foundation.CreatedAt = now
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO novel_foundations (foundation_id, owner_username, project_id, snapshot_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE snapshot_json = VALUES(snapshot_json), updated_at = VALUES(updated_at)`,
+		foundation.ID, owner, foundation.ProjectID, nullableRawJSON(foundation.Snapshot), foundation.CreatedAt, now)
+	if err != nil {
+		return persistenceError(err)
+	}
+	return nil
+}

@@ -77,4 +77,8 @@ type SendMessageInput struct {
 	ModelID        string
 	ThinkingLevel  string
 	IdempotencyKey string
+	// ModeInputs carries the mode-specific contract payload (reference text for
+	// imitation, existing setting for fanfiction, previous text for
+	// continuation). The service validates it against Session.Mode.
+	ModeInputs map[string]string
 }

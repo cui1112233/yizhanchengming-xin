@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -53,7 +54,14 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	}
 
 	handle("GET /api/novel-creation/modes", func(w http.ResponseWriter, _ *http.Request, _ string) {
-		writeJSON(w, http.StatusOK, map[string]any{"modes": novelCreationModes})
+		modes := make([]map[string]any, 0, len(novelCreationModes))
+		for _, mode := range novelCreationModes {
+			modes = append(modes, map[string]any{
+				"id": mode["id"], "name": mode["name"], "description": mode["description"],
+				"inputs": novelcreation.ModeInputFields(mode["id"]),
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"modes": modes})
 	})
 	handle("GET /api/novel-creation/projects", func(w http.ResponseWriter, req *http.Request, owner string) {
 		projects, err := service.ListProjects(req.Context(), owner)
@@ -107,11 +115,12 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("POST /api/novel-creation/sessions/{sessionID}/messages", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			ProjectID     string `json:"projectId"`
-			Content       string `json:"content"`
-			ModelID       string `json:"modelId"`
-			ThinkingLevel string `json:"thinkingLevel"`
-			Idempotency   string `json:"idempotencyKey"`
+			ProjectID     string            `json:"projectId"`
+			Content       string            `json:"content"`
+			ModelID       string            `json:"modelId"`
+			ThinkingLevel string            `json:"thinkingLevel"`
+			Idempotency   string            `json:"idempotencyKey"`
+			ModeInputs    map[string]string `json:"modeInputs"`
 		}
 		if !decode(w, req, &input) {
 			return
@@ -119,6 +128,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		run, err := service.SendMessage(req.Context(), owner, novelcreation.SendMessageInput{
 			SessionID: req.PathValue("sessionID"), ProjectID: input.ProjectID, Content: input.Content,
 			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, IdempotencyKey: input.Idempotency,
+			ModeInputs: input.ModeInputs,
 		})
 		if err != nil {
 			writeNovelCreationError(w, err)
@@ -156,6 +166,58 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"run": run})
+	})
+	handle("POST /api/novel-creation/runs/{runID}/confirm", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Blueprint json.RawMessage `json:"blueprint"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		run, err := service.ConfirmRun(req.Context(), owner, req.PathValue("runID"), input.Blueprint)
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		if starter != nil {
+			starter(context.Background(), owner, run.ID)
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"run": run})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/settings", func(w http.ResponseWriter, req *http.Request, owner string) {
+		settings, err := service.GetProjectSettings(req.Context(), owner, req.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+	})
+	handle("PUT /api/novel-creation/projects/{projectID}/settings", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			StyleProfile string   `json:"styleProfile"`
+			Rules        []string `json:"rules"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		settings, err := service.UpdateProjectSettings(req.Context(), owner, req.PathValue("projectID"), novelcreation.ProjectSettings{
+			StyleProfile: input.StyleProfile, Rules: input.Rules,
+		})
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/export", func(w http.ResponseWriter, req *http.Request, owner string) {
+		document, err := service.ExportProject(req.Context(), owner, req.PathValue("projectID"), req.URL.Query().Get("format"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", document.ContentType)
+		w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(document.Filename))
+		_, _ = w.Write([]byte(document.Content))
 	})
 }
 

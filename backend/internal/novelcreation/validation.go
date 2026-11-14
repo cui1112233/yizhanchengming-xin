@@ -55,6 +55,66 @@ func NormalizeSendMessageInput(input SendMessageInput) (SendMessageInput, error)
 	return input, nil
 }
 
+// ModeInputField describes one mode-specific input the user must supply before
+// a run can start. The frontend renders the same catalog through
+// GET /api/novel-creation/modes.
+type ModeInputField struct {
+	Key      string `json:"key"`
+	Label    string `json:"label"`
+	Required bool   `json:"required"`
+}
+
+var modeInputFieldCatalog = map[string][]ModeInputField{
+	"long_imitation":  {{Key: "referenceText", Label: "参考文本", Required: true}},
+	"short_imitation": {{Key: "referenceText", Label: "参考文本", Required: true}},
+	"fanfiction":      {{Key: "existingSetting", Label: "既有人物与世界规则", Required: true}},
+	"continuation":    {{Key: "previousText", Label: "被续写的前文", Required: true}},
+}
+
+// ModeInputFields returns the input contract for a creation mode. Modes
+// without extra inputs return nil.
+func ModeInputFields(mode string) []ModeInputField {
+	fields := modeInputFieldCatalog[strings.TrimSpace(mode)]
+	return append([]ModeInputField(nil), fields...)
+}
+
+// NormalizeModeInputs trims and keeps only the keys that belong to the session
+// mode, then enforces required fields. Unknown keys are dropped so arbitrary
+// browser payloads cannot reach the prompt snapshot.
+func NormalizeModeInputs(mode string, inputs map[string]string) (map[string]string, error) {
+	fields := modeInputFieldCatalog[strings.TrimSpace(mode)]
+	if len(fields) == 0 {
+		return nil, nil
+	}
+	normalized := make(map[string]string, len(fields))
+	for _, field := range fields {
+		if value := strings.TrimSpace(inputs[field.Key]); value != "" {
+			normalized[field.Key] = value
+		}
+	}
+	for _, field := range fields {
+		if field.Required && normalized[field.Key] == "" {
+			return nil, &DomainError{Code: ErrInputRequired, Message: "请填写" + field.Label}
+		}
+	}
+	if len(normalized) == 0 {
+		return nil, nil
+	}
+	return normalized, nil
+}
+
+// modeUsesCheckpoint reports whether a fresh blueprint must be confirmed before
+// the pipeline writes chapter bodies. Continuations and short forms run
+// straight through.
+func modeUsesCheckpoint(mode string) bool {
+	switch strings.TrimSpace(mode) {
+	case "long_original", "long_imitation":
+		return true
+	default:
+		return false
+	}
+}
+
 func CanTransition(from, to RunStatus) bool {
 	if !validRunStatus(from) || !validRunStatus(to) {
 		return false
@@ -75,7 +135,7 @@ func CanTransition(from, to RunStatus) bool {
 	case RunClarifying:
 		return to == RunAwaitingConfirmation || to == RunQueued
 	case RunAwaitingConfirmation:
-		return to == RunQueued
+		return to == RunQueued || to == RunSucceeded
 	case RunQueued:
 		return to == RunPlanning
 	case RunPlanning:
