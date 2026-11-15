@@ -1,0 +1,158 @@
+package httpapi
+
+import (
+	"context"
+	"net/http"
+	"qiantie/backend/internal/novelfetchworkshop"
+	"testing"
+	"time"
+)
+
+// Investigation fixtures only: no real database, provider or upload service.
+func TestAuditRound2ChangedAICountRetry(t *testing.T) {
+	for _, status := range []string{"completed", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &uniqueRecordingNovelFetchQueue{}
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Original: "已保存原文", Versions: map[string]any{"ai1": "已完成AI1"}, Meta: map[string]any{"status": status, "originalStatus": "done", "aiStatus": "done", "aiCount": 1, "siteSubmitStatus": "submitted", "processSnapshot": map[string]any{"platform_id": "15", "max_txt": 4000, "selected_versions": []any{"ai1"}, "auto_submit": false}}}
+			store.PutDocument(ctx, "tester", doc)
+			now := time.Now()
+			handler := NewRouter(RouterOptions{BridgeSecret: "round2", Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+			response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-ai-count", map[string]any{"ids": []string{doc.BookID}, "count": 3}, now, "round2")
+			if response.Code != 200 {
+				t.Fatalf("count save: %d %s", response.Code, response.Body.String())
+			}
+			saved, _ := store.GetDocument(ctx, "tester", doc.BookID)
+			t.Logf("saved aiCount=%v snapshot=%v", saved.Meta["aiCount"], mapOrEmpty(saved.Meta["processSnapshot"])["selected_versions"])
+			result, err := enqueueWorkshopRetries(ctx, store, queue, "tester", []string{doc.BookID}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Queued != 1 {
+				t.Fatalf("missing AI2/AI3 not queued: %+v", result)
+			}
+			job := queue.jobs[0]
+			if len(job.SelectedVersions) != 3 {
+				t.Fatalf("retry still uses old target: %v", job.SelectedVersions)
+			}
+		})
+	}
+}
+
+func TestAuditRound2ScheduleTerminalAndVersionEvidence(t *testing.T) {
+	for _, scenario := range []string{"cancelled", "partial_submitted"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			item := map[string]any{"id": "audit-schedule", "status": "waiting_retry", "retry_tracking": true, "book_ids": []any{"12345678901"}, "selected_versions": []any{"ai1", "ai2"}, "auto_submit": true}
+			store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}})
+			meta := map[string]any{"status": "cancelled"}
+			if scenario == "partial_submitted" {
+				meta = map[string]any{"status": "completed", "siteSubmitStatus": "submitted", "siteSubmitDoneVersions": []any{"ai1"}}
+			}
+			store.PutDocument(ctx, "tester", novelfetchworkshop.Document{BookID: "12345678901", Meta: meta})
+			cfg, _ := store.GetConfig(ctx, "tester")
+			_, err := reconcileNovelFetchScheduleRetry(ctx, store, "tester", item, cfg, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg, _ = store.GetConfig(ctx, "tester")
+			row := mapOrEmpty(arrayOrEmpty(cfg["novel_fetch_schedules"])[0])
+			t.Logf("actual schedule status=%v", row["status"])
+			if scenario == "cancelled" && row["status"] != "cancelled" && row["status"] != "stopped" {
+				t.Fatalf("cancelled book is not terminal: %v", row["status"])
+			}
+			if scenario == "partial_submitted" && row["status"] == "completed" {
+				t.Fatal("AI2 missing but schedule marked completed")
+			}
+		})
+	}
+}
+
+func TestAuditRound2OneBusyBookDoesNotAbandonOtherScheduledBook(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	due := time.Now().Add(time.Hour)
+	item := createPreparedSchedule(t, store, map[string]any{"input_text": "12345678901 第一本\n12345678902 第二本", "run_at": due.Format(time.RFC3339Nano), "auto_submit": false})
+	occupied := novelfetchworkshop.ProcessJob{ID: "existing-busy-job", BatchID: "existing-batch", Owner: "tester", PlatformID: "2", BookIDs: []string{"12345678901"}}
+	if ok, _, err := queue.EnqueueUniqueBooks(ctx, occupied, time.Hour); err != nil || !ok {
+		t.Fatalf("queue setup: %v", err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", due.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := store.GetConfig(ctx, "tester")
+	row := mapOrEmpty(arrayOrEmpty(cfg["novel_fetch_schedules"])[0])
+	doc, _ := store.GetDocument(ctx, "tester", "12345678902")
+	t.Logf("schedule=%v book2=%v held=%v existingJob=%v scheduleID=%v", row["status"], doc.Meta["status"], doc.Meta["scheduledHold"], row["existing_job_id"], item["id"])
+	if row["status"] == "skipped_existing" && doc.Meta["scheduledHold"] == true {
+		t.Fatal("one Redis book lock abandoned the other book")
+	}
+}
+
+type auditRound2StopStore struct {
+	novelfetchworkshop.LifecycleStore
+	onPut func(context.Context, string, novelfetchworkshop.Document)
+}
+
+func (s *auditRound2StopStore) PutDocument(ctx context.Context, owner string, d novelfetchworkshop.Document) error {
+	if err := s.LifecycleStore.PutDocument(ctx, owner, d); err != nil {
+		return err
+	}
+	if s.onPut != nil {
+		s.onPut(ctx, owner, d)
+	}
+	return nil
+}
+func TestAuditRound2StopDuringDispatchRemainsAuthoritative(t *testing.T) {
+	ctx := context.Background()
+	base := novelfetchworkshop.NewMemoryStore()
+	store := &auditRound2StopStore{LifecycleStore: base}
+	queue := novelfetchworkshop.NewMemoryQueue()
+	due := time.Now().Add(time.Hour)
+	createPreparedSchedule(t, store, map[string]any{"input_text": "12345678901 停止测试", "run_at": due.Format(time.RFC3339Nano), "auto_submit": false})
+	fired := false
+	store.onPut = func(ctx context.Context, owner string, d novelfetchworkshop.Document) {
+		if fired || d.Meta["processSnapshot"] == nil {
+			return
+		}
+		fired = true
+		queue.CancelBooks(ctx, owner, []string{d.BookID})
+		latest, _ := base.GetDocument(ctx, owner, d.BookID)
+		latest.Meta["status"] = "stopped"
+		latest.Meta["queueState"] = "stopped"
+		base.PutDocument(ctx, owner, latest)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", due.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if !fired {
+		t.Fatal("interleaving not exercised")
+	}
+	cancelled, _ := queue.IsBookCancelled(ctx, "tester", "12345678901")
+	doc, _ := store.GetDocument(ctx, "tester", "12345678901")
+	t.Logf("after manual stop: cancelled=%v documentStatus=%v", cancelled, doc.Meta["status"])
+	if !cancelled || doc.Meta["status"] != "stopped" {
+		t.Fatal("dispatch cleared a newer manual stop")
+	}
+}
+
+func TestAuditRound2RetryKeepsExplicitGenerateOnlyChoice(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	store.PutConfig(ctx, "tester", map[string]any{novelFetchAutomationConfigKey: map[string]any{"enabled": true}})
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Original: "已有原文", Meta: map[string]any{"status": "failed", "originalStatus": "done", "aiStatus": "failed", "processSnapshot": map[string]any{"platform_id": "15", "max_txt": 4000, "selected_versions": []any{"ai1"}, "auto_submit": false}}}
+	store.PutDocument(ctx, "tester", doc)
+	result, err := enqueueWorkshopRetries(ctx, store, queue, "tester", []string{doc.BookID}, false)
+	if err != nil || result.Queued != 1 {
+		t.Fatalf("setup enqueue: %+v %v", result, err)
+	}
+	stored, _ := store.GetDocument(ctx, "tester", doc.BookID)
+	t.Logf("job autoSubmit=%v saved snapshot auto_submit=%v", queue.jobs[0].AutoSubmit, mapOrEmpty(stored.Meta["processSnapshot"])["auto_submit"])
+	if queue.jobs[0].AutoSubmit || mapOrEmpty(stored.Meta["processSnapshot"])["auto_submit"] != false {
+		t.Fatal("retry changed explicit generate-only choice into submission")
+	}
+}

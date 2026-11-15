@@ -1,0 +1,9 @@
+{
+  "runtimeObserved": "7d2a2326",
+  "fixtureSha256": "F19C8A1920E7EB31C7FD616630FF82E60983BD42C00D6B95AF4B33E1B2B5D9AF",
+  "sourceRevision": "dabc545c",
+  "expected": "Desired safety invariants fail in current code",
+  "baselineChecks": "Existing normal schedule/retry tests pass (2.638s)",
+  "isolation": "MemoryStore and in-memory/recording queues; Go overlay; no production edits or external provider calls",
+  "originalMainSha256": "5c400add3ecfdc00211e562999ac2fbeea9c2534a6dcf4cf845d2596f87650d2"
+}

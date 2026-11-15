@@ -1,0 +1,39 @@
+=== RUN   TestAuditRound2ChangedAICountRetry
+=== RUN   TestAuditRound2ChangedAICountRetry/completed
+2026/11/15 13:54:51 batch-factory capabilities slice=0 enabled=0 disabled=[batch.create batch.read compiler.preview director.run hook.review merge.run override.edit production.cancel production.submit publish.121 publish.yadi settings.edit snapshot.read working-front.viral]
+    audit_round2_test.go:27: saved aiCount=3 snapshot=[ai1]
+    audit_round2_test.go:33: missing AI2/AI3 not queued: {Requested:1 Queued:0 Updated:0 Retried:0 Failed:0 Skipped:1 AlreadyRunning:0 TaskIDs:[] Jobs:[] Errors:map[] OK:true}
+=== RUN   TestAuditRound2ChangedAICountRetry/failed
+2026/11/15 13:54:51 batch-factory capabilities slice=0 enabled=0 disabled=[batch.create batch.read compiler.preview director.run hook.review merge.run override.edit production.cancel production.submit publish.121 publish.yadi settings.edit snapshot.read working-front.viral]
+    audit_round2_test.go:27: saved aiCount=3 snapshot=[ai1]
+    audit_round2_test.go:37: retry still uses old target: [ai1]
+--- FAIL: TestAuditRound2ChangedAICountRetry (0.19s)
+    --- FAIL: TestAuditRound2ChangedAICountRetry/completed (0.10s)
+    --- FAIL: TestAuditRound2ChangedAICountRetry/failed (0.09s)
+=== RUN   TestAuditRound2ScheduleTerminalAndVersionEvidence
+=== RUN   TestAuditRound2ScheduleTerminalAndVersionEvidence/cancelled
+    audit_round2_test.go:62: actual schedule status=waiting_retry
+    audit_round2_test.go:64: cancelled book is not terminal: waiting_retry
+=== RUN   TestAuditRound2ScheduleTerminalAndVersionEvidence/partial_submitted
+    audit_round2_test.go:62: actual schedule status=completed
+    audit_round2_test.go:67: AI2 missing but schedule marked completed
+--- FAIL: TestAuditRound2ScheduleTerminalAndVersionEvidence (0.38s)
+    --- FAIL: TestAuditRound2ScheduleTerminalAndVersionEvidence/cancelled (0.07s)
+    --- FAIL: TestAuditRound2ScheduleTerminalAndVersionEvidence/partial_submitted (0.30s)
+=== RUN   TestAuditRound2OneBusyBookDoesNotAbandonOtherScheduledBook
+2026/11/15 13:54:52 batch-factory capabilities slice=0 enabled=0 disabled=[batch.create batch.read compiler.preview director.run hook.review merge.run override.edit production.cancel production.submit publish.121 publish.yadi settings.edit snapshot.read working-front.viral]
+    audit_round2_test.go:89: schedule=skipped_existing book2=scheduled_waiting held=true existingJob=existing-busy-job scheduleID=schedule-20261115055452.398389500
+    audit_round2_test.go:91: one Redis book lock abandoned the other book
+--- FAIL: TestAuditRound2OneBusyBookDoesNotAbandonOtherScheduledBook (0.76s)
+=== RUN   TestAuditRound2StopDuringDispatchRemainsAuthoritative
+2026/11/15 13:54:53 batch-factory capabilities slice=0 enabled=0 disabled=[batch.create batch.read compiler.preview director.run hook.review merge.run override.edit production.cancel production.submit publish.121 publish.yadi settings.edit snapshot.read working-front.viral]
+    audit_round2_test.go:136: after manual stop: cancelled=false documentStatus=queued
+    audit_round2_test.go:138: dispatch cleared a newer manual stop
+--- FAIL: TestAuditRound2StopDuringDispatchRemainsAuthoritative (0.61s)
+=== RUN   TestAuditRound2RetryKeepsExplicitGenerateOnlyChoice
+    audit_round2_test.go:154: job autoSubmit=true saved snapshot auto_submit=true
+    audit_round2_test.go:156: retry changed explicit generate-only choice into submission
+--- FAIL: TestAuditRound2RetryKeepsExplicitGenerateOnlyChoice (0.04s)
+FAIL
+FAIL	qiantie/backend/internal/httpapi	2.053s
+FAIL
