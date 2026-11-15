@@ -34,8 +34,8 @@ import (
 	"qiantie/backend/internal/novelcreation"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/productionmedia"
-	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/projectretention"
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/safehttp"
 	"qiantie/backend/internal/safepath"
 	"qiantie/backend/internal/screenplay"
@@ -602,7 +602,12 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	// Expiry must also run on local-only installations without TOS. 全站统一：
 	// 每天 00:00 重算保留期，到期只归档、不自动删除。
 	projectRetention := projectretention.NewService(db, store.MySQLStore, artifactStore, retentionRemote, retentionDays)
+	projectRetention.CanvasAssets = agentAssetStore
+	projectRetention.CanvasObjects = agentAssetObjects
 	projectRetention.StartDaily(0, 0)
+	// 批量测书删除历史文档时正文会转入可回收状态；这里每天兜底清理一次，
+	// 避免 TOS 对象和正文行长期无人回收。
+	startNovelFetchBodyCleanup(ctx, novelFetchStore)
 	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
 	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。
 	automationPresetStore, err := httpapi.NewMySQLAutomationPresetStore(db, cfg.AutomationPresetPath, time.Now)
@@ -739,4 +744,30 @@ func videoManagementTargetBaseURL() string {
 		return "https://two.121w.com"
 	}
 	return raw
+}
+
+// startNovelFetchBodyCleanup 每天兜底回收批量测书的过期正文。
+// 删除历史文档只把正文标记为 releasable，真正的 TOS 对象删除依赖这里。
+func startNovelFetchBodyCleanup(ctx context.Context, store *novelfetchworkshop.MySQLStore) {
+	if store == nil {
+		return
+	}
+	go func() {
+		timer := time.NewTimer(10 * time.Minute)
+		defer timer.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				result, err := store.CleanupExpiredBodies(ctx, time.Now().UTC(), 500)
+				if err != nil {
+					log.Printf("novel fetch body cleanup failed: %v", err)
+				} else if result.Deleted > 0 {
+					log.Printf("novel fetch body cleanup deleted %d expired bodies", result.Deleted)
+				}
+				timer.Reset(24 * time.Hour)
+			}
+		}
+	}()
 }

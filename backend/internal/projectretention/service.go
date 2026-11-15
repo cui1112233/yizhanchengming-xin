@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 )
@@ -51,13 +52,15 @@ type Record struct {
 
 // Service 负责每日 00:00 重算保留期、到期归档，以及归档作品的恢复与彻底删除。
 type Service struct {
-	DB       *sql.DB
-	Batch    *batchfactoryv11.MySQLStore
-	Local    *localartifact.Store
-	Remote   batchfactoryv11.RemoteObjectDeleter
-	Days     func(owner string) int
-	Now      func() time.Time
-	Location *time.Location
+	DB            *sql.DB
+	Batch         *batchfactoryv11.MySQLStore
+	Local         *localartifact.Store
+	Remote        batchfactoryv11.RemoteObjectDeleter
+	CanvasAssets  agentworkspace.AssetStore
+	CanvasObjects agentworkspace.AssetObjectStore
+	Days          func(owner string) int
+	Now           func() time.Time
+	Location      *time.Location
 }
 
 // NewService 构造保留服务。batch 可为空，表示当前运行环境未启用批量工厂存储。
@@ -176,7 +179,12 @@ UNION SELECT owner_username FROM batch_factory_v12_batches`)
 type moduleQuery struct {
 	module Module
 	sql    string
-	stale  string
+	// extraSQL 用于补充跨表活动时间。部分历史表与项目表的字符集/排序规则
+	// 不一致，直接 JOIN 会触发 Illegal mix of collations，因此单独查询后在
+	// Go 侧取最大值。
+	extraSQL string
+	// validSQL 返回该模块仍然存在的项目 ID，用于清理已删除作品的保留记录。
+	validSQL string
 }
 
 var moduleQueries = []moduleQuery{
@@ -186,10 +194,10 @@ var moduleQueries = []moduleQuery{
   p.updated_at,
   COALESCE((SELECT MAX(d.updated_at) FROM screenplay_documents d WHERE d.owner_username=p.owner_username AND d.project_id=p.id), p.updated_at),
   COALESCE((SELECT MAX(a.updated_at) FROM screenplay_assets a WHERE a.owner_username=p.owner_username AND a.project_id=p.id), p.updated_at),
-  COALESCE((SELECT MAX(s.updated_at) FROM screenplay_storyboards s WHERE s.owner_username=p.owner_username AND s.project_id=p.id), p.updated_at),
-  COALESCE((SELECT MAX(j.updated_at) FROM screenplay_production_jobs j WHERE j.owner_username=p.owner_username AND j.project_id=p.id), p.updated_at)
+  COALESCE((SELECT MAX(s.updated_at) FROM screenplay_storyboards s WHERE s.owner_username=p.owner_username AND s.project_id=p.id), p.updated_at)
 ) FROM screenplay_projects p WHERE p.owner_username=? AND p.deleted_at IS NULL`,
-		stale: `DELETE r FROM project_retention r LEFT JOIN screenplay_projects p ON p.id=r.project_id AND p.owner_username=r.owner_username WHERE r.owner_username=? AND r.module=? AND (p.id IS NULL OR p.deleted_at IS NOT NULL)`,
+		extraSQL: `SELECT project_id, MAX(updated_at) FROM screenplay_production_jobs WHERE owner_username=? GROUP BY project_id`,
+		validSQL: `SELECT id FROM screenplay_projects WHERE owner_username=? AND deleted_at IS NULL`,
 	},
 	{
 		module: ModuleCMCanvas,
@@ -199,7 +207,7 @@ var moduleQueries = []moduleQuery{
   COALESCE((SELECT MAX(n.updated_at) FROM agent_canvas_nodes n WHERE n.owner_username=p.owner_username AND n.project_id=p.id), p.updated_at),
   COALESCE((SELECT MAX(e.updated_at) FROM agent_executions e WHERE e.owner_username=p.owner_username AND e.project_id=p.id), p.updated_at)
 ) FROM agent_projects p WHERE p.owner_username=? AND p.deleted_at IS NULL`,
-		stale: `DELETE r FROM project_retention r LEFT JOIN agent_projects p ON p.id=r.project_id AND p.owner_username=r.owner_username WHERE r.owner_username=? AND r.module=? AND (p.id IS NULL OR p.deleted_at IS NOT NULL)`,
+		validSQL: `SELECT id FROM agent_projects WHERE owner_username=? AND deleted_at IS NULL`,
 	},
 	{
 		module: ModuleNovelCreation,
@@ -209,7 +217,7 @@ var moduleQueries = []moduleQuery{
   COALESCE((SELECT MAX(c.updated_at) FROM novel_chapters c WHERE c.owner_username=p.owner_username AND c.project_id=p.project_id), p.updated_at),
   COALESCE((SELECT MAX(r.updated_at) FROM novel_runs r WHERE r.owner_username=p.owner_username AND r.project_id=p.project_id), p.updated_at)
 ) FROM novel_projects p WHERE p.owner_username=? AND p.deleted_at IS NULL`,
-		stale: `DELETE r FROM project_retention r LEFT JOIN novel_projects p ON p.project_id=r.project_id AND p.owner_username=r.owner_username WHERE r.owner_username=? AND r.module=? AND (p.project_id IS NULL OR p.deleted_at IS NOT NULL)`,
+		validSQL: `SELECT project_id FROM novel_projects WHERE owner_username=? AND deleted_at IS NULL`,
 	},
 }
 
@@ -254,6 +262,23 @@ func (s *Service) recomputeModule(ctx context.Context, owner string, days int, n
 	}
 	rows.Close()
 
+	if query.extraSQL != "" {
+		extra, err := s.activityByProject(ctx, query.extraSQL, owner)
+		if err != nil {
+			return err
+		}
+		for i := range items {
+			if last, ok := extra[items[i].id]; ok && last.After(items[i].last) {
+				items[i].last = last
+			}
+		}
+	}
+
+	valid, err := s.validProjectIDs(ctx, query.validSQL, owner)
+	if err != nil {
+		return err
+	}
+
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -272,10 +297,72 @@ ON DUPLICATE KEY UPDATE title=VALUES(title), last_activity_at=VALUES(last_activi
 			return err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, query.stale, owner, string(query.module)); err != nil {
+	stale, err := s.staleProjectIDs(ctx, owner, query.module, valid)
+	if err != nil {
 		return err
 	}
+	for _, projectID := range stale {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM project_retention WHERE owner_username=? AND module=? AND project_id=?`, owner, string(query.module), projectID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
+}
+
+func (s *Service) activityByProject(ctx context.Context, querySQL, owner string) (map[string]time.Time, error) {
+	rows, err := s.DB.QueryContext(ctx, querySQL, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]time.Time{}
+	for rows.Next() {
+		var projectID string
+		var last sql.NullTime
+		if err := rows.Scan(&projectID, &last); err != nil {
+			return nil, err
+		}
+		if projectID != "" && last.Valid {
+			out[projectID] = last.Time
+		}
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) validProjectIDs(ctx context.Context, querySQL, owner string) (map[string]struct{}, error) {
+	rows, err := s.DB.QueryContext(ctx, querySQL, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]struct{}{}
+	for rows.Next() {
+		var projectID string
+		if err := rows.Scan(&projectID); err != nil {
+			return nil, err
+		}
+		out[projectID] = struct{}{}
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) staleProjectIDs(ctx context.Context, owner string, module Module, valid map[string]struct{}) ([]string, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT project_id FROM project_retention WHERE owner_username=? AND module=?`, owner, string(module))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	stale := []string{}
+	for rows.Next() {
+		var projectID string
+		if err := rows.Scan(&projectID); err != nil {
+			return nil, err
+		}
+		if _, ok := valid[projectID]; !ok {
+			stale = append(stale, projectID)
+		}
+	}
+	return stale, rows.Err()
 }
 
 // archiveDue 把已到期的作品集移入归档；只更新状态，不删除任何数据。
@@ -477,6 +564,18 @@ func (s *Service) purgeModuleRows(ctx context.Context, owner string, module Modu
 			return err
 		}
 	case ModuleCMCanvas:
+		// 先删除画布素材的云端/本地对象，再清数据库记录。
+		if s.CanvasAssets != nil && s.CanvasObjects != nil {
+			assets, err := s.CanvasAssets.ListAssets(ctx, owner, projectID, "")
+			if err != nil {
+				return err
+			}
+			for _, asset := range assets {
+				if err := s.CanvasObjects.Delete(ctx, asset); err != nil {
+					return err
+				}
+			}
+		}
 		for _, table := range []string{
 			"agent_generation_results", "agent_generation_tasks", "agent_video_jobs", "agent_shot_generation_links",
 			"agent_script_shots", "agent_batch_factory_node_origins", "agent_batch_factory_bindings",

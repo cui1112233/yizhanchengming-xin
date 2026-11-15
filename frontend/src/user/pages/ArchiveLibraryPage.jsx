@@ -132,7 +132,9 @@ export default function ArchiveLibraryPage() {
                       title="彻底删除这个作品集？"
                       description={item.module === 'batch_factory'
                         ? '将删除数据库记录、TOS 云文件与本地缓存，且不可恢复。'
-                        : '将删除数据库记录，且不可恢复。'}
+                        : item.module === 'cm_canvas'
+                          ? '将删除数据库记录与画布素材对象，且不可恢复。'
+                          : '将删除数据库记录，且不可恢复。'}
                       okText="彻底删除"
                       okButtonProps={{ danger: true }}
                       cancelText="取消"
