@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import OriginalIcon from './ComicScreenplayIcon.jsx';
 import AssetImage from './ComicScreenplayImage.jsx';
 import './comic-screenplay-asset-library-picker.css';
@@ -50,7 +51,7 @@ export default function ComicScreenplayAssetLibraryPicker({ type = 'character', 
   const visible = binding ? filtered : filtered.slice(0, 60);
   const title = binding ? `选择${labels[type] || '资产'}` : variant === 'legacy-add' || type === 'character' ? '从角色库选择' : `更换${labels[type]}图片`;
   if (closed) return null;
-  return <div className={embedded ? 'comic-library-embedded' : 'comic-library-overlay'} onClick={event => { if (!embedded && event.target === event.currentTarget) close(); }}>
+  const content = <div className={embedded ? 'comic-library-embedded' : 'comic-library-overlay'} onClick={event => { if (!embedded && event.target === event.currentTarget) close(); }}>
     <section role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : 'true'} aria-label={title} className={`comic-library-picker is-${variant} type-${libraryType}`} style={embedded ? {width:'100%',maxWidth:'100%',maxHeight:'none',boxShadow:'none',borderRadius:0,background:'transparent'} : undefined}>
       {!embedded ? <header><strong>{title}</strong><button type="button" aria-label="关闭普通库" onClick={close}><OriginalIcon name="CloseOutline" size={18} /></button></header> : <small>库来源：角色库</small>}
       <div className="comic-library-content" style={embedded?{padding:'8px 0 0'}:undefined}>
@@ -60,4 +61,7 @@ export default function ComicScreenplayAssetLibraryPicker({ type = 'character', 
       {!embedded ? <footer><button type="button" onClick={close}>取消</button>{!binding ? <button type="button" className="comic-library-confirm" disabled={disabled || !selected || loading || !!error} onClick={() => choose(selected)}>{variant === 'replace' ? '确认更换' : '保存'}</button> : null}</footer> : null}
     </section>
   </div>;
+  // Glass containers create their own stacking context; modal pickers must share
+  // the body portal layer with Antd dialogs. The add form remains inline.
+  return embedded ? content : createPortal(content, document.body);
 }
