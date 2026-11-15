@@ -112,15 +112,15 @@ func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, req
 				// Compact budgets can be consumed by reasoning before any prose
 				// is returned. Escalate only an explicit truncation, at most twice.
 				// Exhaustion becomes a manual hold instead of another queue loop.
-				if request.MaxTokens >= 8192 {
+				if request.MaxTokens >= 24000 {
 					break
 				}
 				next := request.MaxTokens * 2
-				if next < 4096 {
-					next = 4096
+				if next < 12000 {
+					next = 12000
 				}
-				if next > 8192 {
-					next = 8192
+				if next > 24000 {
+					next = 24000
 				}
 				request.MaxTokens = next
 				continue
