@@ -1,0 +1,21 @@
+{
+  "runtimeSHA": "6cb27cee8a4f6bb62807308ef06e1e982817ec8c",
+  "frontendEntry": "/assets/user-b0zlPZHg.js",
+  "realSignedScheduleRead": true,
+  "persistedScheduleCount": 4,
+  "scheduleUIFixtures": true,
+  "generateOnlyLabel": true,
+  "verificationLabel": true,
+  "waitingIsNotFailure": true,
+  "pageErrors": [],
+  "blockedWrites": [
+    "/api/client-errors",
+    "/api/client-errors",
+    "/api/client-errors",
+    "/api/client-errors",
+    "/api/client-errors",
+    "/api/client-errors"
+  ],
+  "readRequests": 18,
+  "limitations": "Controlled browser with display-session and schedule fixtures; other reads use signed local Go API. No existing-user login or paid-provider test."
+}
