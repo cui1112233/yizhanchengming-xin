@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "created_at_utc": "2026-11-14T20:15:56.641856+00:00",
-  "updated_at_utc": "2026-11-15T05:20:47.292934+00:00",
+  "updated_at_utc": "2026-11-15T05:38:58.560684+00:00",
   "objective": "完整复刻原版，每完成一项立即逐项对比；保留未证实、未知和受费用阻塞的需求。",
   "active_item": {
     "id": "G11",
@@ -2994,7 +2994,8 @@
       "spec_refs": [
         "03-gaps-and-acceptance.md",
         "04-implementation-20261115.md",
-        "05-remaining-scope-audit-20261115.md"
+        "05-remaining-scope-audit-20261115.md",
+        "13-library-character-image-replace-20261115.md"
       ],
       "source_identity_id": "SRC-de4984dbb5867cd7",
       "current_cm_binding": {
@@ -3005,7 +3006,7 @@
           "path": "backend/internal/httpapi/screenplay_asset_library.go"
         },
         "binding_status": "runtime observed: library manager upload/edit/delete;18 live checks;actual role andscene save/reopen/cancel;full original manager unresolved",
-        "runtime_commit": "9d1e588f"
+        "runtime_commit": "7d2a2326"
       },
       "acceptance_profile_ref": "full_parity_v1",
       "checks": {
@@ -3079,6 +3080,14 @@
           "original_or_cm": "cm",
           "claim": "18real checks andactualUI saves,0model calls",
           "proves_comparison": false
+        },
+        {
+          "path": "_local-archive-20261028/luoshui-screenplay-reconstruction-20261115/07-parity-execution/library-replace-live-acceptance.json",
+          "locator": "real_mysql_reread;existing_project_copy_unchanged;new_project_copy_uses_replacement",
+          "sha256": "1635466679bc898eac1e6db22fd4850e1a4756b78a4574f89454a43ce3066745",
+          "original_or_cm": "cm",
+          "proves_comparison": false,
+          "claim": "Actual CM replacement and persistence with manually authored fixtures; original full UI/native parity not proven"
         }
       ],
       "notes": [
@@ -3086,7 +3095,8 @@
         "真实API/数据库/对象12项19请求+实际登录页面取消/保存/仅换图验证通过，模型0。",
         "非内嵌库portal及统一深浅磨砂已修复，原版完整对照仍未通过。",
         "2026-11-15 manager commit9d1e588f/4001 PID48532；18真实检查23请求0模型与真实登录UI保存重开。详情09文档，参考音频/目录导入/导出等仍缺。",
-        "22a5b966文件夹批导入口/预览/稳定key重试已实现，helper及受控DOM通过；原native排序/格式/嵌套仍未知，CM适配规则明示，实际目录选择未在本轮登录页验收。"
+        "22a5b966文件夹批导入口/预览/稳定key重试已实现，helper及受控DOM通过；原native排序/格式/嵌套仍未知，CM适配规则明示，实际目录选择未在本轮登录页验收。",
+        "2026-11-15 7d2a2326：角色库已有档案换图按原编辑选择/应用/取消规则接通；选择仅本地预览、应用更新同ID和草稿，稳定重试/版本保护。4001 PID21680实际14HTTP+MySQL验证原项目副本不改、新绑定新图、错误拒绝与提示词声音保留；原生文件选择器/完整UI/供应商未通过，参考音频等继续，G12仍partial。"
       ],
       "blockers": [
         "原版native eager auth阻止隔离import，未读取账户或联网；原生存储规则仍未知",
