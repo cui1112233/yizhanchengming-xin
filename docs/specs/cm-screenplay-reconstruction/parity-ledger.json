@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "created_at_utc": "2026-11-14T20:15:56.641856+00:00",
-  "updated_at_utc": "2026-11-15T05:02:35.743621+00:00",
+  "updated_at_utc": "2026-11-15T05:20:47.292934+00:00",
   "objective": "完整复刻原版，每完成一项立即逐项对比；保留未证实、未知和受费用阻塞的需求。",
   "active_item": {
     "id": "G11",
@@ -3738,21 +3738,22 @@
       "spec_refs": [
         "03-gaps-and-acceptance.md",
         "04-implementation-20261115.md",
-        "05-remaining-scope-audit-20261115.md"
+        "05-remaining-scope-audit-20261115.md",
+        "12-storyboard-picker-search-order-20261115.md"
       ],
       "source_identity_id": "SRC-de4984dbb5867cd7",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryboardSettings.jsx",
           "historical_line": 12,
-          "sha256": "b7fdc2a6231785555ff1510591c9074c55c0469d0590714f3a99bdf2f9078d8a"
+          "sha256": "330071197f481b53b099e047d75f360b8de85e473b64733350db86c2a6a23abe"
         },
         "backend": {
           "path": "backend/internal/screenplay/storyboard_preferences.go",
           "sha256": "b9ea9195b56af7f97b3904cf593d688a37fbe19647fa7d3e9d9524efd8dc7b7b"
         },
         "binding_status": "baseline pointer only; exact live binding not adjudicated",
-        "runtime_commit": "d8d2f514"
+        "runtime_commit": "94d348f4"
       },
       "acceptance_profile_ref": "full_parity_v1",
       "checks": {
@@ -3826,12 +3827,21 @@
           "original_or_cm": "cm",
           "proves_comparison": false,
           "claim": "139 own implementation and actual manual fixture persistence; native and supplier parity not proven"
+        },
+        {
+          "path": "_local-archive-20261028/luoshui-screenplay-reconstruction-20261115/07-parity-execution/picker-search-live-acceptance.json",
+          "locator": "visible_original_entries_compared;frontend_entry_bytes_match_built",
+          "sha256": "b70ae9b2f8a7dcc517f8deb912c872c3cde0a04ce46db86ae29f310bf8ec4fe8",
+          "original_or_cm": "cm_and_original_accessibility",
+          "proves_comparison": false,
+          "claim": "14 visible names/order and current runtime bytes only; full UI/search/provider parity remains unverified"
         }
       ],
       "notes": [
         "Only local data closure was reported. Original full behavior, UI and pixels remain unverified.",
         "用户截图纠正3vs41：b38f17c7已实际4001返回41original+2compat日期齐；窗口居中/行高修复与受控DOM验证，实际登录新截图及原版同视口仍未验证。详10文档。",
-        "2026-11-15 d8d2f514：139缺省图片词按原前端规则接通，精确SHA协议适配不改原正文；旧冻结显式重选、numeric alias保护、缺图不fallback视频。4001实际13HTTP手工导入/保存重读，非AI生成；138及原版native/provider/UI完整对照仍未过。"
+        "2026-11-15 d8d2f514：139缺省图片词按原前端规则接通，精确SHA协议适配不改原正文；旧冻结显式重选、numeric alias保护、缺图不fallback视频。4001实际13HTTP手工导入/保存重读，非AI生成；138及原版native/provider/UI完整对照仍未过。",
+        "2026-11-15 94d348f4：搜索同步筛选收藏/最近/全部；同时间按原编号排序。原恢复纯函数5组对照与真实React受控浏览器通过；4001实际41目录、前端字节与构建一致，当前原版AX可读14项顺序对照一致。原版搜索点击/截图失败，不能标完整UI/生成对照通过。详12文档。"
       ],
       "blockers": [],
       "execution": {
