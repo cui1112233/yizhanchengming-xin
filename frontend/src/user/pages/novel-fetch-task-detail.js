@@ -98,7 +98,9 @@ export function novelFetchTaskSummaryItems(data = {}) {
   const fixedCount = countValue(meta.sensitiveFixedCount, meta.sensitive_fixed_count, sensitiveFixed.fixed_count, sensitiveFixed.fixedCount, data.sensitiveFixedCount, data.sensitive_fixed_count);
   const readyReferenceCount = Object.entries(data.bodyRefs || {}).filter(([key, ref]) => /^ai\d+$/i.test(key) && ref?.state === 'ready').length;
   const aiCount = countValue(meta.aiGeneratedCount, meta.ai_generated_count, data.aiGeneratedCount, data.ai_generated_count, readyReferenceCount || versions.length);
-  const originalError = first(meta.originalError, meta.original_error, meta.originalFetchLastError, meta.original_fetch_last_error, data.original_fetch_last_error, meta.error);
+  // meta.error 是任务级通用错误，可能来自 AI、敏感词或提交阶段；
+  // 只有明确的原文错误字段才能显示在“原文失败原因”，否则会误导排查方向。
+  const originalError = first(meta.originalError, meta.original_error, meta.originalFetchLastError, meta.original_fetch_last_error, data.original_fetch_last_error);
   const upstreamCode = /(?:business error|HTTP)\s+(\d{3})\b/i.exec(String(originalError || ''))?.[1];
   return [
     ['书籍 ID', first(data.bookId, data.book_id, meta.bookId, meta.book_id, meta.id)],

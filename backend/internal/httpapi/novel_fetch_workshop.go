@@ -2790,7 +2790,21 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	})
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/ai/test", func(w http.ResponseWriter, req *http.Request) {
-		provider, providerErr := resolveRewriteProvider(req)
+		var input struct {
+			Purpose   string `json:"purpose"`
+			Model     string `json:"model"`
+			TextModel string `json:"textModel"`
+		}
+		if req.ContentLength != 0 {
+			if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+				return
+			}
+		}
+		// 连通性测试必须使用当前选择的模型，否则测试通过但实际执行仍可能失败。
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		ctx := novelfetchworkshop.WithProcessTextModel(req.Context(), firstText(input.Model, input.TextModel))
+		provider, providerErr := resolveRewriteProviderFor(ctx, identity.Username)
 		if providerErr != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
 			return
@@ -2799,7 +2813,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "AI 改文模型未配置"})
 			return
 		}
-		content, err := provider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
+		content, err := provider.Complete(ctx, novelfetchworkshop.RewriteRequest{
 			SystemPrompt: "你是接口连通性测试助手。",
 			UserPrompt:   "请只回复：ok",
 			Temperature:  0,

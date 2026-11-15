@@ -25,6 +25,12 @@ test('fetch retry detail shows persisted upstream error and its actual business 
   assert.equal(unknown['原文错误码'], '—');
 });
 
+test('generic task error is not mislabeled as an original fetch failure', () => {
+  const summary = Object.fromEntries(novelFetchTaskSummaryItems({meta:{error:'AI 改文失败：模型超时'}}).map(row => [row.label, row.value]));
+  assert.equal(summary['原文失败原因'], '—');
+  assert.equal(summary['原文错误码'], '—');
+});
+
 test('task detail reads persisted per-version rewrite evidence without inventing history', () => {
   const data = { versions: {ai1: '正文一', ai2: '正文二'}, meta: { rewriteModel: 'model-used', rewriteEvidenceByVersion: {
     ai1: {strategy_name: '方案一', template_name: '模板一'},

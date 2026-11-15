@@ -241,11 +241,11 @@ export function previewWorkshopRules(text, scope = 'ai', options = {}) {
   });
 }
 
-// AI 接口连通性测试
-export function testWorkshopAi(purpose) {
+// AI 接口连通性测试；传入当前选择的模型，避免测试结果与真正执行时使用的模型不一致。
+export function testWorkshopAi(purpose, model) {
   return apiRequest('/api/novel-fetch-workshop/ai/test', {
     method: 'POST',
-    body: JSON.stringify({ purpose })
+    body: JSON.stringify({ purpose, model: model || '' })
   });
 }
 

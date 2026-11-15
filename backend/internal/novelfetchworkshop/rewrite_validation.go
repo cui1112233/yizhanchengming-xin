@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"qiantie/backend/internal/prompt/batchbook"
+	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 var ErrRewriteValidation = errors.New("改文校验未通过")
@@ -153,7 +155,96 @@ func parseRewriteOutput(raw, mode, bookID string, lineCount int) (string, error)
 	return strings.Join(result, "\n"), nil
 }
 
-func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, request RewriteRequest, bookID, mode string, lineCount, targetChars int) (string, error) {
+// 模型偶尔会把后端提示词、JSON 协议字段或重试指令原样带进正文。
+// 这些标记在正常小说正文中不会出现，命中即视为本次输出不可用。
+var rewriteLeakMarkers = []string{
+	"待处理片段：",
+	"后续衔接参考",
+	"只输出改写后的正文",
+	"改文模板：",
+	"临时指令：",
+	"changed_lines",
+	`"line_no"`,
+	"接口连通性测试助手",
+	"请只回复：ok",
+}
+
+var rewriteVersionLeakPattern = regexp.MustCompile(`这是第\s*\d+\s*个改写版本`)
+
+// rewriteComparableText 去掉空白和标点后比较，避免仅换行/标点差异被当成改写。
+func rewriteComparableText(text string) string {
+	var builder strings.Builder
+	for _, char := range strings.ToLower(text) {
+		if unicode.IsSpace(char) || unicode.IsPunct(char) {
+			continue
+		}
+		builder.WriteRune(char)
+	}
+	return builder.String()
+}
+
+func rewriteBigramSet(text string) map[string]struct{} {
+	runes := []rune(text)
+	set := make(map[string]struct{}, len(runes))
+	for index := 0; index+1 < len(runes); index++ {
+		set[string(runes[index:index+2])] = struct{}{}
+	}
+	return set
+}
+
+// rewriteSimilarity 返回字符二元组的 Jaccard 相似度，用于识别模型只复读原文。
+func rewriteSimilarity(left, right string) float64 {
+	leftSet := rewriteBigramSet(left)
+	rightSet := rewriteBigramSet(right)
+	if len(leftSet) == 0 || len(rightSet) == 0 {
+		return 0
+	}
+	intersection := 0
+	for gram := range leftSet {
+		if _, ok := rightSet[gram]; ok {
+			intersection++
+		}
+	}
+	return float64(intersection) / float64(len(leftSet)+len(rightSet)-intersection)
+}
+
+// validateRewriteQuality 在格式和长度校验之后检查内容质量：提示词泄漏、
+// 段落级重复，以及输出与原片段几乎一致（等于没有改写）。
+func validateRewriteQuality(result, source string) error {
+	lower := strings.ToLower(result)
+	for _, marker := range rewriteLeakMarkers {
+		if strings.Contains(lower, marker) {
+			return fmt.Errorf("AI 改文输出包含提示词或协议字段")
+		}
+	}
+	if rewriteVersionLeakPattern.MatchString(result) {
+		return fmt.Errorf("AI 改文输出包含提示词或协议字段")
+	}
+	counts := map[string]int{}
+	for _, line := range strings.Split(result, "\n") {
+		normalized := strings.TrimSpace(line)
+		if len([]rune(normalized)) < 12 {
+			continue
+		}
+		counts[normalized]++
+		if counts[normalized] >= 3 {
+			return fmt.Errorf("AI 改文输出出现重复段落")
+		}
+	}
+	original := rewriteComparableText(source)
+	rewritten := rewriteComparableText(result)
+	if len([]rune(original)) >= 100 && len([]rune(rewritten)) > 0 {
+		if original == rewritten {
+			return fmt.Errorf("AI 改文输出与原文完全一致")
+		}
+		if rewriteSimilarity(original, rewritten) >= 0.96 {
+			return fmt.Errorf("AI 改文输出与原文几乎一致，未实际改写")
+		}
+	}
+	return nil
+}
+
+func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, request RewriteRequest, bookID, mode string, lineCount, targetChars int, source string) (string, error) {
 	if mode != "" && mode != "plain_text" && mode != "changed_lines_json" {
 		return "", fmt.Errorf("不支持的改文响应模式：%s", mode)
 	}
@@ -194,6 +285,9 @@ func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, req
 		// Very short source snippets are legitimate. Apply the floor only to substantial blocks.
 		if err == nil && targetChars >= 200 && len([]rune(result)) < targetChars/10 {
 			err = fmt.Errorf("AI 改文输出异常过短")
+		}
+		if err == nil {
+			err = validateRewriteQuality(result, source)
 		}
 		if err == nil {
 			return result, nil

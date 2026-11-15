@@ -212,7 +212,7 @@ func rewritePlan(settings map[string]any, versionID string, index int) rewriteRu
 	return plan
 }
 
-func buildRewritePrompt(document Document, original string, index int, plan rewriteRuntimePlan) (string, int, int) {
+func buildRewritePrompt(document Document, original string, index int, plan rewriteRuntimePlan) (string, int, int, string) {
 	lines := rewriteLines(original)
 	processCount := len(lines)
 	if plan.ProcessLines > 0 && processCount > plan.ProcessLines {
@@ -254,7 +254,7 @@ func buildRewritePrompt(document Document, original string, index int, plan rewr
 			"line_count": strconv.Itoa(processCount), "extra_instruction": strings.Join(plan.Instructions, "\n"),
 		})
 	}
-	return prompt, processCount, len([]rune(block))
+	return prompt, processCount, len([]rune(block)), block
 }
 
 func mergeRewriteBlock(original, changed string, processCount int) string {
@@ -381,7 +381,7 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 		if plan.TemplateID != "" && plan.TemplateName == "" {
 			return document, fmt.Errorf("所选改文模板不可用，请重新选择模板")
 		}
-		userPrompt, processCount, targetChars := buildRewritePrompt(document, original, index, plan)
+		userPrompt, processCount, targetChars, sourceBlock := buildRewritePrompt(document, original, index, plan)
 		request := RewriteRequest{
 			SystemPrompt: batchbook.RewriteSystem,
 			UserPrompt:   userPrompt,
@@ -392,7 +392,7 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 			request.SystemPrompt = fillRewriteTemplate(plan.SystemPrompt, map[string]string{"content_id": document.BookID, "book_id": document.BookID})
 		}
 		observed := &rewriteBudgetObserver{provider: provider}
-		result, generationErr := completeValidatedRewrite(ctx, observed, request, document.BookID, plan.ResponseMode, processCount, targetChars)
+		result, generationErr := completeValidatedRewrite(ctx, observed, request, document.BookID, plan.ResponseMode, processCount, targetChars, sourceBlock)
 		if generationErr != nil {
 			document.Meta["rewriteValidationHold"] = errors.Is(generationErr, ErrRewriteValidation)
 			document.Meta["aiStatus"] = "failed"

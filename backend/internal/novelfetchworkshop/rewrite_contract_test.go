@@ -80,7 +80,7 @@ func TestImportedRewriteTemplateIsActuallyUsed(t *testing.T) {
 	if plan.TemplateName == "" || plan.SystemPrompt == "" || plan.UserTemplate == "" || plan.ResponseMode != "changed_lines_json" {
 		t.Fatalf("imported template not connected: %q %q", plan.TemplateID, plan.TemplateName)
 	}
-	prompt, _, chars := buildRewritePrompt(Document{BookID: "book", Gender: "女频"}, "中文原文", 1, plan)
+	prompt, _, chars, _ := buildRewritePrompt(Document{BookID: "book", Gender: "女频"}, "中文原文", 1, plan)
 	if chars != 4 || strings.Contains(prompt, "{content_id}") || !strings.Contains(prompt, "中文原文") {
 		t.Fatalf("template substitution/chinese size broken: chars=%d", chars)
 	}
@@ -101,5 +101,55 @@ func TestRewriteKeepsSuccessfulVersionWhenNextFails(t *testing.T) {
 	doc, _ := store.GetDocument(ctx, "a", "123")
 	if err == nil || doc.Versions["ai1"] != "已完成改文" || doc.Versions["ai2"] != nil {
 		t.Fatalf("lost completed version doc=%#v err=%v", doc, err)
+	}
+}
+
+const rewriteQualitySource = "她推开旧书店的门，风铃响了一声。柜台后面的人抬起头，两人对视了片刻，谁也没有先开口。窗外下着小雨，街上的行人匆匆走过。她把手里的信放在柜台上，指尖还在发抖。他终于伸手拿起那封信，慢慢拆开信封，看完之后沉默了很久。雨声渐密，店里的老式挂钟敲了六下。"
+
+func TestRewriteRejectsPromptLeakAndRepeatedParagraph(t *testing.T) {
+	outputs := []string{
+		"待处理片段：" + rewriteQualitySource,
+		"这是第 1 个改写版本。她推门而入，风铃轻响。",
+		strings.Join([]string{
+			"雨水顺着屋檐落下，街灯在风里轻轻摇晃。",
+			"雨水顺着屋檐落下，街灯在风里轻轻摇晃。",
+			"雨水顺着屋檐落下，街灯在风里轻轻摇晃。",
+		}, "\n"),
+	}
+	for _, output := range outputs {
+		calls := 0
+		_, err := completeValidatedRewrite(context.Background(), rewriteProviderFunc(func(context.Context, RewriteRequest) (string, error) {
+			calls++
+			return output, nil
+		}), RewriteRequest{MaxTokens: 2400}, "book", "plain_text", 1, 120, rewriteQualitySource)
+		if !errors.Is(err, ErrRewriteValidation) || calls != 3 {
+			t.Fatalf("accepted polluted output %q: calls=%d err=%v", output, calls, err)
+		}
+	}
+}
+
+func TestRewriteRejectsUnchangedOriginalAndAcceptsRealRewrite(t *testing.T) {
+	ctx := context.Background()
+	store := plainRewriteTestStore("a")
+	_ = store.PutDocument(ctx, "a", Document{BookID: "123", Original: rewriteQualitySource})
+	calls := 0
+	_, err := GenerateAIRewrites(ctx, store, "a", "123", 1, rewriteProviderFunc(func(context.Context, RewriteRequest) (string, error) {
+		calls++
+		return rewriteQualitySource, nil
+	}))
+	doc, _ := store.GetDocument(ctx, "a", "123")
+	if !errors.Is(err, ErrRewriteValidation) || calls != 3 || len(doc.Versions) != 0 {
+		t.Fatalf("unchanged original accepted: calls=%d err=%v versions=%#v", calls, err, doc.Versions)
+	}
+	if _, err := GenerateAIRewrites(ctx, store, "a", "123", 1, rewriteProviderFunc(func(context.Context, RewriteRequest) (string, error) {
+		return "雨点敲打玻璃时，老周从账本后站起，望见门口那个撑伞的身影。两人隔着书架沉默几秒。她把一封折好的信推过去，手背青筋绷紧。老周读完，靠回椅背，很久没有说话。", nil
+	})); err != nil {
+		t.Fatalf("genuine rewrite rejected: %v", err)
+	}
+}
+
+func TestRewriteSimilarityIgnoresPunctuationOnlyChanges(t *testing.T) {
+	if err := validateRewriteQuality(strings.ReplaceAll(rewriteQualitySource, "。", "！"), rewriteQualitySource); err == nil {
+		t.Fatal("punctuation-only rewrite must be rejected when source is substantial")
 	}
 }

@@ -71,8 +71,8 @@ func RegisterLegacyNovelFetchRoutes(root *http.ServeMux, middleware BridgeAuth, 
 			return
 		}
 		maxTxt := input.MaxTxt
-		if maxTxt < 100 || maxTxt > 100000 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "字数需为 100–100000 的整数"})
+		if maxTxt < 100 || maxTxt > 200000 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "字数需为 100–200000 的整数"})
 			return
 		}
 		if fetcher == nil {

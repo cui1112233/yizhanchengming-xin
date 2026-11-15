@@ -455,6 +455,27 @@ func TestNovelFetchAITestUsesReasoningFriendlyTokenBudget(t *testing.T) {
 	}
 }
 
+func TestNovelFetchAITestUsesSelectedModel(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	var seen string
+	provider := rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+		return "ok", nil
+	})
+	resolver := func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
+		if owner != "tester" {
+			t.Fatalf("unexpected owner: %q", owner)
+		}
+		seen = novelfetchworkshop.ProcessTextModel(ctx)
+		return provider, nil
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore(), NovelFetchRewriteResolver: resolver})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/ai/test", map[string]any{"model": "[aistudio]gemini-3.8-flash"}, now, secret)
+	if response.Code != http.StatusOK || seen != "[aistudio]gemini-3.8-flash" {
+		t.Fatalf("ai test ignored selected model: status=%d seen=%q body=%s", response.Code, seen, response.Body.String())
+	}
+}
+
 func TestNovelFetchAITestRejectsEmptyModelOutput(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
