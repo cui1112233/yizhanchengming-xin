@@ -581,6 +581,58 @@ func TestBatchRewriteDeleteSkipsRunningTasks(t *testing.T) {
 	}
 }
 
+func TestBatchRewriteWorkFormRoundTrip(t *testing.T) {
+	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	save := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/work-form", strings.NewReader(`{"state":{"parse_mode":"header","platform_id":"15"}}`))
+	SignBridgeRequest(save, "tester", false, now, "secret")
+	saveResponse := httptest.NewRecorder()
+	mux.ServeHTTP(saveResponse, save)
+	if saveResponse.Code != http.StatusOK {
+		t.Fatalf("save status=%d body=%s", saveResponse.Code, saveResponse.Body.String())
+	}
+	read := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/work-form", nil)
+	SignBridgeRequest(read, "tester", false, now, "secret")
+	readResponse := httptest.NewRecorder()
+	mux.ServeHTTP(readResponse, read)
+	var payload struct {
+		State map[string]any `json:"state"`
+	}
+	if readResponse.Code != http.StatusOK || json.Unmarshal(readResponse.Body.Bytes(), &payload) != nil || payload.State["parse_mode"] != "header" {
+		t.Fatalf("read status=%d body=%s", readResponse.Code, readResponse.Body.String())
+	}
+}
+
+func TestBatchRewritePermanentDeleteSkipsRunningTasks(t *testing.T) {
+	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	for bookID, status := range map[string]string{"book-running": "running", "book-done": "done"} {
+		if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"bookName": bookID, "status": status}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/tasks/permanent-delete", strings.NewReader(`{"ids":["book-running","book-done"]}`))
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	var payload struct {
+		Deleted int      `json:"deleted"`
+		Skipped []string `json:"skipped"`
+	}
+	if res.Code != http.StatusOK || json.Unmarshal(res.Body.Bytes(), &payload) != nil || payload.Deleted != 1 || !reflect.DeepEqual(payload.Skipped, []string{"book-running"}) {
+		t.Fatalf("permanent delete status=%d body=%s", res.Code, res.Body.String())
+	}
+	if _, err := store.GetDocument(context.Background(), "tester", "book-done"); err == nil {
+		t.Fatal("permanently deleted task must be removed")
+	}
+}
+
 func TestIsTargetLoginPage(t *testing.T) {
 	loginPage := `<!DOCTYPE html><html><head><title>管理员登录</title></head><body>
 <form method="post" action="login.php"><input name="username"><input type="password" name="password"></form></body></html>`

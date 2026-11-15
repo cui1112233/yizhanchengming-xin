@@ -255,6 +255,86 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "state": body.State})
 	}))
 	root.Handle("POST /api/batch-rewrite/work-form", workFormHandler)
+	// 旧版工作台刷新页面时会先 GET 回填表单状态；只注册 POST 会导致保存后
+	// 刷新丢失列格式、平台等选择。
+	root.Handle("GET /api/batch-rewrite/work-form", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取设置失败"})
+			return
+		}
+		appConfig := mapOrEmpty(settings["appConfig"])
+		state := mapOrEmpty(appConfig["work_form"])
+		if len(state) == 0 {
+			state = mapOrEmpty(settings["work_form"])
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "state": state})
+	})))
+	permanentDeleteHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			IDs  []string `json:"ids"`
+			Mode string   `json:"mode"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		ids := make([]string, 0, len(body.IDs))
+		seen := map[string]bool{}
+		for _, raw := range body.IDs {
+			id := strings.TrimSpace(raw)
+			if id != "" && !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+		if strings.EqualFold(strings.TrimSpace(body.Mode), "all") {
+			documents, err := store.ListDocuments(req.Context(), identity.Username)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务失败"})
+				return
+			}
+			ids = ids[:0]
+			for _, document := range documents {
+				ids = append(ids, document.BookID)
+			}
+		}
+		if len(ids) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请选择要永久删除的任务"})
+			return
+		}
+		// 与普通删除一致：运行中的任务不能被直接删除，否则 worker 会回写复活。
+		deletable := make([]string, 0, len(ids))
+		skipped := make([]string, 0)
+		for _, id := range ids {
+			if active := activeNovelFetchJobForBooks(req.Context(), store, identity.Username, []string{id}); active != nil {
+				skipped = append(skipped, id)
+				continue
+			}
+			deletable = append(deletable, id)
+		}
+		result, err := store.DeleteDocuments(req.Context(), identity.Username, deletable)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "永久删除任务失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "requested": len(ids), "deleted": result.Deleted, "failed": 0, "skipped": skipped})
+	}))
+	root.Handle("POST /api/batch-rewrite/tasks/permanent-delete", permanentDeleteHandler)
+	root.Handle("POST /api/batch-rewrite/tasks/permanent_delete", permanentDeleteHandler)
+	// 参考实现的旧路径，便于旧版页面无缝迁移。
+	root.Handle("POST /api/tasks/permanent-delete", webSubmitAuth.Middleware(permanentDeleteHandler))
+	root.Handle("POST /api/tasks/permanent_delete", webSubmitAuth.Middleware(permanentDeleteHandler))
 	webSubmitConfigGetHandler := webSubmitAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {

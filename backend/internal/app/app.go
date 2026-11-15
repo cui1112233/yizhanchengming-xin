@@ -765,27 +765,39 @@ func videoManagementTargetBaseURL() string {
 	return raw
 }
 
-// startNovelFetchBodyCleanup 每天兜底回收批量测书的过期正文。
+// startNovelFetchBodyCleanup 定时兜底回收批量测书的过期正文。
 // 删除历史文档只把正文标记为 releasable，真正的 TOS 对象删除依赖这里。
 func startNovelFetchBodyCleanup(ctx context.Context, store *novelfetchworkshop.MySQLStore) {
 	if store == nil {
 		return
 	}
+	const batchLimit = 500
+	const maxBatchesPerSweep = 20
 	go func() {
-		timer := time.NewTimer(10 * time.Minute)
+		// 启动后尽快回收一次，避免服务重启把已过期正文又拖一天。
+		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-timer.C:
-				result, err := store.CleanupExpiredBodies(ctx, time.Now().UTC(), 500)
-				if err != nil {
-					log.Printf("novel fetch body cleanup failed: %v", err)
-				} else if result.Deleted > 0 {
-					log.Printf("novel fetch body cleanup deleted %d expired bodies", result.Deleted)
+				// 单轮只取 500 条会让积压正文按天排队；这里连续消费到不足
+				// 一批为止，同时限制单次轮询总量，避免长期占用数据库连接。
+				for batch := 0; batch < maxBatchesPerSweep && ctx.Err() == nil; batch++ {
+					result, err := store.CleanupExpiredBodies(ctx, time.Now().UTC(), batchLimit)
+					if err != nil {
+						log.Printf("novel fetch body cleanup failed: %v", err)
+						break
+					}
+					if result.Deleted > 0 {
+						log.Printf("novel fetch body cleanup deleted %d expired bodies", result.Deleted)
+					}
+					if result.Deleted < batchLimit {
+						break
+					}
 				}
-				timer.Reset(24 * time.Hour)
+				timer.Reset(6 * time.Hour)
 			}
 		}
 	}()

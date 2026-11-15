@@ -11,7 +11,18 @@ import (
 )
 
 func scheduleInputMetadata(item map[string]any) workshopInputMetadata {
-	return workshopInputMetadata{Format: firstText(item["input_format"], item["inputFormat"]), ColumnPreset: firstText(item["column_preset"], item["columnPreset"]), ColumnOrder: scheduleStringSlice(item["column_order"])}
+	order := scheduleStringSlice(item["column_order"])
+	if len(order) == 0 {
+		if text, ok := item["column_order"].(string); ok {
+			order = workshopColumnOrderFromText(text)
+		}
+	}
+	return workshopInputMetadata{
+		Format:       firstText(item["parse_mode"], item["input_format"], item["inputFormat"]),
+		ColumnPreset: firstText(item["column_preset_id"], item["column_preset"], item["columnPreset"]),
+		ColumnOrder:  order,
+		Normalized:   item["input_normalized"] == true,
+	}
 }
 
 // The UI sends canonical rows; direct clients can supply explicit column order
@@ -53,7 +64,7 @@ func parseScheduleDocuments(item map[string]any) ([]novelfetchworkshop.Document,
 		}
 	}
 	if len(columns) == 0 {
-		docs, parsed, empty, duplicate := parseWorkshopDocuments(input, maxTxt)
+		docs, parsed, empty, duplicate := parseWorkshopDocuments(input, maxTxt, metadata)
 		for i := range docs {
 			metadata.apply(docs[i].Meta)
 		}
@@ -72,7 +83,7 @@ func parseScheduleDocuments(item map[string]any) ([]novelfetchworkshop.Document,
 		// Older smart-form schedules saved display column metadata beside a
 		// plain "ID title" line. Preserve that supported input, too.
 		if len(cells) == 1 && item["input_normalized"] != true && (metadata.Format == "smart" || metadata.Format == "") {
-			fallback, _, _, _ := parseWorkshopDocuments(line, maxTxt)
+			fallback, _, _, _ := parseWorkshopDocuments(line, maxTxt, metadata)
 			if len(fallback) == 1 {
 				row["bookId"], row["bookName"], row["gender"] = fallback[0].BookID, firstText(fallback[0].Meta["bookName"]), fallback[0].Gender
 			}

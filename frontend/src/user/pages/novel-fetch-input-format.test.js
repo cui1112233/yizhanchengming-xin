@@ -95,3 +95,33 @@ test('把解析行整理成后端统一可读的四列格式', () => {
     bookId: '2094511573566019532', bookName: '鼓励式老公', gender: '女频', reason: '闺蜜背刺'
   }]), '2094511573566019532\t鼓励式老公\t女频\t闺蜜背刺');
 });
+
+test('固定 11 列与从 B 列开始时按后端同样的列顺序取值', () => {
+  const full = normalizeNovelFetchInput('忽略\t免费ID\t2094511573566019532\t鼓励式老公\t9.5\tx\ty\tz\tw\t女频\t闺蜜背刺', { format: 'fixed_full_11' });
+  assert.equal(full.validRows, 1);
+  assert.equal(full.rows[0].bookId, '2094511573566019532');
+  assert.equal(full.rows[0].bookName, '鼓励式老公');
+  assert.equal(full.rows[0].gender, '女频');
+
+  const fromB = normalizeNovelFetchInput('免费ID\t2094511573566019532\t鼓励式老公\t9.5\tx\ty\tz\tw\t女频\t闺蜜背刺', { format: 'fixed_from_b' });
+  assert.equal(fromB.rows[0].bookId, '2094511573566019532');
+  assert.equal(fromB.rows[0].bookName, '鼓励式老公');
+});
+
+test('表头/多表头/纯 ID 抓取与后端解析模式对齐', () => {
+  const header = normalizeNovelFetchInput('书籍ID\t书名\t男女频\t推荐理由\n2094511573566019532\t鼓励式老公\t女频\t闺蜜背刺', { format: 'header' });
+  assert.equal(header.rows[0].bookName, '鼓励式老公');
+
+  const multi = normalizeNovelFetchInput([
+    '书籍ID\t书名\t男女频\t理由',
+    'ID\t名称\t频道\t推荐原因',
+    '2094511573566019532\t鼓励式老公\t女频\t闺蜜背刺'
+  ].join('\n'), { format: 'multi_header' });
+  assert.equal(multi.validRows, 1);
+  assert.equal(multi.rows[0].bookName, '鼓励式老公');
+  assert.equal(multi.rows[0].gender, '女频');
+
+  const bookIDs = normalizeNovelFetchInput('https://example.com/book?bookid=2094511573566019532\n书号 12345678901', { format: 'bookid_only' });
+  assert.equal(bookIDs.validRows, 2);
+  assert.deepEqual(bookIDs.rows.map(row => row.bookId), ['2094511573566019532', '12345678901']);
+});

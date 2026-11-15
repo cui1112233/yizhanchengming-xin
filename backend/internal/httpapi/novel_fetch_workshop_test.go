@@ -1940,6 +1940,54 @@ func TestNovelFetchWorkshopProcessStartReturnsBeforeBackgroundFetchCompletes(t *
 	t.Fatal("background fetch did not finish")
 }
 
+func TestNovelFetchPreviewHonorsLegacyParseModeAndColumnOrder(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/preview", map[string]any{
+		"input_text":   "付费书名\t12345678901\t忽略列\t女频\t推荐理由",
+		"parse_mode":   "custom",
+		"column_order": "书名,书籍ID,忽略,男女频,推荐理由",
+		"max_txt":      4000,
+	}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Tasks []map[string]any `json:"tasks"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil || len(body.Tasks) != 1 {
+		t.Fatalf("preview decode=%v body=%s", err, response.Body.String())
+	}
+	if firstText(body.Tasks[0]["bookId"], body.Tasks[0]["book_id"]) != "12345678901" || firstText(body.Tasks[0]["bookName"]) != "付费书名" || firstText(body.Tasks[0]["gender"]) != "女频" {
+		t.Fatalf("legacy column order ignored: %#v", body.Tasks[0])
+	}
+}
+
+func TestNovelFetchPreviewHonorsFixedPresetAndHeader(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	cases := []map[string]any{
+		{"input_text": "忽略\t免费ID\t12345678901\t固定书名\t9.5\tx\ty\tz\tw\t男频\t固定理由", "parse_mode": "fixed_full_11"},
+		{"input_text": "书籍ID\t书名\t男女频\t推荐理由\n12345678901\t表头书名\t女频\t表头理由", "parse_mode": "header"},
+	}
+	expected := []struct{ name, gender string }{{"固定书名", "男频"}, {"表头书名", "女频"}}
+	for index, payload := range cases {
+		payload["max_txt"] = 4000
+		response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/preview", payload, now, secret)
+		var body struct {
+			Tasks []map[string]any `json:"tasks"`
+		}
+		if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &body) != nil || len(body.Tasks) != 1 {
+			t.Fatalf("case %d preview failed: status=%d body=%s", index, response.Code, response.Body.String())
+		}
+		if firstText(body.Tasks[0]["bookName"]) != expected[index].name || firstText(body.Tasks[0]["gender"]) != expected[index].gender {
+			t.Fatalf("case %d wrong parse: %#v", index, body.Tasks[0])
+		}
+	}
+}
+
 func TestNovelFetchWorkshopProcessStartReturnsExistingTaskForActiveDuplicateBook(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
@@ -2101,19 +2149,19 @@ func TestNovelFetchReimportDoesNotOverwriteExistingDocumentData(t *testing.T) {
 	}
 }
 
-func TestNovelFetchStartSkipsBooksAlreadyImportedInAnotherBatch(t *testing.T) {
+func TestNovelFetchStartReprocessesCompletedBookWithMissingVersions(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
 	store := novelfetchworkshop.NewMemoryStore()
-	queue := &recordingNovelFetchQueue{}
+	queue := &uniqueRecordingNovelFetchQueue{}
 	original := novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "已有完整原文", ProcessedText: "已有处理正文", Meta: map[string]any{"platformId": "15", "originalStatus": "done", "status": "completed"}}
 	if err := store.PutDocument(context.Background(), "tester", original); err != nil {
 		t.Fatal(err)
 	}
 	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
-	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复导入", "platform_id": "15"}, now, secret)
-	if response.Code != http.StatusOK || len(queue.jobs) != 0 {
-		t.Fatalf("duplicate start status=%d queued=%d body=%s", response.Code, len(queue.jobs), response.Body.String())
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复导入", "platform_id": "15", "selected_versions": []string{"original", "ai1"}}, now, secret)
+	if response.Code != http.StatusAccepted || len(queue.jobs) != 1 {
+		t.Fatalf("completed book with missing AI version was not reprocessed: status=%d queued=%d body=%s", response.Code, len(queue.jobs), response.Body.String())
 	}
 	updated, err := store.GetDocument(context.Background(), "tester", original.BookID)
 	if err != nil {
@@ -2121,6 +2169,22 @@ func TestNovelFetchStartSkipsBooksAlreadyImportedInAnotherBatch(t *testing.T) {
 	}
 	if updated.OriginalRaw != original.OriginalRaw || updated.ProcessedText != original.ProcessedText {
 		t.Fatalf("duplicate start changed existing text: %#v", updated)
+	}
+}
+
+func TestNovelFetchStartSkipsCompletedBookWithSelectedVersionsDone(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	original := novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "已有完整原文", ProcessedText: "已有处理正文", Versions: map[string]any{"ai1": "已有AI正文"}, Meta: map[string]any{"platformId": "15", "originalStatus": "done", "aiStatus": "done", "status": "completed"}}
+	if err := store.PutDocument(context.Background(), "tester", original); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复导入", "platform_id": "15", "selected_versions": []string{"original", "ai1"}}, now, secret)
+	if response.Code != http.StatusOK || len(queue.jobs) != 0 {
+		t.Fatalf("completed book with all versions was not skipped: status=%d queued=%d body=%s", response.Code, len(queue.jobs), response.Body.String())
 	}
 }
 

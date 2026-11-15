@@ -1275,6 +1275,9 @@ type workshopInputMetadata struct {
 	Format       string
 	ColumnPreset string
 	ColumnOrder  []string
+	// Normalized 表示 input_text 已由新版前端按书籍ID/书名/男女频/理由
+	// 的固定四列序列化，后端不能再按原始列顺序二次映射。
+	Normalized bool
 }
 
 func (metadata workshopInputMetadata) apply(meta map[string]any) {
@@ -1314,27 +1317,55 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	if len(sourceMetadata) > 0 {
 		metadata = sourceMetadata[0]
 	}
+	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
+	result, _, _, err := workshopProcessParsedResult(ctx, store, owner, documents, parsed, emptyIDs, duplicates, platformID, batchID, metadata)
+	return result, err
+}
+
+// workshopProcessParsedResult 复用已解析的书单，避免 /process/start 先解析一次、
+// 再在保存阶段重复解析和查库。已有任务是否跳过与定时任务使用同一套判定：
+// 只有正在执行、需要人工处理或所选版本已全部完成时才跳过，终态任务可以重新处理。
+func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.Store, owner string, documents []novelfetchworkshop.Document, parsed, emptyIDs, duplicates int, platformID, batchID string, metadata workshopInputMetadata, selectedVersions ...[]string) (map[string]any, []string, []string, error) {
 	settings, _ := store.GetConfig(ctx, owner)
 	if settings == nil {
 		settings = map[string]any{}
 	}
 	processingFingerprint := novelFetchProcessingFingerprint(settings)
-	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
+	versions := novelFetchAutomationVersions(settings)
+	if len(selectedVersions) > 0 && len(selectedVersions[0]) > 0 {
+		versions = cleanStrings(selectedVersions[0])
+	}
+	skipItem := map[string]any{"id": "", "selected_versions": versions, "auto_submit": novelFetchAutomationEnabled(settings)}
+	processBookIDs := make([]string, 0, len(documents))
+	skippedBookIDs := make([]string, 0)
 	alreadyExists := 0
 	for _, document := range documents {
-		if existing, err := store.GetDocument(ctx, owner, document.BookID); err == nil {
+		existing, err := store.GetDocument(ctx, owner, document.BookID)
+		if err == nil {
 			alreadyExists++
 			if existing.Meta == nil {
 				existing.Meta = map[string]any{}
 			}
 			existing.Meta["lastImportedBatchId"] = batchID
 			existing.Meta["lastImportedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
-			if err := store.PutDocument(ctx, owner, existing); err != nil {
-				return nil, err
+			if reason := scheduleBookSkipReason(ctx, store, owner, existing, skipItem); reason != "" {
+				skippedBookIDs = append(skippedBookIDs, document.BookID)
+				if err := store.PutDocument(ctx, owner, existing); err != nil {
+					return nil, nil, nil, err
+				}
+				continue
 			}
+			existing.Meta["platformId"] = platformID
+			existing.Meta["currentBatchId"] = batchID
+			metadata.apply(existing.Meta)
+			if err := store.PutDocument(ctx, owner, existing); err != nil {
+				return nil, nil, nil, err
+			}
+			processBookIDs = append(processBookIDs, document.BookID)
 			continue
-		} else if !errors.Is(err, novelfetchworkshop.ErrNotFound) {
-			return nil, err
+		}
+		if !errors.Is(err, novelfetchworkshop.ErrNotFound) {
+			return nil, nil, nil, err
 		}
 		if document.Meta == nil {
 			document.Meta = map[string]any{}
@@ -1345,12 +1376,13 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 		document.Meta["processingConfigRevision"] = "novel-fetch-rules-v1"
 		metadata.apply(document.Meta)
 		if err := store.PutDocument(ctx, owner, document); err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
+		processBookIDs = append(processBookIDs, document.BookID)
 	}
 	tasks, err := store.ListDocuments(ctx, owner)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	settings["novel_fetch_current_batch_id"] = batchID
 	settings["novel_fetch_current_batch_at"] = time.Now().UTC().Format(time.RFC3339Nano)
@@ -1362,28 +1394,12 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 		"emptyIdCount": emptyIDs, "empty_id_count": emptyIDs, "classifyErrors": []any{}, "classify_errors": []any{},
 		"fetched": 0, "fetchFailed": 0, "fetch_failed": 0, "raw_fetched": 0, "generatedAiFiles": 0, "generated_ai_files": 0, "tasks": tasks,
 		"alreadyExists": alreadyExists, "already_exists": alreadyExists,
+		"skippedExistingBookIds": skippedBookIDs, "skipped_existing_book_ids": skippedBookIDs,
 	}
 	for key, value := range metadata.responseFields() {
 		result[key] = value
 	}
-	return result, nil
-}
-
-func novelFetchNewBookIDs(ctx context.Context, store novelfetchworkshop.Store, owner string, documents []novelfetchworkshop.Document) (newBookIDs, skippedBookIDs []string, err error) {
-	newBookIDs = make([]string, 0, len(documents))
-	skippedBookIDs = make([]string, 0)
-	for _, document := range documents {
-		_, lookupErr := store.GetDocument(ctx, owner, document.BookID)
-		if errors.Is(lookupErr, novelfetchworkshop.ErrNotFound) {
-			newBookIDs = append(newBookIDs, document.BookID)
-			continue
-		}
-		if lookupErr != nil {
-			return nil, nil, lookupErr
-		}
-		skippedBookIDs = append(skippedBookIDs, document.BookID)
-	}
-	return newBookIDs, skippedBookIDs, nil
+	return result, processBookIDs, skippedBookIDs, nil
 }
 
 func novelFetchProcessingFingerprint(settings map[string]any) string {
@@ -1976,7 +1992,11 @@ func workshopPreviewResult(inputText string, maxTxt int, sourceMetadata ...works
 	if maxTxt <= 0 {
 		maxTxt = 4000
 	}
-	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
+	metadata := workshopInputMetadata{}
+	if len(sourceMetadata) > 0 {
+		metadata = sourceMetadata[0]
+	}
+	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt, metadata)
 	tasks := make([]map[string]any, 0, len(documents))
 	for _, document := range documents {
 		meta := map[string]any{}
@@ -1986,10 +2006,6 @@ func workshopPreviewResult(inputText string, maxTxt int, sourceMetadata ...works
 		meta["id"] = document.BookID
 		meta["book_id"] = document.BookID
 		tasks = append(tasks, meta)
-	}
-	metadata := workshopInputMetadata{}
-	if len(sourceMetadata) > 0 {
-		metadata = sourceMetadata[0]
 	}
 	result := map[string]any{
 		"parsed": parsed, "unique_tasks": len(tasks), "duplicate_count": duplicates,
@@ -2152,16 +2168,19 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process/preview", func(w http.ResponseWriter, req *http.Request) {
 		var input struct {
-			InputText          string   `json:"input_text"`
-			InputTextLegacy    string   `json:"inputText"`
-			MaxTxt             int      `json:"max_txt"`
-			MaxTxtLegacy       int      `json:"maxTxt"`
-			InputFormat        string   `json:"input_format"`
-			InputFormatLegacy  string   `json:"inputFormat"`
-			ColumnPreset       string   `json:"column_preset"`
-			ColumnPresetLegacy string   `json:"columnPreset"`
-			ColumnOrder        []string `json:"column_order"`
-			ColumnOrderLegacy  []string `json:"columnOrder"`
+			InputText          string          `json:"input_text"`
+			InputTextLegacy    string          `json:"inputText"`
+			MaxTxt             int             `json:"max_txt"`
+			MaxTxtLegacy       int             `json:"maxTxt"`
+			ParseMode          string          `json:"parse_mode"`
+			InputFormat        string          `json:"input_format"`
+			InputFormatLegacy  string          `json:"inputFormat"`
+			ColumnPresetID     string          `json:"column_preset_id"`
+			ColumnPreset       string          `json:"column_preset"`
+			ColumnPresetLegacy string          `json:"columnPreset"`
+			ColumnOrderRaw     json.RawMessage `json:"column_order"`
+			ColumnOrderLegacy  json.RawMessage `json:"columnOrder"`
+			InputNormalized    bool            `json:"input_normalized"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			return
@@ -2172,11 +2191,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = input.MaxTxtLegacy
 		}
-		columnOrder := input.ColumnOrder
+		columnOrder := workshopColumnOrderRaw(input.ColumnOrderRaw)
 		if len(columnOrder) == 0 {
-			columnOrder = input.ColumnOrderLegacy
+			columnOrder = workshopColumnOrderRaw(input.ColumnOrderLegacy)
 		}
-		metadata := workshopInputMetadata{Format: firstText(input.InputFormat, input.InputFormatLegacy), ColumnPreset: firstText(input.ColumnPreset, input.ColumnPresetLegacy), ColumnOrder: columnOrder}
+		normalized := input.InputNormalized || strings.TrimSpace(firstText(input.InputFormat, input.InputFormatLegacy)) != ""
+		metadata := workshopInputMetadata{Format: firstText(input.ParseMode, input.InputFormat, input.InputFormatLegacy), ColumnPreset: firstText(input.ColumnPresetID, input.ColumnPreset, input.ColumnPresetLegacy), ColumnOrder: columnOrder, Normalized: normalized}
 		result, err := workshopPreviewResult(input.InputText, input.MaxTxt, metadata)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -2200,10 +2220,13 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			TextModelID        string            `json:"text_model_id"`
 			InputFormat        string            `json:"input_format"`
 			InputFormatLegacy  string            `json:"inputFormat"`
+			ParseMode          string            `json:"parse_mode"`
+			ColumnPresetID     string            `json:"column_preset_id"`
 			ColumnPreset       string            `json:"column_preset"`
 			ColumnPresetLegacy string            `json:"columnPreset"`
-			ColumnOrder        []string          `json:"column_order"`
-			ColumnOrderLegacy  []string          `json:"columnOrder"`
+			ColumnOrderRaw     json.RawMessage   `json:"column_order"`
+			ColumnOrderLegacy  json.RawMessage   `json:"columnOrder"`
+			InputNormalized    bool              `json:"input_normalized"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
@@ -2235,18 +2258,14 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		// 空选择表示使用账号默认文本模型；不能写入“未指定”占位符，
 		// 否则解析器会把它当成显式模型而跳过默认回退，AI 阶段必然失败。
 		textModelID := strings.TrimSpace(input.TextModelID)
-		columnOrder := input.ColumnOrder
+		columnOrder := workshopColumnOrderRaw(input.ColumnOrderRaw)
 		if len(columnOrder) == 0 {
-			columnOrder = input.ColumnOrderLegacy
+			columnOrder = workshopColumnOrderRaw(input.ColumnOrderLegacy)
 		}
-		metadata := workshopInputMetadata{Format: firstText(input.InputFormat, input.InputFormatLegacy), ColumnPreset: firstText(input.ColumnPreset, input.ColumnPresetLegacy), ColumnOrder: columnOrder}
-		documents, _, _, _ := parseWorkshopDocuments(input.InputText, input.MaxTxt)
-		bookIDs, skippedBookIDs, err := novelFetchNewBookIDs(req.Context(), store, identity.Username, documents)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "检查已有任务失败"})
-			return
-		}
-		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt, metadata)
+		normalized := input.InputNormalized || strings.TrimSpace(firstText(input.InputFormat, input.InputFormatLegacy)) != ""
+		metadata := workshopInputMetadata{Format: firstText(input.ParseMode, input.InputFormat, input.InputFormatLegacy), ColumnPreset: firstText(input.ColumnPresetID, input.ColumnPreset, input.ColumnPresetLegacy), ColumnOrder: columnOrder, Normalized: normalized}
+		documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(input.InputText, input.MaxTxt, metadata)
+		result, bookIDs, skippedBookIDs, err := workshopProcessParsedResult(req.Context(), store, identity.Username, documents, parsed, emptyIDs, duplicates, input.PlatformID, batchID, metadata, input.SelectedVersions)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -3869,31 +3888,319 @@ func mergeWorkshopConfigPreservingSecrets(current, patch map[string]any) map[str
 	return merged
 }
 
-func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Document, int, int, int) {
+var workshopMultiSpacePattern = regexp.MustCompile(`\s{2,}`)
+
+// 与参考实现的列预设保持一致；旧版页面传预设 ID，新版页面传展示名。
+var workshopColumnPresetColumns = map[string][]string{
+	"paid_name_reason":             {"paid_book_id", "book_name", "reason"},
+	"paid_name_gender_reason":      {"paid_book_id", "book_name", "gender", "reason"},
+	"free_paid_name_gender_reason": {"free_book_id", "paid_book_id", "book_name", "gender", "reason"},
+	"sample_input":                 {"book_id", "book_name", "reason", "gender", "tags", "rating"},
+	"full_11":                      {"ignore", "free_book_id", "paid_book_id", "book_name", "rating", "ignore", "ignore", "ignore", "ignore", "gender", "reason"},
+}
+
+var workshopColumnPresetAliases = map[string]string{
+	"付费id/书名/推荐理由":          "paid_name_reason",
+	"付费id/书名/男女频/推荐理由":     "paid_name_gender_reason",
+	"免费id/付费id/书名/男女频/推荐理由": "free_paid_name_gender_reason",
+	"书籍id/书名/推荐理由/男女频/标签/评级": "sample_input",
+	"完整11列":                 "full_11",
+}
+
+var workshopFixedColumnOrders = map[string][]string{
+	"fixed_full_11":    workshopColumnPresetColumns["full_11"],
+	"fixed_from_b":     workshopColumnPresetColumns["full_11"][1:],
+	"fixed_paid_basic": {"paid_book_id", "book_name", "gender", "reason"},
+}
+
+var workshopColumnAliases = map[string]string{}
+
+func init() {
+	for alias, field := range map[string]string{
+		"id": "book_id", "bookid": "book_id", "书籍id": "book_id", "小说id": "book_id", "作品id": "book_id",
+		"书号": "book_id", "书籍编号": "book_id", "小说编号": "book_id", "作品编号": "book_id",
+		"freebookid": "free_book_id", "免费id": "free_book_id", "免费书籍id": "free_book_id",
+		"paidbookid": "paid_book_id", "付费id": "paid_book_id", "付费书籍id": "paid_book_id",
+		"bookname": "book_name", "书名": "book_name", "作品名称": "book_name", "小说名称": "book_name",
+		"书籍名称": "book_name", "名称": "book_name", "title": "book_name",
+		"gender": "gender", "男女频": "gender", "性别": "gender", "频道": "gender", "频道类型": "gender",
+		"reason": "reason", "推荐理由": "reason", "推荐原因": "reason", "入选理由": "reason", "理由": "reason", "简介": "reason",
+		"tags": "tags", "标签": "tags", "rating": "rating", "评级": "rating",
+		"ignore": "ignore", "忽略": "ignore", "跳过": "ignore", "空": "ignore",
+	} {
+		workshopColumnAliases[alias] = field
+	}
+}
+
+func workshopNormalizeColumnToken(token string) string {
+	normalized := strings.ToLower(strings.TrimSpace(token))
+	normalized = strings.NewReplacer(" ", "", "\t", "", "_", "", "：", "", ":", "", "*", "", "（", "", "）", "", "(", "", ")", "", "【", "", "】", "", "[", "", "]", "").Replace(normalized)
+	if field, ok := workshopColumnAliases[normalized]; ok {
+		return field
+	}
+	return ""
+}
+
+func workshopColumnOrderFromText(text string) []string {
+	order := make([]string, 0)
+	for _, token := range strings.FieldsFunc(text, func(r rune) bool {
+		return r == '\n' || r == '\r' || r == '\t' || r == ',' || r == '，' || r == '、' || r == '/' || r == '|'
+	}) {
+		if field := workshopNormalizeColumnToken(token); field != "" {
+			order = append(order, field)
+		}
+	}
+	return order
+}
+
+func workshopColumnOrderFromValues(values []string) []string {
+	order := make([]string, 0, len(values))
+	for _, value := range values {
+		if field := workshopNormalizeColumnToken(value); field != "" {
+			order = append(order, field)
+		}
+	}
+	return order
+}
+
+// workshopColumnOrderRaw 兼容新版数组和旧版逗号/顿号分隔字符串。
+// 返回值保留原始列名用于回显，实际解析时再由 workshopResolveColumnOrder 映射。
+func workshopColumnOrderRaw(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var values []string
+	if err := json.Unmarshal(raw, &values); err == nil {
+		return cleanStrings(values)
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		order := make([]string, 0)
+		for _, token := range strings.FieldsFunc(text, func(r rune) bool {
+			return r == '\n' || r == '\r' || r == '\t' || r == ',' || r == '，' || r == '、' || r == '/' || r == '|'
+		}) {
+			if token = strings.TrimSpace(token); token != "" {
+				order = append(order, token)
+			}
+		}
+		return order
+	}
+	return nil
+}
+
+func workshopResolveColumnOrder(metadata workshopInputMetadata) []string {
+	format := strings.ToLower(strings.TrimSpace(metadata.Format))
+	if fixed, ok := workshopFixedColumnOrders[format]; ok {
+		return append([]string(nil), fixed...)
+	}
+	preset := strings.ToLower(strings.TrimSpace(metadata.ColumnPreset))
+	if alias, ok := workshopColumnPresetAliases[preset]; ok {
+		preset = alias
+	}
+	if columns, ok := workshopColumnPresetColumns[preset]; ok {
+		return append([]string(nil), columns...)
+	}
+	if format == "custom" && len(metadata.ColumnOrder) > 0 {
+		return workshopColumnOrderFromValues(metadata.ColumnOrder)
+	}
+	if len(metadata.ColumnOrder) > 0 {
+		return workshopColumnOrderFromValues(metadata.ColumnOrder)
+	}
+	return nil
+}
+
+func workshopSplitLine(line string) []string {
+	split := func(parts []string) []string {
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			values = append(values, strings.TrimSpace(part))
+		}
+		return values
+	}
+	if strings.Contains(line, "\t") {
+		return split(strings.Split(line, "\t"))
+	}
+	if strings.Contains(line, "|") {
+		return split(strings.Split(line, "|"))
+	}
+	if workshopMultiSpacePattern.MatchString(line) {
+		return split(workshopMultiSpacePattern.Split(line, -1))
+	}
+	if strings.Contains(line, ",") {
+		return split(strings.Split(line, ","))
+	}
+	return []string{strings.TrimSpace(line)}
+}
+
+func workshopHeaderRowScore(cells []string) int {
+	fields := map[string]struct{}{}
+	for _, cell := range cells {
+		if field := workshopNormalizeColumnToken(cell); field != "" && field != "ignore" {
+			fields[field] = struct{}{}
+		}
+	}
+	return len(fields)
+}
+
+// workshopDetectHeader 返回合并后的列顺序和需要跳过的表头行数。
+func workshopDetectHeader(rows [][]string, maxScan int) ([]string, int) {
+	firstHeader := -1
+	for index := 0; index < len(rows) && index < maxScan; index++ {
+		if workshopHeaderRowScore(rows[index]) >= 2 {
+			firstHeader = index
+			break
+		}
+	}
+	if firstHeader < 0 {
+		return nil, 0
+	}
+	lastHeader := firstHeader
+	limit := len(rows)
+	if limit > maxScan {
+		limit = maxScan
+	}
+	for lastHeader+1 < limit && workshopHeaderRowScore(rows[lastHeader+1]) >= 2 {
+		lastHeader++
+	}
+	width := 0
+	for _, row := range rows[:lastHeader+1] {
+		if len(row) > width {
+			width = len(row)
+		}
+	}
+	order := make([]string, width)
+	fields := 0
+	for _, row := range rows[:lastHeader+1] {
+		for index, cell := range row {
+			if field := workshopNormalizeColumnToken(cell); field != "" {
+				order[index] = field
+			}
+		}
+	}
+	for _, field := range order {
+		if field != "" {
+			fields++
+		}
+	}
+	if fields < 2 {
+		return nil, 0
+	}
+	return order, lastHeader + 1
+}
+
+func workshopGenderValue(value string) string {
+	if strings.Contains(value, "男频") {
+		return "男频"
+	}
+	if strings.Contains(value, "女频") {
+		return "女频"
+	}
+	return ""
+}
+
+func workshopRowByColumnOrder(cells, order []string) (bookID, bookName, gender string) {
+	values := map[string]string{}
+	for index, field := range order {
+		if index >= len(cells) {
+			break
+		}
+		cell := strings.TrimSpace(cells[index])
+		if field == "" || field == "ignore" {
+			continue
+		}
+		if field == "reason" || field == "tags" {
+			// 最后一列经常包含被分隔符切开的推荐理由，重新合并剩余单元格。
+			if index == len(order)-1 {
+				parts := make([]string, 0, len(cells)-index)
+				for _, item := range cells[index:] {
+					if strings.TrimSpace(item) != "" {
+						parts = append(parts, strings.TrimSpace(item))
+					}
+				}
+				values["reason"] = strings.Join(parts, " ")
+				continue
+			}
+			if values["reason"] != "" {
+				values["reason"] += " " + cell
+			} else {
+				values["reason"] = cell
+			}
+			continue
+		}
+		if values[field] == "" {
+			values[field] = cell
+		}
+	}
+	bookID = novelFetchSafeBookID(firstText(values["paid_book_id"], values["book_id"], values["free_book_id"]))
+	bookName = values["book_name"]
+	gender = workshopGenderValue(values["gender"])
+	return bookID, bookName, gender
+}
+
+func parseWorkshopDocuments(input string, maxTxt int, options ...workshopInputMetadata) ([]novelfetchworkshop.Document, int, int, int) {
+	metadata := workshopInputMetadata{}
+	if len(options) > 0 {
+		metadata = options[0]
+	}
+	format := strings.ToLower(strings.TrimSpace(metadata.Format))
 	lines := strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n")
-	documents := make([]novelfetchworkshop.Document, 0)
-	seen := make(map[string]struct{})
-	parsed, emptyIDs, duplicates := 0, 0, 0
+	rawRows := make([][]string, 0, len(lines))
 	for _, rawLine := range lines {
 		line := strings.TrimSpace(rawLine)
 		if line == "" {
 			continue
 		}
-		lowerLine := strings.ToLower(line)
+		rawRows = append(rawRows, workshopSplitLine(line))
+	}
+	headerOrder := []string(nil)
+	headerRows := 0
+	// 新前端的输入已经序列化为固定四列，不能再按原始表头/列顺序重排。
+	if !metadata.Normalized && (format == "" || format == "smart" || format == "header" || format == "multi_header") {
+		maxScan := 5
+		if format == "multi_header" {
+			maxScan = 8
+		}
+		headerOrder, headerRows = workshopDetectHeader(rawRows, maxScan)
+	}
+	order := headerOrder
+	if len(order) == 0 {
+		order = workshopResolveColumnOrder(metadata)
+	}
+	if metadata.Normalized {
+		// 新版页面已按书籍ID/书名/男女频/理由序列化，忽略展示用的列顺序。
+		order = []string{"book_id", "book_name", "gender", "reason"}
+	}
+	documents := make([]novelfetchworkshop.Document, 0)
+	seen := make(map[string]struct{})
+	parsed, emptyIDs, duplicates := 0, 0, 0
+	for index, cells := range rawRows {
+		if index < headerRows {
+			continue
+		}
+		line := strings.Join(cells, "\t")
 		// 表头需要跳过，但带 book_id=123456 的链接本身不是表头，不能一起丢掉。
-		if strings.Contains(line, "书籍ID") || (strings.Contains(lowerLine, "book_id") && !novelFetchBookIDURLPattern.MatchString(line)) {
+		if workshopHeaderRowScore(cells) >= 2 && novelFetchBookIDURLPattern.FindString(line) == "" {
 			continue
 		}
 		parsed++
-		cells := strings.FieldsFunc(line, func(r rune) bool { return r == '\t' || r == '|' || r == ',' })
-		for index := range cells {
-			cells[index] = strings.TrimSpace(cells[index])
+		bookID, bookName, gender := "", "", ""
+		if len(order) > 0 {
+			bookID, bookName, gender = workshopRowByColumnOrder(cells, order)
+		} else if format == "bookid_only" {
+			for _, cell := range cells {
+				if candidate := novelFetchSafeBookID(cell); candidate != "" {
+					bookID = candidate
+					break
+				}
+			}
 		}
-		bookID := ""
-		for _, cell := range cells {
-			if candidate := novelFetchSafeBookID(cell); candidate != "" {
-				bookID = candidate
-				break
+		idFromURL := novelFetchBookIDURLPattern.MatchString(line)
+		if bookID == "" && !idFromURL {
+			for _, cell := range cells {
+				if candidate := novelFetchSafeBookID(cell); candidate != "" {
+					bookID = candidate
+					break
+				}
 			}
 		}
 		if bookID == "" {
@@ -3905,36 +4212,43 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 			continue
 		}
 		seen[bookID] = struct{}{}
-		bookName, gender := "", ""
-		idFromURL := novelFetchBookIDURLPattern.MatchString(line)
-		// 常用输入是“ID + 若干空格 + 书名”。先从原始行移除 ID 和
-		// 紧随其后的空白/分隔符，避免把 ID 一并保存成书名。链接输入不参与
-		// 书名推断，否则查询参数会被误存成书名。
-		if idIndex := strings.Index(line, bookID); idIndex >= 0 && !idFromURL {
-			remainder := strings.TrimLeftFunc(line[idIndex+len(bookID):], func(r rune) bool {
-				return unicode.IsSpace(r) || r == '|' || r == ','
-			})
-			if remainder != "" {
-				nameParts := strings.FieldsFunc(remainder, func(r rune) bool { return r == '\t' || r == '|' || r == ',' })
-				if len(nameParts) > 0 {
-					candidate := strings.TrimSpace(nameParts[0])
-					if !strings.Contains(candidate, "男频") && !strings.Contains(candidate, "女频") {
-						bookName = candidate
+		if bookName == "" {
+			// 常用输入是“ID + 若干空格 + 书名”。先从原始行移除 ID 和
+			// 紧随其后的空白/分隔符，避免把 ID 一并保存成书名。链接输入不参与
+			// 书名推断，否则查询参数会被误存成书名。
+			if idIndex := strings.Index(line, bookID); idIndex >= 0 && !idFromURL {
+				remainder := strings.TrimLeftFunc(line[idIndex+len(bookID):], func(r rune) bool {
+					return unicode.IsSpace(r) || r == '|' || r == ','
+				})
+				if remainder != "" {
+					nameParts := strings.FieldsFunc(remainder, func(r rune) bool { return r == '\t' || r == '|' || r == ',' })
+					if len(nameParts) > 0 {
+						candidate := strings.TrimSpace(nameParts[0])
+						if !strings.Contains(candidate, "男频") && !strings.Contains(candidate, "女频") {
+							bookName = candidate
+						}
 					}
 				}
 			}
 		}
-		for _, cell := range cells {
-			if strings.Contains(cell, bookID) || strings.Contains(cell, "男频") || strings.Contains(cell, "女频") {
-				if strings.Contains(cell, "男频") {
-					gender = "男频"
-				} else if strings.Contains(cell, "女频") {
-					gender = "女频"
+		if gender == "" {
+			for _, cell := range cells {
+				if strings.Contains(cell, bookID) {
+					continue
 				}
-				continue
+				if value := workshopGenderValue(cell); value != "" {
+					gender = value
+					break
+				}
 			}
-			if bookName == "" {
+		}
+		if bookName == "" && len(order) == 0 {
+			for _, cell := range cells {
+				if strings.Contains(cell, bookID) || strings.Contains(cell, "男频") || strings.Contains(cell, "女频") {
+					continue
+				}
 				bookName = cell
+				break
 			}
 		}
 		// The V78 preview hides the textarea after parsing and later rebuilds

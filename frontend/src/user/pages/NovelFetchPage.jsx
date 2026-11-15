@@ -32,7 +32,7 @@ import { mergeDefaultUploadProfile, uploadSessionDisplayName } from './novel-fet
 import { describeWebSubmitExecution, describeWebSubmitReconcile, describeWebSubmitVisible } from './webSubmitFeedback.js';
 import { NovelFetchCylinderList, NovelFetchMetricStrip, NovelFetchSubpageShell } from './novel-fetch-workbench-ui.jsx';
 import { batchFactoryRawSourceText, batchFactorySourceMetadata, batchFactorySourceText, batchFactoryVersionLabel } from './novel-fetch-batch-factory.js';
-import { normalizeNovelFetchInput, serializeNovelFetchRows } from './novel-fetch-input-format.js';
+import { normalizeNovelFetchInput, serializeNovelFetchRows, NOVEL_FETCH_INPUT_FORMATS } from './novel-fetch-input-format.js';
 import { parseOpeningDraft } from './novel-fetch-knowledge-edits.js';
 import { buildRuleConfigPatch } from './novel-fetch-rule-config.js';
 import { dispatchGlobalStatus } from '../../shared/notifications/globalTaskCenter.js';
@@ -65,11 +65,7 @@ const REWRITE_METHOD_OPTIONS = [
   { value: 'opening_instruction', label: '爆款开头词库' },
   { value: 'instruction', label: '批量改文指令库' }
 ];
-const INPUT_FORMAT_OPTIONS = [
-  { value: 'smart', label: '智能识别', description: '每行输入 ID 和书名即可', columnPreset: '智能识别', columnOrder: [] },
-  { value: 'paid_id_title_gender_reason', label: '付费 ID、书名、男女频、理由', description: '按制表符分列', columnPreset: '付费 ID + 书名 + 男女频 + 理由', columnOrder: ['bookId', 'bookName', 'gender', 'reason'] },
-  { value: 'custom', label: '自定义列顺序', description: '选择每一列对应的信息', columnPreset: '自定义列顺序', columnOrder: ['bookId', 'bookName', 'gender', 'reason'] }
-];
+const INPUT_FORMAT_OPTIONS = NOVEL_FETCH_INPUT_FORMATS;
 const INPUT_COLUMN_LABELS = { bookId: '书籍 ID', bookName: '书名', gender: '男女频', reason: '理由' };
 
 function scheduleInputValue(date = new Date(Date.now() + 10 * 60 * 1000)) {
