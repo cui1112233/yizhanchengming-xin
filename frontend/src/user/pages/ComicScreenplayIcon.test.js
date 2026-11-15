@@ -55,6 +55,17 @@ test('普通资产库FolderOutline精确采用原包两条路径与32描边',()=
  assert.match(markup,/d="M32 192h448"/);
 });
 
+test('public文件夹导入CloudDownloadOutline保留原包三条路径',()=>{
+ const icon=originalComicIcons.CloudDownloadOutline;
+ assert.equal(createHash('sha256').update(JSON.stringify(icon.svg)).digest('hex'),'548411eee2b38aac5c8709216b85a91d768a222becd2d35b532ff46e7989fe58');
+ assert.deepEqual(icon.original,{line:29,column:1363856,start:1472295,end:1472381});
+ const markup=renderIcon('CloudDownloadOutline',18);
+ assert.match(markup,/viewBox="0 0 512 512"/);
+ assert.equal([...markup.matchAll(/<path\b/g)].length,3);
+ assert.equal([...markup.matchAll(/stroke-width="32"/g)].length,3);
+ assert.match(markup,/d="M256 224v224.03"/);
+});
+
 test('同页多个provider渐变使用useId隔离且所有本地引用都指向各自定义',()=>{
  const markup=renderProviders(['doubao','doubao','minimax','qwen','hunyuan']);const ids=[...markup.matchAll(/\sid="([^"]+)"/g)].map(match=>match[1]);assert.ok(ids.length>1);assert.equal(new Set(ids).size,ids.length);for(const ref of markup.matchAll(/url\(#([^)]+)\)/g))assert.ok(ids.includes(ref[1]),ref[1]);
 });
