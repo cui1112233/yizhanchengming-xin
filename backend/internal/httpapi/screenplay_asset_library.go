@@ -110,6 +110,9 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 	if source == nil {
 		return screenplay.AssetLibraryEntry{}, screenplay.ErrNotFound
 	}
+	if err := validateLibrarySubject(source.Type, sourceSubjectPointer(*source)); err != nil {
+		return screenplay.AssetLibraryEntry{}, err
+	}
 	if source.Revision != *in.ExpectedAssetRevision {
 		return screenplay.AssetLibraryEntry{}, screenplay.ErrRevisionConflict
 	}
@@ -161,6 +164,7 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 		return screenplay.AssetLibraryEntry{}, err
 	}
 	entry := screenplay.AssetLibraryEntry{ID: id, Owner: actor, Type: source.Type, Name: source.Name, Description: firstText(source.Description, source.Identity), Category: strings.TrimSpace(in.Category), Snapshot: *source, SourceProjectID: project.ID, SourceAssetID: source.ID, SourceMediaID: selected.ID, Image: screenplay.MediaItem{ID: imageID, AssetID: imageID, Name: image.Name, Kind: "image", Status: "succeeded", CreatedAt: image.CreatedAt}, ImageObject: screenplay.AssetLibraryImageObject{ObjectKey: key, ContentType: image.ContentType, ByteSize: image.ByteSize}}
+	setLibrarySubject(&entry, sourceSubjectPointer(*source))
 	saved, err := s.Repository.SaveAssetLibraryEntry(ctx, entry, 0)
 	if err != nil {
 		// A failed commit acknowledgement does not prove rollback. Reconcile
@@ -192,6 +196,9 @@ func screenplayLibraryPublic(entry screenplay.AssetLibraryEntry) map[string]any 
 		image.URL = ""
 	}
 	out := map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey], "audio": "", "audioFileName": ""}
+	if entry.Type == screenplay.AssetCharacter {
+		out["sora2Info"] = librarySubject(entry)
+	}
 	out["image_available"] = available
 	if audio, err := libraryAudioObject(entry); err == nil {
 		out["audio"] = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/audio?revision=%d", url.PathEscape(entry.ID), entry.Revision)

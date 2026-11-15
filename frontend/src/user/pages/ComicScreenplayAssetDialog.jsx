@@ -39,7 +39,7 @@ export default function ComicScreenplayAssetDialog({ projectId, workspace, asset
   function libraryKey(purpose) { if(!libraryKeys.current.has(purpose))libraryKeys.current.set(purpose,crypto.randomUUID());return libraryKeys.current.get(purpose); }
   function chooseLibrary(entry) {
     setLibraryCandidate(entry);setSelectedImage('');setFile(null);
-    if(!editing)setDraft(current=>({...current,name:current.name.trim()?current.name:entry.name||'',identity:current.identity.trim()?current.identity:entry.description||'',description:current.description.trim()?current.description:entry.description||''}));
+    if(!editing)setDraft(current=>({...current,name:current.name.trim()?current.name:entry.name||'',identity:current.identity.trim()?current.identity:entry.description||'',description:current.description.trim()?current.description:entry.description||'',...(current.type==='character'?{extra:{...current.extra,sora2_info:entry.sora2Info ?? entry.sora2_info ?? ''}}:{})}));
     setNotice('已选择普通库图片，点击资产窗口保存后生效。');
   }
   const persistedSelectedId=currentMedia?.settings?.selected?.[persisted.current?.id]||'';

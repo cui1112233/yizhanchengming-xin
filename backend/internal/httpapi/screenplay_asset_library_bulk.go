@@ -67,9 +67,14 @@ func (s *ScreenplayAssetLibrary) ImportCharacters(ctx context.Context, actor str
 			}
 			values[field] = v
 		}
+		subject, e := libraryArchiveSubject(record)
+		if e != nil {
+			return empty, e
+		}
 		id := bulkLibraryID(actor, in.RequestKey, digest, i, "entry")
 		raw, _ := json.Marshal(record)
 		entry := screenplay.AssetLibraryEntry{ID: id, Owner: actor, Type: screenplay.AssetCharacter, Name: values["name"], Description: values["description"], Category: values["category"], Snapshot: screenplay.Asset{OwnerUsername: actor, Type: screenplay.AssetCharacter, Name: values["name"], Description: values["description"], Extra: map[string]string{screenplay.LibraryArchiveJSON: string(raw), screenplay.LibraryArchiveID: values["id"], screenplayLibraryPromptKey: values["prompt"], screenplayLibraryVoiceKey: values["voice"]}}}
+		setLibrarySubject(&entry, subject)
 		if entry.Name == "" {
 			return empty, libraryBulkError("每个角色必须填写名称")
 		}
@@ -174,6 +179,10 @@ func (s *ScreenplayAssetLibrary) ExportCharacters(ctx context.Context, actor str
 		set("category", entry.Category)
 		set("prompt", entry.Snapshot.Extra[screenplayLibraryPromptKey])
 		set("voice", entry.Snapshot.Extra[screenplayLibraryVoiceKey])
+		set("sora2Info", librarySubject(entry))
+		if _, ok := record["sora2_info"]; ok {
+			set("sora2_info", librarySubject(entry))
+		}
 		set("image", "")
 		set("imagePath", "")
 		set("audio", "")

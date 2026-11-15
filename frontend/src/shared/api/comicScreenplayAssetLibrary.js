@@ -30,7 +30,16 @@ function libraryEntryPath(id) {
   if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(String(id||'')))throw new Error('素材编号无效');
   return `/api/comic-screenplays/asset-library/${id}`;
 }
-function metadata(input) { return Object.fromEntries(['name','description','category','prompt','voice'].map(key=>[key,String(input[key]||'')])); }
+function metadata(input) {
+  const values=Object.fromEntries(['name','description','category','prompt','voice'].map(key=>[key,String(input[key]||'')]));
+  if(Object.hasOwn(input,'sora2Info')) {
+    if(input.type && input.type!=='character')throw new Error('仅角色支持主体存档');
+    if(typeof input.sora2Info!=='string')throw new Error('主体存档必须为文字');
+    if(new TextEncoder().encode(input.sora2Info).length>16*1024)throw new Error('主体存档不能超过16KiB');
+    values.sora2Info=input.sora2Info;
+  }
+  return values;
+}
 function publicEntry(data) { if(!data?.entry?.id)throw new Error('普通库未返回素材编号，请重新读取核对');return data.entry; }
 function libraryImageForm(input,requireImage=true) {
   if(!['character','scene','prop'].includes(input.type))throw new Error('素材类型无效');

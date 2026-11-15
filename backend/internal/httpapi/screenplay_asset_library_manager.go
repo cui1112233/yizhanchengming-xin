@@ -31,10 +31,12 @@ type screenplayLibraryUploadInput struct {
 	Type                                                 screenplay.AssetType
 	Name, Description, Category, Prompt, Voice, FileName string
 	Bytes                                                []byte
+	Sora2Info                                            *string
 	AudioName                                            string
 	AudioBytes                                           []byte
 }
 type screenplayLibraryMetadataInput struct {
+	Sora2Info   *string `json:"sora2Info"`
 	Expected    *int64  `json:"expectedRevision"`
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
@@ -97,7 +99,7 @@ func parseScreenplayLibraryEditor(w http.ResponseWriter, r *http.Request, requir
 			continue
 		}
 		switch name {
-		case "requestKey", "type", "name", "description", "category", "prompt", "voice":
+		case "requestKey", "type", "name", "description", "category", "prompt", "voice", "sora2Info":
 		default:
 			part.Close()
 			return in, screenplay.ErrInvalidArgument
@@ -123,6 +125,9 @@ func parseScreenplayLibraryEditor(w http.ResponseWriter, r *http.Request, requir
 	in.Category = fields["category"]
 	in.Prompt = fields["prompt"]
 	in.Voice = fields["voice"]
+	if value, ok := fields["sora2Info"]; ok {
+		in.Sora2Info = &value
+	}
 	return in, nil
 }
 func parseLibraryExpectedRevision(r *http.Request) (int64, error) {
@@ -141,6 +146,9 @@ func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, 
 	}
 	if !ordinaryLibraryType(in.Type) || !validAssetLibraryRequestKey(in.RequestKey) || len(in.Bytes) == 0 || len(in.Bytes) > screenplayLibraryImageLimit {
 		return screenplay.AssetLibraryEntry{}, screenplay.ErrInvalidArgument
+	}
+	if err := validateLibrarySubject(in.Type, in.Sora2Info); err != nil {
+		return screenplay.AssetLibraryEntry{}, err
 	}
 	name := strings.TrimSpace(in.Name)
 	if name == "" && in.Type != screenplay.AssetCharacter {
@@ -167,6 +175,10 @@ func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, 
 	if len(in.AudioBytes) > 0 {
 		sum := sha256.Sum256(in.AudioBytes)
 		metadata = append(metadata, []byte(in.AudioName+fmt.Sprintf("%x", sum))...)
+	}
+	if in.Sora2Info != nil {
+		subject, _ := json.Marshal([]string{"sora2Info", *in.Sora2Info})
+		metadata = append(metadata, subject...)
 	}
 	payloadHash := sha256.Sum256(metadata)
 	digest := fmt.Sprintf("%x", payloadHash)
@@ -198,6 +210,7 @@ func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, 
 		return screenplay.AssetLibraryEntry{}, fmt.Errorf("图片上传失败，请重试")
 	}
 	entry := screenplay.AssetLibraryEntry{ID: id, Owner: actor, Type: in.Type, Name: name, Description: in.Description, Category: in.Category, Image: screenplay.MediaItem{ID: imageID, AssetID: imageID, Name: object.Name, Kind: "image", Status: "succeeded", CreatedAt: object.CreatedAt}, ImageObject: screenplay.AssetLibraryImageObject{ObjectKey: objectKey, ContentType: contentType, ByteSize: object.ByteSize}, Snapshot: screenplay.Asset{OwnerUsername: actor, Type: in.Type, Name: name, Description: in.Description, Prompt: in.Prompt, Voice: in.Voice, Extra: map[string]string{"library_upload_digest": digest, screenplayLibraryPromptKey: in.Prompt, screenplayLibraryVoiceKey: in.Voice}}}
+	setLibrarySubject(&entry, in.Sora2Info)
 	if audio.ID != "" {
 		if err = s.Media.Objects.Put(ctx, audio, bytes.NewReader(in.AudioBytes)); err != nil {
 			s.cleanupLibraryDraftObjects(ctx, actor, id, []agentworkspace.Asset{object, audio})
@@ -239,13 +252,17 @@ func (s *ScreenplayAssetLibrary) UpdateEntry(ctx context.Context, actor, id stri
 	if err := ctx.Err(); err != nil {
 		return screenplay.AssetLibraryEntry{}, err
 	}
-	if in.Expected == nil || *in.Expected < 1 || in.Name == nil && in.Description == nil && in.Category == nil && in.Prompt == nil && in.Voice == nil {
+	if in.Expected == nil || *in.Expected < 1 || in.Name == nil && in.Description == nil && in.Category == nil && in.Prompt == nil && in.Voice == nil && in.Sora2Info == nil {
 		return screenplay.AssetLibraryEntry{}, screenplay.ErrInvalidArgument
 	}
 	entry, err := s.Repository.GetAssetLibraryEntry(ctx, actor, id)
 	if err != nil {
 		return screenplay.AssetLibraryEntry{}, err
 	}
+	if err := validateLibrarySubject(entry.Type, in.Sora2Info); err != nil {
+		return screenplay.AssetLibraryEntry{}, err
+	}
+	setLibrarySubject(&entry, in.Sora2Info)
 	if in.Name != nil {
 		entry.Name = *in.Name
 	}
@@ -283,7 +300,7 @@ func (s *ScreenplayAssetLibrary) UpdateEntry(ctx context.Context, actor, id stri
 	return screenplay.AssetLibraryEntry{}, err
 }
 func sameLibraryMetadata(a, b screenplay.AssetLibraryEntry) bool {
-	return a.Name == strings.TrimSpace(b.Name) && a.Description == b.Description && a.Category == b.Category && a.Snapshot.Extra[screenplayLibraryPromptKey] == b.Snapshot.Extra[screenplayLibraryPromptKey] && a.Snapshot.Extra[screenplayLibraryVoiceKey] == b.Snapshot.Extra[screenplayLibraryVoiceKey]
+	return librarySubject(a) == librarySubject(b) && a.Name == strings.TrimSpace(b.Name) && a.Description == b.Description && a.Category == b.Category && a.Snapshot.Extra[screenplayLibraryPromptKey] == b.Snapshot.Extra[screenplayLibraryPromptKey] && a.Snapshot.Extra[screenplayLibraryVoiceKey] == b.Snapshot.Extra[screenplayLibraryVoiceKey]
 }
 func (s *ScreenplayAssetLibrary) DeleteEntry(ctx context.Context, actor, id string, expected int64) error {
 	if err := ctx.Err(); err != nil {
