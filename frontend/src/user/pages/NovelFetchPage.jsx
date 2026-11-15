@@ -522,7 +522,9 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
       { key: 'rules', label: '规则轨迹', children: diagnosticsLoading ? <span className="novel-fetch-inline-loading" role="status" aria-live="polite"><Spin size="small" />正在读取规则轨迹…</span> : diagnostics.rules?.error ? <Alert type="error" showIcon message="规则轨迹读取失败" description={diagnostics.rules.error} /> : renderNovelFetchRulesDiagnostic(diagnostics.rules || {}) },
       { key: 'submit', label: '提交日志', children: diagnosticsLoading ? <span className="novel-fetch-inline-loading" role="status" aria-live="polite"><Spin size="small" />正在读取提交日志…</span> : diagnostics.submit?.error ? <Alert type="error" showIcon message="提交日志读取失败" description={diagnostics.submit.error} /> : renderNovelFetchSubmitDiagnostic(diagnostics.submit || {}) },
       { key: 'logs', label: '操作日志', children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(detailData.logs || [], null, 2)}</Typography.Paragraph> }
-    ]} /> : null}
+    ].map(item => taskDetailNeedsContent(detailData, item.key)
+      ? { ...item, children: <div className="novel-fetch-detail-loading">{contentLoading ? <Spin size="small" /> : null}{contentError || (contentLoading ? '正在读取正文…' : '请选择此标签读取内容')}</div> }
+      : item)} /> : null}
   </Drawer>;
 }
 
