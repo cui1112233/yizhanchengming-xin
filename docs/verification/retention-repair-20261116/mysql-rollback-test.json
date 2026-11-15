@@ -1,0 +1,6 @@
+{
+  "realMySQLForeignKeyReproduced": true,
+  "fixedOrderPassed": true,
+  "allChangesRolledBack": true,
+  "fixtureBook": "book_61c3291d655d5827847d74aefe1f9c72"
+}

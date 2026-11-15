@@ -1,0 +1,10 @@
+{
+  "runtimeSHA": "64910963",
+  "frontendEntry": "/assets/user-B6vVLsnm.js",
+  "oldBookHidden": true,
+  "fullGraceSeconds": 86400,
+  "oldBatchAbsentFromAPI": true,
+  "visibleBatchCount": 0,
+  "databaseRows": "book_f8ecb32dd221e8cb98366d4a231a677b\t2026-10-13 13:02:17.292179\t2026-11-15 16:44:10.411373\t2026-11-16 16:44:10.411373\t86400\n81\t79\t0\n",
+  "cloudDeletionNotClaimed": true
+}

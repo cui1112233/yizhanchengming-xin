@@ -1,0 +1,3 @@
+ok  	qiantie/backend/internal/batchfactoryv11	4.022s
+ok  	qiantie/backend/internal/productionmedia	0.069s
+ok  	qiantie/backend/internal/app	0.028s
