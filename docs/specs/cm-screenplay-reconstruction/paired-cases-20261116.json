@@ -104,7 +104,42 @@
       "comparison": "original_compiled_methods_and_bidirectional_archive_compared_cm_dom_mysql_http_4001_verified",
       "remaining": "原桌面逐按钮与同视口像素、真实登录浏览器未验证；整页刷新恢复未实现；不把配置媒体检查冒称TOS",
       "full_parity_passed": false
+    },
+    {
+      "id": "G12-SUBJECT-001",
+      "name": "主体存档编辑复制与普通库选用项目角色",
+      "original": {
+        "source": "01-readable-frontend/pretty/index-DszfAkKD.js",
+        "lines": [
+          65204,
+          65366,
+          178096,
+          178106
+        ],
+        "controlled_editor_cases": 7,
+        "native_upload_declaration": "api.py:10320 metadata, not recovered source",
+        "evidence": [
+          "library-subject-20261116/original-editor-replay.json",
+          "library-subject-20261116/frontend-sora-consumers.txt",
+          "library-subject-20261116/ANALYSIS.md"
+        ]
+      },
+      "cm": {
+        "commit": "23bbdd92e0677d2156c0c0906f56bf2328b1101a",
+        "actual_mysql_checks": 28,
+        "actual_4001_http_checks": 16,
+        "evidence": [
+          "library-subject-20261116/backend/mysql-result.json",
+          "library-subject-20261116/frontend/RESULTS.md",
+          "library-subject-20261116/actual-4001-result.json",
+          "library-subject-20261116/native-live-subject-archive-result.json",
+          "library-subject-20261116/runtime-verification.json"
+        ]
+      },
+      "comparison": "original_recovered_editor_and_binding_rules_compared_cm_dom_mysql_http_4001_verified",
+      "remaining": "真人上传、原视频最终消费未实现；原桌面点击/同视口像素及实际登录浏览器未通过；主动textarea编辑按LF保存",
+      "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "0f657442e02a26dcc3a85cf46923e104d42330df"
+  "latest_runtime_commit": "23bbdd92e0677d2156c0c0906f56bf2328b1101a"
 }
