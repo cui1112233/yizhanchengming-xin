@@ -57,7 +57,7 @@ func ApplyChapterGeneration(c *Chapter, raw string) error {
 }
 func professionalScriptMarkdown(raw string) (string, error) {
 	cleaned := strings.TrimSpace(raw)
-	if !strings.HasPrefix(cleaned, "{") && !strings.HasPrefix(cleaned, "```json") {
+	if !strings.HasPrefix(cleaned, "{") && !strings.HasPrefix(cleaned, "```json") && !professionalAnalysisStart(cleaned) {
 		// Legacy Markdown remains valid, but a prefixed professional JSON response
 		// must not silently become an editable plain-text script.
 		if strings.Contains(cleaned, "\"scenes\"") || strings.Contains(cleaned, "【转换自检】") {
@@ -191,6 +191,13 @@ func selectedScreenplayOutput(raw, promptID string) (string, error) {
 
 func decodeProfessionalScriptObject(raw string) (json.RawMessage, error) {
 	cleaned := strings.TrimSpace(raw)
+	if !strings.HasPrefix(cleaned, "{") && !strings.HasPrefix(cleaned, "```json") {
+		var ok bool
+		cleaned, ok = professionalAnalysisBody(cleaned)
+		if !ok {
+			return nil, ErrAIInvalidJSON
+		}
+	}
 	fenced := strings.HasPrefix(cleaned, "```json")
 	if fenced {
 		cleaned = strings.TrimSpace(strings.TrimPrefix(cleaned, "```json"))
@@ -214,6 +221,56 @@ func decodeProfessionalScriptObject(raw string) (json.RawMessage, error) {
 		return nil, ErrAIInvalidJSON
 	}
 	return payload, nil
+}
+
+func professionalAnalysisStart(raw string) bool {
+	line, _, _ := strings.Cut(strings.TrimSpace(raw), "\n")
+	return strings.Trim(strings.TrimSpace(line), "#* \t\r") == "场景划分结果："
+}
+
+// The shipped 144 prompt asks for these analysis sections before its JSON.
+// Only that envelope is accepted; arbitrary prose and multiple objects remain invalid.
+// RawResult is saved by the caller without removing or rewriting the envelope.
+func professionalAnalysisBody(raw string) (string, bool) {
+	if !professionalAnalysisStart(raw) {
+		return "", false
+	}
+	sections := map[string]bool{"场景划分结果：": true, "信息清单核对：": true, "难点标记：": true, "地点核实：": true}
+	seen := map[string]bool{}
+	section, hasContent := "", false
+	offset := 0
+	for _, part := range strings.SplitAfter(raw, "\n") {
+		line := strings.TrimSpace(part)
+		if strings.HasPrefix(line, "{") || strings.HasPrefix(line, "```json") {
+			if section == "" || !hasContent {
+				return "", false
+			}
+			return strings.TrimSpace(raw[offset:]), true
+		}
+		if line != "" {
+			heading := strings.Trim(line, "#* \t\r")
+			if sections[heading] {
+				if seen[heading] || (section != "" && !hasContent) {
+					return "", false
+				}
+				seen[heading], section, hasContent = true, heading, false
+			} else {
+				if section == "" || strings.ContainsAny(line, "{}") || strings.Contains(line, "```") {
+					return "", false
+				}
+				if section == "场景划分结果：" {
+					if !strings.HasPrefix(line, "第") || !strings.Contains(line, "场：") {
+						return "", false
+					}
+				} else if !strings.HasPrefix(line, "- ") && !strings.HasPrefix(line, "* ") && !strings.HasPrefix(line, "• ") {
+					return "", false
+				}
+				hasContent = true
+			}
+		}
+		offset += len(part)
+	}
+	return "", false
 }
 
 func validConversionSelfCheck(tail string) bool {

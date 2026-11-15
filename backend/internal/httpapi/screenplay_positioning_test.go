@@ -89,6 +89,7 @@ func TestPositioningCRUDRevisionOwnershipAndProtectedURL(t *testing.T) {
 func TestPositioningRealImageRequestReferencesAndIdempotency(t *testing.T) {
 	s, p := positioningFixture(t)
 	ctx := context.Background()
+	p.CreativeConfig.ImageCoreInstruction = "仅角色设定：全身三视图"
 	referenceIDs := map[string]string{}
 	for _, name := range []string{"甲", "乙", "房间"} {
 		kind := screenplay.AssetCharacter
@@ -116,6 +117,9 @@ func TestPositioningRealImageRequestReferencesAndIdempotency(t *testing.T) {
 	s.Images = func(_ context.Context, owner string, in AgentImageGenerationInput) ([]string, int, error) {
 		calls++
 		want := []string{marked.AssetID, referenceIDs["乙"], referenceIDs["甲"], referenceIDs["房间"]}
+		if strings.Contains(in.Prompt, "仅角色设定：全身三视图") {
+			t.Fatal("character layout leaked into positioning image")
+		}
 		if owner != "alice" || in.ModelID != "edit" || in.AspectRatio != "16:9" || in.Size != "2048x1152" || in.Resolution != "2K" || in.Count != 1 || strings.Join(in.ReferenceAssetIDs, ",") != strings.Join(want, ",") || len(in.ReferenceImages) != 4 || !strings.Contains(in.Prompt, "完整剧本内容") || !strings.Contains(in.Prompt, "不换座") || !strings.Contains(in.Prompt, "禁止复制人物") {
 			t.Fatalf("owner=%s request=%+v", owner, in)
 		}

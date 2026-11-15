@@ -104,7 +104,10 @@ func (s *ScreenplayMediaWorkbench) creativeImagePrompt(ctx context.Context, p sc
 	if result == "" {
 		return "", fmt.Errorf("%w: 请填写图片提示词或选择有描述的目标资产", screenplay.ErrInvalidArgument)
 	}
-	return screenplayCorePrefix(p, result), nil
+	if asset != nil && asset.Type == screenplay.AssetCharacter {
+		result = screenplayCorePrefix(p, result)
+	}
+	return result, nil
 }
 
 func (s *ScreenplayMediaWorkbench) creativeAssetProcessPrompt(ctx context.Context, p screenplay.Project, target, extra string) (string, error) {

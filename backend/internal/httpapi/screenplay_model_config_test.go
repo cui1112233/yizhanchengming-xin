@@ -72,7 +72,7 @@ func TestScreenplayModelConfigCreateFlowSinglePromptIDsOverrideDefaultModes(t *t
 	}
 }
 
-func TestScreenplayModelConfigFinalImageHTTPUsesResolutionAndCore(t *testing.T) {
+func TestScreenplayModelConfigPositioningHTTPUsesResolutionWithoutCharacterCore(t *testing.T) {
 	s, p := positioningFixture(t)
 	p.CreativeConfig.ConfigVersion = 1
 	p.CreativeConfig.ImageResolution = "4K"
@@ -86,7 +86,7 @@ func TestScreenplayModelConfigFinalImageHTTPUsesResolutionAndCore(t *testing.T) 
 			t.Fatal(e)
 		}
 		text, _ := body["prompt"].(string)
-		if body["size"] != "4096x2304" || body["model"] != "seedream-test" || !strings.HasPrefix(text, "前置核心\n\n") || strings.Contains(text, "资产专用不许普通叠加") {
+		if body["size"] != "4096x2304" || body["model"] != "seedream-test" || strings.Contains(text, "前置核心") || !strings.Contains(text, "站位图生成规则") || strings.Contains(text, "资产专用不许普通叠加") {
 			t.Errorf("payload=%v", body)
 		}
 		w.Header().Set("Content-Type", "application/json")

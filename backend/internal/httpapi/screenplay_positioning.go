@@ -444,7 +444,6 @@ func (s *ScreenplayMediaWorkbench) generatePositioning(ctx context.Context, p sc
 		show = *in.ShowNames
 	}
 	text := prefix + "\n场景：" + item.SceneName + "\n角色（与参考图顺序一致）：" + strings.Join(item.Characters, "、") + "\n站位：" + item.PositionDetail
-	text = screenplayCorePrefix(p, text)
 	text += "\n备注：" + item.Remark
 	if purpose == "edit" {
 		text += "\n本次为站位图片编辑。第一张图片是当前站位图或用户标注图，只按以下修改要求编辑，保留其他内容：\n" + in.EditPrompt
