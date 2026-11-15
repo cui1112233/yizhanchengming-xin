@@ -27,4 +27,14 @@ Go screenplay/storage及 `^TestScreenplay` 通过；Stage定向测试覆盖正�
 
 这些测试包含内存对象/受控接口；本地4001真实数据库、对象与页面交付记录待后续追加。没有模型调用。
 
+## 4001实际交付与回归
+
+实现提交 `b4c12dc2`，真实页面发现玻璃父容器使库浮层被Antd编辑窗遮挡；`1281b89d` 将非内嵌层挂到body并补鼠标命中回归。随后 `25ccb869` 让portal继承现有深色/浅色主题，面板82%透明磨砂、24px模糊。最终4001 PID `44140`，git及manifest均为 `25ccb869`；原运行配置完整保留，每次切换前19个批次均无运行生产。未公开发布或push。
+
+真实HTTP/数据库/素材存储12项验证通过、19次请求：手工PNG上传选中、入普通库、重复保存、鉴权读图、过期版本、准备图片重复幂等、准备不选中、不改目标文本、明确选中、图像字节相同、手写字段保留、独立对象元数据SQL重读且未持久临时URL。全部为32×24手工蓝色PNG，不是模型产物，模型调用0。
+
+新增测试作品 `library-source-c5d5f171aa`、`library-target-c5d5f171aa`，未修改原有用户作品。实际已登录浏览器另验证：编辑选择后取消，媒体数量/选中ID/资产revision均不变；编辑明确保存产生目标图并保留名称/身份/提示词/声音；卡片更换取消不写入；卡片确认更换只变Selected、不增加普通资产revision或改文本。修复后真实鼠标命中库卡片，深色白字磨砂可见。
+
+归档 `07-parity-execution/`：`asset-library-runtime-delivery.json`、`live-asset-library-acceptance.json`、`4001-library-layer-before.png`、`4001-library-glass-picker.png`、`4001-library-glass-style.json`、`4001-library-applied.png`。原版实时窗口和全部功能/像素对照仍未通过，因此G12保持partial/unverified。
+
 G12仍需普通库管理页的完整上传、编辑、删除/分类流程，以及原版实时窗口像素、原生未知ID/重名/文件策略对照；V2原版服务特有主体/声音扩展字段不能仅凭图片已显示便宣称全对齐。G11实时原版UI及真实供应商验收也仍保留。
