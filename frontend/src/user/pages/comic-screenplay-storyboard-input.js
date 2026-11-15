@@ -1,3 +1,4 @@
+import {assertUniqueEpisodeNumbers} from './comic-screenplay-episode-headings.js';
 import {comicScriptEpisodes} from './comic-screenplay-stages.js';
 export function storyboardEpisodeTargets(document,chapters=[],source='script'){
  if(source!=='original')return comicScriptEpisodes(document);
@@ -15,9 +16,11 @@ export function buildStoryboardInput(workspace,episodeNo,options={},engine){
  }
  const episodes=comicScriptEpisodes(workspace?.document?.content);
  if(!episodes.length)throw Error('请先保存剧本，或切换到章节原文分镜');
- if(no===0)return {...payload,episodes:Object.fromEntries(episodes.map(ep=>[ep.no,ep.content]))};
+ assertUniqueEpisodeNumbers(episodes);
+ const inputContent=ep=>ep.prefix?`${ep.prefix}\n\n${ep.content}`:ep.content;
+ if(no===0)return {...payload,episodes:Object.fromEntries(episodes.map(ep=>[ep.no,inputContent(ep)]))};
  const selected=episodes.find(ep=>ep.no===no);if(!selected)throw Error('所选剧本集不存在，请刷新后重新选择');
- if(!selected.content.trim())throw Error('所选集剧本内容为空');return {...payload,episodeNo:no,content:selected.content};
+ if(!selected.content.trim())throw Error('所选集剧本内容为空');return {...payload,episodeNo:no,content:inputContent(selected)};
 }
 export async function createRawStoryboardChapter(projectId,{chapterId,readChapters,readWorkspace,saveChapters}){
  if(!chapterId)throw Error('缺少原文章节编号');

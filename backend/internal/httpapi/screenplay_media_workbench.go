@@ -823,16 +823,11 @@ func (s *ScreenplayMediaWorkbench) References(ctx context.Context, p screenplay.
 	if e != nil {
 		return nil, e
 	}
-	targets := []string{shot.ID}
 	assets, e := s.Projects.ListAssets(ctx, p.OwnerUsername, p.ID, "")
 	if e != nil {
 		return nil, e
 	}
-	for _, a := range assets {
-		if a.Name != "" && (strings.Contains(shot.Characters, a.Name) || strings.Contains(shot.Scene, a.Name) || strings.Contains(shot.Props, a.Name)) {
-			targets = append(targets, a.ID)
-		}
-	}
+	targets := screenplayReferenceTargets(shot, assets)
 	urls := []string{}
 	seen := map[string]bool{}
 	for _, target := range targets {
@@ -1187,16 +1182,11 @@ func (s *ScreenplayMediaWorkbench) ReferenceIDs(ctx context.Context, p screenpla
 	if e != nil {
 		return nil, e
 	}
-	targets := []string{shot.ID}
 	assets, e := s.Projects.ListAssets(ctx, p.OwnerUsername, p.ID, "")
 	if e != nil {
 		return nil, e
 	}
-	for _, a := range assets {
-		if a.Name != "" && (strings.Contains(shot.Characters, a.Name) || strings.Contains(shot.Scene, a.Name) || strings.Contains(shot.Props, a.Name)) {
-			targets = append(targets, a.ID)
-		}
-	}
+	targets := screenplayReferenceTargets(shot, assets)
 	ids := []string{}
 	seen := map[string]bool{}
 	for _, target := range targets {

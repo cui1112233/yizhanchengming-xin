@@ -1,3 +1,4 @@
+import {episodeHeadingMatches} from './comic-screenplay-episode-headings.js';
 export const comicStages = [
   { key: 'source', label: '剧本' }, { key: 'assets', label: '资产' }, { key: 'storyboard', label: '分镜' },
 ];
@@ -7,13 +8,13 @@ export function comicStageLocation(key) {
 export function comicScriptEpisodes(content) {
   const text = String(content || '');
   if (!text.trim()) return [];
-  const matches = [...text.matchAll(/^#[ \t]*第[ \t]*([0-9]+)[ \t]*集([^\n]*)$/gm)];
+  const matches = episodeHeadingMatches(text);
   if (!matches.length) return [{ no: 1, title: '第1集', content: text.trim(), raw: true }];
-  return matches.map((match, index) => ({ no: Number(match[1]), title: match[2].trim().replace(/^[：:·—\-\s]+/, '') || `第${match[1]}集`, content: text.slice(match.index + match[0].length, matches[index+1]?.index ?? text.length).trim(), prefix: index === 0 ? text.slice(0, match.index).trim() : '' }));
+  return matches.map(({match,no}, index) => ({ no, title: (match[2]||'').trim().replace(/^[：:·—\-\s]+/, '') || `第${no}集`, content: text.slice(match.index + match[0].length, matches[index+1]?.match.index ?? text.length).trim(), prefix: index === 0 ? text.slice(0, match.index).trim() : '' }));
 }
 export function comicEpisodesDocument(episodes) {
   if (episodes.length === 1 && episodes[0].raw) return episodes[0].content;
-  return episodes.map((episode, index) => `${episode.prefix ? `${episode.prefix}\n\n` : ''}# 第${index+1}集${episode.title && !/^第\d+集$/.test(episode.title) ? ` ${episode.title}` : ''}\n\n${episode.content}`).join('\n\n');
+  return episodes.map((episode, index) => `${episode.prefix ? `${episode.prefix}\n\n` : ''}# 第${episode.no ?? index+1}集${episode.title && !/^第\d+集$/.test(episode.title) ? ` ${episode.title}` : ''}\n\n${episode.content}`).join('\n\n');
 }
 export function reorderComicEpisodes(episodes, from, to) {
   if (from === to || from < 0 || to < 0 || from >= episodes.length || to >= episodes.length) return episodes;

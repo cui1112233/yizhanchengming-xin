@@ -155,6 +155,20 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if len(episodes) == 0 {
 		return StoryboardResult{}, ErrEmptyContent
 	}
+	// Check the whole selection before reserving or generating any episode.
+	// A heading and the document preamble are not episode body text.
+	for _, episode := range episodes {
+		body := episode.Content
+		for _, position := range storyboardEpisodeHeadingRe.FindAllStringSubmatchIndex(body, -1) {
+			if _, ok := storyboardEpisodeNumber(body[position[2]:position[3]]); ok {
+				body = body[position[1]:]
+				break
+			}
+		}
+		if strings.TrimSpace(body) == "" {
+			return StoryboardResult{}, fmt.Errorf("%w: 第%d集正文为空，请补充后再生成", ErrEmptyContent, episode.No)
+		}
+	}
 	// Validate every selected source unit before reserving or calling a provider.
 	sceneInputs := map[int][]storyboardSceneInput{}
 	sceneCounts := map[int]int{}
@@ -353,6 +367,9 @@ func (s *StoryboardService) resolveEpisodes(ctx context.Context, req StoryboardR
 		return episodes, nil
 	}
 	if strings.TrimSpace(req.Content) != "" {
+		if err := validateUniqueStoryboardEpisodes(splitEpisodes(req.Content)); err != nil {
+			return nil, err
+		}
 		number := req.EpisodeNo
 		if number <= 0 {
 			number = 1
@@ -364,6 +381,9 @@ func (s *StoryboardService) resolveEpisodes(ctx context.Context, req StoryboardR
 		return nil, err
 	}
 	episodes := splitEpisodes(document.Content)
+	if err := validateUniqueStoryboardEpisodes(episodes); err != nil {
+		return nil, err
+	}
 	if len(episodes) == 0 {
 		episodes = []episodeInput{{No: 1, Content: document.Content}}
 	}
@@ -379,25 +399,82 @@ func (s *StoryboardService) resolveEpisodes(ctx context.Context, req StoryboardR
 	return episodes, nil
 }
 
-var storyboardEpisodeHeadingRe = regexp.MustCompile(`(?m)^#[ \t]*第[ \t]*([0-9]+)[ \t]*集[^\n]*$`)
+// A title needs a line of its own and a separator after 集; chapter headings
+// and narrative mentions such as 第2集会再见 remain body text.
+var storyboardEpisodeHeadingRe = regexp.MustCompile(`(?m)^[ \t]*(?:#{1,6}[ \t]*)?第[ \t]*([0-9〇零一二三四五六七八九十百千万两]+)[ \t]*集([ \t：:·—\-][^\r\n]*)?\r?$`)
+
+func storyboardEpisodeNumber(text string) (int, bool) {
+	if number, err := strconv.ParseInt(text, 10, 64); err == nil {
+		return int(number), number > 0 && number <= 9007199254740991
+	}
+	digits := map[rune]int64{'〇': 0, '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+	units := map[rune]int64{'十': 10, '百': 100, '千': 1000, '万': 10000}
+	var total, section, digit, positional int64
+	hasUnit := false
+	for _, char := range text {
+		if value, ok := digits[char]; ok {
+			digit = value
+			positional = positional*10 + value
+			if positional > 9007199254740991 {
+				return 0, false
+			}
+			continue
+		}
+		unit, ok := units[char]
+		if !ok {
+			return 0, false
+		}
+		hasUnit = true
+		if unit == 10000 {
+			total += (section + digit) * unit
+			section, digit = 0, 0
+		} else {
+			if digit == 0 {
+				digit = 1
+			}
+			section += digit * unit
+			digit = 0
+		}
+	}
+	if !hasUnit {
+		total = positional
+	} else {
+		total += section + digit
+	}
+	return int(total), total > 0 && total <= 9007199254740991
+}
+
+func validateUniqueStoryboardEpisodes(episodes []episodeInput) error {
+	seen := make(map[int]bool, len(episodes))
+	for _, episode := range episodes {
+		if seen[episode.No] {
+			return fmt.Errorf("%w: 第%d集编号重复，请修改后再生成", ErrInvalidArgument, episode.No)
+		}
+		seen[episode.No] = true
+	}
+	return nil
+}
 
 // splitEpisodes 按集标题原文切分，保留正文逐字不变。
 func splitEpisodes(content string) []episodeInput {
 	positions := storyboardEpisodeHeadingRe.FindAllStringSubmatchIndex(content, -1)
-	if len(positions) == 0 {
-		return nil
+	valid := make([][]int, 0, len(positions))
+	for _, position := range positions {
+		if _, ok := storyboardEpisodeNumber(content[position[2]:position[3]]); ok {
+			valid = append(valid, position)
+		}
 	}
-	episodes := make([]episodeInput, 0, len(positions))
-	for i, position := range positions {
-		number, err := strconv.Atoi(content[position[2]:position[3]])
-		if err != nil || number <= 0 {
-			continue
+	episodes := make([]episodeInput, 0, len(valid))
+	for i, position := range valid {
+		number, _ := storyboardEpisodeNumber(content[position[2]:position[3]])
+		start, end := position[0], len(content)
+		if i == 0 {
+			start = 0
 		}
-		end := len(content)
-		if i+1 < len(positions) {
-			end = positions[i+1][0]
+		if i+1 < len(valid) {
+			end = valid[i+1][0]
 		}
-		episodes = append(episodes, episodeInput{No: number, Content: strings.TrimSpace(content[position[0]:end])})
+		episodes = append(episodes, episodeInput{No: number, Content: strings.TrimSpace(content[start:end])})
 	}
 	return episodes
 }

@@ -1,3 +1,4 @@
+import {splitDocumentEpisodes} from './comic-screenplay-episode-headings.js';
 import {useComicConfirmation} from './comic-screenplay-confirm.js';
 import {buildStoryboardInput} from './comic-screenplay-storyboard-input.js';
 import OriginalIcon, { ComicScreenplayModelIcon } from './ComicScreenplayIcon.jsx';
@@ -30,22 +31,6 @@ const assetTypeOptions = [{ value: 'character', label: '角色' }, { value: 'sce
 
 function prettyTime(value) {
   return formatWorkDateTime(value);
-}
-
-const episodeHeadingPattern = /^#[ \t]*第[ \t]*([0-9]+)[ \t]*集[^\n]*$/gm;
-
-// 按「# 第N集」标题切分剧本正文，与后端 splitEpisodes 的集号识别保持一致。
-function splitDocumentEpisodes(content) {
-  const text = String(content || '');
-  const matches = [...text.matchAll(episodeHeadingPattern)];
-  if (!matches.length) return [];
-  return matches
-    .map((match, index) => {
-      const start = match.index;
-      const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
-      return { no: Number(match[1]), content: text.slice(start, end).trim() };
-    })
-    .filter(item => item.no > 0 && item.content);
 }
 
 function collectWarnings(result) {
