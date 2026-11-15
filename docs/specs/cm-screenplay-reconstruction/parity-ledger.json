@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "created_at_utc": "2026-11-14T20:15:56.641856+00:00",
-  "updated_at_utc": "2026-11-15T04:13:13.974586+00:00",
+  "updated_at_utc": "2026-11-15T04:38:49.223739+00:00",
   "objective": "完整复刻原版，每完成一项立即逐项对比；保留未证实、未知和受费用阻塞的需求。",
   "active_item": {
     "id": "G11",
@@ -51,7 +51,7 @@
     "manifest_path": "_local-archive-20261028/luoshui-screenplay-reconstruction-20261115/00-original/manifest.json",
     "note": "Original source coordinates are retained as exported; formatted-source lines and native offsets are separate evidence types."
   },
-  "current_source_identity_id": "SRC-8fd923bdac3d1880",
+  "current_source_identity_id": "SRC-1d550b09106e0018",
   "source_identities": [
     {
       "recorded_at_utc": "2026-11-14T20:15:56.641856+00:00",
@@ -1348,6 +1348,222 @@
         "note": "Source HEAD and dirty file hashes are not proof of the binary serving 4001; record binary hash and runtime-build-info per acceptance run."
       },
       "id": "SRC-8fd923bdac3d1880"
+    },
+    {
+      "recorded_at_utc": "2026-11-15T04:38:49.223739+00:00",
+      "checkout": "F:\\脚本测试\\一战晟铭-v88",
+      "branch": "v88",
+      "head": "b38f17c78c013ca523bd17b3270cb68c8cc4efda",
+      "dirty_worktree": true,
+      "tracked_diff_sha256": "0fae843c0a1ce5c88134c7cc60ee3247fdab949e3ccd9e6b36fdfd61e93da9aa",
+      "files": [
+        {
+          "path": "backend/internal/httpapi/screenplay_authoring_routes.go",
+          "sha256": "f3570af17f396bd43d6014a79e7f386e971d6bdd8204aac1322e61c269ec9d0b",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/httpapi/screenplay_routes.go",
+          "sha256": "b331d571c78aa044d2977f118cd51b2cb08c74b9775e60b74c2eefa0a25ef83c",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/prompt/screenplay_recovered_catalog.json",
+          "sha256": "aec52f679d50167b8bdd8a643d61967ac52716b61be1ab4b46c0a3d8954581e4",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/asset_checks.go",
+          "sha256": null,
+          "exists": false
+        },
+        {
+          "path": "backend/internal/screenplay/assets_service.go",
+          "sha256": "af14dcec4a1e19072db29a5b6a540d821fadb3efa39556d85a3f7d5a706b4794",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/authoring_service.go",
+          "sha256": "2ce77b4dd4f32d6a6c0ab3e4584342a3d183c6b3e388134f3796fd624f4655eb",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/creative_config.go",
+          "sha256": "47ed15f2ad9cd53207f0af1aac554c1773cca8d85e40cd312e9c17a7c4f1e348",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/manual_document.go",
+          "sha256": "48f0ce0d73a17b552e1d4bb83862671c6a8a494800e87b8bcf0ce3653c1b7132",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/media_store.go",
+          "sha256": "74f0fac74d779cc5b4cdc3c704effc334e3d23580d07dcd1428f7c3a64a4c428",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/production_doctor.go",
+          "sha256": "058a3c54d65ee2f1e6a75e5050cd8c9936852a3aa52dedcd92ee5268501a1955",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/production_runtime.go",
+          "sha256": "ba7ace7d39c6740999a02ed660f9a644679dc5954e37147d45ba7c1795134e0b",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/screenplay_service.go",
+          "sha256": "497603c59c8b59f6935e644d6c3fce0b73a38d48768eaa20279f1a13e1201542",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_editor.go",
+          "sha256": "abec4b845d6e6f9b06513c64e23f039b9c0d82761ba2e301eaf179244a0cd97a",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_generation.go",
+          "sha256": "d8fd52f55147e4a7cb1b8b40fe5b9df9dbd5502749f043284d90b9fbc5c1f9fb",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_planning.go",
+          "sha256": "1ca83baeb450fb1fc98b18b8e70ffb798764e6a1e0df7261f5925a1921d2ab55",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_preferences.go",
+          "sha256": "b9ea9195b56af7f97b3904cf593d688a37fbe19647fa7d3e9d9524efd8dc7b7b",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_preparation.go",
+          "sha256": "a38cd34dc06dae3c7964f414b4222ba6d5b254018582549259ce8bc6311c635f",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_scenes.go",
+          "sha256": "adfbedc939e622bc65c94d18f2392783112f9080e6d63222b85ed96359d32be3",
+          "exists": true
+        },
+        {
+          "path": "backend/internal/screenplay/storyboard_service.go",
+          "sha256": "d94b07fd1d65abd0b5bf628a1ef36530387d1703ea952fb30ee9fb5bef7bfcb3",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicCharacterDesignDialog.jsx",
+          "sha256": "988d76e0fd28a8a198eebac7b037652d3ffd3c981055c91bd7fbe3ddf4d9ca45",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayAssetBatchDialog.jsx",
+          "sha256": "f8f35f62c9c21de3934ca2b7db58679acd5c87ea4a77923950a73ef21492f407",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayAssetDialog.jsx",
+          "sha256": "71ae7de94937d1081ae33b3370c63909c40775b096caa38bc6d622a0c736e36c",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayAssetStage.jsx",
+          "sha256": "5b428607d2188e4c0c1853df3b9d19fc7ca8de585885f5e35f20d271c52103ef",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayAuthoringPanels.jsx",
+          "sha256": "618438a29af646e5fef88a09c993bcb29927554fe672ff549c0e461916b22fad",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayBatchTools.jsx",
+          "sha256": "4b4d0fa3b91cfe3b933b582f1fcf828bd3cd8003e41116e36dea2840bffd8053",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayIcon.jsx",
+          "sha256": "8b4cacec5555da2f8f47d8673aa4c28efcfbc34ec4e6c032b58241cc6a970476",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayMediaPanel.jsx",
+          "sha256": "2269a743bf0be3a981de1ed442b5e13dcb33055071e42d8e1ebdacaca26008a0",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayMediaTools.jsx",
+          "sha256": "5bdb6653bc1f2ff7fa1cee520fd7ddc27a644997ba8e1e371f44055adc7bf55a",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayModelConfig.jsx",
+          "sha256": "8851750e14f5a660789e274186a40172a499448f1fbcb1fa941817998aa26ebf",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayPage.jsx",
+          "sha256": "37c118c5c02c284daa9a3c2f37c1a022b18106ef2241d2af90e5d5fddeb9a065",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayPositioningStage.jsx",
+          "sha256": "dfc559449cf3672e28b9b3dd75622a148d090f879a34c44e83d6115cb9cdea9b",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayProductionPanel.jsx",
+          "sha256": "f4f0073a5a387ee5d4bddc0e88f446c6762ffda980840db1bf3c35ac3a35cc34",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayStoryStage.jsx",
+          "sha256": "b73f6dfaee65b2aa6955b0a186e3b9d0dc8109db157e0f460d0a2e0ca173448a",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayStoryboardPrep.jsx",
+          "sha256": "97a6beb6d4728868e996994084ee0e65a54d02d0025dd5b53b09c2e7879ef1ce",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayStoryboardSettings.jsx",
+          "sha256": "179924dd30f8e96c6391a28fce4ed6cf238b340154c04546933fa230ad17fd19",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicScreenplayStoryboardStage.jsx",
+          "sha256": "70918862fefd47d4e5d154b3e9dee4124d562dfcfe4234aacabbc2dca009072f",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/ComicVoiceSwitchDialog.jsx",
+          "sha256": "67db363814c68d3de838f95e5917883c62736de07ae0bbba0e5ce4c01e1ff3ba",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/comic-screenplay-storyboard-attempts.js",
+          "sha256": "4d28bdddc8a478486a0dc65a059e484898613fbb6f42bf2a1c25241d4940a3b3",
+          "exists": true
+        },
+        {
+          "path": "frontend/src/user/pages/comic-screenplay-storyboard-input.js",
+          "sha256": "a99493af23d8ec72eba071fe5c588b9e2be85c56b6b61cbaf95c92f656cbf653",
+          "exists": true
+        },
+        {
+          "path": "无独立后端（界面渲染）",
+          "sha256": null,
+          "exists": false
+        }
+      ],
+      "runtime_identity": {
+        "status": "unverified",
+        "evidence": [],
+        "note": "Source HEAD and dirty file hashes are not proof of the binary serving 4001; record binary hash and runtime-build-info per acceptance run."
+      },
+      "id": "SRC-1d550b09106e0018"
     }
   ],
   "acceptance_profiles": {
@@ -1403,7 +1619,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayPage.jsx",
@@ -1508,7 +1724,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayPage.jsx",
@@ -1611,7 +1827,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryboardStage.jsx",
@@ -1714,7 +1930,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayPage.jsx",
@@ -1817,7 +2033,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAuthoringPanels.jsx",
@@ -1920,7 +2136,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryStage.jsx",
@@ -2023,7 +2239,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayModelConfig.jsx",
@@ -2128,7 +2344,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAssetStage.jsx",
@@ -2231,7 +2447,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicCharacterDesignDialog.jsx",
@@ -2334,7 +2550,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayBatchTools.jsx",
@@ -2437,7 +2653,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAssetCheckDialog.jsx"
@@ -2545,7 +2761,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAssetLibraryPicker.jsx"
@@ -2634,7 +2850,8 @@
         "区分新增/仅换图/编辑草稿/保存普通库，已实际接线，不以全快照覆盖目标。",
         "真实API/数据库/对象12项19请求+实际登录页面取消/保存/仅换图验证通过，模型0。",
         "非内嵌库portal及统一深浅磨砂已修复，原版完整对照仍未通过。",
-        "2026-11-15 manager commit9d1e588f/4001 PID48532；18真实检查23请求0模型与真实登录UI保存重开。详情09文档，参考音频/目录导入/导出等仍缺。"
+        "2026-11-15 manager commit9d1e588f/4001 PID48532；18真实检查23请求0模型与真实登录UI保存重开。详情09文档，参考音频/目录导入/导出等仍缺。",
+        "22a5b966文件夹批导入口/预览/稳定key重试已实现，helper及受控DOM通过；原native排序/格式/嵌套仍未知，CM适配规则明示，实际目录选择未在本轮登录页验收。"
       ],
       "blockers": [
         "原版native eager auth阻止隔离import，未读取账户或联网；原生存储规则仍未知",
@@ -2670,7 +2887,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAssetDialog.jsx",
@@ -2773,7 +2990,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAssetDialog.jsx",
@@ -2876,7 +3093,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAssetBatchDialog.jsx",
@@ -2979,7 +3196,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayPositioningStage.jsx",
@@ -3082,7 +3299,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayPositioningStage.jsx",
@@ -3185,7 +3402,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicVoiceSwitchDialog.jsx",
@@ -3288,7 +3505,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryboardSettings.jsx",
@@ -3299,7 +3516,8 @@
           "path": "backend/internal/screenplay/storyboard_preferences.go",
           "sha256": "b9ea9195b56af7f97b3904cf593d688a37fbe19647fa7d3e9d9524efd8dc7b7b"
         },
-        "binding_status": "baseline pointer only; exact live binding not adjudicated"
+        "binding_status": "baseline pointer only; exact live binding not adjudicated",
+        "runtime_commit": "b38f17c7"
       },
       "acceptance_profile_ref": "full_parity_v1",
       "checks": {
@@ -3360,7 +3578,8 @@
         }
       ],
       "notes": [
-        "Only local data closure was reported. Original full behavior, UI and pixels remain unverified."
+        "Only local data closure was reported. Original full behavior, UI and pixels remain unverified.",
+        "用户截图纠正3vs41：b38f17c7已实际4001返回41original+2compat日期齐；窗口居中/行高修复与受控DOM验证，实际登录新截图及原版同视口仍未验证。详10文档。"
       ],
       "blockers": [],
       "execution": {
@@ -3393,7 +3612,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryboardPrep.jsx",
@@ -3504,7 +3723,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/comic-screenplay-storyboard-input.js",
@@ -3607,7 +3826,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayBatchTools.jsx",
@@ -3710,7 +3929,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/comic-screenplay-storyboard-attempts.js",
@@ -3813,7 +4032,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryboardPrep.jsx",
@@ -3918,7 +4137,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayBatchTools.jsx",
@@ -4023,7 +4242,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayStoryboardStage.jsx",
@@ -4128,7 +4347,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayPage.jsx",
@@ -4233,7 +4452,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayProductionPanel.jsx",
@@ -4336,7 +4555,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAuthoringPanels.jsx",
@@ -4439,7 +4658,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayAuthoringPanels.jsx",
@@ -4542,7 +4761,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayMediaPanel.jsx",
@@ -4645,7 +4864,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayMediaTools.jsx",
@@ -4748,7 +4967,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayMediaPanel.jsx",
@@ -4851,7 +5070,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayMediaPanel.jsx",
@@ -4954,7 +5173,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayProductionPanel.jsx",
@@ -5057,7 +5276,7 @@
         "04-implementation-20261115.md",
         "05-remaining-scope-audit-20261115.md"
       ],
-      "source_identity_id": "SRC-8fd923bdac3d1880",
+      "source_identity_id": "SRC-1d550b09106e0018",
       "current_cm_binding": {
         "frontend": {
           "path": "frontend/src/user/pages/ComicScreenplayIcon.jsx",
@@ -5068,7 +5287,8 @@
           "path": "无独立后端（界面渲染）",
           "sha256": null
         },
-        "binding_status": "baseline pointer only; exact live binding not adjudicated"
+        "binding_status": "baseline pointer only; exact live binding not adjudicated",
+        "runtime_commit": "b38f17c7"
       },
       "acceptance_profile_ref": "full_parity_v1",
       "checks": {
@@ -5128,7 +5348,9 @@
           "proves_comparison": false
         }
       ],
-      "notes": [],
+      "notes": [
+        "用户截图纠正3vs41：b38f17c7已实际4001返回41original+2compat日期齐；窗口居中/行高修复与受控DOM验证，实际登录新截图及原版同视口仍未验证。详10文档。"
+      ],
       "blockers": [],
       "execution": {
         "state": "queued",
