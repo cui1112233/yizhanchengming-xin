@@ -1,5 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as categoryApi from './comicScreenplayAssetLibrary.js';
+test('独立分类接口保持精确名称、版本和取消信号，拒绝非法输入和响应',async()=>{
+ const calls=[],state={builtin_categories:['古言'],custom_categories:[' 自定义 '],revision:2},request=async(path,options)=>{calls.push({path,options});return state;},signal=new AbortController().signal;
+ assert.equal(typeof categoryApi.listComicAssetLibraryCategories,'function');
+ assert.deepEqual(await categoryApi.listComicAssetLibraryCategories({signal},request),state);
+ await categoryApi.changeComicAssetLibraryCategory({action:'add',name:' 自定义 ',expectedRevision:0},{signal},request);
+ assert.equal(calls[0].path,'/api/comic-screenplays/asset-library/categories');assert.equal(calls[0].options.signal,signal);
+ assert.deepEqual(JSON.parse(calls[1].options.body),{action:'add',name:' 自定义 ',expectedRevision:0});
+ for(const name of [' ','a\n','a'.repeat(192)])assert.throws(()=>categoryApi.changeComicAssetLibraryCategory({action:'add',name,expectedRevision:0},{},request),/分类/);
+ assert.throws(()=>categoryApi.changeComicAssetLibraryCategory({action:'wipe',name:'a',expectedRevision:0},{},request),/操作/);
+ assert.throws(()=>categoryApi.changeComicAssetLibraryCategory({action:'add',name:'a',expectedRevision:-1},{},request),/版本/);
+ await assert.rejects(categoryApi.listComicAssetLibraryCategories({},async()=>({entries:[]})),/分类.*格式/);
+});
 import { listComicAssetLibrary, saveComicAssetLibrarySource, stageComicAssetLibraryEntry, uploadComicAssetLibraryFile, updateComicAssetLibraryEntry, deleteComicAssetLibraryEntry, replaceComicAssetLibraryImage, updateComicAssetLibraryAudio } from './comicScreenplayAssetLibrary.js';
 test('普通库读取、保存、暂存保留版本和请求编号，库ID不当作项目媒体ID', async () => {
   const calls=[], request=async(path,options)=>{calls.push({path,options});return path.includes('/stage')?{item:{id:'media-copy'}}:options?.method?{entry:{id:'library'}}:{entries:[{id:'library'}]};};

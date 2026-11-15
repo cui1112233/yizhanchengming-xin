@@ -328,6 +328,7 @@ func (s *ScreenplayAssetLibrary) DeleteEntry(ctx context.Context, actor, id stri
 // These endpoints are CM persistence adapters. Native file-copy, deletion and
 // duplicate-ID rules remain unrecovered; they are not original parity claims.
 func registerScreenplayLibraryManager(register func(string, func(http.ResponseWriter, *http.Request, string)), service *ScreenplayAssetLibrary) {
+	registerScreenplayLibraryCategories(register, service)
 	base := "/api/comic-screenplays/asset-library"
 	registerScreenplayLibraryAudio(register, service)
 	register("PUT "+base+"/{entryID}/image", func(w http.ResponseWriter, r *http.Request, actor string) {

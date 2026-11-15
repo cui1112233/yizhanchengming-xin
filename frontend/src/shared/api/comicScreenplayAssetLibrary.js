@@ -1,5 +1,19 @@
 import { apiRequest } from './client.js';
 import { comicWorkflowPath } from './comicScreenplayWorkflow.js';
+const categoryPath='/api/comic-screenplays/asset-library/categories';
+function categoryState(data) {
+  if(!Array.isArray(data?.builtin_categories)||!Array.isArray(data?.custom_categories)||![...data.builtin_categories,...data.custom_categories].every(name=>typeof name==='string')||!Number.isSafeInteger(data.revision)||data.revision<0)throw new Error('分类返回格式不正确，请重新读取');
+  return data;
+}
+export function listComicAssetLibraryCategories({signal}={},request=apiRequest) {
+  return request(categoryPath,{signal,suppressGlobalError:true}).then(categoryState);
+}
+export function changeComicAssetLibraryCategory(input,{signal}={},request=apiRequest) {
+  if(!['add','delete'].includes(input.action))throw new Error('分类操作无效');
+  if(typeof input.name!=='string'||!input.name.trim()||Array.from(input.name).length>191||/[\u0000-\u001f\u007f-\u009f]/.test(input.name))throw new Error('分类名称不能为空，最多191字且不能包含控制字符');
+  if(!Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<0)throw new Error('分类版本无效，请重新读取');
+  return request(categoryPath,{method:'POST',body:JSON.stringify({action:input.action,name:input.name,expectedRevision:input.expectedRevision}),signal,suppressGlobalError:true}).then(categoryState);
+}
 export function listComicAssetLibrary({ type }, request = apiRequest) {
   if (!['character','scene','prop'].includes(type)) throw new Error('素材类型无效');
   return request(`/api/comic-screenplays/asset-library?type=${type}`,{suppressGlobalError:true}).then(data=>{if(!Array.isArray(data.entries))throw new Error('素材库返回格式不正确');return data.entries;});

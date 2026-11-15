@@ -14,8 +14,9 @@ import (
 )
 
 type MemoryAssetLibraryRepository struct {
-	mu      sync.Mutex
-	entries map[string]AssetLibraryEntry
+	categories map[string]AssetLibraryCategoryState
+	mu         sync.Mutex
+	entries    map[string]AssetLibraryEntry
 }
 
 func NewMemoryAssetLibraryRepository() *MemoryAssetLibraryRepository {
