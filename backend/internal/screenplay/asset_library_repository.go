@@ -14,9 +14,10 @@ import (
 )
 
 type MemoryAssetLibraryRepository struct {
-	categories map[string]AssetLibraryCategoryState
-	mu         sync.Mutex
-	entries    map[string]AssetLibraryEntry
+	bulkOperations map[string]assetLibraryBulkRecord
+	categories     map[string]AssetLibraryCategoryState
+	mu             sync.Mutex
+	entries        map[string]AssetLibraryEntry
 }
 
 func NewMemoryAssetLibraryRepository() *MemoryAssetLibraryRepository {
@@ -38,7 +39,8 @@ func normalizeAssetLibraryEntry(e AssetLibraryEntry) (AssetLibraryEntry, error) 
 	if e.Image.Status == "completed" {
 		e.Image.Status = "succeeded"
 	}
-	if e.DeletedAt != nil || e.ID == "" || e.Owner == "" || e.Name == "" || !validAssetType(e.Type) || e.Image.Kind != "image" || e.Image.Status != "succeeded" || e.Image.AssetID == "" || utf8.RuneCountInString(e.Name) > 191 || utf8.RuneCountInString(e.Category) > 191 || len(e.ID) > 64 || len(e.Owner) > 191 || len(e.SourceProjectID) > 64 || len(e.SourceAssetID) > 64 || len(e.SourceMediaID) > 64 {
+	metadataOnly := e.Type == AssetCharacter && e.Snapshot.Extra[LibraryMetadataOnly] == "true" && json.Valid([]byte(e.Snapshot.Extra[LibraryArchiveJSON])) && e.Image == (MediaItem{}) && e.ImageObject == (AssetLibraryImageObject{})
+	if e.DeletedAt != nil || e.ID == "" || e.Owner == "" || e.Name == "" || !validAssetType(e.Type) || (!metadataOnly && (e.Image.Kind != "image" || e.Image.Status != "succeeded" || e.Image.AssetID == "")) || utf8.RuneCountInString(e.Name) > 191 || utf8.RuneCountInString(e.Category) > 191 || len(e.ID) > 64 || len(e.Owner) > 191 || len(e.SourceProjectID) > 64 || len(e.SourceAssetID) > 64 || len(e.SourceMediaID) > 64 {
 		return AssetLibraryEntry{}, ErrInvalidArgument
 	}
 	return cloneAssetLibraryEntry(e), nil

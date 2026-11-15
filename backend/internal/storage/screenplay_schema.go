@@ -10,6 +10,7 @@ package storage
 func ScreenplayMigrations() []Migration {
 	return []Migration{
 		screenplayAssetLibraryCategoriesMigration(),
+		screenplayAssetLibraryBulkMigration(),
 		screenplayAssetLibraryTombstoneMigration(),
 		screenplayAssetLibraryMigration(),
 		screenplayAssetCheckMigration(),

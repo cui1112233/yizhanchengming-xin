@@ -67,6 +67,9 @@ func (s *ScreenplayAssetLibrary) stageImageLocked(ctx context.Context, actor str
 	if entry.Revision != *in.ExpectedEntryRevision {
 		return screenplay.MediaItem{}, screenplay.ErrRevisionConflict
 	}
+	if entry.Snapshot.Extra[screenplay.LibraryMetadataOnly] == "true" && entry.ImageObject.ObjectKey == "" {
+		return screenplay.MediaItem{}, fmt.Errorf("%w: 该角色尚无图片，请先补图后再导入项目", screenplay.ErrInvalidArgument)
+	}
 	assets, err := s.Media.Projects.ListAssets(ctx, actor, project.ID, "")
 	if err != nil {
 		return screenplay.MediaItem{}, err

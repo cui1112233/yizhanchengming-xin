@@ -1,0 +1,11 @@
+[
+  {
+    "id": "char_test_a",
+    "name": "隔离角色A",
+    "type": "character",
+    "category": "科幻",
+    "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6WQAAAABJRU5ErkJggg==",
+    "description": "格式验收资料A",
+    "customField": "preserve-me"
+  }
+]

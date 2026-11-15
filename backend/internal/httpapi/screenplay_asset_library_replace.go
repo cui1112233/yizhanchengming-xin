@@ -127,6 +127,7 @@ func (s *ScreenplayAssetLibrary) replaceLibraryEditor(ctx context.Context, actor
 	entry.Snapshot.Extra[libraryReplaceDigest] = digest
 	if len(in.Bytes) > 0 {
 		entry.Image = screenplay.MediaItem{ID: imageID, AssetID: imageID, Name: object.Name, Kind: "image", Status: "succeeded", CreatedAt: object.CreatedAt}
+		delete(entry.Snapshot.Extra, screenplay.LibraryMetadataOnly)
 		entry.ImageObject = screenplay.AssetLibraryImageObject{ObjectKey: objectKey, ContentType: contentType, ByteSize: object.ByteSize}
 	}
 	if err = ctx.Err(); err != nil {

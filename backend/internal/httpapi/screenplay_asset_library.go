@@ -185,8 +185,14 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 // Explicit DTO keeps private object keys and source snapshots out of responses.
 func screenplayLibraryPublic(entry screenplay.AssetLibraryEntry) map[string]any {
 	image := entry.Image
-	image.URL = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/image?revision=%d", url.PathEscape(entry.ID), entry.Revision)
+	available := entry.ImageObject.ObjectKey != "" && entry.Image.AssetID != ""
+	if available {
+		image.URL = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/image?revision=%d", url.PathEscape(entry.ID), entry.Revision)
+	} else {
+		image.URL = ""
+	}
 	out := map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey], "audio": "", "audioFileName": ""}
+	out["image_available"] = available
 	if audio, err := libraryAudioObject(entry); err == nil {
 		out["audio"] = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/audio?revision=%d", url.PathEscape(entry.ID), entry.Revision)
 		out["audioFileName"] = audio.Name
@@ -210,6 +216,7 @@ func RegisterScreenplayAssetLibraryRoutes(mux *http.ServeMux, auth BridgeAuth, s
 		})))
 	}
 	registerScreenplayLibraryManager(register, service)
+	registerScreenplayLibraryBulk(register, service)
 	register("GET /api/comic-screenplays/asset-library", func(w http.ResponseWriter, r *http.Request, actor string) {
 		rows, err := service.Repository.ListAssetLibrary(r.Context(), actor, screenplay.AssetType(r.URL.Query().Get("type")), r.URL.Query().Get("q"), r.URL.Query().Get("category"))
 		if err != nil {
