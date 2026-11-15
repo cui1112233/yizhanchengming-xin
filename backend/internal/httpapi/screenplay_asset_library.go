@@ -186,7 +186,12 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 func screenplayLibraryPublic(entry screenplay.AssetLibraryEntry) map[string]any {
 	image := entry.Image
 	image.URL = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/image?revision=%d", url.PathEscape(entry.ID), entry.Revision)
-	return map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey]}
+	out := map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey], "audio": "", "audioFileName": ""}
+	if audio, err := libraryAudioObject(entry); err == nil {
+		out["audio"] = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/audio?revision=%d", url.PathEscape(entry.ID), entry.Revision)
+		out["audioFileName"] = audio.Name
+	}
+	return out
 }
 
 func RegisterScreenplayAssetLibraryRoutes(mux *http.ServeMux, auth BridgeAuth, service *ScreenplayAssetLibrary) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listComicAssetLibrary, saveComicAssetLibrarySource, stageComicAssetLibraryEntry, uploadComicAssetLibraryFile, updateComicAssetLibraryEntry, deleteComicAssetLibraryEntry, replaceComicAssetLibraryImage } from './comicScreenplayAssetLibrary.js';
+import { listComicAssetLibrary, saveComicAssetLibrarySource, stageComicAssetLibraryEntry, uploadComicAssetLibraryFile, updateComicAssetLibraryEntry, deleteComicAssetLibraryEntry, replaceComicAssetLibraryImage, updateComicAssetLibraryAudio } from './comicScreenplayAssetLibrary.js';
 test('普通库读取、保存、暂存保留版本和请求编号，库ID不当作项目媒体ID', async () => {
   const calls=[], request=async(path,options)=>{calls.push({path,options});return path.includes('/stage')?{item:{id:'media-copy'}}:options?.method?{entry:{id:'library'}}:{entries:[{id:'library'}]};};
   assert.equal((await listComicAssetLibrary({type:'scene'},request))[0].id,'library');
@@ -15,6 +15,16 @@ test('普通库读取、保存、暂存保留版本和请求编号，库ID不当
   assert.deepEqual(JSON.parse(calls[2].options.body),stage);
   assert.throws(()=>stageComicAssetLibraryEntry('p','../bad',stage,{},request),/无效/);
   assert.throws(()=>listComicAssetLibrary({type:'other'},request),/无效/);
+});
+
+test('参考音频支持新建随图提交、已有角色仅换音频和图音一起提交，不能写外部音频地址',async()=>{
+ const calls=[],request=async(path,options)=>{calls.push({path,options});return {entry:{id:'role'}};};
+ const file=new File(['img'],'image.png',{type:'image/png'}),audioFile=new File(['wav'],'参考.wav',{type:'audio/wav'});
+ const values={type:'character',name:'角色',requestKey:'reference-audio-key',audioFile};
+ await uploadComicAssetLibraryFile({...values,file},{},request);assert.equal(calls[0].options.body.get('audio').name,'参考.wav');
+ await updateComicAssetLibraryAudio('role',{...values,expectedRevision:2},{},request);assert.equal(calls[1].path,'/api/comic-screenplays/asset-library/role/audio?expectedRevision=2');assert.equal(calls[1].options.body.has('file'),false);assert.equal(calls[1].options.body.get('requestKey'),values.requestKey);
+ await replaceComicAssetLibraryImage('role',{...values,file,expectedRevision:2},{},request);assert(calls[2].options.body.has('file')&&calls[2].options.body.has('audio'));
+ assert.throws(()=>updateComicAssetLibraryAudio('role',{...values,expectedRevision:2,audioFile:null,audio:'https://outside.invalid/a.wav'}),/选择.*音频/);
 });
 
 test('角色换图只上传编辑草稿和新图，原ID/版本/稳定请求编号不能丢',async()=>{

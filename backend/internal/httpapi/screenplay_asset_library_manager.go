@@ -31,6 +31,8 @@ type screenplayLibraryUploadInput struct {
 	Type                                                 screenplay.AssetType
 	Name, Description, Category, Prompt, Voice, FileName string
 	Bytes                                                []byte
+	AudioName                                            string
+	AudioBytes                                           []byte
 }
 type screenplayLibraryMetadataInput struct {
 	Expected    *int64  `json:"expectedRevision"`
@@ -45,14 +47,18 @@ func ordinaryLibraryType(kind screenplay.AssetType) bool {
 	return kind == screenplay.AssetCharacter || kind == screenplay.AssetScene || kind == screenplay.AssetProp
 }
 func parseScreenplayLibraryUpload(w http.ResponseWriter, r *http.Request) (screenplayLibraryUploadInput, error) {
+	return parseScreenplayLibraryEditor(w, r, true)
+}
+func parseScreenplayLibraryEditor(w http.ResponseWriter, r *http.Request, requireImage bool) (screenplayLibraryUploadInput, error) {
 	var in screenplayLibraryUploadInput
-	r.Body = http.MaxBytesReader(w, r.Body, screenplayLibraryImageLimit+(128<<10))
+	r.Body = http.MaxBytesReader(w, r.Body, screenplayLibraryImageLimit+screenplayLibraryAudioLimit+(128<<10))
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return in, screenplay.ErrInvalidArgument
 	}
 	fields := map[string]string{}
 	hasFile := false
+	hasAudio := false
 	for {
 		part, e := reader.NextPart()
 		if e == io.EOF {
@@ -62,6 +68,20 @@ func parseScreenplayLibraryUpload(w http.ResponseWriter, r *http.Request) (scree
 			return in, screenplay.ErrInvalidArgument
 		}
 		name := part.FormName()
+		if name == "audio" {
+			if hasAudio {
+				part.Close()
+				return in, screenplay.ErrInvalidArgument
+			}
+			hasAudio = true
+			in.AudioName = path.Base(strings.ReplaceAll(part.FileName(), "\\", "/"))
+			in.AudioBytes, e = io.ReadAll(io.LimitReader(part, screenplayLibraryAudioLimit+1))
+			part.Close()
+			if e != nil || len(in.AudioBytes) == 0 || len(in.AudioBytes) > screenplayLibraryAudioLimit {
+				return in, fmt.Errorf("%w: 参考音频不能为空且最大32MB", screenplay.ErrInvalidArgument)
+			}
+			continue
+		}
 		if name == "file" {
 			if hasFile {
 				part.Close()
@@ -93,7 +113,7 @@ func parseScreenplayLibraryUpload(w http.ResponseWriter, r *http.Request) (scree
 		}
 		fields[name] = string(value)
 	}
-	if !hasFile {
+	if requireImage && !hasFile || !requireImage && (!hasAudio || hasFile) {
 		return in, screenplay.ErrInvalidArgument
 	}
 	in.RequestKey = fields["requestKey"]
@@ -104,6 +124,13 @@ func parseScreenplayLibraryUpload(w http.ResponseWriter, r *http.Request) (scree
 	in.Prompt = fields["prompt"]
 	in.Voice = fields["voice"]
 	return in, nil
+}
+func parseLibraryExpectedRevision(r *http.Request) (int64, error) {
+	value, err := strconv.ParseInt(r.URL.Query().Get("expectedRevision"), 10, 64)
+	if err != nil || value < 1 {
+		return 0, screenplay.ErrInvalidArgument
+	}
+	return value, nil
 }
 func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, in screenplayLibraryUploadInput) (screenplay.AssetLibraryEntry, error) {
 	if s == nil || s.Repository == nil || s.Media == nil || s.Media.Objects == nil {
@@ -131,8 +158,16 @@ func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, 
 	if extension == "" {
 		return screenplay.AssetLibraryEntry{}, screenplay.ErrInvalidArgument
 	}
+	audio, err := s.prepareLibraryAudio(actor, in)
+	if err != nil {
+		return screenplay.AssetLibraryEntry{}, err
+	}
 	rawHash := sha256.Sum256(in.Bytes)
 	metadata, _ := json.Marshal([]string{string(in.Type), name, in.Description, in.Category, in.Prompt, in.Voice, fmt.Sprintf("%x", rawHash)})
+	if len(in.AudioBytes) > 0 {
+		sum := sha256.Sum256(in.AudioBytes)
+		metadata = append(metadata, []byte(in.AudioName+fmt.Sprintf("%x", sum))...)
+	}
 	payloadHash := sha256.Sum256(metadata)
 	digest := fmt.Sprintf("%x", payloadHash)
 	keyHash := sha256.Sum256([]byte(actor + "\x00" + in.RequestKey))
@@ -163,10 +198,20 @@ func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, 
 		return screenplay.AssetLibraryEntry{}, fmt.Errorf("图片上传失败，请重试")
 	}
 	entry := screenplay.AssetLibraryEntry{ID: id, Owner: actor, Type: in.Type, Name: name, Description: in.Description, Category: in.Category, Image: screenplay.MediaItem{ID: imageID, AssetID: imageID, Name: object.Name, Kind: "image", Status: "succeeded", CreatedAt: object.CreatedAt}, ImageObject: screenplay.AssetLibraryImageObject{ObjectKey: objectKey, ContentType: contentType, ByteSize: object.ByteSize}, Snapshot: screenplay.Asset{OwnerUsername: actor, Type: in.Type, Name: name, Description: in.Description, Prompt: in.Prompt, Voice: in.Voice, Extra: map[string]string{"library_upload_digest": digest, screenplayLibraryPromptKey: in.Prompt, screenplayLibraryVoiceKey: in.Voice}}}
+	if audio.ID != "" {
+		if err = s.Media.Objects.Put(ctx, audio, bytes.NewReader(in.AudioBytes)); err != nil {
+			s.cleanupLibraryDraftObjects(ctx, actor, id, []agentworkspace.Asset{object, audio})
+			return screenplay.AssetLibraryEntry{}, fmt.Errorf("参考音频上传失败，请保留内容重试")
+		}
+		setLibraryAudio(&entry, audio)
+	}
 	if err = ctx.Err(); err != nil {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = s.Media.Objects.Delete(cleanup, object)
+		if audio.ID != "" {
+			_ = s.Media.Objects.Delete(cleanup, audio)
+		}
 		return screenplay.AssetLibraryEntry{}, err
 	}
 	saved, err := s.Repository.SaveAssetLibraryEntry(ctx, entry, 0)
@@ -178,6 +223,9 @@ func (s *ScreenplayAssetLibrary) UploadEntry(ctx context.Context, actor string, 
 	winner, readErr := s.Repository.GetAssetLibraryEntry(verify, actor, id)
 	if errors.Is(readErr, screenplay.ErrNotFound) || readErr == nil && winner.ImageObject.ObjectKey != objectKey {
 		_ = s.Media.Objects.Delete(verify, object)
+		if audio.ID != "" {
+			_ = s.Media.Objects.Delete(verify, audio)
+		}
 	}
 	if readErr == nil && winner.Snapshot.Extra["library_upload_digest"] == digest {
 		return winner, nil
@@ -270,6 +318,9 @@ func (s *ScreenplayAssetLibrary) DeleteEntry(ctx context.Context, actor, id stri
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = s.Media.Objects.Delete(cleanup, agentworkspace.Asset{ID: entry.Image.AssetID, ProjectID: screenplayLibraryObjectProject, Kind: "image", Name: entry.Image.Name, ObjectKey: entry.ImageObject.ObjectKey, ContentType: entry.ImageObject.ContentType, ByteSize: entry.ImageObject.ByteSize})
+		if audio, err := libraryAudioObject(entry); err == nil {
+			_ = s.Media.Objects.Delete(cleanup, audio)
+		}
 	}
 	return nil
 }
@@ -278,6 +329,7 @@ func (s *ScreenplayAssetLibrary) DeleteEntry(ctx context.Context, actor, id stri
 // duplicate-ID rules remain unrecovered; they are not original parity claims.
 func registerScreenplayLibraryManager(register func(string, func(http.ResponseWriter, *http.Request, string)), service *ScreenplayAssetLibrary) {
 	base := "/api/comic-screenplays/asset-library"
+	registerScreenplayLibraryAudio(register, service)
 	register("PUT "+base+"/{entryID}/image", func(w http.ResponseWriter, r *http.Request, actor string) {
 		expected, err := strconv.ParseInt(r.URL.Query().Get("expectedRevision"), 10, 64)
 		if err != nil || expected < 1 {
