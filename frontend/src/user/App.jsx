@@ -24,7 +24,6 @@ const AICutPage = lazy(() => import('./pages/AICutPage'));
 const AICutLibraryPage = lazy(() => import('./pages/AICutLibraryPage'));
 const ComicScreenplayPage = lazy(() => import('./pages/ComicScreenplayPage'));
 const NovelCreationPage = lazy(() => import('./pages/NovelCreationPage'));
-const ArchiveLibraryPage = lazy(() => import('./pages/ArchiveLibraryPage'));
 const PluginRewritePage = lazy(() => import('./pages/PluginRewritePage'));
 const PluginToolPage = lazy(() => import('./pages/PluginToolPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
@@ -80,8 +79,6 @@ function getPage(pathname) {
     '/novel-fetch-react': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchPage,
     '/novel-creation': NovelCreationPage,
-    // 全站统一的到期归档库。
-    '/archive': ArchiveLibraryPage,
     // The cover-based project library is the only Batch Factory entry.
     '/batch-factory': ShuihuoProductionPage,
     '/agent': AgentPage,

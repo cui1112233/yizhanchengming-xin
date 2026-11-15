@@ -614,7 +614,16 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	projectRetention := projectretention.NewService(db, store.MySQLStore, artifactStore, retentionRemote, retentionDays)
 	projectRetention.CanvasAssets = agentAssetStore
 	projectRetention.CanvasObjects = agentAssetObjects
+	projectRetention.Grace = projectretention.DefaultArchiveGrace
 	projectRetention.StartDaily(0, 0)
+	// 启动后补跑一次：立即归档已到期作品，并清理归档超过 24 小时的作品，
+	// 避免升级/重启后仍能看到早已到期的旧作品，或让归档文件长期占用空间。
+	go func() {
+		time.Sleep(5 * time.Second)
+		if err := projectRetention.RunOnce(context.Background()); err != nil {
+			log.Printf("project retention startup sweep failed: %v", err)
+		}
+	}()
 	// 批量测书删除历史文档时正文会转入可回收状态；这里每天兜底清理一次，
 	// 避免 TOS 对象和正文行长期无人回收。
 	startNovelFetchBodyCleanup(ctx, novelFetchStore)

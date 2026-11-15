@@ -239,6 +239,24 @@ WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
 	return out, rows.Err()
 }
 
+// ListDueArchivedBatches 返回归档时间已超过可恢复期的作品集。
+func (s *MySQLStore) ListDueArchivedBatches(ctx context.Context, owner string, cutoff time.Time) ([]RetentionBatch, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id,owner_username FROM batch_factory_v12_batches WHERE owner_username=? AND hidden_at IS NOT NULL AND hidden_at<=? ORDER BY hidden_at,id LIMIT 50`, owner, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []RetentionBatch{}
+	for rows.Next() {
+		var batch RetentionBatch
+		if err := rows.Scan(&batch.ID, &batch.Owner); err != nil {
+			return nil, err
+		}
+		out = append(out, batch)
+	}
+	return out, rows.Err()
+}
+
 // RestoreArchivedBatch 恢复归档作品集，并按当前保留天数从恢复时刻重新计时。
 func (s *MySQLStore) RestoreArchivedBatch(ctx context.Context, owner, batchID string, days int, now time.Time) error {
 	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" {

@@ -395,7 +395,7 @@ export function SettingsPage({ theme = '', themePreference = 'system', onThemeCh
           <Form.Item label="服务器归档路径" name="storageRoot" extra="必须是服务器可访问的绝对路径；留空表示关闭服务器归档。">
             <Input placeholder="例如 /data/qiantie-archive" />
           </Form.Item>
-          <Form.Item label="作品保留时长" name="productionRetentionDays" extra="作品最后一次制作或编辑后开始计时；到期当天 00:00 自动移入「归档库」并永久保留。归档作品可随时恢复（恢复后重新计时），只有彻底删除才会释放数据。修改天数会对全站未归档作品集重新计算。">
+          <Form.Item label="作品保留时长" name="productionRetentionDays" extra="作品最后一次制作或编辑后开始计时；到期当天 00:00 自动移入各工作区的「归档库」，保留 24 小时供恢复，超过 24 小时自动彻底删除。恢复后按当前天数重新计时。修改天数会对全站未归档作品集重新计算。">
             <Select options={[3, 7, 14, 30].map(days => ({ value: days, label: `${days} 天` }))} />
           </Form.Item>
           <Typography.Paragraph type="secondary">默认保留 7 天；磁盘达到 75% 时会额外优先清理已在 TOS 校验成功的最旧本地副本，降到 65% 后停止。头像、账号和项目配置不受影响。</Typography.Paragraph>

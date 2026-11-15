@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, Archive, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Puzzle, Scissors, Settings2 } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Puzzle, Scissors, Settings2 } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { WindowVideoBackground } from '../components/WindowVideoBackground';
@@ -39,7 +39,6 @@ const navItems = [
   { href: '/agent', icon: Bot, label: 'CM 画布' },
   { href: '/tts', icon: AudioLines, label: '配音' },
   { href: '/ai-cut', icon: Scissors, label: 'AI-CUT' },
-  { href: '/archive', icon: Archive, label: '归档库' },
   { href: '/plugins', icon: Puzzle, label: '插件' }
 ];
 

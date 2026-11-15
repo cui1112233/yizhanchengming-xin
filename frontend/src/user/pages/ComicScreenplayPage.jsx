@@ -4,7 +4,7 @@ import {buildStoryboardInput} from './comic-screenplay-storyboard-input.js';
 import OriginalIcon, { ComicScreenplayModelIcon } from './ComicScreenplayIcon.jsx';
 import { formatWorkDateTime } from '../../shared/workDateTime.js';
 import { Alert, Button, Checkbox, Drawer, Dropdown, Empty, Input, InputNumber, message, Modal, Popconfirm, Select, Spin, Tabs, Upload } from 'antd';
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Clapperboard, Clock3, Download, FileText, Grid2X2, History, LayoutGrid, PauseCircle, Pencil, Play, Plus, Search, Sparkles, Trash2, UploadCloud, Users, Map, Package, WandSparkles, Settings2, Palette, Bot, Check, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Archive, ChevronDown, Clapperboard, Clock3, Download, FileText, Grid2X2, History, LayoutGrid, PauseCircle, Pencil, Play, Plus, Search, Sparkles, Trash2, UploadCloud, Users, Map, Package, WandSparkles, Settings2, Palette, Bot, Check, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplay, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, extractComicAssets, generateComicScreenplay, generateComicStoryboard, getComicScreenplayBatch, loadComicCreativeLibrary, loadComicCreativeConfig, saveComicCreativeConfig, listComicScreenplays, loadComicScreenplayWorkspace, mergeComicStoryboardShot, moveComicScreenplayShot, parseComicScreenplaySource, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from '../../shared/api/comicScreenplay.js';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
@@ -16,6 +16,7 @@ import ComicScreenplayMediaPanel from './ComicScreenplayMediaPanel.jsx';
 import ComicScreenplayStoryStage from './ComicScreenplayStoryStage.jsx';
 import ComicScreenplayAssetStage, { comicAssetAnalysisSource } from './ComicScreenplayAssetStage.jsx';
 import ComicScreenplayAssetLibraryManager from './ComicScreenplayAssetLibraryManager.jsx';
+import { WorkspaceArchivePanel } from '../components/WorkspaceArchivePanel.jsx';
 import ComicScreenplayStoryboardStage from './ComicScreenplayStoryboardStage.jsx';
 import ComicScreenplayModelConfig from './ComicScreenplayModelConfig.jsx';
 import { prepareStoryboardGenerationRequest, completeStoryboardGenerationRequest, reconcileStoryboardGenerationRequest, markStoryboardGenerationNotStarted } from './comic-screenplay-storyboard-attempts.js';
@@ -123,6 +124,7 @@ export default function ComicScreenplayPage() {
 	const [assetEditor, setAssetEditor] = useState(null);
   const [storyboardShotEditor, setStoryboardShotEditor] = useState(null);
   const [scope, setScope] = useState('personal');
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [retention, setRetention] = useState({});
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState('grid');
@@ -707,7 +709,7 @@ export default function ComicScreenplayPage() {
   return <div className="comic-screenplay-page comic-project-library">
     <div className="comic-screenplay-heading">
       <div><h1>漫剧创作</h1><p>管理和创建您的漫剧作品</p></div>
-      <div className="library-heading-actions"><Button icon={<OriginalIcon name="FolderOpenOutline" size={16}/>} onClick={() => setAssetLibraryOpen(true)}>普通资产库</Button><Button type="text" icon={<Clock3 size={18} />} onClick={() => setHistoryOpen(true)}>历史</Button><Button className="create-screenplay-button" type="primary" icon={<Plus size={16} />} onClick={openCreateDialog}>创建漫剧</Button></div>
+      <div className="library-heading-actions"><Button icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)}>归档库</Button><Button icon={<OriginalIcon name="FolderOpenOutline" size={16}/>} onClick={() => setAssetLibraryOpen(true)}>普通资产库</Button><Button type="text" icon={<Clock3 size={18} />} onClick={() => setHistoryOpen(true)}>历史</Button><Button className="create-screenplay-button" type="primary" icon={<Plus size={16} />} onClick={openCreateDialog}>创建漫剧</Button></div>
     </div>
     <div className="library-tabs">{[['personal','个人作品'],['team','团队作品'],['archived','已归档']].map(([key,label])=><button key={key} className={scope===key?'is-active':''} onClick={()=>setScope(key)}>{label}</button>)}</div>
     <div className="comic-screenplay-filters">
@@ -730,5 +732,6 @@ export default function ComicScreenplayPage() {
         <ComicSourceInput mode={sourceMode} onModeChange={mode => { cancelSourceImport(); setSourceMode(mode); }} content={createContent} onContentChange={text => { cancelSourceImport(); setCreateContent(text); }} filename={sourceFilename} parsing={sourceParsing} disabled={creating || !!createdDraftId} onFile={importDraftFile} onRemove={() => { cancelSourceImport(); setSourceFilename(''); }} /></fieldset>
       </div>
     </Modal>
+    <WorkspaceArchivePanel open={archiveOpen} modules={['comic_screenplay']} onClose={() => setArchiveOpen(false)} onChanged={refreshProjects} />
   </div>;
 }

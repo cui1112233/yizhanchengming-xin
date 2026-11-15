@@ -1,5 +1,5 @@
 import { Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Modal, Progress, Select, Spin, Switch, Tabs, Tooltip, message } from 'antd';
-import { BarChart3, BookOpen, Bot, CalendarClock, CheckCircle2, CircleAlert, Download, FileText, LoaderCircle, Menu, NotebookPen, Plus, RotateCcw, Save, Send, Settings2, Sparkles, Square, Trash2, WandSparkles } from 'lucide-react';
+import { Archive, BarChart3, BookOpen, Bot, CalendarClock, CheckCircle2, CircleAlert, Download, FileText, LoaderCircle, Menu, NotebookPen, Plus, RotateCcw, Save, Send, Settings2, Sparkles, Square, Trash2, WandSparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog.js';
 import {
@@ -11,6 +11,7 @@ import {
   sendNovelCreationMessage, stopNovelCreationBatch, updateNovelCreationNote, updateNovelCreationProjectSettings, updateNovelCreationSchedule
 } from '../../shared/api/novelCreation.js';
 import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention.js';
+import { WorkspaceArchivePanel } from '../components/WorkspaceArchivePanel.jsx';
 import './NovelCreationPage.css';
 
 const ACTIVE_MODE_KEY = 'novel-creation-active-mode';
@@ -80,6 +81,7 @@ export default function NovelCreationPage() {
   const [activeMode, setActiveMode] = useState(initialMode);
   const [projects, setProjects] = useState([]);
   const [retention, setRetention] = useState({});
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [sessions, setSessions] = useState([]);
   const [sessionId, setSessionId] = useState('');
@@ -669,7 +671,7 @@ export default function NovelCreationPage() {
       <div className="novel-creation-launcher-head"><strong>开始创作</strong></div>
       <div className="novel-creation-mode-tabs">{modes.map(mode => <button key={mode.id} type="button" className={mode.id === activeMode ? 'active' : ''} onClick={() => { setActiveMode(mode.id); setSnapshot(null); setModeInputs({}); }}><Sparkles size={15} />{mode.name}</button>)}</div>
     </header>
-        <div className="novel-creation-sidebar-head"><span>我的作品 {visibleProjects.length}</span><Tooltip title="新建作品"><Button type="text" icon={<Plus size={17} />} onClick={() => setProjectModalOpen(true)} /></Tooltip></div>
+        <div className="novel-creation-sidebar-head"><span>我的作品 {visibleProjects.length}</span><Tooltip title="归档库"><Button type="text" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)} /></Tooltip><Tooltip title="新建作品"><Button type="text" icon={<Plus size={17} />} onClick={() => setProjectModalOpen(true)} /></Tooltip></div>
         {visibleProjects.length ? <Select className="novel-creation-project-select" value={projectId || undefined} placeholder="创建或选择作品" onChange={setProjectId} options={visibleProjects.map(item => ({ value: item.id, label: `${item.title}${!retention[`novel_creation:${item.id}`]?.archivedAt && Number(retention[`novel_creation:${item.id}`]?.remainingDays) <= 1 ? '（即将归档）' : ''}` }))} /> : <p className="novel-creation-session-empty">还没有作品</p>}
         <div className="novel-creation-session-list"><div className="novel-creation-mode-title">会话记录</div>{sessions.filter(item => item.mode === activeMode).length ? sessions.filter(item => item.mode === activeMode).map(item => <button key={item.id} type="button" className={item.id === sessionId ? 'active' : ''} onClick={() => setSessionId(item.id)}><Menu size={14} /><span>{item.title || '未命名会话'}</span></button>) : <p className="novel-creation-session-empty">当前分类暂无会话，点击下方新建</p>}<Button className="novel-creation-new-session" icon={<Plus size={15} />} onClick={createSessionFromButton}>新建会话</Button></div>
         <div className="novel-creation-toolbar">{toolbar.map(([label, Icon]) => <Button key={label} icon={<Icon size={15} />} onClick={() => openTool(label)}>{label}</Button>)}</div>
@@ -744,5 +746,14 @@ export default function NovelCreationPage() {
     <Drawer open={Boolean(toolDrawer)} title={toolDrawer} width={520} onClose={() => setToolDrawer('')}>
       {drawerBody}
     </Drawer>
+    <WorkspaceArchivePanel
+      open={archiveOpen}
+      modules={['novel_creation']}
+      onClose={() => setArchiveOpen(false)}
+      onChanged={async () => {
+        await loadProjects(projectId);
+        getProjectRetention().then(items => setRetention(indexRetention(items))).catch(() => {});
+      }}
+    />
   </div>;
 }

@@ -1,12 +1,14 @@
 import { formatWorkDateTime } from '../../../shared/workDateTime.js';
-import { AppstoreOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, FileTextOutlined, FolderOpenOutlined, PlusOutlined, SearchOutlined, UnorderedListOutlined, UploadOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, FileTextOutlined, FolderOpenOutlined, InboxOutlined, PlusOutlined, SearchOutlined, UnorderedListOutlined, UploadOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { Alert, Button, Input, Modal, Popconfirm, Select, Upload, message } from 'antd';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { importProject } from '../../../shared/api/shuihuoProduction';
 import { getBatchFactoryMergeCoverBlob, getBookAssetImageBlob, getComicPageImageBlob, getProductionStatus, isBatchFactoryMergeCoverURL, isBookAssetImageURL, isComicPageImageURL } from '../../../shared/api/batchFactory';
 import { ProductionMediaBoundary } from '../batch-factory-v11/ProductionMediaBoundary';
 import { BatchFactoryCreateModal } from './BatchFactoryCreateModal';
 import { batchFactoryFallbackCoverFromProductionStatus, createCoverHydrationScheduler, isBatchFactoryV11Project } from './batchFactoryProjects';
+import { getProjectRetention, indexRetention } from '../../../shared/api/projectRetention.js';
+import { WorkspaceArchivePanel } from '../../components/WorkspaceArchivePanel';
 
 const scheduleLegacyProjectCoverFallback = createCoverHydrationScheduler();
 
@@ -104,6 +106,30 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
   const [segmentationMode, setSegmentationMode] = useState('paragraph');
   const [busy, setBusy] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [retention, setRetention] = useState({});
+
+  const refreshRetention = useCallback(() => {
+    let alive = true;
+    getProjectRetention()
+      .then(items => { if (alive) setRetention(indexRetention(items)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => refreshRetention(), [projects.length, refreshRetention]);
+
+  // 批量工厂作品使用 batch:<id> 作为前端 ID，保留记录里存的是真实批次 ID。
+  function retentionKey(project) {
+    const batchId = project?.batchId || (String(project?.id || '').startsWith('batch:') ? String(project.id).slice(6) : '');
+    return batchId ? `batch_factory:${batchId}` : `comic_screenplay:${project?.id}`;
+  }
+
+  function retentionHint(project) {
+    const record = retention[retentionKey(project)];
+    if (!record || record.archivedAt) return '';
+    return Number(record.remainingDays) <= 1 ? '即将归档' : '';
+  }
 
   useEffect(() => {
     if (openCreateOnLoad) setBatchOpen(true);
@@ -154,13 +180,14 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
   const visibleProjects = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase();
     return [...(projects || [])]
+      .filter(project => !retention[retentionKey(project)]?.archivedAt)
       .filter(project => !keyword || project.name.toLocaleLowerCase().includes(keyword))
       .sort((left, right) => {
         const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
         const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
         return sortOrder === 'desc' ? rightTime - leftTime : leftTime - rightTime;
       });
-  }, [projects, search, sortOrder]);
+  }, [projects, search, sortOrder, retention]);
 
   function projectCount(project) {
     if (Number.isFinite(project.segmentCount)) return `${project.segmentCount} 个分镜`;
@@ -191,6 +218,7 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
       <span className="shuihuo-project-filter-label">全部作品</span>
       <button className="shuihuo-project-filter" type="button" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}><ClockCircleOutlined /><span>{sortOrder === 'desc' ? '按时间降序' : '按时间升序'}</span></button>
       <Button className="shuihuo-project-view-toggle" type="text" icon={viewMode === 'grid' ? <UnorderedListOutlined /> : <AppstoreOutlined />} onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} aria-label={viewMode === 'grid' ? '切换为列表视图' : '切换为网格视图'} title={viewMode === 'grid' ? '切换为列表视图' : '切换为网格视图'} />
+      <Button className="shuihuo-project-archive-entry" icon={<InboxOutlined />} onClick={() => setArchiveOpen(true)}>归档库</Button>
     </div>
     <div className={`shuihuo-project-grid${viewMode === 'list' ? ' is-list' : ''}`}>
       {visibleProjects.map(project => {
@@ -202,7 +230,7 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
             {cover || <><span className={`shuihuo-project-card-mode ${batchProject ? 'is-batch-factory' : ''}`}>{batchProject ? '批量工厂' : '水货生产'}</span><span>{batchProject ? `${batchKindLabel(project)} · 小说列表` : projectCount(project)}</span></>}
             {cover && batchProject ? <span className="shuihuo-project-card-kind">{batchKindLabel(project)}</span> : null}
           </div>
-          <div className="shuihuo-project-card-meta"><strong>{project.name}</strong><span>{formatTime(project.updatedAt || project.createdAt)}</span></div>
+          <div className="shuihuo-project-card-meta"><strong>{project.name}</strong><span>{formatTime(project.updatedAt || project.createdAt)}</span>{retentionHint(project) ? <em className="shuihuo-project-card-retention">{retentionHint(project)}</em> : null}</div>
         </button>
         <div className="shuihuo-project-card-actions"><Button type="text" icon={<FolderOpenOutlined />} onClick={() => onOpen(project)} aria-label={`打开工作台 ${project.name}`} /><Popconfirm title={isBatchFactoryV11Project(project) ? '删除批量项目？' : '删除项目？此操作不会撤销。'} description={isBatchFactoryV11Project(project) ? '将删除其中全部小说和本地生产记录；不会影响已提交到 121 的内容。' : undefined} okText="删除" cancelText="取消" onConfirm={() => onDelete(project)}><Button type="text" danger icon={<DeleteOutlined />} aria-label={`删除${project.name}`} /></Popconfirm></div>
       </article>;
@@ -222,5 +250,6 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
       {hasSource ? <><label className="shuihuo-form-label" htmlFor="shuihuo-segmentation-mode">分段方式</label><Select id="shuihuo-segmentation-mode" value={segmentationMode} onChange={setSegmentationMode} options={[{ value: 'paragraph', label: '自动识别' }, { value: 'smart', label: '智能识别', disabled: !smartReady }]} /></> : null}
     </Modal>
     <BatchFactoryCreateModal open={batchOpen} onCancel={() => setBatchOpen(false)} onCreated={async payload => { await onCreateBatch(payload); setBatchOpen(false); await onRefresh?.(); }} />
+    <WorkspaceArchivePanel open={archiveOpen} modules={['batch_factory', 'comic_screenplay']} onClose={() => setArchiveOpen(false)} onChanged={async () => { await onRefresh?.(); refreshRetention(); }} />
   </section>;
 }

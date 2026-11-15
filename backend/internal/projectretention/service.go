@@ -32,6 +32,8 @@ const (
 
 	// DefaultRetentionDays 与账号设置 productionRetentionDays 的默认值保持一致。
 	DefaultRetentionDays = 7
+	// DefaultArchiveGrace 是作品进入归档库后、被彻底删除前的可恢复时间。
+	DefaultArchiveGrace = 24 * time.Hour
 )
 
 var (
@@ -61,6 +63,8 @@ type Service struct {
 	Days          func(owner string) int
 	Now           func() time.Time
 	Location      *time.Location
+	// Grace 控制归档后可恢复的时长，默认 24 小时。
+	Grace time.Duration
 }
 
 // NewService 构造保留服务。batch 可为空，表示当前运行环境未启用批量工厂存储。
@@ -137,7 +141,7 @@ func nextSweep(hour, minute int, now time.Time, loc *time.Location) time.Time {
 	return next
 }
 
-// RunOnce 对每个有作品的账号重算保留期并归档到期作品集。
+// RunOnce 对每个有作品的账号重算保留期、归档到期作品，并清理超过恢复期的归档。
 func (s *Service) RunOnce(ctx context.Context) error {
 	if s.DB == nil {
 		return fmt.Errorf("project retention database is not configured")
@@ -149,6 +153,58 @@ func (s *Service) RunOnce(ctx context.Context) error {
 	for _, owner := range owners {
 		if err := s.recompute(ctx, owner); err != nil {
 			log.Printf("project retention recompute failed owner=%s: %v", owner, err)
+		}
+		if err := s.purgeExpired(ctx, owner); err != nil {
+			log.Printf("project retention purge failed owner=%s: %v", owner, err)
+		}
+	}
+	return nil
+}
+
+// purgeExpired 彻底删除已归档超过 Grace 的作品集，释放数据库、TOS 与本地文件。
+func (s *Service) purgeExpired(ctx context.Context, owner string) error {
+	grace := s.Grace
+	if grace <= 0 {
+		grace = DefaultArchiveGrace
+	}
+	cutoff := s.now().UTC().Add(-grace)
+	if s.Batch != nil {
+		batches, err := s.Batch.ListDueArchivedBatches(ctx, owner, cutoff)
+		if err != nil {
+			return err
+		}
+		for _, batch := range batches {
+			if err := s.Batch.PurgeArchivedBatch(ctx, owner, batch.ID, s.Local, s.Remote); err != nil {
+				log.Printf("batch retention purge failed owner=%s batch=%s: %v", owner, batch.ID, err)
+			}
+		}
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT module, project_id FROM project_retention WHERE owner_username=? AND archived_at IS NOT NULL AND archived_at<=?`, owner, cutoff)
+	if err != nil {
+		return err
+	}
+	type due struct {
+		module    Module
+		projectID string
+	}
+	items := []due{}
+	for rows.Next() {
+		var module string
+		var projectID string
+		if err := rows.Scan(&module, &projectID); err != nil {
+			rows.Close()
+			return err
+		}
+		items = append(items, due{module: Module(module), projectID: projectID})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, item := range items {
+		if err := s.Purge(ctx, owner, item.module, item.projectID); err != nil {
+			log.Printf("project retention purge failed owner=%s module=%s project=%s: %v", owner, item.module, item.projectID, err)
 		}
 	}
 	return nil
