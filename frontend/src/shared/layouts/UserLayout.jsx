@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Puzzle, Scissors, Settings2 } from 'lucide-react';
+import { AudioLines, Archive, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, PanelLeftClose, PanelLeftOpen, Puzzle, Scissors, Settings2 } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { WindowVideoBackground } from '../components/WindowVideoBackground';
@@ -32,13 +32,14 @@ const navItems = [
   { href: '/script', icon: FilePenLine, label: '私人定制' },
   // Novel Fetch is served as the Go-embedded canonical workbench. Force a
   // document navigation so the SPA cannot swap in a stale React-only page.
-  { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
+  { href: '/novel-fetch', icon: BookOpen, label: '批量测书', reload: true },
   { href: '/novel-creation', icon: FilePenLine, label: '小说创作' },
   { href: '/batch-factory', icon: Clapperboard, label: '水货生产' },
   { href: '/comic-screenplay', icon: FilePenLine, label: '漫剧创作' },
   { href: '/agent', icon: Bot, label: 'CM 画布' },
   { href: '/tts', icon: AudioLines, label: '配音' },
   { href: '/ai-cut', icon: Scissors, label: 'AI-CUT' },
+  { href: '/archive', icon: Archive, label: '归档库' },
   { href: '/plugins', icon: Puzzle, label: '插件' }
 ];
 

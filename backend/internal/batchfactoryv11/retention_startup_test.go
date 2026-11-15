@@ -26,12 +26,11 @@ func TestRetentionWholeBatchGetsHiddenWithFullGrace(t *testing.T) {
 	mock.ExpectBegin()
 	// 旧版本按书隐藏的数据先恢复，统一改由作品集计时。
 	mock.ExpectExec("UPDATE batch_factory_v12_books SET hidden_at=NULL").WithArgs("alice").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("UPDATE batch_factory_v12_batches SET completed_at").WithArgs(old, old.AddDate(0, 0, 3), "batch-old", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec("UPDATE batch_factory_v12_batches SET hidden_at=NULL").WithArgs("alice", sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 0))
-	var hidden time.Time
-	nowArg := retentionTimeArg(func(v driver.Value) bool { var ok bool; hidden, ok = v.(time.Time); return ok })
-	graceArg := retentionTimeArg(func(v driver.Value) bool { t, ok := v.(time.Time); return ok && t.Sub(hidden) == 24*time.Hour })
-	mock.ExpectExec("UPDATE batch_factory_v12_batches SET hidden_at=\\?,purge_after=\\?").WithArgs(nowArg, graceArg, "alice", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE batch_factory_v12_batches SET completed_at").WithArgs(old, retentionExpiry(old, 3), "batch-old", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	// 未到期的归档作品自动恢复显示。
+	mock.ExpectExec("UPDATE batch_factory_v12_batches SET hidden_at=NULL").WithArgs("alice", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 0))
+	// 到期作品只进入归档，不再安排 24 小时后的硬删。
+	mock.ExpectExec("UPDATE batch_factory_v12_batches SET hidden_at=\\?,purge_after=NULL").WithArgs(sqlmock.AnyArg(), "alice", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	result, err := NewMySQLStore(db).RecomputeBatchRetention(context.Background(), "alice", 3)
 	if err != nil || result.Hidden != 1 {

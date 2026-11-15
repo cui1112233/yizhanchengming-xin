@@ -7,8 +7,9 @@ import (
 
 func TestRetentionExpiryUsesConfiguredDays(t *testing.T) {
 	completed := time.Date(2026, 11, 1, 8, 30, 0, 0, time.UTC)
+	local := completed.In(time.Local)
 	for _, days := range []int{3, 7, 14, 30} {
-		want := completed.AddDate(0, 0, days)
+		want := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, days).UTC()
 		if got := retentionExpiry(completed, days); !got.Equal(want) {
 			t.Fatalf("retentionExpiry(%d)=%s want=%s", days, got, want)
 		}
@@ -17,7 +18,8 @@ func TestRetentionExpiryUsesConfiguredDays(t *testing.T) {
 
 func TestRetentionExpiryFallsBackToDefaultWindow(t *testing.T) {
 	completed := time.Date(2026, 11, 1, 8, 30, 0, 0, time.UTC)
-	want := completed.AddDate(0, 0, DefaultLocalMergedArtifactRetentionDays)
+	local := completed.In(time.Local)
+	want := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, DefaultLocalMergedArtifactRetentionDays).UTC()
 	if got := retentionExpiry(completed, 0); !got.Equal(want) {
 		t.Fatalf("retentionExpiry(0)=%s want=%s", got, want)
 	}

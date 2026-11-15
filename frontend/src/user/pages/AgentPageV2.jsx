@@ -3,6 +3,7 @@ import { Button, ConfigProvider, Form, Input, Modal, Popconfirm, Segmented, Spac
 import { ArrowRight, ArrowUp, Bot, ChevronDown, ChevronUp, Clock3, FilePenLine, FileText, Film, Image as ImageIcon, MessageCircle, MoreHorizontal, Music, Paperclip, Pin, RotateCcw, SearchCheck, Send, Sparkles, Square, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, cancelAgentGeneration, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentGenerationSummary, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, mergeAgentScriptShots, renameAgentTask, retryAgentGeneration, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
+import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
@@ -133,6 +134,7 @@ export function AgentPageV2({ theme = 'dark' }) {
   const [workflowFocusRequest, setWorkflowFocusRequest] = useState(0);
   const [storyboardDirectorResizing, setStoryboardDirectorResizing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [retention, setRetention] = useState({});
   const [proxyOpen, setProxyOpen] = useState(false);
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [canvas, setCanvas] = useState({ version: 1, revision: 0, nodes: [], edges: [] });
@@ -947,10 +949,17 @@ export function AgentPageV2({ theme = 'dark' }) {
     return () => { cancelled = true; };
   }, [activeTaskId, isCanvasWorkspace]);
 
+  useEffect(() => {
+    let alive = true;
+    getProjectRetention().then(items => { if (alive) setRetention(indexRetention(items)); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   const visibleSkills = useMemo(() => skills.filter(skill => source === 'all' || skill.source === source), [skills, source]);
-  const visibleProjects = useMemo(() => projectFilter === 'all'
-    ? tasks
-    : tasks.filter(task => normalizeAgentProjectType(task.projectType) === projectFilter), [projectFilter, tasks]);
+  const visibleProjects = useMemo(() => {
+    const active = tasks.filter(task => !retention[`cm_canvas:${task.id}`]?.archivedAt);
+    return projectFilter === 'all' ? active : active.filter(task => normalizeAgentProjectType(task.projectType) === projectFilter);
+  }, [projectFilter, tasks, retention]);
   const activeProjectType = normalizeAgentProjectType(activeTask?.projectType);
   const activeProjectCapabilities = agentProjectCapabilities(activeProjectType);
   const selectedSkills = skills.filter(skill => selectedSkillIds.includes(skill.id));
@@ -1606,7 +1615,7 @@ export function AgentPageV2({ theme = 'dark' }) {
             {composerPanel === 'expert' ? <div className="agent-composer-context"><strong>专家</strong>{['CM 创作顾问', '前贴片广告策划', '短剧编剧'].map(value => <button type="button" key={value} className={selectedExpert === value ? 'active' : ''} onClick={() => { setSelectedExpert(value); setComposerPanel(null); }}>{value}</button>)}</div> : null}
             {composerPanel === 'skill' ? <div className="agent-skill-panel"><Segmented value={source} onChange={setSource} options={[{ label: '全部', value: 'all' }, { label: '平台自带', value: 'system' }, { label: '我的技能', value: 'user' }]} /><div className="agent-skill-list">{visibleSkills.map(skill => <article className={`agent-skill-card${selectedSkillIds.includes(skill.id) ? ' selected' : ''}`} key={skill.id}><strong>{skill.name}</strong><p>{skill.description || '未填写说明'}</p><Button size="small" type={selectedSkillIds.includes(skill.id) ? 'primary' : 'default'} onClick={() => toggleSkill(skill.id)}>{selectedSkillIds.includes(skill.id) ? '已选用' : '选用'}</Button></article>)}</div></div> : null}
           </div>
-          <section className="agent-recent-projects" aria-label="最近项目"><div className="agent-project-list-head"><h3>最近项目</h3><Segmented size="small" value={projectFilter} onChange={setProjectFilter} options={[{ label: '全部', value: 'all' }, { label: '视频', value: 'video' }, { label: '漫画', value: 'comic' }]} /></div>{loading ? <span>正在读取项目…</span> : visibleProjects.slice(0, 6).map(task => <button type="button" key={task.id} onClick={() => { window.history.pushState({}, '', `/agent/canvas?taskId=${encodeURIComponent(task.id)}`); window.dispatchEvent(new PopStateEvent('popstate')); }}><strong>{task.title}<Tag>{agentProjectTypeLabel(task.projectType)}</Tag></strong><span>{task.preview || '尚未开始对话'}</span></button>)}</section>
+          <section className="agent-recent-projects" aria-label="最近项目"><div className="agent-project-list-head"><h3>最近项目</h3><Segmented size="small" value={projectFilter} onChange={setProjectFilter} options={[{ label: '全部', value: 'all' }, { label: '视频', value: 'video' }, { label: '漫画', value: 'comic' }]} /></div>{loading ? <span>正在读取项目…</span> : visibleProjects.slice(0, 6).map(task => <button type="button" key={task.id} onClick={() => { window.history.pushState({}, '', `/agent/canvas?taskId=${encodeURIComponent(task.id)}`); window.dispatchEvent(new PopStateEvent('popstate')); }}><strong>{task.title}<Tag>{agentProjectTypeLabel(task.projectType)}</Tag>{Number(retention[`cm_canvas:${task.id}`]?.remainingDays)<=1&&!retention[`cm_canvas:${task.id}`]?.archivedAt?<Tag color="red">即将归档</Tag>:null}</strong><span>{task.preview || '尚未开始对话'}</span></button>)}</section>
           <section className="agent-proxy-home-entry" aria-label="Agent 代理入口">
             <div className="agent-proxy-home-entry__text">
               <strong>Agent 代理</strong>

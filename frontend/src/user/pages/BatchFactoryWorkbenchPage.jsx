@@ -14,6 +14,7 @@ import { BatchFactoryNovelList } from './shuihuo/BatchFactoryNovelList';
 import { BatchFactoryCreateModal } from './shuihuo/BatchFactoryCreateModal';
 import { batchFactoryBatchFromResponse } from './shuihuo/batchFactoryProjects';
 import { getAvailableModelCatalog } from '../../shared/api/modelCatalog';
+import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention';
 import {
   BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY,
   novelFetchIntakeBooks,
@@ -44,6 +45,12 @@ function bookCount(batch) {
   return Array.isArray(batch?.books) ? batch.books.length : Number(batch?.bookCount || 0);
 }
 
+// 只在归档前的最后一天提示，避免正常的长期作品集一直挂着警告。
+function retentionHint(item) {
+  if (!item || item.archivedAt) return '';
+  return Number(item.remainingDays) <= 1 ? '即将归档' : '';
+}
+
 // 批次访问失败只弹一条可关闭提示；请求侧已用 suppressGlobalError 关掉全局错误条。
 function notifyBatchAccessFailure(error) {
   const notice = batchAccessNotice(error);
@@ -56,6 +63,7 @@ export default function BatchFactoryWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [retention, setRetention] = useState({});
   const [openAutomationOnLoad, setOpenAutomationOnLoad] = useState(false);
   const handoffRef = useRef('');
   // When arriving from Novel Fetch, the intake must win over the previously
@@ -73,6 +81,14 @@ export default function BatchFactoryWorkbenchPage() {
   const pendingBatchId = pendingBatchIdRef.current;
   const mountedRef = useRef(true);
   const refreshInFlightRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjectRetention()
+      .then(items => { if (!cancelled) setRetention(indexRetention(items)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [batches.length]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -186,18 +202,18 @@ export default function BatchFactoryWorkbenchPage() {
         const intake = intakeResult?.intake || intakeResult;
         const incoming = novelFetchIntakeBooks(intake);
         const result = await createBatchFromIntake(intakeId, {
-          title: incoming.length === 1 ? `小说获取·${incoming[0]?.title || '新批量'}` : `小说获取·${incoming.length || 0}本`,
+          title: incoming.length === 1 ? `批量测书·${incoming[0]?.title || '新批量'}` : `批量测书·${incoming.length || 0}本`,
           initialBatchSettings: {
             contentRangeLines: Number(intake?.metadata?.contentRangeLines || 5),
             contentCaptureCharacters: Number(intake?.metadata?.contentCaptureCharacters || 4000),
           }
         });
         await finish(result);
-        message.success('小说获取内容已登记到新批量；统一配置、内容范围、内容截取和自动生产入口已保留');
+        message.success('批量测书内容已登记到新批量；统一配置、内容范围、内容截取和自动生产入口已保留');
       } catch (requestError) {
         if (!cancelled) {
           handoffRef.current = '';
-          message.error(requestError?.message || '小说获取交接失败');
+          message.error(requestError?.message || '批量测书交接失败');
         }
       }
     };
@@ -266,7 +282,10 @@ export default function BatchFactoryWorkbenchPage() {
     {loading ? <div className="batch-factory-workbench-home-state"><Spin /><span>正在读取批量工程</span></div> : null}
     {!loading && error ? <div className="batch-factory-workbench-home-state is-error"><strong>批量工程暂时无法读取</strong><span>{error}{batches.length ? '，当前仍显示上次读取的数据。' : ''}</span><Button onClick={() => refreshBatches()}>重试</Button></div> : null}
     {!loading && (!error || batches.length > 0) ? <section className="batch-factory-workbench-grid">
-      {batches.map(batch => <button type="button" className="batch-factory-workbench-card" key={batch.id} onClick={() => openBatch(batch.id)}><FileTextOutlined /><strong>{batch.title || '未命名批量'}</strong><span>{bookCount(batch)} 本小说</span><small>{batch.updatedAt || batch.createdAt || '刚刚创建'}</small></button>)}
+      {batches.map(batch => {
+        const hint = retentionHint(retention[`batch_factory:${batch.id}`]);
+        return <button type="button" className="batch-factory-workbench-card" key={batch.id} onClick={() => openBatch(batch.id)}><FileTextOutlined /><strong>{batch.title || '未命名批量'}</strong><span>{bookCount(batch)} 本小说</span>{hint ? <em className="batch-factory-retention-soon">{hint}</em> : null}<small>{batch.updatedAt || batch.createdAt || '刚刚创建'}</small></button>;
+      })}
       {!batches.length ? <div className="batch-factory-workbench-home-state"><FileTextOutlined /><strong>还没有批量工程</strong><span>新建批量后即可进入每本小说的完整生产工作台。</span><Button type="primary" onClick={() => setCreateOpen(true)}>新建批量</Button></div> : null}
     </section> : null}
     <BatchFactoryCreateModal open={createOpen} onCancel={() => setCreateOpen(false)} onCreated={async input => { const batch = await createBatch(input); setCreateOpen(false); return batch; }} onBatchUpdated={async batchId => { const refreshed = asBatch(await getBatch(batchId)); if (mountedRef.current) setActiveBatch(refreshed); await refreshBatches({ quiet: true }); }} />

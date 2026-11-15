@@ -395,7 +395,7 @@ export function SettingsPage({ theme = '', themePreference = 'system', onThemeCh
           <Form.Item label="服务器归档路径" name="storageRoot" extra="必须是服务器可访问的绝对路径；留空表示关闭服务器归档。">
             <Input placeholder="例如 /data/qiantie-archive" />
           </Form.Item>
-          <Form.Item label="作品保留时长" name="productionRetentionDays" extra="作品最后一次制作完成后开始计时；到期后先隐藏，24 小时后删除数据库记录、TOS 文件和本地缓存。修改天数会对所有未删除作品重新计算。">
+          <Form.Item label="作品保留时长" name="productionRetentionDays" extra="作品最后一次制作或编辑后开始计时；到期当天 00:00 自动移入「归档库」并永久保留。归档作品可随时恢复（恢复后重新计时），只有彻底删除才会释放数据。修改天数会对全站未归档作品集重新计算。">
             <Select options={[3, 7, 14, 30].map(days => ({ value: days, label: `${days} 天` }))} />
           </Form.Item>
           <Typography.Paragraph type="secondary">默认保留 7 天；磁盘达到 75% 时会额外优先清理已在 TOS 校验成功的最旧本地副本，降到 65% 后停止。头像、账号和项目配置不受影响。</Typography.Paragraph>
@@ -409,7 +409,7 @@ export function SettingsPage({ theme = '', themePreference = 'system', onThemeCh
               <Typography.Text strong>恢复报告</Typography.Text>
               <ul style={{ margin: '8px 0 0', paddingLeft: 20, color: 'var(--legacy-muted)', fontSize: 13, lineHeight: 1.7 }}>
                 <li>私人定制：找到 {restoreReport.scriptResults?.found ?? 0} 个，新并入历史 {restoreReport.scriptResults?.added ?? 0} 条</li>
-                <li>小说获取：{restoreReport.novelFetch?.found ?? 0} 个文件</li>
+                <li>批量测书：{restoreReport.novelFetch?.found ?? 0} 个文件</li>
                 <li>改编小说：{restoreReport.novelAdapt?.found ?? 0} 个文件</li>
                 <li>制作工程：{restoreReport.projects?.found ?? 0} 个项目</li>
               </ul>
@@ -426,7 +426,7 @@ export function SettingsPage({ theme = '', themePreference = 'system', onThemeCh
                 style={{ marginTop: 8 }}
                 dataSource={[
                   { key: 'scriptResults', title: '私人定制', files: fileList.scriptResults || [] },
-                  { key: 'novelFetch', title: '小说获取', files: fileList.novelFetch || [] },
+                  { key: 'novelFetch', title: '批量测书', files: fileList.novelFetch || [] },
                   { key: 'novelAdapt', title: '改编小说', files: fileList.novelAdapt || [] },
                   { key: 'projects', title: '制作工程', projects: fileList.projects || [] }
                 ]}

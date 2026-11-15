@@ -16,3 +16,4 @@
 .batch-factory-workbench-home-state.is-error { border-color: color-mix(in srgb, var(--sh-danger) 58%, var(--sh-line)); }
 .batch-factory-workbench-home-state.is-error strong { color: var(--sh-danger); }
 @media (max-width: 720px) { .batch-factory-workbench-home-heading { align-items: stretch; flex-direction: column; } }
+.batch-factory-workbench-card em.batch-factory-retention-soon { justify-self: start; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, #ff4d4f 18%, transparent); color: #ff7875; font-size: 11px; font-style: normal; font-weight: 600; }

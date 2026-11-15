@@ -17,9 +17,9 @@ import (
 
 const (
 	// DefaultRetentionGrace 是作品集到期隐藏后到真正删除之间的缓冲时间。
-	DefaultRetentionGrace    = 24 * time.Hour
-	retentionClaimWindow     = 15 * time.Minute
-	retentionMaxPerRun       = 50
+	DefaultRetentionGrace = 24 * time.Hour
+	retentionClaimWindow  = 15 * time.Minute
+	retentionMaxPerRun    = 50
 )
 
 // RemoteObjectDeleter 只暴露删除单个对象的能力，避免清理器拿到整份 TOS 客户端。
@@ -39,8 +39,8 @@ type RetentionRecomputeSummary struct {
 	Restored int64
 }
 
-// BatchRetentionSupervisor 按作品集维度执行保留策略：先重算到期时间，再把
-// 到期作品集隐藏，最后在缓冲期结束后删除云端对象、本地文件和数据库记录。
+// BatchRetentionSupervisor 按作品集维度执行保留策略：重算到期时间，并把到期
+// 作品集移入归档（隐藏）。归档作品永久保留，只有用户手动彻底删除才释放文件。
 type BatchRetentionSupervisor struct {
 	Store         *MySQLStore
 	Local         *localartifact.Store
@@ -49,7 +49,7 @@ type BatchRetentionSupervisor struct {
 	MaxPerRun     int
 }
 
-// RunOnce 执行一次完整巡检。
+// RunOnce 执行一次完整巡检。到期作品只归档，不自动删除。
 func (s BatchRetentionSupervisor) RunOnce(ctx context.Context) error {
 	if s.Store == nil {
 		return fmt.Errorf("batch retention store is not configured")
@@ -67,27 +67,11 @@ func (s BatchRetentionSupervisor) RunOnce(ctx context.Context) error {
 			return err
 		}
 	}
-	max := s.MaxPerRun
-	if max <= 0 {
-		max = retentionMaxPerRun
-	}
-	for i := 0; i < max; i++ {
-		batch, found, err := s.Store.ClaimDueRetentionBatch(ctx)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return nil
-		}
-		if err := s.Store.PurgeRetentionBatch(ctx, batch, s.Local, s.Remote); err != nil {
-			log.Printf("batch retention purge failed batch=%s owner=%s: %v", batch.ID, batch.Owner, err)
-		}
-	}
 	return nil
 }
 
-// StartDaily 每天在指定本地时间执行一次巡检。清理和删除动作集中在凌晨，避免
-// 白天业务高峰期间批量删除文件影响正常使用。
+// StartDaily 每天在指定本地时间执行一次巡检。归档动作集中在凌晨，避免白天
+// 业务高峰期间批量修改作品可见状态。
 func (s BatchRetentionSupervisor) StartDaily(hour, minute int) {
 	go func() {
 		for {
@@ -195,12 +179,14 @@ FROM batch_factory_v12_batches b WHERE b.owner_username=?`, owner)
 			return summary, err
 		}
 	}
-	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=NULL,purge_after=NULL WHERE owner_username=? AND hidden_at IS NOT NULL AND purge_after>? AND retention_expires_at>?`, owner, now, now); err != nil {
+	// 调大保留天数后，未到期的归档作品集自动回到列表。
+	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=NULL,purge_after=NULL WHERE owner_username=? AND hidden_at IS NOT NULL AND retention_expires_at>?`, owner, now); err != nil {
 		return summary, err
 	} else if affected, err := result.RowsAffected(); err == nil {
 		summary.Restored = affected
 	}
-	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=?,purge_after=? WHERE owner_username=? AND hidden_at IS NULL AND retention_expires_at IS NOT NULL AND retention_expires_at<=?`, now, now.Add(DefaultRetentionGrace), owner, now); err != nil {
+	// 到期后只进入归档：永久保留，等待用户恢复或手动彻底删除。
+	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=?,purge_after=NULL WHERE owner_username=? AND hidden_at IS NULL AND retention_expires_at IS NOT NULL AND retention_expires_at<=?`, now, owner, now); err != nil {
 		return summary, err
 	} else if affected, err := result.RowsAffected(); err == nil {
 		summary.Hidden = affected
@@ -211,11 +197,83 @@ FROM batch_factory_v12_batches b WHERE b.owner_username=?`, owner)
 	return summary, nil
 }
 
+// retentionExpiry 把完成时间换算成“完成日 + N 天”的本地零点。例如 11-10 完成、
+// 保留 7 天，会在 11-17 00:00 的巡检中归档。
 func retentionExpiry(completed time.Time, days int) time.Time {
 	if days <= 0 {
 		days = DefaultLocalMergedArtifactRetentionDays
 	}
-	return completed.AddDate(0, 0, days)
+	local := completed.In(time.Local)
+	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local)
+	return start.AddDate(0, 0, days).UTC()
+}
+
+// BatchRetentionInfo 是作品集归档库需要的展示字段。
+type BatchRetentionInfo struct {
+	ID          string
+	Title       string
+	CompletedAt time.Time
+	ExpiresAt   sql.NullTime
+	HiddenAt    sql.NullTime
+}
+
+// ListBatchRetention 返回账号下所有作品集的保留状态（含已归档）。
+func (s *MySQLStore) ListBatchRetention(ctx context.Context, owner string) ([]BatchRetentionInfo, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id, COALESCE(NULLIF(r.title,''),'未命名作品集'),
+COALESCE(b.completed_at,b.updated_at), b.retention_expires_at, b.hidden_at
+FROM batch_factory_v12_batches b
+LEFT JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id
+WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []BatchRetentionInfo{}
+	for rows.Next() {
+		var item BatchRetentionInfo
+		if err := rows.Scan(&item.ID, &item.Title, &item.CompletedAt, &item.ExpiresAt, &item.HiddenAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+// RestoreArchivedBatch 恢复归档作品集，并按当前保留天数从恢复时刻重新计时。
+func (s *MySQLStore) RestoreArchivedBatch(ctx context.Context, owner, batchID string, days int, now time.Time) error {
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" {
+		return ErrInvalid
+	}
+	days = normalizeLocalMergedArtifactRetentionDays(days)
+	expires := now.UTC().AddDate(0, 0, days)
+	result, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=NULL,purge_after=NULL,completed_at=?,retention_expires_at=? WHERE id=? AND owner_username=? AND hidden_at IS NOT NULL`, now.UTC(), expires, batchID, owner)
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return ErrNotFound
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE batch_factory_v12_books SET hidden_at=NULL,purge_after=NULL WHERE batch_id=? AND owner_username=?`, batchID, owner)
+	return err
+}
+
+// PurgeArchivedBatch 彻底删除已归档作品集：先删 TOS/本地文件，再删数据库记录。
+func (s *MySQLStore) PurgeArchivedBatch(ctx context.Context, owner, batchID string, local *localartifact.Store, remote RemoteObjectDeleter) error {
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" {
+		return ErrInvalid
+	}
+	var hidden sql.NullTime
+	err := s.db.QueryRowContext(ctx, `SELECT hidden_at FROM batch_factory_v12_batches WHERE id=? AND owner_username=?`, batchID, owner).Scan(&hidden)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !hidden.Valid {
+		return ErrInvalid
+	}
+	return s.PurgeRetentionBatch(ctx, RetentionBatch{ID: batchID, Owner: owner}, local, remote)
 }
 
 // ClaimDueRetentionBatch 原子领取一个已过缓冲期的作品集。purge_after 会被推后，

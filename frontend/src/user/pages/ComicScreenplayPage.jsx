@@ -25,6 +25,7 @@ import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-cr
 import { ComicDegreeCards, ComicSourceInput, ComicStylePicker, ComicCreativeFields } from './ComicScreenplayCreationFields.jsx';
 import { applyCreativeConfigToProject, comicProjectStyleName, comicStoryboardEngine, comicWorkspaceStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, comicModelConfigPatchFields, creativePromptOptions, emptyCreativeConfig } from './comic-screenplay-creative.js';
 import { parseComicScreenplayDraftSource } from '../../shared/api/comicScreenplay.js';
+import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention.js';
 
 const ratioOptions = ['9:16', '16:9', '1:1', '4:3'].map(value => ({ value, label: value }));
 const assetTypeOptions = [{ value: 'character', label: '角色' }, { value: 'scene', label: '场景' }, { value: 'prop', label: '道具' }];
@@ -122,6 +123,7 @@ export default function ComicScreenplayPage() {
 	const [assetEditor, setAssetEditor] = useState(null);
   const [storyboardShotEditor, setStoryboardShotEditor] = useState(null);
   const [scope, setScope] = useState('personal');
+  const [retention, setRetention] = useState({});
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState('grid');
   const [form, setForm] = useState({ title: '', model: '', promptId: 'b_director_screenplay', artStyle: '', selectedStyle: '', aspectRatio: '9:16', degree: 'master', scriptMode: 'b' });
@@ -144,6 +146,12 @@ export default function ComicScreenplayPage() {
   }
 
   useEffect(() => {setProjects([]);void refreshProjects(); return () => {libraryRequest.current+=1; projectNavigation.current+=1; abortRef.current?.abort(); sourceImportGate.current.cancel(); }; }, [scope]);
+  useEffect(() => {
+    if (scope !== 'personal') { setRetention({}); return undefined; }
+    let cancelled = false;
+    getProjectRetention().then(items => { if (!cancelled) setRetention(indexRetention(items)); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [scope, projects.length]);
   useEffect(() => { setDocumentDraft(workspace?.document?.content || ''); }, [workspace?.document?.id]);
   useEffect(()=>{if(!selectedId)return;window.dispatchEvent(new CustomEvent('qiantie:comic-workspace',{detail:{open:true}}));return()=>window.dispatchEvent(new CustomEvent('qiantie:comic-workspace',{detail:{open:false}}));},[selectedId]);
 
@@ -552,9 +560,10 @@ export default function ComicScreenplayPage() {
 
   const visibleProjects = useMemo(() => {
     return projects
+      .filter(item => !retention[`comic_screenplay:${item.id}`]?.archivedAt)
       .filter(item => item.title?.toLowerCase().includes(query.trim().toLowerCase()))
       .sort((a, b) => (sortOrder === 'desc' ? -1 : 1) * (new Date(a.updated_at) - new Date(b.updated_at)));
-  }, [projects, query, scope, sortOrder]);
+  }, [projects, query, scope, sortOrder, retention]);
 
   const documentEpisodes = useMemo(() => splitDocumentEpisodes(workspace?.document?.content), [workspace?.document?.content]);
   const editorEpisodes=useMemo(()=>documentEpisodes.length?documentEpisodes:[...new Set((workspace?.storyboards||[]).map(board=>board.episode_no))].sort((a,b)=>a-b).map(no=>({no})),[documentEpisodes,workspace?.storyboards]);
@@ -705,7 +714,7 @@ export default function ComicScreenplayPage() {
       <Input prefix={<Search size={16} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索作品..." allowClear />
       <div className="library-filter-actions"><Select value={sortOrder} suffixIcon={<ChevronDown size={15} />} onChange={setSortOrder} options={[{ value: 'desc', label: '按时间降序' }, { value: 'asc', label: '按时间升序' }]} /><Button type="text" icon={viewMode === 'grid' ? <Grid2X2 size={18} /> : <LayoutGrid size={18} />} onClick={() => setViewMode(value => value === 'grid' ? 'list' : 'grid')} /></div>
     </div>
-    <Spin spinning={loading}><div className={`comic-project-grid ${viewMode === 'list' ? 'is-list' : ''}`}>{visibleProjects.length ? visibleProjects.map(project => <article key={project.id} className="comic-project-card" onClick={() => openProject(project.id)}><div className="comic-project-cover"><Clapperboard size={38} /><span>{project.aspect_ratio || '9:16'}</span></div><div className="comic-project-meta"><div><h3>{project.title}</h3><p>{comicProjectStyleName(project) || '未指定画风'} · {prettyTime(project.updated_at)}</p></div>{scope!=='team'?<Button type="text" onClick={async event=>{event.stopPropagation();try{const result=await getComicDisplay(project.id);await (scope==='archived'?restoreComic:archiveComic)(project.id,{expected_revision:result.state?.revision||0});await refreshProjects();}catch(err){message.error(err.message);}}}>{scope==='archived'?'恢复':'归档'}</Button>:null}{scope!=='team'?<Popconfirm title="删除这个漫剧项目？" onConfirm={async event => { event?.stopPropagation?.(); await deleteComicScreenplay(project.id); await refreshProjects(); }}><Button type="text" danger icon={<Trash2 size={16} />} onClick={event => event.stopPropagation()} /></Popconfirm>:null}</div></article>) : <Empty description={scope === 'team' ? '暂无团队作品' : '暂无项目，在上方输入框输入内容开始创作'} />}</div></Spin>
+    <Spin spinning={loading}><div className={`comic-project-grid ${viewMode === 'list' ? 'is-list' : ''}`}>{visibleProjects.length ? visibleProjects.map(project => <article key={project.id} className="comic-project-card" onClick={() => openProject(project.id)}><div className="comic-project-cover"><Clapperboard size={38} /><span>{project.aspect_ratio || '9:16'}</span></div><div className="comic-project-meta"><div><h3>{project.title}</h3><p>{comicProjectStyleName(project) || '未指定画风'} · {prettyTime(project.updated_at)}</p>{scope==='personal'&&Number(retention[`comic_screenplay:${project.id}`]?.remainingDays)<=1&&!retention[`comic_screenplay:${project.id}`]?.archivedAt?<span className="comic-retention-soon">即将归档</span>:null}</div>{scope!=='team'?<Button type="text" onClick={async event=>{event.stopPropagation();try{const result=await getComicDisplay(project.id);await (scope==='archived'?restoreComic:archiveComic)(project.id,{expected_revision:result.state?.revision||0});await refreshProjects();}catch(err){message.error(err.message);}}}>{scope==='archived'?'恢复':'归档'}</Button>:null}{scope!=='team'?<Popconfirm title="删除这个漫剧项目？" onConfirm={async event => { event?.stopPropagation?.(); await deleteComicScreenplay(project.id); await refreshProjects(); }}><Button type="text" danger icon={<Trash2 size={16} />} onClick={event => event.stopPropagation()} /></Popconfirm>:null}</div></article>) : <Empty description={scope === 'team' ? '暂无团队作品' : '暂无项目，在上方输入框输入内容开始创作'} />}</div></Spin>
     <Modal title="最近创作历史" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={<Button onClick={() => setHistoryOpen(false)}>关闭</Button>}>
       <div className="screenplay-version-list">{projects.length ? [...projects].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).map(project => <button type="button" key={project.id} onClick={() => { setHistoryOpen(false); void openProject(project.id); }}><b>{project.title}</b><span>{prettyTime(project.updated_at)}</span></button>) : <Empty description="还没有创作记录" />}</div>
     </Modal>

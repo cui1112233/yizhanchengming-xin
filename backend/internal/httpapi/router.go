@@ -27,6 +27,7 @@ import (
 	"qiantie/backend/internal/novelcreation"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
+	"qiantie/backend/internal/projectretention"
 	"qiantie/backend/internal/releasenotes"
 	"qiantie/backend/internal/runtimeaudit"
 	"qiantie/backend/internal/screenplay"
@@ -108,6 +109,7 @@ type RouterOptions struct {
 	AICutPersonalTemplates    *aicut.PersonalTemplateStore
 	Screenplay                screenplay.Store
 	NovelCreation             *novelcreation.Service
+	ProjectRetention          *projectretention.Service
 	NovelCreationRunStarter   NovelCreationRunStarter
 	AICutASR                  *aicut.ASRService
 	AICutExport               *AICutExportService
@@ -619,6 +621,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterAICutPersonalTemplateRoutes(root, auth, personalTemplates)
 	registerScreenplayWorkflow(root, auth, options, runtimeTextProviderResolver, runtimeCatalogStore)
 	RegisterNovelCreationRoutes(root, auth, options.NovelCreation, options.NovelCreationRunStarter)
+	RegisterProjectRetentionRoutes(root, auth, options.ProjectRetention)
 	RegisterAICutAssetRoutes(root, auth, options.AICut, options.AgentAssetObjects, options.Now)
 	RegisterAICutCreativeCanvasRoutes(root, auth, scopedTimelineStore, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
 	RegisterAICutTTSRoutes(root, auth, options.AICut, options.AgentAssetObjects, runtimeCatalogStore, options.Now)
