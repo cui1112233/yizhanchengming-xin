@@ -555,6 +555,21 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			log.Printf("ignore invalid QIANTIE_ARTIFACT_RESTORE_TIMEOUT=%q", raw)
 		}
 	}
+	var retentionRemote batchfactoryv11.RemoteObjectDeleter
+	retentionDays := func(owner string) int {
+		settings, err := userConfigStore.GetConfig(context.Background(), owner)
+		if err != nil {
+			return 7
+		}
+		switch value := settings["productionRetentionDays"].(type) {
+		case int:
+			return productionmedia.NormalizeRetentionDays(value)
+		case float64:
+			return productionmedia.NormalizeRetentionDays(int(value))
+		default:
+			return 7
+		}
+	}
 	productionMediaEnabled := strings.TrimSpace(cfg.ProductionMediaTOSEndpoint) != "" || strings.TrimSpace(cfg.ProductionMediaTOSBucket) != ""
 	if productionMediaEnabled {
 		if err := os.MkdirAll(artifactStore.Root(), 0o750); err != nil {
@@ -567,23 +582,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		if mediaErr != nil {
 			return nil, mediaErr
 		}
+		retentionRemote = remote
 		repository := productionmedia.NewMySQLRepository(db)
 		resolver := &productionmedia.Resolver{Repository: repository, Local: artifactStore, Remote: remote}
 		artifactStore.SetMissingRestorer(resolver)
-		retentionDays := func(owner string) int {
-			settings, err := userConfigStore.GetConfig(context.Background(), owner)
-			if err != nil {
-				return 7
-			}
-			switch value := settings["productionRetentionDays"].(type) {
-			case int:
-				return productionmedia.NormalizeRetentionDays(value)
-			case float64:
-				return productionmedia.NormalizeRetentionDays(int(value))
-			default:
-				return 7
-			}
-		}
+
 		scanner := productionmedia.Scanner{DB: db, Repository: repository, Local: artifactStore, Prefix: cfg.ProductionMediaTOSPrefix, RetentionDays: retentionDays}
 		migrator := productionmedia.Migrator{Repository: repository, Local: artifactStore, Remote: remote, MaxPerRun: 200}
 		cleanup := productionmedia.CleanupSupervisor{Purger: productionmedia.Purger{Repository: repository, Local: artifactStore, MaxPerRun: 200}, Usage: usage}
@@ -593,14 +596,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		// only makes the pressure path react before a busy production host fills;
 		// it can delete exclusively TOS-verified local copies.
 		cleanup.Start(time.Minute)
-		// 作品级保留：作品最后活动时间超过设置天数后先从列表隐藏，24 小时缓冲
-		// 期结束再删除 TOS 对象、本地缓存和数据库记录。每天 00:00 巡检一次，
-		// 并重算未删除作品的到期时间，因此修改天数可以追溯旧作品。
-		retention := batchfactoryv11.BookRetentionSupervisor{
-			Store: store.MySQLStore, Local: artifactStore, Remote: remote, RetentionDays: retentionDays,
-		}
-		retention.StartDaily(0, 0)
+
 	}
+	// Expiry must also run on local-only installations without TOS.
+	retention := batchfactoryv11.BookRetentionSupervisor{Store: store.MySQLStore, Local: artifactStore, Remote: retentionRemote, RetentionDays: retentionDays}
+	retention.StartDaily(0, 0)
 	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
 	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。
 	automationPresetStore, err := httpapi.NewMySQLAutomationPresetStore(db, cfg.AutomationPresetPath, time.Now)

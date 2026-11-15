@@ -88,24 +88,41 @@ func (s BookRetentionSupervisor) RunOnce(ctx context.Context) error {
 	return nil
 }
 
-// StartDaily 每天在指定本地时间执行一次巡检。清理和删除动作集中在凌晨，避免
-// 白天业务高峰期间批量删除文件影响正常使用。
+// StartDaily 启动立即补扫，每小时复查，并在指定时间执行日常巡检。
+// 真正删除仍受24小时缓冲期和每轮删除数量限制保护。
 func (s BookRetentionSupervisor) StartDaily(hour, minute int) {
-	go func() {
-		for {
-			now := time.Now()
-			next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-			if !next.After(now) {
-				next = next.AddDate(0, 0, 1)
-			}
-			log.Printf("book retention next sweep at %s", next.Format("2006-01-02 15:04:05"))
-			timer := time.NewTimer(time.Until(next))
-			<-timer.C
-			if err := s.RunOnce(context.Background()); err != nil {
-				log.Printf("book retention sweep failed: %v", err)
-			}
+	go runBookRetentionLoop(context.Background(), s.RunOnce, func() time.Duration {
+		now := time.Now()
+		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+		if !next.After(now) {
+			next = next.AddDate(0, 0, 1)
 		}
-	}()
+		delay := time.Until(next)
+		// Retry interrupted cleanup and apply changed settings within an hour.
+		if delay > time.Hour {
+			delay = time.Hour
+		}
+		log.Printf("book retention next sweep at %s", now.Add(delay).Format("2006-01-02 15:04:05"))
+		return delay
+	})
+}
+
+func runBookRetentionLoop(ctx context.Context, run func(context.Context) error, delay func() time.Duration) {
+	for ctx.Err() == nil {
+		if err := run(ctx); err != nil {
+			log.Printf("book retention sweep failed: %v", err)
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		timer := time.NewTimer(delay())
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
 }
 
 // ListBookRetentionOwners 返回仍有作品的账号，避免对空账号做无意义扫描。
@@ -252,6 +269,9 @@ func (s *MySQLStore) PurgeRetentionBook(ctx context.Context, book RetentionBook,
 	if err != nil {
 		return err
 	}
+	if remote == nil && len(tosKeys) > 0 {
+		return fmt.Errorf("TOS is not configured; retain book and cloud references for retry")
+	}
 	if len(refs) > 0 {
 		shared, err := s.visibleBookStorageRefs(ctx, book.Owner, book.ID)
 		if err != nil {
@@ -284,6 +304,9 @@ func (s *MySQLStore) purgeStorageRef(ctx context.Context, owner, ref string, loc
 	err := s.db.QueryRowContext(ctx, `SELECT object_key FROM batch_factory_v12_media_objects WHERE owner_username=? AND local_storage_ref=?`, owner, ref).Scan(&objectKey)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
+	}
+	if objectKey != "" && remote == nil {
+		return fmt.Errorf("TOS is not configured; retain local file and object ledger for retry")
 	}
 	if err == nil && objectKey != "" && remote != nil {
 		if err := remote.DeleteObject(ctx, objectKey); err != nil {
