@@ -6,12 +6,30 @@ test('分镜词按用途与名称描述搜索、按时间排序，不搜索或�
  const prompts=[{id:'2',purpose:'storyboard',name:'V7',updated_at:'2026-01-01'},{id:'3',purpose:'storyboard',name:'V9',description:'30秒',updated_at:'2026-01-01'},{id:'1',purpose:'script',name:'剧本',content:'30秒'},{id:'4',purpose:'storyboard',name:'新的',updated_at:'2026-02-01'}];
  assert.deepEqual(storyboardPromptRows(prompts,'').map(item=>item.id),['4','3','2']);assert.deepEqual(storyboardPromptRows(prompts,' 30秒 ').map(item=>item.id),['3']);
  assert.equal(storyboardPromptDate({updated_at:'not-a-real-date-value'}),'not-a-real-date-');
+ assert.deepEqual(storyboardPromptRows([{id:'x',purpose:'storyboard',name:'标题',description:'说明'}],'标题 说明'),[]);
 });
 
 test('收藏与最近仅使用实际目录ID，最近排除收藏并限制8条',()=>{
  const prompts=Array.from({length:12},(_,i)=>({id:String(i),name:String(i),purpose:'storyboard'}));
  const result=storyboardPromptSections(prompts,['0','missing'],['0','1','1','2','3','4','5','6','7','8','9']);
  assert.deepEqual(result.favorites.map(item=>item.id),['0']);assert.deepEqual(result.recent.map(item=>item.id),['1','2','3','4','5','6','7','8']);
+});
+
+test('原版搜索同时筛选收藏和最近，在搜索过滤后取最近8项',()=>{
+ const prompts=Array.from({length:12},(_,i)=>({id:String(i),name:i===0?'已收藏 Alpha':`最近 ${i}`,description:i>=9?'Alpha':'其他',purpose:'storyboard'}));
+ const result=storyboardPromptSections(prompts,['0','1'],['0','1','2','3','4','5','6','7','8','9','10','11'],' alpha ');
+ assert.deepEqual(result.favorites.map(item=>item.id),['0']);
+ assert.deepEqual(result.recent.map(item=>item.id),['9','10','11']);
+ assert.deepEqual(storyboardPromptSections(prompts,['0'],['9'],'没有匹配'),{favorites:[],recent:[]});
+});
+
+test('同时间按原编号倒序，不被CM内部ID名称影响；原日期去空白并规范空格',()=>{
+ const prompts=[{id:'luoshui_z_137',source_id:137,purpose:'storyboard',updated_at:'2026-11-09 11:39:38'},
+  {id:'luoshui_a_310',source_id:310,purpose:'storyboard',updated_at:'2026-11-09T11:39:38'},
+  {id:'luoshui_b_202',source_id:202,purpose:'storyboard',updated_at:'2026-11-09 11:39:38'}];
+ assert.deepEqual(storyboardPromptRows(prompts).map(item=>item.source_id),[310,202,137]);
+ assert.equal(storyboardPromptDate({updated_at:'  2026-11-09 11:39:38  '}),'11-09 11:39');
+ assert.equal(storyboardPromptDate({updated_at:'   '}),'');
 });
 
 test('规划密度严格四值，detail不是更多小节，布尔不冒充数字',()=>{
