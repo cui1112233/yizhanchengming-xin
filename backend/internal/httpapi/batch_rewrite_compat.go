@@ -202,13 +202,24 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				ids = append(ids, id)
 			}
 		}
-		result, err := store.DeleteDocuments(req.Context(), identity.Username, ids)
+		// 运行中的任务被直接删除后，worker 仍会继续处理并回写文档，造成
+		// 任务“复活”和正文引用残留。这里跳过这些 id，并明确返回给前端。
+		deletable := make([]string, 0, len(ids))
+		skipped := make([]string, 0)
+		for _, id := range ids {
+			if active := activeNovelFetchJobForBooks(req.Context(), store, identity.Username, []string{id}); active != nil {
+				skipped = append(skipped, id)
+				continue
+			}
+			deletable = append(deletable, id)
+		}
+		result, err := store.DeleteDocuments(req.Context(), identity.Username, deletable)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "删除任务失败"})
 			return
 		}
 		documents, _ := store.ListDocuments(req.Context(), identity.Username)
-		writeJSON(w, http.StatusOK, map[string]any{"requested": result.Requested, "deleted": result.Deleted, "failed": 0, "tasks": documents})
+		writeJSON(w, http.StatusOK, map[string]any{"requested": len(ids), "deleted": result.Deleted, "failed": 0, "skipped": skipped, "tasks": documents})
 	})))
 	workFormHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())

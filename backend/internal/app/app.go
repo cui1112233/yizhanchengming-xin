@@ -149,6 +149,26 @@ func selectedTextModelID(settings map[string]any) string {
 	return strings.TrimSpace(selected)
 }
 
+// resolveNovelFetchTextProvider 解析批量测书使用的文本模型。
+// selection 为空表示使用账号默认模型：先尝试保存的默认模型，失效时
+// 回退到目录里第一个启用的文本模型；显式选择不做回退，避免静默换模型。
+func resolveNovelFetchTextProvider(settings map[string]any, selection string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
+	selection = strings.TrimSpace(selection)
+	if selection != "" {
+		return configuredTextProvider(settings, selection)
+	}
+	provider, err := configuredTextProvider(settings, selectedTextModelID(settings))
+	if err != nil {
+		return nil, err
+	}
+	if provider != nil {
+		return provider, nil
+	}
+	// 保存的默认模型可能已被管理员下架或被历史配置写死；账号仍应能
+	// 使用目录里第一个可用文本模型，否则所有未指定模型的任务都会失败。
+	return configuredTextProvider(settings, "")
+}
+
 func firstConfiguredString(settings map[string]any, keys ...string) string {
 	for _, key := range keys {
 		if value := strings.TrimSpace(fmt.Sprint(settings[key])); value != "" && value != "<nil>" {
@@ -276,11 +296,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		if err != nil {
 			return nil, err
 		}
-		selectedModel := strings.TrimSpace(selection)
-		if selectedModel == "" {
-			selectedModel = selectedTextModelID(settings)
-		}
-		provider, providerErr := configuredTextProvider(settings, selectedModel)
+		provider, providerErr := resolveNovelFetchTextProvider(settings, selection)
 		if providerErr != nil {
 			return nil, providerErr
 		}
@@ -301,13 +317,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 					if catalog, ok := legacy["modelCatalog"]; ok {
 						settings["modelCatalog"] = catalog
 					}
-					selected := selectedTextModelID(settings)
-					if selected == "" {
-						if value, ok := legacy["textModelId"].(string); ok {
-							selected = strings.TrimSpace(value)
-						}
-					}
-					provider, providerErr = configuredTextProvider(settings, selected)
+					provider, providerErr = resolveNovelFetchTextProvider(settings, "")
 					if providerErr != nil {
 						return nil, providerErr
 					}

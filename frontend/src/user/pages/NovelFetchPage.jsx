@@ -1348,7 +1348,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     } catch (error) { message.error(error.message || '批量重试失败'); } finally { setTaskActionBusy(''); }
   }
   async function handleDeleteTasks() {
-    Modal.confirm({ title: '删除选中任务', content: '删除后无法恢复，确认继续？', onOk: async () => { await deleteWorkshopTasks(selectedTaskKeys); setSelectedTaskKeys([]); await loadTasks(); } });
+    Modal.confirm({ title: '删除选中任务', content: '删除后无法恢复；运行中的任务会自动跳过，确认继续？', onOk: async () => { const result = await deleteWorkshopTasks(selectedTaskKeys); setSelectedTaskKeys([]); await loadTasks(); if (result?.skipped?.length) message.warning(`${result.skipped.length} 个任务正在运行，已跳过删除`); } });
   }
   async function handleRulePreview() {
     if (!ruleText.trim()) return message.warning('请填写待处理文本');
@@ -1724,7 +1724,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   async function deleteTasksByFilter(filter, emptyMessage, scopeIds = null) {
     const ids = tasks.filter(task => (scopeIds === null || scopeIds.includes(task.bookId || task.book_id)) && filter(task)).map(task => task.bookId || task.book_id).filter(Boolean);
     if (!ids.length) return message.info(emptyMessage);
-    return Modal.confirm({ title: scopeIds === null ? '确认删除全部任务范围内的任务' : '确认删除当前批次任务', content: `本次将删除 ${ids.length} 本任务，删除后无法恢复，确认继续？`, onOk: async () => { await deleteWorkshopTasks(ids); setSelectedTaskKeys(current => current.filter(id => !ids.includes(id))); await Promise.all([loadTasks(), loadCurrentBatch()]); message.success('任务已删除'); } });
+    return Modal.confirm({ title: scopeIds === null ? '确认删除全部任务范围内的任务' : '确认删除当前批次任务', content: `本次将删除 ${ids.length} 本任务，删除后无法恢复；运行中的任务会自动跳过，确认继续？`, onOk: async () => { const result = await deleteWorkshopTasks(ids); setSelectedTaskKeys(current => current.filter(id => !ids.includes(id))); await Promise.all([loadTasks(), loadCurrentBatch()]); if (result?.skipped?.length) message.warning(`${result.skipped.length} 个任务正在运行，已跳过删除`); else message.success('任务已删除'); } });
   }
   async function transferToBatchFactory(scope = 'selected') {
     const transferIds = scope === 'batch' ? currentBatchIds : selectedTaskKeys;

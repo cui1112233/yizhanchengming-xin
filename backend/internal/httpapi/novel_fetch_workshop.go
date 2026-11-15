@@ -816,6 +816,7 @@ func activeNovelFetchJobForBooks(ctx context.Context, store novelfetchworkshop.S
 		}
 		return map[string]any{
 			"id":          firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"]),
+			"bookId":      bookID,
 			"status":      status,
 			"queue_state": status,
 		}

@@ -542,6 +542,45 @@ func TestBatchRewriteIssuesReadsGoDocumentLogs(t *testing.T) {
 	}
 }
 
+func TestBatchRewriteDeleteSkipsRunningTasks(t *testing.T) {
+	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	for bookID, status := range map[string]string{"book-running": "running", "book-done": "done"} {
+		if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+			BookID: bookID,
+			Meta:   map[string]any{"bookName": bookID, "status": status},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/tasks/batch-delete", strings.NewReader(`{"ids":["book-running","book-done"]}`))
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("delete status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload struct {
+		Deleted int      `json:"deleted"`
+		Skipped []string `json:"skipped"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Deleted != 1 || !reflect.DeepEqual(payload.Skipped, []string{"book-running"}) {
+		t.Fatalf("payload=%#v body=%s", payload, res.Body.String())
+	}
+	if _, err := store.GetDocument(context.Background(), "tester", "book-running"); err != nil {
+		t.Fatalf("running task must be kept: %v", err)
+	}
+	if _, err := store.GetDocument(context.Background(), "tester", "book-done"); err == nil {
+		t.Fatal("finished task must be deleted")
+	}
+}
+
 func TestIsTargetLoginPage(t *testing.T) {
 	loginPage := `<!DOCTYPE html><html><head><title>管理员登录</title></head><body>
 <form method="post" action="login.php"><input name="username"><input type="password" name="password"></form></body></html>`

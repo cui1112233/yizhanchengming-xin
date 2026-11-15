@@ -51,3 +51,52 @@ func TestConfiguredTextProviderUsesFirstEnabledCatalogModelWhenNoSelection(t *te
 		t.Fatalf("unexpected provider: %#v", provider)
 	}
 }
+
+func TestResolveNovelFetchTextProviderFallsBackWhenSavedDefaultIsUnavailable(t *testing.T) {
+	settings := map[string]any{
+		// 历史配置里保存的默认模型已经下架。
+		"text_model_id": "[anti-2]gemini-3.8-flash",
+		"modelCatalog": []any{
+			map[string]any{"id": "text-primary", "kind": "text", "enabled": true, "baseUrl": "https://text.example/v1", "modelId": "text-model", "credential": "secret"},
+		},
+	}
+	provider, err := resolveNovelFetchTextProvider(settings, "")
+	if err != nil {
+		t.Fatalf("resolveNovelFetchTextProvider returned error: %v", err)
+	}
+	if provider == nil || provider.Model != "text-model" {
+		t.Fatalf("expected fallback to first enabled model, got %#v", provider)
+	}
+}
+
+func TestResolveNovelFetchTextProviderKeepsExplicitSelectionStrict(t *testing.T) {
+	settings := map[string]any{
+		"modelCatalog": []any{
+			map[string]any{"id": "text-primary", "kind": "text", "enabled": true, "baseUrl": "https://text.example/v1", "modelId": "text-model", "credential": "secret"},
+		},
+	}
+	provider, err := resolveNovelFetchTextProvider(settings, "removed-model")
+	if err != nil {
+		t.Fatalf("resolveNovelFetchTextProvider returned error: %v", err)
+	}
+	if provider != nil {
+		t.Fatalf("explicit unavailable selection must not fall back, got %#v", provider)
+	}
+}
+
+func TestResolveNovelFetchTextProviderPrefersSavedDefault(t *testing.T) {
+	settings := map[string]any{
+		"text_model_id": "text-preferred",
+		"modelCatalog": []any{
+			map[string]any{"id": "text-first", "kind": "text", "enabled": true, "baseUrl": "https://first.example/v1", "modelId": "first-model", "credential": "x"},
+			map[string]any{"id": "text-preferred", "kind": "text", "enabled": true, "baseUrl": "https://preferred.example/v1", "modelId": "preferred-model", "credential": "y"},
+		},
+	}
+	provider, err := resolveNovelFetchTextProvider(settings, "")
+	if err != nil {
+		t.Fatalf("resolveNovelFetchTextProvider returned error: %v", err)
+	}
+	if provider == nil || provider.Model != "preferred-model" {
+		t.Fatalf("expected saved default model, got %#v", provider)
+	}
+}
