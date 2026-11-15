@@ -278,6 +278,24 @@ func (s *ScreenplayAssetLibrary) DeleteEntry(ctx context.Context, actor, id stri
 // duplicate-ID rules remain unrecovered; they are not original parity claims.
 func registerScreenplayLibraryManager(register func(string, func(http.ResponseWriter, *http.Request, string)), service *ScreenplayAssetLibrary) {
 	base := "/api/comic-screenplays/asset-library"
+	register("PUT "+base+"/{entryID}/image", func(w http.ResponseWriter, r *http.Request, actor string) {
+		expected, err := strconv.ParseInt(r.URL.Query().Get("expectedRevision"), 10, 64)
+		if err != nil || expected < 1 {
+			writeScreenplayError(w, screenplay.ErrInvalidArgument)
+			return
+		}
+		in, err := parseScreenplayLibraryUpload(w, r)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		entry, err := service.ReplaceImage(r.Context(), actor, r.PathValue("entryID"), expected, in)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"entry": screenplayLibraryPublic(entry)})
+	})
 	register("POST "+base, func(w http.ResponseWriter, r *http.Request, actor string) {
 		in, err := parseScreenplayLibraryUpload(w, r)
 		if err != nil {

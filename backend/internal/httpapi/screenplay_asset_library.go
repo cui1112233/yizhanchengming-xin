@@ -185,7 +185,7 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 // Explicit DTO keeps private object keys and source snapshots out of responses.
 func screenplayLibraryPublic(entry screenplay.AssetLibraryEntry) map[string]any {
 	image := entry.Image
-	image.URL = "/api/comic-screenplays/asset-library/" + url.PathEscape(entry.ID) + "/image"
+	image.URL = fmt.Sprintf("/api/comic-screenplays/asset-library/%s/image?revision=%d", url.PathEscape(entry.ID), entry.Revision)
 	return map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey]}
 }
 

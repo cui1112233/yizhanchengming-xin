@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listComicAssetLibrary, saveComicAssetLibrarySource, stageComicAssetLibraryEntry, uploadComicAssetLibraryFile, updateComicAssetLibraryEntry, deleteComicAssetLibraryEntry } from './comicScreenplayAssetLibrary.js';
+import { listComicAssetLibrary, saveComicAssetLibrarySource, stageComicAssetLibraryEntry, uploadComicAssetLibraryFile, updateComicAssetLibraryEntry, deleteComicAssetLibraryEntry, replaceComicAssetLibraryImage } from './comicScreenplayAssetLibrary.js';
 test('普通库读取、保存、暂存保留版本和请求编号，库ID不当作项目媒体ID', async () => {
   const calls=[], request=async(path,options)=>{calls.push({path,options});return path.includes('/stage')?{item:{id:'media-copy'}}:options?.method?{entry:{id:'library'}}:{entries:[{id:'library'}]};};
   assert.equal((await listComicAssetLibrary({type:'scene'},request))[0].id,'library');
@@ -15,6 +15,15 @@ test('普通库读取、保存、暂存保留版本和请求编号，库ID不当
   assert.deepEqual(JSON.parse(calls[2].options.body),stage);
   assert.throws(()=>stageComicAssetLibraryEntry('p','../bad',stage,{},request),/无效/);
   assert.throws(()=>listComicAssetLibrary({type:'other'},request),/无效/);
+});
+
+test('角色换图只上传编辑草稿和新图，原ID/版本/稳定请求编号不能丢',async()=>{
+ const calls=[],request=async(path,options)=>{calls.push({path,options});return {entry:{id:'same-entry',revision:4}};};
+ const file=new File(['replacement'],'new.png',{type:'image/png'}),signal=new AbortController().signal;
+ await replaceComicAssetLibraryImage('same-entry',{type:'character',name:'保留名称',description:'新描述',category:'古言',prompt:'保留提示词',voice:'保留声音',file,expectedRevision:3,requestKey:'same-replacement-key'},{signal},request);
+ assert.equal(calls[0].path,'/api/comic-screenplays/asset-library/same-entry/image?expectedRevision=3');assert.equal(calls[0].options.method,'PUT');assert.equal(calls[0].options.signal,signal);
+ const form=calls[0].options.body;assert.equal(form.get('requestKey'),'same-replacement-key');assert.equal(form.get('file').name,'new.png');assert.equal(form.get('prompt'),'保留提示词');
+ assert.throws(()=>replaceComicAssetLibraryImage('same-entry',{file,expectedRevision:0}),/版本/);assert.equal(calls.length,1);
 });
 
 test('普通库管理上传仅单真实file，编辑完整版本元数据，删除携带版本',async()=>{
