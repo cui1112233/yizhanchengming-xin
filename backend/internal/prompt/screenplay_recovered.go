@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // CreativePromptContract records the output contract actually stated by each
@@ -32,7 +33,7 @@ type CreativePromptContract struct {
 	FixedDurationSec  float64  `json:"fixed_duration_sec,omitempty"`
 }
 
-//go:embed screenplay_recovered_catalog.json recovered/prompt-*.txt
+//go:embed screenplay_recovered_catalog.json screenplay_recovered_dates.json recovered/prompt-*.txt
 var recoveredCreativeFiles embed.FS
 
 type recoveredCreativeRecord struct {
@@ -54,6 +55,47 @@ func recoveredCreativeEntries() ([]recoveredCreativeRecord, error) {
 		if err = json.Unmarshal(data, &recoveredCreativeRecords); err != nil {
 			recoveredCreativeErr = err
 			return
+		}
+		dateData, e := recoveredCreativeFiles.ReadFile("screenplay_recovered_dates.json")
+		if e != nil {
+			recoveredCreativeErr = e
+			return
+		}
+		var dates struct {
+			Records []struct {
+				SourceID  int    `json:"source_id"`
+				CreatedAt string `json:"created_at"`
+				UpdatedAt string `json:"updated_at"`
+			} `json:"records"`
+		}
+		if e = json.Unmarshal(dateData, &dates); e != nil {
+			recoveredCreativeErr = e
+			return
+		}
+		byID := map[int][2]string{}
+		for _, row := range dates.Records {
+			_, createdErr := time.Parse("2006-01-02 15:04:05", row.CreatedAt)
+			_, updatedErr := time.Parse("2006-01-02 15:04:05", row.UpdatedAt)
+			if _, duplicate := byID[row.SourceID]; duplicate || createdErr != nil || updatedErr != nil {
+				recoveredCreativeErr = fmt.Errorf("恢复提示词%d日期缺失或重复", row.SourceID)
+				return
+			}
+			byID[row.SourceID] = [2]string{row.CreatedAt, row.UpdatedAt}
+		}
+		if len(byID) != 63 {
+			recoveredCreativeErr = fmt.Errorf("恢复提示词日期%d条，应为63", len(byID))
+			return
+		}
+		for i := range recoveredCreativeRecords {
+			row := &recoveredCreativeRecords[i]
+			date, ok := byID[row.SourceID]
+			if !ok {
+				recoveredCreativeErr = fmt.Errorf("恢复提示词%d缺少原日期", row.SourceID)
+				return
+			}
+			row.CreatedAt = date[0]
+			row.UpdatedAt = date[1]
+			row.CatalogGroup = "original"
 		}
 		seen := map[int]bool{}
 		for _, r := range recoveredCreativeRecords {
@@ -130,7 +172,7 @@ func resolveRecoveredCreativePrompt(id, purpose string) (CreativePromptSnapshot,
 		if err != nil {
 			return CreativePromptSnapshot{}, true, err
 		}
-		return CreativePromptSnapshot{ID: r.ID, Name: r.Name, Type: r.Type, Version: r.Version, Digest: r.Digest, Body: string(body), CreativePromptContract: cloneCreativeContract(r.CreativePromptContract)}, true, nil
+		return CreativePromptSnapshot{ID: r.ID, Name: r.Name, Type: r.Type, Version: r.Version, Digest: r.Digest, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, CatalogGroup: r.CatalogGroup, Body: string(body), CreativePromptContract: cloneCreativeContract(r.CreativePromptContract)}, true, nil
 	}
 	return CreativePromptSnapshot{}, false, nil
 }

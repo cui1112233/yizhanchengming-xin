@@ -16,20 +16,26 @@ const (
 
 type CreativePromptMetadata struct {
 	CreativePromptContract
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Version string `json:"version"`
-	Digest  string `json:"digest"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Version      string `json:"version"`
+	Digest       string `json:"digest"`
+	CreatedAt    string `json:"created_at,omitempty"`
+	UpdatedAt    string `json:"updated_at,omitempty"`
+	CatalogGroup string `json:"catalog_group,omitempty"`
 }
 type CreativePromptSnapshot struct {
 	CreativePromptContract
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Version string `json:"version"`
-	Body    string `json:"-"`
-	Digest  string `json:"digest"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Version      string `json:"version"`
+	Body         string `json:"-"`
+	Digest       string `json:"digest"`
+	CreatedAt    string `json:"created_at,omitempty"`
+	UpdatedAt    string `json:"updated_at,omitempty"`
+	CatalogGroup string `json:"catalog_group,omitempty"`
 }
 
 var creativePromptTypes = map[string]string{CreativeScript144: "script", CreativeStoryboard307: "storyboard", CreativeCharacter213: "character-design", CreativeScene289: "scene-design", "a1_novel_to_screenplay": "script", "a2_novel_to_screenplay": "script", "b_director_screenplay": "script", "storyboard_xiaoluo_v7_15s": "storyboard", "storyboard_xiaoyunque_v3": "storyboard"}
@@ -46,7 +52,7 @@ func CreativePromptOptions() []CreativePromptMetadata {
 	for _, id := range []string{"a1_novel_to_screenplay", "b_director_screenplay", "storyboard_xiaoluo_v7_15s", "storyboard_xiaoyunque_v3"} {
 		p, e := ResolveCreativePrompt(id, creativePromptTypes[id])
 		if e == nil {
-			out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest, CreativePromptContract: p.CreativePromptContract})
+			out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest, CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt, CatalogGroup: p.CatalogGroup, CreativePromptContract: p.CreativePromptContract})
 		}
 	}
 	return out
@@ -99,5 +105,5 @@ func ResolveCreativePrompt(id, purpose string) (CreativePromptSnapshot, error) {
 		contract.ResponseMode = "text"
 	}
 	contract.ParserVersion = contract.OutputProtocol
-	return CreativePromptSnapshot{ID: id, Name: strings.NewReplacer("小洛", "小Y", "洛水", "CM").Replace(entry.Name), Type: kind, Version: digest[:16], Body: body, Digest: digest, CreativePromptContract: contract}, nil
+	return CreativePromptSnapshot{ID: id, Name: strings.NewReplacer("小洛", "小Y", "洛水", "CM").Replace(entry.Name), Type: kind, Version: digest[:16], Body: body, Digest: digest, CatalogGroup: "compatibility", CreativePromptContract: contract}, nil
 }
