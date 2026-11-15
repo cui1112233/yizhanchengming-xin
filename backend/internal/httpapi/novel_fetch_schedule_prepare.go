@@ -146,7 +146,7 @@ func scheduleBookSkipReason(ctx context.Context, store novelfetchworkshop.Store,
 	if status == "running" || status == "queued" || status == "processing" {
 		return "已有任务正在执行，不重复启动"
 	}
-	if status == "stopped" || status == "cancelled" || meta["manualOnly"] == true || meta["manual_only"] == true || meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) {
+	if novelFetchStopped(status) || meta["manualOnly"] == true || meta["manual_only"] == true || meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) {
 		return "任务已停止或需要人工处理，请先明确重试"
 	}
 	if meta["scheduledHold"] == true && firstText(meta["scheduleId"], meta["schedule_id"]) != firstText(item["id"]) {
@@ -272,6 +272,11 @@ func filterDueScheduleBooks(ctx context.Context, store novelfetchworkshop.Store,
 			return nil, false, err
 		}
 		reason := scheduleBookSkipReason(ctx, store, owner, doc, item)
+		// A task that became busy after preparation still belongs to this
+		// schedule. Queue deduplication will defer this book independently.
+		if reason == "已有任务正在执行，不重复启动" && firstText(doc.Meta["scheduleId"], doc.Meta["schedule_id"]) == firstText(item["id"]) {
+			reason = ""
+		}
 		if reason == "" && firstText(doc.Meta["scheduleId"], doc.Meta["schedule_id"]) != firstText(item["id"]) {
 			reason = "书籍已由其他任务接管，本定时任务不再派发"
 		}

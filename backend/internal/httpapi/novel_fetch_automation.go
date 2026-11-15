@@ -493,6 +493,7 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		SelectedVersions: novelFetchAutomationVersions(settings), TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定"),
 	}
 	job.ScheduleID = selectedJob.ScheduleID
+	job.AutoSubmit = selectedJob.AutoSubmit
 	job.SelectedVersions = selectedJob.SelectedVersions
 	job.RewriteMethods = selectedJob.RewriteMethods
 	job.TextModelID = selectedJob.TextModelID

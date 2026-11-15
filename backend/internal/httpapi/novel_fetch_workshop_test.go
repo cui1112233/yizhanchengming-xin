@@ -881,6 +881,7 @@ func TestNovelFetchWorkshopBatchRetryUsesGoStore(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
 		BookID:        "already-done",
+		Versions:      map[string]any{"ai1": "已有 AI1 正文"},
 		Original:      "已有正文",
 		ProcessedText: "已有正文",
 		Meta:          map[string]any{"originalStatus": "done", "aiStatus": "done"},
@@ -907,7 +908,8 @@ func TestNovelFetchWorkshopBatchRetryReturnsAffectedTaskIDs(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
 		BookID: "already-done", Original: "已有正文", ProcessedText: "已有正文",
-		Meta: map[string]any{"originalStatus": "done", "aiStatus": "done"},
+		Versions: map[string]any{"ai1": "已有 AI1 正文"},
+		Meta:     map[string]any{"originalStatus": "done", "aiStatus": "done"},
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -31,6 +31,12 @@ func resetNovelFetchAutomationRetryState(document *novelfetchworkshop.Document) 
 		return false
 	}
 	changed := false
+	if novelFetchStopped(firstText(document.Meta["status"], document.Meta["queueState"])) {
+		document.Meta["status"], document.Meta["queueState"] = "input_ready", "input_ready"
+		delete(document.Meta, "currentProcessJobId")
+		delete(document.Meta, "current_process_job_id")
+		changed = true
+	}
 	for _, key := range []string{"scheduledHold", "manualOnly", "manual_only", "automationEnqueueAttempts", "automationNextRetryAt", "manualOriginalFetchRequired", "originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError", "manualAiRetryRequired", "manual_ai_retry_required", "manual_ai_retry_stage", "manual_ai_retry_error"} {
 		if _, ok := document.Meta[key]; ok {
 			delete(document.Meta, key)
@@ -69,12 +75,13 @@ func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store,
 			result.Jobs = append(result.Jobs, active)
 			continue
 		}
+		job := novelFetchRecoveryJob(document, settings, owner, autoSubmit)
 		originalReady := strings.EqualFold(firstText(document.Meta["originalStatus"], document.Meta["original_status"]), "done")
 		aiStatus := strings.ToLower(firstText(document.Meta["aiStatus"], document.Meta["ai_status"]))
 		status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"]))
 		aiDone := aiStatus == "done" || aiStatus == "ai_done" || aiStatus == "completed"
-		uploadNeeded := autoSubmit && firstText(document.Meta["siteSubmitStatus"], document.Meta["site_submit_status"]) != "submitted"
-		if originalReady && aiDone && status != "failed" && !uploadNeeded {
+		uploadNeeded := job.AutoSubmit && !novelFetchVersionsSubmitted(document, job.SelectedVersions)
+		if originalReady && aiDone && status != "failed" && !uploadNeeded && novelFetchVersionsGenerated(ctx, store, owner, document, job.SelectedVersions) {
 			result.Skipped++
 			continue
 		}
@@ -95,7 +102,6 @@ func enqueueWorkshopRetries(ctx context.Context, store novelfetchworkshop.Store,
 				continue
 			}
 		}
-		job := novelFetchRecoveryJob(document, settings, owner, autoSubmit)
 		job.ID = fmt.Sprintf("retry_%d", time.Now().UnixNano())
 		job.BookIDs = []string{bookID}
 		if job.BatchID == "" {

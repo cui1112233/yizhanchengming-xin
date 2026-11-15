@@ -26,6 +26,9 @@ func TestDeferredScheduleFollowsRetriedBooksThroughConfirmedUpload(t *testing.T)
 		{"completed", "submitted", "completed"},
 	} {
 		doc.Meta["status"], doc.Meta["siteSubmitStatus"] = step.task, step.submit
+		if step.submit == "submitted" {
+			doc.Meta["siteSubmitDoneVersions"] = []string{"original"}
+		}
 		if err := store.PutDocument(ctx, "alice", doc); err != nil {
 			t.Fatal(err)
 		}

@@ -569,7 +569,7 @@ func (worker *workshopProcessWorker) bookCancelled(ctx context.Context, owner, b
 	if err != nil {
 		return false
 	}
-	return strings.EqualFold(firstText(document.Meta["status"], document.Meta["queueState"]), "stopped")
+	return novelFetchStopped(firstText(document.Meta["status"], document.Meta["queueState"]))
 }
 
 func (worker *workshopProcessWorker) execute(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
@@ -781,11 +781,11 @@ func markNovelFetchTaskQueued(ctx context.Context, store novelfetchworkshop.Stor
 		document.Meta = map[string]any{}
 	}
 	status := strings.ToLower(strings.TrimSpace(firstText(document.Meta["status"], document.Meta["queueState"])))
-	if status == "running" || status == "processing" {
+	if status == "running" || status == "processing" || novelFetchStopped(status) {
 		return nil
 	}
 	currentJobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
-	if currentJobID != "" && currentJobID != jobID {
+	if currentJobID != "" && currentJobID != jobID && status == "queued" {
 		return nil
 	}
 	document.Meta["status"] = "queued"
@@ -900,6 +900,10 @@ func updateNovelFetchScheduleRuntimeStatus(ctx context.Context, store novelfetch
 		if firstText(item["status"]) == "cancelled" {
 			return nil
 		}
+		if item["partial_dispatch"] == true {
+			// Child results do not settle a parent that still owns other books.
+			return nil
+		}
 		item["status"] = status
 		item["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 		if strings.TrimSpace(message) == "" {
@@ -985,6 +989,14 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			continue
 		}
 		status := strings.ToLower(strings.TrimSpace(firstText(item["status"])))
+		if len(scheduleStringSlice(item["pending_book_ids"])) > 0 && !novelFetchStopped(status) {
+			if enabled, explicit := mapOrEmpty(settings[novelFetchAutomationConfigKey])["enabled"].(bool); !explicit || enabled {
+				if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, now); err != nil {
+					return err
+				}
+			}
+			continue
+		}
 		if handled, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
 			return err
 		} else if handled {
@@ -1156,11 +1168,8 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		if dispatchErr == nil {
 			dispatchErr = novelFetchSnapshotBeforeQueue(ctx, store, job)
 		}
-		if dispatchErr == nil {
-			if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
-				dispatchErr = cancellationQueue.ClearCancelledBooks(ctx, owner, bookIDs)
-			}
-		}
+		// Automatic dispatch never revokes a manual stop. Only an explicit
+		// user retry may clear cancellation flags.
 		startedAt := now.UTC().Format(time.RFC3339Nano)
 		if dispatchErr == nil {
 			dispatchErr = store.PutRun(ctx, owner, novelfetchworkshop.RunRecord{RunID: jobID, BookID: batchID, Stage: "novel_fetch_process", Status: "queued", TextModelID: job.TextModelID, ModelID: "novel-fetch-workshop", ModelDisplayName: "小说获取完整流程", StartedAt: startedAt})
@@ -1173,10 +1182,20 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 				queued, existingID, enqueueErr := uniqueQueue.EnqueueUniqueBooks(ctx, job, 7*24*time.Hour)
 				dispatchErr = enqueueErr
 				if dispatchErr == nil && !queued && existingID != "" && existingID != job.ID {
-					item["status"] = "skipped_existing"
+					item["status"] = "waiting_retry"
+					item["pending_book_ids"] = bookIDs
+					item["partial_dispatch"] = true
+					item["retry_tracking"] = true
 					item["existing_job_id"] = existingID
-					item["error"] = "书目已由其他有效任务处理"
+					item["job_id"], item["batch_id"] = jobID, batchID
 					_ = updateWorkshopRun(store, job, "duplicate_skipped", "书目已由其他有效任务处理", startedAt, true)
+					if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
+						return err
+					}
+					if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, now); err != nil {
+						return err
+					}
+					continue
 				}
 			}
 		}

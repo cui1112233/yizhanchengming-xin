@@ -33,7 +33,7 @@ func saveNovelFetchScheduleItem(ctx context.Context, store novelfetchworkshop.St
 					return nil
 				}
 			}
-			for _, key := range []string{"status", "error", "updatedAt", "dispatch_id", "job_id", "batch_id", "book_ids", "dispatch_started_at", "skipped_existing_book_ids", "existing_job_id", "retry_tracking", "next_retry_at", "tasks_prepared", "created_ids", "requested_book_ids", "skipped_books", "parsed_count", "empty_id_count", "duplicate_count", "selected_versions"} {
+			for _, key := range []string{"status", "error", "updatedAt", "dispatch_id", "job_id", "batch_id", "book_ids", "pending_book_ids", "partial_dispatch", "dispatch_started_at", "skipped_existing_book_ids", "existing_job_id", "retry_tracking", "next_retry_at", "tasks_prepared", "created_ids", "requested_book_ids", "skipped_books", "parsed_count", "empty_id_count", "duplicate_count", "selected_versions"} {
 				if value, ok := item[key]; ok {
 					row[key] = value
 				} else if key == "error" {

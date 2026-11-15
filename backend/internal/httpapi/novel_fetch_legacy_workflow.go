@@ -228,8 +228,11 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		item["id"] = "schedule-" + time.Now().UTC().Format("20060102150405.000000000")
 		item["status"] = "preparing"
 		item["created_at"] = time.Now().UTC().Format(time.RFC3339Nano)
-		// 定时处理的既定行为是处理完成后自动上传；普通立即处理不受影响。
-		item["auto_submit"] = true
+		// New schedules default to submission, but an explicit generate-only
+		// choice must survive persistence and later dispatch.
+		if _, explicit := item["auto_submit"].(bool); !explicit {
+			item["auto_submit"] = true
+		}
 		item["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 		schedules = append(schedules, item)
 		cfg["novel_fetch_schedules"] = schedules
@@ -636,6 +639,15 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		}
 		d.Meta[key] = workshopAIRequestedCount(d, cfg, in.Count)
 		d.Meta["ai_count"] = d.Meta[key]
+		targets := make([]string, 0, intValue(d.Meta[key]))
+		selected := scheduleStringSlice(firstConfiguredValue(d.Meta["nextSelectedVersions"], mapOrEmpty(d.Meta["processSnapshot"])["selected_versions"]))
+		if seenString(selected, "original") {
+			targets = append(targets, "original")
+		}
+		for i := 1; i <= intValue(d.Meta[key]); i++ {
+			targets = append(targets, fmt.Sprintf("ai%d", i))
+		}
+		d.Meta["nextSelectedVersions"] = targets
 		if err := store.PutDocument(req.Context(), identity.Username, d); err != nil {
 			failed++
 			continue

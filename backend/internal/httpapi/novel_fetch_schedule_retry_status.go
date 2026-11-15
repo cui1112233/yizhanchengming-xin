@@ -44,14 +44,19 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 			status = "completed"
 		}
 		submitted := strings.ToLower(firstText(meta["siteSubmitStatus"], meta["site_submit_status"]))
-		if status == "completed" && item["auto_submit"] != false {
+		if novelFetchStopped(status) {
+			status = "stopped"
+		}
+		if status == "completed" && item["auto_submit"] != false && !novelFetchVersionsSubmitted(document, scheduleStringSlice(item["selected_versions"])) {
 			switch submitted {
-			case "completed", "done", "success", "succeeded", "submitted", "uploaded":
-			case "waiting_login", "waiting_configuration":
+			case "waiting_login", "waiting_configuration", "pending_verification", "pending_confirmation":
 				status = submitted
 			default:
 				status = "upload_pending"
 			}
+		}
+		if status == "completed" && item["auto_submit"] == false && !novelFetchVersionsGenerated(ctx, store, owner, document, scheduleStringSlice(item["selected_versions"])) {
+			status = "waiting_retry"
 		}
 		switch status {
 		case "processing", "ai_processing":
@@ -76,7 +81,7 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		}
 	}
 	status := "waiting_retry"
-	for _, candidate := range []string{"running", "queued", "waiting_retry", "waiting_login", "waiting_configuration", "waiting_classification", "waiting_sensitive_ai", "upload_pending", "failed", "stopped", "completed"} {
+	for _, candidate := range []string{"running", "queued", "waiting_retry", "waiting_login", "waiting_configuration", "waiting_classification", "waiting_sensitive_ai", "pending_verification", "pending_confirmation", "upload_pending", "failed", "stopped", "completed"} {
 		if states[candidate] > 0 {
 			status = candidate
 			break
