@@ -14,6 +14,7 @@ import ComicScreenplayProductionPanel from './ComicScreenplayProductionPanel.jsx
 import ComicScreenplayMediaPanel from './ComicScreenplayMediaPanel.jsx';
 import ComicScreenplayStoryStage from './ComicScreenplayStoryStage.jsx';
 import ComicScreenplayAssetStage, { comicAssetAnalysisSource } from './ComicScreenplayAssetStage.jsx';
+import ComicScreenplayAssetLibraryManager from './ComicScreenplayAssetLibraryManager.jsx';
 import ComicScreenplayStoryboardStage from './ComicScreenplayStoryboardStage.jsx';
 import ComicScreenplayModelConfig from './ComicScreenplayModelConfig.jsx';
 import { prepareStoryboardGenerationRequest, completeStoryboardGenerationRequest, reconcileStoryboardGenerationRequest, markStoryboardGenerationNotStarted } from './comic-screenplay-storyboard-attempts.js';
@@ -93,6 +94,7 @@ export default function ComicScreenplayPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [assetLibraryOpen, setAssetLibraryOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [workspace, setWorkspace] = useState(null);
@@ -572,6 +574,8 @@ export default function ComicScreenplayPage() {
   const documentEpisodes = useMemo(() => splitDocumentEpisodes(workspace?.document?.content), [workspace?.document?.content]);
   const editorEpisodes=useMemo(()=>documentEpisodes.length?documentEpisodes:[...new Set((workspace?.storyboards||[]).map(board=>board.episode_no))].sort((a,b)=>a-b).map(no=>({no})),[documentEpisodes,workspace?.storyboards]);
 
+  if (assetLibraryOpen) return <div className="comic-screenplay-page"><ComicScreenplayAssetLibraryManager onBack={() => setAssetLibraryOpen(false)} /></div>;
+
   if (selectedId) {
     const project = workspace?.project || projects.find(item => item.id === selectedId) || {};
     const assets = workspace?.assets || [];
@@ -639,7 +643,7 @@ export default function ComicScreenplayPage() {
       if(current())setActiveTab(next.next);
     }
     return <div className={`comic-screenplay-page comic-screenplay-workbench comic-three-stage-workbench layout-${display.editor_version||'studio'} ${display.sidebar_collapsed?'sidebar-collapsed':''} ${display.show_descriptions===false?'hide-descriptions':''}`} style={{'--comic-body-size':`${display.font_size||14}px`}}>
-      <header className="comic-original-titlebar"><button type="button" aria-label="返回项目库" title="返回项目库" onClick={() => {abortRef.current?.abort();projectNavigation.current+=1;projectRequest.current+=1;creativeTicket.current+=1;selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);void refreshProjects();}}><OriginalIcon name="ArrowBackOutline" size={18}/></button><h1>AI 推理分析</h1><span>{project.title || '新项目'}</span><div className="comic-title-tools">{working && abortRef.current ? <Button size="small" danger onClick={()=>abortRef.current?.abort()}>取消任务</Button>:null}<Dropdown menu={{items:[{key:'source-tools',label:'原文与剧本工具'},{key:'chapter-tools',label:'章节规划'},{key:'history-tools',label:'版本历史'},{type:'divider'},{key:'refresh',label:'刷新作品'},{key:'display',label:'显示设置'},...(access?.owner?[{key:'team',label:'团队权限'}]:[])],onClick:({key})=>{if(key==='source-tools')openTool('source');if(key==='chapter-tools')openTool('chapters');if(key==='history-tools')openTool('history');if(key==='refresh')void openProject(selectedId);if(key==='display')setDisplayOpen(true);if(key==='team')setTeamOpen(true);}}}><Button size="small">更多</Button></Dropdown></div></header>
+      <header className="comic-original-titlebar"><button type="button" aria-label="返回项目库" title="返回项目库" onClick={() => {abortRef.current?.abort();projectNavigation.current+=1;projectRequest.current+=1;creativeTicket.current+=1;selectedProject.current='';setSelectedId('');setWorkspace(null);setAccess(null);void refreshProjects();}}><OriginalIcon name="ArrowBackOutline" size={18}/></button><h1>AI 推理分析</h1><span>{project.title || '新项目'}</span><div className="comic-title-tools">{working && abortRef.current ? <Button size="small" danger onClick={()=>abortRef.current?.abort()}>取消任务</Button>:null}<Dropdown menu={{items:[{key:'source-tools',label:'原文与剧本工具'},{key:'chapter-tools',label:'章节规划'},{key:'history-tools',label:'版本历史'},{key:'asset-library',label:'普通资产库'},{type:'divider'},{key:'refresh',label:'刷新作品'},{key:'display',label:'显示设置'},...(access?.owner?[{key:'team',label:'团队权限'}]:[])],onClick:({key})=>{if(key==='source-tools')openTool('source');if(key==='chapter-tools')openTool('chapters');if(key==='history-tools')openTool('history');if(key==='asset-library')setAssetLibraryOpen(true);if(key==='refresh')void openProject(selectedId);if(key==='display')setDisplayOpen(true);if(key==='team')setTeamOpen(true);}}}><Button size="small">更多</Button></Dropdown></div></header>
       <div className="comic-top-main-tab-row"><div className="comic-top-config-bar"><button type="button" className="comic-model-trigger" title={project.model_id || '选择文本模型'} disabled={readOnly||settingsSaving} onClick={()=>{setModelQuery('');setModelSearchOpen(true);void listAvailableModels('text').then(setModels).catch(error=>message.error(error.message));}}><ComicScreenplayModelIcon modelId={models.find(model=>model.id===project.model_id)?.modelId||project.model_id} size={18}/><span>{models.find(model=>model.id===project.model_id)?.displayName || project.model_id || '选择模型'}</span><OriginalIcon name="ChevronDownOutline" size={11}/></button><button type="button" className="comic-top-pill" title="模型配置" onClick={openSettings}><OriginalIcon name="SettingsOutline" size={13}/><span>模型配置</span><OriginalIcon name="ChevronDownOutline" size={12}/></button><ComicStylePicker compact value={savedStyle} onChange={savePillStyle} styles={creativeLibrary.styles} disabled={readOnly||settingsSaving||!creativeReady} onLibraryChange={readCreativeLibrary}/><button type="button" className={`comic-top-pill${agentOpen?' is-active':''}`} aria-pressed={agentOpen} title="Agent" onClick={()=>setAgentOpen(value=>!value)}><span>Agent</span></button></div><nav className="comic-top-step-tabs" aria-label="创作阶段">{comicStages.map((stage,index)=><span className="comic-top-step-slot" key={stage.key}>{index>0?<span className="comic-top-step-connector"/>:null}<button type="button" aria-current={activeTab===stage.key?'step':undefined} className={`comic-top-step-tab${activeTab===stage.key?' is-active':''}`} onClick={()=>setActiveTab(stage.key)}><i>{index+1}</i><span>{stage.label}</span></button></span>)}</nav><div aria-hidden="true" className="comic-top-row-spacer"/></div>
       <div className="comic-three-stage-body"><main className="comic-stage-main"><div className="comic-stage-scroll">
       {taskWarnings.length?<Alert type="warning" showIcon closable onClose={()=>setTaskWarnings([])} message={`本次处理有 ${taskWarnings.length} 条警告`} description={<ul>{taskWarnings.map((item,index)=><li key={index}>{item}</li>)}</ul>}/>:null}
@@ -709,7 +713,7 @@ export default function ComicScreenplayPage() {
   return <div className="comic-screenplay-page comic-project-library">
     <div className="comic-screenplay-heading">
       <div><h1>漫剧创作</h1><p>管理和创建您的漫剧作品</p></div>
-      <div className="library-heading-actions"><Button type="text" icon={<Clock3 size={18} />} onClick={() => setHistoryOpen(true)}>历史</Button><Button className="create-screenplay-button" type="primary" icon={<Plus size={16} />} onClick={openCreateDialog}>创建漫剧</Button></div>
+      <div className="library-heading-actions"><Button icon={<OriginalIcon name="FolderOpenOutline" size={16}/>} onClick={() => setAssetLibraryOpen(true)}>普通资产库</Button><Button type="text" icon={<Clock3 size={18} />} onClick={() => setHistoryOpen(true)}>历史</Button><Button className="create-screenplay-button" type="primary" icon={<Plus size={16} />} onClick={openCreateDialog}>创建漫剧</Button></div>
     </div>
     <div className="library-tabs">{[['personal','个人作品'],['team','团队作品'],['archived','已归档']].map(([key,label])=><button key={key} className={scope===key?'is-active':''} onClick={()=>setScope(key)}>{label}</button>)}</div>
     <div className="comic-screenplay-filters">

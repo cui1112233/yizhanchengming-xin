@@ -37,12 +37,16 @@ func normalizeAssetLibraryEntry(e AssetLibraryEntry) (AssetLibraryEntry, error) 
 	if e.Image.Status == "completed" {
 		e.Image.Status = "succeeded"
 	}
-	if e.ID == "" || e.Owner == "" || e.Name == "" || !validAssetType(e.Type) || e.Image.Kind != "image" || e.Image.Status != "succeeded" || e.Image.AssetID == "" || utf8.RuneCountInString(e.Name) > 191 || utf8.RuneCountInString(e.Category) > 191 || len(e.ID) > 64 || len(e.Owner) > 191 || len(e.SourceProjectID) > 64 || len(e.SourceAssetID) > 64 || len(e.SourceMediaID) > 64 {
+	if e.DeletedAt != nil || e.ID == "" || e.Owner == "" || e.Name == "" || !validAssetType(e.Type) || e.Image.Kind != "image" || e.Image.Status != "succeeded" || e.Image.AssetID == "" || utf8.RuneCountInString(e.Name) > 191 || utf8.RuneCountInString(e.Category) > 191 || len(e.ID) > 64 || len(e.Owner) > 191 || len(e.SourceProjectID) > 64 || len(e.SourceAssetID) > 64 || len(e.SourceMediaID) > 64 {
 		return AssetLibraryEntry{}, ErrInvalidArgument
 	}
 	return cloneAssetLibraryEntry(e), nil
 }
 func cloneAssetLibraryEntry(e AssetLibraryEntry) AssetLibraryEntry {
+	if e.DeletedAt != nil {
+		deleted := *e.DeletedAt
+		e.DeletedAt = &deleted
+	}
 	extra := map[string]string(nil)
 	if e.Snapshot.Extra != nil {
 		extra = map[string]string{}
@@ -76,7 +80,7 @@ func (m *MemoryAssetLibraryRepository) ListAssetLibrary(_ context.Context, owner
 	defer m.mu.Unlock()
 	out := []AssetLibraryEntry{}
 	for _, e := range m.entries {
-		if e.Owner != owner || (kind != "" && e.Type != kind) || (category != "" && e.Category != category) {
+		if e.DeletedAt != nil || e.Owner != owner || (kind != "" && e.Type != kind) || (category != "" && e.Category != category) {
 			continue
 		}
 		if query != "" && !strings.Contains(strings.ToLower(e.Name), query) && !strings.Contains(strings.ToLower(e.Description), query) {
@@ -96,7 +100,7 @@ func (m *MemoryAssetLibraryRepository) GetAssetLibraryEntry(_ context.Context, o
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e, ok := m.entries[id]
-	if !ok || e.Owner != owner {
+	if !ok || e.Owner != owner || e.DeletedAt != nil {
 		return AssetLibraryEntry{}, ErrNotFound
 	}
 	return cloneAssetLibraryEntry(e), nil
@@ -116,6 +120,9 @@ func (m *MemoryAssetLibraryRepository) SaveAssetLibraryEntry(_ context.Context, 
 	if exists {
 		if old.Owner != e.Owner {
 			return AssetLibraryEntry{}, ErrNotFound
+		}
+		if old.DeletedAt != nil {
+			return AssetLibraryEntry{}, ErrInvalidState
 		}
 		if sameAssetLibraryPayload(old, e) {
 			return cloneAssetLibraryEntry(old), nil
@@ -140,17 +147,21 @@ func (m *MemoryAssetLibraryRepository) SaveAssetLibraryEntry(_ context.Context, 
 	return cloneAssetLibraryEntry(e), nil
 }
 
-const assetLibraryColumns = `id,owner_username,asset_type,name,description,category,image_json,snapshot_json,source_project_id,source_asset_id,source_media_id,image_object_json,revision,created_at,updated_at`
+const assetLibraryColumns = `id,owner_username,asset_type,name,description,category,image_json,snapshot_json,source_project_id,source_asset_id,source_media_id,image_object_json,revision,created_at,updated_at,deleted_at`
 
 func scanAssetLibrary(scanner interface{ Scan(...any) error }) (AssetLibraryEntry, error) {
 	var e AssetLibraryEntry
 	var image, snapshot, imageObject []byte
-	err := scanner.Scan(&e.ID, &e.Owner, &e.Type, &e.Name, &e.Description, &e.Category, &image, &snapshot, &e.SourceProjectID, &e.SourceAssetID, &e.SourceMediaID, &imageObject, &e.Revision, &e.CreatedAt, &e.UpdatedAt)
+	var deleted sql.NullTime
+	err := scanner.Scan(&e.ID, &e.Owner, &e.Type, &e.Name, &e.Description, &e.Category, &image, &snapshot, &e.SourceProjectID, &e.SourceAssetID, &e.SourceMediaID, &imageObject, &e.Revision, &e.CreatedAt, &e.UpdatedAt, &deleted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return e, ErrNotFound
 	}
 	if err != nil {
 		return e, err
+	}
+	if deleted.Valid {
+		e.DeletedAt = &deleted.Time
 	}
 	if err = json.Unmarshal(image, &e.Image); err != nil {
 		return e, err
@@ -172,7 +183,7 @@ func scanAssetLibrary(scanner interface{ Scan(...any) error }) (AssetLibraryEntr
 	return e, nil
 }
 func (s *MySQLStore) GetAssetLibraryEntry(ctx context.Context, owner, id string) (AssetLibraryEntry, error) {
-	return scanAssetLibrary(s.db.QueryRowContext(ctx, `SELECT `+assetLibraryColumns+` FROM screenplay_asset_library WHERE owner_username=? AND id=?`, owner, id))
+	return scanAssetLibrary(s.db.QueryRowContext(ctx, `SELECT `+assetLibraryColumns+` FROM screenplay_asset_library WHERE owner_username=? AND id=? AND deleted_at IS NULL`, owner, id))
 }
 func (s *MySQLStore) ListAssetLibrary(ctx context.Context, owner string, kind AssetType, query, category string) ([]AssetLibraryEntry, error) {
 	if !validAssetLibrarySearch(owner, kind) {
@@ -194,7 +205,7 @@ func (s *MySQLStore) ListAssetLibrary(ctx context.Context, owner string, kind As
 		q += ` AND (LOWER(name) LIKE ? ESCAPE '=' OR LOWER(description) LIKE ? ESCAPE '=')`
 		args = append(args, like, like)
 	}
-	q += ` ORDER BY updated_at DESC,id DESC`
+	q += ` AND deleted_at IS NULL ORDER BY updated_at DESC,id DESC`
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -239,7 +250,7 @@ func (s *MySQLStore) SaveAssetLibraryEntry(ctx context.Context, input AssetLibra
 	// Reserve a new ID without overwriting an existing record. Concurrent equal
 	// creates serialize on the primary key and return the same revision.
 	if expected == 0 {
-		_, err = tx.ExecContext(ctx, `INSERT INTO screenplay_asset_library (`+assetLibraryColumns+`) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?) ON DUPLICATE KEY UPDATE id=id`, e.ID, e.Owner, string(e.Type), e.Name, e.Description, e.Category, string(image), string(snapshot), e.SourceProjectID, e.SourceAssetID, e.SourceMediaID, string(imageObject), now, now)
+		_, err = tx.ExecContext(ctx, `INSERT INTO screenplay_asset_library (`+assetLibraryColumns+`) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,NULL) ON DUPLICATE KEY UPDATE id=id`, e.ID, e.Owner, string(e.Type), e.Name, e.Description, e.Category, string(image), string(snapshot), e.SourceProjectID, e.SourceAssetID, e.SourceMediaID, string(imageObject), now, now)
 		if err != nil {
 			return AssetLibraryEntry{}, err
 		}
@@ -254,6 +265,9 @@ func (s *MySQLStore) SaveAssetLibraryEntry(ctx context.Context, input AssetLibra
 	if old.Owner != e.Owner {
 		return AssetLibraryEntry{}, ErrNotFound
 	}
+	if old.DeletedAt != nil {
+		return AssetLibraryEntry{}, ErrInvalidState
+	}
 	if sameAssetLibraryPayload(old, e) {
 		if err = tx.Commit(); err != nil {
 			return AssetLibraryEntry{}, err
@@ -266,7 +280,7 @@ func (s *MySQLStore) SaveAssetLibraryEntry(ctx context.Context, input AssetLibra
 	e.CreatedAt = old.CreatedAt
 	e.UpdatedAt = now
 	e.Revision = old.Revision + 1
-	result, err := tx.ExecContext(ctx, `UPDATE screenplay_asset_library SET asset_type=?,name=?,description=?,category=?,image_json=?,snapshot_json=?,source_project_id=?,source_asset_id=?,source_media_id=?,image_object_json=?,revision=?,updated_at=? WHERE id=? AND owner_username=? AND revision=?`, string(e.Type), e.Name, e.Description, e.Category, string(image), string(snapshot), e.SourceProjectID, e.SourceAssetID, e.SourceMediaID, string(imageObject), e.Revision, e.UpdatedAt, e.ID, e.Owner, old.Revision)
+	result, err := tx.ExecContext(ctx, `UPDATE screenplay_asset_library SET asset_type=?,name=?,description=?,category=?,image_json=?,snapshot_json=?,source_project_id=?,source_asset_id=?,source_media_id=?,image_object_json=?,revision=?,updated_at=? WHERE id=? AND owner_username=? AND revision=? AND deleted_at IS NULL`, string(e.Type), e.Name, e.Description, e.Category, string(image), string(snapshot), e.SourceProjectID, e.SourceAssetID, e.SourceMediaID, string(imageObject), e.Revision, e.UpdatedAt, e.ID, e.Owner, old.Revision)
 	if err != nil {
 		return AssetLibraryEntry{}, err
 	}
@@ -281,4 +295,59 @@ func (s *MySQLStore) SaveAssetLibraryEntry(ctx context.Context, input AssetLibra
 		return AssetLibraryEntry{}, err
 	}
 	return e, nil
+}
+
+func (m *MemoryAssetLibraryRepository) DeleteAssetLibraryEntry(_ context.Context, owner, id string, expected int64) error {
+	if expected < 1 {
+		return ErrInvalidArgument
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	old, ok := m.entries[id]
+	if !ok || old.Owner != owner || old.DeletedAt != nil {
+		return ErrNotFound
+	}
+	if old.Revision != expected {
+		return ErrRevisionConflict
+	}
+	now := time.Now().UTC()
+	old.DeletedAt = &now
+	old.UpdatedAt = now
+	old.Revision++
+	m.entries[id] = cloneAssetLibraryEntry(old)
+	return nil
+}
+func (s *MySQLStore) DeleteAssetLibraryEntry(ctx context.Context, owner, id string, expected int64) error {
+	if expected < 1 {
+		return ErrInvalidArgument
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var revision int64
+	err = tx.QueryRowContext(ctx, `SELECT revision FROM screenplay_asset_library WHERE owner_username=? AND id=? AND deleted_at IS NULL FOR UPDATE`, owner, id).Scan(&revision)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if revision != expected {
+		return ErrRevisionConflict
+	}
+	now := time.Now().UTC()
+	result, err := tx.ExecContext(ctx, `UPDATE screenplay_asset_library SET deleted_at=?,updated_at=?,revision=revision+1 WHERE owner_username=? AND id=? AND revision=? AND deleted_at IS NULL`, now, now, owner, id, expected)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return ErrRevisionConflict
+	}
+	return tx.Commit()
 }

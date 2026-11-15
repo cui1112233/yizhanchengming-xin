@@ -43,6 +43,18 @@ test('React图标维持原viewBox和描边，尺寸由调用点传入且装饰�
  const inline=renderIcon('InlineModelDialogClose',14);assert.match(inline,/viewBox="0 0 24 24"/);assert.match(inline,/stroke-width="2.5"/);
 });
 
+test('普通资产库FolderOutline精确采用原包两条路径与32描边',()=>{
+ const icon=originalComicIcons.FolderOutline;
+ assert.equal(createHash('sha256').update(JSON.stringify(icon.svg)).digest('hex'),'12b41037554e856f2f2c83dba9865a499020baba1515f2fb8feea19ec14a14ba');
+ assert.deepEqual(icon.original,{line:29,column:1397645,start:1506084,end:1506163});
+ const markup=renderIcon('FolderOutline',40);
+ assert.match(markup,/viewBox="0 0 512 512"/);
+ assert.match(markup,/width="40"/);
+ assert.equal([...markup.matchAll(/<path\b/g)].length,2);
+ assert.equal([...markup.matchAll(/stroke-width="32"/g)].length,2);
+ assert.match(markup,/d="M32 192h448"/);
+});
+
 test('同页多个provider渐变使用useId隔离且所有本地引用都指向各自定义',()=>{
  const markup=renderProviders(['doubao','doubao','minimax','qwen','hunyuan']);const ids=[...markup.matchAll(/\sid="([^"]+)"/g)].map(match=>match[1]);assert.ok(ids.length>1);assert.equal(new Set(ids).size,ids.length);for(const ref of markup.matchAll(/url\(#([^)]+)\)/g))assert.ok(ids.includes(ref[1]),ref[1]);
 });

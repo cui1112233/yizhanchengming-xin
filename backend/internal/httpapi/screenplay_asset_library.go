@@ -186,7 +186,7 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 func screenplayLibraryPublic(entry screenplay.AssetLibraryEntry) map[string]any {
 	image := entry.Image
 	image.URL = "/api/comic-screenplays/asset-library/" + url.PathEscape(entry.ID) + "/image"
-	return map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt}
+	return map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey]}
 }
 
 func RegisterScreenplayAssetLibraryRoutes(mux *http.ServeMux, auth BridgeAuth, service *ScreenplayAssetLibrary) {
@@ -204,6 +204,7 @@ func RegisterScreenplayAssetLibraryRoutes(mux *http.ServeMux, auth BridgeAuth, s
 			fn(w, r, actor.Username)
 		})))
 	}
+	registerScreenplayLibraryManager(register, service)
 	register("GET /api/comic-screenplays/asset-library", func(w http.ResponseWriter, r *http.Request, actor string) {
 		rows, err := service.Repository.ListAssetLibrary(r.Context(), actor, screenplay.AssetType(r.URL.Query().Get("type")), r.URL.Query().Get("q"), r.URL.Query().Get("category"))
 		if err != nil {

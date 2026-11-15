@@ -8,6 +8,7 @@ import (
 // AssetLibraryEntry is CM's durable ordinary asset library adapter. The recovered
 // frontend's image-binding semantics remain separate from this storage entity.
 type AssetLibraryEntry struct {
+	DeletedAt       *time.Time              `json:"-"`
 	SourceMediaID   string                  `json:"source_media_id,omitempty"`
 	ImageObject     AssetLibraryImageObject `json:"image_object"`
 	ID              string                  `json:"id"`
@@ -33,6 +34,7 @@ type AssetLibraryImageObject struct {
 	ByteSize    int64  `json:"byte_size"`
 }
 type AssetLibraryRepository interface {
+	DeleteAssetLibraryEntry(context.Context, string, string, int64) error
 	ListAssetLibrary(context.Context, string, AssetType, string, string) ([]AssetLibraryEntry, error)
 	GetAssetLibraryEntry(context.Context, string, string) (AssetLibraryEntry, error)
 	SaveAssetLibraryEntry(context.Context, AssetLibraryEntry, int64) (AssetLibraryEntry, error)

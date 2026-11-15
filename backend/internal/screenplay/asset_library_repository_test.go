@@ -105,7 +105,7 @@ func libraryEntryRows(e AssetLibraryEntry) *sqlmock.Rows {
 	image, _ := json.Marshal(e.Image)
 	snapshot, _ := json.Marshal(e.Snapshot)
 	imageObject, _ := json.Marshal(e.ImageObject)
-	return sqlmock.NewRows(strings.Split(assetLibraryColumns, ",")).AddRow(e.ID, e.Owner, string(e.Type), e.Name, e.Description, e.Category, string(image), string(snapshot), e.SourceProjectID, e.SourceAssetID, e.SourceMediaID, string(imageObject), e.Revision, e.CreatedAt, e.UpdatedAt)
+	return sqlmock.NewRows(strings.Split(assetLibraryColumns, ",")).AddRow(e.ID, e.Owner, string(e.Type), e.Name, e.Description, e.Category, string(image), string(snapshot), e.SourceProjectID, e.SourceAssetID, e.SourceMediaID, string(imageObject), e.Revision, e.CreatedAt, e.UpdatedAt, e.DeletedAt)
 }
 
 type libraryImageMatcher struct{}
@@ -258,4 +258,115 @@ func (libraryImageObjectMatcher) Match(v driver.Value) bool {
 	}
 	var obj AssetLibraryImageObject
 	return json.Unmarshal([]byte(raw), &obj) == nil && obj.ObjectKey == "asset-library/alice/copy.png" && obj.ContentType == "image/png" && obj.ByteSize == 123
+}
+
+func TestAssetLibraryDeleteOwnerCASAndSQLRollback(t *testing.T) {
+	ctx := context.Background()
+	memory := NewMemoryAssetLibraryRepository()
+	saved, err := memory.SaveAssetLibraryEntry(ctx, assetLibraryFixture(), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = memory.DeleteAssetLibraryEntry(ctx, "bob", saved.ID, saved.Revision); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	if err = memory.DeleteAssetLibraryEntry(ctx, "alice", saved.ID, saved.Revision+1); !errors.Is(err, ErrRevisionConflict) {
+		t.Fatal(err)
+	}
+	if err = memory.DeleteAssetLibraryEntry(ctx, "alice", saved.ID, saved.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = memory.GetAssetLibraryEntry(ctx, "alice", saved.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	for _, outcome := range []string{"success", "stale", "write-error", "foreign"} {
+		t.Run(outcome, func(t *testing.T) {
+			db, m, _ := sqlmock.New()
+			defer db.Close()
+			owner := "alice"
+			if outcome == "foreign" {
+				owner = "bob"
+			}
+			m.ExpectBegin()
+			q := m.ExpectQuery("SELECT revision FROM screenplay_asset_library.*FOR UPDATE").WithArgs(owner, saved.ID)
+			if outcome == "foreign" {
+				q.WillReturnError(sql.ErrNoRows)
+			} else {
+				q.WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(1))
+			}
+			expected := int64(1)
+			if outcome == "stale" {
+				expected = 2
+			}
+			if outcome == "success" || outcome == "write-error" {
+				exec := m.ExpectExec("UPDATE screenplay_asset_library SET deleted_at").WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), owner, saved.ID, expected)
+				if outcome == "write-error" {
+					exec.WillReturnError(fmt.Errorf("write failed"))
+				} else {
+					exec.WillReturnResult(sqlmock.NewResult(0, 1))
+				}
+			}
+			if outcome == "success" {
+				m.ExpectCommit()
+			} else {
+				m.ExpectRollback()
+			}
+			err := NewMySQLStore(db).DeleteAssetLibraryEntry(ctx, owner, saved.ID, expected)
+			if outcome == "success" && err != nil || outcome != "success" && err == nil {
+				t.Fatal(outcome, err)
+			}
+			if err = m.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestAssetLibraryTombstonePreventsDeletedIDAndRevisionReuse(t *testing.T) {
+	ctx := context.Background()
+	memory := NewMemoryAssetLibraryRepository()
+	input := assetLibraryFixture()
+	saved, err := memory.SaveAssetLibraryEntry(ctx, input, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = memory.DeleteAssetLibraryEntry(ctx, "alice", saved.ID, saved.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = memory.GetAssetLibraryEntry(ctx, "alice", saved.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	rows, _ := memory.ListAssetLibrary(ctx, "alice", "", "", "")
+	if len(rows) != 0 {
+		t.Fatal("deleted entry is listed", rows)
+	}
+	for _, revision := range []int64{0, saved.Revision} {
+		if _, err = memory.SaveAssetLibraryEntry(ctx, input, revision); !errors.Is(err, ErrInvalidState) {
+			t.Fatal("deleted ID reused", revision, err)
+		}
+	}
+	input.Image.AssetID = "replacement-image"
+	if _, err = memory.SaveAssetLibraryEntry(ctx, input, 0); !errors.Is(err, ErrInvalidState) {
+		t.Fatal("new image reused deleted revision", err)
+	}
+	tombstone := normalizedLibraryFixture()
+	now := time.Now().UTC()
+	tombstone.DeletedAt = &now
+	tombstone.Revision = 2
+	db, m, _ := sqlmock.New()
+	defer db.Close()
+	m.ExpectBegin()
+	m.ExpectExec("INSERT INTO screenplay_asset_library.*ON DUPLICATE KEY UPDATE id=id").WillReturnResult(sqlmock.NewResult(0, 0))
+	m.ExpectQuery("SELECT .* FROM screenplay_asset_library WHERE id=.*FOR UPDATE").WithArgs(tombstone.ID).WillReturnRows(libraryEntryRows(tombstone))
+	m.ExpectRollback()
+	if _, err = NewMySQLStore(db).SaveAssetLibraryEntry(ctx, assetLibraryFixture(), 0); !errors.Is(err, ErrInvalidState) {
+		t.Fatal("SQL resurrected tombstone", err)
+	}
+	m.ExpectQuery("SELECT .* FROM screenplay_asset_library WHERE owner_username=.*AND id=.*AND deleted_at IS NULL").WithArgs("alice", tombstone.ID).WillReturnError(sql.ErrNoRows)
+	if _, err = NewMySQLStore(db).GetAssetLibraryEntry(ctx, "alice", tombstone.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	if err = m.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
 }
