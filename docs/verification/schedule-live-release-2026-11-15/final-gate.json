@@ -1,0 +1,11 @@
+{
+  "testBookStopped": true,
+  "stopResult": {
+    "ok": true,
+    "updated": 1
+  },
+  "productionHealthy": true,
+  "productionUnchanged": true,
+  "frontendUnchanged": true,
+  "releaseActivated": false
+}

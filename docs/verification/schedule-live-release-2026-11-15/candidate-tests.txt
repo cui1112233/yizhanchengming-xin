@@ -1,0 +1,3 @@
+ok  	qiantie/backend/internal/novelfetchworkshop	3.569s
+ok  	qiantie/backend/internal/videomanagementconnector	0.047s [no tests to run]
+ok  	qiantie/backend/internal/httpapi	57.263s
