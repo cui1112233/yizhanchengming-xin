@@ -8,6 +8,12 @@ import {
   novelFetchTaskSummaryItems
 } from './novel-fetch-task-detail.js';
 
+test('lightweight summary counts ready AI body references without loading their text', () => {
+  const data = { content_loaded: false, bodyRefs: { ai1: {state:'ready'}, ai2: {state:'ready'}, ai3:{state:'pending'}, original:{state:'ready'} } };
+  const summary = Object.fromEntries(novelFetchTaskSummaryItems(data).map(row => [row.label, row.value]));
+  assert.equal(summary['AI 文案版本'], '2 个');
+});
+
 test('fetch retry detail shows persisted upstream error and its actual business code', () => {
   const error = '121 upstream business error 400: 获取书籍信息失败';
   for (const data of [{meta:{originalFetchLastError:error}}, {original_fetch_last_error:error}]) {

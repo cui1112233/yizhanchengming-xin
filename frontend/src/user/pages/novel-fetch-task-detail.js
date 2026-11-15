@@ -96,7 +96,8 @@ export function novelFetchTaskSummaryItems(data = {}) {
   const raw = countValue(data.originalRawChars, data.original_raw_chars, meta.originalRawChars, meta.original_raw_chars, data.originalRaw?.length);
   const hitCount = countValue(meta.sensitiveHitCount, meta.sensitive_hit_count, sensitiveHits.hit_count, sensitiveHits.hitCount, data.sensitiveHitCount, data.sensitive_hit_count);
   const fixedCount = countValue(meta.sensitiveFixedCount, meta.sensitive_fixed_count, sensitiveFixed.fixed_count, sensitiveFixed.fixedCount, data.sensitiveFixedCount, data.sensitive_fixed_count);
-  const aiCount = countValue(meta.aiGeneratedCount, meta.ai_generated_count, data.aiGeneratedCount, data.ai_generated_count, versions.length);
+  const readyReferenceCount = Object.entries(data.bodyRefs || {}).filter(([key, ref]) => /^ai\d+$/i.test(key) && ref?.state === 'ready').length;
+  const aiCount = countValue(meta.aiGeneratedCount, meta.ai_generated_count, data.aiGeneratedCount, data.ai_generated_count, readyReferenceCount || versions.length);
   const originalError = first(meta.originalError, meta.original_error, meta.originalFetchLastError, meta.original_fetch_last_error, data.original_fetch_last_error, meta.error);
   const upstreamCode = /(?:business error|HTTP)\s+(\d{3})\b/i.exec(String(originalError || ''))?.[1];
   return [
