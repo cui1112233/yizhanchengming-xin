@@ -15,6 +15,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
+$explicitRuntimeBinary = -not [string]::IsNullOrWhiteSpace($BinaryPath)
 
 function ConvertTo-LocalRuntimeEntryPath {
   param([string]$Entry)
@@ -244,7 +245,16 @@ try {
   # A local restart must always identify the checkout it is starting. Keeping
   # an inherited SHA here can make 4001 serve new files while reporting an old
   # release, which makes the runtime check misleading.
-  $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
+  $selectedBuildSHA = (& git -C $repo rev-parse --short HEAD).Trim()
+  if ($SkipBuild -and $explicitRuntimeBinary) {
+    $selectedManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw -Encoding utf8 | ConvertFrom-Json
+    if ([string]$selectedManifest.gitSha -notmatch '^[a-fA-F0-9]{7,40}$' -or
+        -not [IO.Path]::GetFullPath([string]$selectedManifest.binaryPath).Equals([IO.Path]::GetFullPath($binaryPath), [StringComparison]::OrdinalIgnoreCase)) {
+      throw '指定二进制与构建清单不匹配，拒绝标注为当前源码版本。'
+    }
+    $selectedBuildSHA = [string]$selectedManifest.gitSha
+  }
+  $env:QIANTIE_RELEASE_SHA = $selectedBuildSHA
   $env:QIANTIE_RUNTIME_MANIFEST_PATH = $runtimeManifestPath
   # Slice 已在脚本入口统一校验并兜底为 3（>=1 才会注册 V12 批次路由）。
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER) {
