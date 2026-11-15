@@ -80,15 +80,21 @@ export function batchMediaCounts(books = [], productionStatus = {}, mergeStatus 
     }
   }
 
-  const merges = new Set();
+  // 「成片」按作品统计：同一本书重复合并会保留多条历史合并记录，但页面上
+  // 只能展示当前作品的一份成片，因此按 bookId 去重，不能按合并次数累加。
+  const mergeBooks = new Set();
+  const mergeJobs = new Set();
   for (const job of mergeStatus?.jobs || []) {
     if (String(job?.status || '').toLowerCase() !== 'succeeded') continue;
     const outputUrl = normalizedText(job?.outputUrl);
     if (!outputUrl) continue;
-    merges.add(String(job?.id || `${job?.bookId || ''}:${outputUrl}`));
+    const jobKey = String(job?.id || `${job?.bookId || ''}:${outputUrl}`);
+    mergeJobs.add(jobKey);
+    const bookKey = normalizedText(job?.bookId);
+    if (bookKey) mergeBooks.add(bookKey);
   }
 
-  return { storyboards, playable: playable.size, merges: merges.size };
+  return { storyboards, playable: playable.size, merges: mergeBooks.size || mergeJobs.size };
 }
 
 // batchFactoryNovelCopyText 生成“复制全部小说”的制表符文本：书名 / 书城ID /

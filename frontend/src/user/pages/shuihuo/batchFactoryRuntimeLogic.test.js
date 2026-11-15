@@ -35,6 +35,20 @@ test('counts only playable VIDEO tasks and completed merge outputs', () => {
   assert.deepEqual(counts, { storyboards: 2, playable: 1, merges: 1 });
 });
 
+test('repeated merges of the same book count as one finished work', () => {
+  const counts = batchMediaCounts(
+    [{ id: 'book-1', videos: [] }, { id: 'book-2', videos: [] }],
+    {},
+    { jobs: [
+      { id: 'm1', bookId: 'book-1', status: 'succeeded', outputUrl: 'https://video/1a.mp4' },
+      { id: 'm2', bookId: 'book-1', status: 'succeeded', outputUrl: 'https://video/1b.mp4' },
+      { id: 'm3', bookId: 'book-2', status: 'succeeded', outputUrl: 'https://video/2.mp4' },
+      { id: 'm4', bookId: 'book-2', status: 'failed', outputUrl: 'https://video/2b.mp4' }
+    ] }
+  );
+  assert.equal(counts.merges, 2);
+});
+
 test('history tasks from an orphaned video record never inflate the playable count', () => {
   const counts = batchMediaCounts(
     [{ videos: [{ id: 'v-active' }] }],
