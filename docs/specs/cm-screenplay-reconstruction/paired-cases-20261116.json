@@ -8,12 +8,21 @@
       "name": "独立分集标题与生成前内容检查",
       "original": {
         "source": "01-readable-frontend/pretty/index-DszfAkKD.js",
-        "lines": [476398, 476590, 478714],
+        "lines": [
+          476398,
+          476590,
+          478714
+        ],
         "observed": "原版创建支持中文章集识别，格式示例为第一集/1-1场次；原生解析及所有格式未实测"
       },
       "cm": {
         "result": "普通/Markdown/中文数字集标题支持；原集号/前言/空集保留；重复和空正文提交前拒绝",
-        "evidence": ["archive/07-parity-execution/zip-reconstruction-20261116/episodes", "07-parity-execution/zip-reconstruction-20261116/frontend-final.log", "07-parity-execution/zip-reconstruction-20261116/core-final.log", "07-parity-execution/zip-reconstruction-20261116/runtime-verification.json"]
+        "evidence": [
+          "archive/07-parity-execution/zip-reconstruction-20261116/episodes",
+          "07-parity-execution/zip-reconstruction-20261116/frontend-final.log",
+          "07-parity-execution/zip-reconstruction-20261116/core-final.log",
+          "07-parity-execution/zip-reconstruction-20261116/runtime-verification.json"
+        ]
       },
       "comparison": "original_static_compared_cm_verified",
       "remaining": "原版同输入实际导入、空集与取消状态逐项对照；无分隔连写标题尚不自动猜测",
@@ -24,16 +33,50 @@
       "name": "分镜参考图消费的完整名称及类型对应",
       "original": {
         "source": "01-readable-frontend/pretty/index-DszfAkKD.js",
-        "lines": [439143, 439150, 439172],
+        "lines": [
+          439143,
+          439150,
+          439172
+        ],
         "observed": "原版有明确名单拆分和清理；这些函数不独自证明原生最终图片引用行为"
       },
       "cm": {
         "result": "References与ReferenceIDs共用完整名称/类型规则；短名字不串入，同类型重名不猜，旧分隔符保留",
-        "evidence": ["07-parity-execution/zip-reconstruction-20261116/references", "07-parity-execution/zip-reconstruction-20261116/runtime-verification.json"]
+        "evidence": [
+          "07-parity-execution/zip-reconstruction-20261116/references",
+          "07-parity-execution/zip-reconstruction-20261116/runtime-verification.json"
+        ]
       },
       "comparison": "cm_real_service_verified_original_final_request_pending",
       "remaining": "原版最终引用请求对照及资产ID关系迁移；别名和描述句不猜测",
       "full_parity_passed": false
+    },
+    {
+      "id": "G12-CAT-001",
+      "name": "角色库分类独立持久化与选择创建删除",
+      "original": {
+        "source": "asset-library-original/manager/source-excerpts/character-editor.txt",
+        "lines": [
+          40,
+          97,
+          367
+        ],
+        "controlled_replay": "library-categories-20261116/original-category-replay.json",
+        "controlled_cases": 6
+      },
+      "cm": {
+        "result": "独立分类持久化，取消角色不回滚，内置不可删，慢响应阻止旧稿应用，Enter与输入法处理",
+        "evidence": [
+          "library-categories-20261116/mysql-result.json",
+          "library-categories-20261116/actual-4001-result.json",
+          "library-categories-20261116/frontend/enter-create-regression.log",
+          "library-categories-20261116/runtime-verification.json"
+        ]
+      },
+      "comparison": "original_static_and_controlled_functions_compared_cm_dom_http_mysql_runtime_verified",
+      "remaining": "原桌面真实编辑与同视口像素对照尚待验证；错误提示为已说明的CM改进",
+      "full_parity_passed": false
     }
-  ]
+  ],
+  "latest_runtime_commit": "9a6a15f41616c37031649db6f5e2419f7396f38a"
 }
