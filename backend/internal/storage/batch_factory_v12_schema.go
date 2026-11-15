@@ -226,6 +226,20 @@ func V12Migrations() []Migration {
 		{Version: 1200109, SQL: V12AutomationPresetStatements(), CallbackChecksum: "batch-factory-v12-automation-presets-v1"},
 		{Version: 1200110, SQL: V12ComicPageLastErrorStatements(), CallbackChecksum: "batch-factory-v12-comic-page-last-error-v1"},
 		{Version: 1200111, SQL: V12BookRetentionStatements(), CallbackChecksum: "batch-factory-v12-book-retention-v1"},
+		{Version: 1200112, SQL: V12BatchRetentionStatements(), CallbackChecksum: "batch-factory-v12-batch-retention-v1"},
+	}
+}
+
+// V12BatchRetentionStatements moves the retention clock from individual books to
+// the whole collection (batch). A project is cleaned as one unit so a partially
+// expired collection can never lose only some of its books.
+func V12BatchRetentionStatements() []string {
+	return []string{
+		`ALTER TABLE batch_factory_v12_batches ADD COLUMN completed_at DATETIME(6) NULL AFTER updated_at`,
+		`ALTER TABLE batch_factory_v12_batches ADD COLUMN retention_expires_at DATETIME(6) NULL AFTER completed_at`,
+		`ALTER TABLE batch_factory_v12_batches ADD COLUMN hidden_at DATETIME(6) NULL AFTER retention_expires_at`,
+		`ALTER TABLE batch_factory_v12_batches ADD COLUMN purge_after DATETIME(6) NULL AFTER hidden_at`,
+		`ALTER TABLE batch_factory_v12_batches ADD KEY idx_bfv12_batches_retention (owner_username, hidden_at, retention_expires_at)`,
 	}
 }
 

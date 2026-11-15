@@ -599,7 +599,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 
 	}
 	// Expiry must also run on local-only installations without TOS.
-	retention := batchfactoryv11.BookRetentionSupervisor{Store: store.MySQLStore, Local: artifactStore, Remote: retentionRemote, RetentionDays: retentionDays}
+	retention := batchfactoryv11.BatchRetentionSupervisor{Store: store.MySQLStore, Local: artifactStore, Remote: retentionRemote, RetentionDays: retentionDays}
 	retention.StartDaily(0, 0)
 	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
 	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。

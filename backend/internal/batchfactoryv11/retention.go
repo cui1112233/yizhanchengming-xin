@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	// DefaultBookRetentionGrace 是作品到期隐藏后到真正删除之间的缓冲时间。
-	DefaultBookRetentionGrace = 24 * time.Hour
-	bookRetentionClaimWindow  = 15 * time.Minute
-	bookRetentionMaxPerRun    = 50
+	// DefaultRetentionGrace 是作品集到期隐藏后到真正删除之间的缓冲时间。
+	DefaultRetentionGrace    = 24 * time.Hour
+	retentionClaimWindow     = 15 * time.Minute
+	retentionMaxPerRun       = 50
 )
 
 // RemoteObjectDeleter 只暴露删除单个对象的能力，避免清理器拿到整份 TOS 客户端。
@@ -27,11 +27,10 @@ type RemoteObjectDeleter interface {
 	DeleteObject(context.Context, string) error
 }
 
-// RetentionBook 是一条待硬删的作品记录。
-type RetentionBook struct {
-	ID      string
-	BatchID string
-	Owner   string
+// RetentionBatch 是一条待硬删的作品集（批次）记录。
+type RetentionBatch struct {
+	ID    string
+	Owner string
 }
 
 // RetentionRecomputeSummary 描述一次重算的隐藏 / 恢复数量。
@@ -40,23 +39,22 @@ type RetentionRecomputeSummary struct {
 	Restored int64
 }
 
-// BookRetentionSupervisor 按作品维度执行保留策略：先重算到期时间，再把到期
-// 作品隐藏，最后在缓冲期结束后删除云端对象、本地文件和数据库记录。
-type BookRetentionSupervisor struct {
+// BatchRetentionSupervisor 按作品集维度执行保留策略：先重算到期时间，再把
+// 到期作品集隐藏，最后在缓冲期结束后删除云端对象、本地文件和数据库记录。
+type BatchRetentionSupervisor struct {
 	Store         *MySQLStore
 	Local         *localartifact.Store
 	Remote        RemoteObjectDeleter
 	RetentionDays func(string) int
-	Grace         time.Duration
 	MaxPerRun     int
 }
 
 // RunOnce 执行一次完整巡检。
-func (s BookRetentionSupervisor) RunOnce(ctx context.Context) error {
+func (s BatchRetentionSupervisor) RunOnce(ctx context.Context) error {
 	if s.Store == nil {
-		return fmt.Errorf("book retention store is not configured")
+		return fmt.Errorf("batch retention store is not configured")
 	}
-	owners, err := s.Store.ListBookRetentionOwners(ctx)
+	owners, err := s.Store.ListRetentionOwners(ctx)
 	if err != nil {
 		return err
 	}
@@ -65,69 +63,57 @@ func (s BookRetentionSupervisor) RunOnce(ctx context.Context) error {
 		if s.RetentionDays != nil {
 			days = normalizeLocalMergedArtifactRetentionDays(s.RetentionDays(owner))
 		}
-		if _, err := s.Store.RecomputeBookRetention(ctx, owner, days); err != nil {
+		if _, err := s.Store.RecomputeBatchRetention(ctx, owner, days); err != nil {
 			return err
 		}
 	}
 	max := s.MaxPerRun
 	if max <= 0 {
-		max = bookRetentionMaxPerRun
+		max = retentionMaxPerRun
 	}
 	for i := 0; i < max; i++ {
-		book, found, err := s.Store.ClaimDueRetentionBook(ctx)
+		batch, found, err := s.Store.ClaimDueRetentionBatch(ctx)
 		if err != nil {
 			return err
 		}
 		if !found {
 			return nil
 		}
-		if err := s.Store.PurgeRetentionBook(ctx, book, s.Local, s.Remote); err != nil {
-			log.Printf("book retention purge failed book=%s batch=%s owner=%s: %v", book.ID, book.BatchID, book.Owner, err)
+		if err := s.Store.PurgeRetentionBatch(ctx, batch, s.Local, s.Remote); err != nil {
+			log.Printf("batch retention purge failed batch=%s owner=%s: %v", batch.ID, batch.Owner, err)
 		}
 	}
 	return nil
 }
 
-// StartDaily 启动立即补扫，每小时复查，并在指定时间执行日常巡检。
-// 真正删除仍受24小时缓冲期和每轮删除数量限制保护。
-func (s BookRetentionSupervisor) StartDaily(hour, minute int) {
-	go runBookRetentionLoop(context.Background(), s.RunOnce, func() time.Duration {
-		now := time.Now()
-		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-		if !next.After(now) {
-			next = next.AddDate(0, 0, 1)
+// StartDaily 每天在指定本地时间执行一次巡检。清理和删除动作集中在凌晨，避免
+// 白天业务高峰期间批量删除文件影响正常使用。
+func (s BatchRetentionSupervisor) StartDaily(hour, minute int) {
+	go func() {
+		for {
+			next := nextRetentionSweep(hour, minute, time.Now())
+			log.Printf("batch retention next sweep at %s", next.Format("2006-01-02 15:04:05"))
+			timer := time.NewTimer(time.Until(next))
+			<-timer.C
+			if err := s.RunOnce(context.Background()); err != nil {
+				log.Printf("batch retention sweep failed: %v", err)
+			}
 		}
-		delay := time.Until(next)
-		// Retry interrupted cleanup and apply changed settings within an hour.
-		if delay > time.Hour {
-			delay = time.Hour
-		}
-		log.Printf("book retention next sweep at %s", now.Add(delay).Format("2006-01-02 15:04:05"))
-		return delay
-	})
+	}()
 }
 
-func runBookRetentionLoop(ctx context.Context, run func(context.Context) error, delay func() time.Duration) {
-	for ctx.Err() == nil {
-		if err := run(ctx); err != nil {
-			log.Printf("book retention sweep failed: %v", err)
-		}
-		if ctx.Err() != nil {
-			return
-		}
-		timer := time.NewTimer(delay())
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-		}
+// nextRetentionSweep 返回下一次巡检时间；当天时间已过就顺延到第二天。
+func nextRetentionSweep(hour, minute int, now time.Time) time.Time {
+	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+	if !next.After(now) {
+		next = next.AddDate(0, 0, 1)
 	}
+	return next
 }
 
-// ListBookRetentionOwners 返回仍有作品的账号，避免对空账号做无意义扫描。
-func (s *MySQLStore) ListBookRetentionOwners(ctx context.Context) ([]string, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT owner_username FROM batch_factory_v12_books`)
+// ListRetentionOwners 返回仍有作品集的账号，避免对空账号做无意义扫描。
+func (s *MySQLStore) ListRetentionOwners(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT owner_username FROM batch_factory_v12_batches`)
 	if err != nil {
 		return nil, err
 	}
@@ -143,16 +129,17 @@ func (s *MySQLStore) ListBookRetentionOwners(ctx context.Context) ([]string, err
 	return owners, rows.Err()
 }
 
-type retentionBookActivity struct {
+type retentionBatchActivity struct {
 	id          string
 	completedAt time.Time
 	existing    sql.NullTime
 }
 
-// RecomputeBookRetention 按当前保留天数重算该账号所有作品的到期时间。
-// 它同时处理两件事：把未到期但已隐藏的作品恢复显示；把已到期的作品隐藏并
-// 安排 24 小时后的硬删。每次巡检都会重算，因此修改天数会追溯已有作品。
-func (s *MySQLStore) RecomputeBookRetention(ctx context.Context, owner string, days int) (RetentionRecomputeSummary, error) {
+// RecomputeBatchRetention 按当前保留天数重算该账号所有作品集的到期时间。
+// 它同时处理三件事：恢复旧版本按单本书隐藏的数据；把未到期但已隐藏的作品集
+// 恢复显示；把已到期的作品集隐藏并安排 24 小时后的硬删。每次巡检都会重算，
+// 因此修改天数会追溯已有作品集。
+func (s *MySQLStore) RecomputeBatchRetention(ctx context.Context, owner string, days int) (RetentionRecomputeSummary, error) {
 	summary := RetentionRecomputeSummary{}
 	if strings.TrimSpace(owner) == "" {
 		return summary, ErrInvalid
@@ -161,24 +148,25 @@ func (s *MySQLStore) RecomputeBookRetention(ctx context.Context, owner string, d
 	rows, err := s.db.QueryContext(ctx, `SELECT b.id,
 GREATEST(
   b.updated_at,
-  COALESCE((SELECT MAX(s.updated_at) FROM batch_factory_v12_book_stage_runs s WHERE s.book_id=b.id), b.updated_at),
-  COALESCE((SELECT MAX(m.updated_at) FROM batch_factory_v12_merge_jobs m WHERE m.book_id=b.id), b.updated_at),
-  COALESCE((SELECT MAX(p.updated_at) FROM batch_factory_v12_comic_pages p WHERE p.book_id=b.id), b.updated_at),
-  COALESCE((SELECT MAX(j.updated_at) FROM batch_factory_v12_production_jobs j WHERE j.book_id=b.id), b.updated_at)
+  COALESCE((SELECT MAX(x.updated_at) FROM batch_factory_v12_books x WHERE x.batch_id=b.id), b.updated_at),
+  COALESCE((SELECT MAX(s.updated_at) FROM batch_factory_v12_book_stage_runs s JOIN batch_factory_v12_books x ON x.id=s.book_id WHERE x.batch_id=b.id), b.updated_at),
+  COALESCE((SELECT MAX(m.updated_at) FROM batch_factory_v12_merge_jobs m WHERE m.batch_id=b.id), b.updated_at),
+  COALESCE((SELECT MAX(p.updated_at) FROM batch_factory_v12_comic_pages p JOIN batch_factory_v12_books x ON x.id=p.book_id WHERE x.batch_id=b.id), b.updated_at),
+  COALESCE((SELECT MAX(j.updated_at) FROM batch_factory_v12_production_jobs j WHERE j.batch_id=b.id), b.updated_at)
 ) AS completed_at,
 b.completed_at
-FROM batch_factory_v12_books b WHERE b.owner_username=?`, owner)
+FROM batch_factory_v12_batches b WHERE b.owner_username=?`, owner)
 	if err != nil {
 		return summary, err
 	}
-	activities := []retentionBookActivity{}
+	activities := []retentionBatchActivity{}
 	for rows.Next() {
-		var item retentionBookActivity
+		var item retentionBatchActivity
 		if err := rows.Scan(&item.id, &item.completedAt, &item.existing); err != nil {
 			rows.Close()
 			return summary, err
 		}
-		// 完成时间只前进不后退：删除漫画页或轮换视频都不应让作品“变新”。
+		// 完成时间只前进不后退：删除分镜或重做合成都不应让作品集“变新”。
 		if item.existing.Valid && item.existing.Time.After(item.completedAt) {
 			item.completedAt = item.existing.Time
 		}
@@ -196,18 +184,23 @@ FROM batch_factory_v12_books b WHERE b.owner_username=?`, owner)
 		return summary, err
 	}
 	defer tx.Rollback()
+	// 旧版本按单本书隐藏的数据恢复为可见，改用作品集统一计时后不会留下
+	// 半隐藏的批次。
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET hidden_at=NULL,purge_after=NULL WHERE owner_username=? AND hidden_at IS NOT NULL`, owner); err != nil {
+		return summary, err
+	}
 	for _, item := range activities {
-		expires := bookRetentionExpiry(item.completedAt, days)
-		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET completed_at=?,retention_expires_at=? WHERE id=? AND owner_username=?`, item.completedAt, expires, item.id, owner); err != nil {
+		expires := retentionExpiry(item.completedAt, days)
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET completed_at=?,retention_expires_at=? WHERE id=? AND owner_username=?`, item.completedAt, expires, item.id, owner); err != nil {
 			return summary, err
 		}
 	}
-	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET hidden_at=NULL,purge_after=NULL WHERE owner_username=? AND hidden_at IS NOT NULL AND purge_after>? AND retention_expires_at>?`, owner, now, now); err != nil {
+	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=NULL,purge_after=NULL WHERE owner_username=? AND hidden_at IS NOT NULL AND purge_after>? AND retention_expires_at>?`, owner, now, now); err != nil {
 		return summary, err
 	} else if affected, err := result.RowsAffected(); err == nil {
 		summary.Restored = affected
 	}
-	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET hidden_at=?,purge_after=? WHERE owner_username=? AND hidden_at IS NULL AND retention_expires_at IS NOT NULL AND retention_expires_at<=?`, now, now.Add(DefaultBookRetentionGrace), owner, now); err != nil {
+	if result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET hidden_at=?,purge_after=? WHERE owner_username=? AND hidden_at IS NULL AND retention_expires_at IS NOT NULL AND retention_expires_at<=?`, now, now.Add(DefaultRetentionGrace), owner, now); err != nil {
 		return summary, err
 	} else if affected, err := result.RowsAffected(); err == nil {
 		summary.Hidden = affected
@@ -218,62 +211,64 @@ FROM batch_factory_v12_books b WHERE b.owner_username=?`, owner)
 	return summary, nil
 }
 
-func bookRetentionExpiry(completed time.Time, days int) time.Time {
+func retentionExpiry(completed time.Time, days int) time.Time {
 	if days <= 0 {
 		days = DefaultLocalMergedArtifactRetentionDays
 	}
 	return completed.AddDate(0, 0, days)
 }
 
-// ClaimDueRetentionBook 原子领取一个已过缓冲期的作品。purge_after 会被推后，
+// ClaimDueRetentionBatch 原子领取一个已过缓冲期的作品集。purge_after 会被推后，
 // 这样进程在删除中途退出时不会立即被下一次巡检重复抢占。
-func (s *MySQLStore) ClaimDueRetentionBook(ctx context.Context) (RetentionBook, bool, error) {
+func (s *MySQLStore) ClaimDueRetentionBatch(ctx context.Context) (RetentionBatch, bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return RetentionBook{}, false, err
+		return RetentionBatch{}, false, err
 	}
 	defer tx.Rollback()
-	var book RetentionBook
+	var batch RetentionBatch
 	// 清理时间统一按 UTC 写入，因此这里也必须用 UTC_TIMESTAMP 比较；数据库
 	// 会话时区是本地时间时，CURRENT_TIMESTAMP 会提前 8 小时触发删除。
-	err = tx.QueryRowContext(ctx, `SELECT id,batch_id,owner_username FROM batch_factory_v12_books WHERE hidden_at IS NOT NULL AND purge_after<=UTC_TIMESTAMP(6) ORDER BY purge_after,id LIMIT 1 FOR UPDATE SKIP LOCKED`).
-		Scan(&book.ID, &book.BatchID, &book.Owner)
+	err = tx.QueryRowContext(ctx, `SELECT id,owner_username FROM batch_factory_v12_batches WHERE hidden_at IS NOT NULL AND purge_after<=UTC_TIMESTAMP(6) ORDER BY purge_after,id LIMIT 1 FOR UPDATE SKIP LOCKED`).
+		Scan(&batch.ID, &batch.Owner)
 	if errors.Is(err, sql.ErrNoRows) {
 		if commitErr := tx.Commit(); commitErr != nil {
-			return RetentionBook{}, false, commitErr
+			return RetentionBatch{}, false, commitErr
 		}
-		return RetentionBook{}, false, nil
+		return RetentionBatch{}, false, nil
 	}
 	if err != nil {
-		return RetentionBook{}, false, err
+		return RetentionBatch{}, false, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET purge_after=? WHERE id=?`, time.Now().UTC().Add(bookRetentionClaimWindow), book.ID); err != nil {
-		return RetentionBook{}, false, err
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET purge_after=? WHERE id=?`, time.Now().UTC().Add(retentionClaimWindow), batch.ID); err != nil {
+		return RetentionBatch{}, false, err
 	}
 	if err := tx.Commit(); err != nil {
-		return RetentionBook{}, false, err
+		return RetentionBatch{}, false, err
 	}
-	return book, true, nil
+	return batch, true, nil
 }
 
-// PurgeRetentionBook 先删云端与本地文件，全部成功后再删数据库记录。任何一步
+// PurgeRetentionBatch 先删云端与本地文件，全部成功后再删数据库记录。任何一步
 // 失败都会保留记录并等待下一轮重试，避免出现“记录没了、文件还在”的孤儿空间。
-func (s *MySQLStore) PurgeRetentionBook(ctx context.Context, book RetentionBook, local *localartifact.Store, remote RemoteObjectDeleter) error {
-	if strings.TrimSpace(book.Owner) == "" || strings.TrimSpace(book.BatchID) == "" || strings.TrimSpace(book.ID) == "" {
+func (s *MySQLStore) PurgeRetentionBatch(ctx context.Context, batch RetentionBatch, local *localartifact.Store, remote RemoteObjectDeleter) error {
+	if strings.TrimSpace(batch.Owner) == "" || strings.TrimSpace(batch.ID) == "" {
 		return ErrInvalid
 	}
 	if local == nil {
-		return fmt.Errorf("book retention local store is not configured")
+		return fmt.Errorf("batch retention local store is not configured")
 	}
-	refs, tosKeys, err := s.bookStorageRefs(ctx, book.Owner, book.ID)
+	refs, tosKeys, err := s.batchStorageRefs(ctx, batch.Owner, batch.ID)
 	if err != nil {
 		return err
 	}
+	// 没有 TOS 客户端时不能确定云端对象是否已删除，保留作品集等待下次重试，
+	// 避免出现“数据库删了、云端还在”的孤儿文件。
 	if remote == nil && len(tosKeys) > 0 {
-		return fmt.Errorf("TOS is not configured; retain book and cloud references for retry")
+		return fmt.Errorf("TOS is not configured; retain batch and cloud references for retry")
 	}
 	if len(refs) > 0 {
-		shared, err := s.visibleBookStorageRefs(ctx, book.Owner, book.ID)
+		shared, err := s.visibleBatchStorageRefs(ctx, batch.Owner, batch.ID)
 		if err != nil {
 			return err
 		}
@@ -281,7 +276,7 @@ func (s *MySQLStore) PurgeRetentionBook(ctx context.Context, book RetentionBook,
 			if _, ok := shared[ref]; ok {
 				continue
 			}
-			if err := s.purgeStorageRef(ctx, book.Owner, ref, local, remote); err != nil {
+			if err := s.purgeStorageRef(ctx, batch.Owner, ref, local, remote); err != nil {
 				return err
 			}
 		}
@@ -293,7 +288,7 @@ func (s *MySQLStore) PurgeRetentionBook(ctx context.Context, book RetentionBook,
 			}
 		}
 	}
-	return s.deleteRetentionBookRows(ctx, book)
+	return s.deleteRetentionBatchRows(ctx, batch)
 }
 
 func (s *MySQLStore) purgeStorageRef(ctx context.Context, owner, ref string, local *localartifact.Store, remote RemoteObjectDeleter) error {
@@ -325,10 +320,10 @@ func (s *MySQLStore) purgeStorageRef(ctx context.Context, owner, ref string, loc
 	return nil
 }
 
-// bookStorageRefs 汇总一个作品实际占用的本地 / 云端文件引用。引用值统一为
+// batchStorageRefs 汇总一个作品集实际占用的本地 / 云端文件引用。引用值统一为
 // localartifact 的文件名，因此既能删本地缓存，也能通过 media_objects 找到
 // 对应的 TOS object_key；合并成片直接上传 TOS 时则单独返回 object_key。
-func (s *MySQLStore) bookStorageRefs(ctx context.Context, owner, bookID string) (map[string]struct{}, map[string]struct{}, error) {
+func (s *MySQLStore) batchStorageRefs(ctx context.Context, owner, batchID string) (map[string]struct{}, map[string]struct{}, error) {
 	refs := map[string]struct{}{}
 	tosKeys := map[string]struct{}{}
 	addRef := func(value string) {
@@ -341,16 +336,13 @@ func (s *MySQLStore) bookStorageRefs(ctx context.Context, owner, bookID string) 
 			tosKeys[value] = struct{}{}
 		}
 	}
-	queries := []struct {
-		query string
-		args  []any
-	}{
-		{`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_page_images i JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id WHERE p.owner_username=? AND p.book_id=?`, []any{owner, bookID}},
-		{`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id WHERE a.owner_username=? AND a.book_id=?`, []any{owner, bookID}},
-		{`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_collection_items i JOIN batch_factory_v12_comic_collections c ON c.id=i.collection_id WHERE c.owner_username=? AND c.book_id=?`, []any{owner, bookID}},
+	queries := []string{
+		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_page_images i JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id JOIN batch_factory_v12_books b ON b.id=p.book_id WHERE p.owner_username=? AND b.batch_id=?`,
+		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id JOIN batch_factory_v12_books b ON b.id=a.book_id WHERE a.owner_username=? AND b.batch_id=?`,
+		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_collection_items i JOIN batch_factory_v12_comic_collections c ON c.id=i.collection_id JOIN batch_factory_v12_books b ON b.id=c.book_id WHERE c.owner_username=? AND b.batch_id=?`,
 	}
-	for _, item := range queries {
-		rows, err := s.db.QueryContext(ctx, item.query, item.args...)
+	for _, query := range queries {
+		rows, err := s.db.QueryContext(ctx, query, owner, batchID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -368,7 +360,7 @@ func (s *MySQLStore) bookStorageRefs(ctx context.Context, owner, bookID string) 
 		}
 		rows.Close()
 	}
-	mediaRefs, artifactIDs, mediaKeys, err := s.bookMediaURLs(ctx, `SELECT COALESCE(j.output_url,'') FROM batch_factory_v12_merge_jobs j WHERE j.owner_username=? AND j.book_id=?`, owner, bookID)
+	mediaRefs, artifactIDs, mediaKeys, err := s.batchMediaURLs(ctx, `SELECT COALESCE(m.output_url,'') FROM batch_factory_v12_merge_jobs m WHERE m.owner_username=? AND m.batch_id=?`, owner, batchID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -379,10 +371,10 @@ func (s *MySQLStore) bookStorageRefs(ctx context.Context, owner, bookID string) 
 		addKey(key)
 	}
 	for _, query := range []string{
-		`SELECT COALESCE(t.media_url,'') FROM batch_factory_v12_production_tasks t JOIN batch_factory_v12_production_jobs j ON j.id=t.job_id WHERE j.owner_username=? AND j.book_id=?`,
-		`SELECT COALESCE(s.media_url,'') FROM batch_factory_v12_merge_sources s JOIN batch_factory_v12_merge_jobs m ON m.id=s.job_id WHERE s.owner_username=? AND m.book_id=?`,
+		`SELECT COALESCE(t.media_url,'') FROM batch_factory_v12_production_tasks t JOIN batch_factory_v12_production_jobs j ON j.id=t.job_id WHERE j.owner_username=? AND j.batch_id=?`,
+		`SELECT COALESCE(s.media_url,'') FROM batch_factory_v12_merge_sources s JOIN batch_factory_v12_merge_jobs m ON m.id=s.job_id WHERE s.owner_username=? AND m.batch_id=?`,
 	} {
-		moreRefs, moreIDs, moreKeys, err := s.bookMediaURLs(ctx, query, owner, bookID)
+		moreRefs, moreIDs, moreKeys, err := s.batchMediaURLs(ctx, query, owner, batchID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -404,8 +396,8 @@ func (s *MySQLStore) bookStorageRefs(ctx context.Context, owner, bookID string) 
 	return refs, tosKeys, nil
 }
 
-// visibleBookStorageRefs 返回其他可见作品仍在使用、因此不能删除的引用。
-func (s *MySQLStore) visibleBookStorageRefs(ctx context.Context, owner, excludeBookID string) (map[string]struct{}, error) {
+// visibleBatchStorageRefs 返回其他可见作品集仍在使用、因此不能删除的引用。
+func (s *MySQLStore) visibleBatchStorageRefs(ctx context.Context, owner, excludeBatchID string) (map[string]struct{}, error) {
 	refs := map[string]struct{}{}
 	addRef := func(value string) {
 		if value = strings.TrimSpace(value); value != "" {
@@ -413,11 +405,11 @@ func (s *MySQLStore) visibleBookStorageRefs(ctx context.Context, owner, excludeB
 		}
 	}
 	for _, query := range []string{
-		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_page_images i JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id JOIN batch_factory_v12_books b ON b.id=p.book_id AND b.owner_username=p.owner_username WHERE i.owner_username=? AND b.id<>? AND b.hidden_at IS NULL`,
-		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id JOIN batch_factory_v12_books b ON b.id=a.book_id AND b.owner_username=a.owner_username WHERE a.owner_username=? AND b.id<>? AND b.hidden_at IS NULL`,
-		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_collection_items i JOIN batch_factory_v12_comic_collections c ON c.id=i.collection_id JOIN batch_factory_v12_books b ON b.id=c.book_id AND b.owner_username=c.owner_username WHERE c.owner_username=? AND b.id<>? AND b.hidden_at IS NULL`,
+		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_page_images i JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id JOIN batch_factory_v12_books b ON b.id=p.book_id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id WHERE i.owner_username=? AND b.batch_id<>? AND ba.hidden_at IS NULL`,
+		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id JOIN batch_factory_v12_books b ON b.id=a.book_id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id WHERE a.owner_username=? AND b.batch_id<>? AND ba.hidden_at IS NULL`,
+		`SELECT COALESCE(i.storage_ref,'') FROM batch_factory_v12_comic_collection_items i JOIN batch_factory_v12_comic_collections c ON c.id=i.collection_id JOIN batch_factory_v12_books b ON b.id=c.book_id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id WHERE c.owner_username=? AND b.batch_id<>? AND ba.hidden_at IS NULL`,
 	} {
-		rows, err := s.db.QueryContext(ctx, query, owner, excludeBookID)
+		rows, err := s.db.QueryContext(ctx, query, owner, excludeBatchID)
 		if err != nil {
 			return nil, err
 		}
@@ -435,7 +427,7 @@ func (s *MySQLStore) visibleBookStorageRefs(ctx context.Context, owner, excludeB
 		}
 		rows.Close()
 	}
-	mergeRefs, _, _, err := s.bookMediaURLs(ctx, `SELECT COALESCE(j.output_url,'') FROM batch_factory_v12_merge_jobs j JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND b.id<>? AND b.hidden_at IS NULL`, owner, excludeBookID)
+	mergeRefs, _, _, err := s.batchMediaURLs(ctx, `SELECT COALESCE(m.output_url,'') FROM batch_factory_v12_merge_jobs m JOIN batch_factory_v12_batches b ON b.id=m.batch_id AND b.owner_username=m.owner_username WHERE m.owner_username=? AND m.batch_id<>? AND b.hidden_at IS NULL`, owner, excludeBatchID)
 	if err != nil {
 		return nil, err
 	}
@@ -444,10 +436,10 @@ func (s *MySQLStore) visibleBookStorageRefs(ctx context.Context, owner, excludeB
 	}
 	artifactIDs := []string{}
 	for _, query := range []string{
-		`SELECT COALESCE(t.media_url,'') FROM batch_factory_v12_production_tasks t JOIN batch_factory_v12_production_jobs j ON j.id=t.job_id JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND b.id<>? AND b.hidden_at IS NULL`,
-		`SELECT COALESCE(s.media_url,'') FROM batch_factory_v12_merge_sources s JOIN batch_factory_v12_merge_jobs m ON m.id=s.job_id JOIN batch_factory_v12_books b ON b.id=m.book_id AND b.owner_username=m.owner_username WHERE s.owner_username=? AND b.id<>? AND b.hidden_at IS NULL`,
+		`SELECT COALESCE(t.media_url,'') FROM batch_factory_v12_production_tasks t JOIN batch_factory_v12_production_jobs j ON j.id=t.job_id JOIN batch_factory_v12_batches b ON b.id=j.batch_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.batch_id<>? AND b.hidden_at IS NULL`,
+		`SELECT COALESCE(s.media_url,'') FROM batch_factory_v12_merge_sources s JOIN batch_factory_v12_merge_jobs m ON m.id=s.job_id JOIN batch_factory_v12_batches b ON b.id=m.batch_id AND b.owner_username=m.owner_username WHERE s.owner_username=? AND m.batch_id<>? AND b.hidden_at IS NULL`,
 	} {
-		rows, err := s.db.QueryContext(ctx, query, owner, excludeBookID)
+		rows, err := s.db.QueryContext(ctx, query, owner, excludeBatchID)
 		if err != nil {
 			return nil, err
 		}
@@ -477,9 +469,9 @@ func (s *MySQLStore) visibleBookStorageRefs(ctx context.Context, owner, excludeB
 	return refs, nil
 }
 
-// bookMediaURLs 把媒体 URL 拆成“本地合并视频文件名”“本地执行器 artifact id”
+// batchMediaURLs 把媒体 URL 拆成“本地合并视频文件名”“本地执行器 artifact id”
 // 和“直接上传 TOS 的合并成片 object_key”。
-func (s *MySQLStore) bookMediaURLs(ctx context.Context, query string, args ...any) ([]string, []string, []string, error) {
+func (s *MySQLStore) batchMediaURLs(ctx context.Context, query string, args ...any) ([]string, []string, []string, error) {
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, nil, nil, err
@@ -545,46 +537,49 @@ func (s *MySQLStore) artifactStorageRefs(ctx context.Context, owner string, ids 
 	return refs, rows.Err()
 }
 
-// deleteRetentionBookRows 删除作品数据库记录。若批次内已无作品，同时清掉批次
-// 记录，避免列表里留下永远空的项目。
-func (s *MySQLStore) deleteRetentionBookRows(ctx context.Context, book RetentionBook) error {
+// deleteRetentionBatchRows 删除整个作品集的数据库记录：先删每本书的子表，再删
+// 批次本身。缓冲期内用户调大保留天数时作品集会恢复显示，此时必须放弃删除。
+func (s *MySQLStore) deleteRetentionBatchRows(ctx context.Context, batch RetentionBatch) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	var hidden sql.NullTime
-	err = tx.QueryRowContext(ctx, `SELECT hidden_at FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, book.ID, book.BatchID, book.Owner).Scan(&hidden)
+	err = tx.QueryRowContext(ctx, `SELECT hidden_at FROM batch_factory_v12_batches WHERE id=? AND owner_username=? FOR UPDATE`, batch.ID, batch.Owner).Scan(&hidden)
 	if errors.Is(err, sql.ErrNoRows) {
 		return tx.Commit()
 	}
 	if err != nil {
 		return err
 	}
-	// 缓冲期内用户调大保留天数时作品会被恢复显示，此时必须放弃删除。
 	if !hidden.Valid {
 		return tx.Commit()
 	}
-	// 合并任务只按批次关联，不会随作品级联删除。先清掉该作品的合并记录，
-	// 避免项目卡片继续引用已经删除的成片文件。
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_merge_sources WHERE owner_username=? AND job_id IN (SELECT id FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=? AND book_id=?)`, book.Owner, book.Owner, book.BatchID, book.ID); err != nil {
+	rows, err := tx.QueryContext(ctx, `SELECT id FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=?`, batch.ID, batch.Owner)
+	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=? AND book_id=?`, book.Owner, book.BatchID, book.ID); err != nil {
-		return err
-	}
-	if err := deleteBookTx(ctx, tx, book.Owner, book.BatchID, book.ID); err != nil {
-		return err
-	}
-	var remaining int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=?`, book.BatchID, book.Owner).Scan(&remaining); err != nil {
-		return err
-	}
-	if remaining == 0 {
-		if err := deleteBatchTx(ctx, tx, book.Owner, book.BatchID); err != nil {
+	bookIDs := []string{}
+	for rows.Next() {
+		var bookID string
+		if err := rows.Scan(&bookID); err != nil {
+			rows.Close()
 			return err
 		}
-	} else if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET revision=revision+1,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, book.BatchID, book.Owner); err != nil {
+		bookIDs = append(bookIDs, bookID)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, bookID := range bookIDs {
+		if err := deleteBookTx(ctx, tx, batch.Owner, batch.ID, bookID); err != nil {
+			return err
+		}
+	}
+	if err := deleteBatchTx(ctx, tx, batch.Owner, batch.ID); err != nil {
 		return err
 	}
 	return tx.Commit()

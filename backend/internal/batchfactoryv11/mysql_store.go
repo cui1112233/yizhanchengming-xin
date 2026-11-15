@@ -518,7 +518,7 @@ func nullableFloat(v float64) any {
 }
 
 func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND EXISTS (SELECT 1 FROM batch_factory_v12_books vb WHERE vb.batch_id=b.id AND vb.owner_username=b.owner_username AND vb.hidden_at IS NULL) ORDER BY b.created_at DESC,b.id DESC`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.created_at DESC,b.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +576,7 @@ func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, er
 // Keeping this as two bulk queries prevents the library page from turning N
 // historical batches into thousands of SQL statements.
 func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([]Batch, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND EXISTS (SELECT 1 FROM batch_factory_v12_books vb WHERE vb.batch_id=b.id AND vb.owner_username=b.owner_username AND vb.hidden_at IS NULL) ORDER BY b.created_at DESC,b.id DESC`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.created_at DESC,b.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -1214,7 +1214,7 @@ type batchQueryer interface {
 
 func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, error) {
 	var b Batch
-	err := q.QueryRowContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.id=? AND b.owner_username=?`, id, owner).Scan(&b.ID, &b.Title, &b.SourceIntakeID, &b.Revision, &b.CreatedAt, &b.UpdatedAt)
+	err := q.QueryRowContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.id=? AND b.owner_username=? AND b.hidden_at IS NULL`, id, owner).Scan(&b.ID, &b.Title, &b.SourceIntakeID, &b.Revision, &b.CreatedAt, &b.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, ErrNotFound
 	}

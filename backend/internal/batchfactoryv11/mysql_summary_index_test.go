@@ -17,7 +17,7 @@ func TestListBatchSummaryIndexReadsOnlyProjectCardFields(t *testing.T) {
 	defer db.Close()
 
 	now := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND EXISTS (SELECT 1 FROM batch_factory_v12_books vb WHERE vb.batch_id=b.id AND vb.owner_username=b.owner_username AND vb.hidden_at IS NULL) ORDER BY b.created_at DESC,b.id DESC`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.created_at DESC,b.id DESC`)).
 		WithArgs("alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "revision", "created_at", "updated_at"}).
 			AddRow("batch-2", "第二批", int64(8), now, now).

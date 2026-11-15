@@ -5,21 +5,21 @@ import (
 	"time"
 )
 
-func TestBookRetentionExpiryUsesConfiguredDays(t *testing.T) {
+func TestRetentionExpiryUsesConfiguredDays(t *testing.T) {
 	completed := time.Date(2026, 11, 1, 8, 30, 0, 0, time.UTC)
 	for _, days := range []int{3, 7, 14, 30} {
 		want := completed.AddDate(0, 0, days)
-		if got := bookRetentionExpiry(completed, days); !got.Equal(want) {
-			t.Fatalf("bookRetentionExpiry(%d)=%s want=%s", days, got, want)
+		if got := retentionExpiry(completed, days); !got.Equal(want) {
+			t.Fatalf("retentionExpiry(%d)=%s want=%s", days, got, want)
 		}
 	}
 }
 
-func TestBookRetentionExpiryFallsBackToDefaultWindow(t *testing.T) {
+func TestRetentionExpiryFallsBackToDefaultWindow(t *testing.T) {
 	completed := time.Date(2026, 11, 1, 8, 30, 0, 0, time.UTC)
 	want := completed.AddDate(0, 0, DefaultLocalMergedArtifactRetentionDays)
-	if got := bookRetentionExpiry(completed, 0); !got.Equal(want) {
-		t.Fatalf("bookRetentionExpiry(0)=%s want=%s", got, want)
+	if got := retentionExpiry(completed, 0); !got.Equal(want) {
+		t.Fatalf("retentionExpiry(0)=%s want=%s", got, want)
 	}
 }
 
