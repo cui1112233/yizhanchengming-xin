@@ -30,7 +30,9 @@ export default function ComicScreenplayStoryboardSettings({projectId,projectRevi
  async function commitConfig(patch,choose=false){
   if(choose){const selected=storyboardPromptRows(prompts,'',{includeCompatibility:true}).find(item=>item.id===patch.storyboard_prompt_id);if(selected?.supported===false){setError(selected.unsupported_reason||'此模板暂不可执行');return false;}}
   if(pending.current||disabled)return false;const token=epoch.current,before=configRef.current;pending.current=true;setBusy('config');setError('');adoptConfig({...before,creative_config:{...before.creative_config,...patch}});
-  try{let result=before;if(!choose||before.creative_config?.storyboard_prompt_id!==patch.storyboard_prompt_id)result=await saveComicCreativeConfig(projectId,{...patch,expected_revision:before.revision});if((token!==epoch.current||scope.current!==projectId))return false;adoptConfig(result);savedRef.current?.(result);
+  // An explicit re-selection must reach the server so a reviewed contract can
+  // be adopted without silently changing a project's frozen prompt on reads.
+  try{const result=await saveComicCreativeConfig(projectId,{...patch,expected_revision:before.revision});if((token!==epoch.current||scope.current!==projectId))return false;adoptConfig(result);savedRef.current?.(result);
    if(choose&&manage){try{const recent=await changeStoryboardPreferences({action:'recent',prompt_id:patch.storyboard_prompt_id,expected_revision:prefsRef.current.state.revision});if((token!==epoch.current||scope.current!==projectId))return false;adoptPrefs({...preferences,...recent});}catch(err){if((token===epoch.current&&scope.current===projectId)){await recover('prefs',token);if((token===epoch.current&&scope.current===projectId))setError(`分镜词已保存，但最近使用记录未保存：${err.message||'请重试'}`);}return false;}}
    if(choose)setPicker(false);return result;
   }catch(err){if((token===epoch.current&&scope.current===projectId)){adoptConfig(before);await recover('config',token);if((token===epoch.current&&scope.current===projectId))setError(err.message||'设置未保存，已恢复服务器状态');}return false;}finally{if((token===epoch.current&&scope.current===projectId)){pending.current=false;setBusy('');}}

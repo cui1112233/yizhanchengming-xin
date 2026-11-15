@@ -92,7 +92,7 @@ func TestRecoveredStoryboardRejectsBadDurationTypesAndIncompleteReports(t *testi
 }
 
 func TestRecoveredUnsupportedPromptMakesNoProviderRequest(t *testing.T) {
-	for _, id := range []string{"138", "139"} {
+	for _, id := range []string{"138"} {
 		s, _, g := newStoryboardService(t, PermissionBypass)
 		req := generationTestRequest("unsupported-" + id)
 		req.PromptID = id

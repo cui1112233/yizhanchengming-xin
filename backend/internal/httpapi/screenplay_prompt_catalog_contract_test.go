@@ -31,11 +31,17 @@ func TestScreenplayPromptCatalogExposesProtocolAndDisabledReasons(t *testing.T) 
 		if p.Body != "" {
 			t.Fatal("public metadata leaked system body")
 		}
-		if p.SourceID == 138 || p.SourceID == 139 || p.SourceID == 293 {
+		if p.SourceID == 138 || p.SourceID == 293 {
 			if p.Supported || p.Reason == "" {
 				t.Fatal("unsupported choice became enabled", p)
 			}
 			found[p.SourceID] = true
+		}
+		if p.SourceID == 139 {
+			if !p.Supported || p.Reason != "" || p.Parser != "cm_storyboard_139_optional_image_v2" {
+				t.Fatal("reviewed optional-image adapter missing", p)
+			}
+			found[139] = true
 		}
 		if p.SourceID == 137 {
 			if !p.Supported || p.Protocol == "" || p.Parser == "" {

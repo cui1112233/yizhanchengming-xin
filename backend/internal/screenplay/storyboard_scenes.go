@@ -226,7 +226,8 @@ func validateSelectedStoryboardProtocol(p prompt.CreativePromptSnapshot, raw str
 				if string(value) == "null" || json.Unmarshal(value, &text) != nil {
 					return fmt.Errorf("%w: 第%d组%s应为文字", ErrAIInvalidStoryboard, i+1, key)
 				}
-				if (key == "video_desc" || key == "image_prompt" || key == "image_desc") && strings.TrimSpace(text) == "" {
+				optionalImage := key == "image_prompt" && prompt.StoryboardAllowsMissingImagePrompt(p)
+				if (key == "video_desc" || key == "image_prompt" || key == "image_desc") && strings.TrimSpace(text) == "" && !optionalImage {
 					return fmt.Errorf("%w: 第%d组%s为空", ErrAIInvalidStoryboard, i+1, key)
 				}
 			}

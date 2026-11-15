@@ -43,6 +43,9 @@ func TestScreenplayCreativeHTTPOriginalStoryboardCatalog(t *testing.T) {
 			}
 			if !row.Supported {
 				unavailable++
+				if row.ID != "luoshui_storyboard_138" {
+					t.Fatal("unexpected unavailable template", row.ID)
+				}
 			}
 		case "compatibility":
 			compat++
@@ -50,7 +53,7 @@ func TestScreenplayCreativeHTTPOriginalStoryboardCatalog(t *testing.T) {
 			t.Fatal("unclassified prompt", row.ID)
 		}
 	}
-	if original != 41 || compat != 2 || unavailable != 2 {
+	if original != 41 || compat != 2 || unavailable != 1 {
 		t.Fatalf("original=%d compatibility=%d unavailable=%d", original, compat, unavailable)
 	}
 }

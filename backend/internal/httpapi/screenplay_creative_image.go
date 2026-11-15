@@ -81,7 +81,13 @@ func (s *ScreenplayMediaWorkbench) creativeImagePrompt(ctx context.Context, p sc
 				if shot.ID == target {
 					imagePrompt := strings.TrimSpace(shot.ImagePrompt)
 					if imagePrompt == "" {
-						imagePrompt = shot.VideoDesc
+						if board.Engine == screenplay.StoryboardEngine("prompt_139") {
+							if strings.TrimSpace(extra) == "" {
+								return "", fmt.Errorf("%w: 当前分镜没有图片提示词，请先补充图片提示词", screenplay.ErrInvalidArgument)
+							}
+						} else {
+							imagePrompt = shot.VideoDesc
+						}
 					}
 					parts = append(parts, imagePrompt)
 				}

@@ -112,6 +112,13 @@ func recoveredCreativeEntries() ([]recoveredCreativeRecord, error) {
 		}
 		if len(seen) != 63 {
 			recoveredCreativeErr = fmt.Errorf("恢复提示词目录数量%d，应为63", len(seen))
+			return
+		}
+		for i := range recoveredCreativeRecords {
+			if err := applyRecoveredProtocolOverrides(&recoveredCreativeRecords[i].CreativePromptMetadata); err != nil {
+				recoveredCreativeErr = err
+				return
+			}
 		}
 	})
 	return recoveredCreativeRecords, recoveredCreativeErr

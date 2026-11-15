@@ -72,7 +72,7 @@ func TestRecoveredSourceDatesRemainPinnedAndSnapshotsRetainDates(t *testing.T) {
 			disabled[row.SourceID] = true
 		}
 	}
-	if len(disabled) != 2 || !disabled[138] || !disabled[139] {
+	if len(disabled) != 1 || !disabled[138] {
 		t.Fatal("unsupported template guards changed", disabled)
 	}
 }

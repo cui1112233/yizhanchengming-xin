@@ -390,6 +390,14 @@ func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor stri
 			continue
 		}
 		if frozen, ok := c.PromptSnapshots[s.purpose]; ok && frozen.ID == id && frozen.Type == s.purpose && frozen.Body != "" {
+			if s.src != nil && s.purpose == "storyboard" && id == "luoshui_storyboard_139" {
+				refreshed, approved := prompt.RefreshStoryboard139ForExplicitSelection(frozen)
+				if approved {
+					c.PromptSnapshots[s.purpose] = refreshed
+				} else if !frozen.Supported {
+					return fmt.Errorf("冻结的139正文与已审核版本不一致，不能自动替换；请先选择其他模板后再重新选择139")
+				}
+			}
 			*s.dst = id
 			continue
 		}
