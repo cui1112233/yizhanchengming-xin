@@ -24,6 +24,17 @@ type RewriteProvider interface {
 	Complete(context.Context, RewriteRequest) (string, error)
 }
 
+type rewriteBudgetObserver struct {
+	provider  RewriteProvider
+	maxTokens int
+	calls     int
+}
+
+func (p *rewriteBudgetObserver) Complete(ctx context.Context, req RewriteRequest) (string, error) {
+	p.maxTokens, p.calls = req.MaxTokens, p.calls+1
+	return p.provider.Complete(ctx, req)
+}
+
 type RewriteTextProcessor func(context.Context, string, string) (string, []map[string]any, []map[string]any, error)
 
 const (
@@ -380,7 +391,8 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 		if plan.SystemPrompt != "" {
 			request.SystemPrompt = fillRewriteTemplate(plan.SystemPrompt, map[string]string{"content_id": document.BookID, "book_id": document.BookID})
 		}
-		result, generationErr := completeValidatedRewrite(ctx, provider, request, document.BookID, plan.ResponseMode, processCount, targetChars)
+		observed := &rewriteBudgetObserver{provider: provider}
+		result, generationErr := completeValidatedRewrite(ctx, observed, request, document.BookID, plan.ResponseMode, processCount, targetChars)
 		if generationErr != nil {
 			document.Meta["rewriteValidationHold"] = errors.Is(generationErr, ErrRewriteValidation)
 			document.Meta["aiStatus"] = "failed"
@@ -424,7 +436,7 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 		if evidence == nil {
 			evidence = map[string]any{}
 		}
-		evidence[versionID] = map[string]any{"method": plan.Method, "strategy_name": plan.StrategyName, "template_id": plan.TemplateID, "template_name": plan.TemplateName, "opening_phrase_name": plan.OpeningPhraseName, "high_imitation_reference_name": plan.HighImitationReferenceName, "process_line_count": plan.ProcessLines, "anchor_line_count": plan.AnchorLines, "temperature": plan.Temperature, "max_tokens": plan.MaxTokens}
+		evidence[versionID] = map[string]any{"method": plan.Method, "strategy_name": plan.StrategyName, "template_id": plan.TemplateID, "template_name": plan.TemplateName, "opening_phrase_name": plan.OpeningPhraseName, "high_imitation_reference_name": plan.HighImitationReferenceName, "process_line_count": plan.ProcessLines, "anchor_line_count": plan.AnchorLines, "temperature": plan.Temperature, "max_tokens": observed.maxTokens, "initial_max_tokens": plan.MaxTokens, "provider_attempts": observed.calls}
 		if model != "" {
 			evidence[versionID].(map[string]any)["model"] = model
 		}

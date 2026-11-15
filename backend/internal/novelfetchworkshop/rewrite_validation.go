@@ -105,6 +105,26 @@ func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, req
 		}
 		raw, err := provider.Complete(ctx, request)
 		if err != nil {
+			message := strings.ToLower(err.Error())
+			truncated := strings.Contains(message, "输出被长度截断") || strings.Contains(message, "finish_reason=length") || strings.Contains(message, "max_output_tokens") && strings.Contains(message, "truncat")
+			if truncated {
+				lastErr = err
+				// Compact budgets can be consumed by reasoning before any prose
+				// is returned. Escalate only an explicit truncation, at most twice.
+				// Exhaustion becomes a manual hold instead of another queue loop.
+				if request.MaxTokens >= 8192 {
+					break
+				}
+				next := request.MaxTokens * 2
+				if next < 4096 {
+					next = 4096
+				}
+				if next > 8192 {
+					next = 8192
+				}
+				request.MaxTokens = next
+				continue
+			}
 			return "", err
 		}
 		result, err := parseRewriteOutput(raw, mode, bookID, lineCount)
