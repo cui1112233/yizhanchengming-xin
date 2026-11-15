@@ -1182,6 +1182,10 @@ var deleteBookStmts = []deleteBookStmt{
 		args:  func(owner, batchID, bookID string) []any { return []any{owner, "working-front:" + bookID, batchID} },
 	},
 	{query: `DELETE FROM batch_factory_v12_config_snapshots WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	// Collection items restrict deletion of their video, page and image parents.
+	// Clear only references within this owner's collections, then own collections.
+	{query: `DELETE i FROM batch_factory_v12_comic_collection_items i JOIN batch_factory_v12_videos v ON v.id=i.video_id JOIN batch_factory_v12_comic_collections c ON c.id=i.collection_id WHERE v.owner_username=? AND v.batch_id=? AND v.book_id=? AND c.owner_username=v.owner_username`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_comic_collections WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{query: `DELETE FROM batch_factory_v12_video_records WHERE video_id IN (SELECT id FROM batch_factory_v12_videos WHERE owner_username=? AND batch_id=? AND book_id=?)`, args: deleteBookDefaultArgs},
 	{query: `DELETE FROM batch_factory_v12_videos WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{

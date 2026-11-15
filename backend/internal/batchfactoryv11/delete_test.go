@@ -47,6 +47,24 @@ func TestDeleteBatchRejectsOtherOwner(t *testing.T) {
 // TestDeleteBookStmtsPlaceholderCountMatchesArgs guards against the bug where
 // the drafts DELETE had 2 placeholders but was handed 3 arguments, which made
 // every book/batch deletion fail with a 500 internal error.
+func TestDeleteBookClearsComicCollectionReferencesBeforeVideoParents(t *testing.T) {
+	collections, references, videos := -1, -1, -1
+	for i, s := range deleteBookStmts {
+		if strings.Contains(s.query, "DELETE FROM batch_factory_v12_comic_collections ") {
+			collections = i
+		}
+		if strings.Contains(s.query, "DELETE i FROM batch_factory_v12_comic_collection_items i") {
+			references = i
+		}
+		if strings.Contains(s.query, "DELETE FROM batch_factory_v12_video_records ") {
+			videos = i
+		}
+	}
+	if collections < 0 || references < 0 || videos < 0 || collections >= videos || references >= videos {
+		t.Fatalf("restricting comic collection references must precede video records: collections=%d references=%d videos=%d", collections, references, videos)
+	}
+}
+
 func TestDeleteBookStmtsPlaceholderCountMatchesArgs(t *testing.T) {
 	for _, stmt := range deleteBookStmts {
 		placeholders := strings.Count(stmt.query, "?")
