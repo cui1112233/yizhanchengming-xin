@@ -373,7 +373,8 @@ func ApplySensitiveRulesForScopeWithDetails(text string, settings map[string]any
 		return text, 0, []map[string]any{}
 	}
 	rules := make([]any, 0)
-	collectSensitiveRulesForScope(settings, &rules, strings.ToLower(strings.TrimSpace(scope)))
+	source, _ := sensitiveRuleSource(settings)
+	collectSensitiveRulesForScope(source, &rules, strings.ToLower(strings.TrimSpace(scope)))
 	// Prefer the most specific phrase when a catalog contains both a phrase
 	// and one of its shorter words (for example "侵犯" and "犯"). This keeps
 	// the intended phrase from being damaged by an earlier short replacement.
@@ -469,7 +470,7 @@ func collectSensitiveRulesForScope(value any, out *[]any, scope string) {
 				}
 			}
 		}
-		for _, key := range []string{"sensitive_rules", "sensitiveRules"} {
+		for _, key := range []string{"sensitive_rules", "sensitiveRules", "rules"} {
 			if raw, ok := typed[key]; ok {
 				for _, rule := range anySlice(raw) {
 					*out = append(*out, rule)
@@ -516,6 +517,9 @@ func sensitiveRule(raw any) (string, string, bool) {
 	if item, ok := raw.(map[string]any); ok {
 		find := strings.TrimSpace(stringValue(item["find"], item["pattern"], item["source"]))
 		replace := stringValue(item["replace"], item["replacement"], item["target"])
+		if explicit, ok := item["replace"].(string); ok && item["replace_explicit"] == true {
+			replace = explicit
+		}
 		enabled := true
 		if value, exists := item["enabled"]; exists {
 			enabled = boolValue(value)

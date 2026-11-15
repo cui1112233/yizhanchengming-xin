@@ -170,6 +170,7 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 			}
 		}
 	}
+	promoteSavedSensitiveCatalog(settings)
 	merged := mergeWorkshopMaps(DefaultWorkshopSettings(), settings)
 	// Keep the legacy view synchronized for older embedded pages. The Go
 	// knowledgeLibraries map remains the canonical persisted source.

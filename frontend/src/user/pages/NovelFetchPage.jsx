@@ -1,4 +1,7 @@
 import { formatWorkDateTime } from '../../shared/workDateTime.js';
+import { updateSensitiveRule, parseSensitiveBulkLines } from './novel-fetch-sensitive-edit.js';
+import { taskDetailNeedsContent } from './novel-fetch-detail-content.js';
+import { getWorkshopTaskSummary } from '../../shared/api/novelFetchWorkshop.js';
 import { Alert, Button, Checkbox, Collapse, ConfigProvider, Descriptions, Drawer, Dropdown, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CalendarClock, ChevronDown, ChevronUp, Factory, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -225,14 +228,14 @@ function RuleEditor({ kind, value, onChange }) {
       update({ ...config, groups: nextGroups });
     };
     const setRule = (key, nextValue) => {
-      const nextGroups = groups.map((item, index) => index === safeGroupIndex ? { ...item, rules: rules.map((entry, itemIndex) => itemIndex === safeRuleIndex ? { ...entry, [key]: nextValue } : entry) } : item);
+      const nextGroups = groups.map((item, index) => index === safeGroupIndex ? { ...item, rules: rules.map((entry, itemIndex) => itemIndex === safeRuleIndex ? updateSensitiveRule(entry, key, nextValue) : entry) } : item);
       update({ ...config, groups: nextGroups });
     };
     const addGroup = () => { const nextGroups = [...groups, { name: `词组${groups.length + 1}`, enabled: true, apply_to_original: true, apply_to_ai: true, rules: [] }]; update({ ...config, groups: nextGroups }); setGroupIndex(nextGroups.length - 1); setRuleIndex(0); };
     const deleteGroup = () => { if (groups.length <= 1) return; const nextGroups = groups.filter((_, index) => index !== safeGroupIndex); update({ ...config, groups: nextGroups }); setGroupIndex(Math.max(0, safeGroupIndex - 1)); setRuleIndex(0); };
     const addRule = () => { const nextRules = [...rules, { find: '', replace: '', enabled: true }]; const nextGroups = groups.map((item, index) => index === safeGroupIndex ? { ...item, rules: nextRules } : item); update({ ...config, groups: nextGroups }); setRuleIndex(nextRules.length - 1); };
     const deleteRule = () => { if (!rules.length) return; const nextRules = rules.filter((_, index) => index !== safeRuleIndex); const nextGroups = groups.map((item, index) => index === safeGroupIndex ? { ...item, rules: nextRules } : item); update({ ...config, groups: nextGroups }); setRuleIndex(Math.max(0, safeRuleIndex - 1)); };
-    const addBulk = () => { const additions = bulkText.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => { const [find, replace = ''] = line.split('=>'); return { find: find.trim(), replace: replace.trim(), enabled: true }; }).filter(item => item.find); if (!additions.length) return; const nextGroups = groups.map((item, index) => index === safeGroupIndex ? { ...item, rules: [...rules, ...additions] } : item); update({ ...config, groups: nextGroups }); setBulkText(''); };
+    const addBulk = () => { const additions = parseSensitiveBulkLines(bulkText); if (!additions.length) return; const nextGroups = groups.map((item, index) => index === safeGroupIndex ? { ...item, rules: [...rules, ...additions] } : item); update({ ...config, groups: nextGroups }); setBulkText(''); };
     return <div className="novel-fetch-rule-editor novel-fetch-rule-workspace">
       <Alert type="info" showIcon message="敏感词 AI 修复由处理页开关控制；这里维护词组、替换词和适用范围。AI 失败或关闭时使用替换词。" />
       <div className="novel-fetch-rule-workspace-body">
@@ -408,35 +411,54 @@ function NovelFetchConfigPanel({ form, effectiveValues, dirty, onDirty, versionP
 }
 
 function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
+  const [fullContent, setFullContent] = useState(null);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [contentError, setContentError] = useState('');
+  const [detailTab, setDetailTab] = useState('summary');
+  useEffect(() => {
+    setFullContent(null);
+    setDetailTab(taskDetail?.initialTab || 'summary');
+    setContentError('');
+    setContentLoading(false);
+    const data = taskDetail?.data || {};
+    setOriginalText(data.original || data.originalRaw || data.processedText || '');
+    setDiagnostics({ sensitive: null, rules: null, submit: null });
+  }, [taskDetail]);
+  useEffect(() => {
+    if (!taskDetailNeedsContent(fullContent || taskDetail?.data, detailTab)) return undefined;
+    let cancelled = false;
+    setContentLoading(true);
+    setContentError('');
+    getWorkshopTask(taskDetail.bookId).then(data => {
+      if (!cancelled) {
+        setFullContent(data);
+        setOriginalText(data.original || data.originalRaw || data.processedText || '');
+      }
+    }).catch(error => { if (!cancelled) setContentError(error.message || '读取正文失败，请切换标签后重试'); })
+      .finally(() => { if (!cancelled) setContentLoading(false); });
+    return () => { cancelled = true; };
+  }, [taskDetail, detailTab, fullContent]);
   const [originalText, setOriginalText] = useState('');
   const [saving, setSaving] = useState(false);
   const [diagnostics, setDiagnostics] = useState({ sensitive: null, rules: null, submit: null });
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   useEffect(() => {
-    const data = taskDetail?.data || {};
-    setOriginalText(data.original || data.originalRaw || data.processedText || '');
     const bookId = taskDetail?.bookId;
+    const loader = { sensitive: getWorkshopTaskSensitiveLog, rules: getWorkshopTaskRulesTrace, submit: getWorkshopTaskSiteSubmitLog }[detailTab];
+    if (!loader) { setDiagnosticsLoading(false); return undefined; }
     if (!bookId) {
       setDiagnostics({ sensitive: null, rules: null, submit: null });
       return undefined;
     }
     let cancelled = false;
     setDiagnosticsLoading(true);
-    Promise.allSettled([
-      getWorkshopTaskSensitiveLog(bookId),
-      getWorkshopTaskRulesTrace(bookId),
-      getWorkshopTaskSiteSubmitLog(bookId)
-    ]).then(([sensitive, rules, submit]) => {
-      if (cancelled) return;
-      setDiagnostics({
-        sensitive: sensitive.status === 'fulfilled' ? sensitive.value : { error: sensitive.reason?.message || '敏感日志读取失败' },
-        rules: rules.status === 'fulfilled' ? rules.value : { error: rules.reason?.message || '规则轨迹读取失败' },
-        submit: submit.status === 'fulfilled' ? submit.value : { error: submit.reason?.message || '提交日志读取失败' }
-      });
-      setDiagnosticsLoading(false);
-    });
+    loader(bookId).then(value => {
+      if (!cancelled) setDiagnostics(current => ({ ...current, [detailTab]: value }));
+    }).catch(error => {
+      if (!cancelled) setDiagnostics(current => ({ ...current, [detailTab]: { error: error.message || '读取日志失败' } }));
+    }).finally(() => { if (!cancelled) setDiagnosticsLoading(false); });
     return () => { cancelled = true; };
-  }, [taskDetail]);
+  }, [taskDetail, detailTab]);
   async function saveOriginal() {
     if (!taskDetail?.bookId) return;
     setSaving(true);
@@ -446,7 +468,7 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
       await onSaved?.();
     } catch (error) { message.error(error.message || '保存原文失败'); } finally { setSaving(false); }
   }
-  const detailData = taskDetail?.data || {};
+  const detailData = fullContent || taskDetail?.data || {};
   const summaryItems = novelFetchTaskSummaryItems(detailData);
   const aiVersions = novelFetchAiVersions(detailData);
   const sensitiveComparison = novelFetchSensitiveComparisons(diagnostics.sensitive || {});
@@ -485,9 +507,11 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
           </div> : <V88EmptyState title={sensitiveSummary.hitCount > 0 ? '有命中计数，但这条旧任务没有保存片段明细' : '暂无敏感词命中记录'} description="重新跑一次敏感词 AI 修复后，这里会显示命中片段与修复结果。" />}
         </div>;
   return <Drawer open={Boolean(taskDetail)} title={taskDetail?.bookId ? `任务详情 · ${taskDetail.bookId}` : '任务详情'} width={860} onClose={onClose}>
-    {taskDetail?.data ? <Tabs key={`${taskDetail.bookId}-${taskDetail.initialTab || 'summary'}`} defaultActiveKey={taskDetail.initialTab || 'summary'} items={[
+    {contentError ? <Alert type="error" showIcon message={contentError} /> : null}
+    {contentLoading ? <Spin size="small" /> : null}
+    {taskDetail?.data ? <Tabs key={`${taskDetail.bookId}-${taskDetail.initialTab || 'summary'}`} activeKey={detailTab} onChange={setDetailTab} items={[
       { key: 'summary', label: '任务概览', children: <Descriptions className="novel-fetch-detail-summary" bordered column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }} items={summaryItems.map(item => ({ ...item, children: item.value }))} /> },
-      { key: 'original', label: '原文', children: <><Input.TextArea rows={18} value={originalText} onChange={event => setOriginalText(event.target.value)} /><Space style={{ marginTop: 12 }}><Button loading={saving} type="primary" onClick={saveOriginal}>保存原文</Button><Button onClick={() => setOriginalText(taskDetail.data.original || taskDetail.data.originalRaw || '')}>恢复已保存原文</Button></Space></> },
+      { key: 'original', label: '原文', children: <><Input.TextArea rows={18} value={originalText} onChange={event => setOriginalText(event.target.value)} /><Space style={{ marginTop: 12 }}><Button disabled={detailData.content_loaded === false || contentLoading} loading={saving} type="primary" onClick={saveOriginal}>保存原文</Button><Button onClick={() => setOriginalText(detailData.original || detailData.originalRaw || '')}>恢复已保存原文</Button></Space></> },
       { key: 'ai', label: `AI 文案${aiVersions.length ? `（${aiVersions.length}）` : ''}`, children: aiVersions.length ? <Tabs className="novel-fetch-ai-versions" type="card" items={aiVersions.map(version => ({ key: version.key, label: version.label, children: <div className="novel-fetch-ai-copy"><div className="novel-fetch-ai-copy__head"><strong>{version.label}</strong><span>{version.content.length.toLocaleString('zh-CN')} 字</span></div>{version.knowledge ? <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }} style={{ marginBottom: 12 }} items={[
         { key: 'strategy', label: '改文方案', children: version.knowledge.strategy_name || version.knowledge.strategy || version.knowledge.method || '—' },
         { key: 'template', label: '改文模板', children: version.knowledge.template_name || version.knowledge.template_id || '—' },
@@ -497,7 +521,7 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
       { key: 'sensitive', label: `敏感日志${sensitiveSummary.hitCount ? `（${sensitiveSummary.fixedCount}/${sensitiveSummary.hitCount}）` : ''}`, children: sensitiveContent },
       { key: 'rules', label: '规则轨迹', children: diagnosticsLoading ? <span className="novel-fetch-inline-loading" role="status" aria-live="polite"><Spin size="small" />正在读取规则轨迹…</span> : diagnostics.rules?.error ? <Alert type="error" showIcon message="规则轨迹读取失败" description={diagnostics.rules.error} /> : renderNovelFetchRulesDiagnostic(diagnostics.rules || {}) },
       { key: 'submit', label: '提交日志', children: diagnosticsLoading ? <span className="novel-fetch-inline-loading" role="status" aria-live="polite"><Spin size="small" />正在读取提交日志…</span> : diagnostics.submit?.error ? <Alert type="error" showIcon message="提交日志读取失败" description={diagnostics.submit.error} /> : renderNovelFetchSubmitDiagnostic(diagnostics.submit || {}) },
-      { key: 'logs', label: '操作日志', children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(taskDetail.data.logs || [], null, 2)}</Typography.Paragraph> }
+      { key: 'logs', label: '操作日志', children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(detailData.logs || [], null, 2)}</Typography.Paragraph> }
     ]} /> : null}
   </Drawer>;
 }
@@ -1941,7 +1965,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
        </div>
        </div>
        </div>
-       {currentBatch ? <div className="novel-fetch-panel novel-fetch-current-batch"><div className="novel-fetch-current-batch-heading"><Typography.Title level={5}>当前批次</Typography.Title><Space><Button size="small" icon={<RefreshCw size={14} />} onClick={loadCurrentBatch}>刷新</Button><Button size="small" danger disabled={!currentBatchStoppableIds.length} onClick={() => Modal.confirm({ title: '停止当前批次？', content: '排队中和正在执行的任务会停止，已完成任务不会改变。', okText: '确认停止', okButtonProps: { danger: true }, onOk: async () => { await stopWorkshopTasks(currentBatchStoppableIds); await Promise.all([loadTasks(), loadCurrentBatch()]); message.success('已停止当前批次'); } })}>停止处理</Button><Button size="small" onClick={() => { setTaskSearch(''); setTaskDate(''); setTaskView('current'); changeTab('tasks'); }}>查看全部任务</Button></Space></div><Typography.Text type="secondary">{currentBatch.id} · {currentBatchIds.length} 本</Typography.Text><Table className="novel-fetch-current-batch-table" size="small" pagination={false} scroll={{ x: 1060 }} rowKey={row => row.bookId || row.book_id} dataSource={currentBatch.taskStates || currentBatch.task_states || []} columns={[{ title: 'ID', render: (_, row) => row.id || row.index || row.bookId || row.book_id }, { title: '书名', render: (_, row) => row.bookName || row.book_name || row.bookId || row.book_id }, { title: 'Book ID', render: (_, row) => row.bookId || row.book_id }, { title: 'AI1', render: (_, row) => novelFetchVersionReady(row, 'ai1') ? '✓' : '×' }, { title: '网站提交', render: (_, row) => row.siteSubmitStatus || row.site_submit_status || '○' }, { title: '状态', render: (_, row) => <TaskStatusTag row={row} /> }, { title: '字数', render: (_, row) => novelFetchCharCount(row) }, { title: '创建时间', render: (_, row) => formatWorkDateTime(row.createdAt || row.created_at) }, { title: '操作', render: (_, row) => <Button size="small" onClick={async () => { const target = novelFetchCurrentBatchTaskDetail(row); if (!target) return; setTaskDetail({ ...target, data: await getWorkshopTask(target.bookId) }); }}>查看</Button> }]} /></div> : null}
+       {currentBatch ? <div className="novel-fetch-panel novel-fetch-current-batch"><div className="novel-fetch-current-batch-heading"><Typography.Title level={5}>当前批次</Typography.Title><Space><Button size="small" icon={<RefreshCw size={14} />} onClick={loadCurrentBatch}>刷新</Button><Button size="small" danger disabled={!currentBatchStoppableIds.length} onClick={() => Modal.confirm({ title: '停止当前批次？', content: '排队中和正在执行的任务会停止，已完成任务不会改变。', okText: '确认停止', okButtonProps: { danger: true }, onOk: async () => { await stopWorkshopTasks(currentBatchStoppableIds); await Promise.all([loadTasks(), loadCurrentBatch()]); message.success('已停止当前批次'); } })}>停止处理</Button><Button size="small" onClick={() => { setTaskSearch(''); setTaskDate(''); setTaskView('current'); changeTab('tasks'); }}>查看全部任务</Button></Space></div><Typography.Text type="secondary">{currentBatch.id} · {currentBatchIds.length} 本</Typography.Text><Table className="novel-fetch-current-batch-table" size="small" pagination={false} scroll={{ x: 1060 }} rowKey={row => row.bookId || row.book_id} dataSource={currentBatch.taskStates || currentBatch.task_states || []} columns={[{ title: 'ID', render: (_, row) => row.id || row.index || row.bookId || row.book_id }, { title: '书名', render: (_, row) => row.bookName || row.book_name || row.bookId || row.book_id }, { title: 'Book ID', render: (_, row) => row.bookId || row.book_id }, { title: 'AI1', render: (_, row) => novelFetchVersionReady(row, 'ai1') ? '✓' : '×' }, { title: '网站提交', render: (_, row) => row.siteSubmitStatus || row.site_submit_status || '○' }, { title: '状态', render: (_, row) => <TaskStatusTag row={row} /> }, { title: '字数', render: (_, row) => novelFetchCharCount(row) }, { title: '创建时间', render: (_, row) => formatWorkDateTime(row.createdAt || row.created_at) }, { title: '操作', render: (_, row) => <Button size="small" onClick={async () => { const target = novelFetchCurrentBatchTaskDetail(row); if (!target) return; setTaskDetail({ ...target, data: await getWorkshopTaskSummary(target.bookId) }); }}>查看</Button> }]} /></div> : null}
        <Modal className="novel-fetch-upload-manager-modal" open={loginModalOpen} width={620} title="视频管理系统" cancelText="取消" okText="保存并关闭" confirmLoading={uploadProfileLoading} okButtonProps={{ disabled: uploadSession?.status !== 'ready' || !uploadProfileDraft }} onCancel={() => { setLoginModalOpen(false); setLoginFormVisible(false); setLoginPassword(''); }} onOk={saveUploadProfileAndClose}>
         <div className={`novel-fetch-upload-manager-status ${uploadSession?.status === 'ready' ? 'is-ready' : ''}`}>
           <div><strong>{uploadSession?.status === 'ready' ? uploadSessionDisplayName(uploadSession) : '尚未登录'}</strong><span>{uploadSession?.status === 'ready' ? '登录会话可用于配置同步和网站提交' : '请先登录视频管理系统，再同步网站配置档'}</span></div>
@@ -2017,7 +2041,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
           { title: '状态', width: 120, render: (_, row) => <TaskStatusTag row={row} /> },
           { title: '操作', width: 64, fixed: 'right', render: (_, row) => {
             const bookId = row.bookId || row.book_id;
-            const openDetail = async initialTab => setTaskDetail({ bookId, initialTab, data: await getWorkshopTask(bookId) });
+            const openDetail = async initialTab => setTaskDetail({ bookId, initialTab, data: await getWorkshopTaskSummary(bookId) });
             const run = action => runTaskRowAction(action, '操作完成', '操作失败');
             return <Dropdown trigger={['click']} menu={{ items: [
                 { key: 'summary', label: '查看详情', onClick: () => openDetail('summary') },

@@ -870,6 +870,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		legacyTaskAlias := func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			path := clone.URL.Path
+			if strings.HasSuffix(path, "/summary") {
+				clone.URL.Path = strings.Replace(path, "/api/tasks", "/api/novel-fetch-workshop/tasks", 1)
+				novelFetch.ServeHTTP(w, clone)
+				return
+			}
 			// The old detail tabs used separate summary/content/diagnostic URLs;
 			// the Go document endpoint already contains the same durable payload.
 			for _, suffix := range []string{"/summary", "/content"} {

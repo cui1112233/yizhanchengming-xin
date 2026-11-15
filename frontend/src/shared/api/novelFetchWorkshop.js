@@ -141,6 +141,10 @@ export function getWorkshopTask(bookId) {
   return apiRequest(`/api/novel-fetch-workshop/tasks/${encodeURIComponent(bookId)}`);
 }
 
+export function getWorkshopTaskSummary(bookId) {
+  return apiRequest(`/api/novel-fetch-workshop/tasks/${encodeURIComponent(bookId)}/summary`);
+}
+
 export function workshopTaskDiagnosticPath(bookId, kind) {
   return `/api/batch-rewrite/tasks/${encodeURIComponent(bookId)}/${kind}`;
 }

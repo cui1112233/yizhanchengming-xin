@@ -50,6 +50,9 @@ func SyncKnowledgeConfigViews(settings, patch map[string]any) {
 		apply(root)
 	}
 	if app, ok := patch["appConfig"].(map[string]any); ok {
+		if sensitive, exists := app["sensitive"]; exists {
+			apply(map[string]any{"sensitive": sensitive})
+		}
 		if root, ok := app["knowledge"].(map[string]any); ok {
 			apply(root)
 		}
@@ -461,12 +464,8 @@ func KnowledgeSummary(settings map[string]any) map[string]int {
 	symbol := knowledgeLibrary(settings, "symbol_rules")
 	chapter := knowledgeLibrary(settings, "chapter_rules")
 	result["sensitive_rules"] = len(arrayMap(layout["sensitive_rules"])) + len(arrayMap(layout["sensitiveKeywords"]))
-	if result["sensitive_rules"] == 0 {
-		app := mapOrEmpty(settings["appConfig"])
-		sensitive := mapOrEmpty(app["sensitive"])
-		for _, rawGroup := range arrayMap(sensitive["groups"]) {
-			result["sensitive_rules"] += len(arrayMap(rawGroup["rules"]))
-		}
+	if source, exists := sensitiveRuleSource(settings); exists {
+		result["sensitive_rules"] = countSensitiveRuleEntries(source)
 	}
 	result["symbol_rules"] = len(arrayMap(symbol["symbol_rules"]))
 	result["pair_fill_rules"] = len(arrayMap(symbol["pair_fill_rules"]))

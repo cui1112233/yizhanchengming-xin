@@ -2533,6 +2533,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"deleted": deleted})
 	})
 
+	registerNovelFetchSummary(mux, store)
 	mux.HandleFunc("GET /api/novel-fetch-workshop/tasks/{bookId}", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		bookID := strings.TrimSpace(req.PathValue("bookId"))
