@@ -76,7 +76,35 @@
       "comparison": "original_static_and_controlled_functions_compared_cm_dom_http_mysql_runtime_verified",
       "remaining": "原桌面真实编辑与同视口像素对照尚待验证；错误提示为已说明的CM改进",
       "full_parity_passed": false
+    },
+    {
+      "id": "G12-BULK-001",
+      "name": "原V2角色归档互通及整库导入导出清空",
+      "original": {
+        "native_module_sha256": "297ec8b0c40be9653cb9d96ea6c6c895f2439048c0810e930d3e94967b3c186c",
+        "source_metadata": "api.py declared lines 11227/11297/11489, not recovered author source",
+        "controlled_cases": 12,
+        "evidence": [
+          "library-bulk-20261116/native-bulk-matrix.json",
+          "library-bulk-20261116/native-file-portability.json"
+        ]
+      },
+      "cm": {
+        "commit": "0f657442e02a26dcc3a85cf46923e104d42330df",
+        "actual_mysql_checks": 31,
+        "actual_4001_http_checks": 16,
+        "evidence": [
+          "library-bulk-20261116/backend/mysql-result.json",
+          "library-bulk-20261116/actual-4001-result.json",
+          "library-bulk-20261116/live-to-native-import-result.json",
+          "library-bulk-20261116/runtime-verification.json",
+          "library-bulk-20261116/frontend/recovery-final.log"
+        ]
+      },
+      "comparison": "original_compiled_methods_and_bidirectional_archive_compared_cm_dom_mysql_http_4001_verified",
+      "remaining": "原桌面逐按钮与同视口像素、真实登录浏览器未验证；整页刷新恢复未实现；不把配置媒体检查冒称TOS",
+      "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "9a6a15f41616c37031649db6f5e2419f7396f38a"
+  "latest_runtime_commit": "0f657442e02a26dcc3a85cf46923e104d42330df"
 }
