@@ -1,0 +1,39 @@
+{
+  "objective": "每完一个对比一个，直至完整复刻",
+  "runtime_commit": "52b7f03be0820cfefdeb879a4b4db281bda41829",
+  "scope_complete": false,
+  "cases": [
+    {
+      "id": "EPI-001",
+      "name": "独立分集标题与生成前内容检查",
+      "original": {
+        "source": "01-readable-frontend/pretty/index-DszfAkKD.js",
+        "lines": [476398, 476590, 478714],
+        "observed": "原版创建支持中文章集识别，格式示例为第一集/1-1场次；原生解析及所有格式未实测"
+      },
+      "cm": {
+        "result": "普通/Markdown/中文数字集标题支持；原集号/前言/空集保留；重复和空正文提交前拒绝",
+        "evidence": ["archive/07-parity-execution/zip-reconstruction-20261116/episodes", "07-parity-execution/zip-reconstruction-20261116/frontend-final.log", "07-parity-execution/zip-reconstruction-20261116/core-final.log", "07-parity-execution/zip-reconstruction-20261116/runtime-verification.json"]
+      },
+      "comparison": "original_static_compared_cm_verified",
+      "remaining": "原版同输入实际导入、空集与取消状态逐项对照；无分隔连写标题尚不自动猜测",
+      "full_parity_passed": false
+    },
+    {
+      "id": "REF-001",
+      "name": "分镜参考图消费的完整名称及类型对应",
+      "original": {
+        "source": "01-readable-frontend/pretty/index-DszfAkKD.js",
+        "lines": [439143, 439150, 439172],
+        "observed": "原版有明确名单拆分和清理；这些函数不独自证明原生最终图片引用行为"
+      },
+      "cm": {
+        "result": "References与ReferenceIDs共用完整名称/类型规则；短名字不串入，同类型重名不猜，旧分隔符保留",
+        "evidence": ["07-parity-execution/zip-reconstruction-20261116/references", "07-parity-execution/zip-reconstruction-20261116/runtime-verification.json"]
+      },
+      "comparison": "cm_real_service_verified_original_final_request_pending",
+      "remaining": "原版最终引用请求对照及资产ID关系迁移；别名和描述句不猜测",
+      "full_parity_passed": false
+    }
+  ]
+}
