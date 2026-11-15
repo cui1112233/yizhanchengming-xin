@@ -462,9 +462,52 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 	delete(document.Meta, "rewriteValidationHold")
 	document.Meta["aiGeneratedCount"] = len(requested)
 	document.Meta["aiError"] = ""
+	// A later successful generation must not keep the previous failure banner:
+	// the task-level error and the ready-version list are read by the list page.
+	delete(document.Meta, "error")
+	if ready, _ := document.Meta["autoSubmitReady"].(bool); ready {
+		versions := metaStringList(document.Meta["autoSubmitReadyVersions"])
+		for _, version := range requested {
+			if !containsMetaString(versions, version) {
+				versions = append(versions, version)
+			}
+		}
+		document.Meta["autoSubmitReadyVersions"] = versions
+		// The fingerprint covers the selected content; a new version invalidates
+		// it so the next auto-submit step re-evaluates instead of skipping.
+		delete(document.Meta, "autoSubmitReadyFingerprint")
+	}
 	document.Meta["aiUpdatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 	if err := store.PutDocument(ctx, owner, document); err != nil {
 		return Document{}, err
 	}
 	return document, nil
+}
+
+func metaStringList(value any) []string {
+	switch raw := value.(type) {
+	case []string:
+		return append([]string{}, raw...)
+	case []any:
+		result := make([]string, 0, len(raw))
+		for _, item := range raw {
+			if text := strings.TrimSpace(fmt.Sprint(item)); text != "" && text != "<nil>" {
+				result = append(result, text)
+			}
+		}
+		return result
+	}
+	if text := strings.TrimSpace(fmt.Sprint(value)); text != "" && text != "<nil>" {
+		return []string{text}
+	}
+	return nil
+}
+
+func containsMetaString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

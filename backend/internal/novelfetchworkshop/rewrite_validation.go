@@ -49,6 +49,68 @@ func ValidateRewriteProse(text string) error {
 	return nil
 }
 
+// normalizeRewriteJSON tolerates the two formatting defects seen from
+// OpenAI-compatible gateways: Markdown code fences around the object, and raw
+// line breaks injected inside JSON string values. A newline is illegal inside
+// a JSON string, so a model that otherwise followed the changed_lines contract
+// would fail every retry merely because the transport wrapped long lines.
+// Keep only the first complete top-level object as well, so trailing prose does
+// not invalidate an otherwise usable rewrite.
+func normalizeRewriteJSON(raw string) string {
+	text := strings.TrimSpace(raw)
+	if strings.HasPrefix(text, "```") {
+		if index := strings.IndexByte(text, '\n'); index >= 0 {
+			text = text[index+1:]
+		} else {
+			text = strings.TrimPrefix(text, "```json")
+			text = strings.TrimPrefix(text, "```JSON")
+			text = strings.TrimPrefix(text, "```")
+		}
+		text = strings.TrimSpace(text)
+	}
+	if strings.HasSuffix(text, "```") {
+		text = strings.TrimSpace(strings.TrimSuffix(text, "```"))
+	}
+	start := strings.IndexByte(text, '{')
+	if start < 0 {
+		return text
+	}
+	var builder strings.Builder
+	builder.Grow(len(text) - start)
+	inString := false
+	escaped := false
+	depth := 0
+	for _, char := range text[start:] {
+		if inString {
+			switch {
+			case char == '\n' || char == '\r' || char == '\t':
+				continue
+			case escaped:
+				escaped = false
+			case char == '\\':
+				escaped = true
+			case char == '"':
+				inString = false
+			}
+			builder.WriteRune(char)
+			continue
+		}
+		switch char {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+		}
+		builder.WriteRune(char)
+		if depth == 0 {
+			return builder.String()
+		}
+	}
+	return builder.String()
+}
+
 func parseRewriteOutput(raw, mode, bookID string, lineCount int) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if mode != "" && mode != "plain_text" && mode != "changed_lines_json" {
@@ -57,9 +119,7 @@ func parseRewriteOutput(raw, mode, bookID string, lineCount int) (string, error)
 	if mode != "changed_lines_json" {
 		return raw, ValidateRewriteProse(raw)
 	}
-	if strings.HasPrefix(raw, "```json\n") && strings.HasSuffix(raw, "```") {
-		raw = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(raw, "```json\n"), "```"))
-	}
+	raw = normalizeRewriteJSON(raw)
 	var payload struct {
 		ID    string `json:"id"`
 		Lines []struct {
