@@ -3,7 +3,7 @@ export const NOVEL_FETCH_PROCESS_SETTINGS_KEY = 'novel-fetch-v78-process-setting
 const DEFAULT_SETTINGS = {
   platform: 2,
   maxTxt: 4000,
-  textModel: '[anti-2]gemini-3.8-flash',
+  textModel: '',
   selectedVersions: ['original', 'ai1'],
   rewriteMethods: { ai1: 'auto', ai2: 'auto', ai3: 'auto', ai4: 'auto', ai5: 'auto' },
   sensitiveAiProcessEnabled: true

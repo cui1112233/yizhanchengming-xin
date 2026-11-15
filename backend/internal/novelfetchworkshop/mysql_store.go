@@ -170,6 +170,13 @@ func (s *MySQLStore) DeleteDocuments(ctx context.Context, owner string, ids []st
 			result.Results = append(result.Results, DeleteRecord{BookID: rawID, Deleted: false})
 			continue
 		}
+		// 删除历史文档时保留正文，但必须转入可回收状态；否则这些正文会永久
+		// 停留在 ready，既不会被容量统计回收，也不会被定时清理命中。
+		releasedAt := time.Now().UTC()
+		expiresAt := releasedAt.Add(DefaultBodyRetentionDays * 24 * time.Hour)
+		if _, err := tx.ExecContext(ctx, `UPDATE novel_fetch_workshop_bodies SET state='releasable', releasable_at=?, expires_at=?, updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=? AND state<>'releasable'`, releasedAt, expiresAt, owner, id); err != nil {
+			return result, err
+		}
 		res, err := tx.ExecContext(ctx, `DELETE FROM novel_fetch_workshop_documents WHERE owner_username=? AND book_id=?`, owner, id)
 		if err != nil {
 			return result, err
@@ -383,7 +390,8 @@ func (s *MySQLStore) ListConfigOwners(ctx context.Context) ([]string, error) {
 
 func (s *MySQLStore) PutRun(ctx context.Context, owner string, record RunRecord) error {
 	record = normalizeRunRecord(record)
-	if record.RunID == "" || record.BookID == "" || record.Stage == "" || record.Status == "" || record.TextModelID == "" || record.ModelID == "" {
+	// TextModelID 允许为空：空值表示未显式选择模型，运行时按账号默认模型解析。
+	if record.RunID == "" || record.BookID == "" || record.Stage == "" || record.Status == "" || record.ModelID == "" {
 		return errors.New("run audit fields are required")
 	}
 	_, err := s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_runs(run_id,owner_username,book_id,stage,status,attempts,text_model_id,model_id,model_display_name,request_id,error_message,started_at,finished_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE book_id=VALUES(book_id),stage=VALUES(stage),status=VALUES(status),attempts=VALUES(attempts),text_model_id=VALUES(text_model_id),model_id=VALUES(model_id),model_display_name=VALUES(model_display_name),request_id=VALUES(request_id),error_message=VALUES(error_message),started_at=VALUES(started_at),finished_at=VALUES(finished_at),updated_at=CURRENT_TIMESTAMP(6)`, record.RunID, owner, record.BookID, record.Stage, record.Status, record.Attempts, record.TextModelID, record.ModelID, record.ModelDisplayName, nullableRunString(record.RequestID), nullableRunString(record.ErrorMessage), nullableTime(record.StartedAt), nullableTime(record.FinishedAt), time.Now().UTC())

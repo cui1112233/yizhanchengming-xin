@@ -43,9 +43,9 @@ func TestMySQLStoreExpiredCleanupSelectsOnlyExpiredReleasableBodies(t *testing.T
 	now := time.Date(2026, 9, 9, 10, 0, 0, 0, time.UTC)
 	released := time.Date(2026, 9, 2, 10, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT book_id, version_id, releasable_at FROM novel_fetch_workshop_bodies WHERE owner_username=? AND state='releasable' AND releasable_at IS NOT NULL AND expires_at IS NOT NULL AND expires_at<=? ORDER BY releasable_at ASC, book_id ASC, version_id ASC LIMIT ?`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT book_id, version_id, content_encoding, content_blob, releasable_at FROM novel_fetch_workshop_bodies WHERE owner_username=? AND state='releasable' AND releasable_at IS NOT NULL AND expires_at IS NOT NULL AND expires_at<=? ORDER BY releasable_at ASC, book_id ASC, version_id ASC LIMIT ?`)).
 		WithArgs("alice", now, 10).
-		WillReturnRows(sqlmock.NewRows([]string{"book_id", "version_id", "releasable_at"}).AddRow("123", "ai3", released))
+		WillReturnRows(sqlmock.NewRows([]string{"book_id", "version_id", "content_encoding", "content_blob", "releasable_at"}).AddRow("123", "ai3", "inline", nil, released))
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM novel_fetch_workshop_bodies WHERE owner_username=? AND book_id=? AND version_id=? AND state='releasable' AND releasable_at=?`)).
 		WithArgs("alice", "123", "ai3", released).
@@ -73,9 +73,9 @@ func TestMySQLStoreCapacityCleanupUsesOldestReleasableBodiesOnly(t *testing.T) {
 	now := time.Date(2026, 9, 3, 10, 0, 0, 0, time.UTC)
 	oldest := time.Date(2026, 9, 2, 8, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT book_id, version_id, releasable_at FROM novel_fetch_workshop_bodies WHERE owner_username=? AND state='releasable' AND releasable_at IS NOT NULL ORDER BY releasable_at ASC, book_id ASC, version_id ASC LIMIT ?`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT book_id, version_id, content_encoding, content_blob, releasable_at FROM novel_fetch_workshop_bodies WHERE owner_username=? AND state='releasable' AND releasable_at IS NOT NULL ORDER BY releasable_at ASC, book_id ASC, version_id ASC LIMIT ?`)).
 		WithArgs("alice", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"book_id", "version_id", "releasable_at"}).AddRow("456", "ai1", oldest))
+		WillReturnRows(sqlmock.NewRows([]string{"book_id", "version_id", "content_encoding", "content_blob", "releasable_at"}).AddRow("456", "ai1", "inline", nil, oldest))
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM novel_fetch_workshop_bodies WHERE owner_username=? AND book_id=? AND version_id=? AND state='releasable' AND releasable_at=?`)).
 		WithArgs("alice", "456", "ai1", oldest).

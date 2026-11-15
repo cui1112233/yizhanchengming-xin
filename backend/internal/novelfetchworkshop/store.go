@@ -175,7 +175,8 @@ func (s *MemoryStore) PutRun(_ context.Context, owner string, record RunRecord) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record = normalizeRunRecord(record)
-	if record.RunID == "" || record.BookID == "" || record.Stage == "" || record.Status == "" || record.TextModelID == "" || record.ModelID == "" {
+	// TextModelID 允许为空：空值表示未显式选择模型，运行时按账号默认模型解析。
+	if record.RunID == "" || record.BookID == "" || record.Stage == "" || record.Status == "" || record.ModelID == "" {
 		return errors.New("run audit fields are required")
 	}
 	if s.runs[owner] == nil {
@@ -250,6 +251,20 @@ func (s *MemoryStore) DeleteDocuments(_ context.Context, owner string, ids []str
 		_, exists := s.docs[owner][id]
 		if exists {
 			delete(s.docs[owner], id)
+			// 正文与历史文档分离保留：转入可回收状态，等待定时清理，
+			// 而不是永久停留在 ready。
+			releasedAt := time.Now().UTC()
+			expiresAt := releasedAt.Add(DefaultBodyRetentionDays * 24 * time.Hour)
+			for versionID, record := range s.bodies[owner][id] {
+				if record.State == "releasable" {
+					continue
+				}
+				record.State = "releasable"
+				record.ReleasableAt = releasedAt.Format(time.RFC3339Nano)
+				record.ExpiresAt = expiresAt.Format(time.RFC3339Nano)
+				record.UpdatedAt = releasedAt.Format(time.RFC3339Nano)
+				s.bodies[owner][id][versionID] = record
+			}
 			result.Deleted++
 		}
 		result.Results = append(result.Results, DeleteRecord{BookID: id, Deleted: exists})

@@ -1076,6 +1076,14 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     }).catch(() => {});
   }, []);
 
+  // 空选择或本地缓存的模型已下架时，回退到当前目录里第一个可用文本模型，
+  // 与后端“未显式选择时使用账号默认模型”的解析顺序保持一致。
+  useEffect(() => {
+    if (!textModelOptions.length) return;
+    if (textModel && textModelOptions.some(option => option.value === textModel)) return;
+    setTextModel(textModelOptions[0].value);
+  }, [textModel, textModelOptions]);
+
   useEffect(() => {
     const onVisibilityChange = () => setDocumentHidden(document.hidden);
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -1919,7 +1927,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台ID：{selectedPlatform || '—'}</Typography.Text></div>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--three">
           <Form.Item name="platform" label="平台"><Select options={platformOptions} onChange={value => setSelectedPlatform(String(value || ''))} /></Form.Item>
-          <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={textModelOptions.length ? textModelOptions : [{ value: textModel || '[anti-2]gemini-3.8-flash', label: textModel || '[anti-2]gemini-3.8-flash' }]} /></label>
+          <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel || undefined} onChange={setTextModel} options={textModelOptions} placeholder="使用账号默认模型" /></label>
           <div className="novel-fetch-field novel-fetch-top-login"><span>视频管理系统登录</span><div className="novel-fetch-login-inline"><span className={uploadSession?.status === 'ready' ? 'is-ready' : ''}>● {uploadSessionDisplayName(uploadSession)}</span><Button size="small" onClick={openUploadManager}>管理</Button></div></div>
         </div>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--two novel-fetch-input-format-row"><label className="novel-fetch-field"><span>输入格式</span><Select value={inputFormat} options={INPUT_FORMAT_OPTIONS.map(item => ({ value: item.value, label: item.label }))} onChange={setInputFormat} /></label><div className="novel-fetch-input-summary"><span>有效 <b>{localInputPreview.validRows}</b> 本</span>{localInputPreview.duplicateIds ? <span className="is-warning">重复 {localInputPreview.duplicateIds}</span> : null}{localInputPreview.emptyIdRows ? <span className="is-warning">空 ID {localInputPreview.emptyIdRows}</span> : null}</div></div>

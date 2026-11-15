@@ -59,7 +59,7 @@ func novelFetchRecoveryJob(doc novelfetchworkshop.Document, settings map[string]
 			}
 		}
 	}
-	job := novelfetchworkshop.ProcessJob{Owner: owner, BatchID: firstText(doc.Meta["currentBatchId"], doc.Meta["current_batch_id"]), ScheduleID: firstText(doc.Meta["schedule_id"], doc.Meta["scheduleId"]), PlatformID: novelFetchResolvedPlatformID(settings, doc.Meta), MaxTxt: doc.MaxTxt, TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定"), SensitiveAIEnabled: novelFetchSensitiveAIEnabled(settings), AutoSubmit: automatic, SelectedVersions: novelFetchAutomationVersions(settings)}
+	job := novelfetchworkshop.ProcessJob{Owner: owner, BatchID: firstText(doc.Meta["currentBatchId"], doc.Meta["current_batch_id"]), ScheduleID: firstText(doc.Meta["schedule_id"], doc.Meta["scheduleId"]), PlatformID: novelFetchResolvedPlatformID(settings, doc.Meta), MaxTxt: doc.MaxTxt, TextModelID: firstText(settings["text_model_id"], settings["textModelId"]), SensitiveAIEnabled: novelFetchSensitiveAIEnabled(settings), AutoSubmit: automatic, SelectedVersions: novelFetchAutomationVersions(settings)}
 	job.RewriteMethods = scheduleStringMap(mapOrEmpty(mapOrEmpty(settings["appConfig"])["rewrite"])["ai_slot_methods"])
 	if len(snap) > 0 {
 		job.BatchID = firstText(snap["batch_id"], job.BatchID)

@@ -63,7 +63,7 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 			PlatformID: firstText(item["platform_id"], "2"), MaxTxt: intValue(item["max_txt"]),
 			SelectedVersions: versions, AutoSubmit: item["auto_submit"] != false,
 			SensitiveAIEnabled: item["sensitive_ai_enabled"] == true,
-			RewriteMethods:     scheduleStringMap(item["rewrite_methods"]), TextModelID: firstText(item["text_model_id"], "未指定"),
+			RewriteMethods:     scheduleStringMap(item["rewrite_methods"]), TextModelID: firstText(item["text_model_id"]),
 		}
 		if job.MaxTxt <= 0 {
 			job.MaxTxt = 4000

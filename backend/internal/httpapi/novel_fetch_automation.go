@@ -490,7 +490,7 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	job := novelfetchworkshop.ProcessJob{
 		ID: fmt.Sprintf("queue_%d_%x", now.UnixMilli(), stamp&0xffffffff), Owner: owner, BatchID: batchID,
 		BookIDs: bookIDs, PlatformID: platformID, MaxTxt: maxTxt, SensitiveAIEnabled: novelFetchSensitiveAIEnabled(settings), AutoSubmit: true,
-		SelectedVersions: novelFetchAutomationVersions(settings), TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定"),
+		SelectedVersions: novelFetchAutomationVersions(settings), TextModelID: firstText(settings["text_model_id"], settings["textModelId"]),
 	}
 	job.ScheduleID = selectedJob.ScheduleID
 	job.AutoSubmit = selectedJob.AutoSubmit

@@ -23,6 +23,12 @@ test('readNovelFetchProcessSettings_withSavedV78Options_restoresAllProcessingSel
   assert.equal(settings.rewriteMethods.ai1, 'auto');
 });
 
+test('readNovelFetchProcessSettings_withoutSavedModel_keepsModelEmptyForAccountDefault', () => {
+  const settings = readNovelFetchProcessSettings(new Map());
+
+  assert.equal(settings.textModel, '');
+});
+
 test('writeNovelFetchProcessSettings_withV78Options_persistsValuesForNextPageVisit', () => {
   const storage = new Map();
 

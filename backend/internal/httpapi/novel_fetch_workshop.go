@@ -1157,7 +1157,7 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			AutoSubmit:         item["auto_submit"] != false,
 			SelectedVersions:   scheduleStringSlice(item["selected_versions"]),
 			RewriteMethods:     scheduleStringMap(item["rewrite_methods"]),
-			TextModelID:        firstText(item["text_model_id"], item["textModelId"], "未指定"),
+			TextModelID:        firstText(item["text_model_id"], item["textModelId"]),
 		}
 		if dispatchErr == nil && len(bookIDs) == 0 {
 			dispatchErr = errors.New("定时任务没有有效书籍")
@@ -2231,10 +2231,9 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
 		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
 		jobView := map[string]any{"id": id, "status": "queued", "queue_state": "queued", "started_at": now, "updated_at": now, "attempts": 0, "steps": []any{}, "progress": []any{}}
+		// 空选择表示使用账号默认文本模型；不能写入“未指定”占位符，
+		// 否则解析器会把它当成显式模型而跳过默认回退，AI 阶段必然失败。
 		textModelID := strings.TrimSpace(input.TextModelID)
-		if textModelID == "" {
-			textModelID = "未指定"
-		}
 		columnOrder := input.ColumnOrder
 		if len(columnOrder) == 0 {
 			columnOrder = input.ColumnOrderLegacy
@@ -2803,15 +2802,21 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			SystemPrompt: "你是接口连通性测试助手。",
 			UserPrompt:   "请只回复：ok",
 			Temperature:  0,
-			MaxTokens:    64,
+			// 推理模型会先消耗思考 token；预算过小会在返回正文前被截断，
+			// 导致连通性测试误报模型不可用。这里留出足够余量。
+			MaxTokens: 2048,
 		})
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
 		content = strings.TrimSpace(content)
-		if len(content) > 200 {
-			content = content[:200]
+		if content == "" {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "文本模型返回为空，请检查模型或上游通道"})
+			return
+		}
+		if runes := []rune(content); len(runes) > 200 {
+			content = string(runes[:200])
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "content": content})
 	})

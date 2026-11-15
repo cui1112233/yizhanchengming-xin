@@ -437,6 +437,65 @@ func (f rewriteProviderFunc) Complete(ctx context.Context, request novelfetchwor
 	return f(ctx, request)
 }
 
+func TestNovelFetchAITestUsesReasoningFriendlyTokenBudget(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	var maxTokens int
+	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
+		maxTokens = request.MaxTokens
+		return "ok", nil
+	})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore(), NovelFetchRewrite: provider})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/ai/test", map[string]any{}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("ai test status=%d body=%s", response.Code, response.Body.String())
+	}
+	if maxTokens < 1024 {
+		t.Fatalf("ai test max tokens=%d, want at least 1024 for reasoning models", maxTokens)
+	}
+}
+
+func TestNovelFetchAITestRejectsEmptyModelOutput(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	provider := rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+		return "   ", nil
+	})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore(), NovelFetchRewrite: provider})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/ai/test", map[string]any{}, now, secret)
+	if response.Code != http.StatusBadGateway {
+		t.Fatalf("empty ai test status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+type recordingProcessQueue struct {
+	*novelfetchworkshop.MemoryQueue
+	enqueued []novelfetchworkshop.ProcessJob
+}
+
+func (q *recordingProcessQueue) EnqueueUniqueBooks(ctx context.Context, job novelfetchworkshop.ProcessJob, ttl time.Duration) (bool, string, error) {
+	q.enqueued = append(q.enqueued, job)
+	return q.MemoryQueue.EnqueueUniqueBooks(ctx, job, ttl)
+}
+
+func TestWorkshopStartWithoutSelectedModelKeepsAccountDefault(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &recordingProcessQueue{MemoryQueue: novelfetchworkshop.NewMemoryQueue()}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	started := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t默认模型任务"}, now, secret)
+	if started.Code != http.StatusAccepted {
+		t.Fatalf("start status=%d body=%s", started.Code, started.Body.String())
+	}
+	if len(queue.enqueued) != 1 {
+		t.Fatalf("enqueued jobs=%d body=%s", len(queue.enqueued), started.Body.String())
+	}
+	if queue.enqueued[0].TextModelID != "" {
+		t.Fatalf("text model=%q, want empty so the account default is used", queue.enqueued[0].TextModelID)
+	}
+}
+
 func waitForNovelFetchDocument(t *testing.T, store novelfetchworkshop.Store, bookID string, ready func(novelfetchworkshop.Document) bool) novelfetchworkshop.Document {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

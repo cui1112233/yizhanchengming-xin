@@ -107,6 +107,30 @@ type memoryCleanupCandidate struct {
 	releasableAt time.Time
 }
 
+// CleanupExpiredBodies 跨账号回收到期正文，供后台定时任务使用。
+func (s *MemoryStore) CleanupExpiredBodies(ctx context.Context, now time.Time, limit int) (BodyCleanupResult, error) {
+	now = normalizeCleanupNow(now)
+	s.mu.RLock()
+	owners := make([]string, 0, len(s.bodies))
+	for owner := range s.bodies {
+		owners = append(owners, owner)
+	}
+	s.mu.RUnlock()
+	combined := BodyCleanupResult{Results: make([]BodyCleanupRecord, 0)}
+	for _, owner := range owners {
+		result, err := s.CleanupBodies(ctx, owner, BodyCleanupRequest{Now: now, Reason: BodyCleanupReasonExpired, Limit: limit})
+		if err != nil {
+			return combined, err
+		}
+		combined.Deleted += result.Deleted
+		combined.Results = append(combined.Results, result.Results...)
+		if len(combined.Results) >= limit {
+			break
+		}
+	}
+	return combined, nil
+}
+
 func (s *MemoryStore) CleanupBodies(_ context.Context, owner string, request BodyCleanupRequest) (BodyCleanupResult, error) {
 	if request.Reason != BodyCleanupReasonExpired && request.Reason != BodyCleanupReasonCapacity {
 		return BodyCleanupResult{}, errors.New("invalid body cleanup reason")
