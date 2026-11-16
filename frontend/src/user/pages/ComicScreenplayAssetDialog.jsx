@@ -17,6 +17,10 @@ import { listComicAssetLibrary, saveComicAssetLibrarySource, stageComicAssetLibr
 import { applyCharacterDesign, characterDesignSavedSelection } from './comic-character-design.js';
 import './comic-screenplay-asset-dialog.css';
 
+function subjectUploadSnapshot(value) {
+  if(!value||typeof value.assetId!=='string'||!value.assetId)return '';
+  return JSON.stringify(Object.fromEntries(['assetId','assetUri','groupId','projectName','provider','status'].filter(key=>typeof value[key]==='string').map(key=>[key,value[key]])));
+}
 const labels = { character: '角色', scene: '场景', prop: '道具' };
 export default function ComicScreenplayAssetDialog({ projectId, workspace, asset, imageOnly = false, type = 'character', degree, media, readOnly, canGenerate, onSaved, onClose, onMediaChanged }) {
   const confirmForProject=useComicConfirmation(`${projectId}:${readOnly}:${canGenerate}`);
@@ -39,7 +43,7 @@ export default function ComicScreenplayAssetDialog({ projectId, workspace, asset
   function libraryKey(purpose) { if(!libraryKeys.current.has(purpose))libraryKeys.current.set(purpose,crypto.randomUUID());return libraryKeys.current.get(purpose); }
   function chooseLibrary(entry) {
     setLibraryCandidate(entry);setSelectedImage('');setFile(null);
-    if(!editing)setDraft(current=>({...current,name:current.name.trim()?current.name:entry.name||'',identity:current.identity.trim()?current.identity:entry.description||'',description:current.description.trim()?current.description:entry.description||'',...(current.type==='character'?{extra:{...current.extra,sora2_info:entry.sora2Info ?? entry.sora2_info ?? ''}}:{})}));
+    if(!editing)setDraft(current=>({...current,name:current.name.trim()?current.name:entry.name||'',identity:current.identity.trim()?current.identity:entry.description||'',description:current.description.trim()?current.description:entry.description||'',...(current.type==='character'?{extra:{...current.extra,sora2_info:entry.sora2Info ?? entry.sora2_info ?? '',subject_upload_result:subjectUploadSnapshot(entry.subjectUpload)}}:{})}));
     setNotice('已选择普通库图片，点击资产窗口保存后生效。');
   }
   const persistedSelectedId=currentMedia?.settings?.selected?.[persisted.current?.id]||'';

@@ -38,6 +38,11 @@ function metadata(input) {
     if(new TextEncoder().encode(input.sora2Info).length>16*1024)throw new Error('主体存档不能超过16KiB');
     values.sora2Info=input.sora2Info;
   }
+  if(Object.hasOwn(input,'subjectUploadKey')) {
+    if(input.type && input.type!=='character')throw new Error('仅角色支持真人上传引用');
+    if(input.subjectUploadKey!==''&&!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(input.subjectUploadKey))throw new Error('真人上传请求编号无效');
+    values.subjectUploadKey=input.subjectUploadKey;
+  }
   return values;
 }
 function publicEntry(data) { if(!data?.entry?.id)throw new Error('普通库未返回素材编号，请重新读取核对');return data.entry; }
@@ -77,3 +82,24 @@ export function deleteComicAssetLibraryEntry(id,expectedRevision,{signal}={},req
   if(!Number.isInteger(expectedRevision)||expectedRevision<1)throw new Error('素材版本无效，请重新读取');
   return request(`${path}?expectedRevision=${expectedRevision}`,{method:'DELETE',signal,suppressGlobalError:true}).then(data=>{if(data?.deleted!==true)throw new Error('删除结果未确认，请重新读取核对');return data;});
 }
+
+const subjectPath='/api/comic-screenplays/asset-library/subject-uploads';
+function subjectKey(key){if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(String(key||'')))throw new Error('真人上传请求编号无效');return key;}
+function subjectOperation(data){
+ const op=data?.operation;
+ if(!op?.requestKey||!['running','paused','needs_review','failed','succeeded'].includes(op.status))throw new Error('上传结果格式不正确，请核对本次上传');
+ if(op.status==='succeeded'&&(!op.result?.assetId||typeof op.result.assetId!=='string'))throw new Error('上传未返回主体编号，请核对本次上传');
+ return op;
+}
+export function getComicSubjectUploadCapability({signal}={},request=apiRequest){
+ return request('/api/comic-screenplays/asset-library/subject-upload-capability',{signal,suppressGlobalError:true}).then(data=>{
+ if(typeof data?.available!=='boolean'||typeof data.label!=='string')throw new Error('无法确认真人素材上传配置');return data;});
+}
+export function createComicSubjectUpload(input,{signal}={},request=apiRequest){
+ subjectKey(input.requestKey);if(!String(input.name||'').trim())throw new Error('请输入角色名称');
+ const form=new FormData();for(const key of ['requestKey','name','description','groupId'])form.append(key,String(input[key]||''));
+ if(input.file){if(!(input.file instanceof Blob)||!input.file.type.startsWith('image/')||input.file.size===0||input.file.size>40*1024*1024)throw new Error('请选择不超过40MB的图片');form.append('file',input.file);}
+ else {if(!input.entryId||!Number.isInteger(input.expectedRevision)||input.expectedRevision<1)throw new Error('请选择角色图片');form.append('entryId',input.entryId);form.append('expectedRevision',String(input.expectedRevision));}
+ return request(subjectPath,{method:'POST',body:form,signal,timeoutMs:190000,suppressGlobalError:true}).then(subjectOperation);
+}
+export function getComicSubjectUpload(key,{signal}={},request=apiRequest){return request(subjectPath+'/'+subjectKey(key),{signal,suppressGlobalError:true}).then(subjectOperation);}

@@ -61,6 +61,10 @@ func (s *ScreenplayAssetLibrary) replaceLibraryEditor(ctx context.Context, actor
 	if err := validateLibrarySubject(entry.Type, in.Sora2Info); err != nil {
 		return fail(err)
 	}
+	reference, refErr := s.resolveLibrarySubjectReference(ctx, actor, entry.Type, in.SubjectUploadKey)
+	if refErr != nil {
+		return fail(refErr)
+	}
 	audio, err := s.prepareLibraryAudio(actor, in)
 	if err != nil {
 		return fail(err)
@@ -74,6 +78,10 @@ func (s *ScreenplayAssetLibrary) replaceLibraryEditor(ctx context.Context, actor
 	if in.Sora2Info != nil {
 		subject, _ := json.Marshal([]string{"sora2Info", *in.Sora2Info})
 		raw = append(raw, subject...)
+	}
+	if in.SubjectUploadKey != nil {
+		ref, _ := json.Marshal([]string{"subjectUploadKey", *in.SubjectUploadKey})
+		raw = append(raw, ref...)
 	}
 	digest := fmt.Sprintf("%x", sha256.Sum256(raw))
 	if entry.Snapshot.Extra[libraryReplaceKey] == in.RequestKey {
@@ -123,6 +131,7 @@ func (s *ScreenplayAssetLibrary) replaceLibraryEditor(ctx context.Context, actor
 		setLibraryAudio(&entry, audio)
 	}
 	setLibrarySubject(&entry, in.Sora2Info)
+	setLibrarySubjectReference(&entry, in.SubjectUploadKey, reference)
 	entry.Name = in.Name
 	entry.Description = in.Description
 	entry.Category = in.Category

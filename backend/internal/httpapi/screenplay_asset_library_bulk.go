@@ -180,6 +180,7 @@ func (s *ScreenplayAssetLibrary) ExportCharacters(ctx context.Context, actor str
 		set("prompt", entry.Snapshot.Extra[screenplayLibraryPromptKey])
 		set("voice", entry.Snapshot.Extra[screenplayLibraryVoiceKey])
 		set("sora2Info", librarySubject(entry))
+		exportLibrarySubjectReference(record, entry)
 		if _, ok := record["sora2_info"]; ok {
 			set("sora2_info", librarySubject(entry))
 		}

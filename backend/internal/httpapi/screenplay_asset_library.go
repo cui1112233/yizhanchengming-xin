@@ -21,8 +21,9 @@ const screenplayLibraryImageLimit = 40 << 20
 const screenplayLibraryObjectProject = "screenplay-library"
 
 type ScreenplayAssetLibrary struct {
-	Repository screenplay.AssetLibraryRepository
-	Media      *ScreenplayMediaWorkbench
+	SubjectUploads *ScreenplaySubjectUploadService
+	Repository     screenplay.AssetLibraryRepository
+	Media          *ScreenplayMediaWorkbench
 }
 
 type screenplayLibrarySaveInput struct {
@@ -165,6 +166,7 @@ func (s *ScreenplayAssetLibrary) saveSourceLocked(ctx context.Context, actor str
 	}
 	entry := screenplay.AssetLibraryEntry{ID: id, Owner: actor, Type: source.Type, Name: source.Name, Description: firstText(source.Description, source.Identity), Category: strings.TrimSpace(in.Category), Snapshot: *source, SourceProjectID: project.ID, SourceAssetID: source.ID, SourceMediaID: selected.ID, Image: screenplay.MediaItem{ID: imageID, AssetID: imageID, Name: image.Name, Kind: "image", Status: "succeeded", CreatedAt: image.CreatedAt}, ImageObject: screenplay.AssetLibraryImageObject{ObjectKey: key, ContentType: image.ContentType, ByteSize: image.ByteSize}}
 	setLibrarySubject(&entry, sourceSubjectPointer(*source))
+	librarySubjectReferenceSource(&entry, *source)
 	saved, err := s.Repository.SaveAssetLibraryEntry(ctx, entry, 0)
 	if err != nil {
 		// A failed commit acknowledgement does not prove rollback. Reconcile
@@ -198,6 +200,12 @@ func screenplayLibraryPublic(entry screenplay.AssetLibraryEntry) map[string]any 
 	out := map[string]any{"id": entry.ID, "type": entry.Type, "name": entry.Name, "description": entry.Description, "category": entry.Category, "revision": entry.Revision, "image": image, "created_at": entry.CreatedAt, "updated_at": entry.UpdatedAt, "prompt": entry.Snapshot.Extra[screenplayLibraryPromptKey], "voice": entry.Snapshot.Extra[screenplayLibraryVoiceKey], "audio": "", "audioFileName": ""}
 	if entry.Type == screenplay.AssetCharacter {
 		out["sora2Info"] = librarySubject(entry)
+		out["subjectUploadKey"] = entry.Snapshot.Extra[librarySubjectRequestKey]
+		var result any
+		if r := librarySubjectResult(entry); r != nil {
+			result = r
+		}
+		out["subjectUpload"] = result
 	}
 	out["image_available"] = available
 	if audio, err := libraryAudioObject(entry); err == nil {
@@ -223,6 +231,9 @@ func RegisterScreenplayAssetLibraryRoutes(mux *http.ServeMux, auth BridgeAuth, s
 		})))
 	}
 	registerScreenplayLibraryManager(register, service)
+	if service.SubjectUploads != nil {
+		registerScreenplaySubjectUploads(register, service.SubjectUploads)
+	}
 	registerScreenplayLibraryBulk(register, service)
 	register("GET /api/comic-screenplays/asset-library", func(w http.ResponseWriter, r *http.Request, actor string) {
 		rows, err := service.Repository.ListAssetLibrary(r.Context(), actor, screenplay.AssetType(r.URL.Query().Get("type")), r.URL.Query().Get("q"), r.URL.Query().Get("category"))

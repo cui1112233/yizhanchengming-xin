@@ -8,6 +8,7 @@ import (
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/screenplay"
+	"qiantie/backend/internal/subjectupload"
 )
 
 func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options RouterOptions, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), catalog novelfetchworkshop.Store) {
@@ -65,7 +66,14 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 			libraryRepo = screenplay.NewMemoryAssetLibraryRepository()
 		}
 	}
-	RegisterScreenplayAssetLibraryRoutes(root, auth, &ScreenplayAssetLibrary{Repository: libraryRepo, Media: media})
+	library := &ScreenplayAssetLibrary{Repository: libraryRepo, Media: media}
+	uploadRepo, _ := options.Screenplay.(screenplay.SubjectUploadRepository)
+	uploads := &ScreenplaySubjectUploadService{Repository: uploadRepo, Library: library, Configs: options.UserConfigStore, Runner: subjectupload.NewClient()}
+	if redis, err := mergeworker.NewRedisStore(options.RedisURL, "qiantie:screenplay:subject-upload"); err == nil {
+		uploads.RedisDo = subjectUploadRedisDo(redis.Do)
+	}
+	library.SubjectUploads = uploads
+	RegisterScreenplayAssetLibraryRoutes(root, auth, library)
 	assetCheckRepo, _ := options.Screenplay.(screenplay.AssetCheckRepository)
 	assetChecks := &screenplay.AssetCheckRuntime{Store: options.Screenplay, Repository: assetCheckRepo, Authoring: authoring, BuildSteps: screenplay.BuildAssetCheckSteps, Generator: func(owner string) screenplay.TextGenerator {
 		return screenplayTextGenerator{owner: owner, resolver: resolver}

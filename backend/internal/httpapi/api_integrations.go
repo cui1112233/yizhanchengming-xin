@@ -48,7 +48,7 @@ var apiIntegrationFields = map[string]bool{
 	"volcanoMediaKitApiKey": true,
 
 	"conchApiUrl": true, "niji7KongyangKey": true, "niji7Concurrency": false, "niji7Style": false,
-	"imageHostUrl": true,
+	"imageHostUrl": true, "imageHostApiKey": true,
 
 	"ttsServiceUrl": false, "ttsApiKey": true, "qwenTtsKey": true, "cosyVoiceKey": true,
 	"minimaxApiKey": true, "ttsSentenceLength": false,

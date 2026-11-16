@@ -505,7 +505,8 @@ export const API_INTEGRATION_GROUPS = [
         control: 'password',
         placeholder: '输入图床接口地址',
         help: true
-      }
+      },
+      { key: 'imageHostApiKey', label: '图床 API Key（可选）', control: 'password', placeholder: '图床要求 Bearer 时填写' }
     ]
   },
   {
