@@ -1608,6 +1608,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		userPrompt += "\n\n请严格按原顺序返回 JSON 字符串数组，每个元素对应一个片段，只返回数组。"
 		var output string
 		var lastErr error
+		var repaired []string
 		attempts := 0
 		if provider == nil {
 			lastErr = errors.New("敏感词 AI 修复模型未配置")
@@ -1627,22 +1628,33 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 					userPrompt += "\n\n上次返回为空。只返回完整 JSON 数组，不要解释。"
 					continue
 				}
-				break
-			}
-		}
-		var repaired []string
-		if lastErr == nil {
-			lastErr = decodeSensitiveRepairArray(output, &repaired)
-			if lastErr == nil && len(repaired) != len(active) {
-				lastErr = fmt.Errorf("AI 整组返回数量不完整：%d/%d", len(repaired), len(active))
-			}
-		}
-		if lastErr == nil {
-			for index, repairedText := range repaired {
-				if strings.TrimSpace(repairedText) == "" || containsSensitiveKeyword(repairedText, strings.TrimSpace(fmt.Sprint(active[index]["keyword"]))) {
-					lastErr = errors.New("AI 整组结果仍包含命中敏感词")
-					break
+				// 源码在整组解析失败时会带着纠正指令继续重试；这里保持一致，
+				// 避免模型偶发的未转义换行直接把整组命中推给兜底。
+				repaired = nil
+				if parseErr := decodeSensitiveRepairArray(output, &repaired); parseErr != nil {
+					lastErr = parseErr
+					userPrompt += "\n\n上次返回不是合法的 JSON 数组。只返回 [\"片段1\",\"片段2\"] 形式，不要解释、不要代码块，字符串内不要换行。"
+					continue
 				}
+				if len(repaired) != len(active) {
+					lastErr = fmt.Errorf("AI 整组返回数量不完整：%d/%d", len(repaired), len(active))
+					userPrompt += fmt.Sprintf("\n\n上次返回数量不完整（%d/%d）。必须返回正好 %d 个元素的 JSON 数组。", len(repaired), len(active), len(active))
+					continue
+				}
+				unsafe := false
+				for index, repairedText := range repaired {
+					if strings.TrimSpace(repairedText) == "" || containsSensitiveKeyword(repairedText, strings.TrimSpace(fmt.Sprint(active[index]["keyword"]))) {
+						unsafe = true
+						break
+					}
+				}
+				if unsafe {
+					lastErr = errors.New("AI 整组结果仍包含命中敏感词")
+					userPrompt += "\n\n上次返回仍包含命中词。必须彻底改写每个片段，只返回 JSON 数组。"
+					continue
+				}
+				lastErr = nil
+				break
 			}
 		}
 		if lastErr != nil {

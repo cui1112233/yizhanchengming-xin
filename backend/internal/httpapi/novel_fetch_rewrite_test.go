@@ -208,6 +208,31 @@ func TestApplySensitiveAIRepairHonorsGroupModeAndHitLimit(t *testing.T) {
 	}
 }
 
+func TestApplySensitiveAIRepairRetriesGroupParseFailure(t *testing.T) {
+	outputs := []string{"[\"第一段已改\n第二段已改\"]", "[\"第一段已改\",\"第二段已改\"]"}
+	var calls int
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		calls++
+		output := outputs[0]
+		if len(outputs) > 1 {
+			outputs = outputs[1:]
+		}
+		return output, nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": true, "retries": 2}}
+	items := []map[string]any{
+		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段已替换"},
+		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段已替换"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换", items, nil)
+	if calls != 2 {
+		t.Fatalf("group parse failure should be retried, calls=%d", calls)
+	}
+	if text != "第一段已改\n第二段已改" || got[0]["status"] != "done" || got[1]["status"] != "done" {
+		t.Fatalf("group retry did not recover: text=%q items=%#v", text, got)
+	}
+}
+
 func TestApplySensitiveAIRepairAcceptsJSONArrayWrappedInProviderCommentary(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
 		return "Text response:\n[\"第一段已改\",\"第二段已改\"]\n处理完成", nil
