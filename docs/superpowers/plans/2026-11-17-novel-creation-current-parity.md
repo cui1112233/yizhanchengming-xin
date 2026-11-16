@@ -69,14 +69,14 @@ if runner.callCount() != 1 { t.Fatal("duplicate upstream dispatch") }
 
 **Interfaces:** Schedule增加DailyChapterCap、MaxConsecutiveFailures、状态/成功计数/日计数/逐轮记录；Batch增加MaxConsecutiveFailures、计数和StoppedReason。定时轮次以计划ID+到期时刻唯一。
 
-- [ ] 红测：上海时区跨日、日限10、失败阈值3、作品占用不推进、暂停跨日不恢复、两进程去重、立即执行不改原时刻；批次失败不增加完成章数、恢复不重复成功章。
+- [x] 红测：上海时区跨日、日限10、失败阈值3、作品占用不推进、暂停跨日不恢复、两进程去重、立即执行不改原时刻；批次失败不增加完成章数、恢复不重复成功章。
 
 ```go
 if after.CompletedChapters != before.CompletedChapters { t.Fatal("failure counted as completed chapter") }
 ```
 
-- [ ] 实现：间隔1–1440分钟、日限1–100、失败阈值1–10；成功保存才计数；未知结果/确定配置错误立即暂停；临时失败有界；停机只补一个轮次，下一次从处理完加间隔计算。
-- [ ] 验证：自动时间替身测试和MySQL唯一领取测试；运行`go test ./internal/novelcreation ./internal/httpapi -run 'Schedule|Batch|Automation' -count=1`。审查后提交。
+- [x] 实现：间隔1–1440分钟、日限1–100、失败阈值1–10；成功保存才计数；未知结果/确定配置错误立即暂停；临时失败有界；停机只补一个轮次，下一次从处理完加间隔计算。
+- [x] 验证：自动时间替身测试和MySQL唯一领取测试；运行`go test ./internal/novelcreation ./internal/httpapi -run 'Schedule|Batch|Automation' -count=1`。审查后提交。
 
 ## Task 5: Agent模型路由与有界处理
 
