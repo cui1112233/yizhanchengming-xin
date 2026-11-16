@@ -32,7 +32,7 @@
   },
   "ai": {
     "base_url": "https://nvewvip.preview.tencent-zeabur.cn/v1",
-    "api_key": "sk-1ZouTed8iStUO5fPF1xGtxDaAnqSwszhIlshILl5qYETyE3a",
+    "api_key": "",
     "model": "gemini-3.5-flash-maxthinking",
     "timeout_seconds": 180,
     "max_concurrency": 6,
@@ -52,7 +52,7 @@
   "ai_presets": [
     {
       "base_url": "https://nvewvip.preview.tencent-zeabur.cn/v1",
-      "api_key": "sk-1ZouTed8iStUO5fPF1xGtxDaAnqSwszhIlshILl5qYETyE3a",
+      "api_key": "",
       "model": "gemini-3.5-flash-maxthinking",
       "timeout_seconds": 180,
       "max_concurrency": 6,
