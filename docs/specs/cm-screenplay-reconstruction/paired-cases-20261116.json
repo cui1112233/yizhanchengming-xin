@@ -139,7 +139,35 @@
       "comparison": "original_recovered_editor_and_binding_rules_compared_cm_dom_mysql_http_4001_verified",
       "remaining": "真人上传、原视频最终消费未实现；原桌面点击/同视口像素及实际登录浏览器未通过；主动textarea编辑按LF保存",
       "full_parity_passed": false
+    },
+    {
+      "id": "G12-UPLOAD-001",
+      "name": "自有配置真人素材上传、核对与角色应用",
+      "original": {
+        "module_sha256": "297ec8b0c40be9653cb9d96ea6c6c895f2439048c0810e930d3e94967b3c186c",
+        "declaration": "api.py:10320 metadata, not author source",
+        "evidence": [
+          "library-subject-20261116/native-upload-boundaries-fire.json",
+          "subject-upload-20261116/provider/native-deyunai-processing.json"
+        ]
+      },
+      "cm": {
+        "commit": "865e15683bd1384531951d6fc09dcab65a7c3109",
+        "actual_mysql_redis_checks": 66,
+        "actual_4001_http_checks": 11,
+        "provider_execution": "controlled fake HTTP/Runner only, actual supplier calls zero",
+        "evidence": [
+          "subject-upload-20261116/backend/actual-result.json",
+          "subject-upload-20261116/frontend/routes-frontend-green.log",
+          "subject-upload-20261116/actual-4001-result.json",
+          "subject-upload-20261116/native-live-archive-result.json",
+          "subject-upload-20261116/runtime-verification.json"
+        ]
+      },
+      "comparison": "native_request_and_signature_compared_cm_dom_real_mysql_redis_and_4001_controlled_result_verified",
+      "remaining": "实际供应商/原桌面像素/其它渠道/最终视频消费未通过；不跨页面刷新恢复File；storage既存缺ProjectRetention预期失败有前后对照",
+      "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "23bbdd92e0677d2156c0c0906f56bf2328b1101a"
+  "latest_runtime_commit": "865e15683bd1384531951d6fc09dcab65a7c3109"
 }
