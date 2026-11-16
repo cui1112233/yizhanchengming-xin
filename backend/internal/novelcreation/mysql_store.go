@@ -162,7 +162,7 @@ WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_
 	return session, nil
 }
 
-const sessionColumns = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at, s.input_snapshot_json`
+const sessionColumns = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at`
 
 func scanSession(scanner novelRowScanner) (Session, error) {
 	var session Session

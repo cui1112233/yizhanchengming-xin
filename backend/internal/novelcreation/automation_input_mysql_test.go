@@ -127,3 +127,52 @@ func TestAutomationInputSQLStyleProfilesOwnerScoped(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAutomationInputSQLSessionQueriesUseOnlySessionSchemaColumns(t *testing.T) {
+	// Independent of sessionColumns so a mistaken production projection cannot
+	// silently become the mock's expected schema.
+	const projection = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at`
+	const join = ` FROM novel_sessions s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id `
+	now := time.Now().UTC()
+	rows := func() *sqlmock.Rows {
+		return sqlmock.NewRows([]string{"session_id", "project_id", "mode", "title", "context_budget", "message_cursor", "current_run_id", "created_at", "updated_at"}).AddRow("session", "project", "continuation", "会话", 4096, 2, "run", now, now)
+	}
+	for _, kind := range []string{"get", "list-project", "list-all"} {
+		t.Run(kind, func(t *testing.T) {
+			store, mock := newNovelCreationMockStore(t)
+			ctx := context.Background()
+			var got Session
+			if kind == "get" {
+				mock.ExpectQuery(regexp.QuoteMeta("SELECT "+projection+join+`WHERE s.owner_username = ? AND s.session_id = ? AND p.deleted_at IS NULL`)).WithArgs("alice", "session").WillReturnRows(rows())
+				var err error
+				got, err = store.GetSession(ctx, "alice", "session")
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				projectID := ""
+				query := "SELECT " + projection + join + `WHERE s.owner_username = ? AND p.deleted_at IS NULL`
+				if kind == "list-project" {
+					projectID = "project"
+					mock.ExpectQuery(regexp.QuoteMeta(query+` AND s.project_id = ? ORDER BY s.updated_at DESC`)).WithArgs("alice", "project").WillReturnRows(rows())
+				} else {
+					mock.ExpectQuery(regexp.QuoteMeta(query + ` ORDER BY s.updated_at DESC`)).WithArgs("alice").WillReturnRows(rows())
+				}
+				sessions, err := store.ListSessions(ctx, "alice", projectID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(sessions) != 1 {
+					t.Fatalf("sessions=%v", sessions)
+				}
+				got = sessions[0]
+			}
+			if got.ID != "session" || got.ProjectID != "project" || got.CurrentRunID != "run" || got.MessageCursor != 2 || got.ContextBudget != 4096 || got.Mode != "continuation" || got.Title != "会话" || !got.CreatedAt.Equal(now) || !got.UpdatedAt.Equal(now) {
+				t.Fatalf("scan=%+v", got)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

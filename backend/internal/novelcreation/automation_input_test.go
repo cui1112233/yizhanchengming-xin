@@ -3,7 +3,9 @@ package novelcreation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -299,5 +301,95 @@ func TestAutomationInputContinueAndBatchResumeKeepSelections(t *testing.T) {
 		if !reflect.DeepEqual(left, right) {
 			t.Fatalf("confirmation changed %s", key)
 		}
+	}
+}
+
+// failBatchStopStore rejects the durable stop, then can be restored to prove
+// the next scan retries the stop and finally removes the invalid active task.
+type failBatchStopStore struct {
+	Store
+	failure error
+	updates int
+}
+
+func (s *failBatchStopStore) UpdateBatch(ctx context.Context, owner string, batch Batch) (Batch, error) {
+	if batch.Status == BatchFailed {
+		s.updates++
+		if s.failure != nil {
+			return Batch{}, s.failure
+		}
+	}
+	return s.Store.UpdateBatch(ctx, owner, batch)
+}
+
+func TestAutomationInputBatchStopPersistenceErrorIsObservable(t *testing.T) {
+	ctx := context.Background()
+	f := newServiceFixture(t, nil)
+	session, _ := f.service.CreateSession(ctx, "alice", CreateSessionInput{ProjectID: f.project.ID, Mode: "continuation"})
+	// Emulate an old persisted task without the required continuation input.
+	batch, err := f.store.CreateBatch(ctx, "alice", Batch{ProjectID: f.project.ID, SessionID: session.ID, Status: BatchRunning, TotalChapters: 1, Prompt: "续写", ModelID: "text-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stopErr := errors.New("test stop persistence failure")
+	broken := &failBatchStopStore{Store: f.store, failure: stopErr}
+	service := NewService(broken, f.runtime, f.runner)
+	_, err = service.advanceBatch(ctx, batch)
+	if !errors.Is(err, stopErr) || !IsCode(err, ErrInputRequired) {
+		t.Fatalf("stop failed but combined input/save error was lost: %v", err)
+	}
+	dispatched, err := service.AdvanceBatches(ctx)
+	if !errors.Is(err, stopErr) || !strings.Contains(err.Error(), batch.ID) {
+		t.Fatalf("scan silently swallowed durable stop failure: %v", err)
+	}
+	if len(dispatched) != 0 || f.runner.callCount() != 0 {
+		t.Fatal("invalid task reached generation")
+	}
+	current, _ := f.store.GetBatch(ctx, "alice", batch.ID)
+	if current.Status != BatchRunning {
+		t.Fatal("test store unexpectedly persisted failed stop")
+	}
+	// Once persistence recovers, the readable terminal reason must be durable.
+	broken.failure = nil
+	if _, err = service.AdvanceBatches(ctx); !IsCode(err, ErrInputRequired) {
+		t.Fatalf("input failure was not observable after stop persisted: %v", err)
+	}
+	current, _ = f.store.GetBatch(ctx, "alice", batch.ID)
+	if current.Status != BatchFailed || !strings.Contains(current.LastError, "配置需调整") {
+		t.Fatalf("stop=%+v", current)
+	}
+	updates := broken.updates
+	if dispatched, err = service.AdvanceBatches(ctx); err != nil || len(dispatched) != 0 || broken.updates != updates {
+		t.Fatalf("stopped invalid task was scanned repeatedly: %v", err)
+	}
+}
+
+func TestAutomationInputBatchScanReturnsSuccessesAndAllFailures(t *testing.T) {
+	ctx := context.Background()
+	f := newServiceFixture(t, nil)
+	badIDs := []string{}
+	for _, mode := range []string{"continuation", "fanfiction"} {
+		session, _ := f.service.CreateSession(ctx, "alice", CreateSessionInput{ProjectID: f.project.ID, Mode: mode})
+		batch, err := f.store.CreateBatch(ctx, "alice", Batch{ProjectID: f.project.ID, SessionID: session.ID, Status: BatchRunning, TotalChapters: 1, Prompt: "创作", ModelID: "text-1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		badIDs = append(badIDs, batch.ID)
+	}
+	good, err := f.store.CreateBatch(ctx, "alice", Batch{ProjectID: f.project.ID, SessionID: f.session.ID, Status: BatchRunning, TotalChapters: 1, Prompt: "创作", ModelID: "text-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatched, err := f.service.AdvanceBatches(ctx)
+	if err == nil {
+		t.Fatal("scan swallowed per-batch failures")
+	}
+	for _, id := range badIDs {
+		if !strings.Contains(err.Error(), id) {
+			t.Fatalf("missing batch %s: %v", id, err)
+		}
+	}
+	if len(dispatched) != 1 || dispatched[0].Batch.ID != good.ID || dispatched[0].Run.ID == "" {
+		t.Fatalf("healthy batch was blocked by broken neighbors: %+v", dispatched)
 	}
 }

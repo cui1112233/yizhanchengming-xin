@@ -2,6 +2,7 @@ package novelcreation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -157,16 +158,17 @@ func (s *Service) AdvanceBatches(ctx context.Context) ([]DispatchedBatch, error)
 		return nil, err
 	}
 	dispatched := make([]DispatchedBatch, 0, len(active))
+	var failures []error
 	for _, batch := range active {
 		run, advanceErr := s.advanceBatch(ctx, batch)
 		if advanceErr != nil {
-			continue
+			failures = append(failures, fmt.Errorf("batch %s: %w", batch.ID, advanceErr))
 		}
 		if run.ID != "" {
 			dispatched = append(dispatched, DispatchedBatch{Batch: batch, Run: run})
 		}
 	}
-	return dispatched, nil
+	return dispatched, errors.Join(failures...)
 }
 
 // advanceBatch returns the newly queued run, if any.
@@ -232,7 +234,9 @@ func (s *Service) advanceBatch(ctx context.Context, batch Batch) (Run, error) {
 		if IsCode(err, ErrInputRequired) || IsCode(err, ErrSessionNotFound) || IsCode(err, ErrProjectNotFound) {
 			batch.LastError = "配置需调整：" + err.Error()
 		}
-		_, _ = s.store.UpdateBatch(ctx, owner, batch)
+		if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
+			return Run{}, errors.Join(err, updateErr)
+		}
 		return Run{}, err
 	}
 	batch.CurrentRunID = run.ID
