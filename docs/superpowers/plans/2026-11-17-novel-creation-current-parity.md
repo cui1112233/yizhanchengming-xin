@@ -84,14 +84,14 @@ if after.CompletedChapters != before.CompletedChapters { t.Fatal("failure counte
 
 **Interfaces:** AgentSettings增加ModelRoutes、PassScore、BaseTemperature、TemperatureStep、可空MaxRevisionRounds以区分旧默认和显式0、EnableLengthNorm、EnablePostWrite、EnableAiTells、RequireSecondaryConfirm；所有生效参数写入快照。
 
-- [ ] 红测：每个阶段选对模型；0次修订不调用reviser；审核分数与温度生效；关闭步骤无调用；不支持参数不发送；蓝图确认幂等。
+- [x] 红测：每个阶段选对模型；0次修订不调用reviser；审核分数与温度生效；关闭步骤无调用；不支持参数不发送；蓝图确认幂等。
 
 ```go
 if reviseCalls != 0 { t.Fatal("explicit zero revision limit ignored") }
 ```
 
-- [ ] 实现：保持旧作品已保存值，新设置默认采用批准规格；结构修复和内容修订分开限额；保留有审核提醒的有效正文，不无限生成。
-- [ ] 验证：`go test ./internal/novelcreation ./internal/prompt/... -run 'Novel|Pipeline|Agent|Revision' -count=1`，红/绿记录和实际请求参数替身记录。审查后提交。
+- [x] 实现：保持旧作品已保存值，新设置默认采用批准规格；结构修复和内容修订分开限额；保留有审核提醒的有效正文，不无限生成。
+- [x] 验证：`go test ./internal/novelcreation ./internal/prompt/... -run 'Novel|Pipeline|Agent|Revision' -count=1`，红/绿记录和实际请求参数替身记录。审查后提交。
 
 ## Task 6: 资料导入、文风、备忘录与内容版本
 
