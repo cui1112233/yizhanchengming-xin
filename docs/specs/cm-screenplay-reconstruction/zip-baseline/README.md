@@ -10,6 +10,9 @@
 - [08 新建、分章、保存和重开](08-creation-and-chapters.md)
 - [09 提示词选择、排序和收藏](09-prompt-selector.md)
 - [10 原版缺陷及修复边界](10-original-defects.md)
+- [11 分镜原生生成、消息、重试和结果](11-storyboard-native-generation.md)
+- [12 分镜按钮、取消和保存重开](12-storyboard-frontend-storage.md)
+- [第三批执行结果](../44-zip-storyboard-execution-results.md)
 - [本批执行结果](../43-zip-creation-selector-results.md)
 - [实际执行结果](../42-zip-baseline-execution-results.md)
 
