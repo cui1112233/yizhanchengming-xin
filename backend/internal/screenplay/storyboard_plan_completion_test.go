@@ -62,7 +62,8 @@ func TestStoryboardPlanningPersistsPartialAndCompleteWithoutRebilling(t *testing
 				want = "succeeded"
 			}
 			gen := &fakeGenerator{responses: []string{body}}
-			in := StoryboardPlanRequest{ChapterID: "c", Model: "own-model", ExpectedRevision: &state.Revision, IdempotencyKey: "one"}
+			auto := false
+			in := StoryboardPlanRequest{AutoContinue: &auto, ChapterID: "c", Model: "own-model", ExpectedRevision: &state.Revision, IdempotencyKey: "one"}
 			result, e := authors.GenerateStoryboardPlan(ctx, "alice", "p1", in, gen)
 			if e != nil {
 				t.Fatal(e)

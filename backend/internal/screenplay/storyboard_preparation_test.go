@@ -101,13 +101,14 @@ func TestStoryboardPlanOnlyDensityIdempotencyAndFinalModes(t *testing.T) {
 		t.Fatal(e)
 	}
 	planGen := &fakeGenerator{responses: []string{"原文事件先后完整的30秒规划"}}
-	request := StoryboardPlanRequest{ChapterID: "c1", Model: "selected-text", ExpectedRevision: &state.Revision, UseOriginal: true, IdempotencyKey: "plan-once"}
+	auto := false
+	request := StoryboardPlanRequest{AutoContinue: &auto, ChapterID: "c1", Model: "selected-text", ExpectedRevision: &state.Revision, UseOriginal: true, IdempotencyKey: "plan-once"}
 	result, e := authors.GenerateStoryboardPlan(ctx, "alice", "p1", request, planGen)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if planGen.callCount() != 1 || !strings.Contains(planGen.requests[0].SystemPrompt, "30秒一组") || planGen.requests[0].UserPrompt != "完整原文" || result.Chapter.PlanningText == "" || result.Chapter.PlanDensity != "sd25" || result.Chapter.ScriptText != "完整目标剧本" {
-		t.Fatal(result, planGen.requests)
+	if planGen.callCount() != 1 || !strings.Contains(planGen.requests[0].UserPrompt, "25.0–30.0") || !strings.Contains(planGen.requests[0].UserPrompt, "【本集剧本】\n完整原文") || result.Chapter.PlanningText == "" || result.Chapter.PlanDensity != "sd25" || result.Chapter.ScriptText != "完整目标剧本" {
+		t.Fatal("planning request or stored mode does not match selected density")
 	}
 	if _, e = authors.GenerateStoryboardPlan(ctx, "alice", "p1", request, planGen); e != nil || planGen.callCount() != 1 {
 		t.Fatal(e, planGen.callCount())

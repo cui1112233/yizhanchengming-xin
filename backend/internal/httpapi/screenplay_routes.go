@@ -39,7 +39,12 @@ func (g screenplayTextGenerator) Generate(ctx context.Context, req screenplay.Te
 	if maxTokens <= 0 {
 		maxTokens = 16000
 	}
+	messages := make([]batchfactoryv11.TextCompletionMessage, 0, len(req.Messages))
+	for _, message := range req.Messages {
+		messages = append(messages, batchfactoryv11.TextCompletionMessage{Role: message.Role, Content: message.Content})
+	}
 	content, err := provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+		Messages:     messages,
 		SystemPrompt: req.SystemPrompt, UserPrompt: req.UserPrompt,
 		Temperature: req.Temperature, MaxTokens: maxTokens,
 		DisableJSONResponse: !req.JSONResponse,

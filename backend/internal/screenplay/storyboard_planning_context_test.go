@@ -22,14 +22,15 @@ func TestPlanningSelectedBodyAndChangedContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	in := StoryboardPlanRequest{ChapterID: "c", Model: "own-text", UseOriginal: true, ExpectedRevision: &state.Revision, IdempotencyKey: "one"}
+	auto := false
+	in := StoryboardPlanRequest{AutoContinue: &auto, ChapterID: "c", Model: "own-text", UseOriginal: true, ExpectedRevision: &state.Revision, IdempotencyKey: "one"}
 	gen := &fakeGenerator{responses: []string{"完整规划"}}
 	out, err := authors.GenerateStoryboardPlan(ctx, "alice", "p1", in, gen)
 	if err != nil {
 		t.Fatal(err)
 	}
 	selected, _, _, _ := storyboardPlanningContext(p)
-	if !strings.Contains(gen.requests[0].SystemPrompt, selected.Body) || out.Chapter.PlanningPromptID != selected.ID || out.Chapter.PlanningPromptDigest != contentDigest(selected.Body) {
+	if !strings.Contains(gen.requests[0].UserPrompt, selected.Body) || out.Chapter.PlanningPromptID != selected.ID || out.Chapter.PlanningPromptDigest != contentDigest(selected.Body) {
 		t.Fatal("selected body omitted", out)
 	}
 	if _, err = authors.GenerateStoryboardPlan(ctx, "alice", "p1", in, gen); err != nil || gen.callCount() != 1 {

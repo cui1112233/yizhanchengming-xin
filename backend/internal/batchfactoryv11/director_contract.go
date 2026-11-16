@@ -16,11 +16,26 @@ var DirectorPrefixKeys = []string{
 }
 
 type TextCompletionRequest struct {
+	Messages            []TextCompletionMessage
 	SystemPrompt        string
 	UserPrompt          string
 	Temperature         float64
 	MaxTokens           int
 	DisableJSONResponse bool
+}
+
+type TextCompletionMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// CompletionMessages preserves multi-round conversations in all configured
+// OpenAI-compatible channels, including parameter fallback requests.
+func (in TextCompletionRequest) CompletionMessages() []TextCompletionMessage {
+	if len(in.Messages) > 0 {
+		return append([]TextCompletionMessage(nil), in.Messages...)
+	}
+	return []TextCompletionMessage{{Role: "system", Content: in.SystemPrompt}, {Role: "user", Content: in.UserPrompt}}
 }
 
 type PromptContract struct {

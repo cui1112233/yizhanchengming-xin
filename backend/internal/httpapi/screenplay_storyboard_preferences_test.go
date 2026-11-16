@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"qiantie/backend/internal/batchfactoryv11"
-	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/screenplay"
 	"strings"
 	"testing"
@@ -96,8 +95,8 @@ func TestScreenplayStoryboardPlanAndGenerationHTTPConsumeSavedChoices(t *testing
 	calls := 0
 	provider := screenplayProviderFunc(func(_ context.Context, in batchfactoryv11.TextCompletionRequest) (string, error) {
 		calls++
-		if strings.Contains(in.SystemPrompt, prompt.ScreenplayStoryboardPlanning) {
-			if in.UserPrompt != "完整剧本输入" || !in.DisableJSONResponse {
+		if strings.HasPrefix(in.UserPrompt, "【规划体例】") {
+			if !strings.Contains(in.UserPrompt, "【本集剧本】\n完整剧本输入") || !in.DisableJSONResponse {
 				t.Fatal(in)
 			}
 			return "实际保存规划文本", nil
@@ -122,7 +121,7 @@ func TestScreenplayStoryboardPlanAndGenerationHTTPConsumeSavedChoices(t *testing
 	auth := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}
 	RegisterScreenplayWorkflowRoutes(mux, auth, projects, resolver, func() time.Time { return now }, nil, authors)
 	RegisterScreenplayStoryboardPlanRoutes(mux, auth, authors, resolver)
-	planBody := map[string]any{"chapter_id": "c", "expected_revision": state.Revision, "idempotencyKey": "http-e2-once"}
+	planBody := map[string]any{"chapter_id": "c", "expected_revision": state.Revision, "idempotencyKey": "http-e2-once", "auto_continue": false}
 	planned := signedJSONRequest(t, mux, now, "alice", "POST", "/api/comic-screenplays/projects/e2-p/storyboard-plan", planBody)
 	if planned.Code != 200 || !strings.Contains(planned.Body.String(), `"planning_request_key":"http-e2-once"`) || !strings.Contains(planned.Body.String(), "实际保存规划文本") {
 		t.Fatal(planned.Code, planned.Body.String())

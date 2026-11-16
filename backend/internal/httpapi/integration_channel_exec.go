@@ -214,11 +214,8 @@ type integrationTextProvider struct {
 
 func (p *integrationTextProvider) Complete(ctx context.Context, input batchfactoryv11.TextCompletionRequest) (string, error) {
 	payload := map[string]any{
-		"model": p.Model,
-		"messages": []map[string]string{
-			{"role": "system", "content": input.SystemPrompt},
-			{"role": "user", "content": input.UserPrompt},
-		},
+		"model":       p.Model,
+		"messages":    input.CompletionMessages(),
 		"temperature": input.Temperature,
 		"max_tokens":  input.MaxTokens,
 	}

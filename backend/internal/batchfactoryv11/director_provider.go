@@ -226,11 +226,8 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		return "", err
 	}
 	payload := map[string]any{
-		"model": p.Model,
-		"messages": []map[string]string{
-			{"role": "system", "content": input.SystemPrompt},
-			{"role": "user", "content": input.UserPrompt},
-		},
+		"model":       p.Model,
+		"messages":    input.CompletionMessages(),
 		"temperature": input.Temperature,
 		"max_tokens":  input.MaxTokens,
 	}
@@ -289,11 +286,8 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 				fallbackMaxTokens = 8192
 			}
 			fallbackPayload := map[string]any{
-				"model": p.Model,
-				"messages": []map[string]string{
-					{"role": "system", "content": input.SystemPrompt},
-					{"role": "user", "content": input.UserPrompt},
-				},
+				"model":       p.Model,
+				"messages":    input.CompletionMessages(),
 				"temperature": input.Temperature,
 				"max_tokens":  fallbackMaxTokens,
 			}

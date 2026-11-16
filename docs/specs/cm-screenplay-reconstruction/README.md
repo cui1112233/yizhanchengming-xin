@@ -1,6 +1,6 @@
 # CM漫剧：先恢复、再分析、再规格、再实现
 
-2026-11-16最新检查点：[主体视频实际4001及本地全链检查](33-subject-video-runtime-results.md)、[原编译规划规格](34-native-planning-contract.md)、[完整性220组逐项对照](35-planning-coverage-results.md)。完整36组仍未完成；规划正文和8轮续写仍需接入。以下保留重建基线。
+2026-11-16最新检查点：[规划正文与8轮续写接入](37-planning-continuation-results.md)，前项为[完整性220组对照](35-planning-coverage-results.md)及[主体视频4001验收](33-subject-video-runtime-results.md)。完整36组仍未完成；原流式事件、已有规划显式继续、复杂资产上下文和138分镜续写待进一步对照。以下保留重建基线。
 
 后续实施记录：[2026-11-15已确认规则的独立实现](04-implementation-20261115.md)。下文为重建时的分析基线。
 

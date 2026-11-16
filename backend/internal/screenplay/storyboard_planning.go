@@ -37,6 +37,8 @@ func NormalizePlanDensity(value any) string {
 }
 
 type StoryboardPlanRequest struct {
+	AutoContinue     *bool  `json:"auto_continue,omitempty"`
+	MaxRounds        *int   `json:"max_rounds,omitempty"`
 	IdempotencyKey   string `json:"idempotencyKey"`
 	ChapterID        string `json:"chapter_id"`
 	Model            string `json:"model"`
@@ -90,12 +92,18 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		if model == "" {
 			return fmt.Errorf("%w: 请选择文字模型", ErrInvalidArgument)
 		}
-		selected, configDigest, style, e := storyboardPlanningContext(p)
+		selected, configDigest, _, e := storyboardPlanningContext(p)
 		if e != nil {
 			return e
 		}
 		density := NormalizePlanDensity(EffectiveCreativeConfig(p).PlanDensity)
-		digest := contentDigest(fmt.Sprintf("%s\n%s\n%s\n%s\n%t\n%s", model, selected.ID, contentDigest(selected.Body), configDigest, in.UseOriginal, content))
+		previous := ""
+		if index > 0 {
+			previous = state.Chapters[index-1].PlanningText
+		}
+		system, user := prompt.ScreenplayNativePlanningRequest(p.Title, firstNonEmpty(chapter.Title, fmt.Sprintf("第%d集", index+1)), selected.Name, selected.Body, density, previous, content)
+		limit := storyboardPlanningRoundLimit(in)
+		digest := contentDigest(fmt.Sprintf("%s\n%s\n%s\n%s\n%t\n%s\n%s\n%d", model, selected.ID, contentDigest(selected.Body), configDigest, in.UseOriginal, contentDigest(system), contentDigest(user), limit))
 		if chapter.PlanningRequestKey == in.IdempotencyKey {
 			if chapter.PlanningRequestDigest != digest {
 				return fmt.Errorf("%w: 同一规划请求标识的输入已变化，请核对已有结果", ErrInvalidArgument)
@@ -122,16 +130,18 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 			return e
 		}
 		state = reserved
-		response, runErr := generator.Generate(ctx, TextRequest{Model: model, SystemPrompt: prompt.ScreenplayPlanningReference(selected.ID, selected.Name, selected.Body, density, style), UserPrompt: content, MaxOutputTokens: 16000, Temperature: .4})
+		run, runErr := generateStoryboardPlanRounds(ctx, generator, model, system, user, density, limit)
 		if ctx.Err() != nil {
 			runErr = ctx.Err()
 		}
-		text := strings.TrimSpace(response.Content)
+		text := run.Text
 		if runErr == nil && (text == "" || len([]rune(text)) > 100000) {
 			runErr = fmt.Errorf("%w: 规划正文为空或过长", ErrArtifactInvalid)
 		}
 		if runErr == nil {
 			chapter.PlanningText = text
+			chapter.PlanningRounds = run.Rounds
+			chapter.PlanningContinuationError = run.ContinuationError
 			chapter.PlanningPromptID = selected.ID
 			chapter.PlanningPromptDigest = contentDigest(selected.Body)
 			chapter.PlanningConfigDigest = configDigest

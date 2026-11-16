@@ -31,12 +31,18 @@ var (
 
 // TextRequest 是对模型的最小调用契约，便于替换 provider 与测试。
 type TextRequest struct {
+	Messages        []TextMessage
 	Model           string
 	SystemPrompt    string
 	UserPrompt      string
 	MaxOutputTokens int
 	Temperature     float64
 	JSONResponse    bool
+}
+
+type TextMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type TextResponse struct {
