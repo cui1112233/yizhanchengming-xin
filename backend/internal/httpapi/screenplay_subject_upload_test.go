@@ -5,12 +5,30 @@ import (
 	"context"
 	"fmt"
 	"mime/multipart"
+	"net/http"
 	"net/http/httptest"
 	"qiantie/backend/internal/screenplay"
 	"qiantie/backend/internal/subjectupload"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestSubjectUploadWholeLibraryRoutesRegister(t *testing.T) {
+	library, _, _, _, now := assetLibraryServiceFixture(t)
+	library.SubjectUploads = &ScreenplaySubjectUploadService{Repository: screenplay.NewMemorySubjectUploadRepository(), Library: library}
+	defer func() {
+		if p := recover(); p != nil {
+			t.Fatalf("whole library route registration must not panic: %v", p)
+		}
+	}()
+	mux := http.NewServeMux()
+	RegisterScreenplayAssetLibraryRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, library)
+	w := signedJSONRequest(t, mux, now, "alice", "GET", "/api/comic-screenplays/asset-library/subject-upload-capability", nil)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
 
 type subjectTestRunner struct {
 	calls   int

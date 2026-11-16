@@ -102,4 +102,4 @@ export function createComicSubjectUpload(input,{signal}={},request=apiRequest){
  else {if(!input.entryId||!Number.isInteger(input.expectedRevision)||input.expectedRevision<1)throw new Error('请选择角色图片');form.append('entryId',input.entryId);form.append('expectedRevision',String(input.expectedRevision));}
  return request(subjectPath,{method:'POST',body:form,signal,timeoutMs:190000,suppressGlobalError:true}).then(subjectOperation);
 }
-export function getComicSubjectUpload(key,{signal}={},request=apiRequest){return request(subjectPath+'/'+subjectKey(key),{signal,suppressGlobalError:true}).then(subjectOperation);}
+export function getComicSubjectUpload(key,{signal}={},request=apiRequest){return request(subjectPath+'/'+subjectKey(key)+'/status',{signal,suppressGlobalError:true}).then(subjectOperation);}

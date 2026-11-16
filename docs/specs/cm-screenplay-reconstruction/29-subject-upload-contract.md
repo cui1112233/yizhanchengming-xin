@@ -18,7 +18,7 @@
 
 - GET `/api/comic-screenplays/asset-library/subject-upload-capability`：仅返回provider/label/available/reason，不返回凭据。
 - POST `/api/comic-screenplays/asset-library/subject-uploads`：multipart requestKey/name/description/groupId + file，或entryId/expectedRevision读取当前账号已存图片。40MiB图片限制，禁止服务端任意路径和远程URL输入。
-- GET同路径`/{requestKey}`：核对本账号操作。结果为`{operation:{requestKey,status,phase,message,result?}}`。status为running/paused/needs_review/failed/succeeded；result仅安全的assetId/assetUri/groupId/projectName/provider/status。同键同内容恢复，同键换内容409；未知创建结果暂停核对，不盲目重复建组或素材。
+- GET同路径`/{requestKey}/status`：核对本账号操作。加status尾段避免与已有`/{entryID}/audio`、`/{entryID}/image`发生交叉路由。结果为`{operation:{requestKey,status,phase,message,result?}}`。status为running/paused/needs_review/failed/succeeded；result仅安全的assetId/assetUri/groupId/projectName/provider/status。同键同内容恢复，同键换内容409；未知创建结果暂停核对，不盲目重复建组或素材。
 - 每次操作独立持久化到MySQL（新可选repository及迁移，确认编号未占用），不把密钥存任务。源图片按已有对象存储保存；Redis每请求租约保护，运行上限180秒，小于租约300秒。先持久记录create意图，再外发；成功保存组/素材ID后再下一步。崩溃或创建响应不明保留needs_review，禁止重试创建。已有素材ID仅查询，不重复上传。
 - 请求取消停止后续请求和等待，远端已经创建的素材无法靠取消撤销；保存可核对的进度。没有后台重试或未经用户动作的收费请求。
 - 上传本身不写角色。应用角色时可传subjectUploadKey；必须核对同账号成功操作，将安全结果存入私有Extra，公开和V2导出对应安全字段。省略保留，后续手工存档仍可改，不自动覆写手工值。换图/音频与CAS摘要纳入该引用；取消角色不自动清理远端素材。

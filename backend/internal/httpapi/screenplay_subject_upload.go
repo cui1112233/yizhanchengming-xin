@@ -142,7 +142,7 @@ func registerScreenplaySubjectUploads(register func(string, func(http.ResponseWr
 		}
 		writeJSON(w, 200, map[string]any{"provider": c.Provider, "label": label, "available": e == nil, "reason": reason})
 	})
-	register("GET /api/comic-screenplays/asset-library/subject-uploads/{requestKey}", func(w http.ResponseWriter, r *http.Request, o string) {
+	register("GET /api/comic-screenplays/asset-library/subject-uploads/{requestKey}/status", func(w http.ResponseWriter, r *http.Request, o string) {
 		if s.Repository == nil {
 			writeJSON(w, 503, map[string]string{"error": "素材操作存储未配置"})
 			return
