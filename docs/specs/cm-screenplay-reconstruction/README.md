@@ -1,6 +1,6 @@
 # CM漫剧：先恢复、再分析、再规格、再实现
 
-2026-11-16最新检查点：[真人素材上传及4001受控验收](30-subject-upload-results.md)，前项为[主体存档](28-character-subject-results.md)及[原生归档](26-character-library-bulk-results.md)。已实际调用Craft Anything与原编译函数，完成部分规则重写及双向文件对照；完整36组仍未全部完成。以下表格保留重建时基线，不代表所有后续实现都未接入。
+2026-11-16最新检查点：[主体视频实际4001及本地全链检查](33-subject-video-runtime-results.md)、[原编译规划规格](34-native-planning-contract.md)、[完整性220组逐项对照](35-planning-coverage-results.md)。完整36组仍未完成；规划正文和8轮续写仍需接入。以下保留重建基线。
 
 后续实施记录：[2026-11-15已确认规则的独立实现](04-implementation-20261115.md)。下文为重建时的分析基线。
 

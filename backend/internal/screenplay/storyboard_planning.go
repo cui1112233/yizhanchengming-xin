@@ -100,7 +100,7 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 			if chapter.PlanningRequestDigest != digest {
 				return fmt.Errorf("%w: 同一规划请求标识的输入已变化，请核对已有结果", ErrInvalidArgument)
 			}
-			if chapter.PlanningStatus == "succeeded" {
+			if chapter.PlanningStatus == "succeeded" || chapter.PlanningStatus == "partial" {
 				out = StoryboardPlanResult{Chapter: chapter, Revision: state.Revision}
 				return nil
 			}
@@ -139,6 +139,11 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 			chapter.PlanningSourceSHA256 = contentDigest(content)
 			chapter.PlanningUseOriginal = in.UseOriginal
 			chapter.PlanningStatus = "succeeded"
+			coverage := EvaluateStoryboardPlan(text, density)
+			chapter.PlanningCoverage = &coverage
+			if !coverage.OK {
+				chapter.PlanningStatus = "partial"
+			}
 		} else {
 			chapter.PlanningStatus = "failed"
 			if ctx.Err() != nil {

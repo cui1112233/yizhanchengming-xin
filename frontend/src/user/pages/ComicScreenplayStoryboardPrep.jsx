@@ -1,5 +1,6 @@
 import ComicScreenplaySceneProgress from './ComicScreenplaySceneProgress.jsx';
-import { Alert, Button, Checkbox, Modal, Select } from 'antd';
+import ComicScreenplayPlanCoverage from './ComicScreenplayPlanCoverage.jsx';
+import { Alert, Button, Checkbox, Modal, Select, message } from 'antd';
 import { useEffect,useLayoutEffect,useRef,useState } from 'react';
 import {createStoryboardGenerationRecord,rememberStoryboardGenerationAttempt,completeStoryboardGenerationRequest,isStoryboardGenerationAcknowledged,markStoryboardGenerationNotStarted} from './comic-screenplay-storyboard-attempts.js';
 import { getComicChapters } from '../../shared/api/comicScreenplayWorkflow.js';
@@ -40,11 +41,12 @@ export default function ComicScreenplayStoryboardPrep({projectId,episode,modelId
     const fingerprint=JSON.stringify({chapterId:target,density,useOriginal,text:input,modelId});
     if(retry||attempt.current?.fingerprint!==fingerprint)attempt.current={fingerprint,key:crypto.randomUUID(),status:'new'};
     const active=attempt.current;const currentChapter=dataRef.current?.state?.chapters?.find(item=>item.id===target);
-    if(storyboardPlanningAttempt(currentChapter,active.key)==='succeeded')active.status='succeeded';
-    if(active.status!=='succeeded'){
+    if(['succeeded','partial'].includes(storyboardPlanningAttempt(currentChapter,active.key)))active.status=currentChapter.planning_status;
+    if(!['succeeded','partial'].includes(active.status)){
      setBusy('plan');controller.current=new AbortController();
      const result=await generateStoryboardPlan(projectId,{chapter_id:target,model:modelId,expected_revision:dataRef.current.state.revision,use_original_content_directly:useOriginal,idempotencyKey:active.key},controller.current.signal);if(token!==epoch.current)return;
-     if(!result?.chapter?.planning_text?.trim())throw Error('服务端未返回已保存规划');active.status='succeeded';
+     if(!result?.chapter?.planning_text?.trim())throw Error('服务端未返回已保存规划');active.status=result.chapter.planning_status||'succeeded';
+     if(result.chapter.planning_coverage?.ok===false)message.warning(`第${episode.no}集规划已保存，但可能仍不完整（${result.chapter.planning_coverage.chars}字）。请打开「查看规划」核对。`,8);
      const next={...dataRef.current,state:{...dataRef.current.state,revision:result.revision,chapters:dataRef.current.state.chapters.map(item=>item.id===target?result.chapter:item)}};setData(next);dataRef.current=next;onPlansLoaded?.(next.state.chapters);
     }
     planningID=target;setBusy('refresh');await onChanged?.();if(token!==epoch.current)return;
@@ -53,7 +55,7 @@ export default function ComicScreenplayStoryboardPrep({projectId,episode,modelId
    const options={...(target?{chapterId:target}:{}),usePlanning:mode!=='none',...(mode!=='none'?{planningChapterId:planningID}:{}),useOriginalContentDirectly:useOriginal};const generationRecord=createStoryboardGenerationRecord({projectId,engine,episodeNumbers:[episode.no],options},{forceNew:historySucceeded.current||forceFreshInput.current});historySucceeded.current=false;forceFreshInput.current=false;generationRecord.attempt={request_key:generationRecord.key,status:'running',can_retry:false,episode_numbers:[episode.no]};await runGeneration(generationRecord,choices);
   }catch(err){if(token!==epoch.current)return;
    let status='unknown';if(needsPlan&&attempt.current){const latest=await reload(false);if(token!==epoch.current)return;const currentChapter=latest?.state?.chapters?.find(item=>item.id===target);status=storyboardPlanningAttempt(currentChapter,attempt.current.key);attempt.current.status=status;if(status==='running')setWaiting(true);if(status==='succeeded')onPlansLoaded?.(latest.state.chapters);}
-   const detail=status==='running'?'规划仍在处理，请刷新状态核对；不会再次提交模型。':status==='succeeded'?'规划已保存，可重试后续分镜；不会重复写规划。':status==='failed'||status==='cancelled'?'旧规划保留；再次规划需要明确确认重试。':'';
+   const detail=status==='running'?'规划仍在处理，请刷新状态核对；不会再次提交模型。':['succeeded','partial'].includes(status)?'规划已保存，可核对后继续；不会重复写规划。':status==='failed'||status==='cancelled'?'旧规划保留；再次规划需要明确确认重试。':'';
    setError(`${err.message||'操作失败'}${detail?' '+detail:''}`);
   }finally{if(token===epoch.current){pending.current=false;setBusy('');controller.current=null;}}
  }
@@ -62,7 +64,7 @@ export default function ComicScreenplayStoryboardPrep({projectId,episode,modelId
  const title=generation?.status==='succeeded'?'查看已保存结果':generationLocked?'继续未完成分镜':task==='plan'?'开始规划':'开始分镜';
  return <Modal className="comic-e2-prep-modal" width={560} style={{maxWidth:'94vw'}} title="生成分镜脚本" closeIcon={<span aria-hidden="true">×</span>} open onCancel={()=>{if(!busy)onClose();}} closable={!busy} maskClosable={!busy} footer={<><Button disabled={!!busy} onClick={()=>onClose()}>取消</Button>{busy==='plan'?<Button danger onClick={()=>controller.current?.abort()}>停止等待</Button>:null}{busy==='generate'?<Button title="隐藏后可在页头取消当前任务" onClick={()=>onClose({task,planMode:mode,planDensity:density,useOriginalContentDirectly:useOriginal,chapterId:target||undefined})}>隐藏窗口</Button>:null}{generation?<Button disabled={!!busy||generationLoading} onClick={()=>void refreshGeneration()}>核对分镜状态</Button>:null}{storyboardGenerationCanRetry(generation)?<Button disabled={!!busy} onClick={startFreshInput}>按当前输入新建</Button>:null}{!generation&&(waiting||error)?<Button disabled={!!busy||loading} onClick={()=>void reload(false)}>刷新规划状态</Button>:null}<Button type="primary" disabled={generation?.status==='succeeded'?!!busy:blocked} loading={!!busy&&busy!=='agent'} onClick={confirm}>{title}</Button>{onAgent?<Button type="primary" disabled={loading||!!busy||generationLocked} loading={busy==='agent'} title="仅打开助手并预填可见请求，需另点发送才执行" onClick={()=>void agent()}>Agent 分镜 · 打开助手</Button>:null}</>}>
   <p className="comic-e2-prep-lead">第 {episode.no} 集 · {episode.title}{useOriginal?' · 原文分镜':''}</p>{error?<Alert type="error" showIcon message={error}/>:null}{generation?<Alert type="info" message={`原分镜请求：${generation.status}`} description={<div>{batchMismatch?<p>{generation._restoreUnsupported?'该请求使用旧纯文本输入，无法仅凭摘要安全恢复。请在原生成入口核对或续跑。':'该请求包含多集，请在原批次入口核对或续跑，不能用单集替代。'}</p>:null}<ComicScreenplaySceneProgress episodes={generation.episodes || []}/></div>}/>:null}
-  <div className="comic-e2-agent-hint"><b>分镜脚本生成有两种方式：</b><span>1. 打开 Agent 对话窗口，确认请求后另点发送；</span><span>2. 使用下方内置流程，明确确认后规划或生成分镜。</span></div>
+  <ComicScreenplayPlanCoverage chapter={chapter}/><div className="comic-e2-agent-hint"><b>分镜脚本生成有两种方式：</b><span>1. 打开 Agent 对话窗口，确认请求后另点发送；</span><span>2. 使用下方内置流程，明确确认后规划或生成分镜。</span></div>
   <div className="comic-e2-prep-task"><button type="button" disabled={!!busy||generationLocked} className={task==='plan'?'is-active':''} onClick={()=>setTask('plan')}><strong>只生成规划</strong><span>保存本章规划，不自动生成分镜 JSON</span></button><button type="button" disabled={!!busy||generationLocked} className={task==='generate'?'is-active':''} onClick={()=>setTask('generate')}><strong>生成分镜 JSON</strong><span>按已选择的规划来源生成分镜脚本</span></button></div>
   <StoryboardDensity value={density} disabled={!!busy||readOnly||generationLocked} onChange={setDensity} hint="更少更紧凑；标准默认；更多按细拆样本；SD2.5专项走 30 秒一组。写新规划时按这一档。"/>
   <label className="comic-e2-target">目标章节<Select aria-label="目标章节" size="small" allowClear disabled={loading||!!busy||generationLocked} loading={loading} value={target||undefined} placeholder="选择实际对应的已保存章节" options={chapters.map((item,index)=>({value:item.id,label:`${index+1}. ${item.title||'未命名章节'}`}))} onChange={id=>setTarget(id||'')}/></label><Checkbox disabled={!!busy||!target||generationLocked||episode.sourceOnly} checked={useOriginal} onChange={event=>setUseOriginal(event.target.checked)}>直接使用章节原文</Checkbox>

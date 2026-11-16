@@ -167,7 +167,52 @@
       "comparison": "native_request_and_signature_compared_cm_dom_real_mysql_redis_and_4001_controlled_result_verified",
       "remaining": "实际供应商/原桌面像素/其它渠道/最终视频消费未通过；不跨页面刷新恢复File；storage既存缺ProjectRetention预期失败有前后对照",
       "full_parity_passed": false
+    },
+    {
+      "id": "G12-VIDEO-001",
+      "name": "主体存档进入自有视频协议与中断核对",
+      "original": {
+        "evidence": [
+          "subject-video-20261116/",
+          "subject-video-query-20261116/"
+        ]
+      },
+      "cm": {
+        "commit": "7f2fd9060143293546aac5bf156593ed45a207dd",
+        "actual_4001_http_checks": 16,
+        "real_mysql_runner_adapter_checks": 18,
+        "evidence": [
+          "subject-video-runtime-20261116/actual-config-result.json",
+          "subject-video-runtime-20261116/full-chain-result.json",
+          "subject-video-runtime-20261116/runtime-verification.json"
+        ],
+        "provider_execution": "final HTTP transport controlled; real supplier calls zero"
+      },
+      "comparison": "original_request_and_query_contract_compared_real_local_chain_controlled_HTTP",
+      "remaining": "actual supplier and original desktop pixels remain unverified",
+      "full_parity_passed": false
+    },
+    {
+      "id": "G20-COVERAGE-001",
+      "name": "规划完成器220组输出逐项一致",
+      "original": {
+        "declaration": "works.episode_coverage.evaluate_plan:185 compiled metadata, not source",
+        "evidence": [
+          "planning-native-20261116/planning-rule-cases.json",
+          "planning-native-20261116/planning-coverage-matrix.json"
+        ]
+      },
+      "cm": {
+        "original_golden_cases": 220,
+        "evidence": [
+          "backend/internal/screenplay/testdata/storyboard_plan_coverage_original.json.gz",
+          "35-planning-coverage-results.md"
+        ]
+      },
+      "comparison": "all completion fields and reason compared; service persistence and controlled browser duplicate-click checked",
+      "remaining": "four guide bodies, 8-round continuation, real runtime acceptance and full planning chain still pending",
+      "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "865e15683bd1384531951d6fc09dcab65a7c3109"
+  "latest_runtime_commit": "7f2fd9060143293546aac5bf156593ed45a207dd"
 }

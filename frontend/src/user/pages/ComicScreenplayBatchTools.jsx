@@ -31,16 +31,16 @@ function ComicGenerationBatchDialog({projectId,workspace,episodes,sourceMode='sc
    if(stopRequested.current||!alive.current)return;
    await runner.current.run(captured,async ep=>{
     if(!alive.current)return false;
-    let planningId=ep.chapterId;
+    let planningId=ep.chapterId,planningIncomplete=false;
     if(task==='plan'||mode==='new'){
      const data=await getComicChapters(projectId);if(!alive.current)return false;
      const chapter=data.state?.chapters?.find(c=>c.id===ep.chapterId);if(!chapter)throw Error('对应章节已不存在，请刷新后重新选择');
      if(chapter.planning_status==='running')throw Error('章节规划仍在执行，请核对原请求');
      controller.current=new AbortController();
      const result=await generateStoryboardPlan(projectId,{chapter_id:ep.chapterId,model:modelId,expected_revision:data.state.revision,use_original_content_directly:original,idempotencyKey:crypto.randomUUID()},controller.current.signal);
-     if(!alive.current)return false;if(!result?.chapter?.planning_text?.trim())throw Error('没有返回已保存的规划');await onChanged?.();if(!alive.current)return false;
+     if(!alive.current)return false;if(!result?.chapter?.planning_text?.trim())throw Error('没有返回已保存的规划');planningIncomplete=result.chapter.planning_coverage?.ok===false;await onChanged?.();if(!alive.current)return false;
     }
-    if(task==='plan')return '规划已保存';
+    if(task==='plan')return planningIncomplete?'规划草稿已保存，可能仍不完整；请打开「查看规划」核对':'规划已保存';
     const value=await onGenerate(ep.no,{...(ep.chapterId?{chapterId:ep.chapterId}:{}),usePlanning:mode!=='none',...(mode!=='none'?{planningChapterId:planningId}:{}),useOriginalContentDirectly:original});
     if(value===true)return '分镜已保存';if(value?.not_started){runner.current.stop();throw Error('已取消，未提交生成');}runner.current.stop();return false;
    },rows=>{if(alive.current)setResults(rows);});

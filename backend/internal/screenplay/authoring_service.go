@@ -13,22 +13,23 @@ import (
 var ErrAccessDenied = errors.New("没有此项目的操作权限")
 
 type Chapter struct {
-	PlanningPromptID      string `json:"planning_prompt_id,omitempty"`
-	PlanningPromptDigest  string `json:"planning_prompt_digest,omitempty"`
-	PlanningConfigDigest  string `json:"planning_config_digest,omitempty"`
-	PlanningRequestKey    string `json:"planning_request_key,omitempty"`
-	PlanningRequestDigest string `json:"planning_request_digest,omitempty"`
-	PlanningStatus        string `json:"planning_status,omitempty"`
-	PlanningModel         string `json:"planning_model,omitempty"`
-	PlanningText          string `json:"planning_text,omitempty"`
-	PlanDensity           string `json:"plan_density,omitempty"`
-	PlanningSourceSHA256  string `json:"planning_source_sha256,omitempty"`
-	PlanningUseOriginal   bool   `json:"planning_use_original,omitempty"`
-	RawResult             string `json:"raw_result,omitempty"`
-	ID                    string `json:"id"`
-	Title                 string `json:"title"`
-	SourceText            string `json:"source_text"`
-	ScriptText            string `json:"script_text"`
+	PlanningPromptID      string                  `json:"planning_prompt_id,omitempty"`
+	PlanningPromptDigest  string                  `json:"planning_prompt_digest,omitempty"`
+	PlanningConfigDigest  string                  `json:"planning_config_digest,omitempty"`
+	PlanningRequestKey    string                  `json:"planning_request_key,omitempty"`
+	PlanningRequestDigest string                  `json:"planning_request_digest,omitempty"`
+	PlanningStatus        string                  `json:"planning_status,omitempty"`
+	PlanningModel         string                  `json:"planning_model,omitempty"`
+	PlanningText          string                  `json:"planning_text,omitempty"`
+	PlanningCoverage      *StoryboardPlanCoverage `json:"planning_coverage,omitempty"`
+	PlanDensity           string                  `json:"plan_density,omitempty"`
+	PlanningSourceSHA256  string                  `json:"planning_source_sha256,omitempty"`
+	PlanningUseOriginal   bool                    `json:"planning_use_original,omitempty"`
+	RawResult             string                  `json:"raw_result,omitempty"`
+	ID                    string                  `json:"id"`
+	Title                 string                  `json:"title"`
+	SourceText            string                  `json:"source_text"`
+	ScriptText            string                  `json:"script_text"`
 }
 type MemberGrant struct {
 	Username string `json:"username"`
