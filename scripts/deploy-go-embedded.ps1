@@ -142,12 +142,15 @@ Write-Host "前端源码状态：$frontendSourceState；入口：$frontendEntry"
 if ($Deploy) {
   Write-Host '5/5 上传并原子替换远端二进制...'
   $remote = "$TargetUser@$TargetHost"
+  # 生产出口 IP 会轮换，SSH 连接可能被静默中断；超时和保活必须显式设置，
+  # 否则 scp 会一直挂起而不是报错退出。
+  $connectionOptions = @('-o', 'ConnectTimeout=20', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4')
   $remoteTemp = "/tmp/qiantie-v88-$timestamp-$shortSha"
-  Invoke-Checked 'scp' @('-P', "$SshPort", $binaryPath, "${remote}:$remoteTemp")
+  Invoke-Checked 'scp' (@('-P', "$SshPort") + $connectionOptions + @($binaryPath, "${remote}:$remoteTemp"))
   # 远端目标是正在运行的二进制，直接 install 覆盖会触发 ETXTBSY；
   # 先装到同目录的 .new 再 mv，保证原子替换。
   $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath.new'; sudo mv -f '$TargetPath.new' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
-  Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $remoteCommand)
+  Invoke-Checked 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $remoteCommand))
   Write-Host "远端服务已重启并通过 systemd 健康检查：$ServiceName"
 
   # 旧版本二进制不会自动消失，每次发布都会多留一个约 174MB 的文件。发布成功后
@@ -156,7 +159,7 @@ if ($Deploy) {
   if (-not $KeepOldReleases) {
     # prune 脚本按“软链指向当前版本”的目录结构设计；生产目前是直接文件替换，
     # 这种结构下跳过清理，避免发布成功后因为找不到软链而整体报错。
-    & ssh @('-p', "$SshPort", $remote, "test -L '$TargetPath'") 2>$null
+    & ssh (@('-p', "$SshPort") + $connectionOptions + @($remote, "test -L '$TargetPath'")) 2>$null
     if ($LASTEXITCODE -ne 0) {
       Write-Host "跳过旧版本清理：$TargetPath 不是版本软链，当前为直接文件替换。"
     } else {
@@ -171,9 +174,9 @@ if ($Deploy) {
       $pruneCode = (Get-Content -LiteralPath $pruneScript -Raw) -replace "`r", ""
       [System.IO.File]::WriteAllText($tempPrune, $pruneCode, (New-Object System.Text.UTF8Encoding($false)))
       try {
-        Invoke-Checked 'scp' @('-P', "$SshPort", $tempPrune, "${remote}:$remotePrune")
+        Invoke-Checked 'scp' (@('-P', "$SshPort") + $connectionOptions + @($tempPrune, "${remote}:$remotePrune"))
         $pruneCommand = "set -eu; QIANTIE_RELEASE_ROOT='$remoteRoot' sh '$remotePrune' $KeepPreviousReleases; rm -f '$remotePrune'"
-        Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $pruneCommand)
+        Invoke-Checked 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $pruneCommand))
         Write-Host "旧版本已清理：保留当前版本和最近 $KeepPreviousReleases 个历史版本。"
       } finally {
         Remove-Item -LiteralPath $tempPrune -Force -ErrorAction SilentlyContinue
