@@ -59,6 +59,9 @@ func (s *RedisPlanningProgressRepository) Get(ctx context.Context, owner, projec
 		return out, ErrPlanningProgressUnavailable
 	}
 	value, err := s.Do(ctx, "GET", PlanningProgressRedisKey(owner, project, request))
+	if mergeworker.IsRedisNil(err) {
+		return out, ErrNotFound
+	}
 	if err != nil {
 		return out, err
 	}
