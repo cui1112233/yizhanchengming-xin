@@ -66,6 +66,10 @@ func TestContinuitySecondChapterUsesPersistedFirstChapter(t *testing.T) {
 
 type continuityFailStore struct{ Store }
 
+func (s continuityFailStore) Atomic(ctx context.Context, owner, project string, fn func(Store) error) error {
+	return s.Store.Atomic(ctx, owner, project, func(tx Store) error { return fn(continuityFailStore{tx}) })
+}
+
 func (s continuityFailStore) GetChapterMemory(context.Context, string, string, string) (Memory, bool, error) {
 	return Memory{}, false, errors.New("read failed")
 }

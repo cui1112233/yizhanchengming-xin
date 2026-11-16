@@ -17,9 +17,9 @@ import (
 // MySQLStore is the production persistence implementation for novel creation.
 // It deliberately does not share state with MemoryStore: a restarted process
 // reads all user data back from MySQL.
-type MySQLStore struct{ db *sql.DB }
+type MySQLStore struct{ db sqlExecutor }
 
-func NewMySQLStore(db *sql.DB) Store { return &MySQLStore{db: db} }
+func NewMySQLStore(db *sql.DB) Store { return &MySQLStore{db: sqlDatabase{db}} }
 
 func novelID(prefix string) string {
 	bytes := make([]byte, 12)

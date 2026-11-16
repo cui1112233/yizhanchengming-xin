@@ -216,7 +216,15 @@ func (s *Service) GetSessionSnapshot(ctx context.Context, owner, sessionID strin
 	if chapters == nil {
 		chapters = []Chapter{}
 	}
-	return Snapshot{Project: project, Session: session, Run: latest, Messages: messages, Chapters: chapters, Events: events}, nil
+	executionState := ""
+	if latest.ID != "" {
+		execution, _, getErr := s.store.GetExecution(ctx, owner, latest.ID)
+		if getErr != nil {
+			return Snapshot{}, getErr
+		}
+		executionState = execution.State
+	}
+	return Snapshot{ExecutionState: executionState, Project: project, Session: session, Run: latest, Messages: messages, Chapters: chapters, Events: events}, nil
 }
 
 func (s *Service) validateTargetVersion(ctx context.Context, owner, projectID string, target *PreviousChapter) error {

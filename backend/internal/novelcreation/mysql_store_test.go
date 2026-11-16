@@ -104,7 +104,7 @@ WHERE r.owner_username = ? AND r.idempotency_key = ? AND p.deleted_at IS NULL`
 		"run_id", "project_id", "session_id", "idempotency_key", "status", "model_id", "thinking_level", "prompt_snapshot_json", "runtime_snapshot_json", "error_code", "error_message", "created_at", "updated_at", "finished_at",
 	}).AddRow("run-1", "project-1", "session-1", "send-1", RunQueued, "", "", nil, nil, "", "", now, now, nil))
 
-	second, found, err := NewMySQLStore(store.db).FindRunByIdempotencyKey(ctx, "alice", "send-1")
+	second, found, err := NewMySQLStore(store.db.(sqlDatabase).DB).FindRunByIdempotencyKey(ctx, "alice", "send-1")
 	if err != nil || !found || second.ID != first.ID {
 		t.Fatalf("recovered=%+v found=%v err=%v", second, found, err)
 	}

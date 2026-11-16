@@ -11,6 +11,8 @@ import (
 )
 
 type MemoryStore struct {
+	executions      map[string]Execution
+	slots           map[string]ProjectSlot
 	mu              sync.RWMutex
 	nextID          int64
 	nextEventID     int64
@@ -33,6 +35,8 @@ type MemoryStore struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
+		executions:      make(map[string]Execution),
+		slots:           make(map[string]ProjectSlot),
 		projects:        make(map[string]Project),
 		sessions:        make(map[string]Session),
 		messages:        make(map[string][]Message),
@@ -469,6 +473,18 @@ func (s *MemoryStore) SaveChapterBundle(_ context.Context, owner string, bundle 
 		foundation.Snapshot = cloneRawJSON(foundation.Snapshot)
 		s.foundations[memoryKey(owner, bundle.ProjectID)] = foundation
 	}
+	if bundle.RunID != "" && bundle.FinalRunStatus != "" {
+		key := memoryKey(owner, bundle.RunID)
+		run := s.runs[key]
+		run.Status = bundle.FinalRunStatus
+		run.RuntimeSnapshot = cloneRawJSON(bundle.RuntimeSnapshot)
+		run.UpdatedAt = now
+		if isTerminalRunStatus(run.Status) {
+			run.FinishedAt = &now
+		}
+		s.runs[key] = cloneRun(run)
+	}
+
 	return nil
 }
 

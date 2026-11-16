@@ -236,7 +236,7 @@ func (p *integrationTextProvider) Complete(ctx context.Context, input batchfacto
 	if client == nil {
 		client = safehttp.NewClientWithTimeout(300 * time.Second)
 	}
-	response, err := client.Do(request)
+	response, err := batchfactoryv11.SingleAttemptClient(ctx, client, request).Do(request)
 	if err != nil {
 		return "", fmt.Errorf("渠道「%s」连接失败: %v", p.Label, err)
 	}
@@ -246,6 +246,9 @@ func (p *integrationTextProvider) Complete(ctx context.Context, input batchfacto
 		snippet := strings.TrimSpace(string(raw))
 		if len(snippet) > 300 {
 			snippet = snippet[:300]
+		}
+		if batchfactoryv11.SingleAttempt(ctx) {
+			return "", &batchfactoryv11.DirectorHTTPError{StatusCode: response.StatusCode, Model: p.Model, Body: snippet}
 		}
 		return "", fmt.Errorf("渠道「%s」请求失败（HTTP %d）：%s", p.Label, response.StatusCode, snippet)
 	}

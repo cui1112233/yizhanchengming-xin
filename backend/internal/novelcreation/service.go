@@ -9,29 +9,29 @@ import (
 	"time"
 )
 
-const projectRunLockTTL = 15 * time.Minute
-
 type PipelineRunner interface {
 	Run(context.Context, RunContext, EventSink) (ChapterBundle, error)
 }
 
 type Snapshot struct {
-	Project  Project    `json:"project"`
-	Session  Session    `json:"session"`
-	Run      Run        `json:"run"`
-	Messages []Message  `json:"messages"`
-	Events   []RunEvent `json:"events"`
-	Chapters []Chapter  `json:"chapters"`
+	ExecutionState string     `json:"executionState,omitempty"`
+	Project        Project    `json:"project"`
+	Session        Session    `json:"session"`
+	Run            Run        `json:"run"`
+	Messages       []Message  `json:"messages"`
+	Events         []RunEvent `json:"events"`
+	Chapters       []Chapter  `json:"chapters"`
 }
 
 type Service struct {
 	store    Store
 	runtime  Runtime
 	pipeline PipelineRunner
+	control  *workerControl
 }
 
 func NewService(store Store, runtime Runtime, pipeline PipelineRunner) *Service {
-	return &Service{store: store, runtime: runtime, pipeline: pipeline}
+	return &Service{store: store, runtime: runtime, pipeline: pipeline, control: newWorkerControl()}
 }
 
 func (s *Service) CreateProject(ctx context.Context, owner string, input CreateProjectInput) (Project, error) {
@@ -69,7 +69,7 @@ func (s *Service) ListSessions(ctx context.Context, owner, projectID string) ([]
 	return s.store.ListSessions(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
 }
 
-func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessageInput) (Run, error) {
+func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessageInput) (Run, error) {
 	if s == nil || s.store == nil || s.runtime == nil {
 		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "小说创作运行服务尚未配置"}
 	}
@@ -130,8 +130,13 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
+	settings, err := s.store.GetProjectSettings(ctx, owner, input.ProjectID)
+	if err != nil {
+		return Run{}, err
+	}
 	snapshotFields := map[string]any{
-		"version": 1, "mode": session.Mode, "user_message": input.Content,
+		"project_settings": settings,
+		"version":          1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
 		"knowledge_ids": selected.KnowledgeIDs, "knowledge_materials": selected.Knowledge,
 		"note_ids": selected.NoteIDs, "notes": selected.Notes, "style_profile_id": selected.StyleProfileID, "style_profile": selected.StyleProfile,
@@ -158,17 +163,11 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if _, err := s.appendEvent(ctx, owner, run, "run.queued", RunQueued, "已加入小说创作队列", 0, nil); err != nil {
 		return run, err
 	}
-	if err := s.runtime.Enqueue(ctx, run.ID); err != nil {
-		failed, failErr := s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "小说创作任务入队失败", err)
-		if failErr != nil {
-			return failed, failErr
-		}
-		return failed, &DomainError{Code: ErrPersistenceFailed, Message: "小说创作任务入队失败，请稍后重试", Cause: err}
-	}
+
 	return run, nil
 }
 
-func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
+func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, error) {
 	owner, runID = strings.TrimSpace(owner), strings.TrimSpace(runID)
 	run, err := s.store.GetRun(ctx, owner, runID)
 	if err != nil {
@@ -180,11 +179,6 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	if s.pipeline == nil || s.runtime == nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "小说创作运行服务尚未配置", nil)
 	}
-	release, err := s.runtime.AcquireProject(ctx, run.ProjectID, run.ID, projectRunLockTTL)
-	if err != nil {
-		return run, err
-	}
-	defer release()
 	project, err := s.store.GetProject(ctx, owner, run.ProjectID)
 	if err != nil {
 		return s.finishWithError(ctx, owner, run, ErrProjectNotFound, "作品不存在", err)
@@ -194,6 +188,7 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
+		Settings            *ProjectSettings    `json:"project_settings"`
 		StyleProfile        *string             `json:"style_profile"`
 		Notes               []ProjectNote       `json:"notes"`
 		UserMessage         string              `json:"user_message"`
@@ -223,6 +218,9 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	if err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "读取作品写作风格失败", err)
 	}
+	if prompt.Settings != nil {
+		settings = *prompt.Settings
+	}
 	agent := NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
 	project.TargetChapterWords = agent.TargetChapterWords
 	if strings.TrimSpace(run.ThinkingLevel) == "" {
@@ -246,6 +244,9 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	if runErr != nil {
 		code, message := domainFailure(runErr)
 		status := RunFailed
+		if code == ErrResultUnknown {
+			status = RunPaused
+		}
 		if code == ErrRunCancelled || errors.Is(runErr, context.Canceled) {
 			status = RunCancelled
 		}
@@ -265,21 +266,13 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		bundle.Chapter.Version = prompt.ExpectedTarget.Version + 1
 		bundle.ChapterVersion.Version = bundle.Chapter.Version
 	}
-	if err := s.store.SaveChapterBundle(ctx, owner, bundle); err != nil {
-		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "保存章节失败", err)
+	if err := persistBundle(ctx, bundle); err != nil {
+		return run, err
 	}
-	status := bundle.FinalRunStatus
-	if status != RunSucceededWithWarnings {
-		status = RunSucceeded
-	}
-	message := "章节创作完成"
-	if status == RunSucceededWithWarnings {
-		message = "章节已生成，但仍有审核提醒"
-	}
-	return s.finish(ctx, owner, run, status, "", message, bundle.RuntimeSnapshot, nil)
+	return s.savePending(ctx, owner, run, bundle)
 }
 
-func (s *Service) RetryRun(ctx context.Context, owner, runID string) (Run, error) {
+func (s *Service) retryRun(ctx context.Context, owner, runID string) (Run, error) {
 	owner = strings.TrimSpace(owner)
 	source, err := s.store.GetRun(ctx, owner, strings.TrimSpace(runID))
 	if err != nil {
@@ -326,26 +319,8 @@ func (s *Service) RetryRun(ctx context.Context, owner, runID string) (Run, error
 	if _, err := s.appendEvent(ctx, owner, retry, "run.queued", RunQueued, "重试任务已加入队列", 0, map[string]any{"retryOfRunId": source.ID}); err != nil {
 		return retry, err
 	}
-	if err := s.runtime.Enqueue(ctx, retry.ID); err != nil {
-		failed, _ := s.finishWithError(ctx, owner, retry, ErrPersistenceFailed, "重试任务入队失败", err)
-		return failed, &DomainError{Code: ErrPersistenceFailed, Message: "重试任务入队失败，请稍后重试", Cause: err}
-	}
-	return retry, nil
-}
 
-func (s *Service) CancelRun(ctx context.Context, owner, runID string) (Run, error) {
-	owner = strings.TrimSpace(owner)
-	run, err := s.store.GetRun(ctx, owner, strings.TrimSpace(runID))
-	if err != nil {
-		return Run{}, err
-	}
-	if isTerminalRunStatus(run.Status) {
-		return run, nil
-	}
-	if err := s.runtime.Cancel(ctx, run.ID); err != nil {
-		return run, err
-	}
-	return s.finish(ctx, owner, run, RunCancelled, ErrRunCancelled, "小说创作已取消", nil, nil)
+	return retry, nil
 }
 
 func (s *Service) GetSnapshot(ctx context.Context, owner, runID string, afterEventID int64) (Snapshot, error) {
@@ -374,7 +349,11 @@ func (s *Service) GetSnapshot(ctx context.Context, owner, runID string, afterEve
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Project: project, Session: session, Run: run, Messages: messages, Events: events, Chapters: chapters}, nil
+	execution, _, err := s.store.GetExecution(ctx, owner, run.ID)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{ExecutionState: execution.State, Project: project, Session: session, Run: run, Messages: messages, Events: events, Chapters: chapters}, nil
 }
 
 type serviceEventSink struct {
@@ -398,7 +377,8 @@ func (s serviceEventSink) Persist(ctx context.Context, event RunEvent) (RunEvent
 }
 
 func (s serviceEventSink) Publish(ctx context.Context, event RunEvent) error {
-	return s.service.runtime.Publish(ctx, event)
+	_ = s.service.runtime.Publish(ctx, event)
+	return nil
 }
 
 func (s *Service) appendEvent(ctx context.Context, owner string, run Run, eventType string, status RunStatus, message string, progress int, payload any) (RunEvent, error) {
@@ -413,9 +393,7 @@ func (s *Service) appendEvent(ctx context.Context, owner string, run Run, eventT
 	if err != nil {
 		return RunEvent{}, err
 	}
-	if err := s.runtime.Publish(ctx, event); err != nil {
-		return RunEvent{}, &DomainError{Code: ErrPersistenceFailed, Message: "发布任务状态失败", Cause: err}
-	}
+	_ = s.runtime.Publish(ctx, event)
 	return event, nil
 }
 
@@ -429,23 +407,31 @@ func (s *Service) finishWithError(ctx context.Context, owner string, run Run, co
 }
 
 func (s *Service) finish(ctx context.Context, owner string, run Run, status RunStatus, code, message string, runtime json.RawMessage, resultErr error) (Run, error) {
-	finishedAt := time.Now().UTC()
-	updated, err := s.store.UpdateRun(ctx, owner, RunUpdate{ID: run.ID, Status: status, RuntimeSnapshot: runtime, ErrorCode: code, ErrorMessage: message, FinishedAt: &finishedAt})
+	g, ok := s.store.(*guardedStore)
+	if !ok {
+		return run, leaseLost()
+	}
+	now := time.Now().UTC()
+	var finishedAt *time.Time
+	if isTerminalRunStatus(status) {
+		finishedAt = &now
+	}
+	eventType := "run.succeeded"
+	switch status {
+	case RunSucceededWithWarnings:
+		eventType = "run.warning"
+	case RunFailed:
+		eventType = "run.failed"
+	case RunCancelled:
+		eventType = "run.cancelled"
+	case RunPaused:
+		eventType = "run.paused"
+	}
+	updated, event, err := g.finishRun(ctx, owner, RunUpdate{ID: run.ID, Status: status, RuntimeSnapshot: runtime, ErrorCode: code, ErrorMessage: message, FinishedAt: finishedAt}, nil, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: eventType, Status: status, Message: message, Progress: 100})
 	if err != nil {
 		return run, err
 	}
-	eventType := "run.succeeded"
-	progress := 100
-	if status == RunSucceededWithWarnings {
-		eventType = "run.warning"
-	} else if status == RunFailed {
-		eventType = "run.failed"
-	} else if status == RunCancelled {
-		eventType = "run.cancelled"
-	}
-	if _, eventErr := s.appendEvent(ctx, owner, updated, eventType, status, message, progress, nil); eventErr != nil && resultErr == nil {
-		resultErr = eventErr
-	}
+	_ = s.runtime.Publish(ctx, event)
 	return updated, resultErr
 }
 
@@ -466,24 +452,21 @@ func domainFailure(err error) (string, string) {
 // finishCheckpoint persists the generated blueprint and leaves the run in
 // awaiting_confirmation so the user can confirm or edit it.
 func (s *Service) finishCheckpoint(ctx context.Context, owner string, run Run, bundle ChapterBundle) (Run, error) {
-	if err := s.store.SaveFoundation(ctx, owner, bundle.Foundation); err != nil {
-		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "保存创作蓝图失败", err)
+	g, ok := s.store.(*guardedStore)
+	if !ok {
+		return run, leaseLost()
 	}
-	updated, err := s.store.UpdateRun(ctx, owner, RunUpdate{
-		ID: run.ID, Status: RunAwaitingConfirmation, RuntimeSnapshot: bundle.RuntimeSnapshot,
-	})
+	updated, event, err := g.finishRun(ctx, owner, RunUpdate{ID: run.ID, Status: RunAwaitingConfirmation, RuntimeSnapshot: bundle.RuntimeSnapshot}, &bundle.Foundation, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: "run.checkpoint", Status: RunAwaitingConfirmation, Message: "创作蓝图已生成，等待确认", Progress: 20})
 	if err != nil {
 		return run, err
 	}
-	if _, err := s.appendEvent(ctx, owner, updated, "run.checkpoint", RunAwaitingConfirmation, "创作蓝图已生成，等待确认", 20, nil); err != nil {
-		return updated, err
-	}
+	_ = s.runtime.Publish(ctx, event)
 	return updated, nil
 }
 
 // ConfirmRun resumes a checkpointed run. An edited blueprint is validated and
 // persisted before the continuation run is queued.
-func (s *Service) ConfirmRun(ctx context.Context, owner, runID string, blueprint json.RawMessage) (Run, error) {
+func (s *Service) confirmRun(ctx context.Context, owner, runID string, blueprint json.RawMessage) (Run, error) {
 	if s == nil || s.store == nil || s.runtime == nil {
 		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "小说创作运行服务尚未配置"}
 	}
@@ -492,14 +475,14 @@ func (s *Service) ConfirmRun(ctx context.Context, owner, runID string, blueprint
 	if err != nil {
 		return Run{}, err
 	}
-	if source.Status != RunAwaitingConfirmation {
-		return Run{}, &DomainError{Code: ErrInvalidTransition, Message: "当前任务不在蓝图确认状态"}
-	}
 	key := "confirm:" + source.ID
 	if existing, found, err := s.store.FindRunByIdempotencyKey(ctx, owner, key); err != nil {
 		return Run{}, err
 	} else if found {
 		return existing, nil
+	}
+	if source.Status != RunAwaitingConfirmation {
+		return Run{}, &DomainError{Code: ErrInvalidTransition, Message: "当前任务不在蓝图确认状态"}
 	}
 	var snapshot map[string]any
 	if err := json.Unmarshal(source.PromptSnapshot, &snapshot); err != nil {
@@ -552,10 +535,7 @@ func (s *Service) ConfirmRun(ctx context.Context, owner, runID string, blueprint
 	if _, err := s.appendEvent(ctx, owner, run, "run.queued", RunQueued, "蓝图已确认，开始写正文", 0, map[string]any{"confirmedFromRunId": source.ID}); err != nil {
 		return run, err
 	}
-	if err := s.runtime.Enqueue(ctx, run.ID); err != nil {
-		failed, _ := s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "确认任务入队失败", err)
-		return failed, &DomainError{Code: ErrPersistenceFailed, Message: "确认任务入队失败，请稍后重试", Cause: err}
-	}
+
 	return run, nil
 }
 

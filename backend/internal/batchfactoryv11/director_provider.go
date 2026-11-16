@@ -269,7 +269,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	for attempt := 1; attempt <= maxAttempts+1; attempt++ {
 		resp, reqErr := p.do(ctx, body)
 		if reqErr != nil {
-			if !directorProviderRetryableTransportError(reqErr) || attempt == maxAttempts {
+			if SingleAttempt(ctx) || !directorProviderRetryableTransportError(reqErr) || attempt == maxAttempts {
 				return "", &directorTransportError{err: reqErr}
 			}
 			if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
@@ -281,7 +281,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		resp.Body.Close()
 		statusCode = resp.StatusCode
 		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || attempt == maxAttempts {
+			if SingleAttempt(ctx) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || attempt == maxAttempts {
 				return "", &directorTransportError{err: err}
 			}
 			if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
@@ -294,7 +294,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		}
 		httpErr := &DirectorHTTPError{StatusCode: statusCode, Model: strings.TrimSpace(p.Model), Body: string(raw)}
 		log.Printf("director provider error model=%s status=%d endpoint=%s body=%s", p.Model, statusCode, directorProviderEndpointHost(p.Endpoint), directorHTTPBodySnippet(raw, 400))
-		if statusCode == http.StatusBadRequest && !fallbackTried && director400LooksLikeParameterRejection(raw) {
+		if !SingleAttempt(ctx) && statusCode == http.StatusBadRequest && !fallbackTried && director400LooksLikeParameterRejection(raw) {
 			fallbackTried = true
 			fallbackMaxTokens := input.MaxTokens
 			if fallbackMaxTokens > 8192 {
@@ -312,7 +312,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 				continue
 			}
 		}
-		if !directorProviderRetryableStatus(statusCode) || attempt >= maxAttempts {
+		if SingleAttempt(ctx) || !directorProviderRetryableStatus(statusCode) || attempt >= maxAttempts {
 			return "", httpErr
 		}
 		if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
@@ -366,13 +366,13 @@ func (p *OpenAICompatibleProvider) do(ctx context.Context, body []byte) (*http.R
 	if client == nil {
 		client = openAICompatibleHTTPClient(p.Endpoint)
 	}
-	resp, err := client.Do(req)
+	resp, err := SingleAttemptClient(ctx, client, req).Do(req)
 	if err == nil {
 		return resp, nil
 	}
 	// 服务端按 HTTP/2 回帧、客户端按 HTTP/1.1 解析时会产生 malformed HTTP
 	// response。这里只切换协议重发一次；重试仍失败则保留原始错误。
-	if !directorProtocolMismatchError(err) {
+	if SingleAttempt(ctx) || !directorProtocolMismatchError(err) {
 		return nil, err
 	}
 	retryClient := p.retryClient

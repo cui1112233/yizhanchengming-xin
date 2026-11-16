@@ -319,5 +319,30 @@ func NovelCreationMigrations() []Migration {
  PRIMARY KEY (owner_username, style_profile_id)
  ) ENGINE=InnoDB`,
 		},
+	}, {
+		Version:          8800312,
+		CallbackChecksum: "v88-novel-durable-worker-v1",
+		SQL: []string{
+			`CREATE TABLE IF NOT EXISTS novel_run_dispatch (
+ owner_username VARCHAR(191) NOT NULL,
+ run_id VARCHAR(96) NOT NULL,
+ project_id VARCHAR(96) NOT NULL,
+ state VARCHAR(32) NOT NULL,
+ lease_until DATETIME(6) NULL,
+ execution_json JSON NOT NULL,
+ PRIMARY KEY (owner_username, run_id),
+ KEY idx_novel_dispatch_scan (state, lease_until),
+ CONSTRAINT fk_novel_dispatch_run FOREIGN KEY (owner_username, run_id) REFERENCES novel_runs(owner_username, run_id)
+ ) ENGINE=InnoDB`,
+			`CREATE TABLE IF NOT EXISTS novel_project_slots (
+ owner_username VARCHAR(191) NOT NULL,
+ project_id VARCHAR(96) NOT NULL,
+ active_run_id VARCHAR(96) NOT NULL,
+ fence BIGINT NOT NULL,
+ lease_until DATETIME(6) NULL,
+ PRIMARY KEY (owner_username, project_id),
+ CONSTRAINT fk_novel_slot_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id)
+ ) ENGINE=InnoDB`,
+		},
 	}}
 }

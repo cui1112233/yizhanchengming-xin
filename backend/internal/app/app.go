@@ -358,15 +358,8 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		novelCreationRuntime = novelcreation.NewRedisRuntime("qiantie:novel-creation", novelcreation.RedisDoFunc(redisTransport.Do))
 	}
 	novelCreationService := novelcreation.NewService(novelCreationStore, novelCreationRuntime, novelcreation.NewPipeline(textProviderForModel))
-	novelCreationRunStarter := func(_ context.Context, owner, runID string) {
-		go func() {
-			runCtx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
-			defer cancel()
-			if _, runErr := novelCreationService.Run(runCtx, owner, runID); runErr != nil {
-				fmt.Printf("novel creation run %s failed: %v\n", runID, runErr)
-			}
-		}()
-	}
+	novelCreationRunStarter := novelCreationService.Notify
+	novelcreation.StartWorker(context.Background(), novelCreationService, time.Second)
 	// The scheduler is a process-lifetime worker: Build's ctx is a startup
 	// timeout, not a server lifecycle context.
 	novelcreation.StartScheduler(context.Background(), novelCreationService, novelCreationRunStarter, time.Minute)

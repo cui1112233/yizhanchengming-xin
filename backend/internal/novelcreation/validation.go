@@ -137,7 +137,7 @@ func CanTransition(from, to RunStatus) bool {
 	if isTerminalRunStatus(from) {
 		return false
 	}
-	if to == RunFailed || to == RunCancelled {
+	if to == RunFailed || to == RunCancelled || to == RunPaused {
 		return true
 	}
 
@@ -171,7 +171,7 @@ func CanTransition(from, to RunStatus) bool {
 
 func validRunStatus(status RunStatus) bool {
 	switch status {
-	case RunDraft, RunClarifying, RunAwaitingConfirmation, RunQueued, RunPlanning,
+	case RunPaused, RunDraft, RunClarifying, RunAwaitingConfirmation, RunQueued, RunPlanning,
 		RunWriting, RunNormalizing, RunAuditing, RunRevising, RunSettling, RunIndexing,
 		RunSucceeded, RunSucceededWithWarnings, RunFailed, RunCancelled:
 		return true

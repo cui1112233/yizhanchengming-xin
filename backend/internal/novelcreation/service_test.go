@@ -155,7 +155,7 @@ func TestServiceSendMessageReturnsExistingRunForSameIdempotencyKey(t *testing.T)
 	}
 }
 
-func TestServiceSendMessageQueueFailurePersistsFailedTerminalAndCanRetry(t *testing.T) {
+func TestServiceSendMessageRedisFailureStillPersistsDispatch(t *testing.T) {
 	store := NewMemoryStore()
 	baseRuntime := NewMemoryRuntime()
 	runtime := failingEnqueueRuntime{Runtime: baseRuntime, err: errors.New("redis unavailable")}
@@ -171,19 +171,24 @@ func TestServiceSendMessageQueueFailurePersistsFailedTerminalAndCanRetry(t *test
 	run, err := service.SendMessage(context.Background(), "alice", SendMessageInput{
 		SessionID: session.ID, ProjectID: project.ID, Content: "写第一章", ModelID: "text-1", IdempotencyKey: "send-fail",
 	})
-	if err == nil || !IsCode(err, ErrPersistenceFailed) {
-		t.Fatalf("run=%+v err=%v, want %s", run, err, ErrPersistenceFailed)
+	if err != nil {
+		t.Fatal(err)
 	}
 	snapshot, getErr := service.GetSnapshot(context.Background(), "alice", run.ID, 0)
 	if getErr != nil {
 		t.Fatal(getErr)
 	}
-	if snapshot.Run.Status != RunFailed || snapshot.Run.ErrorCode != ErrPersistenceFailed || snapshot.Run.FinishedAt == nil {
-		t.Fatalf("failed run was not durable: %+v", snapshot.Run)
+	if snapshot.Run.Status != RunQueued {
+		t.Fatalf("redis wake failure changed durable run: %s", snapshot.Run.Status)
 	}
-	if len(snapshot.Events) != 2 || snapshot.Events[1].Type != "run.failed" {
-		t.Fatalf("events=%+v, want queued then failed", snapshot.Events)
+	pending, err := store.ListDispatch(context.Background(), 10)
+	if err != nil || len(pending) != 1 || pending[0].RunID != run.ID {
+		t.Fatalf("dispatch lost: %+v %v", pending, err)
 	}
+	if len(snapshot.Events) != 1 || snapshot.Events[0].Type != "run.queued" {
+		t.Fatalf("events=%+v", snapshot.Events)
+	}
+
 }
 
 func TestServiceRunUsesServerOwnerAcquiresLockPersistsEventsAndBundle(t *testing.T) {

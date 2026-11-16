@@ -186,6 +186,7 @@ type memoryOpenThread struct {
 }
 
 type modelCallSpec struct {
+	key         string
 	definition  promptcatalog.Definition
 	step        RunStatus
 	userPayload any
@@ -326,7 +327,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	}
 	audits := make([]Audit, 0, p.maxRevisions+1)
 	revisions := make([]Revision, 0, p.maxRevisions)
-	currentAudit, currentAuditRaw, err := p.auditChapter(ctx, input, sink, provider, foundation, plan, bestContent)
+	currentAudit, currentAuditRaw, err := p.auditChapter(ctx, input, sink, provider, foundation, plan, bestContent, 0)
 	if err != nil {
 		return ChapterBundle{}, err
 	}
@@ -352,7 +353,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 
 		var revision chapterRevisionOutput
 		revisionRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-			definition: novelprompt.ChapterRevision, step: RunRevising,
+			definition: novelprompt.ChapterRevision, step: RunRevising, key: fmt.Sprintf(":%d", round),
 			userPayload: map[string]any{
 				"chapter_content":   bestContent,
 				"chapter_plan":      plan,
@@ -369,7 +370,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		}
 		revisions = append(revisions, newRevision(input, round, revision, revisionRaw))
 
-		candidateAudit, candidateAuditRaw, auditErr := p.auditChapter(ctx, input, sink, provider, foundation, plan, revision.Content)
+		candidateAudit, candidateAuditRaw, auditErr := p.auditChapter(ctx, input, sink, provider, foundation, plan, revision.Content, round)
 		if auditErr != nil {
 			return ChapterBundle{}, auditErr
 		}
@@ -451,10 +452,10 @@ func modeContract(mode string) map[string]string {
 	return contracts["long_original"]
 }
 
-func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, foundation foundationPlanOutput, plan chapterPlanOutput, content string) (chapterAuditOutput, json.RawMessage, error) {
+func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, foundation foundationPlanOutput, plan chapterPlanOutput, content string, round int) (chapterAuditOutput, json.RawMessage, error) {
 	var audit chapterAuditOutput
 	raw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-		definition: novelprompt.ChapterAudit, step: RunAuditing,
+		definition: novelprompt.ChapterAudit, step: RunAuditing, key: fmt.Sprintf(":%d", round),
 		userPayload: map[string]any{
 			"foundation_plan":     foundation,
 			"chapter_plan":        plan,
@@ -483,7 +484,7 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		Temperature:  spec.temperature,
 		MaxTokens:    spec.maxTokens,
 	}
-	reply, err := p.complete(ctx, input, sink, provider, spec.step, request)
+	reply, err := p.complete(ctx, input, sink, provider, spec.step, spec.definition.ID+spec.key, request)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +509,7 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		Temperature:  0.1,
 		MaxTokens:    spec.maxTokens,
 	}
-	repairedReply, err := p.complete(ctx, input, sink, provider, spec.step, repairRequest)
+	repairedReply, err := p.complete(ctx, input, sink, provider, spec.step, spec.definition.ID+spec.key+":repair", repairRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -518,11 +519,11 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 	return json.RawMessage(repairedReply), nil
 }
 
-func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, step RunStatus, request batchfactoryv11.TextCompletionRequest) (string, error) {
+func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, step RunStatus, key string, request batchfactoryv11.TextCompletionRequest) (string, error) {
 	if err := p.checkCancelled(ctx, input); err != nil {
 		return "", err
 	}
-	reply, err := provider.Complete(ctx, request)
+	reply, err := journalComplete(ctx, key, provider, request)
 	if err != nil {
 		return "", mapModelError(err)
 	}
