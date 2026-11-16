@@ -96,6 +96,9 @@ func (s *MySQLStore) loadCreativeConfig(ctx context.Context, p *Project) error {
 	return e
 }
 func (s *MySQLStore) SaveCreativeConfig(ctx context.Context, owner, id string, c CreativeConfig, expected int64) (Project, error) {
+	if err := ValidateCreativeVideoConfig(c); err != nil {
+		return Project{}, err
+	}
 	b, e := encodeCreativeConfig(&c)
 	if e != nil {
 		return Project{}, e

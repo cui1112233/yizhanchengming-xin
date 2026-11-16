@@ -5,10 +5,18 @@ export const creativePromptFields = [
   { field: 'scene_design_prompt_id', purpose: 'scene_design', label: '场景设计提示词' },
 ];
 
-export const comicModelConfigFields = ['config_version','aspect_ratio','image_resolution','asset_prompt_type','asset_process_prompt','voice_design_model','show_original_text','character_image_mode','scene_image_mode'];
+export const comicModelConfigFields = ['config_version','aspect_ratio','image_resolution','asset_prompt_type','asset_process_prompt','voice_design_model','show_original_text','character_image_mode','scene_image_mode','video_generation_mode','auto_replace_sora2_info','use_subject_mode'];
+
+export const comicVideoGenerationModes = [{value:'',label:'沿用现有参考方式'},{value:'text_to_video',label:'文字生成视频'},{value:'image_to_video',label:'图片生成视频'}];
+export function comicSubjectVideoError(config) {
+  if(!comicVideoGenerationModes.some(mode=>mode.value===(config.video_generation_mode??'')))return '生成模式无效，请重新选择。';
+  if(config.auto_replace_sora2_info&&config.use_subject_mode)return '自动替换主体存档与主体模式不能同时开启。';
+  if(config.auto_replace_sora2_info&&config.video_generation_mode!=='text_to_video')return '自动替换主体存档仅适用于明确选择文字生成视频的 Sora 模式。';
+  return '';
+}
 
 export function emptyCreativeConfig() {
-  return { script_prompt_id: '', storyboard_prompt_id: '', character_design_prompt_id: '', scene_design_prompt_id: '', style_id: null, style_name: '', image_core_instruction: '', image_model_id: '', image_edit_model_id: '' };
+  return { script_prompt_id: '', storyboard_prompt_id: '', character_design_prompt_id: '', scene_design_prompt_id: '', style_id: null, style_name: '', image_core_instruction: '', image_model_id: '', image_edit_model_id: '', video_generation_mode: '', auto_replace_sora2_info: false, use_subject_mode: false };
 }
 
 // 新建时未触碰的指令省略提交，让后端保留系统默认；输入后清空仍为显式空串。
@@ -26,6 +34,7 @@ export function creativeConfigDraft(config) {
 }
 
 export function creativeConfigPayload(draft, revision) {
+  const videoError=comicSubjectVideoError(draft);if(videoError)throw new Error(videoError);
   const patch = { expected_revision: revision, style_id: draft.style_id || null };
   for (const { field, label } of creativePromptFields) {
     if (!draft[field]) throw new Error(`请选择${label}`);
@@ -38,6 +47,7 @@ export function creativeConfigPayload(draft, revision) {
 
 export const comicModelConfigPatchFields = [...comicModelConfigFields.filter(field=>field!=='config_version'),'image_core_instruction','image_model_id','image_edit_model_id','character_design_prompt_id','scene_design_prompt_id'];
 export function creativeModelConfigPayload(draft, revision) {
+  const videoError=comicSubjectVideoError(draft);if(videoError)throw new Error(videoError);
   const patch={expected_revision:revision};
   for(const field of comicModelConfigPatchFields)if(draft[field]!==undefined)patch[field]=draft[field];
   return patch;

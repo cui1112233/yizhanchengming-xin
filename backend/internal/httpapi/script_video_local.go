@@ -12,18 +12,22 @@ import (
 const localScriptVideoTaskPrefix = "go-local:"
 
 type scriptVideoLocalInput struct {
-	SourceTaskID    string                     `json:"-"`
-	ModelKey        string                     `json:"modelKey"`
-	Prompt          string                     `json:"prompt"`
-	BookID          string                     `json:"bookId"`
-	VideoID         string                     `json:"videoId"`
-	Model           string                     `json:"model"`
-	Duration        any                        `json:"duration"`
-	AspectRatio     string                     `json:"aspectRatio"`
-	Resolution      string                     `json:"resolution"`
-	ImageURLs       []string                   `json:"imageUrls"`
-	ReferenceAssets []agentLocalReferenceAsset `json:"-"`
-	GenerateAudio   bool                       `json:"generateAudio"`
+	SubjectStrategy      string                     `json:"subjectStrategy,omitempty"`
+	GenerationMode       string                     `json:"generationMode,omitempty"`
+	SubjectReferenceURIs []string                   `json:"subjectReferenceUris,omitempty"`
+	SubjectReferenceIDs  []string                   `json:"-"`
+	SourceTaskID         string                     `json:"-"`
+	ModelKey             string                     `json:"modelKey"`
+	Prompt               string                     `json:"prompt"`
+	BookID               string                     `json:"bookId"`
+	VideoID              string                     `json:"videoId"`
+	Model                string                     `json:"model"`
+	Duration             any                        `json:"duration"`
+	AspectRatio          string                     `json:"aspectRatio"`
+	Resolution           string                     `json:"resolution"`
+	ImageURLs            []string                   `json:"imageUrls"`
+	ReferenceAssets      []agentLocalReferenceAsset `json:"-"`
+	GenerateAudio        bool                       `json:"generateAudio"`
 }
 
 type agentLocalReferenceAsset struct {
@@ -32,6 +36,22 @@ type agentLocalReferenceAsset struct {
 }
 
 func validateLocalScriptVideoInput(input scriptVideoLocalInput) error {
+	if input.SubjectStrategy != "" || len(input.SubjectReferenceURIs) > 0 || len(input.SubjectReferenceIDs) > 0 {
+		return fmt.Errorf("本地执行器尚不支持主体存档模式，请关闭后再执行")
+	}
+	switch input.GenerationMode {
+	case "":
+	case "text_to_video":
+		if len(input.ImageURLs) > 0 || len(input.ReferenceAssets) > 0 {
+			return fmt.Errorf("文本生成不能携带图片引用")
+		}
+	case "image_to_video":
+		if len(input.ImageURLs) == 0 && len(input.ReferenceAssets) == 0 {
+			return fmt.Errorf("图片生成需要可用图片")
+		}
+	default:
+		return fmt.Errorf("视频生成模式无效")
+	}
 	spec, ok := scriptVideoModelSpec(strings.TrimSpace(input.ModelKey))
 	if !ok || spec.Provider != "doubao_local_executor" {
 		return fmt.Errorf("unsupported local video model")

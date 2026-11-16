@@ -14,6 +14,11 @@ import (
 
 var errUnsupportedReferenceImages = errors.New("unsupported reference images")
 
+type scriptVideoPreflightError struct{ Err error }
+
+func (e *scriptVideoPreflightError) Error() string { return e.Err.Error() }
+func (e *scriptVideoPreflightError) Unwrap() error { return e.Err }
+
 type scriptVideoSubmission struct {
 	TaskID   string
 	Status   string
@@ -38,15 +43,9 @@ type scriptVideoService struct {
 func (s *scriptVideoService) Submit(ctx context.Context, owner string, input scriptVideoLocalInput) (scriptVideoSubmission, error) {
 	input.ModelKey = strings.TrimSpace(input.ModelKey)
 	input.Prompt = strings.TrimSpace(input.Prompt)
-	if input.Prompt == "" || len([]rune(input.Prompt)) > 12000 {
-		return scriptVideoSubmission{}, fmt.Errorf("分镜视频提示词不能为空或超过 12000 个字符")
-	}
-	spec, known := scriptVideoModelSpec(input.ModelKey)
-	if !known {
-		return scriptVideoSubmission{}, fmt.Errorf("unsupported video provider")
-	}
-	if len(input.ImageURLs) > 0 && !spec.AcceptsReferenceImages {
-		return scriptVideoSubmission{}, errUnsupportedReferenceImages
+	spec, cfg, err := s.resolveInput(ctx, owner, input)
+	if err != nil {
+		return scriptVideoSubmission{}, &scriptVideoPreflightError{Err: err}
 	}
 	if spec.Provider == batchfactoryv11.VideoProviderDoubaoLocal {
 		if s.localExecutor == nil {
@@ -73,24 +72,21 @@ func (s *scriptVideoService) Submit(ctx context.Context, owner string, input scr
 		}
 		return scriptVideoSubmission{TaskID: localScriptVideoTaskPrefix + job.ID, Status: "processing", Provider: spec.Provider}, nil
 	}
-	if s.resolver == nil {
-		return scriptVideoSubmission{}, fmt.Errorf("视频模型配置不可用")
-	}
-	cfg, err := s.resolver(ctx, owner, input.ModelKey)
-	if err != nil {
-		return scriptVideoSubmission{}, err
-	}
 	adapter, err := newScriptVideoAdapter(cfg, spec.Provider)
 	if err != nil {
 		return scriptVideoSubmission{}, err
 	}
 	setScriptVideoClient(adapter, s.client)
 	settings := scriptVideoEffectiveSettings(spec.Provider, input.AspectRatio, input.Resolution)
-	ref, err := adapter.Submit(ctx, batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15, MaxReferenceImages: 9}, batchfactoryv11.FinalPrompt{CompiledPrompt: input.Prompt, DurationSeconds: durationValue(input.Duration), ReferenceImageURLs: input.ImageURLs, EffectiveSettings: batchfactoryv11.EffectiveSettings{Values: settings}})
+	ref, err := adapter.Submit(ctx, batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15, MaxReferenceImages: 9}, batchfactoryv11.FinalPrompt{CompiledPrompt: input.Prompt, DurationSeconds: durationValue(input.Duration), ReferenceImageURLs: input.ImageURLs, SubjectReferenceURIs: input.SubjectReferenceURIs, EffectiveSettings: batchfactoryv11.EffectiveSettings{Values: settings}})
 	if err != nil {
 		return scriptVideoSubmission{}, err
 	}
-	return scriptVideoSubmission{TaskID: spec.PublicTaskPrefix + ref.ProviderTaskID, Status: "processing", Provider: spec.Provider}, nil
+	prefix := spec.PublicTaskPrefix
+	if isNativeScriptVideoProvider(spec.Provider) {
+		prefix = nativeScriptTaskPrefix(spec.Provider, cfg.ConfigID)
+	}
+	return scriptVideoSubmission{TaskID: prefix + ref.ProviderTaskID, Status: "processing", Provider: spec.Provider}, nil
 }
 
 func scriptVideoEffectiveSettings(provider, aspectRatio, resolution string) batchfactoryv11.SettingsPatch {
@@ -150,16 +146,22 @@ func (s *scriptVideoService) Poll(ctx context.Context, owner, taskID string) (sc
 	}
 	prefix, provider := scriptVideoProvider(taskID)
 	if prefix == "" || s.resolver == nil {
-		return scriptVideoStatus{}, fmt.Errorf("unsupported video task")
+		return scriptVideoStatus{}, &scriptVideoPreflightError{Err: fmt.Errorf("unsupported video task")}
 	}
-	modelKey := map[string]string{batchfactoryv11.VideoProviderPersonalAPI: "yd2-mini-video", batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
+	modelKey := scriptVideoTaskModelKey(taskID, provider)
 	cfg, err := s.resolver(ctx, owner, modelKey)
 	if err != nil {
-		return scriptVideoStatus{}, err
+		return scriptVideoStatus{}, &scriptVideoPreflightError{Err: err}
+	}
+	if isNativeScriptVideoProvider(provider) && cfg.ConfigID != modelKey {
+		return scriptVideoStatus{}, &scriptVideoPreflightError{Err: fmt.Errorf("原视频任务的模型配置已不存在，请恢复原配置条目")}
+	}
+	if isNativeScriptVideoProvider(provider) && cfg.Provider != provider {
+		return scriptVideoStatus{}, &scriptVideoPreflightError{Err: fmt.Errorf("视频任务模型配置协议已更改")}
 	}
 	adapter, err := newScriptVideoAdapter(cfg, provider)
 	if err != nil {
-		return scriptVideoStatus{}, err
+		return scriptVideoStatus{}, &scriptVideoPreflightError{Err: err}
 	}
 	setScriptVideoClient(adapter, s.client)
 	ref, err := adapter.Poll(ctx, batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15}, batchfactoryv11.ProviderTaskRef{ProviderTaskID: strings.TrimPrefix(taskID, prefix)})

@@ -37,11 +37,12 @@ type PromptComponent struct {
 }
 
 type FinalPrompt struct {
-	BatchID            string `json:"batchId"`
-	BookID             string `json:"bookId"`
-	VideoID            string `json:"videoId"`
-	DirectorRevisionID string `json:"directorRevisionId"`
-	SnapshotHash       string `json:"snapshotHash"`
+	SubjectReferenceURIs []string `json:"subjectReferenceUris,omitempty"`
+	BatchID              string   `json:"batchId"`
+	BookID               string   `json:"bookId"`
+	VideoID              string   `json:"videoId"`
+	DirectorRevisionID   string   `json:"directorRevisionId"`
+	SnapshotHash         string   `json:"snapshotHash"`
 	// DisplayPrompt is the concise, editable director-card text shown in the
 	// workbench. CompiledPrompt is the private submission payload sent to the
 	// video provider and may include H3's full visual baseline and safeguards.

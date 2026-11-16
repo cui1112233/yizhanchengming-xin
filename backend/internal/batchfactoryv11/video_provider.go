@@ -40,6 +40,7 @@ func wrapNotConfigured(err error) error {
 }
 
 type VideoProviderConfig struct {
+	ConfigID   string `json:"configId,omitempty"`
 	Provider   string
 	APIKey     string
 	Model      string

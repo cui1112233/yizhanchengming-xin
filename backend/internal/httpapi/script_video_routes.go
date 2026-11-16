@@ -3,9 +3,9 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
@@ -66,61 +66,29 @@ func (r *scriptVideoRoutes) handle(w http.ResponseWriter, req *http.Request) {
 // download a task that is still processing or has failed.
 func (r *scriptVideoRoutes) download(w http.ResponseWriter, req *http.Request, owner string) {
 	taskID := strings.TrimSuffix(strings.TrimSpace(req.PathValue("taskId")), "/download")
-	if strings.HasPrefix(taskID, localScriptVideoTaskPrefix) {
-		if r.localExecutor == nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "本地执行器服务不可用"})
-			return
-		}
-		job, err := r.localExecutor.GetJob(req.Context(), owner, strings.TrimPrefix(taskID, localScriptVideoTaskPrefix))
-		if err != nil {
-			writeLocalJobError(w, err)
-			return
-		}
-		if job.State != localexecutor.JobSucceeded || strings.TrimSpace(job.ArtifactID) == "" {
-			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "status": string(job.State), "error": "视频尚未生成完成"})
-			return
-		}
-		http.Redirect(w, req, "/api/shuihuo-production/local-executor-artifacts/"+url.PathEscape(job.ArtifactID), http.StatusFound)
-		return
-	}
-	prefix, provider := scriptVideoProvider(taskID)
-	if prefix == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported video task"})
-		return
-	}
-	if r.resolver == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
-		return
-	}
-	modelKey := scriptVideoTaskModelKey(taskID, provider)
-	cfg, err := r.resolver(req.Context(), owner, modelKey)
+	status, err := r.service().Poll(req.Context(), owner, taskID)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		r.writeServiceError(w, taskID, err)
 		return
 	}
-	adapter, err := newScriptVideoAdapter(cfg, provider)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+	if status.Status == "failed" && !strings.HasPrefix(taskID, localScriptVideoTaskPrefix) {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "status": "failed", "error": status.Error})
 		return
 	}
-	setScriptVideoClient(adapter, r.client)
-	ref, err := adapter.Poll(req.Context(), batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15}, batchfactoryv11.ProviderTaskRef{ProviderTaskID: strings.TrimPrefix(taskID, prefix)})
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+	if status.Status != "succeeded" || status.VideoURL == "" {
+		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "status": status.Status, "error": "视频尚未生成完成"})
 		return
 	}
-	if ref.State == batchfactoryv11.ProductionFailed {
-		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "status": "failed", "error": ref.ErrorMessage})
-		return
-	}
-	if ref.State != batchfactoryv11.ProductionSucceeded || strings.TrimSpace(ref.MediaURL) == "" {
-		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "status": "processing", "error": "视频尚未生成完成"})
-		return
-	}
-	http.Redirect(w, req, ref.MediaURL, http.StatusFound)
+	http.Redirect(w, req, status.VideoURL, http.StatusFound)
+}
+func (r *scriptVideoRoutes) service() *scriptVideoService {
+	return &scriptVideoService{resolver: r.resolver, client: r.client, localExecutor: r.localExecutor}
 }
 
 func scriptVideoProvider(taskID string) (string, string) {
+	if prefix, provider, _ := nativeScriptTaskParts(taskID); prefix != "" {
+		return prefix, provider
+	}
 	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:fanke-video-api:", batchfactoryv11.VideoProviderYFAISeedance}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
 		if strings.HasPrefix(taskID, item.prefix) {
 			return item.prefix, item.provider
@@ -130,6 +98,9 @@ func scriptVideoProvider(taskID string) (string, string) {
 }
 
 func scriptVideoTaskModelKey(taskID, provider string) string {
+	if _, _, key := nativeScriptTaskParts(taskID); key != "" {
+		return key
+	}
 	if strings.HasPrefix(taskID, "yfai:fanke-video-api:") {
 		return "fanke-video-api"
 	}
@@ -142,128 +113,63 @@ func (r *scriptVideoRoutes) submit(w http.ResponseWriter, req *http.Request, own
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
 	}
-	input.ModelKey = strings.TrimSpace(input.ModelKey)
-	input.Prompt = strings.TrimSpace(input.Prompt)
-	if input.Prompt == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "分镜视频提示词不能为空"})
-		return
-	}
-	if len([]rune(input.Prompt)) > 12000 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "分镜视频提示词不能超过 12000 个字符"})
-		return
-	}
-	spec, known := scriptVideoModelSpec(input.ModelKey)
-	if !known {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported video provider"})
-		return
-	}
-	if len(input.ImageURLs) > 0 && !spec.AcceptsReferenceImages {
-		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "status": "unsupported_reference_images", "code": "UNSUPPORTED_REFERENCE_IMAGES", "error": "当前视频模型不支持参考图，是否允许无参考图生成"})
-		return
-	}
-	if spec.Provider == batchfactoryv11.VideoProviderDoubaoLocal {
-		if r.localExecutor == nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "本地执行器服务不可用"})
+	out, err := r.service().Submit(req.Context(), owner, input)
+	if err != nil {
+		if errors.Is(err, errUnsupportedReferenceImages) {
+			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "status": "unsupported_reference_images", "code": "UNSUPPORTED_REFERENCE_IMAGES", "error": "当前视频模型不支持参考图，是否允许无参考图生成"})
 			return
 		}
-		job, err := r.localExecutor.CreateJob(req.Context(), owner, localexecutor.CreateJobInput{SourceTaskID: "script-video", Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"model": firstText(input.Model, "Seedance 2.0 Fast"), "prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": input.ImageURLs}})
-		if err != nil {
-			writeLocalJobError(w, err)
+
+		var preflight *scriptVideoPreflightError
+		preflightFailed := errors.As(err, &preflight)
+		if input.ModelKey == "local-doubao-executor-video" {
+			if r.localExecutor == nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "本地执行器服务不可用"})
+				return
+			}
+			if !preflightFailed {
+				writeLocalJobError(w, err)
+				return
+			}
+		}
+		if spec, known := scriptVideoModelSpec(input.ModelKey); known && spec.Provider != batchfactoryv11.VideoProviderDoubaoLocal && r.resolver == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
 			return
 		}
-		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "taskId": localScriptVideoTaskPrefix + job.ID, "status": "processing"})
+		status := http.StatusBadGateway
+
+		if errors.As(err, &preflight) {
+			status = http.StatusBadRequest
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
 		return
 	}
-	if r.resolver == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
-		return
-	}
-	cfg, err := r.resolver(req.Context(), owner, input.ModelKey)
+	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "taskId": out.TaskID, "status": out.Status, "provider": out.Provider})
+}
+func (r *scriptVideoRoutes) poll(w http.ResponseWriter, req *http.Request, owner string) {
+	out, err := r.service().Poll(req.Context(), owner, strings.TrimSpace(req.PathValue("taskId")))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		r.writeServiceError(w, strings.TrimSpace(req.PathValue("taskId")), err)
 		return
 	}
-	model := batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15, MaxReferenceImages: 9}
-	prompt := batchfactoryv11.FinalPrompt{CompiledPrompt: input.Prompt, DurationSeconds: durationValue(input.Duration), ReferenceImageURLs: input.ImageURLs, EffectiveSettings: batchfactoryv11.EffectiveSettings{Values: batchfactoryv11.SettingsPatch{}}}
-	adapter, err := newScriptVideoAdapter(cfg, spec.Provider)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	setScriptVideoClient(adapter, r.client)
-	ref, err := adapter.Submit(req.Context(), model, prompt)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-		return
-	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "taskId": spec.PublicTaskPrefix + ref.ProviderTaskID, "status": "processing", "provider": spec.Provider})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "taskId": out.TaskID, "status": out.Status, "provider": out.Provider, "videoUrl": out.VideoURL, "error": out.Error})
 }
 
-func (r *scriptVideoRoutes) poll(w http.ResponseWriter, req *http.Request, owner string) {
-	taskID := strings.TrimSpace(req.PathValue("taskId"))
-	prefix := ""
-	provider := ""
+func (r *scriptVideoRoutes) writeServiceError(w http.ResponseWriter, taskID string, err error) {
+	var preflight *scriptVideoPreflightError
+	if errors.As(err, &preflight) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
 	if strings.HasPrefix(taskID, localScriptVideoTaskPrefix) {
 		if r.localExecutor == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "本地执行器服务不可用"})
 			return
 		}
-		job, err := r.localExecutor.GetJob(req.Context(), owner, strings.TrimPrefix(taskID, localScriptVideoTaskPrefix))
-		if err != nil {
-			writeLocalJobError(w, err)
-			return
-		}
-		result := map[string]any{"ok": true, "taskId": taskID, "status": "processing"}
-		switch job.State {
-		case localexecutor.JobFailed, localexecutor.JobCancelled:
-			result["status"], result["error"] = "failed", job.ErrorMessage
-		case localexecutor.JobSucceeded:
-			result["status"] = "succeeded"
-			result["videoUrl"] = "/api/shuihuo-production/local-executor-artifacts/" + job.ArtifactID
-		}
-		writeJSON(w, http.StatusOK, result)
+		writeLocalJobError(w, err)
 		return
 	}
-	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:fanke-video-api:", batchfactoryv11.VideoProviderYFAISeedance}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
-		if strings.HasPrefix(taskID, item.prefix) {
-			prefix, provider = item.prefix, item.provider
-			break
-		}
-	}
-	if prefix == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported video task"})
-		return
-	}
-	modelKey := scriptVideoTaskModelKey(taskID, provider)
-	if r.resolver == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
-		return
-	}
-	cfg, err := r.resolver(req.Context(), owner, modelKey)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	adapter, err := newScriptVideoAdapter(cfg, provider)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	setScriptVideoClient(adapter, r.client)
-	ref, err := adapter.Poll(req.Context(), batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15}, batchfactoryv11.ProviderTaskRef{ProviderTaskID: strings.TrimPrefix(taskID, prefix)})
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-		return
-	}
-	result := map[string]any{"ok": true, "taskId": taskID, "status": "processing", "provider": provider}
-	if ref.State == batchfactoryv11.ProductionFailed {
-		result["status"] = "failed"
-		result["error"] = ref.ErrorMessage
-	} else if ref.State == batchfactoryv11.ProductionSucceeded {
-		result["status"] = "succeeded"
-		result["videoUrl"] = ref.MediaURL
-	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 }
 
 func setScriptVideoClient(adapter scriptVideoAdapter, client *http.Client) {
@@ -271,6 +177,8 @@ func setScriptVideoClient(adapter scriptVideoAdapter, client *http.Client) {
 		return
 	}
 	switch typed := adapter.(type) {
+	case *nativeScriptVideoAdapter:
+		typed.Client = client
 	case *batchfactoryv11.AutoDLH3VideoAdapter:
 		typed.Client = client
 	case *batchfactoryv11.YFAISeedanceAdapter:
@@ -282,6 +190,8 @@ func setScriptVideoClient(adapter scriptVideoAdapter, client *http.Client) {
 
 func newScriptVideoAdapter(cfg batchfactoryv11.VideoProviderConfig, provider string) (scriptVideoAdapter, error) {
 	switch provider {
+	case scriptVideoProviderArk, scriptVideoProviderSora:
+		return &nativeScriptVideoAdapter{cfg: cfg}, nil
 	case batchfactoryv11.VideoProviderAutoDLH3:
 		return &batchfactoryv11.AutoDLH3VideoAdapter{CreateURL: cfg.CreateURL, TasksURL: cfg.TasksURL, APIKey: cfg.APIKey, Model: cfg.Model, WorkflowID: cfg.WorkflowID}, nil
 	case batchfactoryv11.VideoProviderYFAISeedance:

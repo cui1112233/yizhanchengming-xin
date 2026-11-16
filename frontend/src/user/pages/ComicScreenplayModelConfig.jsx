@@ -1,7 +1,7 @@
 import { Alert, Button, Empty, Input, Select, Spin, Switch } from 'antd';
 import { useEffect, useState } from 'react';
 import { listAvailableModels } from '../../shared/api/modelCatalog.js';
-import { creativePromptOptions } from './comic-screenplay-creative.js';
+import { creativePromptOptions, comicVideoGenerationModes, comicSubjectVideoError } from './comic-screenplay-creative.js';
 import {getComicMedia} from '../../shared/api/comicScreenplayWorkflow.js';
 import {availableComicImageModels,comicImageModelFamily,comicImageModelGroups,comicImageModelChange} from './comic-screenplay-model-options.js';
 
@@ -41,6 +41,12 @@ export default function ComicScreenplayModelConfig({projectId,value,onChange,lib
       <div className="comic-config-control-group"><span>出图分辨率</span><div className="comic-config-segments" role="group" aria-label="出图分辨率">{enums.image_resolutions.map(resolution=><button key={resolution} type="button" disabled={locked} aria-pressed={value.image_resolution===resolution} className={value.image_resolution===resolution?'is-active':''} onClick={()=>onChange({image_resolution:resolution})}>{resolution}</button>)}</div></div>
       <div className="comic-config-control-group"><span>资产类型</span><div className="comic-config-segments" role="group" aria-label="资产类型">{enums.asset_prompt_types.map(type=><button key={type} type="button" disabled={locked} aria-pressed={value.asset_prompt_type===type} className={value.asset_prompt_type===type?'is-active':''} onClick={()=>onChange({asset_prompt_type:type})}>{type==='western'?'海外':'通用'}</button>)}</div></div>
       <p>{value.asset_prompt_type==='western'?'海外：角色/场景/道具解析走海外版提示词。':'通用：角色/场景/道具解析走通用提示词。'} 剧本比例与出图分辨率保存后，下次打开沿用。</p>
+      <label><span>生成模式</span><Select aria-label="生成模式" size="small" disabled={locked} value={value.video_generation_mode??''} options={comicVideoGenerationModes} onChange={mode=>onChange({video_generation_mode:mode,...(mode!=='text_to_video'?{auto_replace_sora2_info:false}:{})})}/><small>沿用现有参考方式时，保持当前视频引用规则。视频模型使用设置中本账号已配置的模型。</small></label>
+      <label className="comic-config-display"><Switch aria-label="自动替换主体存档" disabled={locked||value.video_generation_mode!=='text_to_video'} checked={value.auto_replace_sora2_info===true} onChange={checked=>onChange({auto_replace_sora2_info:checked,...(checked?{use_subject_mode:false}:{})})}/><span>自动替换主体存档</span></label>
+      <p>仅用于 Sora 文字生成视频：将提示词中的主体名称替换为已保存的主体标识。图片模式或沿用现有参考方式时不适用。</p>
+      <label className="comic-config-display"><Switch aria-label="主体模式" disabled={locked} checked={value.use_subject_mode===true} onChange={checked=>onChange({use_subject_mode:checked,...(checked?{auto_replace_sora2_info:false}:{})})}/><span>主体模式</span></label>
+      <p>用于 Seedance 主体参考，将已保存的主体作为视频参考发送，保留提示词原文。请使用支持主体参考的已配置模型。</p>
+      {comicSubjectVideoError(value)?<Alert type="error" message={comicSubjectVideoError(value)}/>:null}
     </section>
     <section className="comic-config-column"><header><h3>图像与音色模型</h3><p>与设置中的模型管理共用目录，仅显示本账号可用模型</p></header>
       <div className="comic-config-control-group"><span>生图模型</span>{chips('gen',genChannel)}{modelSelect('image_model_id',genChannel,'生图模型')}</div>

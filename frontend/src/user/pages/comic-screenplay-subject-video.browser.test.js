@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {existsSync,mkdirSync,mkdtempSync,writeFileSync,readFileSync} from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';
+import {build} from 'esbuild';
+const here=path.dirname(fileURLToPath(import.meta.url));
+const browser=[process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(file=>file&&existsSync(file));
+const archive=path.resolve(here,'../../../../_local-archive-20261028/luoshui-screenplay-reconstruction-20261115/07-parity-execution/subject-video-implementation-20261116/frontend');
+test('主体视频配置真实浏览器默认关闭、模式、互斥、API保存重开、取消、只读与错误提示',{skip:!browser},async()=>{
+const bundle=await build({stdin:{resolveDir:here,loader:'jsx',contents:`
+import React,{useState}from'react';import{createRoot}from'react-dom/client';import Config from'./ComicScreenplayModelConfig.jsx';
+import{creativeConfigDraft,creativeModelConfigPayload,creativeConfigPayload}from'./comic-screenplay-creative.js';import{saveComicCreativeConfig}from'../../shared/api/comicScreenplay.js';
+const tick=()=>new Promise(r=>setTimeout(r,120)),assert=(v,m)=>{if(!v)throw Error(m)};
+let persisted={script_prompt_id:'s',storyboard_prompt_id:'b',character_design_prompt_id:'c',scene_design_prompt_id:'e',image_model_id:'own-image'};window.calls=[];
+window.fetch=async(path,options={})=>{if(String(path).includes('creative-config')){window.calls.push({path,method:options.method,body:JSON.parse(options.body)});persisted={...persisted,...JSON.parse(options.body)};return new Response(JSON.stringify({creative_config:persisted,revision:2}),{headers:{'Content-Type':'application/json'}});}return new Response(JSON.stringify({models:[{id:'own-image',displayName:'我的图片模型',kind:'image',capabilities:{generationModes:['text_to_image']}}]}),{headers:{'Content-Type':'application/json'}});};
+function Harness(){const[value,setValue]=useState(creativeConfigDraft(persisted)),[locked,setLocked]=useState(false),[error,setError]=useState('');window.setLocked=setLocked;window.invalid=()=>setValue(v=>({...v,auto_replace_sora2_info:true,use_subject_mode:true}));window.badMode=()=>setValue(v=>({...v,auto_replace_sora2_info:false,use_subject_mode:false,video_generation_mode:'bad'}));window.snapshot=()=>value;return <><Config value={value} loading={false} disabled={locked} library={{prompts:[]}} onChange={patch=>setValue(v=>({...v,...patch}))}/><button id="cancel" onClick={()=>setValue(creativeConfigDraft(persisted))}>取消</button><button id="reopen" onClick={()=>setValue(creativeConfigDraft(persisted))}>重开</button><button id="save" onClick={async()=>{try{const patch=creativeModelConfigPayload(value,1);await saveComicCreativeConfig('own-project',patch);setError('');}catch(e){setError(e.message);}}}>保存</button><output id="error">{error}</output></>;}
+const sw=name=>document.querySelector('button[aria-label="'+name+'"]');
+const choose=async(label)=>{const input=document.querySelector('[aria-label="生成模式"]');assert(input,'missing generation mode');const select=input.closest('.ant-select');select.querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));await tick();const option=[...document.querySelectorAll('.ant-select-item-option')].find(el=>el.textContent===label);assert(option,'missing mode '+label);option.click();await tick();};
+(async()=>{createRoot(document.getElementById('root')).render(<Harness/>);await tick();await tick();await tick();
+assert(sw('自动替换主体存档')&&sw('主体模式'),'subject controls absent');assert(sw('自动替换主体存档').getAttribute('aria-checked')==='false'&&sw('主体模式').getAttribute('aria-checked')==='false','legacy config not default off');assert(sw('自动替换主体存档').disabled,'unspecified mode must not allow text replacement');assert(document.body.textContent.includes('我的图片模型'),'own configured image model missing');for(const foreign of ['洛水出图包','小鱼漫漫','GRSAI','Higgsfield'])assert(!document.body.textContent.includes(foreign),'foreign model option '+foreign);
+await choose('文字生成视频');sw('自动替换主体存档').click();await tick();assert(window.snapshot().auto_replace_sora2_info===true,'text option not applied');sw('主体模式').click();await tick();assert(window.snapshot().use_subject_mode===true&&window.snapshot().auto_replace_sora2_info===false,'subject did not exclude replacement');sw('自动替换主体存档').click();await tick();assert(window.snapshot().auto_replace_sora2_info===true&&window.snapshot().use_subject_mode===false,'replacement did not exclude subject');
+document.querySelector('#save').click();await tick();await tick();assert(window.calls[0]?.method==='PUT'&&window.calls[0].path.endsWith('/own-project/creative-config'),'wrong save API');assert(window.calls[0].body.video_generation_mode==='text_to_video'&&window.calls[0].body.auto_replace_sora2_info===true&&window.calls[0].body.use_subject_mode===false,'API lost fields');assert(creativeConfigPayload(window.snapshot(),2).auto_replace_sora2_info===true,'full creative payload lost fields');
+await choose('图片生成视频');assert(sw('自动替换主体存档').disabled,'image mode allows text replacement');assert(window.snapshot().auto_replace_sora2_info===false,'mode switch retained incompatible replacement');document.querySelector('#cancel').click();await tick();assert(window.snapshot().video_generation_mode==='text_to_video'&&window.snapshot().auto_replace_sora2_info===true,'cancel did not restore saved config');document.querySelector('#reopen').click();await tick();assert(sw('自动替换主体存档').getAttribute('aria-checked')==='true','reopen lost saved choice');
+window.setLocked(true);await tick();assert(sw('自动替换主体存档').disabled&&sw('主体模式').disabled&&document.querySelector('[aria-label="生成模式"]').closest('.ant-select').classList.contains('ant-select-disabled'),'readonly/saving not locked');window.setLocked(false);await tick();window.invalid();await tick();assert(document.body.textContent.includes('不能同时开启'),'invalid conflict not visible');document.querySelector('#save').click();await tick();assert(document.querySelector('#error').textContent.includes('不能同时开启')&&window.calls.length===1,'invalid config sent');window.badMode();await tick();document.querySelector('#save').click();await tick();assert(document.querySelector('#error').textContent.includes('生成模式')&&window.calls.length===1,'invalid mode sent');
+document.querySelector('#reopen').click();await tick();document.body.dataset.result='passed';document.body.dataset.calls=JSON.stringify(window.calls);})().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
+`},bundle:true,jsx:'automatic',write:false,platform:'browser',format:'iife',loader:{'.css':'empty'}});
+mkdirSync(archive,{recursive:true});const dir=mkdtempSync(path.join(archive,'browser-'));writeFileSync(path.join(dir,'test.js'),bundle.outputFiles[0].text);const html=path.join(dir,'test.html');writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="test.js"></script>');const output=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--host-resolver-rules=MAP * ~NOTFOUND','--virtual-time-budget=9000','--user-data-dir='+path.join(dir,'profile'),'--dump-dom',pathToFileURL(html).href],{encoding:'utf8',timeout:60000,windowsHide:true,stdio:['ignore','pipe','pipe'],maxBuffer:4000000});const passed=/data-result="passed"/.test(output);writeFileSync(path.join(archive,passed?'green-dom.html':'red-dom.html'),output);assert.ok(passed,output.match(/data-error="([^"]*)"/)?.[1]||'browser did not finish');
+});
+
+// 三种保存入口必须保留显式 false/空模式；非法组合在外发之前停止。
+test('视频主体配置默认关闭，完整保存/模型配置保存/读回保持字段与互斥边界', async () => {
+  const {creativeConfigDraft,creativeConfigPayload,creativeModelConfigPayload}=await import('./comic-screenplay-creative.js');
+  const defaults=creativeConfigDraft({script_prompt_id:'s',storyboard_prompt_id:'b',character_design_prompt_id:'c',scene_design_prompt_id:'e'});
+  for(const payload of [creativeConfigPayload(defaults,3),creativeModelConfigPayload(defaults,3)]){
+    assert.equal(payload.video_generation_mode,'');assert.equal(payload.auto_replace_sora2_info,false);assert.equal(payload.use_subject_mode,false);
+  }
+  const saved={...defaults,video_generation_mode:'text_to_video',auto_replace_sora2_info:true,use_subject_mode:false};
+  assert.deepEqual(creativeModelConfigPayload(creativeConfigDraft(saved),3),creativeModelConfigPayload(saved,3));
+  assert.throws(()=>creativeModelConfigPayload({...saved,use_subject_mode:true},3),/不能同时开启/);
+  assert.throws(()=>creativeModelConfigPayload({...saved,video_generation_mode:'image_to_video'},3),/文字生成视频/);
+  assert.throws(()=>creativeConfigPayload({...saved,video_generation_mode:'unknown'},3),/生成模式/);
+});

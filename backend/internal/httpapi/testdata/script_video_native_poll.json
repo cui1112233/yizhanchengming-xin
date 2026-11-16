@@ -1,0 +1,201 @@
+{
+  "source": "Original compiled query_task/query_task_status via isolated FakeHTTP; subject-video-implementation-20261116/native-poll/native-poll-results.json",
+  "rows": [
+    {
+      "provider": "sora_json",
+      "input": {
+        "id": "OWN_TASK"
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "id": "OWN_TASK"
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "task_id": "OWN_TASK"
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "task_id": "OWN_TASK"
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "data": {
+          "id": "OWN_TASK"
+        }
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "data": {
+          "id": "OWN_TASK"
+        }
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "status": "pending"
+      },
+      "status": "pending",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "status": "pending"
+      },
+      "status": "pending",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "status": "succeeded",
+        "content": {
+          "video_url": "https://own.invalid/video.mp4"
+        }
+      },
+      "status": "succeeded",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "status": "succeeded",
+        "content": {
+          "video_url": "https://own.invalid/video.mp4"
+        }
+      },
+      "status": "succeeded",
+      "video_url": "https://own.invalid/video.mp4",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "status": "failed",
+        "error": {
+          "message": "OWN_FAILURE"
+        }
+      },
+      "status": "failed",
+      "video_url": "",
+      "error": "OWN_FAILURE"
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "status": "failed",
+        "error": {
+          "message": "OWN_FAILURE"
+        }
+      },
+      "status": "failed",
+      "video_url": "",
+      "error": "OWN_FAILURE"
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "status": "completed",
+        "video_url": "https://own.invalid/video.mp4"
+      },
+      "status": "completed",
+      "video_url": "https://own.invalid/video.mp4",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "status": "completed",
+        "video_url": "https://own.invalid/video.mp4"
+      },
+      "status": "completed",
+      "video_url": "https://own.invalid/video.mp4",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "data": {
+          "id": "OWN_TASK",
+          "status": "completed",
+          "video_url": "https://own.invalid/video.mp4"
+        }
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "data": {
+          "id": "OWN_TASK",
+          "status": "completed",
+          "video_url": "https://own.invalid/video.mp4"
+        }
+      },
+      "status": "completed",
+      "video_url": "https://own.invalid/video.mp4",
+      "error": ""
+    },
+    {
+      "provider": "sora_json",
+      "input": {
+        "data": {
+          "id": "OWN_TASK",
+          "status": "succeeded",
+          "url": "https://own.invalid/video.mp4"
+        }
+      },
+      "status": "",
+      "video_url": "",
+      "error": ""
+    },
+    {
+      "provider": "seedance_ark",
+      "input": {
+        "data": {
+          "id": "OWN_TASK",
+          "status": "succeeded",
+          "url": "https://own.invalid/video.mp4"
+        }
+      },
+      "status": "succeeded",
+      "video_url": "https://own.invalid/video.mp4",
+      "error": ""
+    }
+  ]
+}

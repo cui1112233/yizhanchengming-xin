@@ -71,6 +71,9 @@ func (m *MemoryStore) DeleteUserStyle(_ context.Context, owner, id string, expec
 	return nil
 }
 func (m *MemoryStore) SaveCreativeConfig(_ context.Context, owner, id string, c CreativeConfig, expected int64) (Project, error) {
+	if err := ValidateCreativeVideoConfig(c); err != nil {
+		return Project{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := projectKey(owner, id)

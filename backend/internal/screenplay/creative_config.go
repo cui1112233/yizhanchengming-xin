@@ -1,6 +1,7 @@
 package screenplay
 
 import (
+	"fmt"
 	"qiantie/backend/internal/prompt"
 	"strings"
 )
@@ -14,6 +15,9 @@ type CreativeStyleSnapshot struct {
 	Revision int64    `json:"revision"`
 }
 type CreativeConfig struct {
+	AutoReplaceSora2Info        bool                              `json:"auto_replace_sora2_info"`
+	UseSubjectMode              bool                              `json:"use_subject_mode"`
+	VideoGenerationMode         string                            `json:"video_generation_mode"`
 	PlanDensity                 string                            `json:"plan_density"`
 	StoryboardAutoSyncAssets    bool                              `json:"storyboard_auto_sync_assets"`
 	StoryboardUseContextHistory bool                              `json:"storyboard_use_context_history"`
@@ -61,4 +65,17 @@ func ResolveProjectPrompt(p Project, id, purpose string) (CreativePromptSnapshot
 		}
 	}
 	return resolved, nil
+}
+
+func ValidateCreativeVideoConfig(c CreativeConfig) error {
+	if c.AutoReplaceSora2Info && c.UseSubjectMode {
+		return fmt.Errorf("%w: 自动替换主体存档和主体模式不能同时开启", ErrInvalidArgument)
+	}
+	if c.VideoGenerationMode != "" && c.VideoGenerationMode != "text_to_video" && c.VideoGenerationMode != "image_to_video" {
+		return fmt.Errorf("%w: 视频生成模式无效", ErrInvalidArgument)
+	}
+	if c.AutoReplaceSora2Info && c.VideoGenerationMode != "text_to_video" {
+		return fmt.Errorf("%w: 自动替换主体存档需要明确选择文生视频", ErrInvalidArgument)
+	}
+	return nil
 }

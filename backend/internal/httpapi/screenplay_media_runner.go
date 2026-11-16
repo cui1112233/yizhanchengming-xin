@@ -26,6 +26,7 @@ type screenplayVideoRunner struct {
 	repo         screenplay.ProductionRepository
 	References   func(context.Context, screenplay.Project, screenplay.StoryboardShot) ([]string, error)
 	ReferenceIDs func(context.Context, screenplay.Project, screenplay.StoryboardShot) ([]string, error)
+	Subjects     func(context.Context, screenplay.Project, screenplay.StoryboardShot) (screenplayVideoSubjects, error)
 }
 
 func (r *screenplayVideoRunner) ProduceEpisode(ctx context.Context, project screenplay.Project, episode int, storyboard screenplay.Storyboard) ([]string, error) {
@@ -54,51 +55,37 @@ func (r *screenplayVideoRunner) ProduceEpisode(ctx context.Context, project scre
 			return artifacts, fmt.Errorf("第%d集第%d镜头缺少视频提示词或已确认时长，请先在分镜编辑中补全", episode, shot.Seq)
 		}
 	}
-	for _, shot := range storyboard.Shots {
-		prompt := strings.TrimSpace(shot.VideoDesc)
-		if prompt == "" {
-			return artifacts, fmt.Errorf("第 %d 集第 %d 镜头缺少视频提示词", episode, shot.Seq)
-		}
-
-		if r.repo == nil {
-			return artifacts, fmt.Errorf("生产镜头存储未配置，已停止提交")
-		}
+	prepared := make([]scriptVideoLocalInput, len(storyboard.Shots))
+	hashes := make([]string, len(storyboard.Shots))
+	for i, shot := range storyboard.Shots {
 		if err := ctx.Err(); err != nil {
 			return artifacts, err
 		}
-		input := scriptVideoLocalInput{SourceTaskID: fmt.Sprintf("screenplay:%s:%s:%d", project.ID, storyboard.ID, shot.Seq), ModelKey: modelKey, Prompt: prompt, Duration: shot.Duration, AspectRatio: project.AspectRatio, Resolution: resolution, GenerateAudio: true}
-		if r.References != nil {
-			input.ImageURLs, err = r.References(ctx, project, shot)
-			if err != nil {
-				return artifacts, err
+		input, hash, err := r.prepareInput(ctx, project, storyboard, shot, modelKey, resolution)
+		if err != nil {
+			return artifacts, fmt.Errorf("第%d集第%d镜头：%w", episode, shot.Seq, err)
+		}
+		if validator, ok := r.service.(interface {
+			ValidateInput(context.Context, string, scriptVideoLocalInput) error
+		}); ok {
+			if err = validator.ValidateInput(ctx, project.OwnerUsername, input); err != nil {
+				return artifacts, fmt.Errorf("第%d集第%d镜头：%w", episode, shot.Seq, err)
 			}
 		}
-		hashInput := input
-		if r.ReferenceIDs != nil {
-			hashInput.ImageURLs, err = r.ReferenceIDs(ctx, project, shot)
-			if err != nil {
-				return artifacts, err
-			}
+		if _, _, e := r.existingShotTask(ctx, project, storyboard, shot, episode, hash); e != nil {
+			return artifacts, e
 		}
-		raw, _ := json.Marshal(hashInput)
-		hash := fmt.Sprintf("%x", sha256.Sum256(raw))
-		input.SourceTaskID += ":" + hash[:16]
-		task, getErr := r.repo.GetShotTask(ctx, project.OwnerUsername, project.ID, storyboard.ID, shot.Seq)
-		if versions, ok := r.repo.(screenplay.VersionedProductionRepository); ok {
-			previous, previousErr := task, getErr
-			task, getErr = versions.GetShotTaskVersion(ctx, project.OwnerUsername, project.ID, storyboard.ID, shot.Seq, hash)
-			if errors.Is(getErr, screenplay.ErrNotFound) && previousErr == nil && previous.RequestHash != hash {
-				job, jobErr := r.repo.GetProductionJob(ctx, project.OwnerUsername, project.ID)
-				if jobErr != nil || !job.Rebuild {
-					return artifacts, fmt.Errorf("第 %d 集第 %d 镜头请求已改变；请明确选择重建变更镜头，旧任务将保留", episode, shot.Seq)
-				}
-			}
+		prepared[i], hashes[i] = input, hash
+	}
+	for i, shot := range storyboard.Shots {
+		input, hash := prepared[i], hashes[i]
+		if r.repo == nil {
+			return artifacts, fmt.Errorf("生产镜头存储未配置，已停止提交")
 		}
-		if getErr != nil && !errors.Is(getErr, screenplay.ErrNotFound) {
-			return artifacts, getErr
-		}
-		if getErr == nil && task.RequestHash != hash {
-			return artifacts, fmt.Errorf("第 %d 集第 %d 镜头内容或模型已改变，请明确创建新版本后再生成", episode, shot.Seq)
+
+		task, getErr, lookupErr := r.existingShotTask(ctx, project, storyboard, shot, episode, hash)
+		if lookupErr != nil {
+			return artifacts, lookupErr
 		}
 		if task.Status == "succeeded" && task.Artifact != "" {
 			task.ShotID = shot.ID
@@ -139,8 +126,15 @@ func (r *screenplayVideoRunner) ProduceEpisode(ctx context.Context, project scre
 			submission, submitErr := r.service.Submit(ctx, project.OwnerUsername, input)
 			if submitErr != nil {
 				task.Status = "submission_unknown"
+				var preflight *scriptVideoPreflightError
+				if errors.As(submitErr, &preflight) {
+					task.Status = "not_submitted"
+				}
 				task.Error = submitErr.Error()
 				_ = r.repo.SaveShotTask(context.Background(), task)
+				if task.Status == "not_submitted" {
+					return artifacts, fmt.Errorf("第 %d 集第 %d 镜头未发送，请核对配置后继续：%w", episode, shot.Seq, submitErr)
+				}
 				return artifacts, fmt.Errorf("第 %d 集第 %d 镜头提交失败（不会自动重复提交）：%w", episode, shot.Seq, submitErr)
 			}
 			if strings.TrimSpace(submission.TaskID) == "" {
@@ -212,4 +206,82 @@ func screenplayVideoDefaults(config map[string]any) (string, string) {
 		modelKey = ""
 	}
 	return modelKey, resolution
+}
+
+func (r *screenplayVideoRunner) prepareInput(ctx context.Context, project screenplay.Project, storyboard screenplay.Storyboard, shot screenplay.StoryboardShot, modelKey, resolution string) (scriptVideoLocalInput, string, error) {
+	input := scriptVideoLocalInput{SourceTaskID: fmt.Sprintf("screenplay:%s:%s:%d", project.ID, storyboard.ID, shot.Seq), ModelKey: modelKey, Prompt: strings.TrimSpace(shot.VideoDesc), Duration: shot.Duration, AspectRatio: project.AspectRatio, Resolution: resolution, GenerateAudio: true}
+	c := screenplay.CreativeConfig{}
+	if project.CreativeConfig != nil {
+		c = *project.CreativeConfig
+	}
+	if err := screenplay.ValidateCreativeVideoConfig(c); err != nil {
+		return input, "", err
+	}
+	input.GenerationMode = c.VideoGenerationMode
+	var err error
+	if c.UseSubjectMode || c.AutoReplaceSora2Info {
+		if r.Subjects == nil {
+			return input, "", fmt.Errorf("主体解析服务未配置")
+		}
+		subjects, e := r.Subjects(ctx, project, shot)
+		if e != nil {
+			return input, "", e
+		}
+		if c.AutoReplaceSora2Info {
+			input.SubjectStrategy = "sora_text"
+			input.Prompt = subjects.Prompt
+		} else {
+			input.SubjectStrategy = "seedance_subject"
+			input.SubjectReferenceURIs = subjects.URIs
+			input.SubjectReferenceIDs = subjects.IDs
+		}
+	}
+	if input.GenerationMode != "text_to_video" && !c.UseSubjectMode && r.References != nil {
+		input.ImageURLs, err = r.References(ctx, project, shot)
+		if err != nil {
+			return input, "", err
+		}
+	}
+	if input.GenerationMode == "image_to_video" && len(input.ImageURLs) == 0 && len(input.SubjectReferenceURIs) == 0 {
+		return input, "", fmt.Errorf("图生视频缺少可用参考图片")
+	}
+	hashInput := input
+	if len(input.SubjectReferenceIDs) > 0 {
+		hashInput.SubjectReferenceURIs = input.SubjectReferenceIDs
+	}
+	if input.GenerationMode != "text_to_video" && !c.UseSubjectMode && r.ReferenceIDs != nil {
+		hashInput.ImageURLs, err = r.ReferenceIDs(ctx, project, shot)
+		if err != nil {
+			return input, "", err
+		}
+	}
+	raw, _ := json.Marshal(hashInput)
+	hash := fmt.Sprintf("%x", sha256.Sum256(raw))
+	input.SourceTaskID += ":" + hash[:16]
+	return input, hash, nil
+}
+
+func (r *screenplayVideoRunner) existingShotTask(ctx context.Context, project screenplay.Project, storyboard screenplay.Storyboard, shot screenplay.StoryboardShot, episode int, hash string) (screenplay.ShotTask, error, error) {
+	if r.repo == nil {
+		return screenplay.ShotTask{}, nil, fmt.Errorf("生产镜头存储未配置，已停止提交")
+	}
+	task, getErr := r.repo.GetShotTask(ctx, project.OwnerUsername, project.ID, storyboard.ID, shot.Seq)
+	if versions, ok := r.repo.(screenplay.VersionedProductionRepository); ok {
+		previous, previousErr := task, getErr
+		task, getErr = versions.GetShotTaskVersion(ctx, project.OwnerUsername, project.ID, storyboard.ID, shot.Seq, hash)
+		if errors.Is(getErr, screenplay.ErrNotFound) && previousErr == nil && previous.RequestHash != hash {
+			job, jobErr := r.repo.GetProductionJob(ctx, project.OwnerUsername, project.ID)
+			if jobErr != nil || !job.Rebuild {
+				return task, getErr, fmt.Errorf("第 %d 集第 %d 镜头请求已改变；请明确选择重建变更镜头，旧任务将保留", episode, shot.Seq)
+			}
+		}
+	}
+	if getErr != nil && !errors.Is(getErr, screenplay.ErrNotFound) {
+		return task, getErr, getErr
+	}
+	if getErr == nil && task.RequestHash != hash {
+		return task, getErr, fmt.Errorf("第 %d 集第 %d 镜头内容或模型已改变，请明确创建新版本后再生成", episode, shot.Seq)
+	}
+
+	return task, getErr, nil
 }

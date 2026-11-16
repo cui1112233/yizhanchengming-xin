@@ -269,6 +269,9 @@ func serveCreativeConfigMutation(w http.ResponseWriter, r *http.Request, actor s
 }
 
 type creativeConfigPatch struct {
+	AutoReplaceSora2Info        *bool           `json:"auto_replace_sora2_info"`
+	UseSubjectMode              *bool           `json:"use_subject_mode"`
+	VideoGenerationMode         *string         `json:"video_generation_mode"`
 	PlanDensity                 json.RawMessage `json:"plan_density"`
 	StoryboardAutoSyncAssets    *bool           `json:"storyboard_auto_sync_assets"`
 	StoryboardUseContextHistory *bool           `json:"storyboard_use_context_history"`
@@ -292,6 +295,19 @@ type creativeConfigPatch struct {
 }
 
 func applyCreativePatch(r *http.Request, cs screenplay.CreativeStore, actor string, c *screenplay.CreativeConfig, in creativeConfigPatch) error {
+	if in.AutoReplaceSora2Info != nil {
+		c.AutoReplaceSora2Info = *in.AutoReplaceSora2Info
+	}
+	if in.UseSubjectMode != nil {
+		c.UseSubjectMode = *in.UseSubjectMode
+	}
+	if in.VideoGenerationMode != nil {
+		c.VideoGenerationMode = strings.TrimSpace(*in.VideoGenerationMode)
+	}
+	if err := screenplay.ValidateCreativeVideoConfig(*c); err != nil {
+		return err
+	}
+
 	if len(in.PlanDensity) > 0 {
 		var value any
 		if e := json.Unmarshal(in.PlanDensity, &value); e != nil {
