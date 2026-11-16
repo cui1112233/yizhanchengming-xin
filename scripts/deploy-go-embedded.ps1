@@ -6,8 +6,8 @@
   [string]$TargetHost = '',
   [string]$TargetUser = 'deploy',
   [int]$SshPort = 22,
-  [string]$TargetPath = '/opt/qiantie/releases/v88/qiantie-server',
-  [string]$ServiceName = 'qiantie-v88',
+  [string]$TargetPath = '/opt/www/qiantie/qiantie',
+  [string]$ServiceName = 'qiantie',
   [switch]$KeepBuildDirectory,
   # 发布成功后保留多少个历史版本（当前版本不计入）。默认 1，即当前版 + 上一版。
   [int]$KeepPreviousReleases = 1,
@@ -144,7 +144,9 @@ if ($Deploy) {
   $remote = "$TargetUser@$TargetHost"
   $remoteTemp = "/tmp/qiantie-v88-$timestamp-$shortSha"
   Invoke-Checked 'scp' @('-P', "$SshPort", $binaryPath, "${remote}:$remoteTemp")
-  $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
+  # 远端目标是正在运行的二进制，直接 install 覆盖会触发 ETXTBSY；
+  # 先装到同目录的 .new 再 mv，保证原子替换。
+  $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath.new'; sudo mv -f '$TargetPath.new' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
   Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $remoteCommand)
   Write-Host "远端服务已重启并通过 systemd 健康检查：$ServiceName"
 
@@ -152,23 +154,30 @@ if ($Deploy) {
   # 按“当前版本 + 最近 N 个历史版本 + runtime-release.json 记录的回滚版本”清理，
   # 避免服务器磁盘被历史构建占满。
   if (-not $KeepOldReleases) {
-    $pruneScript = Join-Path $PSScriptRoot 'prune-qiantie-releases.sh'
-    if (-not (Test-Path -LiteralPath $pruneScript)) {
-      throw "版本清理脚本不存在：$pruneScript"
-    }
-    $remoteRoot = ($TargetPath -replace '/[^/]+$', '')
-    if ([string]::IsNullOrWhiteSpace($remoteRoot)) { $remoteRoot = '/' }
-    $remotePrune = "/tmp/qiantie-prune-$timestamp.sh"
-    $tempPrune = Join-Path ([System.IO.Path]::GetTempPath()) "qiantie-prune-$timestamp.sh"
-    $pruneCode = (Get-Content -LiteralPath $pruneScript -Raw) -replace "`r", ""
-    [System.IO.File]::WriteAllText($tempPrune, $pruneCode, (New-Object System.Text.UTF8Encoding($false)))
-    try {
-      Invoke-Checked 'scp' @('-P', "$SshPort", $tempPrune, "${remote}:$remotePrune")
-      $pruneCommand = "set -eu; QIANTIE_RELEASE_ROOT='$remoteRoot' sh '$remotePrune' $KeepPreviousReleases; rm -f '$remotePrune'"
-      Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $pruneCommand)
-      Write-Host "旧版本已清理：保留当前版本和最近 $KeepPreviousReleases 个历史版本。"
-    } finally {
-      Remove-Item -LiteralPath $tempPrune -Force -ErrorAction SilentlyContinue
+    # prune 脚本按“软链指向当前版本”的目录结构设计；生产目前是直接文件替换，
+    # 这种结构下跳过清理，避免发布成功后因为找不到软链而整体报错。
+    & ssh @('-p', "$SshPort", $remote, "test -L '$TargetPath'") 2>$null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "跳过旧版本清理：$TargetPath 不是版本软链，当前为直接文件替换。"
+    } else {
+      $pruneScript = Join-Path $PSScriptRoot 'prune-qiantie-releases.sh'
+      if (-not (Test-Path -LiteralPath $pruneScript)) {
+        throw "版本清理脚本不存在：$pruneScript"
+      }
+      $remoteRoot = ($TargetPath -replace '/[^/]+$', '')
+      if ([string]::IsNullOrWhiteSpace($remoteRoot)) { $remoteRoot = '/' }
+      $remotePrune = "/tmp/qiantie-prune-$timestamp.sh"
+      $tempPrune = Join-Path ([System.IO.Path]::GetTempPath()) "qiantie-prune-$timestamp.sh"
+      $pruneCode = (Get-Content -LiteralPath $pruneScript -Raw) -replace "`r", ""
+      [System.IO.File]::WriteAllText($tempPrune, $pruneCode, (New-Object System.Text.UTF8Encoding($false)))
+      try {
+        Invoke-Checked 'scp' @('-P', "$SshPort", $tempPrune, "${remote}:$remotePrune")
+        $pruneCommand = "set -eu; QIANTIE_RELEASE_ROOT='$remoteRoot' sh '$remotePrune' $KeepPreviousReleases; rm -f '$remotePrune'"
+        Invoke-Checked 'ssh' @('-p', "$SshPort", $remote, $pruneCommand)
+        Write-Host "旧版本已清理：保留当前版本和最近 $KeepPreviousReleases 个历史版本。"
+      } finally {
+        Remove-Item -LiteralPath $tempPrune -Force -ErrorAction SilentlyContinue
+      }
     }
   }
 } else {
