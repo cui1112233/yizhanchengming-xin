@@ -246,7 +246,41 @@
       "comparison": "message texts, accumulated output and rounds compared; configured channel and real persistence readback controlled final HTTP verified",
       "remaining": "native streaming/progress events, explicit continue-existing entry, complex asset context, original pixels and138storyboard continuation pending",
       "full_parity_passed": false
+    },
+    {
+      "id": "G20-PROGRESS-003",
+      "name": "章节规划逐轮真实进度与Redis空记录边界",
+      "original": {
+        "declaration": "creation_agent.py:3121,3166; compiled metadata, not recovered author source; installed JS440515",
+        "evidence": [
+          "planning-native-20261116/planning-generation-progress.json",
+          "planning-native-20261116/planning-continue-existing.json",
+          "planning-native-20261116/planning-guide-empty-boundaries.json"
+        ],
+        "progress_cases": 4,
+        "progress_events": 8,
+        "continue_existing_cases": 5,
+        "guide_boundary_cases": 3
+      },
+      "cm": {
+        "commit": "3a3ec8182eecb197975a60f7855af31cad62ebda",
+        "actual_mysql_redis_4001_checks": 12,
+        "browser_progress_checks": 5,
+        "page_regression_checks": 4,
+        "real_supplier_calls": 0,
+        "evidence": [
+          "39-planning-progress-results.md",
+          "planning-progress-runtime-20261116/runtime-verification.json",
+          "planning-progress-runtime-20261116/mysql-http-result.json",
+          "planning-progress-browser-20261116/final-source-progress.log",
+          "planning-progress-browser-20261116/final-source-page.log",
+          "planning-progress-browser-20261116/final-source-partial-recheck.log"
+        ]
+      },
+      "comparison": "Exact native round events matched; real Redis/MySQL producer and actual4001 readback verify pending/final/missing states, isolation and no repeat generation. Browser partial regression required isolated rerun after inspection timeout; one earlier HTTP timeout remains unexplained and retained.",
+      "remaining": "Existing-plan continuation, works-page separate11-call planning, native streaming,138storyboard continuation and original full UI/icon pixel parity remain pending.",
+      "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "6a2e7ca2d96a62e7ac7b2883c53966b74b1c6304"
+  "latest_runtime_commit": "3a3ec8182eecb197975a60f7855af31cad62ebda"
 }
