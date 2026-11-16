@@ -206,13 +206,17 @@
         "original_golden_cases": 220,
         "evidence": [
           "backend/internal/screenplay/testdata/storyboard_plan_coverage_original.json.gz",
-          "35-planning-coverage-results.md"
-        ]
+          "35-planning-coverage-results.md",
+          "planning-coverage-runtime-20261116/mysql-http-result.json",
+          "planning-coverage-runtime-20261116/runtime-verification.json"
+        ],
+        "commit": "13b208764f8319fe6c5fd0bc4df931acf37bcdd4",
+        "real_mysql_and_actual_4001_checks": 5
       },
       "comparison": "all completion fields and reason compared; service persistence and controlled browser duplicate-click checked",
-      "remaining": "four guide bodies, 8-round continuation, real runtime acceptance and full planning chain still pending",
+      "remaining": "four guide bodies, eight-round continuation and full planning chain still pending; no paid provider or original desktop pixel acceptance",
       "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "7f2fd9060143293546aac5bf156593ed45a207dd"
+  "latest_runtime_commit": "13b208764f8319fe6c5fd0bc4df931acf37bcdd4"
 }

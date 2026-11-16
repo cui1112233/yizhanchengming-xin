@@ -21,3 +21,13 @@ Go实现`backend/internal/screenplay/storyboard_plan_coverage.go`，金样为`te
 ## 尚未完成
 
 本增量仍是一次规划请求。34已恢复的四档原生规划正文、system/user组包、默认最多8轮续写及更复杂的跨集/取消规则，仍待接入和成对验收。不能把本文件220组完成器对照当作8轮规划生成或完整36组复刻已通过。实际4001交付状态另记运行验收，不能从源码测试推断。
+
+## 实际4001交付
+
+源码提交`13b208764f8319fe6c5fd0bc4df931acf37bcdd4`。构建使用提交快照，未混入其它已跟踪脏文件。原4001及Docker已退出；先启动原有Docker与持久化MySQL，核对数据库就绪后恢复旧运行包，再检查批次/其它任务空闲，才替换新包。
+
+实际4001 PID27508，运行SHA和manifest均13b20876，入口`/assets/user-kVtWxcms.js`与构建字节一致，懒加载漫剧模块包含新提醒，旧回放作品原始回包仍逐字一致。证据`07-parity-execution/planning-coverage-runtime-20261116/runtime-verification.json`。
+
+`mysql_http_test.go`经Go临时覆盖测试执行真实MySQL、AuthoringService、完成器和重复请求校验，再向实际4001发送签名GET读回同一章节；5项检查通过。只有文字生成器使用自造部分文本，无真实供应商调用。独立测试作品全部清理。证据`mysql-http.log`、`mysql-http-result.json`。这不是实际供应商生成，也不是已登录页面的全状态像素验收。
+
+浏览器验证说明：26项相关检查通过；新增部分稿丢包用例独立通过。中途一份已启动的重复测试进程保留了旧版测试拼接错误，最后报重复声明；该测试代码已修复，修复后的新增用例通过，不把旧进程的失败冒称整体全绿。
