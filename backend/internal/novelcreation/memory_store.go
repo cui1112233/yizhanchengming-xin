@@ -26,6 +26,7 @@ type MemoryStore struct {
 	foundations     map[string]Foundation
 	materials       map[string]Material
 	notes           map[string]ProjectNote
+	styles          map[string]StyleProfile
 	schedules       map[string]Schedule
 	batches         map[string]Batch
 }
@@ -44,6 +45,7 @@ func NewMemoryStore() *MemoryStore {
 		foundations:     make(map[string]Foundation),
 		materials:       make(map[string]Material),
 		notes:           make(map[string]ProjectNote),
+		styles:          make(map[string]StyleProfile),
 		schedules:       make(map[string]Schedule),
 		batches:         make(map[string]Batch),
 	}
@@ -549,8 +551,8 @@ func (s *MemoryStore) ListMaterials(_ context.Context, owner, projectID string) 
 		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
 	}
 	materials := make([]Material, 0)
-	for _, material := range s.materials {
-		if material.ProjectID == projectID {
+	for key, material := range s.materials {
+		if strings.HasPrefix(key, memoryKey(owner)+"\x00") && material.ProjectID == projectID {
 			materials = append(materials, material)
 		}
 	}
@@ -595,8 +597,8 @@ func (s *MemoryStore) ListNotes(_ context.Context, owner, projectID string) ([]P
 		return nil, &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
 	}
 	notes := make([]ProjectNote, 0)
-	for _, note := range s.notes {
-		if note.ProjectID == projectID {
+	for key, note := range s.notes {
+		if strings.HasPrefix(key, memoryKey(owner)+"\x00") && note.ProjectID == projectID {
 			notes = append(notes, note)
 		}
 	}
@@ -676,8 +678,8 @@ func (s *MemoryStore) ListSchedules(_ context.Context, owner, projectID string) 
 	}
 	schedules := make([]Schedule, 0)
 	for _, schedule := range s.schedules {
-		if schedule.ProjectID == projectID {
-			schedules = append(schedules, schedule)
+		if schedule.OwnerUsername == owner && schedule.ProjectID == projectID {
+			schedules = append(schedules, cloneSchedule(schedule))
 		}
 	}
 	sort.Slice(schedules, func(i, j int) bool { return schedules[i].CreatedAt.After(schedules[j].CreatedAt) })
@@ -691,7 +693,7 @@ func (s *MemoryStore) GetSchedule(_ context.Context, owner, scheduleID string) (
 	if !ok {
 		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
 	}
-	return schedule, nil
+	return cloneSchedule(schedule), nil
 }
 
 func (s *MemoryStore) CreateSchedule(_ context.Context, owner string, schedule Schedule) (Schedule, error) {
@@ -713,8 +715,8 @@ func (s *MemoryStore) CreateSchedule(_ context.Context, owner string, schedule S
 		schedule.CreatedAt = now
 	}
 	schedule.UpdatedAt = now
-	s.schedules[memoryKey(owner, schedule.ID)] = schedule
-	return schedule, nil
+	s.schedules[memoryKey(owner, schedule.ID)] = cloneSchedule(schedule)
+	return cloneSchedule(schedule), nil
 }
 
 func (s *MemoryStore) UpdateSchedule(_ context.Context, owner string, schedule Schedule) (Schedule, error) {
@@ -728,8 +730,8 @@ func (s *MemoryStore) UpdateSchedule(_ context.Context, owner string, schedule S
 	schedule.OwnerUsername = owner
 	schedule.CreatedAt = existing.CreatedAt
 	schedule.UpdatedAt = time.Now().UTC()
-	s.schedules[key] = schedule
-	return schedule, nil
+	s.schedules[key] = cloneSchedule(schedule)
+	return cloneSchedule(schedule), nil
 }
 
 func (s *MemoryStore) DeleteSchedule(_ context.Context, owner, projectID, scheduleID string) error {
@@ -753,7 +755,7 @@ func (s *MemoryStore) ListDueSchedules(_ context.Context, now time.Time, limit i
 	due := make([]Schedule, 0)
 	for _, schedule := range s.schedules {
 		if schedule.Enabled && !schedule.NextRunAt.After(now) {
-			due = append(due, schedule)
+			due = append(due, cloneSchedule(schedule))
 		}
 	}
 	sort.Slice(due, func(i, j int) bool { return due[i].NextRunAt.Before(due[j].NextRunAt) })
@@ -772,8 +774,8 @@ func (s *MemoryStore) ListBatches(_ context.Context, owner, projectID string) ([
 	}
 	batches := make([]Batch, 0)
 	for _, batch := range s.batches {
-		if batch.ProjectID == projectID {
-			batches = append(batches, batch)
+		if batch.OwnerUsername == owner && batch.ProjectID == projectID {
+			batches = append(batches, cloneBatch(batch))
 		}
 	}
 	sort.Slice(batches, func(i, j int) bool { return batches[i].CreatedAt.After(batches[j].CreatedAt) })
@@ -787,7 +789,7 @@ func (s *MemoryStore) GetBatch(_ context.Context, owner, batchID string) (Batch,
 	if !ok {
 		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "batch not found"}
 	}
-	return batch, nil
+	return cloneBatch(batch), nil
 }
 
 func (s *MemoryStore) CreateBatch(_ context.Context, owner string, batch Batch) (Batch, error) {
@@ -809,8 +811,8 @@ func (s *MemoryStore) CreateBatch(_ context.Context, owner string, batch Batch) 
 		batch.CreatedAt = now
 	}
 	batch.UpdatedAt = now
-	s.batches[memoryKey(owner, batch.ID)] = batch
-	return batch, nil
+	s.batches[memoryKey(owner, batch.ID)] = cloneBatch(batch)
+	return cloneBatch(batch), nil
 }
 
 func (s *MemoryStore) UpdateBatch(_ context.Context, owner string, batch Batch) (Batch, error) {
@@ -824,8 +826,8 @@ func (s *MemoryStore) UpdateBatch(_ context.Context, owner string, batch Batch) 
 	batch.OwnerUsername = owner
 	batch.CreatedAt = existing.CreatedAt
 	batch.UpdatedAt = time.Now().UTC()
-	s.batches[key] = batch
-	return batch, nil
+	s.batches[key] = cloneBatch(batch)
+	return cloneBatch(batch), nil
 }
 
 func (s *MemoryStore) ListActiveBatches(_ context.Context, limit int) ([]Batch, error) {
@@ -837,7 +839,7 @@ func (s *MemoryStore) ListActiveBatches(_ context.Context, limit int) ([]Batch, 
 	active := make([]Batch, 0)
 	for _, batch := range s.batches {
 		if batch.Status == BatchRunning {
-			active = append(active, batch)
+			active = append(active, cloneBatch(batch))
 		}
 	}
 	sort.Slice(active, func(i, j int) bool { return active[i].UpdatedAt.Before(active[j].UpdatedAt) })

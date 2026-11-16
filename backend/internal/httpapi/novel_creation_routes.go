@@ -123,13 +123,15 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("POST /api/novel-creation/sessions/{sessionID}/messages", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			ProjectID     string            `json:"projectId"`
-			Content       string            `json:"content"`
-			ModelID       string            `json:"modelId"`
-			ThinkingLevel string            `json:"thinkingLevel"`
-			Idempotency   string            `json:"idempotencyKey"`
-			ModeInputs    map[string]string `json:"modeInputs"`
-			KnowledgeIDs  []string          `json:"knowledgeIds"`
+			ProjectID      string            `json:"projectId"`
+			Content        string            `json:"content"`
+			ModelID        string            `json:"modelId"`
+			ThinkingLevel  string            `json:"thinkingLevel"`
+			Idempotency    string            `json:"idempotencyKey"`
+			ModeInputs     map[string]string `json:"modeInputs"`
+			KnowledgeIDs   []string          `json:"knowledgeIds"`
+			NoteIDs        []string          `json:"noteIds"`
+			StyleProfileID string            `json:"styleProfileId"`
 		}
 		if !decode(w, req, &input) {
 			return
@@ -137,7 +139,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		run, err := service.SendMessage(req.Context(), owner, novelcreation.SendMessageInput{
 			SessionID: req.PathValue("sessionID"), ProjectID: input.ProjectID, Content: input.Content,
 			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, IdempotencyKey: input.Idempotency,
-			ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs,
+			ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID,
 		})
 		if err != nil {
 			writeNovelCreationError(w, err)
@@ -368,18 +370,22 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("POST /api/novel-creation/projects/{projectID}/batches", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			SessionID     string `json:"sessionId"`
-			TotalChapters int    `json:"totalChapters"`
-			Prompt        string `json:"prompt"`
-			ModelID       string `json:"modelId"`
-			ThinkingLevel string `json:"thinkingLevel"`
+			SessionID      string            `json:"sessionId"`
+			TotalChapters  int               `json:"totalChapters"`
+			Prompt         string            `json:"prompt"`
+			ModelID        string            `json:"modelId"`
+			ThinkingLevel  string            `json:"thinkingLevel"`
+			ModeInputs     map[string]string `json:"modeInputs"`
+			KnowledgeIDs   []string          `json:"knowledgeIds"`
+			NoteIDs        []string          `json:"noteIds"`
+			StyleProfileID string            `json:"styleProfileId"`
 		}
 		if !decode(w, req, &input) {
 			return
 		}
 		batch, err := service.CreateBatch(req.Context(), owner, req.PathValue("projectID"), novelcreation.BatchInput{
 			SessionID: input.SessionID, TotalChapters: input.TotalChapters, Prompt: input.Prompt,
-			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel,
+			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID,
 		})
 		if err != nil {
 			writeNovelCreationError(w, err)
@@ -411,6 +417,26 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"batch": batch})
 	})
+	handle("POST /api/novel-creation/style-profiles", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input novelcreation.StyleProfile
+		if !decode(w, req, &input) {
+			return
+		}
+		result, err := service.SaveStyleProfile(req.Context(), owner, input)
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"styleProfile": result})
+	})
+	handle("GET /api/novel-creation/style-profiles/{styleID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		result, err := service.GetStyleProfile(req.Context(), owner, req.PathValue("styleID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"styleProfile": result})
+	})
 	handle("GET /api/novel-creation/projects/{projectID}/export", func(w http.ResponseWriter, req *http.Request, owner string) {
 		document, err := service.ExportProject(req.Context(), owner, req.PathValue("projectID"), req.URL.Query().Get("format"))
 		if err != nil {
@@ -426,12 +452,16 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 // novelScheduleRequest keeps "enabled" optional while defaulting it to true on
 // creation, matching the frontend switch.
 type novelScheduleRequest struct {
-	SessionID       string `json:"sessionId"`
-	IntervalMinutes int    `json:"intervalMinutes"`
-	Enabled         *bool  `json:"enabled"`
-	Prompt          string `json:"prompt"`
-	ModelID         string `json:"modelId"`
-	ThinkingLevel   string `json:"thinkingLevel"`
+	SessionID       string            `json:"sessionId"`
+	IntervalMinutes int               `json:"intervalMinutes"`
+	Enabled         *bool             `json:"enabled"`
+	Prompt          string            `json:"prompt"`
+	ModelID         string            `json:"modelId"`
+	ThinkingLevel   string            `json:"thinkingLevel"`
+	ModeInputs      map[string]string `json:"modeInputs"`
+	KnowledgeIDs    []string          `json:"knowledgeIds"`
+	NoteIDs         []string          `json:"noteIds"`
+	StyleProfileID  string            `json:"styleProfileId"`
 }
 
 func (r novelScheduleRequest) toInput() novelcreation.ScheduleInput {
@@ -441,7 +471,7 @@ func (r novelScheduleRequest) toInput() novelcreation.ScheduleInput {
 	}
 	return novelcreation.ScheduleInput{
 		SessionID: r.SessionID, IntervalMinutes: r.IntervalMinutes, Enabled: enabled,
-		Prompt: r.Prompt, ModelID: r.ModelID, ThinkingLevel: r.ThinkingLevel,
+		Prompt: r.Prompt, ModelID: r.ModelID, ThinkingLevel: r.ThinkingLevel, ModeInputs: r.ModeInputs, KnowledgeIDs: r.KnowledgeIDs, NoteIDs: r.NoteIDs, StyleProfileID: r.StyleProfileID,
 	}
 }
 

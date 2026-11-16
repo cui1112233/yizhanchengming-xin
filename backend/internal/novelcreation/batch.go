@@ -40,6 +40,10 @@ func (s *Service) CreateBatch(ctx context.Context, owner, projectID string, inpu
 	if session.ProjectID != projectID {
 		return Batch{}, &DomainError{Code: ErrInputRequired, Message: "会话与作品不匹配"}
 	}
+	selected, err := s.prepareGenerationInput(ctx, owner, projectID, input.SessionID, AutomationInput{ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID})
+	if err != nil {
+		return Batch{}, err
+	}
 	existing, err := s.store.ListBatches(ctx, owner, projectID)
 	if err != nil {
 		return Batch{}, err
@@ -54,6 +58,7 @@ func (s *Service) CreateBatch(ctx context.Context, owner, projectID string, inpu
 		modelID = project.ModelID
 	}
 	return s.store.CreateBatch(ctx, owner, Batch{
+		ModeInputs: selected.ModeInputs, KnowledgeIDs: selected.KnowledgeIDs, NoteIDs: selected.NoteIDs, StyleProfileID: selected.StyleProfileID,
 		ProjectID: projectID, SessionID: input.SessionID, Status: BatchRunning,
 		TotalChapters: input.TotalChapters, Attempt: 1, Prompt: input.Prompt,
 		ModelID: modelID, ThinkingLevel: input.ThinkingLevel,
@@ -85,6 +90,9 @@ func (s *Service) ResumeBatch(ctx context.Context, owner, projectID, batchID str
 	}
 	if batch.Status != BatchPaused && batch.Status != BatchFailed {
 		return Batch{}, &DomainError{Code: ErrInvalidTransition, Message: "当前批量任务状态不允许继续"}
+	}
+	if _, err := s.prepareGenerationInput(ctx, strings.TrimSpace(owner), batch.ProjectID, batch.SessionID, batchInput(batch)); err != nil {
+		return Batch{}, err
 	}
 	if batch.Status == BatchFailed {
 		batch.Attempt++
@@ -221,6 +229,9 @@ func (s *Service) advanceBatch(ctx context.Context, batch Batch) (Run, error) {
 		}
 		batch.Status = BatchFailed
 		batch.LastError = err.Error()
+		if IsCode(err, ErrInputRequired) || IsCode(err, ErrSessionNotFound) || IsCode(err, ErrProjectNotFound) {
+			batch.LastError = "配置需调整：" + err.Error()
+		}
 		_, _ = s.store.UpdateBatch(ctx, owner, batch)
 		return Run{}, err
 	}
@@ -236,6 +247,7 @@ func (s *Service) dispatchBatchRun(ctx context.Context, owner string, batch Batc
 	return s.SendMessage(ctx, owner, SendMessageInput{
 		SessionID: batch.SessionID, ProjectID: batch.ProjectID,
 		Content: batch.Prompt, ModelID: batch.ModelID, ThinkingLevel: batch.ThinkingLevel,
+		ModeInputs: batch.ModeInputs, KnowledgeIDs: batch.KnowledgeIDs, NoteIDs: batch.NoteIDs, StyleProfileID: batch.StyleProfileID,
 		IdempotencyKey: key,
 	})
 }

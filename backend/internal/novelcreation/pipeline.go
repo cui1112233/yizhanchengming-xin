@@ -63,6 +63,7 @@ type RunContext struct {
 	// user-confirmed blueprint.
 	ConfirmedFoundation json.RawMessage
 	// KnowledgeMaterials is the bounded snapshot of user-selected materials.
+	Notes              []ProjectNote
 	KnowledgeMaterials []KnowledgeMaterial
 	// MaxRevisionRounds overrides the default audit-revision loop bound.
 	MaxRevisionRounds int
@@ -221,6 +222,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		"mode_inputs":         input.ModeInputs,
 		"style_profile":       input.StyleProfile,
 		"rules":               input.Rules,
+		"notes":               input.Notes,
 		"knowledge_materials": input.KnowledgeMaterials,
 		"project_brief": map[string]any{
 			"title": input.Project.Title, "genre": input.Project.Genre,
@@ -265,6 +267,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 			"mode_inputs":          input.ModeInputs,
 			"style_profile":        input.StyleProfile,
 			"rules":                input.Rules,
+			"notes":                input.Notes,
 			"knowledge_materials":  input.KnowledgeMaterials,
 			"foundation_plan":      foundation,
 			"chapter_number":       chapterNumber,
@@ -296,6 +299,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 			"mode_inputs":         input.ModeInputs,
 			"style_profile":       input.StyleProfile,
 			"rules":               input.Rules,
+			"notes":               input.Notes,
 			"knowledge_materials": input.KnowledgeMaterials,
 			"foundation_plan":     foundation,
 			"chapter_plan":        plan,
@@ -456,6 +460,7 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 			"chapter_plan":        plan,
 			"chapter_content":     content,
 			"rules":               input.Rules,
+			"notes":               input.Notes,
 			"knowledge_materials": input.KnowledgeMaterials,
 			"previous_truth":      rawJSONValue(input.PreviousTruth),
 			"previous_chapters":   input.PreviousChapters,

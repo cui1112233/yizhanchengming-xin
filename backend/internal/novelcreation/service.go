@@ -96,19 +96,9 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if _, err := s.store.GetProject(ctx, owner, input.ProjectID); err != nil {
 		return Run{}, err
 	}
-	modeInputs, err := NormalizeModeInputs(session.Mode, input.ModeInputs)
-	if err != nil {
-		return Run{}, err
-	}
-	knowledgeIDs, err := NormalizeKnowledgeIDs(input.KnowledgeIDs)
-	if err != nil {
-		return Run{}, err
-	}
-	materials, err := s.store.ListMaterials(ctx, owner, input.ProjectID)
-	if err != nil {
-		return Run{}, err
-	}
-	knowledgeMaterials, err := selectKnowledgeMaterials(materials, knowledgeIDs)
+	selected, err := s.prepareGenerationInput(ctx, owner, input.ProjectID, input.SessionID, AutomationInput{
+		ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID,
+	})
 	if err != nil {
 		return Run{}, err
 	}
@@ -142,8 +132,9 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	}
 	snapshotFields := map[string]any{
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
-		"mode_inputs": modeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
-		"knowledge_ids": knowledgeIDs, "knowledge_materials": knowledgeMaterials,
+		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
+		"knowledge_ids": selected.KnowledgeIDs, "knowledge_materials": selected.Knowledge,
+		"note_ids": selected.NoteIDs, "notes": selected.Notes, "style_profile_id": selected.StyleProfileID, "style_profile": selected.StyleProfile,
 		"previous_truth": continuity.Truth, "previous_memory": continuity.Memory,
 		"previous_chapters": continuity.Chapters,
 		"message_id":        message.ID,
@@ -203,6 +194,8 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
+		StyleProfile        *string             `json:"style_profile"`
+		Notes               []ProjectNote       `json:"notes"`
 		UserMessage         string              `json:"user_message"`
 		Mode                string              `json:"mode"`
 		ModeInputs          map[string]string   `json:"mode_inputs"`
@@ -235,12 +228,16 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	if strings.TrimSpace(run.ThinkingLevel) == "" {
 		run.ThinkingLevel = agent.ThinkingLevel
 	}
+	styleProfile := settings.StyleProfile
+	if prompt.StyleProfile != nil {
+		styleProfile = *prompt.StyleProfile
+	}
 	sink := serviceEventSink{service: s, owner: owner}
 	bundle, runErr := s.pipeline.Run(ctx, RunContext{
 		OwnerUsername: owner, Run: run, Project: project, Session: session,
 		UserMessage: prompt.UserMessage, ChapterNumber: prompt.ChapterNumber,
 		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, PreviousChapters: prompt.PreviousChapters, Runtime: s.runtime,
-		ModeInputs: prompt.ModeInputs, StyleProfile: settings.StyleProfile, Rules: settings.Rules,
+		ModeInputs: prompt.ModeInputs, StyleProfile: styleProfile, Rules: settings.Rules, Notes: prompt.Notes,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
 		KnowledgeMaterials:  prompt.KnowledgeMaterials,

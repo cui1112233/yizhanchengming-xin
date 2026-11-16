@@ -162,7 +162,7 @@ WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_
 	return session, nil
 }
 
-const sessionColumns = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at`
+const sessionColumns = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at, s.input_snapshot_json`
 
 func scanSession(scanner novelRowScanner) (Session, error) {
 	var session Session
@@ -1115,16 +1115,17 @@ ORDER BY r.created_at DESC`, owner, strings.TrimSpace(projectID))
 	return runs, nil
 }
 
-const scheduleColumns = `s.schedule_id, s.owner_username, s.project_id, s.session_id, s.interval_minutes, s.enabled, s.prompt, s.model_id, s.thinking_level, s.next_run_at, s.last_run_at, COALESCE(s.last_run_id, ''), s.created_at, s.updated_at`
+const scheduleColumns = `s.schedule_id, s.owner_username, s.project_id, s.session_id, s.interval_minutes, s.enabled, s.prompt, s.model_id, s.thinking_level, s.next_run_at, s.last_run_at, COALESCE(s.last_run_id, ''), s.created_at, s.updated_at, s.input_snapshot_json`
 
 type novelScheduleScanner interface{ Scan(...any) error }
 
 func scanSchedule(scanner novelScheduleScanner) (Schedule, error) {
 	var schedule Schedule
+	var inputJSON []byte
 	var lastRunAt sql.NullTime
 	err := scanner.Scan(&schedule.ID, &schedule.OwnerUsername, &schedule.ProjectID, &schedule.SessionID,
 		&schedule.IntervalMinutes, &schedule.Enabled, &schedule.Prompt, &schedule.ModelID, &schedule.ThinkingLevel,
-		&schedule.NextRunAt, &lastRunAt, &schedule.LastRunID, &schedule.CreatedAt, &schedule.UpdatedAt)
+		&schedule.NextRunAt, &lastRunAt, &schedule.LastRunID, &schedule.CreatedAt, &schedule.UpdatedAt, &inputJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Schedule{}, &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
 	}
@@ -1135,6 +1136,17 @@ func scanSchedule(scanner novelScheduleScanner) (Schedule, error) {
 		when := lastRunAt.Time
 		schedule.LastRunAt = &when
 	}
+	var input AutomationInput
+	if len(inputJSON) > 0 {
+		if err := json.Unmarshal(inputJSON, &input); err != nil {
+			return Schedule{}, persistenceError(err)
+		}
+	}
+	schedule.ModeInputs = input.ModeInputs
+	schedule.KnowledgeIDs = input.KnowledgeIDs
+	schedule.NoteIDs = input.NoteIDs
+	schedule.StyleProfileID = input.StyleProfileID
+	schedule.ConfigurationError = input.ConfigurationError
 	return schedule, nil
 }
 
@@ -1193,13 +1205,13 @@ func (s *MySQLStore) CreateSchedule(ctx context.Context, owner string, schedule 
 	}
 	schedule.UpdatedAt = now
 	result, err := s.db.ExecContext(ctx, `INSERT INTO novel_schedules
-(schedule_id, owner_username, project_id, session_id, interval_minutes, enabled, prompt, model_id, thinking_level, next_run_at, last_run_at, last_run_id, created_at, updated_at)
-SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+(schedule_id, owner_username, project_id, session_id, interval_minutes, enabled, prompt, model_id, thinking_level, next_run_at, last_run_at, last_run_id, created_at, updated_at, input_snapshot_json)
+SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)
   AND EXISTS (SELECT 1 FROM novel_sessions WHERE owner_username = ? AND session_id = ? AND project_id = ?)`,
 		schedule.ID, owner, schedule.ProjectID, schedule.SessionID, schedule.IntervalMinutes, schedule.Enabled, schedule.Prompt,
 		schedule.ModelID, schedule.ThinkingLevel, schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID),
-		schedule.CreatedAt, schedule.UpdatedAt, owner, schedule.ProjectID, owner, schedule.SessionID, schedule.ProjectID)
+		schedule.CreatedAt, schedule.UpdatedAt, inputJSON(scheduleInput(schedule)), owner, schedule.ProjectID, owner, schedule.SessionID, schedule.ProjectID)
 	if err != nil {
 		return Schedule{}, persistenceError(err)
 	}
@@ -1223,10 +1235,10 @@ func (s *MySQLStore) UpdateSchedule(ctx context.Context, owner string, schedule 
 	_, err = s.db.ExecContext(ctx, `UPDATE novel_schedules s
 JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
 SET s.session_id = ?, s.interval_minutes = ?, s.enabled = ?, s.prompt = ?, s.model_id = ?, s.thinking_level = ?,
-    s.next_run_at = ?, s.last_run_at = ?, s.last_run_id = ?, s.updated_at = ?
+    s.next_run_at = ?, s.last_run_at = ?, s.last_run_id = ?, s.updated_at = ?, s.input_snapshot_json = ?
 WHERE s.owner_username = ? AND s.schedule_id = ? AND s.project_id = ? AND p.deleted_at IS NULL`,
 		schedule.SessionID, schedule.IntervalMinutes, schedule.Enabled, schedule.Prompt, schedule.ModelID, schedule.ThinkingLevel,
-		schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID), now, owner, schedule.ID, schedule.ProjectID)
+		schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID), now, inputJSON(scheduleInput(schedule)), owner, schedule.ID, schedule.ProjectID)
 	if err != nil {
 		return Schedule{}, persistenceError(err)
 	}
@@ -1277,21 +1289,32 @@ ORDER BY s.next_run_at LIMIT ?`, now.UTC(), limit)
 	return schedules, nil
 }
 
-const batchColumns = `b.batch_id, b.owner_username, b.project_id, b.session_id, b.status, b.total_chapters, b.completed_chapters, COALESCE(b.current_run_id, ''), b.attempt, b.prompt, b.model_id, b.thinking_level, b.last_error, b.created_at, b.updated_at`
+const batchColumns = `b.batch_id, b.owner_username, b.project_id, b.session_id, b.status, b.total_chapters, b.completed_chapters, COALESCE(b.current_run_id, ''), b.attempt, b.prompt, b.model_id, b.thinking_level, b.last_error, b.created_at, b.updated_at, b.input_snapshot_json`
 
 type novelBatchScanner interface{ Scan(...any) error }
 
 func scanBatch(scanner novelBatchScanner) (Batch, error) {
 	var batch Batch
+	var inputJSON []byte
 	err := scanner.Scan(&batch.ID, &batch.OwnerUsername, &batch.ProjectID, &batch.SessionID,
 		&batch.Status, &batch.TotalChapters, &batch.CompletedChapters, &batch.CurrentRunID, &batch.Attempt,
-		&batch.Prompt, &batch.ModelID, &batch.ThinkingLevel, &batch.LastError, &batch.CreatedAt, &batch.UpdatedAt)
+		&batch.Prompt, &batch.ModelID, &batch.ThinkingLevel, &batch.LastError, &batch.CreatedAt, &batch.UpdatedAt, &inputJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, &DomainError{Code: ErrProjectNotFound, Message: "batch not found"}
 	}
 	if err != nil {
 		return Batch{}, persistenceError(err)
 	}
+	var input AutomationInput
+	if len(inputJSON) > 0 {
+		if err := json.Unmarshal(inputJSON, &input); err != nil {
+			return Batch{}, persistenceError(err)
+		}
+	}
+	batch.ModeInputs = input.ModeInputs
+	batch.KnowledgeIDs = input.KnowledgeIDs
+	batch.NoteIDs = input.NoteIDs
+	batch.StyleProfileID = input.StyleProfileID
 	return batch, nil
 }
 
@@ -1350,13 +1373,13 @@ func (s *MySQLStore) CreateBatch(ctx context.Context, owner string, batch Batch)
 	}
 	batch.UpdatedAt = now
 	result, err := s.db.ExecContext(ctx, `INSERT INTO novel_batches
-(batch_id, owner_username, project_id, session_id, status, total_chapters, completed_chapters, current_run_id, attempt, prompt, model_id, thinking_level, last_error, created_at, updated_at)
-SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+(batch_id, owner_username, project_id, session_id, status, total_chapters, completed_chapters, current_run_id, attempt, prompt, model_id, thinking_level, last_error, created_at, updated_at, input_snapshot_json)
+SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL)
   AND EXISTS (SELECT 1 FROM novel_sessions WHERE owner_username = ? AND session_id = ? AND project_id = ?)`,
 		batch.ID, owner, batch.ProjectID, batch.SessionID, batch.Status, batch.TotalChapters, batch.CompletedChapters,
 		nullableString(batch.CurrentRunID), batch.Attempt, batch.Prompt, batch.ModelID, batch.ThinkingLevel, batch.LastError,
-		batch.CreatedAt, batch.UpdatedAt, owner, batch.ProjectID, owner, batch.SessionID, batch.ProjectID)
+		batch.CreatedAt, batch.UpdatedAt, inputJSON(batchInput(batch)), owner, batch.ProjectID, owner, batch.SessionID, batch.ProjectID)
 	if err != nil {
 		return Batch{}, persistenceError(err)
 	}
@@ -1379,10 +1402,10 @@ func (s *MySQLStore) UpdateBatch(ctx context.Context, owner string, batch Batch)
 	_, err = s.db.ExecContext(ctx, `UPDATE novel_batches b
 JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
 SET b.status = ?, b.completed_chapters = ?, b.current_run_id = ?, b.attempt = ?, b.prompt = ?, b.model_id = ?,
-    b.thinking_level = ?, b.last_error = ?, b.updated_at = ?
+    b.thinking_level = ?, b.last_error = ?, b.updated_at = ?, b.input_snapshot_json = ?
 WHERE b.owner_username = ? AND b.batch_id = ? AND b.project_id = ? AND p.deleted_at IS NULL`,
 		batch.Status, batch.CompletedChapters, nullableString(batch.CurrentRunID), batch.Attempt, batch.Prompt,
-		batch.ModelID, batch.ThinkingLevel, batch.LastError, time.Now().UTC(), owner, batch.ID, batch.ProjectID)
+		batch.ModelID, batch.ThinkingLevel, batch.LastError, time.Now().UTC(), inputJSON(batchInput(batch)), owner, batch.ID, batch.ProjectID)
 	if err != nil {
 		return Batch{}, persistenceError(err)
 	}
@@ -1413,4 +1436,38 @@ ORDER BY b.updated_at LIMIT ?`, limit)
 		return nil, persistenceError(err)
 	}
 	return batches, nil
+}
+
+func (s *MySQLStore) GetStyleProfile(ctx context.Context, owner, id string) (StyleProfile, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return StyleProfile{}, err
+	}
+	var p StyleProfile
+	err = s.db.QueryRowContext(ctx, `SELECT style_profile_id, title, content FROM novel_style_profiles WHERE owner_username = ? AND style_profile_id = ?`, owner, strings.TrimSpace(id)).Scan(&p.ID, &p.Title, &p.Content)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, &DomainError{Code: ErrInputRequired, Message: "所选文风不存在或无权使用，请重新选择"}
+	}
+	if err != nil {
+		return p, persistenceError(err)
+	}
+	return p, nil
+}
+func (s *MySQLStore) SaveStyleProfile(ctx context.Context, owner string, p StyleProfile) (StyleProfile, error) {
+	owner, err := requiredOwner(owner)
+	if err != nil {
+		return StyleProfile{}, err
+	}
+	p, err = normalizeStyleProfile(p)
+	if err != nil {
+		return p, err
+	}
+	if p.ID == "" {
+		p.ID = novelID("style")
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO novel_style_profiles (owner_username, style_profile_id, title, content) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content)`, owner, p.ID, p.Title, p.Content)
+	if err != nil {
+		return p, persistenceError(err)
+	}
+	return p, nil
 }

@@ -8,8 +8,8 @@ import (
 
 func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	if len(migrations) != 4 {
-		t.Fatalf("migrations=%d, want 4", len(migrations))
+	if len(migrations) != 5 {
+		t.Fatalf("migrations=%d, want 5", len(migrations))
 	}
 	migration := migrations[0]
 	if migration.Version != 8800300 {
@@ -124,5 +124,26 @@ func TestNovelCreationSchemaKeepsProjectBindingsConsistent(t *testing.T) {
 		if !strings.Contains(statementFor("novel_runs"), constraint) && !strings.Contains(statementFor("novel_run_events"), constraint) {
 			t.Fatalf("missing composite project binding: %s", constraint)
 		}
+	}
+}
+
+func TestNovelCreationAutomationInputMigration(t *testing.T) {
+	migrations := NovelCreationMigrations()
+	m := migrations[4]
+	if m.Version != 8800311 {
+		t.Fatalf("migration=%+v", m)
+	}
+	sql := strings.Join(m.SQL, "\n")
+	for _, part := range []string{"ALTER TABLE novel_schedules ADD COLUMN input_snapshot_json JSON NULL", "ALTER TABLE novel_batches ADD COLUMN input_snapshot_json JSON NULL", "CREATE TABLE IF NOT EXISTS novel_style_profiles", "PRIMARY KEY (owner_username, style_profile_id)"} {
+		if !strings.Contains(sql, part) {
+			t.Fatalf("missing %s", part)
+		}
+	}
+	seen := map[int]bool{}
+	for _, m := range AppMigrations() {
+		if seen[m.Version] {
+			t.Fatalf("duplicate migration %d", m.Version)
+		}
+		seen[m.Version] = true
 	}
 }

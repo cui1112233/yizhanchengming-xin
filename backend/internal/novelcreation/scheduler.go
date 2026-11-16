@@ -41,12 +41,17 @@ func (s *Service) CreateSchedule(ctx context.Context, owner, projectID string, i
 	if session.ProjectID != projectID {
 		return Schedule{}, &DomainError{Code: ErrInputRequired, Message: "会话与作品不匹配"}
 	}
+	selected, err := s.prepareGenerationInput(ctx, owner, projectID, input.SessionID, AutomationInput{ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID})
+	if err != nil {
+		return Schedule{}, err
+	}
 	modelID := input.ModelID
 	if modelID == "" {
 		modelID = project.ModelID
 	}
 	now := time.Now().UTC()
 	schedule := Schedule{
+		ModeInputs: selected.ModeInputs, KnowledgeIDs: selected.KnowledgeIDs, NoteIDs: selected.NoteIDs, StyleProfileID: selected.StyleProfileID,
 		ID: novelID("schedule"), ProjectID: projectID, SessionID: input.SessionID,
 		IntervalMinutes: input.IntervalMinutes, Enabled: input.Enabled, Prompt: input.Prompt,
 		ModelID: modelID, ThinkingLevel: input.ThinkingLevel,
@@ -78,11 +83,20 @@ func (s *Service) UpdateSchedule(ctx context.Context, owner, projectID, schedule
 	if session.ProjectID != projectID {
 		return Schedule{}, &DomainError{Code: ErrInputRequired, Message: "会话与作品不匹配"}
 	}
+	selected, err := s.prepareGenerationInput(ctx, owner, projectID, input.SessionID, AutomationInput{ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID})
+	if err != nil {
+		return Schedule{}, err
+	}
 	modelID := input.ModelID
 	if modelID == "" {
 		modelID = schedule.ModelID
 	}
 	now := time.Now().UTC()
+	schedule.ConfigurationError = ""
+	schedule.ModeInputs = selected.ModeInputs
+	schedule.KnowledgeIDs = selected.KnowledgeIDs
+	schedule.NoteIDs = selected.NoteIDs
+	schedule.StyleProfileID = selected.StyleProfileID
 	schedule.SessionID = input.SessionID
 	schedule.IntervalMinutes = input.IntervalMinutes
 	schedule.Enabled = input.Enabled
@@ -152,16 +166,21 @@ func (s *Service) dispatchSchedule(ctx context.Context, owner string, schedule S
 	run, sendErr := s.SendMessage(ctx, owner, SendMessageInput{
 		SessionID: schedule.SessionID, ProjectID: schedule.ProjectID,
 		Content: schedule.Prompt, ModelID: modelID, ThinkingLevel: schedule.ThinkingLevel,
+		ModeInputs: schedule.ModeInputs, KnowledgeIDs: schedule.KnowledgeIDs, NoteIDs: schedule.NoteIDs, StyleProfileID: schedule.StyleProfileID,
 		IdempotencyKey: fmt.Sprintf("schedule:%s:%d", schedule.ID, now.UTC().Unix()),
 	})
+	if IsCode(sendErr, ErrInputRequired) || IsCode(sendErr, ErrSessionNotFound) || IsCode(sendErr, ErrProjectNotFound) {
+		schedule.Enabled = false
+		schedule.ConfigurationError = "配置需调整：" + sendErr.Error()
+	}
 	lastRunAt := now.UTC()
 	schedule.LastRunAt = &lastRunAt
 	if run.ID != "" {
 		schedule.LastRunID = run.ID
 	}
 	schedule.NextRunAt = now.UTC().Add(time.Duration(schedule.IntervalMinutes) * time.Minute)
-	if _, updateErr := s.store.UpdateSchedule(ctx, owner, schedule); updateErr != nil && sendErr == nil {
-		return run, updateErr
+	if _, updateErr := s.store.UpdateSchedule(ctx, owner, schedule); updateErr != nil {
+		return run, errors.Join(sendErr, updateErr)
 	}
 	return run, sendErr
 }
