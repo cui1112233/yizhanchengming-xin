@@ -104,3 +104,25 @@ func (s *Service) ListStyleSources(ctx context.Context, owner, project string) (
 	}
 	return out, nil
 }
+
+// The source run's transaction also creates its retry/outbox. Only replace the
+// current pointer; an independently queued newer analysis remains visible.
+func (s *Service) trackStyleRetry(ctx context.Context, owner string, source, retry Run, snap maintenanceSnapshot) error {
+	if snap.Operation != "style_analysis" || snap.Style == nil {
+		return nil
+	}
+	var current StyleSource
+	ok, e := readContent(ctx, s.store, owner, source.ProjectID, "style", snap.Style.Profile.ID, &current)
+	if e != nil {
+		return e
+	}
+	if !ok {
+		return conflict()
+	}
+	if current.AnalysisRunID != source.ID {
+		return nil
+	}
+	current.AnalysisRunID = retry.ID
+	current.Status = string(retry.Status)
+	return putContent(ctx, s.store, owner, source.ProjectID, "style", current.Profile.ID, current.Status, time.Time{}, current)
+}

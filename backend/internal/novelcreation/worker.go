@@ -77,12 +77,9 @@ func (s *Service) claim(ctx context.Context, owner, id string) (RunLease, Execut
 		if e != nil {
 			return e
 		}
-		session, sessionErr := tx.GetSession(ctx, owner, current.SessionID)
+		_, sessionErr := writableSession(ctx, tx, owner, current.ProjectID, current.SessionID)
 		if sessionErr != nil {
 			return sessionErr
-		}
-		if session.ArchivedAt != nil {
-			return inputError("会话已归档，请先恢复")
 		}
 		if isTerminalRunStatus(current.Status) || current.Status == RunAwaitingConfirmation || current.Status == RunPaused {
 			return &DomainError{Code: ErrInvalidTransition, Message: "任务当前不可领取"}
@@ -654,6 +651,9 @@ func (s *Service) queueAtomic(ctx context.Context, owner, project, hash string, 
 				return conflict()
 			}
 			return nil
+		}
+		if _, err = writableSession(ctx, tx, owner, project, out.SessionID); err != nil {
+			return err
 		}
 		return tx.PutExecution(ctx, Execution{Owner: owner, ProjectID: project, RunID: out.ID, State: "ready", Fingerprint: hash, Calls: map[string]CallRecord{}})
 	})

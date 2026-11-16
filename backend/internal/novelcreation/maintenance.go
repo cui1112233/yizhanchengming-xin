@@ -59,12 +59,9 @@ func (s *Service) QueueMaintenance(ctx context.Context, owner, project string, i
 		} else if ok {
 			return old, nil
 		}
-		se, e := tx.GetSession(ctx, owner, in.SessionID)
+		_, e := writableSession(ctx, tx, owner, project, in.SessionID)
 		if e != nil {
 			return Run{}, e
-		}
-		if se.ProjectID != project || se.ArchivedAt != nil {
-			return Run{}, inputError("会话已归档或不属于当前作品")
 		}
 		p, e := tx.GetProject(ctx, owner, project)
 		if e != nil {

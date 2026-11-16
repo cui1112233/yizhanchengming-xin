@@ -34,6 +34,7 @@ func (s *Service) ConfirmModelCall(ctx context.Context, owner, id, token string)
 	if err != nil {
 		return run, err
 	}
+	dispatch := false
 	err = s.store.Atomic(ctx, owner, run.ProjectID, func(tx Store) error {
 		var e error
 		run, e = tx.GetRun(ctx, owner, id)
@@ -48,6 +49,13 @@ func (s *Service) ConfirmModelCall(ctx context.Context, owner, id, token string)
 			return &DomainError{Code: ErrInputRequired, Message: "缺少模型调用确认编号"}
 		}
 		if _, confirmed := state.ConfirmedCalls[token]; confirmed {
+			if session, sessionErr := writableSession(ctx, tx, owner, run.ProjectID, run.SessionID); sessionErr != nil {
+				// Approved tokens are historical reads, even while the session is archived.
+				if session.ProjectID == run.ProjectID && session.ArchivedAt != nil {
+					return nil
+				}
+				return sessionErr
+			}
 			// Legacy deterministic IDs can already be both approved history and
 			// the current unapproved pending. Refresh that pending, never reuse
 			// the old approval to authorize it.
@@ -83,6 +91,9 @@ func (s *Service) ConfirmModelCall(ctx context.Context, owner, id, token string)
 		if run.Status != RunAwaitingConfirmation || state.CancelRequested || state.PendingConfirmation == nil || state.PendingConfirmation.ID != token {
 			return &DomainError{Code: ErrInvalidTransition, Message: "该确认编号已过期，请刷新当前任务"}
 		}
+		if _, e = writableSession(ctx, tx, owner, run.ProjectID, run.SessionID); e != nil {
+			return e
+		}
 		pending := state.PendingConfirmation
 		call, ok := state.Calls[pending.Key]
 		if !ok || call.State != "prepared" || call.ConfirmationID != token {
@@ -114,9 +125,10 @@ func (s *Service) ConfirmModelCall(ctx context.Context, owner, id, token string)
 			return e
 		}
 		_, e = tx.AppendRunEvent(ctx, owner, RunEvent{RunID: id, ProjectID: run.ProjectID, SessionID: run.SessionID, Status: RunQueued, Type: "run.queued", Message: "已确认，继续当前创作步骤"})
+		dispatch = e == nil
 		return e
 	})
-	if err == nil {
+	if err == nil && dispatch {
 		s.Notify(ctx, owner, id)
 	}
 	return run, err

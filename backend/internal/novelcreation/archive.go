@@ -161,3 +161,19 @@ func (s *Service) DeleteSchedule(ctx context.Context, o, p, id string) error {
 	_, e := mutateValue(ctx, s, o, p, func(c *Service) (bool, error) { return true, c.deleteSchedule(ctx, o, p, id) })
 	return e
 }
+
+// Call under the existing project transaction before producing any new work.
+// Session archive uses the same lock, including confirmations on an old run.
+func writableSession(ctx context.Context, st Store, owner, project, id string) (Session, error) {
+	session, e := st.GetSession(ctx, owner, id)
+	if e != nil {
+		return session, e
+	}
+	if session.ProjectID != project {
+		return session, inputError("会话与作品不匹配")
+	}
+	if session.ArchivedAt != nil {
+		return session, inputError("会话已归档，请先恢复")
+	}
+	return session, nil
+}

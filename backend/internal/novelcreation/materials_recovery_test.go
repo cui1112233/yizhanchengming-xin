@@ -76,6 +76,9 @@ func TestUploadIntentRetainedOnDatabaseFailureAndRecover(t *testing.T) {
 	if e != nil || persisted.Status != "uploading" || persisted.Object.Key == "" || objects.objects[persisted.Object.Key] == nil {
 		t.Fatalf("lost orphan tracking %+v %v", persisted, e)
 	}
+	// An abandoned upload becomes recoverable only after its upload lease.
+	rec, _, _ := st.GetContentRecord(ctx, "alice", p.ID, "document", j.ID)
+	s.store = documentClockStore{st, rec.LeaseUntil}
 	if _, e = s.RetryDocument(ctx, "alice", p.ID, j.ID); e != nil {
 		t.Fatal(e)
 	}

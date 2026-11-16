@@ -27,15 +27,9 @@ type generationMaterials struct {
 
 func (s *Service) prepareGenerationInput(ctx context.Context, owner, projectID, sessionID string, input AutomationInput) (generationMaterials, error) {
 	result := generationMaterials{}
-	session, err := s.store.GetSession(ctx, owner, sessionID)
+	session, err := writableSession(ctx, s.store, owner, projectID, sessionID)
 	if err != nil {
 		return result, err
-	}
-	if session.ArchivedAt != nil {
-		return result, inputError("会话已归档，请先恢复")
-	}
-	if session.ProjectID != projectID {
-		return result, &DomainError{Code: ErrInputRequired, Message: "会话与作品不匹配"}
 	}
 	if _, err = s.store.GetProject(ctx, owner, projectID); err != nil {
 		return result, err

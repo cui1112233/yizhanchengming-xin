@@ -192,7 +192,7 @@ func (s *Service) UploadDocument(ctx context.Context, owner, project, name strin
 func (s *Service) RetryDocument(ctx context.Context, owner, project, id string) (j DocumentJob, err error) {
 	err = s.store.Atomic(ctx, owner, project, func(tx Store) error {
 		var e error
-		j, e = getDocument(ctx, tx, owner, project, id)
+		j, e = documentForMutation(ctx, tx, owner, project, id)
 		if e != nil {
 			return e
 		}
@@ -404,7 +404,7 @@ func (s *Service) ResegmentDocument(ctx context.Context, owner, project, id stri
 }
 func (s *Service) DeleteDocument(ctx context.Context, owner, project, id string) error {
 	return s.store.Atomic(ctx, owner, project, func(tx Store) error {
-		j, e := getDocument(ctx, tx, owner, project, id)
+		j, e := documentForMutation(ctx, tx, owner, project, id)
 		if e != nil {
 			return e
 		}
@@ -433,4 +433,26 @@ func StartDocumentWorker(ctx context.Context, s *Service) {
 			}
 		}
 	}()
+}
+
+// Called inside the project transaction. Do not discard an upload intent while
+// its bounded external Put may still be writing the original object.
+func documentForMutation(ctx context.Context, tx Store, owner, project, id string) (DocumentJob, error) {
+	rec, ok, e := tx.GetContentRecord(ctx, owner, project, "document", id)
+	if e != nil {
+		return DocumentJob{}, e
+	}
+	if !ok {
+		return DocumentJob{}, inputError("资料不存在")
+	}
+	if rec.Status == "uploading" {
+		now, e := tx.Clock(ctx)
+		if e != nil {
+			return DocumentJob{}, e
+		}
+		if rec.LeaseUntil.After(now) {
+			return DocumentJob{}, inputError("原件正在上传，请等待上传结束后再重试或删除")
+		}
+	}
+	return getDocument(ctx, tx, owner, project, id)
 }

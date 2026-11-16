@@ -338,6 +338,9 @@ func (s *Service) retryRun(ctx context.Context, owner, runID string) (Run, error
 	} else if found {
 		return existing, nil
 	}
+	if _, err := writableSession(ctx, s.store, owner, source.ProjectID, source.SessionID); err != nil {
+		return Run{}, err
+	}
 	if operationKind(source) != "" {
 		var snap maintenanceSnapshot
 		if e := json.Unmarshal(source.PromptSnapshot, &snap); e != nil {
@@ -348,6 +351,9 @@ func (s *Service) retryRun(ctx context.Context, owner, runID string) (Run, error
 		}
 		retry, e := s.store.CreateRun(ctx, owner, Run{ProjectID: source.ProjectID, SessionID: source.SessionID, IdempotencyKey: key, Status: RunQueued, ModelID: source.ModelID, ThinkingLevel: source.ThinkingLevel, PromptSnapshot: cloneRawJSON(source.PromptSnapshot)})
 		if e != nil {
+			return retry, e
+		}
+		if e = s.trackStyleRetry(ctx, owner, source, retry, snap); e != nil {
 			return retry, e
 		}
 		_, e = s.appendEvent(ctx, owner, retry, "run.queued", RunQueued, "分析重试已加入队列", 0, map[string]any{"retryOfRunId": source.ID})
@@ -554,6 +560,9 @@ func (s *Service) confirmRun(ctx context.Context, owner, runID string, blueprint
 		return Run{}, err
 	} else if found {
 		return existing, nil
+	}
+	if _, err := writableSession(ctx, s.store, owner, source.ProjectID, source.SessionID); err != nil {
+		return Run{}, err
 	}
 	if source.Status != RunAwaitingConfirmation {
 		return Run{}, &DomainError{Code: ErrInvalidTransition, Message: "当前任务不在蓝图确认状态"}
