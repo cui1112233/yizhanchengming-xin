@@ -120,9 +120,10 @@ func (r *MemoryAuthoringRepository) List(_ context.Context) ([]AuthoringState, e
 }
 
 type AuthoringService struct {
-	Store      Store
-	Repository AuthoringRepository
-	Generator  TextGenerator
+	PlanningProgress PlanningProgressRepository
+	Store            Store
+	Repository       AuthoringRepository
+	Generator        TextGenerator
 }
 
 func (s AuthoringService) Load(ctx context.Context, o, p string) (AuthoringState, error) {

@@ -32,13 +32,13 @@ func ScreenplayNativePlanGuide(workTitle, episodeTitle, promptName, density, con
 		episodeTitle = "本集"
 	}
 	if promptName == "" {
-		promptName = "当前分镜词"
+		promptName = "用户选定的分镜词"
 	}
 	if density != "compact" && density != "more" && density != "sd25" {
 		density = "standard"
 	}
-	if continuation != "tools" {
-		continuation = "chat"
+	if continuation != "chat" {
+		continuation = "tools"
 	}
 	return strings.NewReplacer("{{WORK_TITLE}}", workTitle, "{{EPISODE_TITLE}}", episodeTitle, "{{PROMPT_NAME}}", promptName).Replace(screenplayNativePlanGuides[density+"/"+continuation])
 }

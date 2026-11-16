@@ -20,7 +20,11 @@ func TestScreenplayNativePlanningOriginalMessages(t *testing.T) {
 	}
 	defer z.Close()
 	var d struct {
-		Guides         []struct{ Density, Continuation, Text string }
+		Guides          []struct{ Density, Continuation, Text string }
+		GuideBoundaries []struct {
+			Args []string
+			Text string
+		} `json:"guide_boundaries"`
 		FirstMessages  []struct{ Role, Content string } `json:"first_messages"`
 		SecondMessages []struct{ Role, Content string } `json:"second_messages"`
 		ContinueCases  []struct{ Input, Output string } `json:"continue_cases"`
@@ -40,6 +44,11 @@ func TestScreenplayNativePlanningOriginalMessages(t *testing.T) {
 	for _, r := range d.Guides {
 		if got := ScreenplayNativePlanGuide("OWN_WORK", "OWN_EPISODE", "OWN_PROMPT", r.Density, r.Continuation); got != r.Text {
 			t.Fatalf("guide differs %s/%s", r.Density, r.Continuation)
+		}
+	}
+	for _, r := range d.GuideBoundaries {
+		if got := ScreenplayNativePlanGuide(r.Args[0], r.Args[1], r.Args[2], r.Args[4], r.Args[3]); got != r.Text {
+			t.Fatal("native empty/default guide mismatch")
 		}
 	}
 	script := "第1集\n1-1 操场 日 外\nAlice：下一幕由我创造。\n△Alice走进Park。"

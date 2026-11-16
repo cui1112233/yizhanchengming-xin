@@ -30,12 +30,20 @@ type storyboardPlanRun struct {
 	ContinuationError string
 }
 
-func generateStoryboardPlanRounds(ctx context.Context, generator TextGenerator, model, system, user, density string, limit int) (storyboardPlanRun, error) {
+func generateStoryboardPlanRounds(ctx context.Context, generator TextGenerator, model, system, user, density string, limit int, observers ...func(PlanningProgress)) (storyboardPlanRun, error) {
 	var out storyboardPlanRun
 	base := []TextMessage{{Role: "system", Content: system}, {Role: "user", Content: user}}
 	messages := append([]TextMessage(nil), base...)
 	empty := 0
 	for round := 1; round <= limit; round++ {
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+		for _, observe := range observers {
+			if observe != nil {
+				observe(planningProgressFrame(round, out.Text, density, "requesting"))
+			}
+		}
 		if ctx.Err() != nil {
 			return out, ctx.Err()
 		}
@@ -75,6 +83,11 @@ func generateStoryboardPlanRounds(ctx context.Context, generator TextGenerator, 
 			break
 		}
 		out.Text = next
+		for _, observe := range observers {
+			if observe != nil {
+				observe(planningProgressFrame(round, out.Text, density, "received"))
+			}
+		}
 		if EvaluateStoryboardPlan(out.Text, density).OK {
 			break
 		}

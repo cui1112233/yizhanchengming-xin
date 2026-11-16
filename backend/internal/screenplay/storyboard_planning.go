@@ -130,7 +130,8 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 			return e
 		}
 		state = reserved
-		run, runErr := generateStoryboardPlanRounds(ctx, generator, model, system, user, density, limit)
+		observe, finish := s.planningProgressObserver(owner, project, chapter.ID, in.IdempotencyKey, index)
+		run, runErr := generateStoryboardPlanRounds(ctx, generator, model, system, user, density, limit, observe)
 		if ctx.Err() != nil {
 			runErr = ctx.Err()
 		}
@@ -166,6 +167,7 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 			return e
 		}
 		out = StoryboardPlanResult{Chapter: chapter, Revision: saved.Revision}
+		finish(chapter.PlanningStatus)
 		return runErr
 	})
 	return out, err

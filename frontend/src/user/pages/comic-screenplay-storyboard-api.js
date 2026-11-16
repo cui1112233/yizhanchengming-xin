@@ -6,6 +6,7 @@ export function changeStoryboardPreferences(input,request=apiRequest){return req
 // Eight sequential model rounds can exceed the shared ten-minute limit. The
 // provider has its own timeout; the caller's explicit cancel signal stays active.
 export function generateStoryboardPlan(id,input,signal,request=apiRequest){return request(`/api/comic-screenplays/projects/${projectID(id)}/storyboard-plan`,{method:'POST',body:JSON.stringify(input),signal,timeoutMs:0,suppressGlobalError:true});}
+export function loadStoryboardPlanProgress(id,chapterId,key,signal,request=apiRequest){if(!chapterId||!String(key||'').trim()||String(key).length>256)throw Error('规划请求无效');const query=new URLSearchParams({chapter_id:chapterId,request_key:key});return request(`/api/comic-screenplays/projects/${projectID(id)}/storyboard-plan-progress?${query}`,{signal,suppressGlobalError:true,timeoutMs:8000});}
 export function loadStoryboardAssistantDraft(id,input,request=apiRequest){return request(`/api/comic-screenplays/projects/${projectID(id)}/storyboard-assistant-draft`,{method:'POST',body:JSON.stringify(input),suppressGlobalError:true});}
 
 export function loadStoryboardGenerationAttempt(id,key,request=apiRequest){if(!key||!String(key).match(/^[a-zA-Z0-9_-]+$/))throw Error('生成请求编号无效');return request(`/api/comic-screenplays/projects/${projectID(id)}/storyboard-generation-attempts/${encodeURIComponent(key)}`,{suppressGlobalError:true});}

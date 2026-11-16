@@ -49,6 +49,7 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 	}}
 	if redis, err := mergeworker.NewRedisStore(options.RedisURL, "qiantie:screenplay:production"); err == nil {
 		runtime.RedisDo = redis.Do
+		authoring.PlanningProgress = &screenplay.RedisPlanningProgressRepository{Do: redis.Do}
 	}
 	RegisterScreenplayWorkflowRoutes(root, auth, options.Screenplay, resolver, options.Now, options.PresetCatalog, authoring, runner)
 	RegisterScreenplayAuthoringRoutes(root, auth, options.Screenplay, authoringRepo, resolver)

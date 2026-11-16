@@ -12,6 +12,7 @@ func RegisterScreenplayStoryboardPlanRoutes(mux *http.ServeMux, auth BridgeAuth,
 	if mux == nil || authors == nil {
 		return
 	}
+	registerScreenplayPlanningProgressRoute(mux, auth, authors)
 	mux.Handle("POST /api/comic-screenplays/projects/{id}/storyboard-assistant-draft", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		actor, ok := BridgeIdentityFromContext(r.Context())
 		if !ok {
