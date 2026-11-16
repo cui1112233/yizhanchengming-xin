@@ -38,7 +38,7 @@ func (p *rewriteBudgetObserver) Complete(ctx context.Context, req RewriteRequest
 type RewriteTextProcessor func(context.Context, string, string) (string, []map[string]any, []map[string]any, error)
 
 const (
-	rewriteProcessLines = 20
+	rewriteProcessLines = 5
 	rewriteAnchorLines  = 5
 	rewriteTemperature  = 0.45
 	rewriteMaxTokens    = 1200

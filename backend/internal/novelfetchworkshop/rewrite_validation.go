@@ -279,9 +279,8 @@ func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, req
 			return "", err
 		}
 		result, err := parseRewriteOutput(raw, mode, bookID, lineCount)
-		if err == nil && !rewriteWithinSize(result, targetChars) {
-			err = fmt.Errorf("AI 改文输出过长")
-		}
+		// 与批量原文改文系统源码保持一致：不设 135% 长度硬上限。
+		// 只保留空输出、污染、过短和几乎未改写这几类真正影响成品的检查。
 		// Very short source snippets are legitimate. Apply the floor only to substantial blocks.
 		if err == nil && targetChars >= 200 && len([]rune(result)) < targetChars/10 {
 			err = fmt.Errorf("AI 改文输出异常过短")
@@ -293,6 +292,21 @@ func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, req
 			return result, nil
 		}
 		lastErr = err
+		// 与源码一致：后续重试降低随机性并放大输出预算，
+		// 避免同一个提示词原样重试三次仍然得到同样的问题输出。
+		if request.Temperature > 0.1 {
+			request.Temperature = 0.1
+		}
+		if request.MaxTokens < 24000 {
+			next := request.MaxTokens * 2
+			if next < 12000 {
+				next = 12000
+			}
+			if next > 24000 {
+				next = 24000
+			}
+			request.MaxTokens = next
+		}
 		request.UserPrompt = base + fmt.Sprintf(batchbook.Repair, err.Error())
 	}
 	return "", fmt.Errorf("%w，已停止（最多 3 次）：%v", ErrRewriteValidation, lastErr)

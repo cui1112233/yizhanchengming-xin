@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -194,13 +195,27 @@ const directorProviderRequestTimeout = 300 * time.Second
 
 func (p *OpenAICompatibleProvider) Validate() error {
 	u, err := url.Parse(strings.TrimSpace(p.Endpoint))
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" {
+	if err != nil || u.Hostname() == "" {
+		return fmt.Errorf("文本模型接口地址无效，请在模型设置中改为完整的 https 地址")
+	}
+	// 本地模型服务（如自建免费模型网关）通常只监听 http 回环地址；
+	// 仅对回环主机放行 http，公网地址仍然强制 https。
+	if u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackEndpointHost(u.Hostname())) {
 		return fmt.Errorf("文本模型接口地址无效，请在模型设置中改为完整的 https 地址")
 	}
 	if strings.TrimSpace(p.APIKey) == "" || strings.TrimSpace(p.Model) == "" {
 		return fmt.Errorf("文本模型缺少密钥或模型名，请在模型设置中补全")
 	}
 	return nil
+}
+
+func isLoopbackEndpointHost(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // director400LooksLikeParameterRejection 判断 400 是否更像“参数不被上游接受”，
