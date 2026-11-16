@@ -16,7 +16,7 @@
 - 每项红测→最小实现→绿测→审查；实施代理串行，审查只读。不得多代理同时改共享文件。
 - 不发起收费模型调用或公网发布；真实收费验收独立记录为待授权，不伪称已通过。
 - 仅本地4001为交付入口，最终源码和运行包须一致。提示词只在后端prompt模块。
-- 临时证据与构建放`_local-archive-20261028/novel-parity-20261117/`；本计划进度账本放`.superpowers/sdd/novel-current-parity-20261117/progress.md`。
+- 临时证据与构建放`_local-archive-20261028/novel-parity-20261117/`；本计划进度账本放`.superpowers/sdd/2026-11-17-novel-creation-current-parity/progress.md`。
 
 ## Task 1: 可信前文与会话恢复 API
 
@@ -24,14 +24,14 @@
 
 **Interfaces:** Store新增`GetChapterMemory(ctx,owner,projectID,chapterID) (Memory,bool,error)`；Service新增`GetSessionSnapshot(ctx,owner,sessionID) (Snapshot,error)`；GET `/api/novel-creation/sessions/{sessionID}/snapshot`。生成快照新增`previous_chapters`（章ID、版本、结尾）和版本化事实/记忆。第一章为空，后续章失败关闭。
 
-- [ ] 红测：真实保存第一章及其记忆后发送第二章，捕获Pipeline.RunContext检查PreviousMemory/PreviousTruth与第一章一致；注入记忆读取错误，确认Pipeline未调用。
+- [x] 红测：真实保存第一章及其记忆后发送第二章，捕获Pipeline.RunContext检查PreviousMemory/PreviousTruth与第一章一致；注入记忆读取错误，确认Pipeline未调用。
 
 ```go
 if string(got.PreviousMemory) == "{}" || len(got.PreviousMemory) == 0 { t.Fatal("lost persisted chapter memory") }
 ```
 
-- [ ] 实现：MySQL按owner/project/chapter关联查询最新记忆；内存库等价；从最新已保存章节和蓝图结算提取输入，不用空对象替代读取失败；按会话返回消息/最新run/章节，空会话可正常返回。
-- [ ] 验证：`go test ./internal/novelcreation ./internal/httpapi -run 'Continuity|SessionSnapshot' -count=1`，再运行两包相关旧测试。确认跨账号404、无运行空状态、已有正文版本一致。审查后提交。
+- [x] 实现：MySQL按owner/project/chapter关联查询最新记忆；内存库等价；从最新已保存章节和蓝图结算提取输入，不用空对象替代读取失败；按会话返回消息/最新run/章节，空会话可正常返回。
+- [x] 验证：`go test ./internal/novelcreation ./internal/httpapi -run 'Continuity|SessionSnapshot' -count=1`，再运行两包相关旧测试。确认跨账号404、无运行空状态、已有正文版本一致。审查后提交。
 
 ## Task 2: 完整自动执行输入合同
 
