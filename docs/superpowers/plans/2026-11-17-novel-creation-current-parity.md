@@ -54,14 +54,14 @@ if got.ModeInputs["referenceText"] != "参考片段" { t.Fatal("scheduled run dr
 
 **Interfaces:** 持久待派发、运行租约及调用状态；`StartWorker(ctx,service,interval)`扫描与领取。MySQL条件更新领取/续租/提交；90秒租约、30秒续租。HTTP starter只通知，不直接生成。
 
-- [ ] 红测：两个worker竞争同一个run只调用一次；过期token不能提交；已发送结果未知重启后暂停；明确未发送可恢复；已完成正文只重试保存。
+- [x] 红测：两个worker竞争同一个run只调用一次；过期token不能提交；已发送结果未知重启后暂停；明确未发送可恢复；已完成正文只重试保存。
 
 ```go
 if runner.callCount() != 1 { t.Fatal("duplicate upstream dispatch") }
 ```
 
-- [ ] 实现：用户消息/运行/待派发事务；Redis通知失效仍可从数据库扫描；记录发送前/已发送/已完成及步骤产物；取消可打断上下文并阻止后续步骤；删除直接后台Run链及未消费队列路径。
-- [ ] 验证：`go test ./internal/novelcreation ./internal/httpapi ./internal/app -run 'Novel|Worker|Lease|Recovery' -count=1`，聚焦并发疑点使用race；记录迁移与重启恢复证据。审查后提交。
+- [x] 实现：用户消息/运行/待派发事务；Redis通知失效仍可从数据库扫描；记录发送前/已发送/已完成及步骤产物；取消可打断上下文并阻止后续步骤；删除直接后台Run链及未消费队列路径。
+- [x] 验证：`go test ./internal/novelcreation ./internal/httpapi ./internal/app -run 'Novel|Worker|Lease|Recovery' -count=1`，聚焦并发疑点使用race；记录迁移与重启恢复证据。审查后提交。
 
 ## Task 4: 定时和批量状态、阈值与日志
 
