@@ -141,9 +141,34 @@ func TestExplicitAllowUnsetBlocksLoopback(t *testing.T) {
 	previous := allowPrivateDestinations.Swap(false)
 	defer allowPrivateDestinations.Store(previous)
 	t.Setenv(envDoubaoRelayBaseURL, "")
+	t.Setenv(envOutboundAllowURLs, "")
 
 	if err := checkURL("http://127.0.0.1:8787/v1/images/generations", false); !errors.Is(err, ErrBlockedAddress) {
 		t.Fatalf("unset config must keep loopback blocked, got %v", err)
+	}
+}
+
+func TestExplicitAllowListEnvMatchesOnlyListedAddresses(t *testing.T) {
+	previous := allowPrivateDestinations.Swap(false)
+	defer allowPrivateDestinations.Store(previous)
+	t.Setenv(envDoubaoRelayBaseURL, "")
+	t.Setenv(envOutboundAllowURLs, "http://127.0.0.1:18900, https://127.0.0.1:18901")
+
+	if err := checkURL("http://127.0.0.1:18900/v1/chat/completions", false); err != nil {
+		t.Fatalf("listed address rejected: %v", err)
+	}
+	if err := checkURL("https://127.0.0.1:18901/v1/chat/completions", false); err != nil {
+		t.Fatalf("second listed address rejected: %v", err)
+	}
+	cases := []string{
+		"http://127.0.0.1:18902/v1/chat/completions",  // 未列出的端口
+		"https://127.0.0.1:18900/v1/chat/completions", // 协议不一致
+		"http://127.0.0.2:18900/v1/chat/completions",  // 未列出的地址
+	}
+	for _, raw := range cases {
+		if err := checkURL(raw, false); !errors.Is(err, ErrBlockedAddress) {
+			t.Fatalf("checkURL(%q) = %v, want blocked", raw, err)
+		}
 	}
 }
 

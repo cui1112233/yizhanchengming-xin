@@ -44,6 +44,11 @@ const (
 	// 配置里写明的这一个「协议 + 主机 + 端口」，不做网段放行；未配置该
 	// 变量时，127.0.0.1 仍然全部拦截。
 	envDoubaoRelayBaseURL = "QIANTIE_DOUBAO_RELAY_BASE_URL"
+	// envOutboundAllowURLs 是额外放行的出站地址列表，逗号或空白分隔，例如
+	// `QIANTIE_OUTBOUND_ALLOW_URLS=http://127.0.0.1:18900`。用于本机受信任
+	// 的模型网关等回环服务；每项仍然要求协议、主机、端口三者完全一致，
+	// 不做网段或通配符放行。
+	envOutboundAllowURLs = "QIANTIE_OUTBOUND_ALLOW_URLS"
 )
 
 var (
@@ -135,18 +140,29 @@ var (
 // 不受支持时都返回空列表，保持“默认不放行任何内网地址”。首次解析成功时
 // 打印一行日志，说明放行了哪个地址、来自哪个配置项。
 func explicitAllowEntries() []explicitAllowEntry {
-	raw := strings.TrimSpace(os.Getenv(envDoubaoRelayBaseURL))
-	if raw == "" {
+	rawDoubao := strings.TrimSpace(os.Getenv(envDoubaoRelayBaseURL))
+	rawList := strings.TrimSpace(os.Getenv(envOutboundAllowURLs))
+	cacheKey := rawDoubao + "\n" + rawList
+	if strings.TrimSpace(cacheKey) == "" {
 		return nil
 	}
 	allowMu.Lock()
 	defer allowMu.Unlock()
-	if allowCacheRaw == raw && time.Since(allowCacheAt) < allowCacheTTL {
+	if allowCacheRaw == cacheKey && time.Since(allowCacheAt) < allowCacheTTL {
 		return allowCache
 	}
-	allowCacheRaw = raw
+	allowCacheRaw = cacheKey
 	allowCacheAt = time.Now()
-	allowCache = resolveExplicitAllow(raw)
+	entries := []explicitAllowEntry{}
+	if rawDoubao != "" {
+		entries = append(entries, resolveExplicitAllow(envDoubaoRelayBaseURL, rawDoubao)...)
+	}
+	for _, raw := range strings.FieldsFunc(rawList, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\r' || r == '\t' || r == ' '
+	}) {
+		entries = append(entries, resolveExplicitAllow(envOutboundAllowURLs, raw)...)
+	}
+	allowCache = entries
 	for _, entry := range allowCache {
 		key := entry.source + "|" + entry.raw
 		if _, logged := allowLogged[key]; logged {
@@ -158,7 +174,7 @@ func explicitAllowEntries() []explicitAllowEntry {
 	return allowCache
 }
 
-func resolveExplicitAllow(raw string) []explicitAllowEntry {
+func resolveExplicitAllow(source, raw string) []explicitAllowEntry {
 	parsed, err := url.Parse(raw)
 	if err != nil {
 		return nil
@@ -172,7 +188,7 @@ func resolveExplicitAllow(raw string) []explicitAllowEntry {
 		return nil
 	}
 	entry := explicitAllowEntry{
-		source: envDoubaoRelayBaseURL,
+		source: source,
 		scheme: scheme,
 		host:   host,
 		port:   effectivePort(parsed),
