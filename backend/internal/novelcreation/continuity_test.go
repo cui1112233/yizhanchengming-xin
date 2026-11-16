@@ -27,7 +27,16 @@ func continuityFirstChapter(t *testing.T, f serviceFixture) {
 	}
 }
 func TestContinuitySecondChapterUsesPersistedFirstChapter(t *testing.T) {
-	f := newServiceFixture(t, nil)
+	runner := &stubPipelineRunner{run: func(_ context.Context, input RunContext, _ EventSink) (ChapterBundle, error) {
+		bundle := serviceTestBundle(input, RunSucceeded)
+		// This case writes chapter two; the generic fixture intentionally writes chapter one.
+		bundle.Chapter.ID = input.Project.ID + "-chapter-2"
+		bundle.Chapter.Number = 2
+		bundle.ChapterVersion.ID = bundle.Chapter.ID + "-version-" + input.Run.ID
+		bundle.ChapterVersion.ChapterID = bundle.Chapter.ID
+		return bundle, nil
+	}}
+	f := newServiceFixture(t, runner)
 	continuityFirstChapter(t, f)
 	r, e := f.service.SendMessage(context.Background(), "alice", f.sendInput("second"))
 	if e != nil {

@@ -594,7 +594,7 @@ ON DUPLICATE KEY UPDATE volume_id = VALUES(volume_id), title = VALUES(title), co
 			version.CreatedAt = now
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO novel_chapter_versions (version_id, owner_username, project_id, chapter_id, run_id, version_no, content, snapshot_json, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE content = VALUES(content), snapshot_json = VALUES(snapshot_json)`, version.ID, owner, bundle.ProjectID, version.ChapterID, nullableString(version.RunID), version.Version, version.Content, nullableRawJSON(version.Snapshot), version.CreatedAt); err != nil {
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, version.ID, owner, bundle.ProjectID, version.ChapterID, nullableString(version.RunID), version.Version, version.Content, nullableRawJSON(version.Snapshot), version.CreatedAt); err != nil {
 			return persistenceError(err)
 		}
 	}

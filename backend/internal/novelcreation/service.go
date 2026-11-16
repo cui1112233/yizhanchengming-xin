@@ -263,6 +263,11 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	if bundle.FinalRunStatus == RunAwaitingConfirmation {
 		return s.finishCheckpoint(ctx, owner, run, bundle)
 	}
+	// A regenerated target is a new immutable chapter version associated with this run.
+	if prompt.ExpectedTarget != nil {
+		bundle.Chapter.Version = prompt.ExpectedTarget.Version + 1
+		bundle.ChapterVersion.Version = bundle.Chapter.Version
+	}
 	if err := s.store.SaveChapterBundle(ctx, owner, bundle); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "保存章节失败", err)
 	}
@@ -306,6 +311,7 @@ func (s *Service) RetryRun(ctx context.Context, owner, runID string) (Run, error
 	if err != nil {
 		return Run{}, continuityError(err)
 	}
+	snapshot["expected_target"] = PreviousChapter{Number: original.ChapterNumber, Version: 0}
 	for _, chapter := range chapters {
 		if chapter.Number == original.ChapterNumber {
 			snapshot["expected_target"] = PreviousChapter{ChapterID: chapter.ID, Version: chapter.Version, Number: chapter.Number, Ending: chapter.Content}

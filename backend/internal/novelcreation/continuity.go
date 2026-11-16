@@ -227,6 +227,14 @@ func (s *Service) validateTargetVersion(ctx context.Context, owner, projectID st
 	if err != nil {
 		return continuityError(err)
 	}
+	if target.Version == 0 {
+		for _, chapter := range chapters {
+			if chapter.Number == target.Number {
+				return continuityError(nil)
+			}
+		}
+		return nil
+	}
 	for _, chapter := range chapters {
 		if chapter.ID == target.ChapterID && chapter.Version == target.Version && chapter.Content == target.Ending {
 			return nil

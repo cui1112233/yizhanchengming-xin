@@ -11,39 +11,41 @@ import (
 )
 
 type MemoryStore struct {
-	mu             sync.RWMutex
-	nextID         int64
-	nextEventID    int64
-	projects       map[string]Project
-	sessions       map[string]Session
-	messages       map[string][]Message
-	runs           map[string]Run
-	runByKey       map[string]string
-	runEvents      map[string][]RunEvent
-	chapterBundles map[string]ChapterBundle
-	settings       map[string]ProjectSettings
-	foundations    map[string]Foundation
-	materials      map[string]Material
-	notes          map[string]ProjectNote
-	schedules      map[string]Schedule
-	batches        map[string]Batch
+	mu              sync.RWMutex
+	nextID          int64
+	nextEventID     int64
+	projects        map[string]Project
+	sessions        map[string]Session
+	messages        map[string][]Message
+	runs            map[string]Run
+	runByKey        map[string]string
+	runEvents       map[string][]RunEvent
+	chapterBundles  map[string]ChapterBundle
+	chapterVersions map[string]ChapterVersion
+	settings        map[string]ProjectSettings
+	foundations     map[string]Foundation
+	materials       map[string]Material
+	notes           map[string]ProjectNote
+	schedules       map[string]Schedule
+	batches         map[string]Batch
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		projects:       make(map[string]Project),
-		sessions:       make(map[string]Session),
-		messages:       make(map[string][]Message),
-		runs:           make(map[string]Run),
-		runByKey:       make(map[string]string),
-		runEvents:      make(map[string][]RunEvent),
-		chapterBundles: make(map[string]ChapterBundle),
-		settings:       make(map[string]ProjectSettings),
-		foundations:    make(map[string]Foundation),
-		materials:      make(map[string]Material),
-		notes:          make(map[string]ProjectNote),
-		schedules:      make(map[string]Schedule),
-		batches:        make(map[string]Batch),
+		projects:        make(map[string]Project),
+		sessions:        make(map[string]Session),
+		messages:        make(map[string][]Message),
+		runs:            make(map[string]Run),
+		runByKey:        make(map[string]string),
+		runEvents:       make(map[string][]RunEvent),
+		chapterBundles:  make(map[string]ChapterBundle),
+		chapterVersions: make(map[string]ChapterVersion),
+		settings:        make(map[string]ProjectSettings),
+		foundations:     make(map[string]Foundation),
+		materials:       make(map[string]Material),
+		notes:           make(map[string]ProjectNote),
+		schedules:       make(map[string]Schedule),
+		batches:         make(map[string]Batch),
 	}
 }
 
@@ -432,6 +434,21 @@ func (s *MemoryStore) SaveChapterBundle(_ context.Context, owner string, bundle 
 	}
 	if strings.TrimSpace(bundle.Chapter.ID) == "" || bundle.Chapter.Number <= 0 {
 		return &DomainError{Code: ErrInputRequired, Message: "chapter id and number are required"}
+	}
+	// Keep version rows immutable, matching the MySQL unique chapter/version key.
+	if version := bundle.ChapterVersion; version.ID != "" {
+		if version.Version == 0 {
+			version.Version = bundle.Chapter.Version
+			if version.Version == 0 {
+				version.Version = 1
+			}
+		}
+		key := memoryKey(owner, bundle.ProjectID, bundle.Chapter.ID, fmt.Sprint(version.Version))
+		if _, exists := s.chapterVersions[key]; exists {
+			return continuityError(fmt.Errorf("chapter version already exists"))
+		}
+		version.Snapshot = cloneRawJSON(version.Snapshot)
+		s.chapterVersions[key] = version
 	}
 	bundle.Chapter.ProjectID = bundle.ProjectID
 	now := time.Now().UTC()

@@ -67,3 +67,40 @@ func TestContinuityQueuedChapterEditStopsBeforePipeline(t *testing.T) {
 		t.Fatal("pipeline called after predecessor edited")
 	}
 }
+func TestMySQLContinuityRetrySavesImmutableNewVersion(t *testing.T) {
+	store, mock := newNovelCreationMockStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	b := validMySQLChapterBundle()
+	b.RunID = "retry-run"
+	b.Chapter.Version = 2
+	b.ChapterVersion.ID = "retry-version"
+	b.ChapterVersion.Version = 2
+	b.ChapterVersion.RunID = b.RunID
+	b.Foundation = Foundation{}
+	b.Audits = nil
+	b.Revisions = nil
+	b.Memories = []Memory{{ID: "retry-memory", Snapshot: []byte(`{"summary":"重试记忆"}`)}}
+	b.RuntimeSnapshot = []byte(`{"truthSettlement":{"facts":["重试事实"]},"memoryIndex":{"summary":"重试记忆"}}`)
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT 1 FROM novel_projects").WithArgs("alice", b.ProjectID).WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
+	mock.ExpectQuery("SELECT 1 FROM novel_runs").WithArgs("alice", b.RunID, b.ProjectID).WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
+	mock.ExpectExec("INSERT INTO novel_chapters").WillReturnResult(sqlmock.NewResult(1, 1))
+	// The historical row must never be updated on a duplicate chapter/version key.
+	mock.ExpectExec(`(?s)^INSERT INTO novel_chapter_versions .*VALUES \(\?, \?, \?, \?, \?, \?, \?, \?, \?\)$`).WithArgs(b.ChapterVersion.ID, "alice", b.ProjectID, b.Chapter.ID, b.RunID, 2, b.Chapter.Content, []byte(b.ChapterVersion.Snapshot), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO novel_memories").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("UPDATE novel_runs SET status").WithArgs(b.FinalRunStatus, []byte(b.RuntimeSnapshot), sqlmock.AnyArg(), sqlmock.AnyArg(), "alice", b.RunID, b.ProjectID).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	if err := store.SaveChapterBundle(ctx, "alice", b); err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectQuery("SELECT project_id, title").WithArgs("alice", b.ProjectID).WillReturnRows(sqlmock.NewRows([]string{"id", "title", "genre", "world", "protagonist", "conflict", "model", "words", "status", "created", "updated", "deleted"}).AddRow(b.ProjectID, "书", "悬疑", nil, nil, nil, "text", 2000, "draft", now, now, nil))
+	mock.ExpectQuery(`(?s)SELECT m.memory_id.*v.version_no=c.version_no.*r.run_id=v.run_id`).WithArgs("alice", b.ProjectID, b.Chapter.ID).WillReturnRows(sqlmock.NewRows([]string{"id", "project", "chapter", "snapshot", "created", "updated", "version", "runtime"}).AddRow("retry-memory", b.ProjectID, b.Chapter.ID, string(b.Memories[0].Snapshot), now, now, 2, string(b.RuntimeSnapshot)))
+	memory, found, err := store.GetChapterMemory(ctx, "alice", b.ProjectID, b.Chapter.ID)
+	if err != nil || !found || memory.ChapterVersion != 2 || string(memory.PreviousTruth) != `{"facts":["重试事实"]}` {
+		t.Fatalf("next chapter lost mysql retry continuity: %+v %v", memory, err)
+	}
+	if err = mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
