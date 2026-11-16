@@ -28,7 +28,7 @@ func (s *Service) ListSchedules(ctx context.Context, owner, projectID string) ([
 	return plans, nil
 }
 
-func (s *Service) CreateSchedule(ctx context.Context, owner, projectID string, input ScheduleInput) (Schedule, error) {
+func (s *Service) createSchedule(ctx context.Context, owner, projectID string, input ScheduleInput) (Schedule, error) {
 	if s == nil || s.store == nil {
 		return Schedule{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
@@ -138,7 +138,7 @@ func (s *Service) UpdateSchedule(ctx context.Context, owner, project, id string,
 	return out, err
 }
 
-func (s *Service) DeleteSchedule(ctx context.Context, owner, projectID, scheduleID string) error {
+func (s *Service) deleteSchedule(ctx context.Context, owner, projectID, scheduleID string) error {
 	if s == nil || s.store == nil {
 		return &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}

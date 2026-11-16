@@ -25,6 +25,8 @@ func RegisterProjectRetentionRoutes(mux *http.ServeMux, auth BridgeAuth, service
 	}
 	writeRetentionError := func(w http.ResponseWriter, err error) {
 		switch {
+		case errors.Is(err, projectretention.ErrPurging):
+			writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "PROJECT_PURGING"})
 		case errors.Is(err, projectretention.ErrNotFound):
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "作品不存在或未归档"})
 		case errors.Is(err, projectretention.ErrInvalid):

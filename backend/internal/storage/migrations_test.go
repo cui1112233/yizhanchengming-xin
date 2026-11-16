@@ -76,6 +76,7 @@ func TestAppMigrationsIncludesV11AndV12Migrations(t *testing.T) {
 	want = append(want, ScreenplayMediaMigrations()...)
 	want = append(want, ScreenplayAuthoringMigrations()...)
 	want = append(want, NovelCreationMigrations()...)
+	want = append(want, ProjectRetentionMigrations()...)
 	want = append(want, ImageCapacityMigrations()...)
 	if len(migrations) != len(want) {
 		t.Fatalf("AppMigrations length=%d, want %d", len(migrations), len(want))

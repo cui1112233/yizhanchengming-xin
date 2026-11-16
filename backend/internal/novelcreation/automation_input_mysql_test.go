@@ -135,11 +135,11 @@ func TestAutomationInputSQLStyleProfilesOwnerScoped(t *testing.T) {
 func TestAutomationInputSQLSessionQueriesUseOnlySessionSchemaColumns(t *testing.T) {
 	// Independent of sessionColumns so a mistaken production projection cannot
 	// silently become the mock's expected schema.
-	const projection = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at`
+	const projection = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at, s.archived_at`
 	const join = ` FROM novel_sessions s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id `
 	now := time.Now().UTC()
 	rows := func() *sqlmock.Rows {
-		return sqlmock.NewRows([]string{"session_id", "project_id", "mode", "title", "context_budget", "message_cursor", "current_run_id", "created_at", "updated_at"}).AddRow("session", "project", "continuation", "会话", 4096, 2, "run", now, now)
+		return sqlmock.NewRows([]string{"session_id", "project_id", "mode", "title", "context_budget", "message_cursor", "current_run_id", "created_at", "updated_at", "archived_at"}).AddRow("session", "project", "continuation", "会话", 4096, 2, "run", now, now, nil)
 	}
 	for _, kind := range []string{"get", "list-project", "list-all"} {
 		t.Run(kind, func(t *testing.T) {

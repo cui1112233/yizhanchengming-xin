@@ -17,6 +17,7 @@ type novelCreationStartup struct {
 func (s *novelCreationStartup) Start(ctx context.Context) {
 	s.once.Do(func() {
 		novelcreation.StartWorker(ctx, s.service, time.Second)
+		novelcreation.StartDocumentWorker(ctx, s.service)
 		novelcreation.StartScheduler(ctx, s.service, s.service.Notify, time.Minute)
 		novelcreation.StartBatchWorker(ctx, s.service, s.service.Notify, 5*time.Second)
 	})

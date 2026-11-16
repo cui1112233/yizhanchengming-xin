@@ -10,6 +10,8 @@ import (
 // Store is the durable boundary for the novel-creation domain. Production
 // implementations persist through MySQL; MemoryStore exists for unit tests.
 type Store interface {
+	ContentStore
+	ContentManagementStore
 	HasSavedRun(context.Context, string, string) (bool, error)
 	InsertAutomationRound(context.Context, string, string, string, string, string, time.Time) error
 	Clock(context.Context) (time.Time, error)
@@ -110,15 +112,16 @@ type CreateSessionInput struct {
 }
 
 type Session struct {
-	ID            string    `json:"id"`
-	ProjectID     string    `json:"projectId"`
-	Mode          string    `json:"mode"`
-	Title         string    `json:"title"`
-	ContextBudget int       `json:"contextBudget"`
-	MessageCursor int64     `json:"messageCursor"`
-	CurrentRunID  string    `json:"currentRunId,omitempty"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ArchivedAt    *time.Time `json:"archivedAt,omitempty"`
+	ID            string     `json:"id"`
+	ProjectID     string     `json:"projectId"`
+	Mode          string     `json:"mode"`
+	Title         string     `json:"title"`
+	ContextBudget int        `json:"contextBudget"`
+	MessageCursor int64      `json:"messageCursor"`
+	CurrentRunID  string     `json:"currentRunId,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
 }
 
 type Message struct {

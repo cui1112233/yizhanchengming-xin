@@ -153,7 +153,9 @@ func CanTransition(from, to RunStatus) bool {
 	case RunAwaitingConfirmation:
 		return to == RunQueued || to == RunSucceeded
 	case RunQueued:
-		return to == RunPlanning
+		return to == RunPlanning || to == RunAnalyzing
+	case RunAnalyzing:
+		return to == RunSucceeded
 	case RunPlanning:
 		return to == RunWriting
 	case RunWriting:
@@ -175,7 +177,7 @@ func CanTransition(from, to RunStatus) bool {
 
 func validRunStatus(status RunStatus) bool {
 	switch status {
-	case RunPaused, RunDraft, RunClarifying, RunAwaitingConfirmation, RunQueued, RunPlanning,
+	case RunAnalyzing, RunPaused, RunDraft, RunClarifying, RunAwaitingConfirmation, RunQueued, RunPlanning,
 		RunWriting, RunNormalizing, RunAuditing, RunRevising, RunSettling, RunIndexing,
 		RunSucceeded, RunSucceededWithWarnings, RunFailed, RunCancelled:
 		return true

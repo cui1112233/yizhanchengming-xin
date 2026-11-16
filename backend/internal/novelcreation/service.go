@@ -24,6 +24,10 @@ type Snapshot struct {
 }
 
 type Service struct {
+	archiveProject  func(context.Context, string, string) error
+	restoreProject  func(context.Context, string, string) error
+	documents       DocumentObjectStore
+	documentParser  DocumentParser
 	automationClock func() time.Time
 	store           Store
 	runtime         Runtime
@@ -49,7 +53,7 @@ func (s *Service) CreateProject(ctx context.Context, owner string, input CreateP
 	return s.store.CreateProject(ctx, strings.TrimSpace(owner), input)
 }
 
-func (s *Service) CreateSession(ctx context.Context, owner string, input CreateSessionInput) (Session, error) {
+func (s *Service) createSession(ctx context.Context, owner string, input CreateSessionInput) (Session, error) {
 	if s == nil || s.store == nil {
 		return Session{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
@@ -334,6 +338,21 @@ func (s *Service) retryRun(ctx context.Context, owner, runID string) (Run, error
 	} else if found {
 		return existing, nil
 	}
+	if operationKind(source) != "" {
+		var snap maintenanceSnapshot
+		if e := json.Unmarshal(source.PromptSnapshot, &snap); e != nil {
+			return Run{}, e
+		}
+		if e := s.validateMaintenanceSources(ctx, owner, source.ProjectID, snap); e != nil {
+			return Run{}, e
+		}
+		retry, e := s.store.CreateRun(ctx, owner, Run{ProjectID: source.ProjectID, SessionID: source.SessionID, IdempotencyKey: key, Status: RunQueued, ModelID: source.ModelID, ThinkingLevel: source.ThinkingLevel, PromptSnapshot: cloneRawJSON(source.PromptSnapshot)})
+		if e != nil {
+			return retry, e
+		}
+		_, e = s.appendEvent(ctx, owner, retry, "run.queued", RunQueued, "分析重试已加入队列", 0, map[string]any{"retryOfRunId": source.ID})
+		return retry, e
+	}
 	var snapshot map[string]any
 	if err := json.Unmarshal(source.PromptSnapshot, &snapshot); err != nil {
 		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "原任务输入快照损坏", Cause: err}
@@ -611,7 +630,7 @@ func (s *Service) GetProjectSettings(ctx context.Context, owner, projectID strin
 	return settings, nil
 }
 
-func (s *Service) UpdateProjectSettings(ctx context.Context, owner, projectID string, input ProjectSettings) (ProjectSettings, error) {
+func (s *Service) updateProjectSettings(ctx context.Context, owner, projectID string, input ProjectSettings) (ProjectSettings, error) {
 	if s == nil || s.store == nil {
 		return ProjectSettings{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
@@ -656,14 +675,14 @@ func (s *Service) ListMaterials(ctx context.Context, owner, projectID string) ([
 	return s.store.ListMaterials(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
 }
 
-func (s *Service) CreateMaterial(ctx context.Context, owner, projectID string, input CreateMaterialInput) (Material, error) {
+func (s *Service) createMaterial(ctx context.Context, owner, projectID string, input CreateMaterialInput) (Material, error) {
 	if s == nil || s.store == nil {
 		return Material{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
 	return s.store.CreateMaterial(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), input)
 }
 
-func (s *Service) DeleteMaterial(ctx context.Context, owner, projectID, materialID string) error {
+func (s *Service) deleteMaterial(ctx context.Context, owner, projectID, materialID string) error {
 	if s == nil || s.store == nil {
 		return &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
@@ -677,21 +696,21 @@ func (s *Service) ListNotes(ctx context.Context, owner, projectID string) ([]Pro
 	return s.store.ListNotes(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
 }
 
-func (s *Service) CreateNote(ctx context.Context, owner, projectID string, input ProjectNoteInput) (ProjectNote, error) {
+func (s *Service) createNote(ctx context.Context, owner, projectID string, input ProjectNoteInput) (ProjectNote, error) {
 	if s == nil || s.store == nil {
 		return ProjectNote{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
 	return s.store.CreateNote(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), input)
 }
 
-func (s *Service) UpdateNote(ctx context.Context, owner, projectID, noteID string, input ProjectNoteInput) (ProjectNote, error) {
+func (s *Service) updateNote(ctx context.Context, owner, projectID, noteID string, input ProjectNoteInput) (ProjectNote, error) {
 	if s == nil || s.store == nil {
 		return ProjectNote{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
 	return s.store.UpdateNote(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(noteID), input)
 }
 
-func (s *Service) DeleteNote(ctx context.Context, owner, projectID, noteID string) error {
+func (s *Service) deleteNote(ctx context.Context, owner, projectID, noteID string) error {
 	if s == nil || s.store == nil {
 		return &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
@@ -771,6 +790,15 @@ func (s *Service) ExportProject(ctx context.Context, owner, projectID, format st
 	chapters, err := s.store.ListChapters(ctx, owner, projectID)
 	if err != nil {
 		return ExportDocument{}, err
+	}
+	hasContent := false
+	for _, c := range chapters {
+		if strings.TrimSpace(c.Content) != "" {
+			hasContent = true
+		}
+	}
+	if !hasContent {
+		return ExportDocument{}, inputError("暂无可导出正文")
 	}
 	normalized := strings.ToLower(strings.TrimSpace(format))
 	switch normalized {

@@ -22,5 +22,5 @@ func ProjectRetentionMigrations() []Migration {
   KEY idx_project_retention_owner (owner_username, module, archived_at, retention_expires_at)
 ) ENGINE=InnoDB`,
 		},
-	}}
+	}, {Version: 8800401, CallbackChecksum: "v88-retention-manual-novel-guard-v1", SQL: []string{`ALTER TABLE project_retention ADD COLUMN manual_archived TINYINT(1) NOT NULL DEFAULT 0`, `UPDATE novel_projects p JOIN project_retention r ON r.owner_username=p.owner_username AND r.project_id=p.project_id AND r.module='novel_creation' SET p.status='archived' WHERE r.archived_at IS NOT NULL`}}}
 }

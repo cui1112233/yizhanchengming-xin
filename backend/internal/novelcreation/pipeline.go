@@ -571,7 +571,11 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 			return actual, request, nil, nil
 		}
 		route := strings.Split(strings.TrimPrefix(key, "novel-creation."), ":")[0]
-		modelID := input.Agent.ModelRoutes[route]
+		routeKey := route
+		if route == "style-analysis" {
+			routeKey = "foundation-plan"
+		}
+		modelID := input.Agent.ModelRoutes[routeKey]
 		if modelID == "" {
 			modelID = input.Run.ModelID
 		}

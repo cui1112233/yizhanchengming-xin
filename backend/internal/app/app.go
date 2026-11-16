@@ -360,6 +360,13 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	memberProfiles := httpapi.NewMemberProfileStore(cfg.MemberSystemDir)
 	novelCreationService := novelcreation.NewService(novelCreationStore, novelCreationRuntime, novelcreation.NewPipeline(novelcreation.ProviderResolver(httpapi.NovelCreationTextResolver(authStore, memberProfiles, textProviderForModel))))
+	if cfg.AgentAssetTOSBucket != "" {
+		documentObjects, documentErr := novelcreation.NewTOSDocumentStore(novelcreation.DocumentTOSConfig{Endpoint: cfg.AgentAssetTOSEndpoint, Region: cfg.AgentAssetTOSRegion, Bucket: cfg.AgentAssetTOSBucket, AccessKey: cfg.AgentAssetTOSAccessKey, SecretKey: cfg.AgentAssetTOSSecretKey})
+		if documentErr != nil {
+			return nil, documentErr
+		}
+		novelCreationService.ConfigureDocuments(documentObjects, nil)
+	}
 	novelCreationRunStarter := novelCreationService.Notify
 	novelStartup := &novelCreationStartup{service: novelCreationService}
 	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
@@ -603,6 +610,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	// Expiry must also run on local-only installations without TOS. 全站统一：
 	// 每天 00:00 重算保留期，到期只归档、不自动删除。
 	projectRetention := projectretention.NewService(db, store.MySQLStore, artifactStore, retentionRemote, retentionDays)
+	novelCreationService.ConfigureRetention(projectRetention.ArchiveNovel, func(ctx context.Context, owner, project string) error {
+		return projectRetention.Restore(ctx, owner, projectretention.ModuleNovelCreation, project)
+	})
+	projectRetention.NovelObjects = novelCreationService.PurgeDocumentObjects
 	projectRetention.CanvasAssets = agentAssetStore
 	projectRetention.CanvasObjects = agentAssetObjects
 	projectRetention.Grace = projectretention.DefaultArchiveGrace

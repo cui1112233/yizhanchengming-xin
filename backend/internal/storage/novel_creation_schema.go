@@ -354,5 +354,5 @@ func NovelCreationMigrations() []Migration {
  PRIMARY KEY (owner_username, kind, plan_id, round_key),
  UNIQUE KEY uq_novel_automation_run (owner_username, run_id),
  CONSTRAINT fk_novel_automation_run FOREIGN KEY (owner_username, run_id) REFERENCES novel_runs(owner_username, run_id)
- ) ENGINE=InnoDB`}}}
+ ) ENGINE=InnoDB`}}, {Version: 8800314, CallbackChecksum: "v88-novel-documents-content-v1", SQL: novelContentStatements()}}
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"qiantie/backend/internal/novelcreation"
+	"qiantie/backend/internal/projectretention"
 )
 
 const novelCreationJSONLimit = 4 << 20
@@ -53,6 +54,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		return true
 	}
 
+	registerNovelContentRoutes(handle, decode, service)
 	handle("GET /api/novel-creation/modes", func(w http.ResponseWriter, _ *http.Request, _ string) {
 		modes := make([]map[string]any, 0, len(novelCreationModes))
 		for _, mode := range novelCreationModes {
@@ -535,6 +537,10 @@ func validNovelCreationMode(value string) bool {
 }
 
 func writeNovelCreationError(w http.ResponseWriter, err error) {
+	if errors.Is(err, projectretention.ErrPurging) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "PROJECT_PURGING"})
+		return
+	}
 	status := http.StatusInternalServerError
 	message := "小说创作暂时无法处理，请稍后重试"
 	var domainErr *novelcreation.DomainError

@@ -51,8 +51,9 @@ type CallConfirmation struct {
 	Metadata *ModelCallMetadata `json:"metadata"`
 }
 type Execution struct {
-	PendingConfirmation *CallConfirmation `json:",omitempty"`
-	ConfirmedCalls      map[string]string `json:",omitempty"`
+	Maintenance         *MaintenanceResult `json:",omitempty"`
+	PendingConfirmation *CallConfirmation  `json:",omitempty"`
+	ConfirmedCalls      map[string]string  `json:",omitempty"`
 	Owner               string
 	RunID               string
 	ProjectID           string
@@ -115,8 +116,12 @@ func (s *MemoryStore) Atomic(ctx context.Context, owner, project string, fn func
 	if !ok || p.DeletedAt != nil {
 		return &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
 	}
+	if projectReadOnly(p.Status) {
+		return archivedError()
+	}
 	c := NewMemoryStore()
 	c.nextID, c.nextEventID = s.nextID, s.nextEventID
+	c.contentRecords = maps.Clone(s.contentRecords)
 	c.projects = maps.Clone(s.projects)
 	c.sessions = maps.Clone(s.sessions)
 	c.messages = maps.Clone(s.messages)
@@ -148,6 +153,7 @@ func (s *MemoryStore) Atomic(ctx context.Context, owner, project string, fn func
 		return err
 	}
 	s.nextID, s.nextEventID = c.nextID, c.nextEventID
+	s.contentRecords = c.contentRecords
 	s.projects, s.sessions, s.messages, s.runs, s.runByKey, s.runEvents = c.projects, c.sessions, c.messages, c.runs, c.runByKey, c.runEvents
 	s.chapterBundles, s.chapterVersions, s.settings, s.foundations = c.chapterBundles, c.chapterVersions, c.settings, c.foundations
 	s.materials, s.notes, s.styles, s.schedules, s.batches = c.materials, c.notes, c.styles, c.schedules, c.batches
@@ -187,6 +193,9 @@ func (s *MemoryStore) ListDispatch(_ context.Context, limit int) ([]Execution, e
 			continue
 		}
 		owner := strings.SplitN(key, "\x00", 2)[0]
+		if projectReadOnly(s.projects[memoryKey(owner, r.ProjectID)].Status) {
+			continue
+		}
 		if slot := s.slots[memoryKey(owner, r.ProjectID)]; slot.LeaseUntil.After(time.Now().UTC()) {
 			continue
 		}
@@ -257,7 +266,7 @@ func (s *MySQLStore) Atomic(ctx context.Context, owner, project string, fn func(
 	}
 	defer tx.Rollback()
 	var one int
-	if err = tx.QueryRowContext(ctx, `SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL FOR UPDATE`, owner, project).Scan(&one); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_id = ? AND deleted_at IS NULL AND status NOT IN ('archived','purging') FOR UPDATE`, owner, project).Scan(&one); err != nil {
 		return persistenceError(err)
 	}
 	if err = fn(&MySQLStore{db: tx}); err != nil {
@@ -320,7 +329,7 @@ func (s *MySQLStore) PutSlot(ctx context.Context, owner, project string, slot Pr
 	return persistenceError(err)
 }
 func (s *MySQLStore) ListDispatch(ctx context.Context, limit int) ([]Execution, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT r.owner_username, r.run_id, r.project_id FROM novel_runs r JOIN novel_projects p ON p.owner_username=r.owner_username AND p.project_id=r.project_id LEFT JOIN novel_run_dispatch d ON d.owner_username=r.owner_username AND d.run_id=r.run_id WHERE p.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM novel_project_slots slot WHERE slot.owner_username=r.owner_username AND slot.project_id=r.project_id AND slot.lease_until > UTC_TIMESTAMP(6)) AND r.status NOT IN ('succeeded','succeeded_with_warnings','failed','cancelled','awaiting_confirmation','paused') AND (d.run_id IS NULL OR (d.state IN ('ready','leased','save_pending') AND (d.lease_until IS NULL OR d.lease_until <= UTC_TIMESTAMP(6)))) ORDER BY r.created_at LIMIT ?`, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT r.owner_username, r.run_id, r.project_id FROM novel_runs r JOIN novel_projects p ON p.owner_username=r.owner_username AND p.project_id=r.project_id LEFT JOIN novel_run_dispatch d ON d.owner_username=r.owner_username AND d.run_id=r.run_id WHERE p.deleted_at IS NULL AND p.status NOT IN ('archived','purging') AND NOT EXISTS (SELECT 1 FROM novel_project_slots slot WHERE slot.owner_username=r.owner_username AND slot.project_id=r.project_id AND slot.lease_until > UTC_TIMESTAMP(6)) AND r.status NOT IN ('succeeded','succeeded_with_warnings','failed','cancelled','awaiting_confirmation','paused') AND (d.run_id IS NULL OR (d.state IN ('ready','leased','save_pending') AND (d.lease_until IS NULL OR d.lease_until <= UTC_TIMESTAMP(6)))) ORDER BY r.created_at LIMIT ?`, limit)
 	if err != nil {
 		return nil, persistenceError(err)
 	}

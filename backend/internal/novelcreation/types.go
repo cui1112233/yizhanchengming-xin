@@ -110,9 +110,12 @@ type SendMessageInput struct {
 
 // KnowledgeMaterial is the bounded material snapshot injected into prompts.
 type KnowledgeMaterial struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	SourceVersion      int      `json:"sourceVersion,omitempty"`
+	SelectedChapterIDs []string `json:"selectedChapterIds,omitempty"`
+	Characters         int      `json:"characters,omitempty"`
+	ID                 string   `json:"id"`
+	Title              string   `json:"title"`
+	Content            string   `json:"content"`
 }
 
 // Material is a user-imported reference document attached to a project.

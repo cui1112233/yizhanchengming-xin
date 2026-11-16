@@ -116,6 +116,26 @@ func (s *Service) loadContinuity(ctx context.Context, owner, projectID string, c
 	ordered := append([]Chapter(nil), chapters...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Number < ordered[j].Number })
 	latest := ordered[len(ordered)-1]
+	state, stateErr := s.GetContinuityState(ctx, owner, projectID)
+	if stateErr != nil {
+		return out, stateErr
+	}
+	if state.DirtyFrom > 0 && state.DirtyFrom <= latest.Number {
+		return out, inputError("前文已编辑，请先刷新事实与记忆")
+	}
+	for _, entry := range state.Entries {
+		if entry.Source.ID == latest.ID && entry.Source.Version == latest.Version && entry.Source.Digest == fingerprint(latest.Content) {
+			ending := []rune(strings.TrimSpace(latest.Content))
+			if len(ending) > 2000 {
+				ending = ending[len(ending)-2000:]
+			}
+			out.Truth = cloneRawJSON(entry.Truth)
+			out.Memory = cloneRawJSON(entry.Memory)
+			out.Chapters = []PreviousChapter{{ChapterID: latest.ID, Version: latest.Version, Number: latest.Number, Ending: string(ending)}}
+			return out, nil
+		}
+	}
+
 	memory, found, err := s.store.GetChapterMemory(ctx, owner, projectID, latest.ID)
 	if err != nil {
 		return out, continuityError(err)

@@ -31,6 +31,9 @@ func (s *Service) prepareGenerationInput(ctx context.Context, owner, projectID, 
 	if err != nil {
 		return result, err
 	}
+	if session.ArchivedAt != nil {
+		return result, inputError("会话已归档，请先恢复")
+	}
 	if session.ProjectID != projectID {
 		return result, &DomainError{Code: ErrInputRequired, Message: "会话与作品不匹配"}
 	}
@@ -61,9 +64,39 @@ func (s *Service) prepareGenerationInput(ctx context.Context, owner, projectID, 
 	if err != nil {
 		return result, err
 	}
-	result.Knowledge, err = selectKnowledgeMaterials(materials, input.KnowledgeIDs)
+	legacyIDs := []string{}
+	for _, id := range input.KnowledgeIDs {
+		if !documentID(id) {
+			legacyIDs = append(legacyIDs, id)
+		}
+	}
+	result.Knowledge, err = selectKnowledgeMaterials(materials, legacyIDs)
 	if err != nil {
 		return result, err
+	}
+	for _, id := range input.KnowledgeIDs {
+		if documentID(id) {
+			j, e := getDocument(ctx, s.store, owner, projectID, strings.TrimPrefix(id, "docref-"))
+			if e != nil {
+				return result, e
+			}
+			if j.Selection == nil {
+				return result, inputError("请先选择资料章节范围")
+			}
+			selected, e := selectedDocument(j, DocumentSelection{ExpectedVersion: j.Selection.SourceVersion, ChapterIDs: j.Selection.SelectedChapterIDs})
+			if e != nil {
+				return result, e
+			}
+			result.Knowledge = append(result.Knowledge, selected)
+		}
+	}
+	byKnowledgeID := map[string]KnowledgeMaterial{}
+	for _, k := range result.Knowledge {
+		byKnowledgeID[k.ID] = k
+	}
+	result.Knowledge = nil
+	for _, id := range input.KnowledgeIDs {
+		result.Knowledge = append(result.Knowledge, byKnowledgeID[id])
 	}
 	input.NoteIDs, err = NormalizeKnowledgeIDs(input.NoteIDs)
 	if err != nil {

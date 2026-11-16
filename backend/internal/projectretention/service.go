@@ -37,12 +37,14 @@ const (
 )
 
 var (
+	ErrPurging  = errors.New("作品正在清理，无法恢复；清理失败可重试删除")
 	ErrInvalid  = errors.New("保留/归档参数无效")
 	ErrNotFound = errors.New("作品不存在或未归档")
 )
 
 // Record 是列表页与归档库共用的保留状态。
 type Record struct {
+	Purging       bool       `json:"purging,omitempty"`
 	Module        Module     `json:"module"`
 	ProjectID     string     `json:"projectId"`
 	Title         string     `json:"title"`
@@ -54,6 +56,7 @@ type Record struct {
 
 // Service 负责每日 00:00 重算保留期、到期归档，以及归档作品的恢复与彻底删除。
 type Service struct {
+	NovelObjects  func(context.Context, string, string) error
 	DB            *sql.DB
 	Batch         *batchfactoryv11.MySQLStore
 	Local         *localartifact.Store
@@ -266,13 +269,8 @@ var moduleQueries = []moduleQuery{
 		validSQL: `SELECT id FROM agent_projects WHERE owner_username=? AND deleted_at IS NULL`,
 	},
 	{
-		module: ModuleNovelCreation,
-		sql: `SELECT p.project_id, COALESCE(NULLIF(p.title,''),'未命名作品集'), GREATEST(
-  p.updated_at,
-  COALESCE((SELECT MAX(s.updated_at) FROM novel_sessions s WHERE s.owner_username=p.owner_username AND s.project_id=p.project_id), p.updated_at),
-  COALESCE((SELECT MAX(c.updated_at) FROM novel_chapters c WHERE c.owner_username=p.owner_username AND c.project_id=p.project_id), p.updated_at),
-  COALESCE((SELECT MAX(r.updated_at) FROM novel_runs r WHERE r.owner_username=p.owner_username AND r.project_id=p.project_id), p.updated_at)
-) FROM novel_projects p WHERE p.owner_username=? AND p.deleted_at IS NULL`,
+		module:   ModuleNovelCreation,
+		sql:      novelActivitySQL,
 		validSQL: `SELECT project_id FROM novel_projects WHERE owner_username=? AND deleted_at IS NULL`,
 	},
 }
@@ -424,12 +422,15 @@ func (s *Service) staleProjectIDs(ctx context.Context, owner string, module Modu
 // archiveDue 把已到期的作品集移入归档；只更新状态，不删除任何数据。
 func (s *Service) archiveDue(ctx context.Context, owner string) error {
 	now := s.now().UTC()
-	if _, err := s.DB.ExecContext(ctx, `UPDATE project_retention SET archived_at=?, updated_at=? WHERE owner_username=? AND archived_at IS NULL AND retention_expires_at<=?`, now, now, owner, now); err != nil {
+	if _, err := s.DB.ExecContext(ctx, `UPDATE project_retention SET archived_at=?, updated_at=? WHERE owner_username=? AND module<>'novel_creation' AND archived_at IS NULL AND retention_expires_at<=?`, now, now, owner, now); err != nil {
 		return err
 	}
 	// 调大保留天数后，尚未到期的归档作品会自动回到作品列表。
-	_, err := s.DB.ExecContext(ctx, `UPDATE project_retention SET archived_at=NULL, updated_at=? WHERE owner_username=? AND archived_at IS NOT NULL AND retention_expires_at>?`, now, owner, now)
-	return err
+	_, err := s.DB.ExecContext(ctx, `UPDATE project_retention SET archived_at=NULL, updated_at=? WHERE owner_username=? AND module<>'novel_creation' AND manual_archived=0 AND archived_at IS NOT NULL AND retention_expires_at>?`, now, owner, now)
+	if err != nil {
+		return err
+	}
+	return s.archiveDueNovel(ctx, owner)
 }
 
 // ArchiveDue 在重算后统一执行到期归档。RunOnce 已包含该步骤，拆分出来便于测试。
@@ -470,6 +471,16 @@ func (s *Service) Status(ctx context.Context, owner string) ([]Record, error) {
 	}
 	rows.Close()
 
+	for i := range out {
+		if out[i].Module == ModuleNovelCreation && out[i].ArchivedAt != nil {
+			var status string
+			e := s.DB.QueryRowContext(ctx, `SELECT status FROM novel_projects WHERE owner_username=? AND project_id=?`, owner, out[i].ProjectID).Scan(&status)
+			if e != nil && !errors.Is(e, sql.ErrNoRows) {
+				return nil, e
+			}
+			out[i].Purging = status == "purging"
+		}
+	}
 	if s.Batch != nil {
 		batches, err := s.Batch.ListBatchRetention(ctx, owner)
 		if err != nil {
@@ -531,6 +542,9 @@ func (s *Service) Restore(ctx context.Context, owner string, module Module, proj
 	}
 	if !validModule(module) || strings.TrimSpace(projectID) == "" {
 		return ErrInvalid
+	}
+	if module == ModuleNovelCreation {
+		return s.restoreNovel(ctx, owner, projectID)
 	}
 	now := s.now().UTC()
 	days := s.days(owner)
@@ -601,8 +615,21 @@ func (s *Service) Purge(ctx context.Context, owner string, module Module, projec
 	if !archived.Valid {
 		return ErrInvalid
 	}
+	if module == ModuleNovelCreation {
+		if err := s.beginNovelPurge(ctx, owner, projectID); err != nil {
+			return err
+		}
+		if s.NovelObjects != nil {
+			if err := s.NovelObjects(ctx, owner, projectID); err != nil {
+				return err
+			}
+		}
+	}
 	if err := s.purgeModuleRows(ctx, owner, module, projectID); err != nil {
 		return err
+	}
+	if module == ModuleNovelCreation {
+		return nil
 	}
 	_, err = s.DB.ExecContext(ctx, `DELETE FROM project_retention WHERE owner_username=? AND module=? AND project_id=?`, owner, string(module), projectID)
 	return err
@@ -671,8 +698,23 @@ func (s *Service) purgeModuleRows(ctx context.Context, owner string, module Modu
 			return err
 		}
 	case ModuleNovelCreation:
+		var one int
+		if err = tx.QueryRowContext(ctx, `SELECT 1 FROM novel_projects WHERE owner_username=? AND project_id=? AND status='purging' FOR UPDATE`, owner, projectID).Scan(&one); err != nil {
+			return err
+		}
+		var archived sql.NullTime
+		if err = tx.QueryRowContext(ctx, `SELECT archived_at FROM project_retention WHERE owner_username=? AND module='novel_creation' AND project_id=? FOR UPDATE`, owner, projectID).Scan(&archived); err != nil {
+			return err
+		}
+		if !archived.Valid {
+			return ErrInvalid
+		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM novel_automation_rounds WHERE owner_username=? AND run_id IN (SELECT run_id FROM novel_runs WHERE owner_username=? AND project_id=?)`, owner, owner, projectID); err != nil {
+			return err
+		}
 		// 小说表带 RESTRICT 外键，必须从子表往父表删。
 		for _, table := range []string{
+			"novel_content_records", "novel_run_dispatch", "novel_project_slots",
 			"novel_run_events", "novel_run_steps", "novel_runs", "novel_schedules", "novel_batches",
 			"novel_messages", "novel_chapter_versions", "novel_audits", "novel_revisions",
 			"novel_chapters", "novel_volumes", "novel_memories", "novel_foundations",
@@ -683,6 +725,9 @@ func (s *Service) purgeModuleRows(ctx context.Context, owner string, module Modu
 			}
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM novel_projects WHERE owner_username=? AND project_id=?`, owner, projectID); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM project_retention WHERE owner_username=? AND module='novel_creation' AND project_id=?`, owner, projectID); err != nil {
 			return err
 		}
 	default:

@@ -77,6 +77,13 @@ func (s *Service) claim(ctx context.Context, owner, id string) (RunLease, Execut
 		if e != nil {
 			return e
 		}
+		session, sessionErr := tx.GetSession(ctx, owner, current.SessionID)
+		if sessionErr != nil {
+			return sessionErr
+		}
+		if session.ArchivedAt != nil {
+			return inputError("会话已归档，请先恢复")
+		}
 		if isTerminalRunStatus(current.Status) || current.Status == RunAwaitingConfirmation || current.Status == RunPaused {
 			return &DomainError{Code: ErrInvalidTransition, Message: "任务当前不可领取"}
 		}
@@ -230,7 +237,7 @@ func (s *Service) recoverDurableWriteFailure(ctx context.Context, owner string, 
 			return err
 		}
 		e.State = "ready"
-		if e.Bundle != nil {
+		if e.Bundle != nil || e.Maintenance != nil {
 			e.State = "save_pending"
 		}
 		run, err = tx.GetRun(ctx, owner, run.ID)
@@ -321,6 +328,12 @@ func (s *Service) Run(ctx context.Context, owner, id string) (Run, error) {
 	}()
 	gs := &guardedStore{Store: s.store, lease: l}
 	child := &Service{store: gs, runtime: executionRuntime{Runtime: s.runtime, store: s.store, owner: owner}, pipeline: s.pipeline, control: s.control}
+	if e.Maintenance != nil {
+		return child.saveMaintenance(runCtx, owner, current, *e.Maintenance)
+	}
+	if operationKind(current) != "" {
+		return child.runMaintenance(runCtx, owner, current)
+	}
 	if e.Bundle != nil {
 		return child.savePending(runCtx, owner, current, *e.Bundle)
 	}
@@ -681,7 +694,7 @@ func (s *Service) RetryRun(ctx context.Context, owner, id string) (Run, error) {
 				return run, unknownResult()
 			}
 		}
-		if e.Bundle != nil && e.CommittedHash == "" && !e.CancelRequested {
+		if (e.Bundle != nil || e.Maintenance != nil) && e.CommittedHash == "" && !e.CancelRequested {
 			s.Notify(ctx, owner, id)
 			return run, nil
 		}

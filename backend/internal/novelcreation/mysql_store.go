@@ -162,11 +162,11 @@ WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_
 	return session, nil
 }
 
-const sessionColumns = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at`
+const sessionColumns = `s.session_id, s.project_id, s.mode, s.title, s.context_budget, s.message_cursor, COALESCE(s.current_run_id, ''), s.created_at, s.updated_at, s.archived_at`
 
 func scanSession(scanner novelRowScanner) (Session, error) {
 	var session Session
-	err := scanner.Scan(&session.ID, &session.ProjectID, &session.Mode, &session.Title, &session.ContextBudget, &session.MessageCursor, &session.CurrentRunID, &session.CreatedAt, &session.UpdatedAt)
+	err := scanner.Scan(&session.ID, &session.ProjectID, &session.Mode, &session.Title, &session.ContextBudget, &session.MessageCursor, &session.CurrentRunID, &session.CreatedAt, &session.UpdatedAt, &session.ArchivedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Session{}, &DomainError{Code: ErrSessionNotFound, Message: "session not found"}
 	}
@@ -1460,7 +1460,11 @@ func (s *MySQLStore) GetStyleProfile(ctx context.Context, owner, id string) (Sty
 		return StyleProfile{}, err
 	}
 	var p StyleProfile
-	err = s.db.QueryRowContext(ctx, `SELECT style_profile_id, title, content FROM novel_style_profiles WHERE owner_username = ? AND style_profile_id = ?`, owner, strings.TrimSpace(id)).Scan(&p.ID, &p.Title, &p.Content)
+	query := `SELECT style_profile_id, title, content FROM novel_style_profiles WHERE owner_username = ? AND style_profile_id = ?`
+	if _, bound := s.db.(sqlTransaction); bound {
+		query += " FOR UPDATE"
+	}
+	err = s.db.QueryRowContext(ctx, query, owner, strings.TrimSpace(id)).Scan(&p.ID, &p.Title, &p.Content)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, &DomainError{Code: ErrInputRequired, Message: "所选文风不存在或无权使用，请重新选择"}
 	}
