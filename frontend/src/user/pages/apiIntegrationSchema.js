@@ -636,6 +636,7 @@ export const API_CHANNEL_PRESETS = {
         id: 'seedance2',
         label: 'Seedance2.0',
         fieldKey: 'seedance2Api',
+        addressField: 'seedance2BaseUrl',
         baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
         model: 'doubao-seedance-2-0',
         common: true

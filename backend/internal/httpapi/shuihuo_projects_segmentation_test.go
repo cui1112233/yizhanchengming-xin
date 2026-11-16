@@ -54,6 +54,11 @@ func TestShuihuoImageGenerationEndpointAndSize(t *testing.T) {
 	if rootErr != nil || rootGot != "https://api.vveai.com/v1/images/generations" {
 		t.Fatalf("root endpoint=%q err=%v", rootGot, rootErr)
 	}
+	// 火山方舟基地址是 /api/v3，不能再多拼一层 /v1。
+	arkGot, arkErr := shuihuoImageGenerationEndpoint("https://ark.cn-beijing.volces.com/api/v3")
+	if arkErr != nil || arkGot != "https://ark.cn-beijing.volces.com/api/v3/images/generations" {
+		t.Fatalf("ark endpoint=%q err=%v", arkGot, arkErr)
+	}
 	if shuihuoImageSize("9:16") != "1024x1792" || shuihuoImageSize("1:1") != "1024x1024" {
 		t.Fatalf("unexpected image sizes")
 	}

@@ -26,7 +26,7 @@ var apiIntegrationFields = map[string]bool{
 	"qwenOfficialApiKey":     true,
 	"mimoOfficialApiKey":     true,
 
-	"seedance2Api": true, "viduApi": true, "runninghubApi": true, "runninghubConcurrency": false,
+	"seedance2Api": true, "seedance2BaseUrl": false, "viduApi": true, "runninghubApi": true, "runninghubConcurrency": false,
 	"wanxApiKey": true, "localGrokVideoBaseUrl": false, "localGrokVideoApiKey": true,
 	"xiaoyunqueAccessKey": true, "xiaoyunqueConcurrency": false, "xiaoyunqueIntlAccessKey": true,
 	"xiaoyunqueIntlConcurrency": false, "happyHorseKey": true, "minimaxH3Key": true,

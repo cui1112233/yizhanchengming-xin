@@ -5696,7 +5696,9 @@ func shuihuoImageGenerationEndpoint(raw string) (string, error) {
 	if !strings.HasSuffix(strings.ToLower(path), "/images/generations") {
 		if path == "" {
 			path = "/v1/images/generations"
-		} else if strings.HasSuffix(path, "/v1") {
+		} else if strings.HasSuffix(path, "/v1") || strings.HasSuffix(path, "/v3") {
+			// 火山方舟的基地址是 /api/v3，图像接口就是 /api/v3/images/generations；
+			// 早期只识别 /v1，导致拼成 /api/v3/v1/images/generations 而 404。
 			path += "/images/generations"
 		} else {
 			path += "/v1/images/generations"

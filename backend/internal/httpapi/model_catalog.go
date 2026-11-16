@@ -626,7 +626,7 @@ var integrationChannelPresets = []integrationChannelPreset{
 	{Group: "text", ID: "glm", Label: "智谱 GLM", ModelID: "glm-4.5", BaseURL: "https://open.bigmodel.cn/api/paas/v4", KeyField: "glmOfficialApiKey"},
 	{Group: "text", ID: "mimo", Label: "小米 MiMo", ModelID: "mimo", BaseURL: "https://api.xiaomimimo.com/v1", KeyField: "mimoOfficialApiKey"},
 	// 视频模型
-	{Group: "video", ID: "seedance2", Label: "Seedance2.0", ModelID: "doubao-seedance-2-0", BaseURL: "https://ark.cn-beijing.volces.com/api/v3", KeyField: "seedance2Api"},
+	{Group: "video", ID: "seedance2", Label: "Seedance2.0", ModelID: "doubao-seedance-2-0", BaseURL: "https://ark.cn-beijing.volces.com/api/v3", KeyField: "seedance2Api", AddressField: "seedance2BaseUrl"},
 	{Group: "video", ID: "minimaxH3", Label: "MiniMax-H3", ModelID: "MiniMax-H3", BaseURL: "https://api.minimaxi.com/v1", KeyField: "minimaxH3Key"},
 	{Group: "video", ID: "runninghub", Label: "RunningHub", ModelID: "工作流任务", BaseURL: "https://www.runninghub.cn", KeyField: "runninghubApi"},
 	{Group: "video", ID: "viduVideo", Label: "Vidu", ModelID: "Vidu 默认", BaseURL: "https://api.vidu.cn", KeyField: "viduApi"},
