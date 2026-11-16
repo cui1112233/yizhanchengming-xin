@@ -7,6 +7,10 @@
 - [02 已确认功能链路](02-function-contracts.md)
 - [03 原版提示词恢复与对比](03-prompt-contracts.md)
 - [04 未解决问题](04-open-questions.md)
+- [08 新建、分章、保存和重开](08-creation-and-chapters.md)
+- [09 提示词选择、排序和收藏](09-prompt-selector.md)
+- [10 原版缺陷及修复边界](10-original-defects.md)
+- [本批执行结果](../43-zip-creation-selector-results.md)
 - [实际执行结果](../42-zip-baseline-execution-results.md)
 
 固定证据目录：
