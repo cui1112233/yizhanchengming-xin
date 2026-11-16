@@ -10,6 +10,7 @@ import (
 // plans retain selections; each new run resolves current content once. Retries
 // reuse the run snapshot, including content removed since the original run.
 type AutomationInput struct {
+	State              *AutomationState  `json:"automationState,omitempty"`
 	ModeInputs         map[string]string `json:"modeInputs"`
 	KnowledgeIDs       []string          `json:"knowledgeIds"`
 	NoteIDs            []string          `json:"noteIds"`
@@ -111,10 +112,23 @@ func scheduleInput(v Schedule) AutomationInput {
 func batchInput(v Batch) AutomationInput {
 	return AutomationInput{ModeInputs: v.ModeInputs, KnowledgeIDs: v.KnowledgeIDs, NoteIDs: v.NoteIDs, StyleProfileID: v.StyleProfileID}
 }
+func scheduleStoredInput(v Schedule) AutomationInput {
+	in := scheduleInput(v)
+	in.State = &v.AutomationState
+	return in
+}
+func batchStoredInput(v Batch) AutomationInput {
+	in := batchInput(v)
+	in.State = &v.AutomationState
+	return in
+}
 func inputJSON(v AutomationInput) string { b, _ := json.Marshal(v); return string(b) }
 func cloneSchedule(v Schedule) Schedule {
 	var in AutomationInput
-	_ = json.Unmarshal([]byte(inputJSON(scheduleInput(v))), &in)
+	_ = json.Unmarshal([]byte(inputJSON(scheduleStoredInput(v))), &in)
+	if in.State != nil {
+		v.AutomationState = *in.State
+	}
 	v.ModeInputs = in.ModeInputs
 	v.KnowledgeIDs = in.KnowledgeIDs
 	v.NoteIDs = in.NoteIDs
@@ -126,7 +140,10 @@ func cloneSchedule(v Schedule) Schedule {
 }
 func cloneBatch(v Batch) Batch {
 	var in AutomationInput
-	_ = json.Unmarshal([]byte(inputJSON(batchInput(v))), &in)
+	_ = json.Unmarshal([]byte(inputJSON(batchStoredInput(v))), &in)
+	if in.State != nil {
+		v.AutomationState = *in.State
+	}
 	v.ModeInputs = in.ModeInputs
 	v.KnowledgeIDs = in.KnowledgeIDs
 	v.NoteIDs = in.NoteIDs

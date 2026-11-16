@@ -312,6 +312,15 @@ type failBatchStopStore struct {
 	updates int
 }
 
+func (s *failBatchStopStore) Atomic(ctx context.Context, owner, project string, fn func(Store) error) error {
+	return s.Store.Atomic(ctx, owner, project, func(tx Store) error {
+		child := &failBatchStopStore{Store: tx, failure: s.failure}
+		e := fn(child)
+		s.updates += child.updates
+		return e
+	})
+}
+
 func (s *failBatchStopStore) UpdateBatch(ctx context.Context, owner string, batch Batch) (Batch, error) {
 	if batch.Status == BatchFailed {
 		s.updates++

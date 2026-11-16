@@ -8,8 +8,8 @@ import (
 
 func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	if len(migrations) != 6 {
-		t.Fatalf("migrations=%d, want 6", len(migrations))
+	if len(migrations) != 7 {
+		t.Fatalf("migrations=%d, want 7", len(migrations))
 	}
 	migration := migrations[0]
 	if migration.Version != 8800300 {
@@ -150,7 +150,7 @@ func TestNovelCreationAutomationInputMigration(t *testing.T) {
 
 func TestNovelWorkerMigrationUsesDurableDispatchAndProjectSlot(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	m := migrations[len(migrations)-1]
+	m := migrations[5]
 	if m.Version != 8800312 {
 		t.Fatalf("worker migration=%d", m.Version)
 	}
@@ -158,6 +158,19 @@ func TestNovelWorkerMigrationUsesDurableDispatchAndProjectSlot(t *testing.T) {
 	for _, part := range []string{"novel_run_dispatch", "execution_json JSON NOT NULL", "PRIMARY KEY (owner_username, run_id)", "novel_project_slots", "fence BIGINT NOT NULL", "lease_until DATETIME(6)", "PRIMARY KEY (owner_username, project_id)"} {
 		if !strings.Contains(sql, part) {
 			t.Fatalf("missing %s", part)
+		}
+	}
+}
+
+func TestNovelAutomationRoundMigrationUniquePlanAndRun(t *testing.T) {
+	m := NovelCreationMigrations()[6]
+	if m.Version != 8800313 {
+		t.Fatal(m.Version)
+	}
+	sql := strings.Join(m.SQL, "\n")
+	for _, part := range []string{"PRIMARY KEY (owner_username, kind, plan_id, round_key)", "UNIQUE KEY uq_novel_automation_run (owner_username, run_id)", "planned_at DATETIME(6)", "REFERENCES novel_runs(owner_username, run_id)"} {
+		if !strings.Contains(sql, part) {
+			t.Fatal("missing " + part)
 		}
 	}
 }

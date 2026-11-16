@@ -11,47 +11,49 @@ import (
 )
 
 type MemoryStore struct {
-	executions      map[string]Execution
-	slots           map[string]ProjectSlot
-	mu              sync.RWMutex
-	nextID          int64
-	nextEventID     int64
-	projects        map[string]Project
-	sessions        map[string]Session
-	messages        map[string][]Message
-	runs            map[string]Run
-	runByKey        map[string]string
-	runEvents       map[string][]RunEvent
-	chapterBundles  map[string]ChapterBundle
-	chapterVersions map[string]ChapterVersion
-	settings        map[string]ProjectSettings
-	foundations     map[string]Foundation
-	materials       map[string]Material
-	notes           map[string]ProjectNote
-	styles          map[string]StyleProfile
-	schedules       map[string]Schedule
-	batches         map[string]Batch
+	automationRounds map[string]string
+	executions       map[string]Execution
+	slots            map[string]ProjectSlot
+	mu               sync.RWMutex
+	nextID           int64
+	nextEventID      int64
+	projects         map[string]Project
+	sessions         map[string]Session
+	messages         map[string][]Message
+	runs             map[string]Run
+	runByKey         map[string]string
+	runEvents        map[string][]RunEvent
+	chapterBundles   map[string]ChapterBundle
+	chapterVersions  map[string]ChapterVersion
+	settings         map[string]ProjectSettings
+	foundations      map[string]Foundation
+	materials        map[string]Material
+	notes            map[string]ProjectNote
+	styles           map[string]StyleProfile
+	schedules        map[string]Schedule
+	batches          map[string]Batch
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		executions:      make(map[string]Execution),
-		slots:           make(map[string]ProjectSlot),
-		projects:        make(map[string]Project),
-		sessions:        make(map[string]Session),
-		messages:        make(map[string][]Message),
-		runs:            make(map[string]Run),
-		runByKey:        make(map[string]string),
-		runEvents:       make(map[string][]RunEvent),
-		chapterBundles:  make(map[string]ChapterBundle),
-		chapterVersions: make(map[string]ChapterVersion),
-		settings:        make(map[string]ProjectSettings),
-		foundations:     make(map[string]Foundation),
-		materials:       make(map[string]Material),
-		notes:           make(map[string]ProjectNote),
-		styles:          make(map[string]StyleProfile),
-		schedules:       make(map[string]Schedule),
-		batches:         make(map[string]Batch),
+		automationRounds: make(map[string]string),
+		executions:       make(map[string]Execution),
+		slots:            make(map[string]ProjectSlot),
+		projects:         make(map[string]Project),
+		sessions:         make(map[string]Session),
+		messages:         make(map[string][]Message),
+		runs:             make(map[string]Run),
+		runByKey:         make(map[string]string),
+		runEvents:        make(map[string][]RunEvent),
+		chapterBundles:   make(map[string]ChapterBundle),
+		chapterVersions:  make(map[string]ChapterVersion),
+		settings:         make(map[string]ProjectSettings),
+		foundations:      make(map[string]Foundation),
+		materials:        make(map[string]Material),
+		notes:            make(map[string]ProjectNote),
+		styles:           make(map[string]StyleProfile),
+		schedules:        make(map[string]Schedule),
+		batches:          make(map[string]Batch),
 	}
 }
 
@@ -770,7 +772,7 @@ func (s *MemoryStore) ListDueSchedules(_ context.Context, now time.Time, limit i
 	}
 	due := make([]Schedule, 0)
 	for _, schedule := range s.schedules {
-		if schedule.Enabled && !schedule.NextRunAt.After(now) {
+		if (schedule.Enabled && !schedule.NextRunAt.After(now)) || schedule.ActiveRound != "" {
 			due = append(due, cloneSchedule(schedule))
 		}
 	}
@@ -854,7 +856,7 @@ func (s *MemoryStore) ListActiveBatches(_ context.Context, limit int) ([]Batch, 
 	}
 	active := make([]Batch, 0)
 	for _, batch := range s.batches {
-		if batch.Status == BatchRunning {
+		if batch.Status == BatchRunning || batch.Status == BatchPaused || (batch.Status == BatchStopped && batch.ActiveRound != "") {
 			active = append(active, cloneBatch(batch))
 		}
 	}

@@ -24,10 +24,11 @@ type Snapshot struct {
 }
 
 type Service struct {
-	store    Store
-	runtime  Runtime
-	pipeline PipelineRunner
-	control  *workerControl
+	automationClock func() time.Time
+	store           Store
+	runtime         Runtime
+	pipeline        PipelineRunner
+	control         *workerControl
 }
 
 func NewService(store Store, runtime Runtime, pipeline PipelineRunner) *Service {
@@ -136,7 +137,8 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	}
 	snapshotFields := map[string]any{
 		"project_settings": settings,
-		"version":          1, "mode": session.Mode, "user_message": input.Content,
+		"source_type":      input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
+		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
 		"knowledge_ids": selected.KnowledgeIDs, "knowledge_materials": selected.Knowledge,
 		"note_ids": selected.NoteIDs, "notes": selected.Notes, "style_profile_id": selected.StyleProfileID, "style_profile": selected.StyleProfile,

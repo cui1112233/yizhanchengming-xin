@@ -21,7 +21,7 @@ func (s *Service) ListBatches(ctx context.Context, owner, projectID string) ([]B
 	return s.store.ListBatches(ctx, strings.TrimSpace(owner), strings.TrimSpace(projectID))
 }
 
-func (s *Service) CreateBatch(ctx context.Context, owner, projectID string, input BatchInput) (Batch, error) {
+func (s *Service) createBatch(ctx context.Context, owner, projectID string, input BatchInput) (Batch, error) {
 	if s == nil || s.store == nil {
 		return Batch{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
@@ -59,78 +59,110 @@ func (s *Service) CreateBatch(ctx context.Context, owner, projectID string, inpu
 		modelID = project.ModelID
 	}
 	return s.store.CreateBatch(ctx, owner, Batch{
-		ModeInputs: selected.ModeInputs, KnowledgeIDs: selected.KnowledgeIDs, NoteIDs: selected.NoteIDs, StyleProfileID: selected.StyleProfileID,
+		AutomationState: AutomationState{MaxConsecutiveFailures: input.MaxConsecutiveFailures},
+		ModeInputs:      selected.ModeInputs, KnowledgeIDs: selected.KnowledgeIDs, NoteIDs: selected.NoteIDs, StyleProfileID: selected.StyleProfileID,
 		ProjectID: projectID, SessionID: input.SessionID, Status: BatchRunning,
 		TotalChapters: input.TotalChapters, Attempt: 1, Prompt: input.Prompt,
 		ModelID: modelID, ThinkingLevel: input.ThinkingLevel,
 	})
 }
 
-func (s *Service) PauseBatch(ctx context.Context, owner, projectID, batchID string) (Batch, error) {
-	batch, err := s.batchInProject(ctx, owner, projectID, batchID)
-	if err != nil {
-		return Batch{}, err
+func (s *Service) CreateBatch(ctx context.Context, owner, project string, input BatchInput) (Batch, error) {
+	if s == nil || s.store == nil {
+		return Batch{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
-	if batch.Status == BatchPaused {
-		return batch, nil
-	}
-	if batch.Status != BatchRunning {
-		return Batch{}, &DomainError{Code: ErrInvalidTransition, Message: "当前批量任务状态不允许暂停"}
-	}
-	batch.Status = BatchPaused
-	return s.store.UpdateBatch(ctx, strings.TrimSpace(owner), batch)
+	owner, project = strings.TrimSpace(owner), strings.TrimSpace(project)
+	var out Batch
+	err := s.store.Atomic(ctx, owner, project, func(tx Store) error {
+		var e error
+		out, e = s.automationChild(tx).createBatch(ctx, owner, project, input)
+		return e
+	})
+	return out, err
 }
-
-func (s *Service) ResumeBatch(ctx context.Context, owner, projectID, batchID string) (Batch, error) {
-	batch, err := s.batchInProject(ctx, owner, projectID, batchID)
-	if err != nil {
-		return Batch{}, err
+func (s *Service) PauseBatch(ctx context.Context, owner, project, id string) (Batch, error) {
+	return s.controlBatch(ctx, owner, project, id, "pause")
+}
+func (s *Service) ResumeBatch(ctx context.Context, owner, project, id string) (Batch, error) {
+	return s.controlBatch(ctx, owner, project, id, "resume")
+}
+func (s *Service) StopBatch(ctx context.Context, owner, project, id string) (Batch, error) {
+	return s.controlBatch(ctx, owner, project, id, "stop")
+}
+func (s *Service) controlBatch(ctx context.Context, owner, project, id, action string) (Batch, error) {
+	if s == nil || s.store == nil {
+		return Batch{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
-	if batch.Status == BatchRunning {
-		return batch, nil
-	}
-	if batch.Status != BatchPaused && batch.Status != BatchFailed {
-		return Batch{}, &DomainError{Code: ErrInvalidTransition, Message: "当前批量任务状态不允许继续"}
-	}
-	if _, err := s.prepareGenerationInput(ctx, strings.TrimSpace(owner), batch.ProjectID, batch.SessionID, batchInput(batch)); err != nil {
-		return Batch{}, err
-	}
-	if batch.Status == BatchFailed {
-		batch.Attempt++
-		batch.CurrentRunID = ""
-	}
-	batch.Status = BatchRunning
-	batch.LastError = ""
-	if batch.CurrentRunID != "" {
-		run, runErr := s.store.GetRun(ctx, strings.TrimSpace(owner), batch.CurrentRunID)
-		if runErr != nil || isTerminalRunStatus(run.Status) {
-			batch.CurrentRunID = ""
-			batch.Attempt++
+	owner, project, id = strings.TrimSpace(owner), strings.TrimSpace(project), strings.TrimSpace(id)
+	var out Batch
+	var cancelledID string
+	err := s.store.Atomic(ctx, owner, project, func(tx Store) error {
+		child := s.automationChild(tx)
+		p, e := child.batchInProject(ctx, owner, project, id)
+		if e != nil {
+			return e
 		}
-	}
-	return s.store.UpdateBatch(ctx, strings.TrimSpace(owner), batch)
-}
-
-func (s *Service) StopBatch(ctx context.Context, owner, projectID, batchID string) (Batch, error) {
-	batch, err := s.batchInProject(ctx, owner, projectID, batchID)
-	if err != nil {
-		return Batch{}, err
-	}
-	owner = strings.TrimSpace(owner)
-	if batch.Status == BatchStopped || batch.Status == BatchCompleted {
-		return batch, nil
-	}
-	if batch.CurrentRunID != "" {
-		if run, runErr := s.store.GetRun(ctx, owner, batch.CurrentRunID); runErr == nil && !isTerminalRunStatus(run.Status) {
-			if _, cancelErr := s.CancelRun(ctx, owner, run.ID); cancelErr != nil {
-				return Batch{}, cancelErr
+		switch action {
+		case "pause":
+			if p.Status != BatchRunning && p.Status != BatchPaused {
+				return &DomainError{Code: ErrInvalidTransition, Message: "当前批量任务状态不允许暂停"}
+			}
+			p.Status = BatchPaused
+			p.StoppedReason = "用户暂停"
+		case "resume":
+			if p.Status != BatchPaused && p.Status != BatchFailed && p.Status != BatchRunning {
+				return &DomainError{Code: ErrInvalidTransition, Message: "当前批量任务状态不允许继续"}
+			}
+			p.defaults()
+			if p.TotalChapters < 1 || p.TotalChapters > 50 || p.MaxConsecutiveFailures < 1 || p.MaxConsecutiveFailures > 10 {
+				return &DomainError{Code: ErrInputRequired, Message: "配置需调整"}
+			}
+			if _, e = child.prepareGenerationInput(ctx, owner, p.ProjectID, p.SessionID, batchInput(p)); e != nil {
+				return e
+			}
+			if r := p.active(); r != nil {
+				if _, e := child.inspectRound(ctx, owner, r); e != nil {
+					return e
+				}
+				if r.ErrorCode == ErrResultUnknown {
+					return unknownResult()
+				}
+			}
+			p.Status = BatchRunning
+			p.StoppedReason = ""
+			p.ConsecutiveFailures = 0
+		case "stop":
+			if p.Status == BatchCompleted {
+				return nil
+			}
+			p.Status = BatchStopped
+			p.StoppedReason = "用户停止"
+			if r := p.active(); r != nil {
+				if _, e := child.inspectRound(ctx, owner, r); e != nil {
+					return e
+				}
+				p.CurrentRunID = r.RunID
+			}
+			if p.CurrentRunID != "" {
+				run, e := tx.GetRun(ctx, owner, p.CurrentRunID)
+				if e != nil {
+					return e
+				}
+				if !isTerminalRunStatus(run.Status) {
+					if e = s.cancelAutomationInTx(ctx, tx, owner, run.ID); e != nil {
+						return e
+					}
+					cancelledID = run.ID
+				}
 			}
 		}
+		out, e = tx.UpdateBatch(ctx, owner, p)
+		return e
+	})
+	if err == nil {
+		s.signalAutomationCancel(ctx, owner, cancelledID)
 	}
-	batch.Status = BatchStopped
-	batch.CurrentRunID = ""
-	batch.Attempt++
-	return s.store.UpdateBatch(ctx, owner, batch)
+	return out, err
 }
 
 func (s *Service) batchInProject(ctx context.Context, owner, projectID, batchID string) (Batch, error) {
@@ -172,88 +204,133 @@ func (s *Service) AdvanceBatches(ctx context.Context) ([]DispatchedBatch, error)
 }
 
 // advanceBatch returns the newly queued run, if any.
-func (s *Service) advanceBatch(ctx context.Context, batch Batch) (Run, error) {
-	owner := batch.OwnerUsername
-	if batch.CompletedChapters >= batch.TotalChapters {
-		batch.Status = BatchCompleted
-		batch.LastError = ""
-		if _, err := s.store.UpdateBatch(ctx, owner, batch); err != nil {
-			return Run{}, err
+func (s *Service) advanceBatch(ctx context.Context, stale Batch) (Run, error) {
+	var out Run
+	var observed error
+	owner := stale.OwnerUsername
+	now := s.automationNow()
+	err := s.store.Atomic(ctx, owner, stale.ProjectID, func(tx Store) error {
+		child := s.automationChild(tx)
+		p, e := tx.GetBatch(ctx, owner, stale.ID)
+		if e != nil {
+			return e
 		}
-		return Run{}, nil
-	}
-	if batch.CurrentRunID != "" {
-		run, err := s.store.GetRun(ctx, owner, batch.CurrentRunID)
-		if err == nil && !isTerminalRunStatus(run.Status) {
-			return Run{}, nil
+		p.defaults()
+		save := func() error { _, e := tx.UpdateBatch(ctx, owner, p); return e }
+		if p.TotalChapters < 1 || p.TotalChapters > 50 || p.MaxConsecutiveFailures < 1 || p.MaxConsecutiveFailures > 10 {
+			p.Status = BatchPaused
+			p.StoppedReason = "配置需调整：章节数或失败阈值超出范围"
+			p.LastError = p.StoppedReason
+			return save()
 		}
-		if err == nil {
-			switch run.Status {
-			case RunSucceeded, RunSucceededWithWarnings:
-				batch.CompletedChapters++
-				batch.CurrentRunID = ""
-				if batch.CompletedChapters >= batch.TotalChapters {
-					batch.Status = BatchCompleted
-					batch.LastError = ""
-					if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
-						return Run{}, updateErr
-					}
-					return Run{}, nil
-				}
-				if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
-					return Run{}, updateErr
-				}
-			case RunFailed:
-				batch.Status = BatchFailed
-				batch.CurrentRunID = ""
-				batch.LastError = run.ErrorMessage
-				if batch.LastError == "" {
-					batch.LastError = "章节生成失败，可继续批量续写重试"
-				}
-				if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
-					return Run{}, updateErr
-				}
-				return Run{}, nil
-			case RunCancelled:
-				batch.Status = BatchStopped
-				batch.CurrentRunID = ""
-				if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
-					return Run{}, updateErr
-				}
-				return Run{}, nil
+		if p.Status != BatchRunning && p.Status != BatchPaused && p.Status != BatchStopped {
+			return nil
+		}
+		if p.CurrentRunID != "" && p.ActiveRound == "" {
+			key := fmt.Sprintf("legacy:%d", p.Attempt)
+			p.Rounds = append(p.Rounds, AutomationRound{Key: key, RunID: p.CurrentRunID, PlannedAt: now})
+			p.ActiveRound = key
+		}
+		previous := ""
+		if r := p.active(); r != nil {
+			outcome, e := child.inspectRound(ctx, owner, r)
+			if e != nil {
+				return e
 			}
+			p.CurrentRunID = r.RunID
+			if outcome == "waiting" {
+				p.WaitingReason = automationWaitReason(r.State)
+				return save()
+			}
+			if outcome == "halt" && r.ErrorCode == ErrResultUnknown {
+				p.Status = BatchFailed
+				p.StoppedReason = "上游结果待确认，已暂停自动重试"
+				p.LastError = p.StoppedReason
+				r.State = "paused"
+				return save()
+			}
+			previous = r.RunID
+			finished := now
+			r.FinishedAt = &finished
+			r.State = outcome
+			if outcome == "success" {
+				r.State = "saved"
+				p.CompletedChapters++
+				p.TotalSavedChapters++
+				p.ConsecutiveFailures = 0
+				p.LastError = ""
+			} else if outcome == "cancelled" {
+				p.Status = BatchStopped
+				p.StoppedReason = "用户停止"
+			} else {
+				p.ConsecutiveFailures++
+				p.LastError = r.ErrorMessage
+				p.LastFailure = r.ErrorMessage
+				if outcome != "failure" || p.ConsecutiveFailures >= p.MaxConsecutiveFailures {
+					if p.Status != BatchStopped {
+						p.Status = BatchFailed
+					}
+					if p.Status != BatchStopped {
+						p.StoppedReason = r.ErrorMessage
+					}
+					if p.StoppedReason == "" {
+						p.StoppedReason = "章节生成失败，请检查运行结果"
+					}
+				}
+			}
+			p.ActiveRound = ""
+			p.CurrentRunID = ""
+			p.Attempt++
+			p.WaitingReason = ""
 		}
-	}
-	run, err := s.dispatchBatchRun(ctx, owner, batch)
-	if err != nil {
-		if IsCode(err, ErrRunInProgress) || IsCode(err, ErrProjectLocked) {
-			return Run{}, nil
+		if p.CompletedChapters >= p.TotalChapters && p.Status != BatchStopped {
+			p.Status = BatchCompleted
+			p.StoppedReason = ""
+			return save()
 		}
-		batch.Status = BatchFailed
-		batch.LastError = err.Error()
-		if IsCode(err, ErrInputRequired) || IsCode(err, ErrSessionNotFound) || IsCode(err, ErrProjectNotFound) {
-			batch.LastError = "配置需调整：" + err.Error()
+		if p.Status != BatchRunning {
+			return save()
 		}
-		if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
-			return Run{}, errors.Join(err, updateErr)
+		if previous == "" && len(p.Rounds) > 0 {
+			previous = p.Rounds[len(p.Rounds)-1].RunID
 		}
-		return Run{}, err
-	}
-	batch.CurrentRunID = run.ID
-	if _, updateErr := s.store.UpdateBatch(ctx, owner, batch); updateErr != nil {
-		return run, updateErr
-	}
-	return run, nil
-}
-
-func (s *Service) dispatchBatchRun(ctx context.Context, owner string, batch Batch) (Run, error) {
-	key := fmt.Sprintf("batch:%s:%d:%d", batch.ID, batch.CompletedChapters+1, batch.Attempt)
-	return s.SendMessage(ctx, owner, SendMessageInput{
-		SessionID: batch.SessionID, ProjectID: batch.ProjectID,
-		Content: batch.Prompt, ModelID: batch.ModelID, ThinkingLevel: batch.ThinkingLevel,
-		ModeInputs: batch.ModeInputs, KnowledgeIDs: batch.KnowledgeIDs, NoteIDs: batch.NoteIDs, StyleProfileID: batch.StyleProfileID,
-		IdempotencyKey: key,
+		key := fmt.Sprintf("batch:%s:%d:%d", p.ID, p.CompletedChapters+1, p.Attempt)
+		run, e := child.queueAutomationMessage(ctx, owner, SendMessageInput{SourceType: "batch", SourcePlanID: p.ID, SourceRound: key, SourceRunID: previous, SessionID: p.SessionID, ProjectID: p.ProjectID, Content: p.Prompt, ModelID: p.ModelID, ThinkingLevel: p.ThinkingLevel, ModeInputs: p.ModeInputs, KnowledgeIDs: p.KnowledgeIDs, NoteIDs: p.NoteIDs, StyleProfileID: p.StyleProfileID, IdempotencyKey: key})
+		if e != nil {
+			if busy(e) {
+				p.WaitingReason = "该作品正在创作，等待空闲"
+				return save()
+			}
+			if IsCode(e, ErrPersistenceFailed) || IsCode(e, ErrIdempotencyConflict) {
+				return e
+			}
+			observed = e
+			p.Status = BatchFailed
+			p.LastError = e.Error()
+			p.StoppedReason = e.Error()
+			if IsCode(e, ErrInputRequired) || IsCode(e, ErrSessionNotFound) || IsCode(e, ErrProjectNotFound) {
+				p.LastError = "配置需调整：" + e.Error()
+				p.StoppedReason = p.LastError
+			}
+			return save()
+		}
+		if e = tx.InsertAutomationRound(ctx, owner, "batch", p.ID, key, run.ID, now); e != nil {
+			return e
+		}
+		p.Rounds = append(p.Rounds, AutomationRound{Key: key, RunID: run.ID, PreviousRunID: previous, PlannedAt: now, State: "queued"})
+		p.ActiveRound = key
+		p.CurrentRunID = run.ID
+		p.WaitingReason = ""
+		out = run
+		return save()
 	})
+	if err != nil {
+		return Run{}, errors.Join(observed, err)
+	}
+	if out.ID != "" {
+		s.Notify(ctx, owner, out.ID)
+	}
+	return out, observed
 }
 
 // StartBatchWorker advances running batches and starts their chapter runs.

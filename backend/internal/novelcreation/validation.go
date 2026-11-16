@@ -13,8 +13,8 @@ const (
 
 	maxKnowledgeMaterials      = 8
 	maxKnowledgeMaterialRunes  = 12000
-	minScheduleIntervalMinutes = 15
-	maxScheduleIntervalMinutes = 10080
+	minScheduleIntervalMinutes = 1
+	maxScheduleIntervalMinutes = 1440
 	minBatchChapters           = 1
 	maxBatchChapters           = 50
 	defaultBatchPrompt         = "继续写下一章，保持已有设定、人物关系和文风。"
@@ -280,6 +280,15 @@ func NormalizeBatchInput(input BatchInput) (BatchInput, error) {
 	if input.SessionID == "" {
 		return BatchInput{}, &DomainError{Code: ErrInputRequired, Message: "请选择批量续写使用的会话"}
 	}
+	if input.TotalChapters == 0 {
+		input.TotalChapters = 5
+	}
+	if input.MaxConsecutiveFailures == 0 {
+		input.MaxConsecutiveFailures = 3
+	}
+	if input.MaxConsecutiveFailures < 1 || input.MaxConsecutiveFailures > 10 {
+		return BatchInput{}, &DomainError{Code: ErrInputRequired, Message: "连续失败阈值必须在 1 到 10 之间"}
+	}
 	if input.TotalChapters < minBatchChapters || input.TotalChapters > maxBatchChapters {
 		return BatchInput{}, &DomainError{Code: ErrInputRequired, Message: "批量续写章节数必须在 1 到 50 之间"}
 	}
@@ -300,11 +309,20 @@ func NormalizeScheduleInput(input ScheduleInput) (ScheduleInput, error) {
 	if input.Prompt == "" {
 		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "定时写作指令不能为空"}
 	}
+	if input.DailyChapterCap == 0 {
+		input.DailyChapterCap = 10
+	}
+	if input.MaxConsecutiveFailures == 0 {
+		input.MaxConsecutiveFailures = 3
+	}
+	if input.DailyChapterCap < 1 || input.DailyChapterCap > 100 || input.MaxConsecutiveFailures < 1 || input.MaxConsecutiveFailures > 10 {
+		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "每日章节上限必须在 1 到 100，连续失败阈值必须在 1 到 10 之间"}
+	}
 	if input.IntervalMinutes == 0 {
-		input.IntervalMinutes = 60
+		input.IntervalMinutes = 30
 	}
 	if input.IntervalMinutes < minScheduleIntervalMinutes || input.IntervalMinutes > maxScheduleIntervalMinutes {
-		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "定时间隔必须在 15 到 10080 分钟之间"}
+		return ScheduleInput{}, &DomainError{Code: ErrInputRequired, Message: "定时间隔必须在 1 到 1440 分钟之间"}
 	}
 	return input, nil
 }

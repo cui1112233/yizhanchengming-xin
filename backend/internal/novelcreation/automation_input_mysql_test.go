@@ -26,7 +26,11 @@ func (a automationJSONArgument) Match(value driver.Value) bool {
 		return false
 	}
 	var got AutomationInput
-	return json.Unmarshal(raw, &got) == nil && reflect.DeepEqual(got, a.want)
+	if json.Unmarshal(raw, &got) != nil {
+		return false
+	}
+	got.State = nil
+	return reflect.DeepEqual(got, a.want)
 }
 
 func scheduleSQLRows(input any) *sqlmock.Rows {

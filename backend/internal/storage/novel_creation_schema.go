@@ -344,5 +344,15 @@ func NovelCreationMigrations() []Migration {
  CONSTRAINT fk_novel_slot_project FOREIGN KEY (owner_username, project_id) REFERENCES novel_projects(owner_username, project_id)
  ) ENGINE=InnoDB`,
 		},
-	}}
+	}, {Version: 8800313, CallbackChecksum: "v88-novel-automation-rounds-v1", SQL: []string{`CREATE TABLE IF NOT EXISTS novel_automation_rounds (
+ owner_username VARCHAR(191) NOT NULL,
+ kind VARCHAR(16) NOT NULL,
+ plan_id VARCHAR(96) NOT NULL,
+ round_key VARCHAR(128) NOT NULL,
+ run_id VARCHAR(96) NOT NULL,
+ planned_at DATETIME(6) NOT NULL,
+ PRIMARY KEY (owner_username, kind, plan_id, round_key),
+ UNIQUE KEY uq_novel_automation_run (owner_username, run_id),
+ CONSTRAINT fk_novel_automation_run FOREIGN KEY (owner_username, run_id) REFERENCES novel_runs(owner_username, run_id)
+ ) ENGINE=InnoDB`}}}
 }

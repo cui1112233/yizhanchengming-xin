@@ -10,6 +10,8 @@ import (
 // Store is the durable boundary for the novel-creation domain. Production
 // implementations persist through MySQL; MemoryStore exists for unit tests.
 type Store interface {
+	HasSavedRun(context.Context, string, string) (bool, error)
+	InsertAutomationRound(context.Context, string, string, string, string, string, time.Time) error
 	Clock(context.Context) (time.Time, error)
 	Atomic(context.Context, string, string, func(Store) error) error
 	GetExecution(context.Context, string, string) (Execution, bool, error)

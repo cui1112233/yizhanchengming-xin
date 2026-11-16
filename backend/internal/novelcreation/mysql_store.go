@@ -1142,6 +1142,9 @@ func scanSchedule(scanner novelScheduleScanner) (Schedule, error) {
 			return Schedule{}, persistenceError(err)
 		}
 	}
+	if input.State != nil {
+		schedule.AutomationState = *input.State
+	}
 	schedule.ModeInputs = input.ModeInputs
 	schedule.KnowledgeIDs = input.KnowledgeIDs
 	schedule.NoteIDs = input.NoteIDs
@@ -1211,7 +1214,7 @@ WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_
   AND EXISTS (SELECT 1 FROM novel_sessions WHERE owner_username = ? AND session_id = ? AND project_id = ?)`,
 		schedule.ID, owner, schedule.ProjectID, schedule.SessionID, schedule.IntervalMinutes, schedule.Enabled, schedule.Prompt,
 		schedule.ModelID, schedule.ThinkingLevel, schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID),
-		schedule.CreatedAt, schedule.UpdatedAt, inputJSON(scheduleInput(schedule)), owner, schedule.ProjectID, owner, schedule.SessionID, schedule.ProjectID)
+		schedule.CreatedAt, schedule.UpdatedAt, inputJSON(scheduleStoredInput(schedule)), owner, schedule.ProjectID, owner, schedule.SessionID, schedule.ProjectID)
 	if err != nil {
 		return Schedule{}, persistenceError(err)
 	}
@@ -1238,7 +1241,7 @@ SET s.session_id = ?, s.interval_minutes = ?, s.enabled = ?, s.prompt = ?, s.mod
     s.next_run_at = ?, s.last_run_at = ?, s.last_run_id = ?, s.updated_at = ?, s.input_snapshot_json = ?
 WHERE s.owner_username = ? AND s.schedule_id = ? AND s.project_id = ? AND p.deleted_at IS NULL`,
 		schedule.SessionID, schedule.IntervalMinutes, schedule.Enabled, schedule.Prompt, schedule.ModelID, schedule.ThinkingLevel,
-		schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID), now, inputJSON(scheduleInput(schedule)), owner, schedule.ID, schedule.ProjectID)
+		schedule.NextRunAt, schedule.LastRunAt, nullableString(schedule.LastRunID), now, inputJSON(scheduleStoredInput(schedule)), owner, schedule.ID, schedule.ProjectID)
 	if err != nil {
 		return Schedule{}, persistenceError(err)
 	}
@@ -1269,7 +1272,7 @@ func (s *MySQLStore) ListDueSchedules(ctx context.Context, now time.Time, limit 
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT `+scheduleColumns+`
 FROM novel_schedules s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
-WHERE s.enabled = 1 AND s.next_run_at <= ? AND p.deleted_at IS NULL
+WHERE ((s.enabled = 1 AND s.next_run_at <= ?) OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(s.input_snapshot_json, '$.automationState.activeRound')), '') <> '') AND p.deleted_at IS NULL
 ORDER BY s.next_run_at LIMIT ?`, now.UTC(), limit)
 	if err != nil {
 		return nil, persistenceError(err)
@@ -1310,6 +1313,9 @@ func scanBatch(scanner novelBatchScanner) (Batch, error) {
 		if err := json.Unmarshal(inputJSON, &input); err != nil {
 			return Batch{}, persistenceError(err)
 		}
+	}
+	if input.State != nil {
+		batch.AutomationState = *input.State
 	}
 	batch.ModeInputs = input.ModeInputs
 	batch.KnowledgeIDs = input.KnowledgeIDs
@@ -1379,7 +1385,7 @@ WHERE EXISTS (SELECT 1 FROM novel_projects WHERE owner_username = ? AND project_
   AND EXISTS (SELECT 1 FROM novel_sessions WHERE owner_username = ? AND session_id = ? AND project_id = ?)`,
 		batch.ID, owner, batch.ProjectID, batch.SessionID, batch.Status, batch.TotalChapters, batch.CompletedChapters,
 		nullableString(batch.CurrentRunID), batch.Attempt, batch.Prompt, batch.ModelID, batch.ThinkingLevel, batch.LastError,
-		batch.CreatedAt, batch.UpdatedAt, inputJSON(batchInput(batch)), owner, batch.ProjectID, owner, batch.SessionID, batch.ProjectID)
+		batch.CreatedAt, batch.UpdatedAt, inputJSON(batchStoredInput(batch)), owner, batch.ProjectID, owner, batch.SessionID, batch.ProjectID)
 	if err != nil {
 		return Batch{}, persistenceError(err)
 	}
@@ -1405,7 +1411,7 @@ SET b.status = ?, b.completed_chapters = ?, b.current_run_id = ?, b.attempt = ?,
     b.thinking_level = ?, b.last_error = ?, b.updated_at = ?, b.input_snapshot_json = ?
 WHERE b.owner_username = ? AND b.batch_id = ? AND b.project_id = ? AND p.deleted_at IS NULL`,
 		batch.Status, batch.CompletedChapters, nullableString(batch.CurrentRunID), batch.Attempt, batch.Prompt,
-		batch.ModelID, batch.ThinkingLevel, batch.LastError, time.Now().UTC(), inputJSON(batchInput(batch)), owner, batch.ID, batch.ProjectID)
+		batch.ModelID, batch.ThinkingLevel, batch.LastError, time.Now().UTC(), inputJSON(batchStoredInput(batch)), owner, batch.ID, batch.ProjectID)
 	if err != nil {
 		return Batch{}, persistenceError(err)
 	}
@@ -1418,7 +1424,7 @@ func (s *MySQLStore) ListActiveBatches(ctx context.Context, limit int) ([]Batch,
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT `+batchColumns+`
 FROM novel_batches b JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
-WHERE b.status = 'running' AND p.deleted_at IS NULL
+WHERE (b.status IN ('running','paused') OR (b.status = 'stopped' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(b.input_snapshot_json, '$.automationState.activeRound')), '') <> '')) AND p.deleted_at IS NULL
 ORDER BY b.updated_at LIMIT ?`, limit)
 	if err != nil {
 		return nil, persistenceError(err)

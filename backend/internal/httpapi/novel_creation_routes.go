@@ -360,6 +360,46 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"run": run})
 	})
+
+	for _, action := range []string{"pause", "resume", "stop"} {
+		action := action
+		handle("POST /api/novel-creation/projects/{projectID}/schedules/{scheduleID}/"+action, func(w http.ResponseWriter, req *http.Request, owner string) {
+			p, e := service.ControlSchedule(req.Context(), owner, req.PathValue("projectID"), req.PathValue("scheduleID"), action)
+			if e != nil {
+				writeNovelCreationError(w, e)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"schedule": p})
+		})
+	}
+	handle("GET /api/novel-creation/projects/{projectID}/schedules/{scheduleID}/logs", func(w http.ResponseWriter, req *http.Request, owner string) {
+		plans, e := service.ListSchedules(req.Context(), owner, req.PathValue("projectID"))
+		if e != nil {
+			writeNovelCreationError(w, e)
+			return
+		}
+		for _, p := range plans {
+			if p.ID == req.PathValue("scheduleID") {
+				writeJSON(w, http.StatusOK, map[string]any{"rounds": p.Rounds})
+				return
+			}
+		}
+		writeNovelCreationError(w, &novelcreation.DomainError{Code: novelcreation.ErrProjectNotFound, Message: "定时任务不存在"})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/batches/{batchID}/logs", func(w http.ResponseWriter, req *http.Request, owner string) {
+		plans, e := service.ListBatches(req.Context(), owner, req.PathValue("projectID"))
+		if e != nil {
+			writeNovelCreationError(w, e)
+			return
+		}
+		for _, p := range plans {
+			if p.ID == req.PathValue("batchID") {
+				writeJSON(w, http.StatusOK, map[string]any{"rounds": p.Rounds})
+				return
+			}
+		}
+		writeNovelCreationError(w, &novelcreation.DomainError{Code: novelcreation.ErrProjectNotFound, Message: "批量任务不存在"})
+	})
 	handle("GET /api/novel-creation/projects/{projectID}/batches", func(w http.ResponseWriter, req *http.Request, owner string) {
 		batches, err := service.ListBatches(req.Context(), owner, req.PathValue("projectID"))
 		if err != nil {
@@ -370,21 +410,22 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("POST /api/novel-creation/projects/{projectID}/batches", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			SessionID      string            `json:"sessionId"`
-			TotalChapters  int               `json:"totalChapters"`
-			Prompt         string            `json:"prompt"`
-			ModelID        string            `json:"modelId"`
-			ThinkingLevel  string            `json:"thinkingLevel"`
-			ModeInputs     map[string]string `json:"modeInputs"`
-			KnowledgeIDs   []string          `json:"knowledgeIds"`
-			NoteIDs        []string          `json:"noteIds"`
-			StyleProfileID string            `json:"styleProfileId"`
+			SessionID              string            `json:"sessionId"`
+			TotalChapters          int               `json:"totalChapters"`
+			MaxConsecutiveFailures int               `json:"maxConsecutiveFailures"`
+			Prompt                 string            `json:"prompt"`
+			ModelID                string            `json:"modelId"`
+			ThinkingLevel          string            `json:"thinkingLevel"`
+			ModeInputs             map[string]string `json:"modeInputs"`
+			KnowledgeIDs           []string          `json:"knowledgeIds"`
+			NoteIDs                []string          `json:"noteIds"`
+			StyleProfileID         string            `json:"styleProfileId"`
 		}
 		if !decode(w, req, &input) {
 			return
 		}
 		batch, err := service.CreateBatch(req.Context(), owner, req.PathValue("projectID"), novelcreation.BatchInput{
-			SessionID: input.SessionID, TotalChapters: input.TotalChapters, Prompt: input.Prompt,
+			MaxConsecutiveFailures: input.MaxConsecutiveFailures, SessionID: input.SessionID, TotalChapters: input.TotalChapters, Prompt: input.Prompt,
 			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID,
 		})
 		if err != nil {
@@ -452,16 +493,18 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 // novelScheduleRequest keeps "enabled" optional while defaulting it to true on
 // creation, matching the frontend switch.
 type novelScheduleRequest struct {
-	SessionID       string            `json:"sessionId"`
-	IntervalMinutes int               `json:"intervalMinutes"`
-	Enabled         *bool             `json:"enabled"`
-	Prompt          string            `json:"prompt"`
-	ModelID         string            `json:"modelId"`
-	ThinkingLevel   string            `json:"thinkingLevel"`
-	ModeInputs      map[string]string `json:"modeInputs"`
-	KnowledgeIDs    []string          `json:"knowledgeIds"`
-	NoteIDs         []string          `json:"noteIds"`
-	StyleProfileID  string            `json:"styleProfileId"`
+	DailyChapterCap        int               `json:"dailyChapterCap"`
+	MaxConsecutiveFailures int               `json:"maxConsecutiveFailures"`
+	SessionID              string            `json:"sessionId"`
+	IntervalMinutes        int               `json:"intervalMinutes"`
+	Enabled                *bool             `json:"enabled"`
+	Prompt                 string            `json:"prompt"`
+	ModelID                string            `json:"modelId"`
+	ThinkingLevel          string            `json:"thinkingLevel"`
+	ModeInputs             map[string]string `json:"modeInputs"`
+	KnowledgeIDs           []string          `json:"knowledgeIds"`
+	NoteIDs                []string          `json:"noteIds"`
+	StyleProfileID         string            `json:"styleProfileId"`
 }
 
 func (r novelScheduleRequest) toInput() novelcreation.ScheduleInput {
@@ -470,7 +513,7 @@ func (r novelScheduleRequest) toInput() novelcreation.ScheduleInput {
 		enabled = *r.Enabled
 	}
 	return novelcreation.ScheduleInput{
-		SessionID: r.SessionID, IntervalMinutes: r.IntervalMinutes, Enabled: enabled,
+		DailyChapterCap: r.DailyChapterCap, MaxConsecutiveFailures: r.MaxConsecutiveFailures, SessionID: r.SessionID, IntervalMinutes: r.IntervalMinutes, Enabled: enabled,
 		Prompt: r.Prompt, ModelID: r.ModelID, ThinkingLevel: r.ThinkingLevel, ModeInputs: r.ModeInputs, KnowledgeIDs: r.KnowledgeIDs, NoteIDs: r.NoteIDs, StyleProfileID: r.StyleProfileID,
 	}
 }

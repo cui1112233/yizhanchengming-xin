@@ -87,6 +87,10 @@ type CreateProjectInput struct {
 }
 
 type SendMessageInput struct {
+	SourceType     string `json:"sourceType,omitempty"`
+	SourcePlanID   string `json:"sourcePlanId,omitempty"`
+	SourceRound    string `json:"sourceRound,omitempty"`
+	SourceRunID    string `json:"sourceRunId,omitempty"`
 	SessionID      string
 	ProjectID      string
 	Content        string
@@ -150,6 +154,7 @@ type ProjectNoteInput struct {
 
 // Schedule is a recurring writing task.
 type Schedule struct {
+	AutomationState
 	ConfigurationError string            `json:"configurationError,omitempty"`
 	ID                 string            `json:"id"`
 	OwnerUsername      string            `json:"-"`
@@ -172,16 +177,18 @@ type Schedule struct {
 }
 
 type ScheduleInput struct {
-	SessionID       string
-	IntervalMinutes int
-	Enabled         bool
-	Prompt          string
-	ModelID         string
-	ThinkingLevel   string
-	ModeInputs      map[string]string `json:"modeInputs"`
-	KnowledgeIDs    []string          `json:"knowledgeIds"`
-	NoteIDs         []string          `json:"noteIds"`
-	StyleProfileID  string            `json:"styleProfileId"`
+	DailyChapterCap        int
+	MaxConsecutiveFailures int
+	SessionID              string
+	IntervalMinutes        int
+	Enabled                bool
+	Prompt                 string
+	ModelID                string
+	ThinkingLevel          string
+	ModeInputs             map[string]string `json:"modeInputs"`
+	KnowledgeIDs           []string          `json:"knowledgeIds"`
+	NoteIDs                []string          `json:"noteIds"`
+	StyleProfileID         string            `json:"styleProfileId"`
 }
 
 // Dashboard aggregates project progress for the data panel.
@@ -198,6 +205,7 @@ type Dashboard struct {
 // Batch is a continuous chapter-generation task. Each chapter is a normal run,
 // so auditing, revision, chapter storage and retry keep working unchanged.
 type Batch struct {
+	AutomationState
 	ID                string            `json:"id"`
 	OwnerUsername     string            `json:"-"`
 	ProjectID         string            `json:"projectId"`
@@ -220,15 +228,16 @@ type Batch struct {
 }
 
 type BatchInput struct {
-	SessionID      string
-	TotalChapters  int
-	Prompt         string
-	ModelID        string
-	ThinkingLevel  string
-	ModeInputs     map[string]string `json:"modeInputs"`
-	KnowledgeIDs   []string          `json:"knowledgeIds"`
-	NoteIDs        []string          `json:"noteIds"`
-	StyleProfileID string            `json:"styleProfileId"`
+	MaxConsecutiveFailures int
+	SessionID              string
+	TotalChapters          int
+	Prompt                 string
+	ModelID                string
+	ThinkingLevel          string
+	ModeInputs             map[string]string `json:"modeInputs"`
+	KnowledgeIDs           []string          `json:"knowledgeIds"`
+	NoteIDs                []string          `json:"noteIds"`
+	StyleProfileID         string            `json:"styleProfileId"`
 }
 
 // StyleProfile is an account-owned, reusable writing style. Import and analysis

@@ -111,6 +111,7 @@ func (s *MemoryStore) Atomic(ctx context.Context, owner, project string, fn func
 	c.materials = maps.Clone(s.materials)
 	c.notes = maps.Clone(s.notes)
 	c.styles = maps.Clone(s.styles)
+	c.automationRounds = maps.Clone(s.automationRounds)
 	c.schedules = maps.Clone(s.schedules)
 	c.batches = maps.Clone(s.batches)
 	c.executions = maps.Clone(s.executions)
@@ -125,6 +126,7 @@ func (s *MemoryStore) Atomic(ctx context.Context, owner, project string, fn func
 	s.projects, s.sessions, s.messages, s.runs, s.runByKey, s.runEvents = c.projects, c.sessions, c.messages, c.runs, c.runByKey, c.runEvents
 	s.chapterBundles, s.chapterVersions, s.settings, s.foundations = c.chapterBundles, c.chapterVersions, c.settings, c.foundations
 	s.materials, s.notes, s.styles, s.schedules, s.batches = c.materials, c.notes, c.styles, c.schedules, c.batches
+	s.automationRounds = c.automationRounds
 	s.executions, s.slots = c.executions, c.slots
 	return nil
 }

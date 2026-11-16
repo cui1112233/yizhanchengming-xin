@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -848,7 +849,7 @@ func TestServiceScheduleDispatchCreatesRunAndAdvancesNextRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reloaded.LastRunID != dispatched[0].Run.ID || !reloaded.NextRunAt.After(now) {
+	if reloaded.LastRunID != dispatched[0].Run.ID || !reloaded.NextRunAt.Equal(schedule.NextRunAt) {
 		t.Fatalf("schedule after dispatch=%+v", reloaded)
 	}
 	second, err := fixture.service.DispatchDueSchedules(context.Background(), now)
@@ -858,6 +859,7 @@ func TestServiceScheduleDispatchCreatesRunAndAdvancesNextRun(t *testing.T) {
 	if len(second) != 0 {
 		t.Fatalf("second dispatch=%+v, want none", second)
 	}
+	finishQueuedRun(t, fixture.store, "alice", dispatched[0].Run, RunSucceeded, "")
 	run, err := fixture.service.RunSchedule(context.Background(), "alice", fixture.project.ID, schedule.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -875,6 +877,23 @@ func finishQueuedRun(t *testing.T, store *MemoryStore, owner string, run Run, st
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if status == RunSucceeded || status == RunSucceededWithWarnings {
+		n := len(store.chapterVersions) + 1
+		if e := store.SaveChapterBundle(context.Background(), owner, ChapterBundle{ProjectID: run.ProjectID, RunID: run.ID, Chapter: Chapter{ID: fmt.Sprintf("chapter-%d", n), ProjectID: run.ProjectID, Number: n, Content: "正文", Version: 1}, ChapterVersion: ChapterVersion{ID: fmt.Sprintf("version-%d", n), ChapterID: fmt.Sprintf("chapter-%d", n), RunID: run.ID, Version: 1, Content: "正文"}, Memories: []Memory{{ID: fmt.Sprintf("memory-%d", n), ChapterID: fmt.Sprintf("chapter-%d", n), Snapshot: json.RawMessage(`{"summary":"已保存的前文"}`)}}, RuntimeSnapshot: json.RawMessage(`{"truthSettlement":{"facts":["已发生"]},"memoryIndex":{"summary":"已保存的前文"}}`), FinalRunStatus: status}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	e, ok, err := store.GetExecution(context.Background(), owner, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		e.State = "done"
+		if err = store.PutExecution(context.Background(), e); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 }
 
 func TestServiceBatchAdvancesChaptersAndCompletes(t *testing.T) {
