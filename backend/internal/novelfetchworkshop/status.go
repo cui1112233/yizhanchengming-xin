@@ -129,7 +129,7 @@ func doneOrPending(document Document, original, ai, submit string) string {
 }
 
 func isDoneState(value string) bool {
-	return hasState(value, "done", "success", "succeeded", "complete", "completed", "ready", "ai_done", "submitted", "uploaded", "restored")
+	return hasState(value, "done", "success", "succeeded", "complete", "completed", "submitted", "uploaded", "restored")
 }
 
 func isSubmitDone(value string) bool {
@@ -137,7 +137,7 @@ func isSubmitDone(value string) bool {
 }
 
 func aiContentReady(document Document) bool {
-	if isDoneState(statusValue(document.Meta, "aiStatus", "ai_status")) {
+	if hasState(statusValue(document.Meta, "aiStatus", "ai_status"), "ai_done", "done", "completed", "success", "succeeded", "ready") {
 		return true
 	}
 	for version, value := range document.Versions {
