@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	xdraw "golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
 
 const (
@@ -48,25 +49,66 @@ func n8ImageMaxBytes() int {
 	return value
 }
 
-// compressImageForUpload 把超过体积上限的图片重编码成 JPEG。未超过上限、
-// 无法解码（如 BMP）或 GIF 动图一律原样返回，避免改变原有语义。
+// n8UploadAcceptedTypes 是 N8 允许直接上传的图片格式。手动换图允许上传
+// WebP，但 N8 不接受 WebP，因此这些格式必须在发布前转码，否则会被判
+// 为“无效图片”。
+var n8UploadAcceptedTypes = map[string]string{
+	"image/jpeg": "image/jpeg",
+	"image/jpg":  "image/jpeg",
+	"image/gif":  "image/gif",
+	"image/bmp":  "image/bmp",
+	"image/png":  "image/png",
+}
+
+// webpTranscodeQuality 是 WebP 转 JPEG 的质量；漫画页以线条和文字为主，
+// 这里用较高画质，避免细小文字发糊。
+const webpTranscodeQuality = 92
+
+// compressImageForUpload 保证返回的内容是 N8 接受的格式，并把超过体积上限
+// 的图片重编码成 JPEG。手动换图允许上传 WebP，但 N8 不接受 WebP，所以这类
+// 图片必须在发布前转码；GIF 动图原样返回，避免改变原有语义。
 func compressImageForUpload(content []byte, mediaType string) ([]byte, string, error) {
-	if len(content) <= n8ImageMaxBytes() {
-		return content, mediaType, nil
+	lowered := strings.ToLower(strings.TrimSpace(mediaType))
+	if lowered == "image/gif" {
+		return content, "image/gif", nil
 	}
-	if strings.EqualFold(mediaType, "image/gif") {
-		return content, mediaType, nil
+	declared, declaredOK := n8UploadAcceptedTypes[lowered]
+	withinLimit := len(content) <= n8ImageMaxBytes()
+	if declaredOK && withinLimit {
+		return content, declared, nil
 	}
-	config, _, err := image.DecodeConfig(bytes.NewReader(content))
+	config, format, err := image.DecodeConfig(bytes.NewReader(content))
 	if err != nil || config.Width < 1 || config.Height < 1 {
-		return content, mediaType, nil
+		if declaredOK {
+			// BMP 等格式由 imageDimensions 单独解析尺寸，这里保持原样。
+			return content, declared, nil
+		}
+		return content, mediaType, fmt.Errorf("图片内容无法识别，无法转码为 N8 支持的格式（声明格式 %s）", fallbackMediaType(mediaType))
 	}
 	if config.Width*config.Height > n8ImageMaxPixels {
 		return content, mediaType, nil
 	}
+	if real, ok := n8UploadAcceptedTypes["image/"+strings.ToLower(format)]; ok && real != "image/gif" && withinLimit && !declaredOK {
+		// 声明格式缺失或写错，但内容本身已经是 N8 支持的格式：按真实格式上传，
+		// 不做无谓的重编码，避免画质损失。
+		log.Printf("n8 image media type corrected %s -> %s", fallbackMediaType(mediaType), real)
+		return content, real, nil
+	}
 	source, _, err := image.Decode(bytes.NewReader(content))
 	if err != nil {
-		return content, mediaType, nil
+		if declaredOK {
+			return content, declared, nil
+		}
+		return content, mediaType, fmt.Errorf("图片格式 %s 无法转码为 JPEG", fallbackMediaType(mediaType))
+	}
+	if !declaredOK && withinLimit {
+		// 体积未超限，只需要换格式，不需要缩边降质。
+		var buffer bytes.Buffer
+		if err := jpeg.Encode(&buffer, source, &jpeg.Options{Quality: webpTranscodeQuality}); err != nil {
+			return content, mediaType, fmt.Errorf("图片转码失败：%w", err)
+		}
+		log.Printf("n8 image transcoded %s %dKB -> jpeg %dKB %dx%d", fallbackMediaType(mediaType), len(content)/1024, buffer.Len()/1024, config.Width, config.Height)
+		return buffer.Bytes(), "image/jpeg", nil
 	}
 	for _, step := range n8UploadLadder {
 		width := int(float64(config.Width)*step.scale + 0.5)
@@ -93,4 +135,14 @@ func compressImageForUpload(content []byte, mediaType string) ([]byte, string, e
 		}
 	}
 	return content, mediaType, nil
+}
+
+// fallbackMediaType 用于拼错误文案：声明格式为空时用「未知格式」兜底，
+// 不让用户看到一句没有主语的中文。
+func fallbackMediaType(mediaType string) string {
+	trimmed := strings.TrimSpace(mediaType)
+	if trimmed == "" {
+		return "未知格式"
+	}
+	return trimmed
 }

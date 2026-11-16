@@ -367,7 +367,7 @@ func (c *Client) prepareImageUpload(ctx context.Context, producer string, input 
 		return pendingImage{}, fmt.Errorf("漫画图片 %s %w", fileName, err)
 	}
 	if uploadType != mediaType {
-		fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName)) + ".jpg"
+		fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName)) + imageFileExtension(uploadType)
 		mediaType = uploadType
 	}
 	width, height, err := imageDimensions(content, mediaType)
@@ -529,6 +529,21 @@ func uniquePositiveIDs(values []int64, label string) ([]int64, error) {
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+// imageFileExtension 返回与媒体类型匹配的文件后缀。转码后必须同步换后缀，
+// 否则会出现「.png 实际是 JPEG」这种声明与实际不一致的上传。
+func imageFileExtension(mediaType string) string {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "image/jpeg", "image/jpg":
+		return ".jpg"
+	case "image/gif":
+		return ".gif"
+	case "image/bmp":
+		return ".bmp"
+	default:
+		return ".png"
+	}
 }
 
 func imageDimensions(content []byte, mediaType string) (int, int, error) {
