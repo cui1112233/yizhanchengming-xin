@@ -34,3 +34,11 @@
 - 第二轮取消保留旧完整稿，取消后同请求不自动重跑；改轮次或改上集规划不能复用原请求；空值保留旧稿。浏览器核对部分稿读回后的实际轮次数、中断原因及再次点击不重复规划。多轮取消信号和等待配置测试通过。
 
 所有模型调用使用受控替身/最终HTTP传输，无新增真实额度消耗。自己的通道目前保持原有非流式HTTP方式；本次对齐的是文本、消息、业务轮次、结果和保存，不代表原版流式事件、逐轮实时推送或桌面像素也已对齐。已有规划的显式继续入口、真实项目更复杂的资产上下文及138分镜续写仍需单独核查。本轮实际4001交付结果随后附记，不能从测试通过推断已经更新。
+
+## 实际4001交付及联合检查
+
+源码提交`6a2e7ca2d96a62e7ac7b2883c53966b74b1c6304`，从提交快照独立构建。替换前核对批量工厂、小说获取和其它任务均空闲；保留13b20876运行包回滚。实际4001 PID31028，运行SHA及manifest均6a2e7ca2，入口`/assets/user-Tp3H7XdY.js`及`ComicScreenplayPage-pktjHMLo.js`与构建字节一致。旧回放作品原始回包逐字一致。
+
+`07-parity-execution/planning-continuation-runtime-20261116/`保存`runtime-verification.json`与`mysql-http-result.json`。联合测试使用真实MySQL、AuthoringService、screenplayTextGenerator、自定义模型通道及最终请求解析，只替换最后HTTP传输。9项检查通过：8轮完整历史、自己的模型入口绑定、重复请求不重发、实际4001签名GET读回相同正文/完整性/轮次/partial状态。独立测试作品清理完成，真实供应商调用为0。
+
+继续发现：原`_emit_plan_progress:3121`对自造window调用`window.onScreenplayAIProgress`，包含type=plan、chapter_index、round、chars、complete、missing，总轮数参数8。证据`planning-native-20261116/planning-progress-events.json`，对应恢复JS`index-DszfAkKD.js:440145/440515`等订阅点。这一实时显示尚未接入CM，下一步需对照真实字段及取消/切页时的迟到通知，不能以最终轮次已显示代替实时进度已对齐。

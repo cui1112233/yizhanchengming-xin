@@ -216,7 +216,37 @@
       "comparison": "all completion fields and reason compared; service persistence and controlled browser duplicate-click checked",
       "remaining": "four guide bodies, eight-round continuation and full planning chain still pending; no paid provider or original desktop pixel acceptance",
       "full_parity_passed": false
+    },
+    {
+      "id": "G20-PLAN-002",
+      "name": "原生四档规划正文、8轮续写与自有模型链",
+      "original": {
+        "declaration": "creation_agent.py:3166,3102,3081,3072; storyboard_plan_guide.py:498; compiled metadata not source",
+        "evidence": [
+          "planning-native-20261116/planning-generation-boundary.json",
+          "planning-native-20261116/planning-generation-extended.json",
+          "planning-native-20261116/planning-previous-excerpts.json",
+          "planning-native-20261116/planning-continuation-tail.json"
+        ]
+      },
+      "cm": {
+        "commit": "6a2e7ca2d96a62e7ac7b2883c53966b74b1c6304",
+        "native_generation_cases": 15,
+        "guide_variants": 8,
+        "continue_message_cases": 16,
+        "append_cases": 60,
+        "actual_mysql_provider_4001_checks": 9,
+        "real_supplier_calls": 0,
+        "evidence": [
+          "37-planning-continuation-results.md",
+          "planning-continuation-runtime-20261116/runtime-verification.json",
+          "planning-continuation-runtime-20261116/mysql-http-result.json"
+        ]
+      },
+      "comparison": "message texts, accumulated output and rounds compared; configured channel and real persistence readback controlled final HTTP verified",
+      "remaining": "native streaming/progress events, explicit continue-existing entry, complex asset context, original pixels and138storyboard continuation pending",
+      "full_parity_passed": false
     }
   ],
-  "latest_runtime_commit": "13b208764f8319fe6c5fd0bc4df931acf37bcdd4"
+  "latest_runtime_commit": "6a2e7ca2d96a62e7ac7b2883c53966b74b1c6304"
 }
