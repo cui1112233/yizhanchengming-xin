@@ -39,14 +39,14 @@ if string(got.PreviousMemory) == "{}" || len(got.PreviousMemory) == 0 { t.Fatal(
 
 **Interfaces:** 定时/批量输入增加ModeInputs、KnowledgeIDs、NoteIDs、StyleProfileID及相应JSON持久字段；统一输入构造函数服务于SendMessage和调度。迁移使用新增版本，不改写旧迁移。
 
-- [ ] 红测：四种附加输入模式创建调度/批次后立即执行，断言发送完整材料；创建缺必填资料时拒绝，不能保存空计划。
+- [x] 红测：四种附加输入模式创建调度/批次后立即执行，断言发送完整材料；创建缺必填资料时拒绝，不能保存空计划。
 
 ```go
 if got.ModeInputs["referenceText"] != "参考片段" { t.Fatal("scheduled run dropped reference") }
 ```
 
-- [ ] 实现：复用同一输入校验与材料归属选择；序列化输入快照；旧缺输入计划暂停并显示配置需调整，不能静默猜值。
-- [ ] 验证：`go test ./internal/novelcreation ./internal/httpapi -run 'Schedule|Batch|ModeInput' -count=1`，覆盖重试/继续快照不变、引用失效与其他账号材料。审查后提交。
+- [x] 实现：复用同一输入校验与材料归属选择；序列化输入快照；旧缺输入计划暂停并显示配置需调整，不能静默猜值。
+- [x] 验证：`go test ./internal/novelcreation ./internal/httpapi -run 'Schedule|Batch|ModeInput' -count=1`，覆盖重试/继续快照不变、引用失效与其他账号材料。审查后提交。
 
 ## Task 3: 可靠任务领取、租约和中断恢复
 
