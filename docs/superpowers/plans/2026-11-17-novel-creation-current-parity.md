@@ -114,15 +114,15 @@ if len(snapshot.SelectedChapterIDs) != 2 { t.Fatal("selected chapter range lost"
 
 **Interfaces:** 使用Task1–6正式API；会话快照恢复、游标轮询、AbortController与单在途请求；草稿键按账号/作品/会话/模式隔离。
 
-- [ ] 红测：点击新建产生新会话；刷新恢复run与正文；慢旧请求不能串作品；IME Enter不发送；定时/批量传材料；所有阈值/Agent字段实际发送并显示保存结果。
+- [x] 红测：点击新建产生新会话；刷新恢复run与正文；慢旧请求不能串作品；IME Enter不发送；定时/批量传材料；所有阈值/Agent字段实际发送并显示保存结果。
 
 ```js
 assert.equal(createdSession.id === previousSession.id, false);
 assert.equal(outgoing.modeInputs.referenceText, '参考片段');
 ```
 
-- [ ] 实现：恢复/新建/草稿逻辑，六模式不同资料视图，导入章节/风格/备注，管理操作和版本列表；不叠透明弹窗，不暴露密钥或内部错误；状态与后端一致。
-- [ ] 验证：前端交互测试加构建；不能用仅匹配源码字符串的4个测试代替浏览器事件。审查后提交。
+- [x] 实现：恢复/新建/草稿逻辑，六模式不同资料视图，导入章节/风格/备注，管理操作和版本列表；不叠透明弹窗，不暴露密钥或内部错误；状态与后端一致。
+- [x] 验证：前端交互测试加构建；不能用仅匹配源码字符串的4个测试代替浏览器事件。审查后提交。
 
 ## Task 8: 同状态对照、本地4001交付与总审
 
