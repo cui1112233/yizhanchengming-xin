@@ -45,6 +45,8 @@ type MaterialChapter struct {
 	Characters int    `json:"characters"`
 }
 type DocumentJob struct {
+	CanRetry   bool               `json:"canRetry"`
+	CanDelete  bool               `json:"canDelete"`
 	ID         string             `json:"id"`
 	ProjectID  string             `json:"projectId"`
 	Filename   string             `json:"filename"`
@@ -118,7 +120,25 @@ func getDocument(ctx context.Context, st Store, owner, project, id string) (Docu
 	return v.Job, nil
 }
 func (s *Service) GetDocument(ctx context.Context, owner, project, id string) (DocumentJob, error) {
-	return getDocument(ctx, s.store, owner, project, id)
+	j, err := getDocument(ctx, s.store, owner, project, id)
+	if err != nil {
+		return j, err
+	}
+	r, _, err := s.store.GetContentRecord(ctx, owner, project, "document", id)
+	if err != nil {
+		return j, err
+	}
+	now, err := s.store.Clock(ctx)
+	if err != nil {
+		return j, err
+	}
+	return publicDocumentCapabilities(j, r, now), nil
+}
+func publicDocumentCapabilities(j DocumentJob, r ContentRecord, now time.Time) DocumentJob {
+	liveUpload := r.Status == "uploading" && r.LeaseUntil.After(now)
+	j.CanRetry = !liveUpload && (j.Status == "failed" || j.Status == "uploading")
+	j.CanDelete = !liveUpload && j.Status != "deleted"
+	return j
 }
 func (s *Service) ListDocuments(ctx context.Context, owner, project string) ([]DocumentJob, error) {
 	rows, e := s.store.ListContentRecords(ctx, owner, project, "document")
@@ -126,6 +146,10 @@ func (s *Service) ListDocuments(ctx context.Context, owner, project string) ([]D
 		return nil, e
 	}
 	out := []DocumentJob{}
+	now, e := s.store.Clock(ctx)
+	if e != nil {
+		return nil, e
+	}
 	for _, r := range rows {
 		if r.Status == "deleted" {
 			continue
@@ -135,7 +159,7 @@ func (s *Service) ListDocuments(ctx context.Context, owner, project string) ([]D
 			return nil, e
 		}
 		v.Job.Object = DocumentObject(v.Object)
-		out = append(out, v.Job)
+		out = append(out, publicDocumentCapabilities(v.Job, r, now))
 	}
 	return out, nil
 }

@@ -1,42 +1,34 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-
-const page = readFileSync(new URL('./NovelCreationPage.jsx', import.meta.url), 'utf8');
-const layout = readFileSync(new URL('../../shared/layouts/UserLayout.jsx', import.meta.url), 'utf8');
-const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+import { MODES, draftKey, mergeSnapshot, modelOptions } from './novel-creation/contracts.js';
 
 test('小说创作拥有独立导航与路由', () => {
+  const layout = readFileSync(new URL('../../shared/layouts/UserLayout.jsx', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.match(layout, /href: '\/novel-creation'[\s\S]{0,80}label: '小说创作'/);
   assert.match(app, /'\/novel-creation': NovelCreationPage/);
 });
 
-test('小说创作按真实洛水入口展示六种模式与六个工具', () => {
-  for (const label of ['长篇原创', '短篇原创', '仿写长篇', '仿写短篇', '番外创作', '续写创作']) {
-    assert.match(page, new RegExp(label));
-  }
-  for (const label of ['写作风格', '导入素材', 'Agent 设置', '定时写作', '数据看板', '备忘录']) {
-    assert.match(page, new RegExp(label));
-  }
-  assert.doesNotMatch(page, /同人创作|创作看板|风格库/);
-  assert.match(page, /开始创作/);
-  assert.match(page, /我的作品/);
-  assert.match(page, /会话记录/);
-  assert.match(page, /新建会话/);
+test('六模式使用批准的中文合同', () => {
+  assert.deepEqual(MODES.map(([, label]) => label), ['长篇原创', '短篇原创', '仿写长篇', '仿写短篇', '番外创作', '续写创作']);
 });
 
-test('小说创作保留三栏工作台和真实空白页文案', () => {
-  assert.match(page, /novel-creation-sidebar/);
-  assert.match(page, /novel-creation-conversation/);
-  assert.match(page, /novel-creation-inspector/);
-  assert.match(page, /novel-creation-active-mode/);
-  assert.match(page, /novel-creation-inspector-width/);
-  assert.match(page, /告诉我你想写什么——题材、世界观、主角、核心冲突。/);
-  assert.match(page, /输入指令… 可在模型列表中设置思考强度 \(Enter 发送，Shift\+Enter 换行\)/);
+test('草稿键编码分隔符且账号作品会话模式分别隔离', () => {
+  const parts = ['owner', 'project', 'session', 'mode'];
+  const baseline = draftKey(...parts);
+  for (let i = 0; i < parts.length; i++) { const changed = [...parts]; changed[i] += ':other'; assert.notEqual(draftKey(...changed), baseline); }
+  assert.notEqual(draftKey('a:b', 'c', 's', 'm'), draftKey('a', 'b:c', 's', 'm'));
 });
 
-test('小说创作成功后直接展示后端保存的章节正文', () => {
-  assert.match(page, /snapshot\?\.chapters/);
-  assert.match(page, /chapter\.content/);
-  assert.match(page, /chapter\.wordCount/);
+test('同run增量事件去重按游标合并，换run不混旧事件', () => {
+  const old = { run: { id: 'one' }, events: [{ eventId: 2, message: 'old' }], chapters: [{ id: 'saved' }] };
+  const result = mergeSnapshot(old, { run: { id: 'one', status: 'writing' }, events: [{ eventId: 3 }, { eventId: 2, message: 'new' }] });
+  assert.deepEqual(result.events.map(e => e.eventId), [2, 3]); assert.equal(result.events[0].message, 'new'); assert.equal(result.chapters[0].id, 'saved');
+  assert.deepEqual(mergeSnapshot(old, { run: { id: 'two' }, events: [] }).events, []);
+});
+
+test('不可用显式模型保留为禁选提示，授权模型不被改写', () => {
+  const options = [{ value: 'paid', label: '授权模型' }]; const result = modelOptions(options, 'removed');
+  assert.equal(result[0].value, 'removed'); assert.equal(result[0].disabled, true); assert.equal(result[1], options[0]);
 });

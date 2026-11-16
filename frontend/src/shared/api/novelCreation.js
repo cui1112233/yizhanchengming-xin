@@ -1,5 +1,19 @@
 import { apiRequest } from './client.js';
 
+// Every workspace request can be cancelled when its account/project/session changes.
+export function novelRequest(path, input, options = {}) {
+  return apiRequest(`/api/novel-creation${path}`, {
+    suppressGlobalError: true, ...options,
+    ...(input === undefined ? {} : { method: options.method || 'POST', body: input instanceof FormData ? input : JSON.stringify(input) })
+  });
+}
+export function novelProjectRequest(projectId, path = '', input, options) {
+  return novelRequest(`/projects/${encodeURIComponent(projectId)}${path}`, input, options);
+}
+export function getNovelCreationSessionSnapshot(sessionId, signal) {
+  return novelRequest(`/sessions/${encodeURIComponent(sessionId)}/snapshot`, undefined, { signal });
+}
+
 export function listNovelCreationModes() {
   return apiRequest('/api/novel-creation/modes');
 }
