@@ -462,8 +462,8 @@ export function BatchFactoryGiantMaterialImportModal({ open, batch, onCancel, on
     footer={<Space wrap><Button onClick={close} disabled={busy}>关闭</Button>{busy ? <Button danger onClick={() => controllerRef.current?.abort()}>取消读取</Button> : null}<Button onClick={retryFailed} disabled={busy || !summary.error}>重试失败项</Button><Button type="primary" onClick={startQueue} loading={busy} disabled={!canStart}>{busy ? '顺序读取中…' : '开始读取并登记'}</Button></Space>}
   >
     <BatchFactoryGiantMaterialExecutorStatus job={executorJob} onHealthChange={setExecutorHealth} onInstall={showExecutorInstallHelp} />
-    <Alert type="info" showIcon message="支持批量巨量素材 ID" description="每行或用逗号分隔一条 ID。系统会顺序读取，成功后登记到当前批量；重复 ID 自动跳过，不保存 MP4 或抽帧文件。" />
-    <label className="shuihuo-form-label" htmlFor="batch-giant-material-id">巨量素材 ID（可多条）</label>
+    <Alert type="info" showIcon message="支持批量巨量素材 ID" description="每行、制表符、空格、逗号或分号分隔都可以。系统会顺序读取，成功后登记到当前批量；重复 ID 自动跳过，不保存 MP4 或抽帧文件。" />
+    <label className="shuihuo-form-label" htmlFor="batch-giant-material-id">巨量素材 ID（可多条，支持整列粘贴）</label>
     <Input.TextArea id="batch-giant-material-id" value={giantMaterialInput} disabled={busy} onChange={event => setGiantMaterialInput(event.target.value)} rows={5} placeholder="例如：\n7689285397448523826\n7613606077155459091" />
     {invalidIds.length ? <Alert style={{ marginTop: 10 }} type="warning" showIcon message="已忽略格式不正确的内容" description={invalidIds.join('、')} /> : null}
     {!batch?.id ? <Alert style={{ marginTop: 10 }} type="info" showIcon message="尚未选择批量" description="读取完成后会自动创建一个新的批量工程，并把后续素材都登记进去。" /> : null}
