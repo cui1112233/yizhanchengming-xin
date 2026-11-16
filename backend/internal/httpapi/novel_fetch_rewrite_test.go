@@ -233,6 +233,24 @@ func TestApplySensitiveAIRepairRetriesGroupParseFailure(t *testing.T) {
 	}
 }
 
+func TestApplySensitiveAIRepairAcceptsGroupJSONWithRawNewlines(t *testing.T) {
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		return "[\"第一段\n已改\",\"第二段\n已改\"]", nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": true}}
+	items := []map[string]any{
+		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段已替换"},
+		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段已替换"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换", items, nil)
+	if text != "第一段已改\n第二段已改" {
+		t.Fatalf("raw newline output was not normalized: %q", text)
+	}
+	if got[0]["status"] != "done" || got[1]["status"] != "done" || got[0]["attempt"] != 1 {
+		t.Fatalf("raw newline output should be accepted on the first attempt: %#v", got)
+	}
+}
+
 func TestApplySensitiveAIRepairAcceptsJSONArrayWrappedInProviderCommentary(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
 		return "Text response:\n[\"第一段已改\",\"第二段已改\"]\n处理完成", nil

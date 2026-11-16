@@ -1462,6 +1462,11 @@ func decodeSensitiveRepairArray(output string, repaired *[]string) error {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), repaired); err == nil {
 		return nil
 	}
+	// 模型经常在 JSON 字符串里直接换行（invalid character '\n' in string literal）。
+	// 先把字符串内部的裸控制字符转义，再按原样解析，避免整组命中白白落到兜底。
+	if err := json.Unmarshal([]byte(escapeRawControlCharsInJSON(strings.TrimSpace(output))), repaired); err == nil {
+		return nil
+	}
 	// A few OpenAI-compatible providers prepend labels such as "Text response:"
 	// even when JSON mode is requested. Accept the first complete string array
 	// while keeping the existing length and sensitive-word checks below.
@@ -1469,14 +1474,56 @@ func decodeSensitiveRepairArray(output string, repaired *[]string) error {
 		if char != '[' {
 			continue
 		}
-		candidate := []string{}
-		decoder := json.NewDecoder(strings.NewReader(output[offset:]))
-		if err := decoder.Decode(&candidate); err == nil {
-			*repaired = candidate
-			return nil
+		for _, text := range []string{output[offset:], escapeRawControlCharsInJSON(output[offset:])} {
+			candidate := []string{}
+			decoder := json.NewDecoder(strings.NewReader(text))
+			if err := decoder.Decode(&candidate); err == nil {
+				*repaired = candidate
+				return nil
+			}
 		}
 	}
 	return json.Unmarshal([]byte(strings.TrimSpace(output)), repaired)
+}
+
+// escapeRawControlCharsInJSON 只处理字符串字面量内部的裸换行/制表符，
+// 字符串外部的结构和转义原样保留。
+func escapeRawControlCharsInJSON(raw string) string {
+	var builder strings.Builder
+	builder.Grow(len(raw))
+	inString := false
+	escaped := false
+	for _, char := range raw {
+		if !inString {
+			if char == '"' {
+				inString = true
+			}
+			builder.WriteRune(char)
+			continue
+		}
+		if escaped {
+			builder.WriteRune(char)
+			escaped = false
+			continue
+		}
+		switch char {
+		case '\\':
+			builder.WriteRune(char)
+			escaped = true
+		case '"':
+			inString = false
+			builder.WriteRune(char)
+		case '\n':
+			builder.WriteString(`\n`)
+		case '\r':
+			builder.WriteString(`\r`)
+		case '\t':
+			builder.WriteString(`\t`)
+		default:
+			builder.WriteRune(char)
+		}
+	}
+	return builder.String()
 }
 
 // 与批量原文改文系统源码保持一致的敏感词系统提示。
@@ -1640,6 +1687,10 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 					lastErr = fmt.Errorf("AI 整组返回数量不完整：%d/%d", len(repaired), len(active))
 					userPrompt += fmt.Sprintf("\n\n上次返回数量不完整（%d/%d）。必须返回正好 %d 个元素的 JSON 数组。", len(repaired), len(active), len(active))
 					continue
+				}
+				// 片段替换必须保持单行，否则会打乱后续按行分块的改文行号。
+				for index := range repaired {
+					repaired[index] = strings.TrimSpace(strings.NewReplacer("\r\n", "", "\n", "", "\r", "").Replace(repaired[index]))
 				}
 				unsafe := false
 				for index, repairedText := range repaired {
