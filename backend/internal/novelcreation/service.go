@@ -116,7 +116,16 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
-	chapterNumber := len(chapters) + 1
+	continuity, err := s.loadContinuity(ctx, owner, input.ProjectID, chapters)
+	if err != nil {
+		return Run{}, err
+	}
+	chapterNumber := 1
+	for _, chapter := range chapters {
+		if chapter.Number >= chapterNumber {
+			chapterNumber = chapter.Number + 1
+		}
+	}
 	var confirmedFoundation json.RawMessage
 	if foundation, found, findErr := s.store.GetFoundation(ctx, owner, input.ProjectID); findErr != nil {
 		return Run{}, findErr
@@ -135,8 +144,9 @@ func (s *Service) SendMessage(ctx context.Context, owner string, input SendMessa
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": modeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
 		"knowledge_ids": knowledgeIDs, "knowledge_materials": knowledgeMaterials,
-		"previous_truth": map[string]any{}, "previous_memory": map[string]any{},
-		"message_id": message.ID,
+		"previous_truth": continuity.Truth, "previous_memory": continuity.Memory,
+		"previous_chapters": continuity.Chapters,
+		"message_id":        message.ID,
 	}
 	if len(confirmedFoundation) > 0 {
 		snapshotFields["confirmed_foundation"] = json.RawMessage(confirmedFoundation)
@@ -201,11 +211,20 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 		ConfirmedFoundation json.RawMessage     `json:"confirmed_foundation"`
 		KnowledgeIDs        []string            `json:"knowledge_ids"`
 		KnowledgeMaterials  []KnowledgeMaterial `json:"knowledge_materials"`
+		ExpectedTarget      *PreviousChapter    `json:"expected_target"`
+		RetryOfRunID        string              `json:"retry_of_run_id"`
+		PreviousChapters    []PreviousChapter   `json:"previous_chapters"`
 		PreviousTruth       json.RawMessage     `json:"previous_truth"`
 		PreviousMemory      json.RawMessage     `json:"previous_memory"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
+	}
+	if err := s.validateTargetVersion(ctx, owner, run.ProjectID, prompt.ExpectedTarget); err != nil {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "前文版本已变更，请重新确认创作", err)
+	}
+	if err := s.validateContinuity(ctx, owner, run.ProjectID, prompt.PreviousChapters, prompt.ChapterNumber, prompt.RetryOfRunID != ""); err != nil {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "前文资料读取失败，已停止本次创作", err)
 	}
 	settings, err := s.store.GetProjectSettings(ctx, owner, run.ProjectID)
 	if err != nil {
@@ -220,7 +239,7 @@ func (s *Service) Run(ctx context.Context, owner, runID string) (Run, error) {
 	bundle, runErr := s.pipeline.Run(ctx, RunContext{
 		OwnerUsername: owner, Run: run, Project: project, Session: session,
 		UserMessage: prompt.UserMessage, ChapterNumber: prompt.ChapterNumber,
-		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, Runtime: s.runtime,
+		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, PreviousChapters: prompt.PreviousChapters, Runtime: s.runtime,
 		ModeInputs: prompt.ModeInputs, StyleProfile: settings.StyleProfile, Rules: settings.Rules,
 		Checkpoint:          prompt.Checkpoint && len(prompt.ConfirmedFoundation) == 0,
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
@@ -276,6 +295,21 @@ func (s *Service) RetryRun(ctx context.Context, owner, runID string) (Run, error
 	var snapshot map[string]any
 	if err := json.Unmarshal(source.PromptSnapshot, &snapshot); err != nil {
 		return Run{}, &DomainError{Code: ErrPersistenceFailed, Message: "原任务输入快照损坏", Cause: err}
+	}
+	var original struct {
+		ChapterNumber int `json:"chapter_number"`
+	}
+	if err := json.Unmarshal(source.PromptSnapshot, &original); err != nil {
+		return Run{}, continuityError(err)
+	}
+	chapters, err := s.store.ListChapters(ctx, owner, source.ProjectID)
+	if err != nil {
+		return Run{}, continuityError(err)
+	}
+	for _, chapter := range chapters {
+		if chapter.Number == original.ChapterNumber {
+			snapshot["expected_target"] = PreviousChapter{ChapterID: chapter.ID, Version: chapter.Version, Number: chapter.Number, Ending: chapter.Content}
+		}
 	}
 	snapshot["retry_of_run_id"] = source.ID
 	promptSnapshot, _ := json.Marshal(snapshot)

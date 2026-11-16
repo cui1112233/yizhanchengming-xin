@@ -40,15 +40,16 @@ type EventSink interface {
 // Runtime is used only for cancellation checks; durable writes remain the
 // caller's responsibility after Run returns a complete ChapterBundle.
 type RunContext struct {
-	OwnerUsername  string
-	Run            Run
-	Project        Project
-	Session        Session
-	UserMessage    string
-	ChapterNumber  int
-	PreviousTruth  json.RawMessage
-	PreviousMemory json.RawMessage
-	Runtime        Runtime
+	OwnerUsername    string
+	Run              Run
+	Project          Project
+	Session          Session
+	UserMessage      string
+	ChapterNumber    int
+	PreviousChapters []PreviousChapter
+	PreviousTruth    json.RawMessage
+	PreviousMemory   json.RawMessage
+	Runtime          Runtime
 	// ModeInputs is the validated mode-specific contract payload.
 	ModeInputs map[string]string
 	// StyleProfile and Rules are project-level writing constraints injected into
@@ -268,6 +269,8 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 			"foundation_plan":      foundation,
 			"chapter_number":       chapterNumber,
 			"target_chapter_words": input.Project.TargetChapterWords,
+			"previous_truth":       rawJSONValue(input.PreviousTruth),
+			"previous_chapters":    input.PreviousChapters,
 			"memory_context":       rawJSONValue(input.PreviousMemory),
 			"user_message":         input.UserMessage,
 		},
@@ -296,6 +299,8 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 			"knowledge_materials": input.KnowledgeMaterials,
 			"foundation_plan":     foundation,
 			"chapter_plan":        plan,
+			"previous_truth":      rawJSONValue(input.PreviousTruth),
+			"previous_chapters":   input.PreviousChapters,
 			"memory_context":      rawJSONValue(input.PreviousMemory),
 		},
 		temperature: 0.75, maxTokens: 12000,
@@ -345,10 +350,12 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		revisionRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 			definition: novelprompt.ChapterRevision, step: RunRevising,
 			userPayload: map[string]any{
-				"chapter_content": bestContent,
-				"chapter_plan":    plan,
-				"audit_issues":    bestAudit.Issues,
-				"memory_context":  rawJSONValue(input.PreviousMemory),
+				"chapter_content":   bestContent,
+				"chapter_plan":      plan,
+				"audit_issues":      bestAudit.Issues,
+				"previous_truth":    rawJSONValue(input.PreviousTruth),
+				"previous_chapters": input.PreviousChapters,
+				"memory_context":    rawJSONValue(input.PreviousMemory),
 			},
 			temperature: 0.55, maxTokens: 12000,
 			validate: func() error { return validateRevision(revision, bestAudit.Issues) },
@@ -450,6 +457,8 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 			"chapter_content":     content,
 			"rules":               input.Rules,
 			"knowledge_materials": input.KnowledgeMaterials,
+			"previous_truth":      rawJSONValue(input.PreviousTruth),
+			"previous_chapters":   input.PreviousChapters,
 			"memory_context":      rawJSONValue(input.PreviousMemory),
 		},
 		temperature: 0.2, maxTokens: 4500,
@@ -1017,6 +1026,7 @@ func buildChapterBundle(input RunContext, volume foundationVolume, foundationRaw
 		return ChapterBundle{}, err
 	}
 	versionSnapshot, err := json.Marshal(map[string]any{
+		"truthSettlement": json.RawMessage(settlementRaw), "memoryIndex": json.RawMessage(memoryRaw),
 		"chapterPlan": json.RawMessage(planRaw), "modelOutput": json.RawMessage(contentRaw), "finalAudit": json.RawMessage(auditRaw),
 	})
 	if err != nil {

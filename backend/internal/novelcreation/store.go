@@ -25,6 +25,7 @@ type Store interface {
 	AppendRunEvent(context.Context, string, RunEvent) (RunEvent, error)
 	ListRunEvents(context.Context, string, string, int64) ([]RunEvent, error)
 	ListChapters(context.Context, string, string) ([]Chapter, error)
+	GetChapterMemory(context.Context, string, string, string) (Memory, bool, error)
 	SaveChapterBundle(context.Context, string, ChapterBundle) error
 	// GetProjectSettings returns the project-level style profile and creation
 	// rules. A project without a saved row returns zero values, not an error.
@@ -206,12 +207,14 @@ type Foundation struct {
 }
 
 type Memory struct {
-	ID        string
-	ProjectID string
-	ChapterID string
-	Snapshot  json.RawMessage
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ChapterVersion int
+	PreviousTruth  json.RawMessage
+	ID             string
+	ProjectID      string
+	ChapterID      string
+	Snapshot       json.RawMessage
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type Audit struct {

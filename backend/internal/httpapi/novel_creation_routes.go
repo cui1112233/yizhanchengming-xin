@@ -113,6 +113,14 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"session": session})
 	})
+	handle("GET /api/novel-creation/sessions/{sessionID}/snapshot", func(w http.ResponseWriter, req *http.Request, owner string) {
+		snapshot, err := service.GetSessionSnapshot(req.Context(), owner, req.PathValue("sessionID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, snapshot)
+	})
 	handle("POST /api/novel-creation/sessions/{sessionID}/messages", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
 			ProjectID     string            `json:"projectId"`
