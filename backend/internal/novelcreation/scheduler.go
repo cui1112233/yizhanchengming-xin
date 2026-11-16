@@ -33,7 +33,14 @@ func (s *Service) createSchedule(ctx context.Context, owner, projectID string, i
 		return Schedule{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
 	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
-	input, err := NormalizeScheduleInput(input)
+	if found, ok, err := s.findScheduleCreation(ctx, owner, projectID, input); err != nil || ok {
+		return found, err
+	}
+	creationID, creation, err := automationCreation(owner, projectID, "schedule", input.IdempotencyKey, input)
+	if err != nil {
+		return Schedule{}, err
+	}
+	input, err = NormalizeScheduleInput(input)
 	if err != nil {
 		return Schedule{}, err
 	}
@@ -58,12 +65,16 @@ func (s *Service) createSchedule(ctx context.Context, owner, projectID string, i
 	}
 	now := s.automationNow()
 	schedule := Schedule{
+		Creation:        creation,
 		AutomationState: AutomationState{Status: "not_started", DailyChapterCap: input.DailyChapterCap, MaxConsecutiveFailures: input.MaxConsecutiveFailures},
 		ModeInputs:      selected.ModeInputs, KnowledgeIDs: selected.KnowledgeIDs, NoteIDs: selected.NoteIDs, StyleProfileID: selected.StyleProfileID,
 		ID: novelID("schedule"), ProjectID: projectID, SessionID: input.SessionID,
 		IntervalMinutes: input.IntervalMinutes, Enabled: input.Enabled, Prompt: input.Prompt,
 		ModelID: modelID, ThinkingLevel: input.ThinkingLevel,
 		NextRunAt: now.Add(time.Duration(input.IntervalMinutes) * time.Minute),
+	}
+	if creation != nil {
+		schedule.ID = creationID
 	}
 	return s.store.CreateSchedule(ctx, owner, schedule)
 }
@@ -110,7 +121,28 @@ func (s *Service) updateSchedule(ctx context.Context, owner, projectID, schedule
 		schedule.Status = "paused"
 		schedule.StoppedReason = "用户暂停"
 	}
-	schedule.ModeInputs = selected.ModeInputs
+	if schedule.SessionID == input.SessionID {
+		preserved := map[string]string{}
+		known := map[string]bool{}
+		for _, field := range ModeInputFields(session.Mode) {
+			known[field.Key] = true
+		}
+		for key, value := range schedule.ModeInputs {
+			if !known[key] {
+				preserved[key] = value
+			}
+		}
+		for key, value := range selected.ModeInputs {
+			preserved[key] = value
+		}
+		if len(preserved) == 0 {
+			schedule.ModeInputs = nil
+		} else {
+			schedule.ModeInputs = preserved
+		}
+	} else {
+		schedule.ModeInputs = selected.ModeInputs
+	}
 	schedule.KnowledgeIDs = selected.KnowledgeIDs
 	schedule.NoteIDs = selected.NoteIDs
 	schedule.StyleProfileID = selected.StyleProfileID

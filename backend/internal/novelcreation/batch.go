@@ -26,7 +26,14 @@ func (s *Service) createBatch(ctx context.Context, owner, projectID string, inpu
 		return Batch{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
 	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
-	input, err := NormalizeBatchInput(input)
+	if found, ok, err := s.findBatchCreation(ctx, owner, projectID, input); err != nil || ok {
+		return found, err
+	}
+	creationID, creation, err := automationCreation(owner, projectID, "batch", input.IdempotencyKey, input)
+	if err != nil {
+		return Batch{}, err
+	}
+	input, err = NormalizeBatchInput(input)
 	if err != nil {
 		return Batch{}, err
 	}
@@ -59,6 +66,7 @@ func (s *Service) createBatch(ctx context.Context, owner, projectID string, inpu
 		modelID = project.ModelID
 	}
 	return s.store.CreateBatch(ctx, owner, Batch{
+		ID: creationID, Creation: creation,
 		AutomationState: AutomationState{MaxConsecutiveFailures: input.MaxConsecutiveFailures},
 		ModeInputs:      selected.ModeInputs, KnowledgeIDs: selected.KnowledgeIDs, NoteIDs: selected.NoteIDs, StyleProfileID: selected.StyleProfileID,
 		ProjectID: projectID, SessionID: input.SessionID, Status: BatchRunning,
@@ -72,6 +80,9 @@ func (s *Service) CreateBatch(ctx context.Context, owner, project string, input 
 		return Batch{}, &DomainError{Code: ErrPersistenceFailed, Message: "novel store is unavailable"}
 	}
 	owner, project = strings.TrimSpace(owner), strings.TrimSpace(project)
+	if found, ok, err := s.findBatchCreation(ctx, owner, project, input); err != nil || ok {
+		return found, err
+	}
 	var out Batch
 	err := s.store.Atomic(ctx, owner, project, func(tx Store) error {
 		var e error

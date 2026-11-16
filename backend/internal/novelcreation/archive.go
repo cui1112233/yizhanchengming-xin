@@ -155,6 +155,9 @@ func (s *Service) DeleteNote(ctx context.Context, o, p, id string) error {
 	return e
 }
 func (s *Service) CreateSchedule(ctx context.Context, o, p string, in ScheduleInput) (Schedule, error) {
+	if found, ok, err := s.findScheduleCreation(ctx, o, p, in); err != nil || ok {
+		return found, err
+	}
 	return mutateValue(ctx, s, o, p, func(c *Service) (Schedule, error) { return c.createSchedule(ctx, o, p, in) })
 }
 func (s *Service) DeleteSchedule(ctx context.Context, o, p, id string) error {

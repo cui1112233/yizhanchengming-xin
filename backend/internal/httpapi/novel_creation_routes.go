@@ -419,6 +419,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("POST /api/novel-creation/projects/{projectID}/batches", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
+			IdempotencyKey         string            `json:"idempotencyKey"`
 			SessionID              string            `json:"sessionId"`
 			TotalChapters          int               `json:"totalChapters"`
 			MaxConsecutiveFailures int               `json:"maxConsecutiveFailures"`
@@ -434,6 +435,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 			return
 		}
 		batch, err := service.CreateBatch(req.Context(), owner, req.PathValue("projectID"), novelcreation.BatchInput{
+			IdempotencyKey:         input.IdempotencyKey,
 			MaxConsecutiveFailures: input.MaxConsecutiveFailures, SessionID: input.SessionID, TotalChapters: input.TotalChapters, Prompt: input.Prompt,
 			ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel, ModeInputs: input.ModeInputs, KnowledgeIDs: input.KnowledgeIDs, NoteIDs: input.NoteIDs, StyleProfileID: input.StyleProfileID,
 		})
@@ -502,6 +504,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 // novelScheduleRequest keeps "enabled" optional while defaulting it to true on
 // creation, matching the frontend switch.
 type novelScheduleRequest struct {
+	IdempotencyKey         string            `json:"idempotencyKey"`
 	DailyChapterCap        int               `json:"dailyChapterCap"`
 	MaxConsecutiveFailures int               `json:"maxConsecutiveFailures"`
 	SessionID              string            `json:"sessionId"`
@@ -522,6 +525,7 @@ func (r novelScheduleRequest) toInput() novelcreation.ScheduleInput {
 		enabled = *r.Enabled
 	}
 	return novelcreation.ScheduleInput{
+		IdempotencyKey:  r.IdempotencyKey,
 		DailyChapterCap: r.DailyChapterCap, MaxConsecutiveFailures: r.MaxConsecutiveFailures, SessionID: r.SessionID, IntervalMinutes: r.IntervalMinutes, Enabled: enabled,
 		Prompt: r.Prompt, ModelID: r.ModelID, ThinkingLevel: r.ThinkingLevel, ModeInputs: r.ModeInputs, KnowledgeIDs: r.KnowledgeIDs, NoteIDs: r.NoteIDs, StyleProfileID: r.StyleProfileID,
 	}
@@ -549,6 +553,9 @@ func writeNovelCreationError(w http.ResponseWriter, err error) {
 		switch domainErr.Code {
 		case novelcreation.ErrInputRequired:
 			status = http.StatusBadRequest
+		case novelcreation.ErrIdempotencyConflict:
+			writeJSON(w, http.StatusConflict, map[string]string{"error": message, "code": domainErr.Code})
+			return
 		case novelcreation.ErrProjectNotFound, novelcreation.ErrSessionNotFound:
 			status = http.StatusNotFound
 		case novelcreation.ErrRunInProgress, novelcreation.ErrProjectLocked, novelcreation.ErrInvalidTransition:

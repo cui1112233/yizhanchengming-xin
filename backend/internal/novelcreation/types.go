@@ -167,28 +167,30 @@ type ProjectNoteInput struct {
 // Schedule is a recurring writing task.
 type Schedule struct {
 	AutomationState
-	ConfigurationError string            `json:"configurationError,omitempty"`
-	ID                 string            `json:"id"`
-	OwnerUsername      string            `json:"-"`
-	ProjectID          string            `json:"projectId"`
-	SessionID          string            `json:"sessionId"`
-	IntervalMinutes    int               `json:"intervalMinutes"`
-	Enabled            bool              `json:"enabled"`
-	Prompt             string            `json:"prompt"`
-	ModelID            string            `json:"modelId"`
-	ThinkingLevel      string            `json:"thinkingLevel"`
-	NextRunAt          time.Time         `json:"nextRunAt"`
-	LastRunAt          *time.Time        `json:"lastRunAt,omitempty"`
-	LastRunID          string            `json:"lastRunId,omitempty"`
-	CreatedAt          time.Time         `json:"createdAt"`
-	UpdatedAt          time.Time         `json:"updatedAt"`
-	ModeInputs         map[string]string `json:"modeInputs"`
-	KnowledgeIDs       []string          `json:"knowledgeIds"`
-	NoteIDs            []string          `json:"noteIds"`
-	StyleProfileID     string            `json:"styleProfileId"`
+	Creation           *AutomationCreation `json:"creation,omitempty"`
+	ConfigurationError string              `json:"configurationError,omitempty"`
+	ID                 string              `json:"id"`
+	OwnerUsername      string              `json:"-"`
+	ProjectID          string              `json:"projectId"`
+	SessionID          string              `json:"sessionId"`
+	IntervalMinutes    int                 `json:"intervalMinutes"`
+	Enabled            bool                `json:"enabled"`
+	Prompt             string              `json:"prompt"`
+	ModelID            string              `json:"modelId"`
+	ThinkingLevel      string              `json:"thinkingLevel"`
+	NextRunAt          time.Time           `json:"nextRunAt"`
+	LastRunAt          *time.Time          `json:"lastRunAt,omitempty"`
+	LastRunID          string              `json:"lastRunId,omitempty"`
+	CreatedAt          time.Time           `json:"createdAt"`
+	UpdatedAt          time.Time           `json:"updatedAt"`
+	ModeInputs         map[string]string   `json:"modeInputs"`
+	KnowledgeIDs       []string            `json:"knowledgeIds"`
+	NoteIDs            []string            `json:"noteIds"`
+	StyleProfileID     string              `json:"styleProfileId"`
 }
 
 type ScheduleInput struct {
+	IdempotencyKey         string `json:"idempotencyKey,omitempty"`
 	DailyChapterCap        int
 	MaxConsecutiveFailures int
 	SessionID              string
@@ -218,28 +220,30 @@ type Dashboard struct {
 // so auditing, revision, chapter storage and retry keep working unchanged.
 type Batch struct {
 	AutomationState
-	ID                string            `json:"id"`
-	OwnerUsername     string            `json:"-"`
-	ProjectID         string            `json:"projectId"`
-	SessionID         string            `json:"sessionId"`
-	Status            string            `json:"status"`
-	TotalChapters     int               `json:"totalChapters"`
-	CompletedChapters int               `json:"completedChapters"`
-	CurrentRunID      string            `json:"currentRunId,omitempty"`
-	Attempt           int               `json:"-"`
-	Prompt            string            `json:"prompt"`
-	ModelID           string            `json:"modelId"`
-	ThinkingLevel     string            `json:"thinkingLevel"`
-	LastError         string            `json:"lastError,omitempty"`
-	CreatedAt         time.Time         `json:"createdAt"`
-	UpdatedAt         time.Time         `json:"updatedAt"`
-	ModeInputs        map[string]string `json:"modeInputs"`
-	KnowledgeIDs      []string          `json:"knowledgeIds"`
-	NoteIDs           []string          `json:"noteIds"`
-	StyleProfileID    string            `json:"styleProfileId"`
+	Creation          *AutomationCreation `json:"creation,omitempty"`
+	ID                string              `json:"id"`
+	OwnerUsername     string              `json:"-"`
+	ProjectID         string              `json:"projectId"`
+	SessionID         string              `json:"sessionId"`
+	Status            string              `json:"status"`
+	TotalChapters     int                 `json:"totalChapters"`
+	CompletedChapters int                 `json:"completedChapters"`
+	CurrentRunID      string              `json:"currentRunId,omitempty"`
+	Attempt           int                 `json:"-"`
+	Prompt            string              `json:"prompt"`
+	ModelID           string              `json:"modelId"`
+	ThinkingLevel     string              `json:"thinkingLevel"`
+	LastError         string              `json:"lastError,omitempty"`
+	CreatedAt         time.Time           `json:"createdAt"`
+	UpdatedAt         time.Time           `json:"updatedAt"`
+	ModeInputs        map[string]string   `json:"modeInputs"`
+	KnowledgeIDs      []string            `json:"knowledgeIds"`
+	NoteIDs           []string            `json:"noteIds"`
+	StyleProfileID    string              `json:"styleProfileId"`
 }
 
 type BatchInput struct {
+	IdempotencyKey         string `json:"idempotencyKey,omitempty"`
 	MaxConsecutiveFailures int
 	SessionID              string
 	TotalChapters          int

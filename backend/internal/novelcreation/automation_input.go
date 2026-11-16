@@ -10,12 +10,13 @@ import (
 // plans retain selections; each new run resolves current content once. Retries
 // reuse the run snapshot, including content removed since the original run.
 type AutomationInput struct {
-	State              *AutomationState  `json:"automationState,omitempty"`
-	ModeInputs         map[string]string `json:"modeInputs"`
-	KnowledgeIDs       []string          `json:"knowledgeIds"`
-	NoteIDs            []string          `json:"noteIds"`
-	StyleProfileID     string            `json:"styleProfileId"`
-	ConfigurationError string            `json:"configurationError,omitempty"`
+	Creation           *AutomationCreation `json:"creation,omitempty"`
+	State              *AutomationState    `json:"automationState,omitempty"`
+	ModeInputs         map[string]string   `json:"modeInputs"`
+	KnowledgeIDs       []string            `json:"knowledgeIds"`
+	NoteIDs            []string            `json:"noteIds"`
+	StyleProfileID     string              `json:"styleProfileId"`
+	ConfigurationError string              `json:"configurationError,omitempty"`
 }
 
 type generationMaterials struct {
@@ -141,11 +142,13 @@ func batchInput(v Batch) AutomationInput {
 }
 func scheduleStoredInput(v Schedule) AutomationInput {
 	in := scheduleInput(v)
+	in.Creation = v.Creation
 	in.State = &v.AutomationState
 	return in
 }
 func batchStoredInput(v Batch) AutomationInput {
 	in := batchInput(v)
+	in.Creation = v.Creation
 	in.State = &v.AutomationState
 	return in
 }
@@ -157,6 +160,7 @@ func cloneSchedule(v Schedule) Schedule {
 		v.AutomationState = *in.State
 	}
 	v.ModeInputs = in.ModeInputs
+	v.Creation = in.Creation
 	v.KnowledgeIDs = in.KnowledgeIDs
 	v.NoteIDs = in.NoteIDs
 	if v.LastRunAt != nil {
@@ -172,6 +176,7 @@ func cloneBatch(v Batch) Batch {
 		v.AutomationState = *in.State
 	}
 	v.ModeInputs = in.ModeInputs
+	v.Creation = in.Creation
 	v.KnowledgeIDs = in.KnowledgeIDs
 	v.NoteIDs = in.NoteIDs
 	return v

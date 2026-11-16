@@ -1146,6 +1146,7 @@ func scanSchedule(scanner novelScheduleScanner) (Schedule, error) {
 		schedule.AutomationState = *input.State
 	}
 	schedule.ModeInputs = input.ModeInputs
+	schedule.Creation = input.Creation
 	schedule.KnowledgeIDs = input.KnowledgeIDs
 	schedule.NoteIDs = input.NoteIDs
 	schedule.StyleProfileID = input.StyleProfileID
@@ -1328,6 +1329,7 @@ func scanBatch(scanner novelBatchScanner) (Batch, error) {
 		batch.AutomationState = *input.State
 	}
 	batch.ModeInputs = input.ModeInputs
+	batch.Creation = input.Creation
 	batch.KnowledgeIDs = input.KnowledgeIDs
 	batch.NoteIDs = input.NoteIDs
 	batch.StyleProfileID = input.StyleProfileID
