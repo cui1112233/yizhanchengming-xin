@@ -146,7 +146,29 @@ if ($Deploy) {
   # 否则 scp 会一直挂起而不是报错退出。
   $connectionOptions = @('-o', 'ConnectTimeout=20', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4')
   $remoteTemp = "/tmp/qiantie-v88-$timestamp-$shortSha"
-  Invoke-Checked 'scp' (@('-P', "$SshPort") + $connectionOptions + @($binaryPath, "${remote}:$remoteTemp"))
+  # scp 本身不会在断线后自动续传，出口 IP 轮换时容易半途失败。
+  # 上传后以远端 SHA-256 为准判断是否完整，不一致就整包重传。
+  $uploadAttempts = 3
+  $localHash = (Get-FileHash -LiteralPath $binaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $uploaded = $false
+  for ($attempt = 1; $attempt -le $uploadAttempts; $attempt++) {
+    try {
+      Invoke-Checked 'scp' (@('-P', "$SshPort") + $connectionOptions + @($binaryPath, "${remote}:$remoteTemp"))
+    } catch {
+      Write-Warning "第 $attempt/$uploadAttempts 次上传失败：$($_.Exception.Message)"
+    }
+    $remoteHash = (& ssh (@('-p', "$SshPort") + $connectionOptions + @($remote, "sha256sum '$remoteTemp' 2>/dev/null | cut -d' ' -f1")) 2>$null) -join ''
+    if ($remoteHash.Trim().ToLowerInvariant() -eq $localHash) {
+      $uploaded = $true
+      break
+    }
+    Write-Warning "第 $attempt/$uploadAttempts 次上传后校验不一致。"
+    if ($attempt -lt $uploadAttempts) { Start-Sleep -Seconds 5 }
+  }
+  if (-not $uploaded) {
+    throw "上传二进制失败：重试 $uploadAttempts 次后仍未通过 SHA-256 校验。"
+  }
+  Write-Host "上传已通过 SHA-256 校验（第 $attempt 次）。"
   # 远端目标是正在运行的二进制，直接 install 覆盖会触发 ETXTBSY；
   # 先装到同目录的 .new 再 mv，保证原子替换。
   $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath.new'; sudo mv -f '$TargetPath.new' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
