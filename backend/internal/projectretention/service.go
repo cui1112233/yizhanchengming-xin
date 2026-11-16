@@ -540,7 +540,12 @@ func (s *Service) Restore(ctx context.Context, owner string, module Module, proj
 		}
 		return s.Batch.RestoreArchivedBatch(ctx, owner, projectID, days, now)
 	}
-	result, err := s.DB.ExecContext(ctx, `UPDATE project_retention SET last_activity_at=?, retention_expires_at=?, archived_at=NULL, updated_at=? WHERE owner_username=? AND module=? AND project_id=? AND archived_at IS NOT NULL`,
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE project_retention SET last_activity_at=?, retention_expires_at=?, archived_at=NULL, updated_at=? WHERE owner_username=? AND module=? AND project_id=? AND archived_at IS NOT NULL`,
 		now, now.AddDate(0, 0, days), now, owner, string(module), projectID)
 	if err != nil {
 		return err
@@ -548,7 +553,27 @@ func (s *Service) Restore(ctx context.Context, owner string, module Module, proj
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		return ErrNotFound
 	}
-	return nil
+	// 恢复后必须把作品本身的最后活动时间推到当前时刻，否则下一次 00:00 巡检
+	// 会按旧的 updated_at 重新算出过期时间，导致刚恢复的作品又被归档。
+	parentSQL := ""
+	switch module {
+	case ModuleComicScreenplay:
+		parentSQL = `UPDATE screenplay_projects SET updated_at=? WHERE owner_username=? AND id=? AND deleted_at IS NULL`
+	case ModuleCMCanvas:
+		parentSQL = `UPDATE agent_projects SET updated_at=? WHERE owner_username=? AND id=? AND deleted_at IS NULL`
+	case ModuleNovelCreation:
+		parentSQL = `UPDATE novel_projects SET updated_at=? WHERE owner_username=? AND project_id=? AND deleted_at IS NULL`
+	default:
+		return ErrInvalid
+	}
+	touched, err := tx.ExecContext(ctx, parentSQL, now, owner, projectID)
+	if err != nil {
+		return err
+	}
+	if affected, _ := touched.RowsAffected(); affected != 1 {
+		return ErrNotFound
+	}
+	return tx.Commit()
 }
 
 // Purge 彻底删除归档作品：批量工厂同时清理 TOS 与本地文件；其余模块删除数据库记录。

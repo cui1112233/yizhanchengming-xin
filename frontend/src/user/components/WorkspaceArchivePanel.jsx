@@ -31,26 +31,29 @@ export function WorkspaceArchivePanel({ open, modules = [], onClose, onChanged }
   const [loading, setLoading] = useState(false);
   const [working, setWorking] = useState('');
 
+  // 调用方通常直接传数组字面量，按内容生成稳定 key，避免每次渲染都重新请求。
+  const moduleKey = Array.isArray(modules) ? modules.join(',') : '';
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const all = await getArchivedProjects();
-      const wanted = new Set(modules);
+      const wanted = new Set(moduleKey ? moduleKey.split(',') : []);
       setItems(wanted.size ? all.filter(item => wanted.has(item.module)) : all);
     } catch (error) {
       message.error(error.message || '归档库读取失败');
     } finally {
       setLoading(false);
     }
-  }, [modules]);
+  }, [moduleKey]);
 
   useEffect(() => {
     if (open) void load();
   }, [open, load]);
 
   const options = useMemo(
-    () => (modules.length ? modules : Array.from(new Set(items.map(item => item.module)))),
-    [items, modules]
+    () => (moduleKey ? moduleKey.split(',') : Array.from(new Set(items.map(item => item.module)))),
+    [items, moduleKey]
   );
 
   async function restore(item) {
