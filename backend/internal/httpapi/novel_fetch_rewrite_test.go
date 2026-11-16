@@ -75,12 +75,50 @@ func TestApplySensitiveAIRepairRecordsExecutionAndReplacesHit(t *testing.T) {
 		},
 	}
 	items := []map[string]any{{"hit_index": 1, "keyword": "出轨", "before": "他说他出轨了", "after": "他说他关系越界了", "status": "done"}}
-	text, items := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "他说他关系越界了", items)
+	text, items := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "他说他关系越界了", items, nil)
 	if text != "他说关系越界了" {
 		t.Fatalf("repaired text = %q", text)
 	}
 	if items[0]["source"] != "ai" || items[0]["model"] != "[anti-2]gemini-3.8-flash" || items[0]["attempt"] != 1 || items[0]["status"] != "done" {
 		t.Fatalf("repair audit = %#v", items[0])
+	}
+}
+
+func TestApplySensitiveAIRepairAcceptsJSONFixedTextAndCodeFence(t *testing.T) {
+	outputs := []string{"{\"fixed_text\":\"他说关系越界了\"}", "```\n他承认关系失当\n```"}
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		output := outputs[0]
+		outputs = outputs[1:]
+		return output, nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": false, "retries": 1}}
+	items := []map[string]any{
+		{"hit_index": 1, "keyword": "出轨", "before": "他说他出轨了", "after": "甲"},
+		{"hit_index": 2, "keyword": "出轨", "before": "她说他出轨", "after": "乙"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "甲\n乙", items, nil)
+	if text != "他说关系越界了\n他承认关系失当" {
+		t.Fatalf("structured output was not decoded into prose: %q", text)
+	}
+	if got[0]["status"] != "done" || got[1]["status"] != "done" {
+		t.Fatalf("structured output should be accepted: %#v", got)
+	}
+}
+
+func TestApplySensitiveAIRepairStopsRetryingWhenServiceUnavailable(t *testing.T) {
+	var calls int
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		calls++
+		return "", errors.New("502 bad gateway")
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": false, "retries": 5}}
+	items := []map[string]any{{"hit_index": 1, "keyword": "敏感", "before": "原文敏感", "after": "合规表达"}}
+	_, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "合规表达", items, nil)
+	if calls != 1 {
+		t.Fatalf("service unavailable should stop after the first attempt, calls=%d", calls)
+	}
+	if got[0]["status"] != "failed" || !strings.Contains(firstText(got[0]["error"]), "502") {
+		t.Fatalf("failure audit = %#v", got[0])
 	}
 }
 
@@ -96,7 +134,7 @@ func TestApplySensitiveAIRepairReplacesRepeatedLinesInOrder(t *testing.T) {
 		{"hit_index": 1, "keyword": "敏感", "before": "相同敏感段", "after": "相同已替换段", "status": "done"},
 		{"hit_index": 2, "keyword": "敏感", "before": "相同敏感段", "after": "相同已替换段", "status": "done"},
 	}
-	text, _ := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "相同已替换段\n相同已替换段", items)
+	text, _ := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "相同已替换段\n相同已替换段", items, nil)
 	if text != "第一段已改\n第二段已改" {
 		t.Fatalf("repeated hit order was not preserved: %q", text)
 	}
@@ -131,7 +169,7 @@ func TestApplySensitiveAIRepairHonorsConfiguredConcurrencyAndPreservesOrder(t *t
 		{"hit_index": 2, "keyword": "敏感二", "before": "原文敏感二", "after": "替换二", "status": "done"},
 		{"hit_index": 3, "keyword": "敏感三", "before": "原文敏感三", "after": "替换三", "status": "done"},
 	}
-	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "替换一\n替换二\n替换三", items)
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "替换一\n替换二\n替换三", items, nil)
 	if maximum.Load() != 2 {
 		t.Fatalf("maximum concurrent calls = %d, want configured concurrency 2", maximum.Load())
 	}
@@ -158,7 +196,7 @@ func TestApplySensitiveAIRepairHonorsGroupModeAndHitLimit(t *testing.T) {
 		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段已替换"},
 		{"keyword": "敏感3", "before": "第三段敏感3", "after": "第三段已替换"},
 	}
-	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换\n第三段已替换", items)
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换\n第三段已替换", items, nil)
 	if calls != 1 {
 		t.Fatalf("group mode calls=%d, want 1", calls)
 	}
@@ -179,7 +217,7 @@ func TestApplySensitiveAIRepairAcceptsJSONArrayWrappedInProviderCommentary(t *te
 		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段已替换"},
 		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段已替换"},
 	}
-	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换", items)
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换", items, nil)
 	if text != "第一段已改\n第二段已改" {
 		t.Fatalf("group repair text=%q", text)
 	}
@@ -197,7 +235,7 @@ func TestApplySensitiveAIRepairFallsBackToSafeDeterministicGroupReplacement(t *t
 		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段合规表达"},
 		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段合规表达"},
 	}
-	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段合规表达\n第二段合规表达", items)
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段合规表达\n第二段合规表达", items, nil)
 	if text != "第一段合规表达\n第二段合规表达" {
 		t.Fatalf("fallback changed deterministic text=%q", text)
 	}
@@ -215,7 +253,7 @@ func TestApplySensitiveAIRepairFallsBackWhenGroupOutputIsUnsafeOrIncomplete(t *t
 		{"keyword": "敏感词", "before": "原文敏感词", "after": "替换后"},
 		{"keyword": "另一个词", "before": "原文另一个词", "after": "替换后2"},
 	}
-	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "替换后\n替换后2", items)
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "替换后\n替换后2", items, nil)
 	if text != "替换后\n替换后2" {
 		t.Fatalf("unsafe group changed text=%q", text)
 	}

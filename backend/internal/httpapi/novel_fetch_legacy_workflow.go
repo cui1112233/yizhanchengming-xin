@@ -714,7 +714,11 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 			var trace []map[string]any
 			if restore {
 				processed, _, sensitiveItems = novelfetchworkshop.ApplySensitiveRulesForScopeWithDetails(base, settings, "original")
-				processed, sensitiveItems = applySensitiveAIRepair(req.Context(), provider, settings, d.BookID, processed, sensitiveItems)
+				processed, sensitiveItems = applySensitiveAIRepair(req.Context(), provider, settings, d.BookID, processed, sensitiveItems, map[string]any{
+					"book_name": firstText(d.Meta["bookName"], d.Meta["book_name"], d.Meta["title"]),
+					"style":     firstText(d.Meta["style"]),
+					"gender":    d.Gender,
+				})
 			} else {
 				processed, trace, sensitiveItems, err = processWorkshopConfiguredText(req.Context(), store, identity.Username, d.BookID, base, "original", in.SensitiveAIEnabled, provider)
 				if err != nil {

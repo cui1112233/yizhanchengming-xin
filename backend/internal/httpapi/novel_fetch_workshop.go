@@ -1479,11 +1479,63 @@ func decodeSensitiveRepairArray(output string, repaired *[]string) error {
 	return json.Unmarshal([]byte(strings.TrimSpace(output)), repaired)
 }
 
+// 与批量原文改文系统源码保持一致的敏感词系统提示。
+const sensitiveRepairSystemPrompt = "你是内容合规改写助手。只改写用户给出的命中片段，保持原意，去掉违规、擦边、色情、低俗表达。"
+
+const sensitiveGroupRepairSystemPrompt = "你是内容合规改写助手。请批量处理用户给出的敏感词命中片段。" +
+	"每条只改写对应 snippet，不要增加新剧情，不要改变人物关系和原意。" +
+	"必须只返回 JSON，不要解释。"
+
+// decodeSensitiveRepairText 兼容源码接受的两种单条返回：纯文本片段，
+// 或只包含一个改写字段的 JSON 对象（fixed_text/text/content/result/output）。
+// 返回空字符串表示这次输出不可用，交给上层继续重试。
+func decodeSensitiveRepairText(output string) string {
+	trimmed := strings.TrimSpace(output)
+	if strings.HasPrefix(trimmed, "```") {
+		trimmed = strings.TrimPrefix(trimmed, "```")
+		if index := strings.Index(trimmed, "\n"); index >= 0 {
+			trimmed = trimmed[index+1:]
+		}
+		trimmed = strings.TrimSuffix(strings.TrimSpace(trimmed), "```")
+		trimmed = strings.TrimSpace(trimmed)
+	}
+	if !strings.HasPrefix(trimmed, "{") {
+		return trimmed
+	}
+	var payload map[string]any
+	if json.Unmarshal([]byte(trimmed), &payload) != nil {
+		return trimmed
+	}
+	values := make([]string, 0, 1)
+	for _, key := range []string{"fixed_text", "text", "content", "result", "output"} {
+		if text, ok := payload[key].(string); ok && strings.TrimSpace(text) != "" {
+			values = append(values, strings.TrimSpace(text))
+		}
+	}
+	if len(values) != 1 {
+		return ""
+	}
+	return values[0]
+}
+
+func sensitiveServiceUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	for _, marker := range []string{"502", "503", "504", "timeout", "deadline exceeded", "temporarily unavailable", "暂不可用", "connection reset"} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 // applySensitiveAIRepair runs only when the user explicitly enables the
 // sensitive-word AI repair switch. Deterministic rules still run first; the
 // model then refines each hit line and the audit item records the source,
 // model and attempt count shown by the workbench.
-func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.RewriteProvider, settings map[string]any, bookID, text string, items []map[string]any) (string, []map[string]any) {
+func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.RewriteProvider, settings map[string]any, bookID, text string, items []map[string]any, bookVars map[string]any) (string, []map[string]any) {
 	if len(items) == 0 {
 		return text, items
 	}
@@ -1543,7 +1595,16 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 			snippet := sensitiveContextSnippet(strings.TrimSpace(fmt.Sprint(item["before"])), keyword, contextChars)
 			outputs = append(outputs, fmt.Sprintf("%d. 命中词：%s\n原片段：%s", len(outputs)+1, keyword, snippet))
 		}
-		userPrompt := strings.NewReplacer("{book_id}", bookID, "{keyword}", "多个命中词", "{snippet}", strings.Join(outputs, "\n\n")).Replace(promptTemplate)
+		userPrompt := strings.NewReplacer(
+			"{book_id}", bookID,
+			"{book_name}", firstText(bookVars["book_name"], bookVars["bookName"]),
+			"{style}", firstText(bookVars["style"]),
+			"{gender}", firstText(bookVars["gender"]),
+			"{keyword}", "多个命中词",
+			"{snippet}", strings.Join(outputs, "\n\n"),
+			// 整组模式下没有单个命中序号，避免模板里残留占位符。
+			"{hit_index}", "",
+		).Replace(promptTemplate)
 		userPrompt += "\n\n请严格按原顺序返回 JSON 字符串数组，每个元素对应一个片段，只返回数组。"
 		var output string
 		var lastErr error
@@ -1553,11 +1614,20 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		} else {
 			for attempts < maxAttempts {
 				attempts++
-				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: "你是内容合规改写助手。只返回 JSON 字符串数组。", UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: sensitiveGroupRepairSystemPrompt, UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
 				output = strings.TrimSpace(output)
-				if lastErr == nil && output != "" {
-					break
+				if lastErr != nil {
+					// 服务不可用时立即停止，避免同一故障连续烧掉全部重试次数。
+					if sensitiveServiceUnavailable(lastErr) {
+						break
+					}
+					continue
 				}
+				if output == "" {
+					userPrompt += "\n\n上次返回为空。只返回完整 JSON 数组，不要解释。"
+					continue
+				}
+				break
 			}
 		}
 		var repaired []string
@@ -1629,7 +1699,15 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
 		before := strings.TrimSpace(fmt.Sprint(item["before"]))
 		before = sensitiveContextSnippet(before, keyword, contextChars)
-		userPrompt := strings.NewReplacer("{book_id}", bookID, "{keyword}", keyword, "{snippet}", before).Replace(promptTemplate)
+		userPrompt := strings.NewReplacer(
+			"{book_id}", bookID,
+			"{book_name}", firstText(bookVars["book_name"], bookVars["bookName"]),
+			"{style}", firstText(bookVars["style"]),
+			"{gender}", firstText(bookVars["gender"]),
+			"{keyword}", keyword,
+			"{snippet}", before,
+			"{hit_index}", firstText(item["hit_index"], item["hitIndex"]),
+		).Replace(promptTemplate)
 		attempts := 0
 		var output string
 		var lastErr error
@@ -1638,17 +1716,42 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		} else {
 			for attempts < maxAttempts {
 				attempts++
-				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: "你是内容合规改写助手。只返回改写后的小段内容。", UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: sensitiveRepairSystemPrompt, UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
 				output = strings.TrimSpace(output)
-				if lastErr == nil && output != "" {
-					break
+				if lastErr != nil {
+					// 服务不可用时立即停止，避免同一故障连续烧掉全部重试次数。
+					if sensitiveServiceUnavailable(lastErr) {
+						break
+					}
+					continue
 				}
+				if output == "" {
+					userPrompt += "\n\n上次返回为空。只返回改写后的短片段，不要解释。"
+					continue
+				}
+				// 源码同时接受纯文本和 {"fixed_text":"..."} 两种返回；
+				// 解码后仍无法得到唯一片段时按不合格重试。
+				output = decodeSensitiveRepairText(output)
+				if output == "" {
+					userPrompt += "\n\n上次返回不合格。只返回改写后的短片段或 {\"fixed_text\":\"...\"}，不要解释。"
+					continue
+				}
+				if containsSensitiveKeyword(output, keyword) {
+					userPrompt += "\n\n上次返回仍包含命中词。必须彻底改写该词，只返回改写后的短片段。"
+					continue
+				}
+				break
 			}
 		}
 		item["attempt"] = attempts
 		if lastErr != nil || output == "" || containsSensitiveKeyword(output, keyword) {
 			item["status"] = "failed"
-			item["error"] = firstText(lastErr, "AI 返回为空或仍包含命中敏感词")
+			// firstText 只识别字符串，error 必须显式取文本，否则真实失败原因会被吞掉。
+			message := "AI 返回为空或仍包含命中敏感词"
+			if lastErr != nil {
+				message = lastErr.Error()
+			}
+			item["error"] = message
 			return
 		}
 		item["status"] = "done"
@@ -1750,7 +1853,13 @@ func processWorkshopConfiguredText(ctx context.Context, store novelfetchworkshop
 		ai["enabled"] = true
 		settings["sensitive_ai"] = ai
 		before := processed
-		processed, sensitiveItems = applySensitiveAIRepair(ctx, provider, settings, bookID, processed, sensitiveItems)
+		bookVars := map[string]any{}
+		if document, docErr := store.GetDocument(ctx, owner, bookID); docErr == nil {
+			bookVars["book_name"] = firstText(document.Meta["bookName"], document.Meta["book_name"], document.Meta["title"])
+			bookVars["style"] = firstText(document.Meta["style"])
+			bookVars["gender"] = document.Gender
+		}
+		processed, sensitiveItems = applySensitiveAIRepair(ctx, provider, settings, bookID, processed, sensitiveItems, bookVars)
 		failed := 0
 		for _, item := range sensitiveItems {
 			if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "failed") {

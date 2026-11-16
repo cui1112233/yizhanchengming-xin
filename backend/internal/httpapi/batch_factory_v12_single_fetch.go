@@ -115,7 +115,7 @@ func processBatchConfiguredText(ctx context.Context, store novelfetchworkshop.St
 			attemptAI["model"] = model
 			attemptSettings["sensitive_ai"] = attemptAI
 			before := processed
-			processed, items = applySensitiveAIRepair(ctx, provider, attemptSettings, bookID, processed, items)
+			processed, items = applySensitiveAIRepair(ctx, provider, attemptSettings, bookID, processed, items, nil)
 			failed := 0
 			for _, item := range items {
 				if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "failed") {
