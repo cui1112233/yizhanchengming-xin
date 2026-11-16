@@ -63,3 +63,8 @@ executors/**/target-*/
 
 backend/backend/
 
+# 只应存在于仓库根目录的运行/发布目录，避免在 backend 下重复生成后污染工作树。
+/backend/.local-review/
+/backend/.release/
+__pycache__/
+
