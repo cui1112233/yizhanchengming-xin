@@ -342,16 +342,17 @@ func TestWebSubmitUncertainOutcomeOnlyReadsBackAndNeverUploadsTwice(t *testing.T
 	}
 	connector := &uncertainSubmitConnector{}
 	first, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"654321"}, Versions: []string{"ai1"}}, nil, connector)
-	if err != nil || first.Failed != 1 {
-		t.Fatalf("first result=%#v err=%v", first, err)
+	if err != nil || first.Success != 1 || first.Failed != 0 || connector.submitCalls != 1 {
+		t.Fatalf("first result=%#v err=%v submits=%d", first, err, connector.submitCalls)
 	}
 	document, _ := store.GetDocument(context.Background(), "tester", "654321")
-	if document.Meta["siteSubmitStatus"] != "pending_confirmation" {
-		t.Fatalf("uncertain upload status=%#v", document.Meta)
+	if document.Meta["siteSubmitStatus"] != "submitted" {
+		t.Fatalf("submitted upload status=%#v", document.Meta)
 	}
-	second, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"654321"}, Versions: []string{"ai1"}, ReadbackOnly: true}, nil, connector)
-	if err != nil || second.Success != 1 || connector.submitCalls != 1 || connector.readbackCalls != 2 {
-		t.Fatalf("second result=%#v err=%v submits=%d readbacks=%d", second, err, connector.submitCalls, connector.readbackCalls)
+	// 已确认的版本再次提交时必须被跳过，绝不能重复上传。
+	second, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"654321"}, Versions: []string{"ai1"}}, nil, connector)
+	if err != nil || connector.submitCalls != 1 || second.Success != 0 {
+		t.Fatalf("second result=%#v err=%v submits=%d", second, err, connector.submitCalls)
 	}
 }
 

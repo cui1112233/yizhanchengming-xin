@@ -234,8 +234,12 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				}
 				attempt := mapOrEmpty(mapOrEmpty(meta["siteSubmitAttempts"])[version])
 				if !submissionMatchesAttempt(confirmed, firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID), firstText(attempt["started_at"])) {
-					uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID))
-					continue
+					// 与批量原文改文系统源码对齐：目标站已存在该书的提交记录
+					// 即视为已提交；时间戳和回执号只作为证据，不再阻塞任务。
+					if strings.TrimSpace(firstText(confirmed.ID, mapOrEmpty(confirmed.ReadbackRaw)["bookid"])) == "" {
+						uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID))
+						continue
+					}
 				}
 				recordSuccess(confirmed, confirmed)
 				continue
@@ -322,17 +326,13 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				uncertainVersion("提交结果不确定，等待目标站回读确认", bookID)
 				continue
 			}
-			confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, bookID)
-			if readbackErr != nil {
-				uncertainVersion("上传已接收，但目标站回读确认失败", submission.ID)
-				if errors.Is(readbackErr, videomanagementconnector.ErrSiteContractChanged) {
-					return result, blockContract()
-				}
-				continue
-			}
-			if !submissionMatchesAttempt(confirmed, firstText(submission.ID, bookID), firstText(mapOrEmpty(attempts[version])["started_at"])) {
-				uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(submission.ID, bookID))
-				continue
+			// 与批量原文改文系统源码对齐：上传接口返回成功即视为已提交；
+			// 回读只用来补充证据，回读失败或只有旧记录都不再阻塞任务。
+			confirmed := submission
+			if readback, readbackErr := targets[0].GetSubmission(ctx, targetSession, bookID); readbackErr == nil {
+				confirmed = readback
+			} else if errors.Is(readbackErr, videomanagementconnector.ErrSiteContractChanged) {
+				return result, blockContract()
 			}
 			recordSuccess(submission, confirmed)
 		}

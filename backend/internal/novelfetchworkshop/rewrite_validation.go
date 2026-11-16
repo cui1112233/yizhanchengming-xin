@@ -43,7 +43,22 @@ func ValidateRewriteProse(text string) error {
 		return fmt.Errorf("AI 改文返回为空")
 	}
 	lower := strings.ToLower(text)
-	for _, prefix := range []string{"抱歉，我无法", "对不起，我无法", "很抱歉，我不能", "我无法协助", "我不能帮助", "i'm sorry", "i cannot assist", "i can't assist", "as an ai", "internal server error", "bad gateway", "service unavailable", "error:", "<!doctype", "<html", "```", "{", "["} {
+	// 与批量原文改文系统源码对齐：异常标记按全文匹配，且补齐上游常见的
+	// 策略拒绝、限流和网关错误文案，避免拒答内容被当成正文保存。
+	for _, marker := range []string{
+		"抱歉，我无法", "对不起，我无法", "很抱歉，我不能", "我无法协助", "我不能帮助",
+		"i'm sorry", "i cannot assist", "i can't assist", "as an ai",
+		"internal server error", "bad gateway", "service unavailable",
+		"the prompt could not be submitted", "generative ai prohibited use",
+		"try rephrasing the prompt", "policies.google.com",
+		"too many requests", "rate limit exceeded", "traceback (most recent call last)",
+		"<!doctype", "<html",
+	} {
+		if strings.Contains(lower, marker) {
+			return fmt.Errorf("AI 改文包含拒答、错误消息或未解析格式，请重试或检查模型")
+		}
+	}
+	for _, prefix := range []string{"error:", "```", "{", "["} {
 		if strings.HasPrefix(lower, prefix) {
 			return fmt.Errorf("AI 改文包含拒答、错误消息或未解析格式，请重试或检查模型")
 		}
@@ -307,7 +322,51 @@ func completeValidatedRewrite(ctx context.Context, provider RewriteProvider, req
 			}
 			request.MaxTokens = next
 		}
-		request.UserPrompt = base + fmt.Sprintf(batchbook.Repair, err.Error())
+		// 与源码对齐：上游策略拒绝时不再重发带全文的原提示词，
+		// 改成只含目标片段的最小 payload；其他失败才追加格式纠正。
+		if isProviderRejection(err) {
+			request.SystemPrompt = rewriteCompactSystem
+			if strings.EqualFold(strings.TrimSpace(mode), "changed_lines_json") {
+				request.UserPrompt = fmt.Sprintf(rewriteCompactJSON, lineCount, bookID, lineCount, source)
+			} else {
+				request.UserPrompt = fmt.Sprintf(rewriteCompactText, lineCount, source)
+			}
+		} else {
+			request.UserPrompt = base + fmt.Sprintf(batchbook.Repair, err.Error())
+		}
 	}
 	return "", fmt.Errorf("%w，已停止（最多 3 次）：%v", ErrRewriteValidation, lastErr)
 }
+
+var providerRejectionMarkers = []string{
+	"policy", "prohibited", "could not be submitted", "try rephrasing",
+	"policies.google.com", "content filter", "safety", "拒答", "违规", "敏感",
+}
+
+// isProviderRejection reports whether the failure came from an upstream policy
+// rejection rather than from the model's prose. Such retries must drop the full
+// text payload to avoid triggering the same rejection again.
+func isProviderRejection(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	for _, marker := range providerRejectionMarkers {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+const rewriteCompactSystem = "你是小说改文助手，只处理用户给出的这一小段正文，不要复述、解释或拒绝。"
+
+const rewriteCompactJSON = `只改写下面这段小说正文，共 %d 行。保持人物、情节、视角不变，只做表达层改写。
+只输出 JSON，不要解释：{"id":"%s","changed_lines":[{"line_no":1,"text":"第一行改写结果"}]}
+line_no 从 1 开始，必须正好 %d 条，每条不要包含换行。
+原文：
+%s`
+
+const rewriteCompactText = `只改写下面这段小说正文，共 %d 行。保持人物、情节、视角不变，只做表达层改写。直接输出改写后的正文，不要解释。
+原文：
+%s`
