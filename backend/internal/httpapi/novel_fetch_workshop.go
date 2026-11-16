@@ -26,6 +26,15 @@ import (
 var novelFetchBookIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 var novelFetchVersionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
+// novelFetchMaxTxtLimit matches the legacy API validation. The new workshop
+// endpoints must enforce the same ceiling, otherwise an oversized maxTxt sends
+// an entire novel into the rewrite prompt and amplifies AI cost/timeouts.
+const novelFetchMaxTxtLimit = 200000
+
+func novelFetchMaxTxtInvalid(value int) bool {
+	return value > novelFetchMaxTxtLimit
+}
+
 // The legacy workbench accepts source IDs with a trailing 5-25 digit run.
 // Keep that range here so short but valid platform IDs are not discarded
 // before the fetch stage gets a chance to handle them.
@@ -805,23 +814,48 @@ func markNovelFetchTaskQueued(ctx context.Context, store novelfetchworkshop.Stor
 }
 
 func activeNovelFetchJobForBooks(ctx context.Context, store novelfetchworkshop.Store, owner string, bookIDs []string) map[string]any {
+	return activeNovelFetchJobForBooksWithQueue(ctx, store, nil, owner, bookIDs)
+}
+
+// activeNovelFetchJobForBooksWithQueue reports the first book that must not be
+// deleted. It derives the effective status from the same rule as the task list
+// (queueState wins over a stale terminal meta.status) and, when a queue is
+// available, also checks whether the referenced job still exists in Redis.
+func activeNovelFetchJobForBooksWithQueue(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, bookIDs []string) map[string]any {
 	for _, bookID := range bookIDs {
 		document, err := store.GetDocument(ctx, owner, bookID)
 		if err != nil {
 			continue
 		}
-		status := strings.ToLower(strings.TrimSpace(firstText(document.Meta["status"], document.Meta["queueState"])))
-		if status != "queued" && status != "running" && status != "processing" {
+		jobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
+		status := novelfetchworkshop.DeriveTaskStatus(document)
+		active := status == novelfetchworkshop.TaskStatusQueued || status == novelfetchworkshop.TaskStatusProcessing
+		if !active && jobID != "" && queue != nil {
+			if exists, existsErr := novelFetchProcessJobExists(ctx, queue, jobID); existsErr == nil && exists {
+				active = true
+			}
+		}
+		if !active {
 			continue
 		}
 		return map[string]any{
-			"id":          firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"]),
+			"id":          jobID,
 			"bookId":      bookID,
 			"status":      status,
 			"queue_state": status,
 		}
 	}
 	return nil
+}
+
+func novelFetchProcessJobExists(ctx context.Context, queue novelfetchworkshop.ProcessQueue, jobID string) (bool, error) {
+	type processJobExistence interface {
+		ProcessJobExists(context.Context, string) (bool, error)
+	}
+	if checker, ok := queue.(processJobExistence); ok {
+		return checker.ProcessJobExists(ctx, jobID)
+	}
+	return false, nil
 }
 
 // appendWorkshopTaskLog persists a concise per-book operation log so that the
@@ -1882,6 +1916,13 @@ func fetchNovelWithSettings(ctx context.Context, store novelfetchworkshop.Store,
 	return result, err
 }
 
+// novelFetchSensitiveStageError 标记失败发生在敏感词处理阶段，
+// 让上层按 sensitive 阶段记录退避，而不是重复记成原文抓取失败。
+type novelFetchSensitiveStageError struct{ err error }
+
+func (e *novelFetchSensitiveStageError) Error() string { return e.err.Error() }
+func (e *novelFetchSensitiveStageError) Unwrap() error { return e.err }
+
 func executeWorkshopDocumentFetch(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, fetcher *novelfetchworkshop.UpstreamFetcher, maxTxt int, sensitiveAIEnabled bool, sensitiveProvider novelfetchworkshop.RewriteProvider, genderJudge novelfetchworkshop.AIGenderJudge, styleProvider novelfetchworkshop.RewriteProvider) error {
 	document, err := store.GetDocument(ctx, owner, bookID)
 	if err != nil {
@@ -1928,7 +1969,10 @@ func executeWorkshopDocumentFetch(ctx context.Context, store novelfetchworkshop.
 	processedText, rulesTrace, sensitiveItems, err := processWorkshopConfiguredText(ctx, store, owner, bookID, result.ProcessedText, "original", sensitiveAIEnabled, sensitiveProvider)
 	if err != nil {
 		_ = appendWorkshopTaskLog(ctx, store, owner, bookID, "sensitive_processing_failed", err.Error())
-		return err
+		// 与源码一致：敏感词处理失败单独记在 sensitive 阶段，
+		// 不和原文抓取失败共用同一段退避时间。
+		_ = scheduleNovelFetchDocumentRetry(ctx, store, owner, bookID, novelFetchRetryStageSensitive, err, time.Now().UTC())
+		return &novelFetchSensitiveStageError{err: err}
 	}
 	_ = appendWorkshopTaskLog(ctx, store, owner, bookID, "rules_processing_completed", "正文规则处理完成")
 	sensitiveCount := len(sensitiveItems)
@@ -2157,6 +2201,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = 4000
 		}
+		if novelFetchMaxTxtInvalid(input.MaxTxt) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("maxTxt 不能超过 %d", novelFetchMaxTxtLimit)})
+			return
+		}
 		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
 		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
 		if err != nil {
@@ -2190,6 +2238,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = input.MaxTxtLegacy
+		}
+		if novelFetchMaxTxtInvalid(input.MaxTxt) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("max_txt 不能超过 %d", novelFetchMaxTxtLimit)})
+			return
 		}
 		columnOrder := workshopColumnOrderRaw(input.ColumnOrderRaw)
 		if len(columnOrder) == 0 {
@@ -2247,6 +2299,16 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = 4000
 		}
+		if novelFetchMaxTxtInvalid(input.MaxTxt) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("maxTxt 不能超过 %d", novelFetchMaxTxtLimit)})
+			return
+		}
+		normalizedVersions, err := normalizeNovelFetchAIVersions(input.SelectedVersions)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		input.SelectedVersions = normalizedVersions
 		if queue == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 任务队列未配置"})
 			return
@@ -2299,7 +2361,54 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				return
 			}
 		}
+		jobView["result"] = result
+		uniqueQueue, supported := queue.(novelfetchworkshop.ProcessBookDedupQueue)
+		if !supported {
+			_ = updateWorkshopRun(store, processJob, "failed", "任务队列不支持按书籍防重复入队", now, true)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "任务队列不支持防重复入队"})
+			return
+		}
+		// 队列入队是 all-or-nothing：只要一本书已被占用，整批都不会入队。
+		// 这里先剔除被占用的书，只把剩余的书籍作为同一批次入队，避免其余
+		// 书籍被错误标记为“排队中”却永远没有任务处理。
+		conflicts := map[string]string{}
+		if conflictQueue, ok := queue.(novelfetchworkshop.ProcessBookConflictQueue); ok {
+			detected, err := conflictQueue.ConflictingBookIDs(req.Context(), processJob)
+			if err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 队列状态读取失败"})
+				return
+			}
+			conflicts = detected
+		}
+		queuedBookIDs := make([]string, 0, len(bookIDs))
+		conflictBookIDs := make([]string, 0, len(conflicts))
 		for _, bookID := range bookIDs {
+			existingID, taken := conflicts[bookID]
+			if !taken {
+				queuedBookIDs = append(queuedBookIDs, bookID)
+				continue
+			}
+			conflictBookIDs = append(conflictBookIDs, bookID)
+			_ = setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, existingID, "", "waiting_retry")
+			_ = updateWorkshopTaskRuntimeState(req.Context(), store, identity.Username, bookID, "waiting_retry", "该书已有任务在运行，已跳过本次开始")
+		}
+		if len(queuedBookIDs) == 0 {
+			_ = updateWorkshopRun(store, processJob, "duplicate_skipped", "同一书籍已有有效队列任务", now, true)
+			jobView["id"] = id
+			for _, bookID := range conflictBookIDs {
+				if existingID := strings.TrimSpace(conflicts[bookID]); existingID != "" {
+					jobView["id"] = existingID
+					break
+				}
+			}
+			jobView["existing"] = true
+			jobView["conflicting_book_ids"] = conflictBookIDs
+			registry.put(identity.Username, id, jobView)
+			writeJSON(w, http.StatusAccepted, jobView)
+			return
+		}
+		processJob.BookIDs = queuedBookIDs
+		for _, bookID := range queuedBookIDs {
 			if err := setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, id, batchID, "queued"); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务排队状态失败"})
 				return
@@ -2309,17 +2418,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务审计失败"})
 			return
 		}
-		jobView["result"] = result
-		uniqueQueue, supported := queue.(novelfetchworkshop.ProcessBookDedupQueue)
-		if !supported {
-			_ = updateWorkshopRun(store, processJob, "failed", "任务队列不支持按书籍防重复入队", now, true)
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "任务队列不支持防重复入队"})
-			return
-		}
 		queued, existingID, enqueueErr := uniqueQueue.EnqueueUniqueBooks(req.Context(), processJob, 24*time.Hour)
 		if enqueueErr != nil {
 			_ = updateWorkshopRun(store, processJob, "failed", enqueueErr.Error(), now, true)
-			for _, bookID := range bookIDs {
+			for _, bookID := range queuedBookIDs {
 				document, getErr := store.GetDocument(req.Context(), identity.Username, bookID)
 				if getErr == nil && document.Meta != nil {
 					delete(document.Meta, "currentProcessJobId")
@@ -2335,11 +2437,13 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			if strings.TrimSpace(existingID) == "" {
 				existingID = id
 			}
-			for _, bookID := range bookIDs {
-				_ = setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, existingID, "", "queued")
+			for _, bookID := range queuedBookIDs {
+				_ = setNovelFetchBookQueueState(req.Context(), store, identity.Username, bookID, existingID, "", "waiting_retry")
+				_ = updateWorkshopTaskRuntimeState(req.Context(), store, identity.Username, bookID, "waiting_retry", "同一书籍已有有效队列任务，已跳过本次开始")
 			}
 			jobView["id"] = existingID
 			jobView["existing"] = true
+			jobView["conflicting_book_ids"] = append(conflictBookIDs, queuedBookIDs...)
 			registry.put(identity.Username, id, jobView)
 			writeJSON(w, http.StatusAccepted, jobView)
 			return
@@ -3283,12 +3387,29 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			}
 			ids = append(ids, id)
 		}
-		result, err := store.DeleteDocuments(req.Context(), identity.Username, ids)
+		// 运行中的任务必须跳过删除，否则 worker 处理完会把文档重新写回，
+		// 已删除任务会“复活”或覆盖删除后的新数据。
+		skipped := make([]map[string]any, 0)
+		deletable := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if active := activeNovelFetchJobForBooksWithQueue(req.Context(), store, queue, identity.Username, []string{id}); active != nil {
+				skipped = append(skipped, active)
+				continue
+			}
+			deletable = append(deletable, id)
+		}
+		result, err := store.DeleteDocuments(req.Context(), identity.Username, deletable)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "删除任务失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, result)
+		response := map[string]any{
+			"requested": len(ids),
+			"deleted":   result.Deleted,
+			"results":   result.Results,
+			"skipped":   skipped,
+		}
+		writeJSON(w, http.StatusOK, response)
 	})
 
 	mux.HandleFunc("GET /api/novel-fetch-workshop/platforms", func(w http.ResponseWriter, req *http.Request) {
@@ -3502,15 +3623,57 @@ func novelFetchClassificationResolved(document novelfetchworkshop.Document) bool
 	return !genderNeedsResolution(document.Gender) && !styleNeedsResolution(document.Meta)
 }
 
+// canonicalNovelFetchAIVersion maps aliases such as ai01/ai001 to the
+// canonical ai1..ai20 identifier. Anything outside that range is rejected so a
+// single job cannot request an unbounded number of AI rewrites per book.
+func canonicalNovelFetchAIVersion(value string) (string, bool) {
+	name := strings.ToLower(strings.TrimSpace(value))
+	if !strings.HasPrefix(name, "ai") {
+		return "", false
+	}
+	index, err := strconv.Atoi(strings.TrimPrefix(name, "ai"))
+	if err != nil || index < 1 || index > 20 {
+		return "", false
+	}
+	return "ai" + strconv.Itoa(index), true
+}
+
+// normalizeNovelFetchAIVersions validates user supplied versions and collapses
+// zero-padded aliases (ai01, ai001, ...) to the same canonical version.
+func normalizeNovelFetchAIVersions(values []string) ([]string, error) {
+	normalized := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, raw := range values {
+		value := strings.TrimSpace(raw)
+		if value == "" {
+			continue
+		}
+		if strings.EqualFold(value, "original") {
+			if !seen["original"] {
+				seen["original"] = true
+				normalized = append(normalized, "original")
+			}
+			continue
+		}
+		canonical, ok := canonicalNovelFetchAIVersion(value)
+		if !ok {
+			return nil, fmt.Errorf("不支持的AI版本：%s（仅支持 ai1 到 ai20）", value)
+		}
+		if seen[canonical] {
+			continue
+		}
+		seen[canonical] = true
+		normalized = append(normalized, canonical)
+	}
+	return normalized, nil
+}
+
 func selectedNovelFetchAIVersions(values []string) []string {
 	selected := make([]string, 0, len(values))
 	seen := map[string]bool{}
 	for _, raw := range values {
-		version := strings.ToLower(strings.TrimSpace(raw))
-		if version == "original" || version == "" || !strings.HasPrefix(version, "ai") {
-			continue
-		}
-		if !novelFetchVersionIDPattern.MatchString(version) || seen[version] {
+		version, ok := canonicalNovelFetchAIVersion(raw)
+		if !ok || seen[version] {
 			continue
 		}
 		seen[version] = true
@@ -3920,11 +4083,11 @@ var workshopColumnPresetColumns = map[string][]string{
 }
 
 var workshopColumnPresetAliases = map[string]string{
-	"付费id/书名/推荐理由":          "paid_name_reason",
-	"付费id/书名/男女频/推荐理由":     "paid_name_gender_reason",
-	"免费id/付费id/书名/男女频/推荐理由": "free_paid_name_gender_reason",
+	"付费id/书名/推荐理由":           "paid_name_reason",
+	"付费id/书名/男女频/推荐理由":       "paid_name_gender_reason",
+	"免费id/付费id/书名/男女频/推荐理由":  "free_paid_name_gender_reason",
 	"书籍id/书名/推荐理由/男女频/标签/评级": "sample_input",
-	"完整11列":                 "full_11",
+	"完整11列": "full_11",
 }
 
 var workshopFixedColumnOrders = map[string][]string{

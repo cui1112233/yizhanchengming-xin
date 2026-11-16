@@ -166,15 +166,17 @@ func TestScheduledBookFullChainAndReadbackRecovery(t *testing.T) {
 			}
 			t.Logf("stage=%v error=%v aiError=%v fetch=%d rewrite=%d upload=%d", doc.Meta["status"], doc.Meta["error"], doc.Meta["aiError"], fetches.Load(), rewrites.Load(), uploads.Load())
 			if failReadback {
-				if doc.Meta["siteSubmitStatus"] != "pending_confirmation" {
-					t.Fatalf("unconfirmed upload marked successful: %v", doc.Meta["siteSubmitStatus"])
+				// 与源码一致：上传接口返回成功即视为已提交，回读失败只作为证据缺失。
+				if doc.Meta["siteSubmitStatus"] != "submitted" {
+					t.Fatalf("upload with failed readback was not submitted: %v", doc.Meta["siteSubmitStatus"])
 				}
 				// Simulate the existing retry runner invoking the same saved job.
 				rewriteCount := rewrites.Load()
+				uploadCount := uploads.Load()
 				job.Attempts = 1
 				worker.process(ctx, job)
-				if rewrites.Load() != rewriteCount {
-					t.Fatal("upload retry regenerated prose")
+				if rewrites.Load() != rewriteCount || uploads.Load() != uploadCount {
+					t.Fatal("upload retry regenerated prose or uploaded twice")
 				}
 				doc, err = store.GetDocument(ctx, owner, bookID)
 				if err != nil {

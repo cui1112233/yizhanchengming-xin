@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -163,7 +164,11 @@ func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworks
 	document.Meta["originalFetchLastError"] = firstText(fetchErr)
 	document.Meta["error"] = firstText(fetchErr)
 	// 阶段重试表同时记录原文抓取退避，便于统一判断“是否已到重试时间”。
-	scheduleNovelFetchTaskRetry(document.Meta, novelFetchRetryStageOriginalFetch, fetchErr, delay, now)
+	// 敏感词阶段失败已经单独记过 sensitive，不再重复记成原文抓取失败。
+	var sensitiveStage *novelFetchSensitiveStageError
+	if !errors.As(fetchErr, &sensitiveStage) {
+		scheduleNovelFetchTaskRetry(document.Meta, novelFetchRetryStageOriginalFetch, fetchErr, delay, now)
+	}
 	return store.PutDocument(ctx, owner, document)
 }
 
@@ -252,10 +257,13 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 func novelFetchAutomationTimeout(settings map[string]any) time.Duration {
 	seconds := intValue(mapOrEmpty(settings["workflow"])["auto_queue_task_timeout_seconds"])
 	if seconds <= 0 {
-		seconds = 180
+		// AI rewriting of long text can legitimately run for several minutes
+		// without touching the document; a short default falsely re-queues a
+		// live job and duplicates AI calls. Keep 30 minutes as the floor.
+		seconds = 1800
 	}
-	if seconds < 30 {
-		seconds = 30
+	if seconds < 300 {
+		seconds = 300
 	}
 	if seconds > 24*60*60 {
 		seconds = 24 * 60 * 60
@@ -498,6 +506,29 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	job.RewriteMethods = selectedJob.RewriteMethods
 	job.TextModelID = selectedJob.TextModelID
 	job.SensitiveAIEnabled = selectedJob.SensitiveAIEnabled
+	// EnqueueUniqueBooks is all-or-nothing. Drop books owned by another live
+	// job first, otherwise a single busy book blocks this whole automatic batch
+	// on every sweep until its dedupe key expires.
+	if conflictQueue, ok := queue.(novelfetchworkshop.ProcessBookConflictQueue); ok {
+		conflicts, conflictErr := conflictQueue.ConflictingBookIDs(ctx, job)
+		if conflictErr != nil {
+			return nil, conflictErr
+		}
+		if len(conflicts) > 0 {
+			filtered := make([]string, 0, len(bookIDs))
+			for _, bookID := range bookIDs {
+				if _, taken := conflicts[bookID]; taken {
+					continue
+				}
+				filtered = append(filtered, bookID)
+			}
+			if len(filtered) == 0 {
+				return nil, nil
+			}
+			bookIDs = filtered
+			job.BookIDs = filtered
+		}
+	}
 	if err := novelFetchSnapshotBeforeQueue(ctx, store, job); err != nil {
 		return nil, err
 	}
