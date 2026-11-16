@@ -4,6 +4,7 @@ import { buildManualBatchSubmission, hasFetchedManualSources, manualBookIDsFromI
 
 test('collects each numeric Book ID once from a manual novel list', () => {
   assert.deepEqual(manualBookIDsFromInput('100000000001\t书A\n100000000002  书B\n100000000001\t重复'), ['100000000001', '100000000002']);
+  assert.deepEqual(manualBookIDsFromInput('7707226373706088457\t7705762208613335078 7706177708078759962'), ['7707226373706088457', '7705762208613335078', '7706177708078759962']);
 });
 
 test('collects short Qimao numeric Book IDs from a manual novel list', () => {

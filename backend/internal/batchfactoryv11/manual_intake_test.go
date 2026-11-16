@@ -97,6 +97,27 @@ func TestParseManualBookListAcceptsShortQimaoBookIDs(t *testing.T) {
 	}
 }
 
+func TestParseManualBookListAcceptsHorizontallyPastedBookIDs(t *testing.T) {
+	books, err := ParseManualBookList(ManualIntakeInput{
+		PlatformID:     "2",
+		PlatformName:   "番茄付费",
+		ParseMode:      "smart",
+		ColumnPresetID: "full_metadata",
+		InputText:      "7707226373706088457\t7705762208613335078 7706177708078759962",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(books) != 3 {
+		t.Fatalf("horizontally pasted IDs were not split into books: %+v", books)
+	}
+	for index, want := range []string{"7707226373706088457", "7705762208613335078", "7706177708078759962"} {
+		if books[index].BookID != want {
+			t.Fatalf("books[%d].BookID = %q, want %q", index, books[index].BookID, want)
+		}
+	}
+}
+
 func TestParseManualBookListSeparatesPastedBookIDAndTitleAndKeepsFetchedOriginal(t *testing.T) {
 	const bookID = "7655922169695718462"
 	const title = "未婚妻拿我当踏板，我加入剧组她却哭了"

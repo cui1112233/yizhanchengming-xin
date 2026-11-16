@@ -1,12 +1,22 @@
+const bookIDPattern = /^\d{6,25}$/;
+
+// 一行里如果所有字段都是纯书籍 ID，说明是从表格里横着复制的一串 ID，
+// 每个 ID 都是一本书；只要出现书名等非数字字段，就仍按“ID + 书名 + 字段”解析。
+function horizontalBookIDs(line) {
+  const parts = String(line || '').trim().split(/[\s,，;；]+/).filter(Boolean);
+  return parts.length > 1 && parts.every(part => bookIDPattern.test(part)) ? parts : null;
+}
+
 export function manualBookIDsFromInput(inputText = '') {
   const seen = new Set();
   const ids = [];
   for (const line of String(inputText).split(/\r?\n/)) {
-    const id = line.match(/^\s*(\d{6,25})(?=\s|$)/)?.[1];
-    if (!id) continue;
-    if (!seen.has(id)) {
-      seen.add(id);
-      ids.push(id);
+    const lineIDs = horizontalBookIDs(line) || [line.match(/^\s*(\d{6,25})(?=\s|$)/)?.[1]].filter(Boolean);
+    for (const id of lineIDs) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
     }
   }
   return ids;
@@ -60,16 +70,26 @@ function nonEmptyLines(text) {
   return String(text || '').split(/\r?\n/).map(line => line.trimEnd()).filter(line => line.trim());
 }
 
+function expandedBookLines(text) {
+  const lines = [];
+  for (const line of nonEmptyLines(text)) {
+    const horizontal = horizontalBookIDs(line);
+    if (horizontal) lines.push(...horizontal);
+    else lines.push(line);
+  }
+  return lines;
+}
+
 export function mergeGroupLines(oldText = '', newText = '') {
   const byId = new Map();
   const order = [];
-  for (const line of nonEmptyLines(oldText)) {
+  for (const line of expandedBookLines(oldText)) {
     const id = line.match(/^\s*(\d{6,25})(?=\s|$)/)?.[1];
     if (!id) continue;
     if (!byId.has(id)) order.push(id);
     byId.set(id, line);
   }
-  for (const line of nonEmptyLines(newText)) {
+  for (const line of expandedBookLines(newText)) {
     const id = line.match(/^\s*(\d{6,25})(?=\s|$)/)?.[1];
     if (!id) continue;
     if (!byId.has(id)) order.push(id);

@@ -316,6 +316,30 @@ func inferredManual(cells []string, mode string) manualRow {
 	}
 	return finalize(row, mode)
 }
+
+var manualPureDigits = regexp.MustCompile(`^\d{6,25}$`)
+var manualIDParts = regexp.MustCompile(`[\s,，;；]+`)
+
+// horizontalManualIDs 识别“一行里全是书籍 ID”的横向粘贴：每个 ID 都是一本书。
+// 只要有一个片段不是纯数字（例如书名），就仍按字段行解析，避免把书名里的数字当 ID。
+func horizontalManualIDs(line string) []string {
+	cells := []string{}
+	for _, part := range manualIDParts.Split(cleanManual(line), -1) {
+		if part = cleanManual(part); part != "" {
+			cells = append(cells, part)
+		}
+	}
+	if len(cells) < 2 {
+		return nil
+	}
+	for _, cell := range cells {
+		if !manualPureDigits.MatchString(cell) {
+			return nil
+		}
+	}
+	return cells
+}
+
 func parseManualRows(input ManualIntakeInput) []manualRow {
 	mode := strings.TrimSpace(input.ParseMode)
 	switch mode {
@@ -325,9 +349,17 @@ func parseManualRows(input ManualIntakeInput) []manualRow {
 	}
 	raw := [][]string{}
 	for _, line := range strings.Split(input.InputText, "\n") {
-		if cleanManual(line) != "" {
-			raw = append(raw, splitManual(line))
+		if cleanManual(line) == "" {
+			continue
 		}
+		cells := splitManual(line)
+		if ids := horizontalManualIDs(line); ids != nil {
+			for _, id := range ids {
+				raw = append(raw, []string{id})
+			}
+			continue
+		}
+		raw = append(raw, cells)
 	}
 	if len(raw) == 0 {
 		return nil
