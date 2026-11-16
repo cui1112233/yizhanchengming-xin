@@ -1988,6 +1988,20 @@ func TestNovelFetchPreviewHonorsFixedPresetAndHeader(t *testing.T) {
 	}
 }
 
+func TestNovelFetchTaskDetailPayloadUsesDerivedStatus(t *testing.T) {
+	document := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+		"status": "completed", "queueState": "running", "aiStatus": "failed",
+	}}
+	payload := novelFetchTaskDetailPayload(document)
+	if payload["status"] != novelfetchworkshop.TaskStatusProcessing || payload["effective_status"] != novelfetchworkshop.TaskStatusProcessing {
+		t.Fatalf("detail payload status=%v effective=%v", payload["status"], payload["effective_status"])
+	}
+	meta := mapOrEmpty(payload["meta"])
+	if meta["status"] != novelfetchworkshop.TaskStatusProcessing || meta["effectiveStatus"] != novelfetchworkshop.TaskStatusProcessing {
+		t.Fatalf("detail meta status=%v effective=%v", meta["status"], meta["effectiveStatus"])
+	}
+}
+
 func TestNovelFetchWorkshopProcessStartReturnsExistingTaskForActiveDuplicateBook(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

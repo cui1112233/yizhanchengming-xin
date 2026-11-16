@@ -2600,7 +2600,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			}
 		}
 		syncNovelFetchClassificationMetadata(&document)
-		writeJSON(w, http.StatusOK, document)
+		writeJSON(w, http.StatusOK, novelFetchTaskDetailPayload(document))
 	})
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/{bookId}/fetch", func(w http.ResponseWriter, req *http.Request) {
@@ -3742,6 +3742,22 @@ func publicNovelFetchConfig(input map[string]any) map[string]any {
 	return out
 }
 
+func novelFetchTaskDetailPayload(document novelfetchworkshop.Document) map[string]any {
+	raw, _ := json.Marshal(document)
+	payload := map[string]any{}
+	_ = json.Unmarshal(raw, &payload)
+	status := novelfetchworkshop.DeriveTaskStatus(document)
+	meta := mapOrEmpty(payload["meta"])
+	meta["status"] = status
+	meta["effectiveStatus"] = status
+	meta["effective_status"] = status
+	payload["meta"] = meta
+	payload["status"] = status
+	payload["effectiveStatus"] = status
+	payload["effective_status"] = status
+	return payload
+}
+
 func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 	raw, _ := json.Marshal(document)
 	result := map[string]any{}
@@ -3848,6 +3864,10 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 		}
 	}
 	result["status"] = novelfetchworkshop.DeriveTaskStatus(document)
+	// effective_status 是后端唯一有效状态；status 为兼容旧页面保留同值。
+	result["effective_status"] = result["status"]
+	result["effectiveStatus"] = result["status"]
+	result["queue_state"] = metaString("queueState", "queue_state")
 	createdAt := metaString("createdAt", "created_at", "createdTime", "created_time")
 	if createdAt == "" {
 		createdAt = document.UpdatedAt

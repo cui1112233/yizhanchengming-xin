@@ -581,6 +581,16 @@ func TestBatchRewriteDeleteSkipsRunningTasks(t *testing.T) {
 	}
 }
 
+func TestLegacyBatchRewriteTaskExposesEffectiveStatus(t *testing.T) {
+	document := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+		"status": "completed", "queueState": "queued", "bookName": "测试书",
+	}}
+	task := legacyBatchRewriteTask(document)
+	if task["status"] != novelfetchworkshop.TaskStatusQueued || task["effective_status"] != novelfetchworkshop.TaskStatusQueued || task["effectiveStatus"] != novelfetchworkshop.TaskStatusQueued {
+		t.Fatalf("legacy task status=%v effective=%v", task["status"], task["effective_status"])
+	}
+}
+
 func TestBatchRewriteWorkFormRoundTrip(t *testing.T) {
 	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()

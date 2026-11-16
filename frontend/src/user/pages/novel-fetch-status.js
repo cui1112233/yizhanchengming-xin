@@ -219,6 +219,11 @@ export function mergeNovelFetchQueueStatus(previous = {}, next = {}) {
 }
 
 export function novelFetchTaskStatus(row = {}) {
+  // 后端返回的 effective_status 是唯一有效状态；阶段状态只在旧接口缺字段时兜底。
+  const canonical = text(row.effective_status ?? row.effectiveStatus);
+  if (canonical && labels[canonical]) {
+    return { status: canonical, label: labels[canonical], color: colors[canonical] };
+  }
   const raw = text(row.status ?? row.taskStatus ?? row.task_status);
   if (raw === 'scheduled_waiting' || row.scheduledHold === true) {
     return { status: 'scheduled_waiting', label: labels.scheduled_waiting, color: colors.scheduled_waiting };

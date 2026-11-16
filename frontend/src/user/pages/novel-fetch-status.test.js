@@ -24,6 +24,16 @@ test('raw original file is not an AI1 result and failed version metadata is not 
   assert.equal(statusHelpers.novelFetchVersionReady({ versions: { ai1: { state: 'ready' } } }), true);
 });
 
+test('backend effective status wins over conflicting legacy stage fields', () => {
+  const state = statusHelpers.novelFetchTaskStatus({
+    effective_status: 'processing',
+    status: 'completed',
+    aiStatus: 'failed'
+  });
+  assert.equal(state.status, 'processing');
+  assert.equal(state.label, '正在执行中…');
+});
+
 test('upload-only failure keeps completed body status and actionable next step', () => {
   assert.equal(statusHelpers.novelFetchTaskStatus({ status: 'upload_pending', originalStatus: 'done', aiStatus: 'done', siteSubmitStatus: 'failed' }).label, '正文已完成，待重试上传');
 });

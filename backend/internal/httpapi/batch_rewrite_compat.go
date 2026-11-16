@@ -834,6 +834,12 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	if document.MaxTxt > 0 {
 		task["max_txt"] = document.MaxTxt
 	}
+	// 旧版页面读取 task.status；统一写入后端推导的有效状态，避免直接展示
+	// 可能过期的 meta.status 或某个阶段状态。
+	status := novelfetchworkshop.DeriveTaskStatus(document)
+	task["status"] = status
+	task["effective_status"] = status
+	task["effectiveStatus"] = status
 	return task
 }
 
