@@ -44,6 +44,50 @@ function Invoke-Checked {
   }
 }
 
+# ssh/scp 的 ConnectTimeout 只覆盖 TCP 建连；链路在 banner 阶段被静默丢弃时
+# 进程会永久挂起。这里给每条远端命令加硬超时，超时直接杀掉并报错。
+function Invoke-NativeWithTimeout {
+  param(
+    [string]$Command,
+    [string[]]$Arguments,
+    [int]$TimeoutSeconds,
+    [switch]$Capture
+  )
+  $quoted = $Arguments | ForEach-Object {
+    if ($_ -match '\s') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+  }
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $Command
+  $psi.Arguments = ($quoted -join ' ')
+  $psi.UseShellExecute = $false
+  if ($Capture) {
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+  }
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $psi
+  [void]$process.Start()
+  $stdoutTask = $null
+  $stderrTask = $null
+  if ($Capture) {
+    # 两个管道都要异步读，否则输出较多时子进程会因缓冲区写满而卡住。
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+  }
+  if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+    try { $process.Kill() } catch { }
+    throw "命令超时（${TimeoutSeconds}s）：$Command"
+  }
+  $process.WaitForExit()
+  if ($process.ExitCode -ne 0) {
+    throw "命令执行失败（$($process.ExitCode)）：$Command $($Arguments -join ' ')"
+  }
+  if ($Capture) {
+    $null = $stderrTask.Result
+    return $stdoutTask.Result
+  }
+}
+
 # 前端产物来源校验：发布包必须能说明前端源码是否干净、嵌入的是哪个构建。
 # 默认只记录状态；显式传入 -RequireCleanFrontend 时，源码有未提交改动或
 # dist 落后于源码都会直接拒绝构建，避免把其他会话的半成品页面带上线。
@@ -153,11 +197,15 @@ if ($Deploy) {
   $uploaded = $false
   for ($attempt = 1; $attempt -le $uploadAttempts; $attempt++) {
     try {
-      Invoke-Checked 'scp' (@('-P', "$SshPort") + $connectionOptions + @($binaryPath, "${remote}:$remoteTemp"))
+      Invoke-NativeWithTimeout 'scp' (@('-P', "$SshPort") + $connectionOptions + @($binaryPath, "${remote}:$remoteTemp")) 900
     } catch {
       Write-Warning "第 $attempt/$uploadAttempts 次上传失败：$($_.Exception.Message)"
     }
-    $remoteHash = (& ssh (@('-p', "$SshPort") + $connectionOptions + @($remote, "sha256sum '$remoteTemp' 2>/dev/null | cut -d' ' -f1")) 2>$null) -join ''
+    $remoteHash = ''
+    try {
+      $remoteHash = Invoke-NativeWithTimeout 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, "sha256sum '$remoteTemp' 2>/dev/null | cut -d' ' -f1")) 90 -Capture
+      $remoteHash = ($remoteHash -join '').Trim()
+    } catch { }
     if ($remoteHash.Trim().ToLowerInvariant() -eq $localHash) {
       $uploaded = $true
       break
@@ -172,7 +220,7 @@ if ($Deploy) {
   # 远端目标是正在运行的二进制，直接 install 覆盖会触发 ETXTBSY；
   # 先装到同目录的 .new 再 mv，保证原子替换。
   $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath.new'; sudo mv -f '$TargetPath.new' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
-  Invoke-Checked 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $remoteCommand))
+  Invoke-NativeWithTimeout 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $remoteCommand)) 300
   Write-Host "远端服务已重启并通过 systemd 健康检查：$ServiceName"
 
   # 旧版本二进制不会自动消失，每次发布都会多留一个约 174MB 的文件。发布成功后
@@ -181,8 +229,13 @@ if ($Deploy) {
   if (-not $KeepOldReleases) {
     # prune 脚本按“软链指向当前版本”的目录结构设计；生产目前是直接文件替换，
     # 这种结构下跳过清理，避免发布成功后因为找不到软链而整体报错。
-    & ssh (@('-p', "$SshPort") + $connectionOptions + @($remote, "test -L '$TargetPath'")) 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $isSymlink = $true
+    try {
+      Invoke-NativeWithTimeout 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, "test -L '$TargetPath'")) 60
+    } catch {
+      $isSymlink = $false
+    }
+    if (-not $isSymlink) {
       Write-Host "跳过旧版本清理：$TargetPath 不是版本软链，当前为直接文件替换。"
     } else {
       $pruneScript = Join-Path $PSScriptRoot 'prune-qiantie-releases.sh'
@@ -196,9 +249,9 @@ if ($Deploy) {
       $pruneCode = (Get-Content -LiteralPath $pruneScript -Raw) -replace "`r", ""
       [System.IO.File]::WriteAllText($tempPrune, $pruneCode, (New-Object System.Text.UTF8Encoding($false)))
       try {
-        Invoke-Checked 'scp' (@('-P', "$SshPort") + $connectionOptions + @($tempPrune, "${remote}:$remotePrune"))
+        Invoke-NativeWithTimeout 'scp' (@('-P', "$SshPort") + $connectionOptions + @($tempPrune, "${remote}:$remotePrune")) 120
         $pruneCommand = "set -eu; QIANTIE_RELEASE_ROOT='$remoteRoot' sh '$remotePrune' $KeepPreviousReleases; rm -f '$remotePrune'"
-        Invoke-Checked 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $pruneCommand))
+        Invoke-NativeWithTimeout 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $pruneCommand)) 300
         Write-Host "旧版本已清理：保留当前版本和最近 $KeepPreviousReleases 个历史版本。"
       } finally {
         Remove-Item -LiteralPath $tempPrune -Force -ErrorAction SilentlyContinue
