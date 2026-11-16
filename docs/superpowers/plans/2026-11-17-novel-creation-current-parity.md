@@ -99,14 +99,14 @@ if reviseCalls != 0 { t.Fatal("explicit zero revision limit ignored") }
 
 **Interfaces:** 文件上传→解析任务→章节列表→选中范围；StyleProfile和Note引用快照；作品/会话Rename/Archive/Restore；ChapterVersion列表及显式恢复；短篇独立结果查询；TXT/Markdown导出。
 
-- [ ] 红测：合法TXT/DOCX/PDF、扫描件/加密PDF/超20MiB/超8文件拒绝；无标题单片段；文风或参考二选一；备注引用生效；跨账号/删除引用/章节改版拒绝旧快照覆盖。
+- [x] 红测：合法TXT/DOCX/PDF、扫描件/加密PDF/超20MiB/超8文件拒绝；无标题单片段；文风或参考二选一；备注引用生效；跨账号/删除引用/章节改版拒绝旧快照覆盖。
 
 ```go
 if len(snapshot.SelectedChapterIDs) != 2 { t.Fatal("selected chapter range lost") }
 ```
 
-- [ ] 实现：TOS只放原文件/导出文件，MySQL存解析和版本；纯文风统计不调用AI；归档复用全站机制；编辑/恢复均新增版本并标记记忆刷新，不覆盖历史。
-- [ ] 验证：上传和解析服务聚焦测试、HTTP/存储事务测试；资料失败状态可查且不产生空可用内容；审查后提交。
+- [x] 实现：TOS只放原文件/导出文件，MySQL存解析和版本；纯文风统计不调用AI；归档复用全站机制；编辑/恢复均新增版本并标记记忆刷新，不覆盖历史。
+- [x] 验证：上传和解析服务聚焦测试、HTTP/存储事务测试；资料失败状态可查且不产生空可用内容；审查后提交。
 
 ## Task 7: 前端交互与恢复
 
