@@ -512,7 +512,11 @@ func journalCompletePrepared(ctx context.Context, key string, p batchfactoryv11.
 	if prepareErr != nil {
 		return "", prepareErr
 	}
+	previousMetadata := record.Metadata
 	record.Metadata = metadata
+	if record.ConfirmationFingerprint == "" && record.ConfirmationID != "" {
+		record.ConfirmationFingerprint = confirmationBinding(j.lease.RunID, key, hash, previousMetadata)
+	}
 	if secondary {
 		waiting := false
 		err = guarded(ctx, j.store, j.lease, func(tx Store, e *Execution) error {
@@ -526,17 +530,18 @@ func journalCompletePrepared(ctx context.Context, key string, p batchfactoryv11.
 			if !completed {
 				return nil
 			}
-			token := fingerprint(struct {
-				Run, Key, Request string
-				Metadata          *ModelCallMetadata
-			}{j.lease.RunID, key, hash, metadata})
-			if record.ConfirmationID == token && record.Confirmed {
+			binding := confirmationBinding(j.lease.RunID, key, hash, metadata)
+			_, previouslyApproved := e.ConfirmedCalls[record.ConfirmationID]
+			same := record.ConfirmationID != "" && record.ConfirmationFingerprint == binding
+			if same && record.Confirmed {
 				return nil
 			}
-			record.ConfirmationID = token
-			record.Confirmed = false
-			e.Calls[key] = record
-			e.PendingConfirmation = &CallConfirmation{ID: token, Key: key, Metadata: metadata}
+			if same && !previouslyApproved {
+				e.Calls[key] = record
+				e.PendingConfirmation = &CallConfirmation{ID: record.ConfirmationID, Key: key, Metadata: metadata}
+			} else {
+				issueCallConfirmation(e, key, &record, binding, metadata)
+			}
 			waiting = true
 			return nil
 		})

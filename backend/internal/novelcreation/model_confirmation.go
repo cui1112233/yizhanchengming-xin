@@ -48,6 +48,36 @@ func (s *Service) ConfirmModelCall(ctx context.Context, owner, id, token string)
 			return &DomainError{Code: ErrInputRequired, Message: "缺少模型调用确认编号"}
 		}
 		if _, confirmed := state.ConfirmedCalls[token]; confirmed {
+			// Legacy deterministic IDs can already be both approved history and
+			// the current unapproved pending. Refresh that pending, never reuse
+			// the old approval to authorize it.
+			if pending := state.PendingConfirmation; pending != nil && pending.ID == token {
+				call, exists := state.Calls[pending.Key]
+				if exists && call.State == "prepared" && !call.Confirmed && run.Status == RunAwaitingConfirmation && !state.CancelRequested {
+					binding := confirmationBinding(id, pending.Key, call.Fingerprint, pending.Metadata)
+					issueCallConfirmation(&state, pending.Key, &call, binding, pending.Metadata)
+					if e = tx.PutExecution(ctx, state); e != nil {
+						return e
+					}
+					var snapshot map[string]any
+					_ = json.Unmarshal(run.RuntimeSnapshot, &snapshot)
+					if snapshot == nil {
+						snapshot = map[string]any{}
+					}
+					snapshot["confirmationKind"] = "next_model_call"
+					snapshot["confirmationId"] = state.PendingConfirmation.ID
+					snapshot["callKey"] = state.PendingConfirmation.Key
+					snapshot["nextModelCall"] = state.PendingConfirmation.Metadata
+					snapshot["modelCalls"] = callMetadata(state)
+					raw, _ := json.Marshal(snapshot)
+					run, e = tx.UpdateRun(ctx, owner, RunUpdate{ID: id, Status: RunAwaitingConfirmation, RuntimeSnapshot: raw})
+					if e != nil {
+						return e
+					}
+					_, e = tx.AppendRunEvent(ctx, owner, RunEvent{RunID: id, ProjectID: run.ProjectID, SessionID: run.SessionID, Status: RunAwaitingConfirmation, Type: "run.checkpoint", Message: "确认编号已更新，请确认当前模型调用"})
+					return e
+				}
+			}
 			return nil
 		}
 		if run.Status != RunAwaitingConfirmation || state.CancelRequested || state.PendingConfirmation == nil || state.PendingConfirmation.ID != token {
@@ -109,4 +139,36 @@ func agentFromSnapshot(raw json.RawMessage) any {
 		return nil
 	}
 	return v.Settings.Agent
+}
+
+func confirmationBinding(run, key, request string, metadata *ModelCallMetadata) string {
+	return fingerprint(struct {
+		Run, Key, Request string
+		Metadata          *ModelCallMetadata
+	}{run, key, request, metadata})
+}
+
+// A durable generation distinguishes A1/B1/A2 even when configuration A recurs.
+// Re-observing the same pending never calls this function.
+func issueCallConfirmation(e *Execution, key string, record *CallRecord, binding string, metadata *ModelCallMetadata) {
+	for {
+		record.ConfirmationGeneration++
+		candidate := fingerprint(struct {
+			Binding    string
+			Generation uint64
+		}{binding, record.ConfirmationGeneration})
+		if candidate == record.ConfirmationID {
+			continue
+		}
+		if _, approved := e.ConfirmedCalls[candidate]; approved {
+			continue
+		}
+		record.ConfirmationID = candidate
+		break
+	}
+	record.ConfirmationFingerprint = binding
+	record.Confirmed = false
+	record.Metadata = metadata
+	e.Calls[key] = *record
+	e.PendingConfirmation = &CallConfirmation{ID: record.ConfirmationID, Key: key, Metadata: metadata}
 }

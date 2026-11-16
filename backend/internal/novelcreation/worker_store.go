@@ -34,14 +34,16 @@ type ModelCallMetadata struct {
 }
 
 type CallRecord struct {
-	Metadata       *ModelCallMetadata `json:",omitempty"`
-	ConfirmationID string             `json:",omitempty"`
-	Confirmed      bool               `json:",omitempty"`
-	Fingerprint    string
-	State          string
-	Response       string
-	ErrorCode      string
-	ErrorMessage   string
+	Metadata                *ModelCallMetadata `json:",omitempty"`
+	ConfirmationID          string             `json:",omitempty"`
+	ConfirmationGeneration  uint64             `json:",omitempty"`
+	ConfirmationFingerprint string             `json:",omitempty"`
+	Confirmed               bool               `json:",omitempty"`
+	Fingerprint             string
+	State                   string
+	Response                string
+	ErrorCode               string
+	ErrorMessage            string
 }
 type CallConfirmation struct {
 	ID       string             `json:"confirmationId"`
