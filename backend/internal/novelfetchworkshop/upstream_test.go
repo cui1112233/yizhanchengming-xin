@@ -74,6 +74,17 @@ func TestUpstreamFetchSendsRequiredQueryParameters(t *testing.T) {
 	}
 }
 
+func TestUpstreamFetchRejectsHTMLErrorPageAsBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"msg":"ok","data":"<!DOCTYPE html><html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1><hr>nginx</body></html>"}`))
+	}))
+	defer server.Close()
+
+	if _, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "15", 4000); err == nil {
+		t.Fatal("HTML error page must not be accepted as novel body")
+	}
+}
+
 func TestUpstreamFetchParsesBodyAndBookInfo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"code":200,"msg":"成功","data":"完整正文","bookinfo":{"category":"男频","genre":"都市"}}`))

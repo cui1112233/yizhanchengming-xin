@@ -68,6 +68,22 @@ func (f UpstreamFetcher) FetchAndProcess(ctx context.Context, bookID, platformID
 	}, nil
 }
 
+// upstreamBodyLooksLikeErrorPage 识别 121 在业务码正常时返回的 HTML 错误页。
+// 这类响应的 data 字段是 "502 Bad Gateway" 之类的网页源码，直接当正文保存
+// 会污染原文并让后续改文把整页 HTML 当成小说内容。
+func upstreamBodyLooksLikeErrorPage(text string) bool {
+	lower := strings.ToLower(text)
+	for _, marker := range []string{
+		"<!doctype html", "<html", "<h1>502 bad gateway", "502 bad gateway",
+		"504 gateway time-out", "502 gateway", "chrome-error", "err_connection",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, maxTxt int) (FetchResult, error) {
 	bookID = strings.TrimSpace(bookID)
 	platformID = strings.TrimSpace(platformID)
@@ -122,6 +138,9 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 	}
 	if payload.Code != http.StatusOK {
 		return FetchResult{}, fmt.Errorf("121 upstream business error %d: %s（bookid=%s platform=%s）", payload.Code, strings.TrimSpace(payload.Message), bookID, platformID)
+	}
+	if upstreamBodyLooksLikeErrorPage(payload.Data) {
+		return FetchResult{}, fmt.Errorf("121 upstream 返回的是错误页面而不是正文（bookid=%s platform=%s），请稍后重试", bookID, platformID)
 	}
 	return FetchResult{Code: payload.Code, Message: payload.Message, OriginalRaw: payload.Data, BookInfo: payload.BookInfo}, nil
 }
