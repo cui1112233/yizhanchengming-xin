@@ -67,6 +67,7 @@ type RunContext struct {
 	KnowledgeMaterials []KnowledgeMaterial
 	// MaxRevisionRounds overrides the default audit-revision loop bound.
 	MaxRevisionRounds int
+	Agent             *AgentSettings
 }
 
 type Pipeline struct {
@@ -203,17 +204,8 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		return ChapterBundle{}, err
 	}
 
-	modelID := strings.TrimSpace(input.Run.ModelID)
-	if modelID == "" {
-		modelID = strings.TrimSpace(input.Project.ModelID)
-	}
-	provider, err := p.resolveProvider(ctx, strings.TrimSpace(input.OwnerUsername), modelID)
-	if err != nil {
-		return ChapterBundle{}, mapModelError(err)
-	}
-	if provider == nil {
-		return ChapterBundle{}, &DomainError{Code: ErrModelUnavailable, Message: "novel model is unavailable"}
-	}
+	var provider batchfactoryv11.DirectorProvider
+	var err error
 
 	if err := p.emitStage(ctx, input, sink, RunPlanning, "正在生成基础设定和章节计划", 10); err != nil {
 		return ChapterBundle{}, err
@@ -321,6 +313,25 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	draft.Content = strings.TrimSpace(draft.Content)
 	bestContent := draft.Content
 	bestContentRaw := draftRaw
+	if input.Agent != nil {
+		for _, optional := range []struct {
+			enabled    bool
+			definition promptcatalog.Definition
+		}{
+			{input.Agent.EnableLengthNorm, novelprompt.LengthNormalize}, {input.Agent.EnablePostWrite, novelprompt.PostWrite}, {input.Agent.EnableAiTells, novelprompt.AiTells},
+		} {
+			if !optional.enabled {
+				continue
+			}
+			var processed chapterDraftOutput
+			processedRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{definition: optional.definition, step: RunNormalizing, userPayload: map[string]any{"chapter_content": bestContent, "chapter_plan": plan, "target_chapter_words": input.Project.TargetChapterWords, "rules": input.Rules, "style_profile": input.StyleProfile}, maxTokens: 12000, validate: func() error { return requireText("content", processed.Content) }}, &processed)
+			if callErr != nil {
+				return ChapterBundle{}, callErr
+			}
+			bestContent = strings.TrimSpace(processed.Content)
+			bestContentRaw = processedRaw
+		}
+	}
 
 	if err := p.emitStage(ctx, input, sink, RunAuditing, "正在审核章节", 55); err != nil {
 		return ChapterBundle{}, err
@@ -335,12 +346,15 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	bestAudit := currentAudit
 	bestAuditRaw := currentAuditRaw
 
+	threshold := p.threshold(input)
 	revisingStageEmitted := false
 	maxRevisions := p.maxRevisions
-	if input.MaxRevisionRounds > 0 {
+	if input.Agent != nil {
+		maxRevisions = input.Agent.MaxRevisionRounds
+	} else if input.MaxRevisionRounds > 0 {
 		maxRevisions = input.MaxRevisionRounds
 	}
-	for round := 1; !auditPasses(bestAudit, p.auditThreshold) && round <= maxRevisions; round++ {
+	for round := 1; !auditPasses(bestAudit, threshold) && round <= maxRevisions; round++ {
 		if len(bestAudit.Issues) == 0 {
 			break
 		}
@@ -375,7 +389,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 			return ChapterBundle{}, auditErr
 		}
 		audits = append(audits, newAudit(input, len(audits)+1, candidateAudit, candidateAuditRaw))
-		if betterAudit(candidateAudit, bestAudit, p.auditThreshold) {
+		if betterAudit(candidateAudit, bestAudit, threshold) {
 			bestContent = strings.TrimSpace(revision.Content)
 			bestContentRaw = revisionRaw
 			bestAudit = candidateAudit
@@ -384,7 +398,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	}
 
 	finalStatus := RunSucceeded
-	if !auditPasses(bestAudit, p.auditThreshold) {
+	if !auditPasses(bestAudit, threshold) {
 		finalStatus = RunSucceededWithWarnings
 	}
 
@@ -454,12 +468,17 @@ func modeContract(mode string) map[string]string {
 
 func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, foundation foundationPlanOutput, plan chapterPlanOutput, content string, round int) (chapterAuditOutput, json.RawMessage, error) {
 	var audit chapterAuditOutput
+	definition := novelprompt.ChapterAudit
+	if input.Agent != nil {
+		definition = novelprompt.AgentChapterAudit
+	}
 	raw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-		definition: novelprompt.ChapterAudit, step: RunAuditing, key: fmt.Sprintf(":%d", round),
+		definition: definition, step: RunAuditing, key: fmt.Sprintf(":%d", round),
 		userPayload: map[string]any{
 			"foundation_plan":     foundation,
 			"chapter_plan":        plan,
 			"chapter_content":     content,
+			"pass_score":          p.threshold(input),
 			"rules":               input.Rules,
 			"notes":               input.Notes,
 			"knowledge_materials": input.KnowledgeMaterials,
@@ -468,12 +487,25 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 			"memory_context":      rawJSONValue(input.PreviousMemory),
 		},
 		temperature: 0.2, maxTokens: 4500,
-		validate: func() error { return validateAudit(audit, p.auditThreshold) },
+		validate: func() error { return validateAudit(audit, p.threshold(input)) },
 	}, &audit)
 	return audit, raw, err
 }
 
 func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, spec modelCallSpec, target any) (json.RawMessage, error) {
+	if input.Agent != nil {
+		spec.temperature = input.Agent.BaseTemperature
+		if spec.definition.ID == novelprompt.ChapterRevision.ID {
+			var round int
+			fmt.Sscanf(spec.key, ":%d", &round)
+			spec.temperature = boundedAgentNumber(spec.temperature+float64(round)*input.Agent.TemperatureStep, 0, 2, 0)
+		}
+	}
+	if input.Agent == nil && spec.definition.ID == novelprompt.ChapterAudit.ID {
+		if fields, ok := spec.userPayload.(map[string]any); ok {
+			delete(fields, "pass_score")
+		}
+	}
 	userPrompt, err := marshalPromptPayload(withThinkingLevel(spec.userPayload, input.Run.ThinkingLevel))
 	if err != nil {
 		return nil, &DomainError{Code: ErrInvalidOutput, Message: "failed to build model input", Cause: err}
@@ -484,7 +516,7 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		Temperature:  spec.temperature,
 		MaxTokens:    spec.maxTokens,
 	}
-	reply, err := p.complete(ctx, input, sink, provider, spec.step, spec.definition.ID+spec.key, request)
+	reply, err := p.complete(ctx, input, sink, provider, spec.step, spec.definition.ID+spec.key, request, spec.definition.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +526,7 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 	}
 
 	repairPrompt, marshalErr := marshalPromptPayload(map[string]any{
-		"instruction":      "上一轮输出不符合合同，只返回修复后的完整 JSON 对象",
+		"instruction":      novelprompt.StructureRepairInstruction,
 		"thinking_level":   strings.TrimSpace(input.Run.ThinkingLevel),
 		"original_request": json.RawMessage(userPrompt),
 		"invalid_output":   reply,
@@ -504,12 +536,12 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		return nil, invalidOutputError(spec.definition, validationErr)
 	}
 	repairRequest := batchfactoryv11.TextCompletionRequest{
-		SystemPrompt: outputContractSystemPrompt(spec.definition) + "\n\n上一轮输出无法通过合同校验。现在只返回一个修复后的完整 JSON 对象，不要解释。",
+		SystemPrompt: outputContractSystemPrompt(spec.definition) + "\n\n" + novelprompt.StructureRepairSystem,
 		UserPrompt:   repairPrompt,
 		Temperature:  0.1,
 		MaxTokens:    spec.maxTokens,
 	}
-	repairedReply, err := p.complete(ctx, input, sink, provider, spec.step, spec.definition.ID+spec.key+":repair", repairRequest)
+	repairedReply, err := p.complete(ctx, input, sink, provider, spec.step, spec.definition.ID+spec.key+":repair", repairRequest, spec.definition.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -519,11 +551,54 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 	return json.RawMessage(repairedReply), nil
 }
 
-func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, step RunStatus, key string, request batchfactoryv11.TextCompletionRequest) (string, error) {
+func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, step RunStatus, key string, request batchfactoryv11.TextCompletionRequest, promptVersion int) (string, error) {
 	if err := p.checkCancelled(ctx, input); err != nil {
 		return "", err
 	}
-	reply, err := journalComplete(ctx, key, provider, request)
+	reply, err := journalCompletePrepared(ctx, key, provider, request, input.Agent != nil && input.Agent.RequireSecondaryConfirm, func() (batchfactoryv11.DirectorProvider, batchfactoryv11.TextCompletionRequest, *ModelCallMetadata, error) {
+		if input.Agent == nil {
+			id := strings.TrimSpace(input.Run.ModelID)
+			if id == "" {
+				id = strings.TrimSpace(input.Project.ModelID)
+			}
+			actual, err := p.resolveProvider(ctx, input.OwnerUsername, id)
+			if err != nil {
+				return nil, request, nil, mapModelError(err)
+			}
+			if actual == nil {
+				return nil, request, nil, &DomainError{Code: ErrModelUnavailable, Message: "所选文本模型当前不可用"}
+			}
+			return actual, request, nil, nil
+		}
+		route := strings.Split(strings.TrimPrefix(key, "novel-creation."), ":")[0]
+		modelID := input.Agent.ModelRoutes[route]
+		if modelID == "" {
+			modelID = input.Run.ModelID
+		}
+		if modelID == "" {
+			modelID = input.Project.ModelID
+		}
+		actual, resolveErr := p.resolveProvider(ctx, input.OwnerUsername, modelID)
+		if resolveErr != nil {
+			return nil, request, nil, mapModelError(resolveErr)
+		}
+		if actual == nil {
+			return nil, request, nil, &DomainError{Code: ErrModelUnavailable, Message: "所选文本模型当前不可用"}
+		}
+		meta := ModelCallMetadata{ChosenModelID: modelID, PromptID: "novel-creation." + route, PromptVersion: promptVersion, Temperature: request.Temperature, MaxTokens: request.MaxTokens, TemperatureStatus: "sent", MaxTokensStatus: "sent"}
+		if withMeta, ok := actual.(batchfactoryv11.TextModelMetadataProvider); ok {
+			meta.Provider = withMeta.TextModelMetadata()
+			if meta.Provider.SupportsTemperature != nil && !*meta.Provider.SupportsTemperature {
+				request.OmitTemperature = true
+				meta.TemperatureStatus = "不支持，未发送"
+			}
+			if meta.Provider.SupportsMaxTokens != nil && !*meta.Provider.SupportsMaxTokens {
+				request.OmitMaxTokens = true
+				meta.MaxTokensStatus = "不支持，未发送"
+			}
+		}
+		return actual, request, &meta, nil
+	})
 	if err != nil {
 		return "", mapModelError(err)
 	}
@@ -695,7 +770,7 @@ func classifyUpstreamModelError(err error) error {
 	text := strings.ToLower(err.Error())
 	switch {
 	case upstreamAuthStatus.MatchString(text), containsAny(text, "unauthorized", "forbidden", "invalid api key", "incorrect api key", "authentication failed", "鉴权"):
-		return &DomainError{Code: ErrModelAuthFailed, Message: "文本模型鉴权失败，请到 API 配置检查", Cause: err}
+		return &DomainError{Code: ErrModelAuthFailed, Message: "所选文本模型当前不可用，请联系管理员或选择其他授权模型", Cause: err}
 	case upstreamHTTPStatus.FindString(text) == "429", containsAny(text, "rate limit", "too many requests", "requests per minute", "限流"):
 		return &DomainError{Code: ErrModelRateLimited, Message: "模型服务限流，请稍后重试", Cause: err}
 	case upstreamHTTPStatus.MatchString(text),
@@ -1081,4 +1156,11 @@ func countVisibleRunes(value string) int {
 		}
 	}
 	return count
+}
+
+func (p *Pipeline) threshold(input RunContext) float64 {
+	if input.Agent != nil {
+		return input.Agent.PassScore
+	}
+	return p.auditThreshold
 }

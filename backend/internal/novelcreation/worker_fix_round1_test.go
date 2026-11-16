@@ -80,7 +80,7 @@ func TestWorkerFixR3EventFailureReplaysSameRun(t *testing.T) {
 	for _, kind := range []string{"event", "next_stage"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newServiceFixture(t, nil)
-			provider := &queuedPipelineProvider{responses: []string{foundationJSON, chapterPlanJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON}}
+			provider := &queuedPipelineProvider{responses: []string{foundationJSON, chapterPlanJSON, draftJSON, draftJSON, draftJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON}}
 			f.service.pipeline = pipelineWithProvider(provider)
 			f.service.store = faultJournalStore{f.store, &onceWriteFault{kind: kind}}
 			r := queuedWorkerRun(t, f)
@@ -100,7 +100,7 @@ func TestWorkerFixR3EventFailureReplaysSameRun(t *testing.T) {
 			if err != nil || got.Status != RunSucceeded {
 				t.Fatalf("recovery=%s %v", got.Status, err)
 			}
-			if len(provider.requests) != 6 {
+			if len(provider.requests) != 9 {
 				t.Fatalf("completed response resent: calls=%d", len(provider.requests))
 			}
 		})

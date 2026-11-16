@@ -116,7 +116,8 @@ func All() []promptcatalog.Definition {
 		FoundationPlan,
 		ChapterPlan,
 		ChapterDraft,
-		ChapterAudit,
+		LengthNormalize, PostWrite, AiTells,
+		AgentChapterAudit,
 		ChapterRevision,
 		TruthSettlement,
 		MemoryIndex,
@@ -136,3 +137,18 @@ func cloneDefinition(definition promptcatalog.Definition) promptcatalog.Definiti
 	definition.Errors = errors
 	return definition
 }
+
+const StructureRepairInstruction = "上一轮输出不符合合同，只返回修复后的完整 JSON 对象"
+const StructureRepairSystem = "上一轮输出无法通过合同校验。现在只返回一个修复后的完整 JSON 对象，不要解释。"
+
+var LengthNormalize = promptcatalog.Definition{ID: "novel-creation.length-normalize", Version: 1, SystemPrompt: "你是章节长度整理编辑。依据目标字数适度扩充或精简正文，保留事件、人物动机和段落结尾完整，不截断句子，不改变已经发生的事实。只返回包含完整content的JSON对象。", RequiredInputs: []string{"chapter_content", "target_chapter_words"}, OutputContract: ChapterDraft.OutputContract, Errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "正文整理 JSON 格式无效", "upstream_failed": "正文整理失败"}}
+var PostWrite = promptcatalog.Definition{ID: "novel-creation.post-write", Version: 1, SystemPrompt: "你是小说正文后处理编辑。修正错字、标点、段落衔接和叙述一致性，保持人物声音、事件顺序与事实，不插入解释。只返回包含完整content的JSON对象。", RequiredInputs: []string{"chapter_content"}, OutputContract: ChapterDraft.OutputContract, Errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "正文整理 JSON 格式无效", "upstream_failed": "正文整理失败"}}
+var AiTells = promptcatalog.Definition{ID: "novel-creation.ai-tells", Version: 1, SystemPrompt: "你是小说表达检查编辑。检查并整理机械重复、空泛总结、模板化转折和不自然的解释句，保留具体行动、个性语言、剧情事实及完整结尾。只返回包含完整content的JSON对象。", RequiredInputs: []string{"chapter_content"}, OutputContract: ChapterDraft.OutputContract, Errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "正文整理 JSON 格式无效", "upstream_failed": "正文整理失败"}}
+
+// Preserve ChapterAudit v1 for already-journaled legacy requests.
+var AgentChapterAudit = func() promptcatalog.Definition {
+	d := cloneDefinition(ChapterAudit)
+	d.Version = 2
+	d.SystemPrompt += " 输入中的pass_score是本次审核通过分。passed必须等于score达到pass_score且issues中不存在high或critical问题；不得使用其他固定通过分。"
+	return d
+}()

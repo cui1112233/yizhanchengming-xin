@@ -75,7 +75,7 @@ func resolveAgentTextModel(ctx context.Context, store novelfetchworkshop.Store, 
 		if !strings.HasSuffix(endpoint, "/chat/completions") {
 			endpoint += "/chat/completions"
 		}
-		provider := &batchfactoryv11.OpenAICompatibleProvider{Endpoint: endpoint, APIKey: shuihuoModelCredential(model), Model: modelString(model, "modelId")}
+		provider := &batchfactoryv11.OpenAICompatibleProvider{Metadata: batchfactoryv11.NewTextModelMetadata(modelString(model, "modelId"), modelString(model, "id"), endpoint, model), Endpoint: endpoint, APIKey: shuihuoModelCredential(model), Model: modelString(model, "modelId")}
 		if err := provider.Validate(); err != nil {
 			return nil, err
 		}

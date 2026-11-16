@@ -180,6 +180,7 @@ type DirectorProvider interface {
 }
 
 type OpenAICompatibleProvider struct {
+	Metadata TextModelMetadata
 	Endpoint string
 	APIKey   string
 	Model    string
@@ -249,6 +250,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	// SD director cards and opening variants have a deliberately plain-text
 	// wire protocol. Sending OpenAI's JSON-only response_format for those calls
 	// contradicts their required ===VIDEO/时长 lines and causes false failures.
+	ApplyTextParameterOmissions(payload, input)
 	if !input.DisableJSONResponse {
 		payload["response_format"] = map[string]string{"type": "json_object"}
 	}
@@ -481,3 +483,5 @@ func directorProtocolMismatchError(err error) bool {
 	message := err.Error()
 	return strings.Contains(message, "malformed HTTP response") || strings.Contains(message, "\x00\x00\x1e\x04")
 }
+
+func (p *OpenAICompatibleProvider) TextModelMetadata() TextModelMetadata { return p.Metadata }

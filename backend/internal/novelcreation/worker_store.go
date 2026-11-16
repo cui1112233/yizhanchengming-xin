@@ -8,37 +8,60 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"qiantie/backend/internal/batchfactoryv11"
 	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	RunPaused              RunStatus = "paused"
-	ErrLeaseLost                     = "novel_lease_lost"
-	ErrResultUnknown                 = "novel_upstream_result_unknown"
-	ErrIdempotencyConflict           = "novel_idempotency_conflict"
+	RunPaused                RunStatus = "paused"
+	ErrLeaseLost                       = "novel_lease_lost"
+	ErrResultUnknown                   = "novel_upstream_result_unknown"
+	ErrIdempotencyConflict             = "novel_idempotency_conflict"
+	ErrSecondaryConfirmation           = "novel_secondary_confirmation_required"
 )
 
+type ModelCallMetadata struct {
+	ChosenModelID     string                            `json:"chosenModelId"`
+	Provider          batchfactoryv11.TextModelMetadata `json:"provider"`
+	PromptID          string                            `json:"promptId"`
+	PromptVersion     int                               `json:"promptVersion"`
+	Temperature       float64                           `json:"temperature"`
+	MaxTokens         int                               `json:"maxTokens"`
+	TemperatureStatus string                            `json:"temperatureStatus"`
+	MaxTokensStatus   string                            `json:"maxTokensStatus"`
+}
+
 type CallRecord struct {
-	Fingerprint  string
-	State        string
-	Response     string
-	ErrorCode    string
-	ErrorMessage string
+	Metadata       *ModelCallMetadata `json:",omitempty"`
+	ConfirmationID string             `json:",omitempty"`
+	Confirmed      bool               `json:",omitempty"`
+	Fingerprint    string
+	State          string
+	Response       string
+	ErrorCode      string
+	ErrorMessage   string
+}
+type CallConfirmation struct {
+	ID       string             `json:"confirmationId"`
+	Key      string             `json:"callKey"`
+	Metadata *ModelCallMetadata `json:"metadata"`
 }
 type Execution struct {
-	Owner           string
-	RunID           string
-	ProjectID       string
-	State           string
-	Fingerprint     string
-	Fence           int64
-	CancelRequested bool
-	LeaseUntil      time.Time
-	Calls           map[string]CallRecord
-	Bundle          *ChapterBundle
-	CommittedHash   string
+	PendingConfirmation *CallConfirmation `json:",omitempty"`
+	ConfirmedCalls      map[string]string `json:",omitempty"`
+	Owner               string
+	RunID               string
+	ProjectID           string
+	State               string
+	Fingerprint         string
+	Fence               int64
+	CancelRequested     bool
+	LeaseUntil          time.Time
+	Calls               map[string]CallRecord
+	Bundle              *ChapterBundle
+	CommittedHash       string
 }
 type ProjectSlot struct {
 	RunID      string

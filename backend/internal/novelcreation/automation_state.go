@@ -3,6 +3,7 @@ package novelcreation
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -77,6 +78,8 @@ func temporary(code string) bool {
 }
 func automationWaitReason(state string) string {
 	switch state {
+	case "awaiting_model_confirmation":
+		return "请确认后继续下一次模型调用"
 	case "awaiting_confirmation":
 		return "请确认创作蓝图后继续"
 	case "save_pending":
@@ -102,6 +105,16 @@ func (s *Service) inspectRound(ctx context.Context, owner string, r *AutomationR
 	run, err := s.store.GetRun(ctx, owner, r.RunID)
 	if err != nil {
 		return "", err
+	}
+	if run.Status == RunAwaitingConfirmation {
+		var checkpoint struct {
+			Kind string `json:"confirmationKind"`
+		}
+		_ = json.Unmarshal(run.RuntimeSnapshot, &checkpoint)
+		if checkpoint.Kind == "next_model_call" {
+			r.State = "awaiting_model_confirmation"
+			return "waiting", nil
+		}
 	}
 	if run.Status == RunAwaitingConfirmation || run.Status == RunSucceeded {
 		next, ok, e := s.store.FindRunByIdempotencyKey(ctx, owner, "confirm:"+run.ID)

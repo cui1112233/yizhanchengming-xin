@@ -15,6 +15,8 @@ type PublicDurationCapabilities struct {
 }
 
 type PublicModelCapabilities struct {
+	SupportsTemperature    *bool                      `json:"supportsTemperature,omitempty"`
+	SupportsMaxTokens      *bool                      `json:"supportsMaxTokens,omitempty"`
 	Ratios                 []string                   `json:"ratios,omitempty"`
 	Resolutions            []string                   `json:"resolutions,omitempty"`
 	QualityLevels          []string                   `json:"qualityLevels,omitempty"`
@@ -56,7 +58,8 @@ func publicModelCapabilities(model map[string]any) PublicModelCapabilities {
 			AdvancedFlags: []string{"voice", "speed", "pitch", "emotion", "format"},
 		}
 	case "text":
-		return PublicModelCapabilities{MaxOutputCount: 1, GenerationModes: []string{"generate", "rewrite", "continue"}, AcceptsTextPrompt: true, AdvancedFlags: []string{"length", "creativity", "structure"}}
+		metadata := batchfactoryv11.NewTextModelMetadata("", "", "", model)
+		return PublicModelCapabilities{SupportsTemperature: metadata.SupportsTemperature, SupportsMaxTokens: metadata.SupportsMaxTokens, MaxOutputCount: 1, GenerationModes: []string{"generate", "rewrite", "continue"}, AcceptsTextPrompt: true, AdvancedFlags: []string{"length", "creativity", "structure"}}
 	default:
 		return PublicModelCapabilities{MaxOutputCount: 1}
 	}

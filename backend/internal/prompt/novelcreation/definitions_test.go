@@ -10,8 +10,8 @@ import (
 // system prompt out of the backend-owned contract.
 func TestDefinitionsKeepSystemPromptsInBackend(t *testing.T) {
 	definitions := All()
-	if len(definitions) != 7 {
-		t.Fatalf("definitions = %d, want 7", len(definitions))
+	if len(definitions) != 10 {
+		t.Fatalf("definitions = %d, want 10", len(definitions))
 	}
 
 	seen := map[string]struct{}{}
@@ -52,6 +52,9 @@ func TestDefinitionsExposeExactStableContracts(t *testing.T) {
 			errors: map[string]string{"plan_required": "章节计划不能为空", "invalid_output": "章节正文 JSON 格式无效", "upstream_failed": "章节正文生成失败"},
 			output: `{"format":"JSON object only","markdownCodeFence":"forbidden","additionalExplanation":"forbidden","structure":{"content":"string"}}`,
 		},
+		{id: "novel-creation.length-normalize", inputs: []string{"chapter_content", "target_chapter_words"}, errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "正文整理 JSON 格式无效", "upstream_failed": "正文整理失败"}, output: `{"format":"JSON object only","markdownCodeFence":"forbidden","additionalExplanation":"forbidden","structure":{"content":"string"}}`},
+		{id: "novel-creation.post-write", inputs: []string{"chapter_content"}, errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "正文整理 JSON 格式无效", "upstream_failed": "正文整理失败"}, output: `{"format":"JSON object only","markdownCodeFence":"forbidden","additionalExplanation":"forbidden","structure":{"content":"string"}}`},
+		{id: "novel-creation.ai-tells", inputs: []string{"chapter_content"}, errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "正文整理 JSON 格式无效", "upstream_failed": "正文整理失败"}, output: `{"format":"JSON object only","markdownCodeFence":"forbidden","additionalExplanation":"forbidden","structure":{"content":"string"}}`},
 		{
 			id: "novel-creation.chapter-audit", inputs: []string{"foundation_plan", "chapter_plan", "chapter_content", "memory_context"},
 			errors: map[string]string{"content_required": "章节正文不能为空", "invalid_output": "章节审核 JSON 格式无效", "upstream_failed": "章节审核失败"},
@@ -80,8 +83,12 @@ func TestDefinitionsExposeExactStableContracts(t *testing.T) {
 	}
 	for index, expected := range want {
 		definition := got[index]
-		if definition.ID != expected.id || definition.Version != 1 {
-			t.Fatalf("definition[%d] = %s@%d, want %s@1", index, definition.ID, definition.Version, expected.id)
+		expectedVersion := 1
+		if expected.id == "novel-creation.chapter-audit" {
+			expectedVersion = 2
+		}
+		if definition.ID != expected.id || definition.Version != expectedVersion {
+			t.Fatalf("definition[%d] = %s@%d, want %s@%d", index, definition.ID, definition.Version, expected.id, expectedVersion)
 		}
 		if !reflect.DeepEqual(definition.RequiredInputs, expected.inputs) {
 			t.Fatalf("%s inputs = %#v, want %#v", expected.id, definition.RequiredInputs, expected.inputs)

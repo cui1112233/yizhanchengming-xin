@@ -194,7 +194,7 @@ func TestServiceSendMessageRedisFailureStillPersistsDispatch(t *testing.T) {
 
 func TestServiceRunUsesServerOwnerAcquiresLockPersistsEventsAndBundle(t *testing.T) {
 	provider := &queuedPipelineProvider{responses: []string{
-		foundationJSON, chapterPlanJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON,
+		foundationJSON, chapterPlanJSON, draftJSON, draftJSON, draftJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON,
 	}}
 	store := NewMemoryStore()
 	runtime := NewMemoryRuntime()
@@ -226,7 +226,7 @@ func TestServiceRunUsesServerOwnerAcquiresLockPersistsEventsAndBundle(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Status != RunSucceeded || len(provider.requests) != 6 {
+	if completed.Status != RunSucceeded || len(provider.requests) != 9 {
 		t.Fatalf("completed=%+v provider requests=%d", completed, len(provider.requests))
 	}
 	snapshot, err := service.GetSnapshot(context.Background(), "alice", run.ID, 0)

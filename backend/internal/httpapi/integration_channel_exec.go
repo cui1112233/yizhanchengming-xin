@@ -27,6 +27,7 @@ const (
 )
 
 type integrationChannelTarget struct {
+	Metadata    batchfactoryv11.TextModelMetadata
 	Kind        string
 	Label       string
 	BaseURL     string
@@ -86,7 +87,8 @@ func integrationChannelTargetFor(ctx context.Context, userConfig *UserConfigStor
 				return integrationChannelTarget{}, true, fmt.Errorf("渠道「%s」缺少接口地址", preset.Label)
 			}
 			return integrationChannelTarget{
-				Kind: preset.Group, Label: preset.Label, BaseURL: baseURL,
+				Metadata: batchfactoryv11.NewTextModelMetadata(preset.ModelID, modelID, baseURL, nil),
+				Kind:     preset.Group, Label: preset.Label, BaseURL: baseURL,
 				ModelID: preset.ModelID, Credential: credential,
 			}, true, nil
 		}
@@ -112,7 +114,8 @@ func integrationChannelTargetFor(ctx context.Context, userConfig *UserConfigStor
 			return integrationChannelTarget{}, true, fmt.Errorf("自定义渠道「%s」缺少模型名", fmt.Sprint(channel["name"]))
 		}
 		target := integrationChannelTarget{
-			Kind: group, Label: fmt.Sprint(channel["name"]), BaseURL: baseURL,
+			Metadata: batchfactoryv11.NewTextModelMetadata(modelID, "custom:"+id, baseURL, channel),
+			Kind:     group, Label: fmt.Sprint(channel["name"]), BaseURL: baseURL,
 			ModelID: modelID, Credential: credential,
 			FullURL: channel["fullUrl"] == true,
 		}
@@ -205,6 +208,7 @@ func resolveLegacyIntegrationImageCatalogEntry(ctx context.Context, userConfig *
 // 与目录模型不同，渠道允许 http 地址（本地 Grok / 大香蕉等），因此不复用
 // batchfactoryv11.OpenAICompatibleProvider 的 https 强校验。
 type integrationTextProvider struct {
+	Metadata batchfactoryv11.TextModelMetadata
 	Label    string
 	Endpoint string
 	APIKey   string
@@ -219,6 +223,7 @@ func (p *integrationTextProvider) Complete(ctx context.Context, input batchfacto
 		"temperature": input.Temperature,
 		"max_tokens":  input.MaxTokens,
 	}
+	batchfactoryv11.ApplyTextParameterOmissions(payload, input)
 	if !input.DisableJSONResponse {
 		payload["response_format"] = map[string]string{"type": "json_object"}
 	}
@@ -298,7 +303,7 @@ func ResolveIntegrationTextProvider(ctx context.Context, userConfig *UserConfigS
 		return nil, true, fmt.Errorf("渠道「%s」的接口地址格式不正确", target.Label)
 	}
 	return &integrationTextProvider{
-		Label: target.Label, Endpoint: endpoint, APIKey: target.Credential, Model: target.ModelID,
+		Metadata: target.Metadata, Label: target.Label, Endpoint: endpoint, APIKey: target.Credential, Model: target.ModelID,
 	}, true, nil
 }
 
@@ -451,4 +456,8 @@ func generateIntegrationChannelImage(ctx context.Context, target integrationChan
 		return nil, http.StatusBadGateway, fmt.Errorf("图片模型只返回了 %d 张图片，少于请求的 %d 张", len(images), input.Count)
 	}
 	return images, http.StatusOK, nil
+}
+
+func (p *integrationTextProvider) TextModelMetadata() batchfactoryv11.TextModelMetadata {
+	return p.Metadata
 }

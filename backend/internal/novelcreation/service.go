@@ -94,7 +94,8 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	if session.ProjectID != input.ProjectID {
 		return Run{}, &DomainError{Code: ErrInputRequired, Message: "会话与作品不匹配"}
 	}
-	if _, err := s.store.GetProject(ctx, owner, input.ProjectID); err != nil {
+	project, err := s.store.GetProject(ctx, owner, input.ProjectID)
+	if err != nil {
 		return Run{}, err
 	}
 	selected, err := s.prepareGenerationInput(ctx, owner, input.ProjectID, input.SessionID, AutomationInput{
@@ -135,9 +136,11 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
+	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
 	snapshotFields := map[string]any{
-		"project_settings": settings,
-		"source_type":      input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
+		"project_settings":       settings,
+		"agent_contract_version": 1,
+		"source_type":            input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
 		"knowledge_ids": selected.KnowledgeIDs, "knowledge_materials": selected.Knowledge,
@@ -190,22 +193,23 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
-		Settings            *ProjectSettings    `json:"project_settings"`
-		StyleProfile        *string             `json:"style_profile"`
-		Notes               []ProjectNote       `json:"notes"`
-		UserMessage         string              `json:"user_message"`
-		Mode                string              `json:"mode"`
-		ModeInputs          map[string]string   `json:"mode_inputs"`
-		ChapterNumber       int                 `json:"chapter_number"`
-		Checkpoint          bool                `json:"checkpoint"`
-		ConfirmedFoundation json.RawMessage     `json:"confirmed_foundation"`
-		KnowledgeIDs        []string            `json:"knowledge_ids"`
-		KnowledgeMaterials  []KnowledgeMaterial `json:"knowledge_materials"`
-		ExpectedTarget      *PreviousChapter    `json:"expected_target"`
-		RetryOfRunID        string              `json:"retry_of_run_id"`
-		PreviousChapters    []PreviousChapter   `json:"previous_chapters"`
-		PreviousTruth       json.RawMessage     `json:"previous_truth"`
-		PreviousMemory      json.RawMessage     `json:"previous_memory"`
+		AgentContractVersion int                 `json:"agent_contract_version"`
+		Settings             *ProjectSettings    `json:"project_settings"`
+		StyleProfile         *string             `json:"style_profile"`
+		Notes                []ProjectNote       `json:"notes"`
+		UserMessage          string              `json:"user_message"`
+		Mode                 string              `json:"mode"`
+		ModeInputs           map[string]string   `json:"mode_inputs"`
+		ChapterNumber        int                 `json:"chapter_number"`
+		Checkpoint           bool                `json:"checkpoint"`
+		ConfirmedFoundation  json.RawMessage     `json:"confirmed_foundation"`
+		KnowledgeIDs         []string            `json:"knowledge_ids"`
+		KnowledgeMaterials   []KnowledgeMaterial `json:"knowledge_materials"`
+		ExpectedTarget       *PreviousChapter    `json:"expected_target"`
+		RetryOfRunID         string              `json:"retry_of_run_id"`
+		PreviousChapters     []PreviousChapter   `json:"previous_chapters"`
+		PreviousTruth        json.RawMessage     `json:"previous_truth"`
+		PreviousMemory       json.RawMessage     `json:"previous_memory"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
@@ -224,6 +228,26 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		settings = *prompt.Settings
 	}
 	agent := NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	var effectiveAgent *AgentSettings
+	if prompt.AgentContractVersion > 0 {
+		effectiveAgent = &agent
+	} else {
+		var legacy struct {
+			Settings struct {
+				Agent struct {
+					Rounds int `json:"maxRevisionRounds"`
+				} `json:"agent"`
+			} `json:"project_settings"`
+		}
+		_ = json.Unmarshal(run.PromptSnapshot, &legacy)
+		agent.MaxRevisionRounds = legacy.Settings.Agent.Rounds
+		if agent.MaxRevisionRounds < 1 {
+			agent.MaxRevisionRounds = 2
+		}
+		if agent.MaxRevisionRounds > 5 {
+			agent.MaxRevisionRounds = 5
+		}
+	}
 	project.TargetChapterWords = agent.TargetChapterWords
 	if strings.TrimSpace(run.ThinkingLevel) == "" {
 		run.ThinkingLevel = agent.ThinkingLevel
@@ -242,8 +266,12 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		ConfirmedFoundation: prompt.ConfirmedFoundation,
 		KnowledgeMaterials:  prompt.KnowledgeMaterials,
 		MaxRevisionRounds:   agent.MaxRevisionRounds,
+		Agent:               effectiveAgent,
 	}, sink)
 	if runErr != nil {
+		if IsCode(runErr, ErrSecondaryConfirmation) {
+			return s.finishModelCallConfirmation(ctx, owner, run)
+		}
 		if isDurableWriteFailure(runErr) || IsCode(runErr, ErrPersistenceFailed) {
 			return s.recoverDurableWriteFailure(ctx, owner, run, runErr)
 		}
@@ -262,6 +290,20 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 	} else if cancelled {
 		cancelledErr := &DomainError{Code: ErrRunCancelled, Message: "小说创作已取消", Cause: context.Canceled}
 		return s.finish(ctx, owner, run, RunCancelled, ErrRunCancelled, cancelledErr.Message, nil, cancelledErr)
+	}
+	if effectiveAgent != nil {
+		execution, _, loadErr := s.store.GetExecution(ctx, owner, run.ID)
+		if loadErr != nil {
+			return s.recoverDurableWriteFailure(ctx, owner, run, loadErr)
+		}
+		var runtimeFields map[string]any
+		_ = json.Unmarshal(bundle.RuntimeSnapshot, &runtimeFields)
+		if runtimeFields == nil {
+			runtimeFields = map[string]any{}
+		}
+		runtimeFields["agentSettings"] = agent
+		runtimeFields["modelCalls"] = callMetadata(execution)
+		bundle.RuntimeSnapshot, _ = json.Marshal(runtimeFields)
 	}
 	if bundle.FinalRunStatus == RunAwaitingConfirmation {
 		return s.finishCheckpoint(ctx, owner, run, bundle)
@@ -482,6 +524,11 @@ func (s *Service) confirmRun(ctx context.Context, owner, runID string, blueprint
 	source, err := s.store.GetRun(ctx, owner, runID)
 	if err != nil {
 		return Run{}, err
+	}
+	if e, found, loadErr := s.store.GetExecution(ctx, owner, source.ID); loadErr != nil {
+		return Run{}, loadErr
+	} else if found && e.PendingConfirmation != nil {
+		return Run{}, &DomainError{Code: ErrInputRequired, Message: "请提交当前模型调用的确认编号"}
 	}
 	key := "confirm:" + source.ID
 	if existing, found, err := s.store.FindRunByIdempotencyKey(ctx, owner, key); err != nil {

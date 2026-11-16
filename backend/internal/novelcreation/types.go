@@ -132,9 +132,18 @@ type CreateMaterialInput struct {
 
 // AgentSettings controls generation volume and revision rounds per project.
 type AgentSettings struct {
-	TargetChapterWords int    `json:"targetChapterWords"`
-	MaxRevisionRounds  int    `json:"maxRevisionRounds"`
-	ThinkingLevel      string `json:"thinkingLevel"`
+	Version                 int               `json:"version"`
+	ModelRoutes             map[string]string `json:"modelRoutes"`
+	PassScore               float64           `json:"passScore"`
+	BaseTemperature         float64           `json:"baseTemperature"`
+	TemperatureStep         float64           `json:"temperatureStep"`
+	EnableLengthNorm        bool              `json:"enableLengthNorm"`
+	EnablePostWrite         bool              `json:"enablePostWrite"`
+	EnableAiTells           bool              `json:"enableAiTells"`
+	RequireSecondaryConfirm bool              `json:"requireSecondaryConfirm"`
+	TargetChapterWords      int               `json:"targetChapterWords"`
+	MaxRevisionRounds       int               `json:"maxRevisionRounds"`
+	ThinkingLevel           string            `json:"thinkingLevel"`
 }
 
 // ProjectNote is a free-form memo bound to a project.

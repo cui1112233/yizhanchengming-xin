@@ -401,6 +401,9 @@ func (g *guardedStore) finishRun(ctx context.Context, owner string, u RunUpdate,
 			return er
 		}
 		e.State = "done"
+		if out.Status == RunAwaitingConfirmation {
+			e.State = "awaiting_confirmation"
+		}
 		if out.Status == RunPaused {
 			e.State = "paused"
 		}
@@ -460,9 +463,21 @@ type callJournal struct {
 }
 
 func journalComplete(ctx context.Context, key string, p batchfactoryv11.DirectorProvider, request batchfactoryv11.TextCompletionRequest) (string, error) {
+	return journalCompletePrepared(ctx, key, p, request, false, func() (batchfactoryv11.DirectorProvider, batchfactoryv11.TextCompletionRequest, *ModelCallMetadata, error) {
+		return p, request, nil, nil
+	})
+}
+
+type prepareModelCall func() (batchfactoryv11.DirectorProvider, batchfactoryv11.TextCompletionRequest, *ModelCallMetadata, error)
+
+func journalCompletePrepared(ctx context.Context, key string, p batchfactoryv11.DirectorProvider, request batchfactoryv11.TextCompletionRequest, secondary bool, prepare prepareModelCall) (string, error) {
 	j, _ := ctx.Value(journalKey{}).(*callJournal)
 	if j == nil {
-		return p.Complete(batchfactoryv11.WithSingleAttempt(ctx), request)
+		actual, prepared, _, err := prepare()
+		if err != nil {
+			return "", err
+		}
+		return actual.Complete(batchfactoryv11.WithSingleAttempt(ctx), prepared)
 	}
 	hash := fingerprint(request)
 	var record CallRecord
@@ -493,6 +508,47 @@ func journalComplete(ctx context.Context, key string, p batchfactoryv11.Director
 	if record.State == "rejected" {
 		return "", &DomainError{Code: record.ErrorCode, Message: record.ErrorMessage}
 	}
+	actual, prepared, metadata, prepareErr := prepare()
+	if prepareErr != nil {
+		return "", prepareErr
+	}
+	record.Metadata = metadata
+	if secondary {
+		waiting := false
+		err = guarded(ctx, j.store, j.lease, func(tx Store, e *Execution) error {
+			completed := false
+			for _, c := range e.Calls {
+				if c.State == "completed" {
+					completed = true
+					break
+				}
+			}
+			if !completed {
+				return nil
+			}
+			token := fingerprint(struct {
+				Run, Key, Request string
+				Metadata          *ModelCallMetadata
+			}{j.lease.RunID, key, hash, metadata})
+			if record.ConfirmationID == token && record.Confirmed {
+				return nil
+			}
+			record.ConfirmationID = token
+			record.Confirmed = false
+			e.Calls[key] = record
+			e.PendingConfirmation = &CallConfirmation{ID: token, Key: key, Metadata: metadata}
+			waiting = true
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+		if waiting {
+			return "", &DomainError{Code: ErrSecondaryConfirmation, Message: "请确认后继续下一次模型调用"}
+		}
+	}
+	p = actual
+	request = prepared
 	err = guarded(ctx, j.store, j.lease, func(tx Store, e *Execution) error { record.State = "may_have_sent"; e.Calls[key] = record; return nil })
 	if err != nil {
 		return "", err

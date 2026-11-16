@@ -180,12 +180,19 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	})
 	handle("POST /api/novel-creation/runs/{runID}/confirm", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
-			Blueprint json.RawMessage `json:"blueprint"`
+			Blueprint      json.RawMessage `json:"blueprint"`
+			ConfirmationID string          `json:"confirmationId"`
 		}
 		if !decode(w, req, &input) {
 			return
 		}
-		run, err := service.ConfirmRun(req.Context(), owner, req.PathValue("runID"), input.Blueprint)
+		var run novelcreation.Run
+		var err error
+		if input.ConfirmationID != "" {
+			run, err = service.ConfirmModelCall(req.Context(), owner, req.PathValue("runID"), input.ConfirmationID)
+		} else {
+			run, err = service.ConfirmRun(req.Context(), owner, req.PathValue("runID"), input.Blueprint)
+		}
 		if err != nil {
 			writeNovelCreationError(w, err)
 			return

@@ -408,6 +408,31 @@ func sanitizeIntegrationChannel(input map[string]any, previous map[string]any) (
 		}
 	}
 
+	// Only explicitly advertised text sampling support is accepted. Missing
+	// capability metadata retains the historical request payload.
+	rawCaps, hasCaps := input["capabilities"]
+	if !hasCaps && previous != nil {
+		rawCaps = previous["capabilities"]
+	}
+	if rawCaps != nil {
+		caps, ok := rawCaps.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		safe := map[string]any{}
+		for _, key := range []string{"supportsTemperature", "supportsMaxTokens"} {
+			if raw, present := caps[key]; present && raw != nil {
+				value, ok := raw.(bool)
+				if !ok {
+					return nil, false
+				}
+				safe[key] = value
+			}
+		}
+		if len(safe) > 0 {
+			channel["capabilities"] = safe
+		}
+	}
 	if clear, ok := input["clearApiKey"].(bool); ok && clear {
 		// 显式清空 Key：渠道还在，但因为没凭证不会进入模型下拉。
 		channel["apiKey"] = ""

@@ -1,14 +1,18 @@
 package novelcreation
 
-import "strings"
+import (
+	"encoding/json"
+	"math"
+	"strings"
+)
 
 const (
 	defaultTargetChapterWords = 2000
 	minTargetChapterWords     = 800
 	maxTargetChapterWords     = 8000
 
-	defaultMaxRevisionRounds = 2
-	minMaxRevisionRounds     = 1
+	defaultMaxRevisionRounds = 3
+	minMaxRevisionRounds     = 0
 	maxMaxRevisionRounds     = 5
 
 	maxKnowledgeMaterials      = 8
@@ -137,7 +141,7 @@ func CanTransition(from, to RunStatus) bool {
 	if isTerminalRunStatus(from) {
 		return false
 	}
-	if to == RunFailed || to == RunCancelled || to == RunPaused {
+	if to == RunFailed || to == RunCancelled || to == RunPaused || to == RunAwaitingConfirmation {
 		return true
 	}
 
@@ -226,17 +230,40 @@ func NormalizeAgentSettings(input AgentSettings, fallbackTargetWords int) AgentS
 	if target > maxTargetChapterWords {
 		target = maxTargetChapterWords
 	}
-	rounds := input.MaxRevisionRounds
-	if rounds == 0 {
-		rounds = defaultMaxRevisionRounds
+	if input.Version == 0 {
+		rounds := input.MaxRevisionRounds
+		input.Version = 1
+		input.PassScore = 80
+		input.BaseTemperature = .65
+		input.TemperatureStep = .15
+		input.EnableLengthNorm = true
+		input.EnablePostWrite = true
+		input.EnableAiTells = true
+		if rounds == 0 {
+			input.MaxRevisionRounds = defaultMaxRevisionRounds
+		}
 	}
+	rounds := input.MaxRevisionRounds
 	if rounds < minMaxRevisionRounds {
 		rounds = minMaxRevisionRounds
 	}
 	if rounds > maxMaxRevisionRounds {
 		rounds = maxMaxRevisionRounds
 	}
-	return AgentSettings{TargetChapterWords: target, MaxRevisionRounds: rounds, ThinkingLevel: normalizeThinkingLevel(input.ThinkingLevel)}
+	input.TargetChapterWords = target
+	input.MaxRevisionRounds = rounds
+	input.ThinkingLevel = normalizeThinkingLevel(input.ThinkingLevel)
+	input.PassScore = boundedAgentNumber(input.PassScore, 0, 100, 80)
+	input.BaseTemperature = boundedAgentNumber(input.BaseTemperature, 0, 2, .65)
+	input.TemperatureStep = boundedAgentNumber(input.TemperatureStep, 0, .5, .15)
+	routes := map[string]string{}
+	for key, value := range input.ModelRoutes {
+		if validAgentRoute(key) && strings.TrimSpace(value) != "" {
+			routes[key] = strings.TrimSpace(value)
+		}
+	}
+	input.ModelRoutes = routes
+	return input
 }
 
 func normalizeThinkingLevel(value string) string {
@@ -337,4 +364,35 @@ func truncateRunes(value string, limit int) string {
 		return string(runes)
 	}
 	return string(runes[:limit])
+}
+
+// UnmarshalJSON applies defaults only to absent fields, preserving explicit zero.
+func (a *AgentSettings) UnmarshalJSON(raw []byte) error {
+	type plain AgentSettings
+	v := plain{Version: 1, MaxRevisionRounds: 3, PassScore: 80, BaseTemperature: .65, TemperatureStep: .15, EnableLengthNorm: true, EnablePostWrite: true, EnableAiTells: true}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return err
+	}
+	v.Version = 1
+	*a = AgentSettings(v)
+	return nil
+}
+func boundedAgentNumber(v, min, max, fallback float64) float64 {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return fallback
+	}
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+func validAgentRoute(key string) bool {
+	switch key {
+	case "foundation-plan", "chapter-plan", "chapter-draft", "length-normalize", "post-write", "ai-tells", "chapter-audit", "chapter-revision", "truth-settlement", "memory-index":
+		return true
+	}
+	return false
 }

@@ -22,6 +22,8 @@ type TextCompletionRequest struct {
 	Temperature         float64
 	MaxTokens           int
 	DisableJSONResponse bool
+	OmitTemperature     bool `json:",omitempty"`
+	OmitMaxTokens       bool `json:",omitempty"`
 }
 
 type TextCompletionMessage struct {

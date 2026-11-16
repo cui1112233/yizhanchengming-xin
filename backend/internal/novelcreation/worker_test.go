@@ -374,6 +374,7 @@ func TestWorkerRedisOfflineDoesNotLoseSavedRun(t *testing.T) {
 func TestWorkerPipelineRecoveryReplaysRepairAndAuditRounds(t *testing.T) {
 	f := newServiceFixture(t, nil)
 	r := queuedWorkerRun(t, f)
+	r = legacyAgentRun(t, f, r)
 	l, _, err := f.service.claim(context.Background(), "alice", r.ID)
 	if err != nil {
 		t.Fatal(err)
