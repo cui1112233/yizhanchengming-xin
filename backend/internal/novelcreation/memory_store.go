@@ -764,7 +764,10 @@ func (s *MemoryStore) DeleteSchedule(_ context.Context, owner, projectID, schedu
 	return nil
 }
 
-func (s *MemoryStore) ListDueSchedules(_ context.Context, now time.Time, limit int) ([]Schedule, error) {
+func (s *MemoryStore) ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]Schedule, error) {
+	return s.ListDueSchedulePage(ctx, now, ScheduleCursor{}, limit)
+}
+func (s *MemoryStore) ListDueSchedulePage(_ context.Context, now time.Time, after ScheduleCursor, limit int) ([]Schedule, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if limit <= 0 {
@@ -772,11 +775,13 @@ func (s *MemoryStore) ListDueSchedules(_ context.Context, now time.Time, limit i
 	}
 	due := make([]Schedule, 0)
 	for _, schedule := range s.schedules {
-		if (schedule.Enabled && !schedule.NextRunAt.After(now)) || schedule.ActiveRound != "" {
+		if ((schedule.Enabled && !schedule.NextRunAt.After(now)) || schedule.ActiveRound != "") && scheduleAfter(schedule, after) {
 			due = append(due, cloneSchedule(schedule))
 		}
 	}
-	sort.Slice(due, func(i, j int) bool { return due[i].NextRunAt.Before(due[j].NextRunAt) })
+	sort.Slice(due, func(i, j int) bool {
+		return scheduleAfter(due[j], ScheduleCursor{NextRunAt: due[i].NextRunAt, OwnerUsername: due[i].OwnerUsername, ID: due[i].ID})
+	})
 	if len(due) > limit {
 		due = due[:limit]
 	}

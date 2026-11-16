@@ -168,9 +168,21 @@ func (s *Service) DispatchDueSchedules(ctx context.Context, now time.Time) ([]Di
 	if s == nil || s.store == nil || s.runtime == nil {
 		return nil, &DomainError{Code: ErrPersistenceFailed, Message: "小说创作运行服务尚未配置"}
 	}
-	due, err := s.store.ListDueSchedules(ctx, now, 20)
-	if err != nil {
-		return nil, err
+	// Capture all pages before processing: settlement may update due dates and
+	// enablement, so offset pagination over a mutating candidate set is unsafe.
+	var due []Schedule
+	var cursor ScheduleCursor
+	for {
+		page, err := s.store.ListDueSchedulePage(ctx, now, cursor, 20)
+		if err != nil {
+			return nil, err
+		}
+		due = append(due, page...)
+		if len(page) < 20 {
+			break
+		}
+		last := page[len(page)-1]
+		cursor = ScheduleCursor{NextRunAt: last.NextRunAt, OwnerUsername: last.OwnerUsername, ID: last.ID}
 	}
 	dispatched := make([]DispatchedSchedule, 0, len(due))
 	failures := make([]error, 0)
@@ -207,15 +219,7 @@ func (s *Service) dispatchSchedule(ctx context.Context, owner string, stale Sche
 			p.StoppedReason = p.ConfigurationError
 			return save()
 		}
-		if p.ActiveRound == "" && len(p.Rounds) == 0 && p.LastRunID != "" {
-			planned := p.NextRunAt
-			if p.LastRunAt != nil {
-				planned = *p.LastRunAt
-			}
-			key := "legacy:" + p.LastRunID
-			p.Rounds = append(p.Rounds, AutomationRound{Key: key, RunID: p.LastRunID, PlannedAt: planned})
-			p.ActiveRound = key
-		}
+		restoreLegacyScheduleRound(&p)
 		if r := p.active(); r != nil {
 			outcome, e := child.inspectRound(ctx, owner, r)
 			if e != nil {
@@ -372,6 +376,7 @@ func (s *Service) ControlSchedule(ctx context.Context, owner, project, id, actio
 		if p.ProjectID != project {
 			return &DomainError{Code: ErrProjectNotFound, Message: "schedule not found"}
 		}
+		restoreLegacyScheduleRound(&p)
 		switch action {
 		case "pause":
 			p.Enabled = false

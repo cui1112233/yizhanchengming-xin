@@ -102,6 +102,7 @@ func (s *Service) controlBatch(ctx context.Context, owner, project, id, action s
 		if e != nil {
 			return e
 		}
+		restoreLegacyBatchRound(&p, s.automationNow())
 		switch action {
 		case "pause":
 			if p.Status != BatchRunning && p.Status != BatchPaused {
@@ -133,6 +134,7 @@ func (s *Service) controlBatch(ctx context.Context, owner, project, id, action s
 			p.ConsecutiveFailures = 0
 		case "stop":
 			if p.Status == BatchCompleted {
+				out = p
 				return nil
 			}
 			p.Status = BatchStopped
@@ -226,11 +228,7 @@ func (s *Service) advanceBatch(ctx context.Context, stale Batch) (Run, error) {
 		if p.Status != BatchRunning && p.Status != BatchPaused && p.Status != BatchStopped {
 			return nil
 		}
-		if p.CurrentRunID != "" && p.ActiveRound == "" {
-			key := fmt.Sprintf("legacy:%d", p.Attempt)
-			p.Rounds = append(p.Rounds, AutomationRound{Key: key, RunID: p.CurrentRunID, PlannedAt: now})
-			p.ActiveRound = key
-		}
+		restoreLegacyBatchRound(&p, now)
 		previous := ""
 		if r := p.active(); r != nil {
 			outcome, e := child.inspectRound(ctx, owner, r)

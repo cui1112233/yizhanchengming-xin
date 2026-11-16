@@ -258,3 +258,44 @@ func (s *Service) queueAutomationMessage(ctx context.Context, owner string, inpu
 	}
 	return s.SendMessage(ctx, owner, input)
 }
+
+// ScheduleCursor uses ordered keys rather than an offset into a changing
+// candidate set. The scanner captures its pages before settling any rounds.
+// Business due dates are not changed to make scans fair.
+type ScheduleCursor struct {
+	NextRunAt         time.Time
+	OwnerUsername, ID string
+}
+
+func scheduleAfter(p Schedule, c ScheduleCursor) bool {
+	if c.ID == "" {
+		return true
+	}
+	if !p.NextRunAt.Equal(c.NextRunAt) {
+		return p.NextRunAt.After(c.NextRunAt)
+	}
+	if p.OwnerUsername != c.OwnerUsername {
+		return p.OwnerUsername > c.OwnerUsername
+	}
+	return p.ID > c.ID
+}
+func restoreLegacyScheduleRound(p *Schedule) {
+	if p.ActiveRound != "" || len(p.Rounds) != 0 || p.LastRunID == "" {
+		return
+	}
+	planned := p.NextRunAt
+	if p.LastRunAt != nil {
+		planned = *p.LastRunAt
+	}
+	key := "legacy:" + p.LastRunID
+	p.Rounds = append(p.Rounds, AutomationRound{Key: key, RunID: p.LastRunID, PlannedAt: planned})
+	p.ActiveRound = key
+}
+func restoreLegacyBatchRound(p *Batch, now time.Time) {
+	if p.ActiveRound != "" || p.CurrentRunID == "" {
+		return
+	}
+	key := "legacy:" + p.CurrentRunID
+	p.Rounds = append(p.Rounds, AutomationRound{Key: key, RunID: p.CurrentRunID, PlannedAt: now})
+	p.ActiveRound = key
+}

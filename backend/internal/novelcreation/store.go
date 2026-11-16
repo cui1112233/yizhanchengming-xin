@@ -64,6 +64,7 @@ type Store interface {
 	UpdateSchedule(context.Context, string, Schedule) (Schedule, error)
 	DeleteSchedule(context.Context, string, string, string) error
 	ListDueSchedules(context.Context, time.Time, int) ([]Schedule, error)
+	ListDueSchedulePage(context.Context, time.Time, ScheduleCursor, int) ([]Schedule, error)
 	// Batches drive continuous multi-chapter generation.
 	ListBatches(context.Context, string, string) ([]Batch, error)
 	GetBatch(context.Context, string, string) (Batch, error)

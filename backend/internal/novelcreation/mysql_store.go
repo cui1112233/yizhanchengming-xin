@@ -1267,13 +1267,23 @@ WHERE s.owner_username = ? AND s.project_id = ? AND s.schedule_id = ? AND p.dele
 }
 
 func (s *MySQLStore) ListDueSchedules(ctx context.Context, now time.Time, limit int) ([]Schedule, error) {
+	return s.ListDueSchedulePage(ctx, now, ScheduleCursor{}, limit)
+}
+func (s *MySQLStore) ListDueSchedulePage(ctx context.Context, now time.Time, after ScheduleCursor, limit int) ([]Schedule, error) {
 	if limit <= 0 {
 		limit = 20
 	}
+	cursorSQL := ""
+	args := []any{now.UTC()}
+	if after.ID != "" {
+		cursorSQL = ` AND (s.next_run_at > ? OR (s.next_run_at = ? AND (BINARY s.owner_username > ? OR (BINARY s.owner_username = ? AND BINARY s.schedule_id > ?))))`
+		args = append(args, after.NextRunAt.UTC(), after.NextRunAt.UTC(), after.OwnerUsername, after.OwnerUsername, after.ID)
+	}
+	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx, `SELECT `+scheduleColumns+`
 FROM novel_schedules s JOIN novel_projects p ON p.owner_username = s.owner_username AND p.project_id = s.project_id
-WHERE ((s.enabled = 1 AND s.next_run_at <= ?) OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(s.input_snapshot_json, '$.automationState.activeRound')), '') <> '') AND p.deleted_at IS NULL
-ORDER BY s.next_run_at LIMIT ?`, now.UTC(), limit)
+WHERE ((s.enabled = 1 AND s.next_run_at <= ?) OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(s.input_snapshot_json, '$.automationState.activeRound')), '') <> '') AND p.deleted_at IS NULL`+cursorSQL+`
+ORDER BY s.next_run_at, BINARY s.owner_username, BINARY s.schedule_id LIMIT ?`, args...)
 	if err != nil {
 		return nil, persistenceError(err)
 	}
