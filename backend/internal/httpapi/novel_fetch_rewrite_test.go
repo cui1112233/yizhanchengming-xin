@@ -233,6 +233,29 @@ func TestApplySensitiveAIRepairRetriesGroupParseFailure(t *testing.T) {
 	}
 }
 
+func TestApplySensitiveAIRepairGrowsGroupBudgetOnTruncation(t *testing.T) {
+	budgets := make([]int, 0, 2)
+	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
+		budgets = append(budgets, request.MaxTokens)
+		if len(budgets) == 1 {
+			return "", errors.New("文本模型输出被长度截断，请重试或增大输出上限")
+		}
+		return `["第一段已改","第二段已改"]`, nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": true, "retries": 2}}
+	items := []map[string]any{
+		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段已替换"},
+		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段已替换"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换", items, nil)
+	if len(budgets) != 2 || budgets[1] <= budgets[0] {
+		t.Fatalf("truncation should raise the group output budget: %v", budgets)
+	}
+	if text != "第一段已改\n第二段已改" || got[0]["status"] != "done" {
+		t.Fatalf("retry after truncation did not recover: text=%q items=%#v", text, got)
+	}
+}
+
 func TestApplySensitiveAIRepairAcceptsGroupJSONWithRawNewlines(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
 		return "[\"第一段\n已改\",\"第二段\n已改\"]", nil

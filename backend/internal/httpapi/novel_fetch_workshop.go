@@ -1660,14 +1660,29 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		if provider == nil {
 			lastErr = errors.New("敏感词 AI 修复模型未配置")
 		} else {
+			// 源码的敏感词整组请求不限制输出长度；这里按命中数估算，并在
+			// 上游报长度截断时翻倍，避免命中较多时整组结果必然失败。
+			maxTokens := len(active) * 300
+			if maxTokens < 1200 {
+				maxTokens = 1200
+			}
+			if maxTokens > 8000 {
+				maxTokens = 8000
+			}
 			for attempts < maxAttempts {
 				attempts++
-				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: sensitiveGroupRepairSystemPrompt, UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: sensitiveGroupRepairSystemPrompt, UserPrompt: userPrompt, Temperature: temperature, MaxTokens: maxTokens})
 				output = strings.TrimSpace(output)
 				if lastErr != nil {
 					// 服务不可用时立即停止，避免同一故障连续烧掉全部重试次数。
 					if sensitiveServiceUnavailable(lastErr) {
 						break
+					}
+					if strings.Contains(lastErr.Error(), "长度截断") && maxTokens < 8000 {
+						maxTokens *= 2
+						if maxTokens > 8000 {
+							maxTokens = 8000
+						}
 					}
 					continue
 				}
