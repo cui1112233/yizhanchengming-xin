@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"sort"
 	"strings"
 	"time"
 )
@@ -159,6 +160,9 @@ func (s *MemoryStore) ListDispatch(_ context.Context, limit int) ([]Execution, e
 			continue
 		}
 		owner := strings.SplitN(key, "\x00", 2)[0]
+		if slot := s.slots[memoryKey(owner, r.ProjectID)]; slot.LeaseUntil.After(time.Now().UTC()) {
+			continue
+		}
 		e, ok := s.executions[key]
 		if !ok {
 			e = Execution{Owner: owner, RunID: r.ID, ProjectID: r.ProjectID, State: "legacy"}
@@ -167,9 +171,12 @@ func (s *MemoryStore) ListDispatch(_ context.Context, limit int) ([]Execution, e
 			continue
 		}
 		out = append(out, cloneExecution(e))
-		if len(out) >= limit {
-			break
-		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return s.runs[memoryKey(out[i].Owner, out[i].RunID)].CreatedAt.Before(s.runs[memoryKey(out[j].Owner, out[j].RunID)].CreatedAt)
+	})
+	if limit >= 0 && len(out) > limit {
+		out = out[:limit]
 	}
 	return out, nil
 }
@@ -286,7 +293,7 @@ func (s *MySQLStore) PutSlot(ctx context.Context, owner, project string, slot Pr
 	return persistenceError(err)
 }
 func (s *MySQLStore) ListDispatch(ctx context.Context, limit int) ([]Execution, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT r.owner_username, r.run_id, r.project_id FROM novel_runs r JOIN novel_projects p ON p.owner_username=r.owner_username AND p.project_id=r.project_id LEFT JOIN novel_run_dispatch d ON d.owner_username=r.owner_username AND d.run_id=r.run_id WHERE p.deleted_at IS NULL AND r.status NOT IN ('succeeded','succeeded_with_warnings','failed','cancelled','awaiting_confirmation','paused') AND (d.run_id IS NULL OR (d.state IN ('ready','leased','save_pending') AND (d.lease_until IS NULL OR d.lease_until <= UTC_TIMESTAMP(6)))) ORDER BY r.created_at LIMIT ?`, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT r.owner_username, r.run_id, r.project_id FROM novel_runs r JOIN novel_projects p ON p.owner_username=r.owner_username AND p.project_id=r.project_id LEFT JOIN novel_run_dispatch d ON d.owner_username=r.owner_username AND d.run_id=r.run_id WHERE p.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM novel_project_slots slot WHERE slot.owner_username=r.owner_username AND slot.project_id=r.project_id AND slot.lease_until > UTC_TIMESTAMP(6)) AND r.status NOT IN ('succeeded','succeeded_with_warnings','failed','cancelled','awaiting_confirmation','paused') AND (d.run_id IS NULL OR (d.state IN ('ready','leased','save_pending') AND (d.lease_until IS NULL OR d.lease_until <= UTC_TIMESTAMP(6)))) ORDER BY r.created_at LIMIT ?`, limit)
 	if err != nil {
 		return nil, persistenceError(err)
 	}

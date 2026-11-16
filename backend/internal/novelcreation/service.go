@@ -242,6 +242,9 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		MaxRevisionRounds:   agent.MaxRevisionRounds,
 	}, sink)
 	if runErr != nil {
+		if isDurableWriteFailure(runErr) || IsCode(runErr, ErrPersistenceFailed) {
+			return s.recoverDurableWriteFailure(ctx, owner, run, runErr)
+		}
 		code, message := domainFailure(runErr)
 		status := RunFailed
 		if code == ErrResultUnknown {
@@ -432,6 +435,9 @@ func (s *Service) finish(ctx context.Context, owner string, run Run, status RunS
 		return run, err
 	}
 	_ = s.runtime.Publish(ctx, event)
+	if updated.Status == RunPaused && updated.ErrorCode == ErrResultUnknown {
+		return updated, unknownResult()
+	}
 	return updated, resultErr
 }
 

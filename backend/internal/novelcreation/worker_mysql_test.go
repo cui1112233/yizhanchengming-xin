@@ -87,3 +87,18 @@ func TestWorkerSQLExpiredFenceRollsBackBeforeMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWorkerFixR4SQLFiltersBusyProjectBeforeLimit(t *testing.T) {
+	store, mock := newNovelCreationMockStore(t)
+	mock.ExpectQuery(`SELECT .*NOT EXISTS \(SELECT 1 FROM novel_project_slots slot WHERE slot.owner_username=r.owner_username AND slot.project_id=r.project_id AND slot.lease_until > UTC_TIMESTAMP\(6\)\).*ORDER BY r.created_at LIMIT \?`).WithArgs(64).WillReturnRows(sqlmock.NewRows([]string{"owner", "run", "project"}).AddRow("alice", "free-run", "free-project"))
+	entries, err := store.ListDispatch(context.Background(), 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].RunID != "free-run" {
+		t.Fatalf("dispatch=%+v", entries)
+	}
+	if err = mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

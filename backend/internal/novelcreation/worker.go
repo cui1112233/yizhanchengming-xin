@@ -171,7 +171,7 @@ func guard(ctx context.Context, tx Store, l RunLease) (Execution, error) {
 	return e, nil
 }
 func guarded(ctx context.Context, store Store, l RunLease, fn func(Store, *Execution) error) error {
-	return store.Atomic(ctx, l.Owner, l.ProjectID, func(tx Store) error {
+	err := store.Atomic(ctx, l.Owner, l.ProjectID, func(tx Store) error {
 		e, err := guard(ctx, tx, l)
 		if err != nil {
 			return err
@@ -186,6 +186,62 @@ func guarded(ctx context.Context, store Store, l RunLease, fn func(Store, *Execu
 		}
 		return tx.PutExecution(ctx, e)
 	})
+	if err != nil && !IsCode(err, ErrLeaseLost) && !IsCode(err, ErrResultUnknown) && !IsCode(err, ErrIdempotencyConflict) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		return &durableWriteError{err}
+	}
+	return err
+}
+
+// Local journal/event failures are not model failures. Preserve this marker
+// through DomainError wrappers so a paid response is never retried as new work.
+type durableWriteError struct{ cause error }
+
+func (e *durableWriteError) Error() string { return e.cause.Error() }
+func (e *durableWriteError) Unwrap() error { return e.cause }
+func isDurableWriteFailure(err error) bool {
+	var local *durableWriteError
+	return errors.As(err, &local)
+}
+func hasUncertainCall(e Execution) bool {
+	for _, call := range e.Calls {
+		if call.State == "may_have_sent" {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) recoverDurableWriteFailure(ctx context.Context, owner string, run Run, cause error) (Run, error) {
+	g, ok := s.store.(*guardedStore)
+	if !ok {
+		return run, cause
+	}
+	resultErr := persistenceError(cause)
+	err := guarded(ctx, g.Store, g.lease, func(tx Store, e *Execution) error {
+		var err error
+		if hasUncertainCall(*e) {
+			resultErr = unknownResult()
+			e.State = "paused"
+			run, err = tx.UpdateRun(ctx, owner, RunUpdate{ID: run.ID, Status: RunPaused, ErrorCode: ErrResultUnknown, ErrorMessage: resultErr.Error()})
+			if err != nil {
+				return err
+			}
+			_, err = tx.AppendRunEvent(ctx, owner, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: "run.paused", Status: RunPaused, Message: resultErr.Error()})
+			return err
+		}
+		e.State = "ready"
+		if e.Bundle != nil {
+			e.State = "save_pending"
+		}
+		run, err = tx.GetRun(ctx, owner, run.ID)
+		return err
+	})
+	// If MySQL is still unavailable, leave the prior leased record untouched:
+	// the scanner will reconsider it after expiry. Never invent a done state.
+	if err != nil {
+		return run, err
+	}
+	return run, resultErr
 }
 func (s *Service) renew(ctx context.Context, l RunLease) error {
 	return guarded(ctx, s.store, l, func(tx Store, e *Execution) error {
@@ -318,6 +374,15 @@ func (g *guardedStore) finishRun(ctx context.Context, owner string, u RunUpdate,
 		return out, persisted, leaseLost()
 	}
 	err = guarded(ctx, g.Store, g.lease, func(tx Store, e *Execution) error {
+		if u.Status == RunFailed && hasUncertainCall(*e) {
+			u.Status = RunPaused
+			u.ErrorCode = ErrResultUnknown
+			u.ErrorMessage = unknownResult().Error()
+			u.FinishedAt = nil
+			event.Status = RunPaused
+			event.Type = "run.paused"
+			event.Message = u.ErrorMessage
+		}
 		if f != nil {
 			if f.ProjectID != g.lease.ProjectID {
 				return leaseLost()
@@ -556,6 +621,10 @@ func (s *Service) RetryRun(ctx context.Context, owner, id string) (Run, error) {
 			}
 		}
 		if e.Bundle != nil && e.CommittedHash == "" && !e.CancelRequested {
+			s.Notify(ctx, owner, id)
+			return run, nil
+		}
+		if e.State == "ready" && !isTerminalRunStatus(run.Status) && !e.CancelRequested {
 			s.Notify(ctx, owner, id)
 			return run, nil
 		}
