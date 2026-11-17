@@ -299,7 +299,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	if len(activeBookIDs) == 0 {
 		_ = updateWorkshopRun(worker.store, job, "stopped", "任务已停止", startedAt, true)
 		_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, "stopped", "")
-		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": "stopped", "queue_state": "stopped", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": []any{}, "progress": []any{}})
+		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "stopped", "queue_state": "stopped", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": []any{}, "progress": []any{}})
 		_ = worker.queue.Ack(ctx, job)
 		return
 	}
@@ -307,7 +307,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	activeJob.BookIDs = activeBookIDs
 	_ = updateWorkshopRun(worker.store, job, "running", "", startedAt, false)
 	_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, "running", "")
-	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": progress, "progress": progress})
+	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": progress, "progress": progress})
 	retry := job.Attempts < 3
 	deferredOriginalFetchRetry := false
 	failedBookIDs := make([]string, 0)
@@ -353,7 +353,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			results <- bookProcessResult{bookID: bookID, bookName: bookName, err: err, stopped: worker.bookCancelled(ctx, job.Owner, bookID)}
 		}()
 	}
-	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
+	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
 	go func() {
 		processing.Wait()
 		close(results)
@@ -396,7 +396,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
 			}
 			progress = append(progress, workshopProgressItem("error", "处理失败："+result.err.Error(), bookID, bookName))
-			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": status, "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
+			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
 			continue
 		}
 		if result.stopped {
@@ -408,7 +408,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		_ = clearNovelFetchOriginalFetchRetry(ctx, worker.store, job.Owner, bookID)
 		_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, "completed", "")
 		progress = append(progress, workshopProgressItem("success", "处理完成", bookID, bookName))
-		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
+		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
 		if job.AutoSubmit && worker.autoSubmit != nil && !worker.bookCancelled(ctx, job.Owner, bookID) {
 			bookJob := job
 			bookJob.BookIDs = []string{bookID}
@@ -428,7 +428,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			}
 			_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, bookID, "auto_submit_started", "本书处理完成，开始提交到视频管理系统")
 			progress = append(progress, workshopProgressItem("processing", "本书开始上传", bookID, bookName))
-			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
+			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
 			if err := worker.autoSubmit(ctx, bookJob); err != nil {
 				uploadFailures = append(uploadFailures, bookID+"："+err.Error())
 				failedBookIDs = append(failedBookIDs, bookID)
@@ -470,7 +470,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			documents, _ := worker.store.ListDocuments(ctx, job.Owner)
 			result := map[string]any{"batch_id": job.BatchID, "current_batch_id": job.BatchID, "tasks": documents, "completed": completed, "failed": len(failedBookIDs), "failed_book_ids": failedBookIDs}
 			progress = append(progress, workshopProgressItem("warning", "原文未抓到，等待下次自动抓取", "", ""))
-			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": status, "queue_state": queueState, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "error": errorMessage, "result": result, "steps": progress, "progress": progress})
+			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "error": errorMessage, "result": result, "steps": progress, "progress": progress})
 			_ = worker.queue.Fail(ctx, job, false)
 			return
 		}
@@ -505,7 +505,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			progressMessage = "处理结束，任务失败"
 		}
 		progress = append(progress, workshopProgressItem("warning", progressMessage, "", ""))
-		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": status, "queue_state": queueState, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "error": errorMessage, "result": result, "steps": progress, "progress": progress})
+		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "error": errorMessage, "result": result, "steps": progress, "progress": progress})
 		retryJob := job
 		retryJob.BookIDs = retryBookIDs
 		_ = worker.queue.Fail(ctx, retryJob, retryEnabled)
@@ -538,7 +538,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	} else if finalStatus == "upload_pending" {
 		progress = append(progress, workshopProgressItem("warning", "内容处理完成，等待自动上传重试", "", ""))
 	}
-	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "status": finalStatus, "queue_state": finalStatus, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "result": result, "steps": progress, "progress": progress})
+	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": finalStatus, "queue_state": finalStatus, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "result": result, "steps": progress, "progress": progress})
 	_ = worker.queue.Ack(ctx, job)
 }
 
@@ -989,7 +989,7 @@ func runNovelFetchScheduleDispatcher(ctx context.Context, store novelfetchworksh
 				continue
 			}
 			updatedAt := time.Now().UTC().Format(time.RFC3339Nano)
-			registry.put(owner, job.ID, map[string]any{"id": job.ID, "status": "queued", "queue_state": "queued", "started_at": updatedAt, "updated_at": updatedAt, "steps": []any{}, "progress": []any{}})
+			registry.put(owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "queued", "queue_state": "queued", "started_at": updatedAt, "updated_at": updatedAt, "steps": []any{}, "progress": []any{}})
 		}
 	}
 
@@ -1392,6 +1392,7 @@ func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.S
 			}
 			existing.Meta["platformId"] = platformID
 			existing.Meta["currentBatchId"] = batchID
+			existing.Meta["batchCreatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 			metadata.apply(existing.Meta)
 			if err := store.PutDocument(ctx, owner, existing); err != nil {
 				return nil, nil, nil, err
@@ -1407,6 +1408,7 @@ func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.S
 		}
 		document.Meta["platformId"] = platformID
 		document.Meta["currentBatchId"] = batchID
+		document.Meta["batchCreatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 		document.Meta["processingFingerprint"] = processingFingerprint
 		document.Meta["processingConfigRevision"] = "novel-fetch-rules-v1"
 		metadata.apply(document.Meta)
@@ -2334,7 +2336,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		if job != nil {
 			now := time.Now().UTC().Format(time.RFC3339Nano)
-			registry.put(identity.Username, job.ID, map[string]any{"id": job.ID, "status": "queued", "queue_state": "queued", "started_at": now, "updated_at": now, "steps": []any{}, "progress": []any{}})
+			registry.put(identity.Username, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "queued", "queue_state": "queued", "started_at": now, "updated_at": now, "steps": []any{}, "progress": []any{}})
 		}
 		status, err := novelFetchAutomationStatus(req.Context(), store, registry, identity.Username)
 		if err != nil {
@@ -2504,7 +2506,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
 		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
-		jobView := map[string]any{"id": id, "status": "queued", "queue_state": "queued", "started_at": now, "updated_at": now, "attempts": 0, "steps": []any{}, "progress": []any{}}
+		jobView := map[string]any{"id": id, "batch_id": batchID, "status": "queued", "queue_state": "queued", "started_at": now, "updated_at": now, "attempts": 0, "steps": []any{}, "progress": []any{}}
 		// 空选择表示使用账号默认文本模型；不能写入“未指定”占位符，
 		// 否则解析器会把它当成显式模型而跳过默认回退，AI 阶段必然失败。
 		textModelID := strings.TrimSpace(input.TextModelID)
@@ -2725,7 +2727,14 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	// so a refresh does not fall through to the default 404 page.
 	mux.HandleFunc("GET /api/novel-fetch-workshop/realtime/status", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
-		status, err := novelFetchAutomationStatus(req.Context(), store, registry, identity.Username)
+		query := req.URL.Query()
+		// 队列统计必须跟随页面当前查看的批次/日期，否则旧批次未完成的书
+		// 会混进当天队列横幅，让“处理中/排队”数字与当天书单对不上。
+		scope := novelFetchQueueScope{
+			BatchID: strings.TrimSpace(query.Get("batch_id")),
+			Date:    strings.TrimSpace(query.Get("date")),
+		}
+		status, err := novelFetchAutomationStatusScoped(req.Context(), store, registry, identity.Username, scope)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务队列失败"})
 			return
@@ -4221,7 +4230,14 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 	result["effective_status"] = result["status"]
 	result["effectiveStatus"] = result["status"]
 	result["queue_state"] = metaString("queueState", "queue_state")
-	createdAt := metaString("createdAt", "created_at", "createdTime", "created_time")
+	// 日期视图必须按批次创建时间分组。旧文档没有 createdAt，直接回退到
+	// updatedAt 会把历史批次显示成“今天”，导致天数筛选形同虚设。
+	createdAt := metaString("batchCreatedAt", "batch_created_at", "createdAt", "created_at", "createdTime", "created_time")
+	if createdAt == "" {
+		if batchAt := novelFetchBatchTime(metaString("currentBatchId", "current_batch_id")); !batchAt.IsZero() {
+			createdAt = batchAt.UTC().Format(time.RFC3339Nano)
+		}
+	}
 	if createdAt == "" {
 		createdAt = document.UpdatedAt
 	}

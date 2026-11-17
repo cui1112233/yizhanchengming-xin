@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -145,6 +146,58 @@ func TestNovelFetchAutomationStatusSeparatesConfigurationBlocksFromQueue(t *test
 	counts := status["counts"].(map[string]int)
 	if counts["waiting_configuration"] != 1 || status["pending_count"] != 0 || status["processing_count"] != 0 {
 		t.Fatalf("configuration block must stay outside active queue: %#v", status)
+	}
+}
+
+func TestNovelFetchAutomationStatusScopesCountsToBatchAndDate(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	historyBatch := fmt.Sprintf("batch-%d", time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC).UnixNano())
+	currentBatch := fmt.Sprintf("batch-%d", time.Date(2026, 11, 17, 10, 0, 0, 0, time.UTC).UnixNano())
+	if err := store.PutConfig(ctx, "alice", map[string]any{
+		"novel_fetch_current_batch_id": currentBatch,
+		"novel_fetch_automation":       map[string]any{"enabled": true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, doc := range []novelfetchworkshop.Document{
+		{BookID: "today-queued", Meta: map[string]any{"status": "queued", "currentBatchId": currentBatch}},
+		{BookID: "today-running", Meta: map[string]any{"status": "running", "currentBatchId": currentBatch}},
+		{BookID: "old-queued", Meta: map[string]any{"status": "queued", "currentBatchId": historyBatch}},
+		{BookID: "old-running", Meta: map[string]any{"status": "processing", "currentBatchId": historyBatch}},
+	} {
+		if err := store.PutDocument(ctx, "alice", doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	status, err := novelFetchAutomationStatus(ctx, store, newWorkshopProcessRegistry(), "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := status["counts"].(map[string]int)
+	if counts["queued"] != 1 || counts["running"] != 1 || status["pending_count"] != 1 {
+		t.Fatalf("default counts must only include the current batch: %#v", status)
+	}
+	if scope := status["scope"].(map[string]any); scope["batch_id"] != currentBatch {
+		t.Fatalf("default scope=%#v, want current batch %q", scope, currentBatch)
+	}
+
+	history, err := novelFetchAutomationStatusScoped(ctx, store, newWorkshopProcessRegistry(), "alice", novelFetchQueueScope{Date: "2026-09-24"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	historyCounts := history["counts"].(map[string]int)
+	if historyCounts["queued"] != 1 || historyCounts["running"] != 1 || historyCounts["failed"] != 0 {
+		t.Fatalf("date scope must only include that day's batch: %#v", history)
+	}
+
+	explicit, err := novelFetchAutomationStatusScoped(ctx, store, newWorkshopProcessRegistry(), "alice", novelFetchQueueScope{BatchID: historyBatch})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if explicit["counts"].(map[string]int)["queued"] != 1 || explicit["counts"].(map[string]int)["running"] != 1 {
+		t.Fatalf("explicit batch scope lost its own documents: %#v", explicit)
 	}
 }
 
