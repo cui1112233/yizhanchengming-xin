@@ -11,6 +11,8 @@ if($ResourceFile){
   if($npContainer -notmatch '^[a-f0-9]{64}$' -or $npAddress -notmatch '^127\.0\.0\.1:[0-9]{4,5}$'){throw 'Invalid dedicated MySQL identity'}
   $npActual=(& docker inspect $npContainer --format '{{.Id}}|{{.Image}}|{{.Name}}|{{json .HostConfig.Tmpfs}}').Trim()
   if($LASTEXITCODE -ne 0 -or $npActual -notlike "$npContainer|$($npResource.imageID)|/$($npResource.containerName)|*" -or $npActual -notmatch '/var/lib/mysql' -or (& docker port $npContainer 3306/tcp).Trim() -ne $npAddress){throw 'Dedicated MySQL resource identity changed'}
+  $npMemory=[long]((& docker inspect $npContainer --format '{{.HostConfig.Memory}}').Trim())
+  if($npMemory -ne [long]$npResource.memoryLimitBytes -or $npMemory -lt 536870912 -or $npMemory -gt 2147483648){throw 'Dedicated MySQL memory limit changed or is unbounded'}
 }
 if($OwnerFile){
   $npOwner=Get-Content -LiteralPath $OwnerFile -Raw | ConvertFrom-Json
