@@ -422,6 +422,11 @@ func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, ow
 			}
 			sensitiveByVersion[versionID] = sensitiveItems
 			document.Meta["sensitiveByVersion"] = sensitiveByVersion
+			// AI 版本命中的敏感词同样写入任务级 sensitiveHits/sensitiveFixed，
+			// 否则敏感日志接口只读这两份记录，会导致这些命中被漏记。
+			if len(sensitiveItems) > 0 {
+				SetSensitiveDetails(document.Meta, sensitiveItems, len(sensitiveItems))
+			}
 		}
 		document.Versions[versionID] = result
 		model := ""

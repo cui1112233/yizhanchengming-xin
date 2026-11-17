@@ -4009,41 +4009,7 @@ func applyNovelFetchSensitiveRulesDetailed(ctx context.Context, store novelfetch
 }
 
 func setSensitiveDetails(meta map[string]any, items []map[string]any, count int) {
-	if meta == nil {
-		return
-	}
-	updated := time.Now().UTC().Format(time.RFC3339Nano)
-	hits := make([]any, 0, len(items))
-	fixed := make([]any, 0, len(items))
-	failedCount := 0
-	mode := "system_rule"
-	for _, item := range items {
-		itemSource := strings.ToLower(strings.TrimSpace(fmt.Sprint(item["source"])))
-		if itemSource == "ai_group" || itemSource == "group" {
-			mode = "ai_group"
-		} else if itemSource == "ai" || itemSource == "ai_each" {
-			mode = "ai_each"
-		}
-		hits = append(hits, map[string]any{
-			"hit_index": item["hit_index"], "keyword": item["keyword"],
-			"start": item["start"], "end": item["end"],
-			"snippet": item["before"], "status": item["status"],
-		})
-		fixed = append(fixed, item)
-		if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "failed") {
-			failedCount++
-		}
-	}
-	fixedCount := count - failedCount
-	if fixedCount < 0 {
-		fixedCount = 0
-	}
-	meta["sensitiveHits"] = map[string]any{"mode": mode, "status": "done", "hit_count": count, "updated_at": updated, "hits": hits}
-	status := "done"
-	if failedCount > 0 {
-		status = "failed"
-	}
-	meta["sensitiveFixed"] = map[string]any{"mode": mode, "status": status, "fixed_count": fixedCount, "failed_count": failedCount, "updated_at": updated, "items": fixed}
+	novelfetchworkshop.SetSensitiveDetails(meta, items, count)
 }
 
 // novelFetchAppConfig restores the flat config contract used by the 3001
