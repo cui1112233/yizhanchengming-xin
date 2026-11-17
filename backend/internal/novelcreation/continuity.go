@@ -244,7 +244,11 @@ func (s *Service) GetSessionSnapshot(ctx context.Context, owner, sessionID strin
 		}
 		executionState = execution.State
 	}
-	return Snapshot{ExecutionState: executionState, Project: project, Session: session, Run: latest, Messages: messages, Chapters: chapters, Events: events}, nil
+	canExport, err := s.canExportShort(ctx, owner, latest, session)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{CanExportShort: canExport, ExecutionState: executionState, Project: project, Session: session, Run: latest, Messages: messages, Chapters: chapters, Events: events}, nil
 }
 
 func (s *Service) validateTargetVersion(ctx context.Context, owner, projectID string, target *PreviousChapter) error {

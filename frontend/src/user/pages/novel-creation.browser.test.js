@@ -7,18 +7,20 @@ import { build } from 'esbuild';
 import { runNovelBrowserDOM } from './novel-creation/browserEvidence.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const browser = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(p => p && existsSync(p));
+const emptyRunJSON = readFileSync(new URL('../../../../backend/internal/novelcreation/testdata/empty-run.json', import.meta.url), 'utf8');
 const fixture = String.raw`
 import React from 'react';import {createRoot} from 'react-dom/client';import Page from './NovelCreationPage.jsx';
+const emptyRun = ${emptyRunJSON};
 localStorage.clear();localStorage.setItem('auth_token','fixture');localStorage.setItem('auth_username','fixture-owner');
 const tick=()=>new Promise(r=>setTimeout(r,90)),assert=(v,m)=>{if(!v)throw Error(m)},visible=e=>!!e&&e.getClientRects().length>0;
 const button=(s,scope=document)=>[...scope.querySelectorAll('button')].find(e=>visible(e)&&(e.textContent.replace(/\s/g,'')===s.replace(/\s/g,'')||e.getAttribute('aria-label')===s));
 const click=e=>{assert(e&&!e.disabled,'missing/disabled button '+window.step);e.click()},type=(e,v)=>{assert(e,'missing input '+window.step);Object.getOwnPropertyDescriptor(e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));};
 const wait=async f=>{for(let n=0;n<80;n++){if(f())return;await tick()}throw Error('timeout '+window.step)};
 const project={id:'p1',title:'作品甲',genre:'悬疑',modelId:'m1'},other={id:'p2',title:'作品乙',genre:'都市',modelId:'m1'};
-let sessions=[{id:'s1',projectId:'p1',mode:'long_original',title:'旧会话'}],run=null,events=[],chapters=[{id:'c1',number:1,title:'持久章节',content:'持久正文',version:2,wordCount:4}],documents=[],notes=[{id:'n1',title:'伏笔',content:'必须保留'}],styles=[],batches=[];
+let sessions=[{id:'s1',projectId:'p1',mode:'long_original',title:'旧会话'}],run=structuredClone(emptyRun),events=[],chapters=[{id:'c1',number:1,title:'持久章节',content:'持久正文',version:2,wordCount:4}],documents=[],notes=[{id:'n1',title:'伏笔',content:'必须保留'}],styles=[],batches=[];
 window.calls=[];window.pollInFlight=0;window.maxPoll=0;window.savedKeys=[];
 const response=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{'Content-Type':'application/json'}});
-const snap=(id)=>({project,session:sessions.find(s=>s.id===id)||sessions[0],run,messages:run?[{id:'msg',role:'user',content:'持久指令'}]:[],chapters,events,executionState:window.executionState||'done'});
+const snap=(id)=>({project,session:sessions.find(s=>s.id===id)||sessions[0],run:run||structuredClone(emptyRun),canExportShort:window.canExportShort===true,messages:run?.id?[{id:'msg',role:'user',content:'持久指令'}]:[],chapters,events,executionState:window.executionState||'done'});
 window.fetch=async(url,options={})=>{url=String(url);const method=options.method||'GET',body=options.body instanceof FormData?{files:options.body.getAll('files').map(f=>f.name)}:options.body?JSON.parse(options.body):{};window.calls.push({url,method,body});
  if(url==='/api/login/session')return response({username:localStorage.getItem('auth_username'),role:'member',canManageApi:false});
  if(url.startsWith('/api/models'))return response({models:[{id:'m1',kind:'text',displayName:'授权模型'}]});
@@ -66,6 +68,24 @@ test('新建会话真实创建，失败保留原会话及草稿', {skip:!browser
  await open();window.step='new session';const count=sessions.length;click(button('新建会话'));await wait(()=>sessions.length===count+1);await tick();await tick();assert(sessions[0].id!=='s1','reused old session');
  const composer=document.querySelector('[aria-label="创作要求"]')||document.querySelector('.novel-creation-composer textarea');type(composer,'新会话草稿');await tick();window.failCreate=true;click(button('新建会话'));await tick();await tick();assert(composer.value==='新会话草稿','failed create cleared draft');
 `,'sessions'));
+
+test('真实空run对象新建会话后可首次发送且无假进度', {skip:!browser},async()=>run(String.raw`
+ await open();window.step='empty wire DTO';assert(snap().run.id===''&&snap().run.status==='','fixture is not real empty Go run');click(button('新建会话'));await tick();await tick();assert(!document.querySelector('.novel-run'),'empty run showed fake progress');type(document.querySelector('[aria-label="创作要求"]'),'验收首次创作要求');await tick();assert(!button('开始创作').disabled,'empty run blocks first send');assert(!button('停止后续步骤'),'empty run offers cancellation');click(button('开始创作'));await wait(()=>sends().length===1);assert(run.id==='r1','first send did not restore real run');
+`,'task8-empty-run'));
+
+test('最终审核展示零分与未解决问题，资料维护不冒充章节审核', {skip:!browser},async()=>run(String.raw`
+ run={id:'warning',status:'succeeded_with_warnings',runtimeSnapshot:{finalAudit:{score:0,passed:false,issues:[{id:'unresolved',severity:'high',description:'<b>匿名信线索未闭合</b>'}]}}};await open();window.step='final audit';assert(document.body.textContent.includes('最终审核：0分'),'final audit zero score hidden');assert(document.body.textContent.includes('严重')&&document.body.textContent.includes('<b>匿名信线索未闭合</b>'),'unresolved issue hidden');assert(!document.querySelector('.novel-run b b'),'issue rendered HTML');run={id:'maintenance-audit',status:'succeeded',runtimeSnapshot:{operation:'style_analysis',finalAudit:{score:0,issues:[]}}};await remount();assert(!document.body.textContent.includes('最终审核：'),'maintenance displayed chapter audit');
+`,'task8-final-audit'));
+
+test('停止批次无继续动作', {skip:!browser},async()=>run(String.raw`
+ batches=[{id:'stopped-batch',status:'stopped',totalChapters:2,completedChapters:1}];await open();window.step='stopped batch';click(button('批量续写'));await wait(()=>button('刷新逐轮日志'));assert(!button('继续'),'stopped batch offers invalid resume');assert(document.body.textContent.includes('此批次已停止'),'stopped explanation missing');
+ assert(!window.calls.some(c=>c.url.endsWith('/resume')),'invalid resume sent');
+`,'task8-stopped-batch'));
+
+test('短篇导出只消费正式已保存能力，空长篇维护和蓝图不能导出短篇', {skip:!browser},async()=>run(String.raw`
+ await open();window.step='saved short capability';
+ for(const [id,status,cap] of [['', '',false],['long','succeeded',false],['maintenance','succeeded',false],['blueprint-source','succeeded',false],['saved-short','succeeded',true]]){run={id,status};window.canExportShort=cap;await remount();assert(!!button('导出本次短篇')===cap,'wrong short export capability '+id);assert(!!button('导出整本'),'whole export missing');}assert(!window.calls.some(c=>c.url.endsWith('/resume')),'invalid resume sent');
+`,'task8-public-capabilities'));
 
 test('刷新恢复持久运行与正文；增量游标轮询只有一个在途请求', {skip:!browser},async()=>run(String.raw`
  run={id:'r1',status:'writing'};events=[{eventId:7,status:'writing',message:'写作中'}];window.pollDelay=1900;await open();window.step='recovery';await wait(()=>document.body.textContent.includes('持久指令'));assert(document.body.textContent.includes('持久正文'),'saved chapter absent');await new Promise(r=>setTimeout(r,7300));assert(window.maxPoll===1,'poll overlap');const polls=window.calls.filter(c=>c.url.includes('/runs/r1?'));assert(polls.length>=2&&polls.every(c=>c.url.includes('afterEventId=7')),'cursor not incremental');await remount();await wait(()=>document.body.textContent.includes('持久指令'));assert(sends().length===0,'refresh called generation');
@@ -115,7 +135,7 @@ test('归档可恢复且保持自动任务暂停提示，清理中禁恢复；�
 `,'archive'));
 
 test('章节历史恢复请求保留expectedVersion；整本和短篇只下载已保存正文，空作品给出错误', {skip:!browser},async()=>run(String.raw`
- run={id:'short',status:'succeeded'};await open();window.step='exports';const downloads=[];HTMLAnchorElement.prototype.click=function(){downloads.push({filename:this.download,url:this.href})};click(button('导出整本'));await wait(()=>downloads.length===1);assert(downloads[0].filename==='小说.md','whole export filename');await choose('导出格式','TXT');click(button('导出本次短篇'));await wait(()=>downloads.length===2);assert(downloads[1].filename==='短篇.txt','short TXT export');assert(window.calls.some(c=>c.url.includes('/runs/short/short-result/export?format=txt')),'short not saved result endpoint');click(button('版本历史'));await wait(()=>button('恢复为新版本'));click(button('恢复为新版本'));await wait(()=>chapters[0].version===3);const restore=window.calls.find(c=>c.url.endsWith('/chapters/c1/restore'));assert(restore.body.expectedVersion===2&&restore.body.version===1,'restore overwrote version history');chapters=[];await remount();click(button('导出整本'));await wait(()=>document.body.textContent.includes('暂无可导出正文'));assert(downloads.length===2,'empty exported partial');
+ run={id:'short',status:'succeeded'};window.canExportShort=true;await open();window.step='exports';const downloads=[];HTMLAnchorElement.prototype.click=function(){downloads.push({filename:this.download,url:this.href})};click(button('导出整本'));await wait(()=>downloads.length===1);assert(downloads[0].filename==='小说.md','whole export filename');await choose('导出格式','TXT');click(button('导出本次短篇'));await wait(()=>downloads.length===2);assert(downloads[1].filename==='短篇.txt','short TXT export');assert(window.calls.some(c=>c.url.includes('/runs/short/short-result/export?format=txt')),'short not saved result endpoint');click(button('版本历史'));await wait(()=>button('恢复为新版本'));click(button('恢复为新版本'));await wait(()=>chapters[0].version===3);const restore=window.calls.find(c=>c.url.endsWith('/chapters/c1/restore'));assert(restore.body.expectedVersion===2&&restore.body.version===1,'restore overwrote version history');chapters=[];await remount();click(button('导出整本'));await wait(()=>document.body.textContent.includes('暂无可导出正文'));assert(downloads.length===2,'empty exported partial');
 `,'exports'));
 
 test('未知上游无普通重试；保存待恢复保持同run，维护分析不显示为新章节', {skip:!browser},async()=>run(String.raw`

@@ -863,6 +863,10 @@ func (s *MemoryStore) ListActiveBatches(_ context.Context, limit int) ([]Batch, 
 	}
 	active := make([]Batch, 0)
 	for _, batch := range s.batches {
+		project, ok := s.projects[memoryKey(batch.OwnerUsername, batch.ProjectID)]
+		if !ok || project.DeletedAt != nil || projectReadOnly(project.Status) {
+			continue
+		}
 		if batch.Status == BatchRunning || batch.Status == BatchPaused || (batch.Status == BatchStopped && batch.ActiveRound != "") {
 			active = append(active, cloneBatch(batch))
 		}

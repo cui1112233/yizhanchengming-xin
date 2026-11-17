@@ -1436,7 +1436,7 @@ func (s *MySQLStore) ListActiveBatches(ctx context.Context, limit int) ([]Batch,
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT `+batchColumns+`
 FROM novel_batches b JOIN novel_projects p ON p.owner_username = b.owner_username AND p.project_id = b.project_id
-WHERE (b.status IN ('running','paused') OR (b.status = 'stopped' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(b.input_snapshot_json, '$.automationState.activeRound')), '') <> '')) AND p.deleted_at IS NULL
+WHERE (b.status IN ('running','paused') OR (b.status = 'stopped' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(b.input_snapshot_json, '$.automationState.activeRound')), '') <> '')) AND p.deleted_at IS NULL AND p.status NOT IN ('archived','purging')
 ORDER BY b.updated_at LIMIT ?`, limit)
 	if err != nil {
 		return nil, persistenceError(err)

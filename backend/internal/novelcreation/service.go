@@ -14,6 +14,7 @@ type PipelineRunner interface {
 }
 
 type Snapshot struct {
+	CanExportShort bool       `json:"canExportShort"`
 	ExecutionState string     `json:"executionState,omitempty"`
 	Project        Project    `json:"project"`
 	Session        Session    `json:"session"`
@@ -425,7 +426,22 @@ func (s *Service) GetSnapshot(ctx context.Context, owner, runID string, afterEve
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{ExecutionState: execution.State, Project: project, Session: session, Run: run, Messages: messages, Events: events, Chapters: chapters}, nil
+	canExport, err := s.canExportShort(ctx, owner, run, session)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{CanExportShort: canExport, ExecutionState: execution.State, Project: project, Session: session, Run: run, Messages: messages, Events: events, Chapters: chapters}, nil
+}
+
+func (s *Service) canExportShort(ctx context.Context, owner string, run Run, session Session) (bool, error) {
+	if run.ID == "" || (session.Mode != "short_original" && session.Mode != "short_imitation") || operationKind(run) != "" || (run.Status != RunSucceeded && run.Status != RunSucceededWithWarnings) {
+		return false, nil
+	}
+	saved, err := s.store.HasSavedRun(ctx, owner, run.ID)
+	if err != nil {
+		return false, persistenceError(err)
+	}
+	return saved, nil
 }
 
 type serviceEventSink struct {

@@ -1,14 +1,16 @@
 import { Button, Progress } from 'antd';
-import { PHASES, STATUS, TERMINAL, parseJSON } from './contracts.js';
+import { PHASES, STATUS, TERMINAL, parseJSON, validRun } from './contracts.js';
 
 export default function RunCard({ snapshot, onAction, onBlueprint, busy }) {
-  const run = snapshot?.run; if (!run) return null;
+  const run = validRun(snapshot?.run); if (!run) return null;
   const runtime = parseJSON(run.runtimeSnapshot), secondary = runtime.confirmationKind === 'next_model_call';
   const unknown = run.errorCode === 'novel_upstream_result_unknown';
   const progress = Math.max(0, ...(snapshot.events || []).map(e => Number(e.progress) || 0));
   const calls = Object.entries(runtime.modelCalls || {});
+  const audit = !runtime.operation && ['succeeded', 'succeeded_with_warnings'].includes(run.status) && typeof runtime.finalAudit?.score === 'number' && Number.isFinite(runtime.finalAudit.score) ? runtime.finalAudit : null;
   return <section className="novel-run" aria-label="当前任务"><b>{run.status === 'analyzing' ? '资料分析' : STATUS[run.status] || '处理中'}</b><span>{STATUS[snapshot.executionState] || ''}</span><Progress percent={progress} showInfo />
     {unknown ? <p role="alert">上游结果待确认，已暂停自动重试。请核对原轮次；不会自动重新调用模型。</p> : run.errorMessage && <p role="alert">{run.errorMessage}</p>}
+    {audit && <section aria-label="最终审核"><b>最终审核：{audit.score}分</b>{Array.isArray(audit.issues) && audit.issues.length > 0 && <><p>未解决问题：</p><ul>{audit.issues.map((issue, index) => <li key={issue.id || index}>{({ high: '严重', critical: '严重', medium: '一般', low: '轻微' })[issue.severity] || '提示'}：{typeof issue.description === 'string' ? issue.description : '请检查本章内容'}</li>)}</ul></>}</section>}
     {snapshot.executionState === 'save_pending' && <p>模型结果已保留，正在等待恢复保存；恢复使用同一任务，不会重新生成。</p>}
     {run.status === 'awaiting_confirmation' && <><p>{secondary ? '请确认后继续下一次模型调用' : '请确认创作蓝图后继续'}</p>{secondary && runtime.nextModelCall && <p>下一步：{PHASES.find(([phase]) => runtime.callKey?.includes(phase))?.[1] || '资料处理'} · 选择模型：{runtime.nextModelCall.chosenModelId} · 实际模型：{runtime.nextModelCall.provider?.actualModel || '尚无记录'}</p>}{!secondary && <p>{runtime.foundationPlan?.coreConflict || runtime.foundationPlan?.title}</p>}<div className="novel-actions"><Button type="primary" loading={busy} onClick={() => onAction('confirm', secondary ? { confirmationId: runtime.confirmationId } : {})}>{secondary ? '确认下一次模型调用' : '确认蓝图'}</Button>{!secondary && <Button onClick={() => onBlueprint(runtime.foundationPlan || {})}>修改蓝图</Button>}</div></>}
     <div className="novel-actions">{!unknown && (run.status === 'failed' || ['ready', 'save_pending'].includes(snapshot.executionState)) && <Button loading={busy} onClick={() => onAction('retry', {})}>{snapshot.executionState === 'save_pending' ? '恢复保存结果' : '从失败处重试'}</Button>}

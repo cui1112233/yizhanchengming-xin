@@ -20,6 +20,7 @@ export const STATUS = {
   awaiting_model_confirmation: '请确认后继续下一次模型调用', busy: '等待作品空闲', daily_cap: '今日已达章节上限', awaiting_blueprint_confirmation: '请确认创作蓝图后继续'
 };
 export const parseJSON = value => { if (typeof value === 'object') return value || {}; try { return JSON.parse(value || '{}'); } catch { return {}; } };
+export const validRun = value => typeof value?.id === 'string' && value.id.trim() ? value : null;
 export const draftKey = (owner, project, session, mode) => `novel:draft:v2:${[owner, project || '_', session || '_', mode].map(encodeURIComponent).join(':')}`;
 export function readSaved(key, fallback = {}) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
 export function mergeSnapshot(previous, next) {

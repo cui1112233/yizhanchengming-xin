@@ -96,7 +96,8 @@ export default function AutomationPanel({ projectId, sessionId, mode, input, mod
       {[item.waitingReason, item.configurationError, item.stoppedReason, item.lastFailure, item.lastError].filter(Boolean).map((reason, i) => <p key={i} role="status">{STATUS[reason] || reason}</p>)}
       <p>{item.prompt}</p><div className="novel-actions">
         {['running', 'waiting', 'not_started'].includes(item.status) && <Button onClick={() => control(item, 'pause')}>暂停</Button>}
-        {['paused', 'stopped', 'failed'].includes(item.status) && <Button onClick={() => control(item, 'resume')}>继续</Button>}
+        {(batch ? ['paused', 'failed'] : ['paused', 'stopped', 'failed']).includes(item.status) && <Button onClick={() => control(item, 'resume')}>继续</Button>}
+        {batch && item.status === 'stopped' && <small>此批次已停止，如需继续写作请新建批次。</small>}
         {!['completed', 'stopped'].includes(item.status) && <Button onClick={() => control(item, 'stop')}>停止</Button>}
         {!batch && <><Button onClick={() => action(() => scope.call(request(`/schedules/${item.id}/run`, {}), () => { message.success('已请求立即执行，请查看会话'); load(); }))}>立即执行</Button><Button onClick={() => editPlan(item)}>修改配置</Button></>}
         <Button onClick={() => action(() => scope.call(request(`/${kind}/${item.id}/logs`), r => setItems(old => old.map(i => i.id === item.id ? { ...i, rounds: r.rounds || [] } : i))))}>刷新逐轮日志</Button>

@@ -14,7 +14,7 @@ import ChaptersPanel from './novel-creation/ChaptersPanel.jsx';
 import RunCard from './novel-creation/RunCard.jsx';
 import BlueprintEditor from './novel-creation/BlueprintEditor.jsx';
 import useWorkspaceScope from './novel-creation/useWorkspaceScope.js';
-import { MODE_FIELDS, MODES, STATUS, TERMINAL, THINKING, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved } from './novel-creation/contracts.js';
+import { MODE_FIELDS, MODES, STATUS, TERMINAL, THINKING, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved, validRun } from './novel-creation/contracts.js';
 import './NovelCreationPage.css';
 
 const TOOLS = [['写作风格', FileText], ['导入素材', BookOpen], ['Agent设置', Bot], ['定时写作', CalendarClock], ['数据看板', ChartColumn], ['备忘录', NotebookPen]];
@@ -37,7 +37,7 @@ export default function NovelCreationPage() {
   const key = draftKey(owner, projectId, sessionId, activeMode), project = projects.find(p => p.id === projectId);
   const defaultDraft = { content: '', modeInputs: {}, knowledgeIds: [], noteIds: [], styleProfileId: '', modelId: project?.modelId || models[0]?.value || '', thinkingLevel: 'standard' };
   const draft = draftState?.key === key ? draftState.value : { ...defaultDraft, ...readSaved(key) };
-  const run = snapshot?.run, chapters = snapshot?.chapters || [], currentSession = sessions.find(s => s.id === sessionId);
+  const run = validRun(snapshot?.run), chapters = snapshot?.chapters || [], currentSession = sessions.find(s => s.id === sessionId);
   const archived = !!currentSession?.archivedAt || project?.status === 'archived' || project?.status === 'purging' || !!retention[`novel_creation:${projectId}`]?.archivedAt;
   const active = !!run && !TERMINAL.has(run.status), sending = sendKey === key;
   const intent = readSaved(key + ':intent', null);
@@ -227,7 +227,7 @@ export default function NovelCreationPage() {
       <div className="novel-creation-resizer" role="separator" aria-label="调整资料栏宽度" onPointerDown={() => { resize.current = true; document.body.classList.add('novel-creation-resizing'); }} />
       <aside className="novel-creation-inspector"><div className="novel-creation-toolbar">{TOOLS.map(([label, Icon]) => <Button key={label} icon={<Icon size={14} />} onClick={() => openTool(label)}>{label}</Button>)}</div><div className="novel-current-reference"><h3>当前资料</h3><p>{project?.title || '尚未选择作品'} · {project?.genre || '选择作品后显示资料'}</p>{(draft.knowledgeIds || []).map(id => <small key={id}>{references.find(r => r.id === id)?.title || '已保存参考范围'}</small>)}</div>
         <Tabs defaultActiveKey="chapters" items={[
-          { key: 'chapters', label: `正文${chapters.length ? '（' + chapters.length + '）' : ''}`, children: projectId ? <ChaptersPanel key={scopeKey} projectId={projectId} sessionId={sessionId} chapters={chapters} run={run} onChapter={chapter => setSnapshot(old => ({ ...old, chapters: (old?.chapters || []).map(c => c.id === chapter.id ? chapter : c) }))} onMaintenance={maintenance} onBatch={() => setBatchOpen(true)} /> : <Empty description="选择作品后查看正文" /> },
+          { key: 'chapters', label: `正文${chapters.length ? '（' + chapters.length + '）' : ''}`, children: projectId ? <ChaptersPanel key={scopeKey} projectId={projectId} sessionId={sessionId} chapters={chapters} run={run} canExportShort={snapshot?.canExportShort === true} onChapter={chapter => setSnapshot(old => ({ ...old, chapters: (old?.chapters || []).map(c => c.id === chapter.id ? chapter : c) }))} onMaintenance={maintenance} onBatch={() => setBatchOpen(true)} /> : <Empty description="选择作品后查看正文" /> },
           ...(run ? [{ key: 'progress', label: '创作进度', children: <ol className="novel-timeline">{(snapshot.events || []).filter(e => e.type !== 'assistant.delta').map(e => <li key={e.eventId}><b>{STATUS[e.status] || '处理进度'}</b><p>{e.message}</p></li>)}</ol> }] : [])
         ]} />
       </aside>
