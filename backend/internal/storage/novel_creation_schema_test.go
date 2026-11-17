@@ -8,8 +8,8 @@ import (
 
 func TestNovelCreationMigrationCreatesOwnerScopedLongFormDomain(t *testing.T) {
 	migrations := NovelCreationMigrations()
-	if len(migrations) != 8 {
-		t.Fatalf("migrations=%d, want 8", len(migrations))
+	if len(migrations) != 9 {
+		t.Fatalf("migrations=%d, want 9", len(migrations))
 	}
 	migration := migrations[0]
 	if migration.Version != 8800300 {

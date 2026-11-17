@@ -183,7 +183,7 @@ func expectNovelPurgeFinish(m sqlmock.Sqlmock) {
 	m.ExpectQuery("SELECT 1 FROM novel_projects.*status='purging'.*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"one"}).AddRow(1))
 	m.ExpectQuery("SELECT archived_at.*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(time.Now()))
 	m.ExpectExec("DELETE FROM novel_automation_rounds.*SELECT run_id FROM novel_runs").WithArgs("alice", "alice", "p").WillReturnResult(sqlmock.NewResult(0, 1))
-	for _, table := range []string{"novel_content_records", "novel_run_dispatch", "novel_project_slots", "novel_run_events", "novel_run_steps", "novel_runs", "novel_schedules", "novel_batches", "novel_messages", "novel_chapter_versions", "novel_audits", "novel_revisions", "novel_chapters", "novel_volumes", "novel_memories", "novel_foundations", "novel_project_settings", "novel_materials", "novel_project_notes", "novel_sessions", "novel_projects"} {
+	for _, table := range []string{"novel_submission_receipts", "novel_content_records", "novel_run_dispatch", "novel_project_slots", "novel_run_events", "novel_run_steps", "novel_runs", "novel_schedules", "novel_batches", "novel_messages", "novel_chapter_versions", "novel_audits", "novel_revisions", "novel_chapters", "novel_volumes", "novel_memories", "novel_foundations", "novel_project_settings", "novel_materials", "novel_project_notes", "novel_sessions", "novel_projects"} {
 		m.ExpectExec("DELETE FROM "+table+" WHERE owner_username=\\? AND project_id=\\?").WithArgs("alice", "p").WillReturnResult(sqlmock.NewResult(0, 1))
 	}
 	m.ExpectExec("DELETE FROM project_retention").WillReturnResult(sqlmock.NewResult(0, 1))

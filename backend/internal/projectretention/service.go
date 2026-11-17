@@ -714,7 +714,7 @@ func (s *Service) purgeModuleRows(ctx context.Context, owner string, module Modu
 		}
 		// 小说表带 RESTRICT 外键，必须从子表往父表删。
 		for _, table := range []string{
-			"novel_content_records", "novel_run_dispatch", "novel_project_slots",
+			"novel_submission_receipts", "novel_content_records", "novel_run_dispatch", "novel_project_slots",
 			"novel_run_events", "novel_run_steps", "novel_runs", "novel_schedules", "novel_batches",
 			"novel_messages", "novel_chapter_versions", "novel_audits", "novel_revisions",
 			"novel_chapters", "novel_volumes", "novel_memories", "novel_foundations",

@@ -11,6 +11,7 @@ import (
 )
 
 type MemoryStore struct {
+	submissions      map[string]submissionReceipt
 	contentRecords   map[string]ContentRecord
 	automationRounds map[string]string
 	executions       map[string]Execution
@@ -37,6 +38,7 @@ type MemoryStore struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
+		submissions:      make(map[string]submissionReceipt),
 		contentRecords:   make(map[string]ContentRecord),
 		automationRounds: make(map[string]string),
 		executions:       make(map[string]Execution),

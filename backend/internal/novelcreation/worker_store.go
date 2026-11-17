@@ -107,19 +107,28 @@ func (s *MySQLStore) Clock(ctx context.Context) (time.Time, error) {
 // Atomic serializes every decision for a project. The callback must not perform
 // network I/O. Its Store is bound to this transaction; nested calls share it.
 func (s *MemoryStore) Atomic(ctx context.Context, owner, project string, fn func(Store) error) error {
+	return s.atomicCreate(ctx, owner, project, true, fn)
+}
+func (s *MemoryStore) AtomicCreate(ctx context.Context, owner string, fn func(Store) error) error {
+	return s.atomicCreate(ctx, owner, "", false, fn)
+}
+func (s *MemoryStore) atomicCreate(ctx context.Context, owner, project string, requireProject bool, fn func(Store) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p, ok := s.projects[memoryKey(owner, project)]
-	if !ok || p.DeletedAt != nil {
-		return &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
-	}
-	if projectReadOnly(p.Status) {
-		return archivedError()
+	if requireProject {
+		p, ok := s.projects[memoryKey(owner, project)]
+		if !ok || p.DeletedAt != nil {
+			return &DomainError{Code: ErrProjectNotFound, Message: "project not found"}
+		}
+		if projectReadOnly(p.Status) {
+			return archivedError()
+		}
 	}
 	c := NewMemoryStore()
+	c.submissions = maps.Clone(s.submissions)
 	c.nextID, c.nextEventID = s.nextID, s.nextEventID
 	c.contentRecords = maps.Clone(s.contentRecords)
 	c.projects = maps.Clone(s.projects)
@@ -153,6 +162,7 @@ func (s *MemoryStore) Atomic(ctx context.Context, owner, project string, fn func
 		return err
 	}
 	s.nextID, s.nextEventID = c.nextID, c.nextEventID
+	s.submissions = c.submissions
 	s.contentRecords = c.contentRecords
 	s.projects, s.sessions, s.messages, s.runs, s.runByKey, s.runEvents = c.projects, c.sessions, c.messages, c.runs, c.runByKey, c.runEvents
 	s.chapterBundles, s.chapterVersions, s.settings, s.foundations = c.chapterBundles, c.chapterVersions, c.settings, c.foundations
