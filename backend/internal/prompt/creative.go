@@ -42,6 +42,9 @@ var creativePromptTypes = map[string]string{CreativeScript144: "script", Creativ
 
 func CreativePromptOptions() []CreativePromptMetadata {
 	out := []CreativePromptMetadata{}
+	if p, _, err := resolveZIPCreativePrompt(CreativeStoryboard164, "storyboard"); err == nil {
+		out = append(out, CreativePromptMetadata{ID: p.ID, Name: p.Name, Type: p.Type, Version: p.Version, Digest: p.Digest, CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt, CatalogGroup: p.CatalogGroup, CreativePromptContract: p.CreativePromptContract})
+	}
 	if records, err := RecoveredCreativePromptCatalog(); err == nil {
 		for _, r := range records {
 			if r.Type != "voice-design" {
@@ -60,6 +63,9 @@ func CreativePromptOptions() []CreativePromptMetadata {
 func ResolveCreativePrompt(id, purpose string) (CreativePromptSnapshot, error) {
 	id = strings.TrimSpace(id)
 	id = CreativePromptAlias(id)
+	if p, found, err := resolveZIPCreativePrompt(id, purpose); err != nil || found {
+		return p, err
+	}
 	if p, found, err := resolveRecoveredCreativePrompt(id, purpose); err != nil || found {
 		return p, err
 	}

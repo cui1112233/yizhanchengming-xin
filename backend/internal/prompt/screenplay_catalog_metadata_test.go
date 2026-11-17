@@ -8,7 +8,7 @@ import (
 )
 
 func TestStoryboardCatalogSeparates41OriginalRowsAndKeepsRealSourceDates(t *testing.T) {
-	original, compat := 0, 0
+	original, compat, zipOriginal := 0, 0, 0
 	dates := map[int]string{137: "2026-03-04 18:21:53", 268: "2026-11-09 11:39:38", 307: "2026-11-10 15:08:11"}
 	for _, item := range CreativePromptOptions() {
 		if item.Type != "storyboard" {
@@ -18,6 +18,13 @@ func TestStoryboardCatalogSeparates41OriginalRowsAndKeepsRealSourceDates(t *test
 		var fields map[string]any
 		json.Unmarshal(raw, &fields)
 		group, _ := fields["catalog_group"].(string)
+		if group == "zip-original" {
+			zipOriginal++
+			if item.SourceID != 164 {
+				t.Fatalf("unexpected ZIP supplement %d", item.SourceID)
+			}
+			continue
+		}
 		if item.SourceID > 0 {
 			original++
 			if group != "original" {
@@ -36,8 +43,8 @@ func TestStoryboardCatalogSeparates41OriginalRowsAndKeepsRealSourceDates(t *test
 			}
 		}
 	}
-	if original != 41 || compat != 2 {
-		t.Fatalf("original=%d compatibility=%d", original, compat)
+	if original != 41 || compat != 2 || zipOriginal != 1 {
+		t.Fatalf("original=%d compatibility=%d zip-original=%d", original, compat, zipOriginal)
 	}
 	for _, id := range []string{"storyboard_xiaoluo_v7_15s", "storyboard_xiaoyunque_v3"} {
 		p, err := ResolveCreativePrompt(id, "storyboard")

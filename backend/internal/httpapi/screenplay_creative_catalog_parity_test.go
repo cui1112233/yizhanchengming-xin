@@ -30,12 +30,17 @@ func TestScreenplayCreativeHTTPOriginalStoryboardCatalog(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	original, compat, unavailable := 0, 0, 0
+	original, compat, unavailable, zipOriginal := 0, 0, 0, 0
 	for _, row := range result.Prompts {
 		if row.Purpose != "storyboard" {
 			continue
 		}
 		switch row.Group {
+		case "zip-original":
+			zipOriginal++
+			if row.ID != "luoshui_storyboard_164" || !row.Supported || row.Created != "2026-03-14 17:59:47" || row.Digest != "b3ea2ac397a09cee548464e5834d0c1dafcb2439649ae642fbe8547627dcf328" {
+				t.Fatal("invalid ZIP supplement", row)
+			}
 		case "original":
 			original++
 			if row.Created == "" || row.Updated == "" || len(row.Digest) != 64 {
@@ -53,7 +58,7 @@ func TestScreenplayCreativeHTTPOriginalStoryboardCatalog(t *testing.T) {
 			t.Fatal("unclassified prompt", row.ID)
 		}
 	}
-	if original != 41 || compat != 2 || unavailable != 1 {
-		t.Fatalf("original=%d compatibility=%d unavailable=%d", original, compat, unavailable)
+	if original != 41 || compat != 2 || unavailable != 1 || zipOriginal != 1 {
+		t.Fatalf("original=%d compatibility=%d unavailable=%d zip-original=%d", original, compat, unavailable, zipOriginal)
 	}
 }

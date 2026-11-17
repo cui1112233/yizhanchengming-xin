@@ -118,6 +118,23 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 				user += "\n\n【本章此前已完成场景，仅供衔接参考】\n" + string(raw)
 			}
 		}
+		if selected.SourceID == 164 {
+			// Render's braces wrap these keys, matching the ZIP's double-braced Chinese variables.
+			vars["{剧本内容}"] = episode.Content
+			vars["{前场景末尾/后场景开头分镜}"] = ""
+			if useHistory {
+				history := req.generationSession.history(episode.No)
+				if len(all) > 0 {
+					recent := all
+					if len(recent) > 5 {
+						recent = recent[len(recent)-5:]
+					}
+					raw, _ := json.Marshal(storyboardSemanticRows(recent))
+					history += "\n" + string(raw)
+				}
+				vars["{前场景末尾/后场景开头分镜}"] = strings.TrimSpace(history)
+			}
+		}
 		system := luoshui.Render(selected.Body, vars)
 		if strings.TrimSpace(prefix) != "" {
 			system = prefix + "\n\n" + system
