@@ -9,4 +9,3 @@ export function HomeHandwriting() {
     </span>)}
   </h1>;
 }
-
