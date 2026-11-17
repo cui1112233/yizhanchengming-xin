@@ -1891,6 +1891,27 @@ func TestWorkshopStartPersistsInputFormatMetadataOnTasks(t *testing.T) {
 	}
 }
 
+func TestWorkshopStartAlwaysAutoSubmitsToVideoSystem(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue()})
+	started := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+		"inputText": "12345678901\t直接提交测试",
+	}, now, secret)
+	if started.Code != http.StatusAccepted {
+		t.Fatalf("start status=%d body=%s", started.Code, started.Body.String())
+	}
+	document, err := store.GetDocument(context.Background(), "tester", "12345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, ok := document.Meta["processSnapshot"].(map[string]any)
+	if !ok || snapshot["auto_submit"] != true {
+		t.Fatalf("manual start should auto submit, snapshot=%#v", document.Meta["processSnapshot"])
+	}
+}
+
 func TestDeriveNovelFetchBatchStatusUsesTaskStates(t *testing.T) {
 	completed := novelfetchworkshop.Document{Meta: map[string]any{"status": "completed"}}
 	queued := novelfetchworkshop.Document{Meta: map[string]any{"status": "queued"}}
