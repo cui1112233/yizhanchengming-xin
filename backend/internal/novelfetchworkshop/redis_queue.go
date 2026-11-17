@@ -196,6 +196,42 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 	return queued, existingID, nil
 }
 
+func (q *RedisQueue) ConflictingBookIDs(ctx context.Context, job ProcessJob) (map[string]string, error) {
+	seen := map[string]bool{}
+	bookIDs := make([]string, 0, len(job.BookIDs))
+	keys := make([]string, 0, len(job.BookIDs)+1)
+	for _, bookID := range job.BookIDs {
+		bookID = strings.TrimSpace(bookID)
+		if bookID == "" || seen[bookID] {
+			continue
+		}
+		seen[bookID] = true
+		bookIDs = append(bookIDs, bookID)
+		keys = append(keys, q.bookDedupeKey(job.Owner, job.PlatformID, bookID))
+	}
+	if len(keys) == 0 {
+		return map[string]string{}, nil
+	}
+	value, err := q.command(ctx, append([]string{"MGET"}, keys...)...)
+	if err != nil {
+		return nil, err
+	}
+	values, ok := value.([]any)
+	if !ok || len(values) != len(keys) {
+		return nil, fmt.Errorf("unexpected redis response for novel fetch conflicts: %T", value)
+	}
+	conflicts := map[string]string{}
+	for i, raw := range values {
+		if raw == nil {
+			continue
+		}
+		if existingID := strings.TrimSpace(fmt.Sprint(raw)); existingID != "" {
+			conflicts[bookIDs[i]] = existingID
+		}
+	}
+	return conflicts, nil
+}
+
 func (q *RedisQueue) Claim(ctx context.Context, lease time.Duration) (ProcessJob, error) {
 	seconds := int(lease.Round(time.Second) / time.Second)
 	if seconds < 1 {

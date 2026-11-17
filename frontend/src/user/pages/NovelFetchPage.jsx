@@ -1912,7 +1912,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     process: <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <div className="novel-fetch-process-grid">
       <div className="novel-fetch-process-main">
-      <Form className="novel-fetch-public-workspace" form={processForm} layout="vertical" initialValues={{ platform: savedProcessSettings.platform, maxTxt: savedProcessSettings.maxTxt }} onValuesChange={changedValues => {
+      <Form className="novel-fetch-public-workspace" form={processForm} layout="vertical" initialValues={{ platform: savedProcessSettings.platform, maxTxt: savedProcessSettings.maxTxt, bookIds: savedProcessSettings.bookIds }} onValuesChange={changedValues => {
         writeNovelFetchProcessSettings({
           ...savedProcessSettings,
           ...processForm.getFieldsValue(),

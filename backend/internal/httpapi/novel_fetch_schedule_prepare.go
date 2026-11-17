@@ -203,6 +203,16 @@ func prepareNovelFetchScheduleTasks(ctx context.Context, store novelfetchworksho
 	if _, exists := item["selected_versions"]; !exists {
 		item["selected_versions"] = novelFetchAutomationVersions(settings)
 	}
+	if versions := scheduleStringSlice(item["selected_versions"]); len(versions) > 0 {
+		normalizedVersions, normalizeErr := normalizeNovelFetchAIVersions(versions)
+		if normalizeErr != nil {
+			return normalizeErr
+		}
+		item["selected_versions"] = normalizedVersions
+	}
+	if maxTxt := int(targetNumber(firstConfiguredValue(item["max_txt"], item["maxTxt"]))); novelFetchMaxTxtInvalid(maxTxt) {
+		return fmt.Errorf("max_txt 不能超过 %d", novelFetchMaxTxtLimit)
+	}
 	runAt, err := parseNovelFetchScheduleTime(firstText(item["run_at"], item["runAt"]))
 	if err != nil {
 		return err

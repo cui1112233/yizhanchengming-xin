@@ -132,6 +132,10 @@ func processBookDedupeMarker(job ProcessJob) string {
 	return "books:" + strings.TrimSpace(job.Owner) + ":" + strings.TrimSpace(job.PlatformID)
 }
 
+func processBookDedupeKey(owner, platformID, bookID string) string {
+	return "book:" + strings.TrimSpace(owner) + ":" + strings.TrimSpace(platformID) + ":" + strings.TrimSpace(bookID)
+}
+
 func processBookDedupeKeys(job ProcessJob) []string {
 	seen := map[string]bool{}
 	keys := make([]string, 0, len(job.BookIDs))
@@ -141,9 +145,27 @@ func processBookDedupeKeys(job ProcessJob) []string {
 			continue
 		}
 		seen[bookID] = true
-		keys = append(keys, "book:"+strings.TrimSpace(job.Owner)+":"+strings.TrimSpace(job.PlatformID)+":"+bookID)
+		keys = append(keys, processBookDedupeKey(job.Owner, job.PlatformID, bookID))
 	}
 	return keys
+}
+
+func (q *MemoryQueue) ConflictingBookIDs(_ context.Context, job ProcessJob) (map[string]string, error) {
+	conflicts := map[string]string{}
+	seen := map[string]bool{}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, bookID := range job.BookIDs {
+		bookID = strings.TrimSpace(bookID)
+		if bookID == "" || seen[bookID] {
+			continue
+		}
+		seen[bookID] = true
+		if existingID := q.dedupe[processBookDedupeKey(job.Owner, job.PlatformID, bookID)]; existingID != "" {
+			conflicts[bookID] = existingID
+		}
+	}
+	return conflicts, nil
 }
 
 func cancellationKey(owner, bookID string) string {

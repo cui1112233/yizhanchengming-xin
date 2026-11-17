@@ -205,6 +205,16 @@ func (q *uniqueRecordingNovelFetchQueue) EnqueueUniqueBooks(ctx context.Context,
 	return true, job.ID, q.Enqueue(ctx, job)
 }
 
+func (q *uniqueRecordingNovelFetchQueue) ConflictingBookIDs(_ context.Context, job novelfetchworkshop.ProcessJob) (map[string]string, error) {
+	conflicts := map[string]string{}
+	for _, bookID := range job.BookIDs {
+		if existingID := q.bookDedupe[job.Owner+":"+job.PlatformID+":"+bookID]; existingID != "" {
+			conflicts[bookID] = existingID
+		}
+	}
+	return conflicts, nil
+}
+
 func TestRecoverStaleNovelFetchScheduleReusesPersistedDispatchIdentity(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
@@ -2199,6 +2209,123 @@ func TestNovelFetchStartSkipsCompletedBookWithSelectedVersionsDone(t *testing.T)
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复导入", "platform_id": "15", "selected_versions": []string{"original", "ai1"}}, now, secret)
 	if response.Code != http.StatusOK || len(queue.jobs) != 0 {
 		t.Fatalf("completed book with all versions was not skipped: status=%d queued=%d body=%s", response.Code, len(queue.jobs), response.Body.String())
+	}
+}
+
+func TestNovelFetchStartQueuesRemainingBooksWhenOneBookIsBusy(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{bookDedupe: map[string]string{"tester:15:12345678901": "existing-job"}}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+		"inputText":         "12345678901\t书一\n12345678902\t书二",
+		"platform_id":       "15",
+		"selected_versions": []string{"ai1"},
+	}, now, secret)
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("unexpected status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(queue.jobs) != 1 {
+		t.Fatalf("queued jobs=%d, want 1", len(queue.jobs))
+	}
+	if len(queue.jobs[0].BookIDs) != 1 || queue.jobs[0].BookIDs[0] != "12345678902" {
+		t.Fatalf("queued bookIDs=%v, want only 12345678902", queue.jobs[0].BookIDs)
+	}
+	busy, err := store.GetDocument(context.Background(), "tester", "12345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := firstText(busy.Meta["status"], busy.Meta["queueState"]); got != "waiting_retry" {
+		t.Fatalf("busy book status=%q, want waiting_retry", got)
+	}
+	queued, err := store.GetDocument(context.Background(), "tester", "12345678902")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := firstText(queued.Meta["status"], queued.Meta["queueState"]); got != "queued" {
+		t.Fatalf("free book status=%q, want queued", got)
+	}
+}
+
+func TestNovelFetchStartCollapsesZeroPaddedAIVersions(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+		"inputText":         "12345678901\t书一",
+		"platform_id":       "15",
+		"selected_versions": []string{"ai01", "ai1", "ai001"},
+	}, now, secret)
+	if response.Code != http.StatusAccepted || len(queue.jobs) != 1 {
+		t.Fatalf("static_versions status=%d jobs=%d body=%s", response.Code, len(queue.jobs), response.Body.String())
+	}
+	if got := queue.jobs[0].SelectedVersions; len(got) != 1 || got[0] != "ai1" {
+		t.Fatalf("selected versions=%v, want [ai1]", got)
+	}
+
+	invalid := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+		"inputText":         "12345678903\t书三",
+		"platform_id":       "15",
+		"selected_versions": []string{"ai21"},
+	}, now, secret)
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("ai21 status=%d, want 400 body=%s", invalid.Code, invalid.Body.String())
+	}
+}
+
+func TestNovelFetchProcessRejectsOversizedMaxTxt(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process", map[string]any{
+		"inputText": "12345678901\t书一",
+		"maxTxt":    novelFetchMaxTxtLimit + 1,
+	}, now, secret)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("oversized maxTxt status=%d, want 400 body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestNovelFetchDeleteSkipsRunningBookWithStaleCompletedStatus(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	ctx := context.Background()
+	if err := store.PutDocument(ctx, "tester", novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+		"status": "completed", "queueState": "processing", "currentProcessJobId": "job-running",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(ctx, "tester", novelfetchworkshop.Document{BookID: "12345678902", Meta: map[string]any{
+		"status": "completed",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodDelete, "/api/novel-fetch-workshop/tasks", map[string]any{
+		"ids": []string{"12345678901", "12345678902"},
+	}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("delete status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Deleted int              `json:"deleted"`
+		Skipped []map[string]any `json:"skipped"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Deleted != 1 || len(payload.Skipped) != 1 {
+		t.Fatalf("deleted=%d skipped=%d, want 1/1 body=%s", payload.Deleted, len(payload.Skipped), response.Body.String())
+	}
+	if _, err := store.GetDocument(ctx, "tester", "12345678901"); err != nil {
+		t.Fatalf("running book was deleted: %v", err)
+	}
+	if _, err := store.GetDocument(ctx, "tester", "12345678902"); err == nil {
+		t.Fatal("idle book was not deleted")
 	}
 }
 

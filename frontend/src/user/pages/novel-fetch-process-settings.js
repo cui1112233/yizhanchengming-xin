@@ -3,6 +3,7 @@ export const NOVEL_FETCH_PROCESS_SETTINGS_KEY = 'novel-fetch-v78-process-setting
 const DEFAULT_SETTINGS = {
   platform: 2,
   maxTxt: 4000,
+  bookIds: '',
   textModel: '',
   selectedVersions: ['original', 'ai1'],
   rewriteMethods: { ai1: 'auto', ai2: 'auto', ai3: 'auto', ai4: 'auto', ai5: 'auto' },
@@ -38,6 +39,7 @@ export function readNovelFetchProcessSettings(storage = getDefaultStorage()) {
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
+      bookIds: typeof saved.bookIds === 'string' ? saved.bookIds : '',
       selectedVersions: Array.isArray(saved.selectedVersions) ? saved.selectedVersions : [...DEFAULT_SETTINGS.selectedVersions],
       rewriteMethods: { ...DEFAULT_SETTINGS.rewriteMethods, ...(saved.rewriteMethods || {}) }
     };
