@@ -233,6 +233,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	base["scene_inputs"] = sceneInputs
 	base["output_protocol"] = selected.OutputProtocol
 	base["parser_version"] = selected.ParserVersion
+	base["transport_contract"] = "scene-single-attempt-v1"
 	session, replay, e = beginStoryboardGeneration(ctx, store, req, engine, numbers, base, assets, external, currentBoards)
 	if e != nil {
 		if replay != nil {

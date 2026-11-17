@@ -25,6 +25,9 @@ type screenplayTextGenerator struct {
 }
 
 func (g screenplayTextGenerator) Generate(ctx context.Context, req screenplay.TextRequest) (screenplay.TextResponse, error) {
+	if req.SingleAttempt {
+		ctx = batchfactoryv11.WithSingleAttempt(ctx)
+	}
 	if g.resolver == nil {
 		return screenplay.TextResponse{}, screenplay.ErrAPIKeyMissing
 	}

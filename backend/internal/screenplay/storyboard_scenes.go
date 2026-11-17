@@ -152,7 +152,7 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 		if strings.TrimSpace(prefix) != "" {
 			system = prefix + "\n\n" + system
 		}
-		response, err := s.generationCall(ctx, req, episode.No, phase, TextRequest{Model: model, SystemPrompt: system, UserPrompt: user, JSONResponse: selected.ResponseMode != "json_with_report" && selected.ResponseMode != "text"})
+		response, err := s.generationCall(ctx, req, episode.No, phase, TextRequest{Model: model, SystemPrompt: system, UserPrompt: user, JSONResponse: selected.ResponseMode != "json_with_report" && selected.ResponseMode != "text", SingleAttempt: true})
 		if err == nil {
 			err = ctx.Err()
 		}

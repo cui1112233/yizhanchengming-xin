@@ -38,6 +38,7 @@ type TextRequest struct {
 	MaxOutputTokens int
 	Temperature     float64
 	JSONResponse    bool
+	SingleAttempt   bool `json:"single_attempt,omitempty"`
 }
 
 type TextMessage struct {
