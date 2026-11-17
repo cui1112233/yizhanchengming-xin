@@ -3181,8 +3181,8 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-cell-segmented button.is-active{color:var(--text-on-accent);background:var(--sh-accent)}
 .batch-factory-cell-segmented button:disabled{opacity:.34;cursor:not-allowed}
 .batch-factory-prompt-mode-label{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:74px;height:26px;padding:0 10px;border-radius:6px;color:var(--text-primary);font-size:11px;font-weight:700}
-.batch-factory-prompt-mode-label.is-video{color:var(--surface-base);background:var(--text-link);box-shadow:var(--shadow-1)}
-.batch-factory-prompt-mode-label.is-comic{color:var(--surface-base);background:var(--text-danger);box-shadow:var(--shadow-1)}
+.batch-factory-prompt-mode-label.is-video{color:#fff;background:var(--text-link);box-shadow:var(--shadow-1)}
+.batch-factory-prompt-mode-label.is-comic{color:#fff;background:var(--text-danger);box-shadow:var(--shadow-1)}
 .batch-factory-prompt-entry-content{
   position:relative;display:grid!important;align-content:start!important;gap:7px!important;
   min-height:0!important;padding:10px 12px!important;color:var(--sh-text)!important;border:0!important;background:transparent!important;text-align:left
