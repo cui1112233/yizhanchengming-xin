@@ -132,7 +132,7 @@ export default function NovelCreationPage() {
     try {
       const result = await scope.call(request('/sessions', { mode: activeMode, title: modeName + '会话', contextBudget: 120000 }));
       if (!result) return; setSessions(old => [result.session, ...old]);
-      if (explicit) { setSessionId(result.session.id); setSnapshot(null); }
+      if (explicit) { setSessionId(result.session.id); setSnapshot(null); setTool(''); }
       return result.session;
     } catch (e) { error(e); } finally { if (flight.current === key + ':session') flight.current = null; }
   }
