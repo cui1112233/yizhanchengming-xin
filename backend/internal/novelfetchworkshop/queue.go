@@ -55,6 +55,13 @@ type ProcessStaleJobRecoveryQueue interface {
 	RecoverStaleJob(context.Context, string) (bool, error)
 }
 
+// ProcessBookConflictQueue reports which books already hold a queue slot
+// without mutating the queue. Batch callers use it to dispatch the remaining
+// books instead of dropping the whole batch when one book is already queued.
+type ProcessBookConflictQueue interface {
+	ConflictingBookIDs(context.Context, ProcessJob) (map[string]string, error)
+}
+
 type MemoryQueue struct {
 	mu        sync.Mutex
 	pending   chan ProcessJob
