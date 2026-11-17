@@ -67,8 +67,9 @@ type StoryboardService struct {
 }
 
 type episodeInput struct {
-	No      int
-	Content string
+	No              int
+	Content         string
+	OriginalContent string `json:"original_content,omitempty"`
 }
 
 // Generate 按章节内场次调用并分别保存原回包；失败续跑复用已完成场次。
@@ -155,6 +156,11 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 	if len(episodes) == 0 {
 		return StoryboardResult{}, ErrEmptyContent
 	}
+	if selected.SourceID > 0 {
+		for i := range episodes {
+			episodes[i].OriginalContent = storyboardReferenceOriginal(req, authoring, episodes[i])
+		}
+	}
 	// Check the whole selection before reserving or generating any episode.
 	// A heading and the document preamble are not episode body text.
 	for _, episode := range episodes {
@@ -216,6 +222,9 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 		external = generationExternalHistory(currentBoards, numbers)
 	}
 	base := map[string]any{"owner": req.Owner, "project": req.ProjectID, "engine": engine, "model": firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), "prompt_id": selected.ID, "prompt_digest": contentDigest(selected.Body), "config": EffectiveCreativeConfig(project), "prefix": prefix, "episodes": episodes, "planning": planningByEpisode, "style": style, "synopsis": synopsis, "chapter_id": req.ChapterID, "planning_chapter_id": req.PlanningChapterID, "use_original": req.UseOriginalContentDirectly, "use_planning": req.UsePlanning, "external_history": external, "scene_contract": "chapter-scenes-v1"}
+	if selected.SourceID > 0 {
+		base["scene_contract"] = "zip-chapter-scene-message-v1"
+	}
 	var replay *StoryboardGenerationAttempt
 	base["scene_counts"] = sceneCounts
 	base["scene_inputs"] = sceneInputs

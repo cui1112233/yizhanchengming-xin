@@ -20,6 +20,9 @@ func TestScreenplayZIP164SavedSelectionGeneratesListsAndExports(t *testing.T) {
 	calls := 0
 	provider := screenplayProviderFunc(func(_ context.Context, in batchfactoryv11.TextCompletionRequest) (string, error) {
 		calls++
+		if !strings.HasPrefix(in.UserPrompt, "【章节原文】\n# 第1集\n当前剧本164\n\n【当前剧本场景JSON（仅1个场景）】\n") || !strings.Contains(in.UserPrompt, "【处理要求】") {
+			t.Fatal("ZIP scene message missing at provider boundary", in.UserPrompt)
+		}
 		if !strings.Contains(in.SystemPrompt, "当前剧本164") || strings.Contains(in.SystemPrompt, "{{剧本内容}}") {
 			t.Fatal("unrendered system prompt")
 		}

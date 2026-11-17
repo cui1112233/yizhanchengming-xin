@@ -1,0 +1,26 @@
+[
+  {
+    "evidence": "storyboard-matrix-v1.json results.valid.trace.model_request",
+    "original": "OWN_ORIGINAL",
+    "scene": {
+      "scene_number": "1-1",
+      "scene_name": "OWN_ROOM",
+      "content": "Alice enters."
+    },
+    "expected_user": "【章节原文】\nOWN_ORIGINAL\n\n【当前剧本场景JSON（仅1个场景）】\n{\n  \"scene_number\": \"1-1\",\n  \"scene_name\": \"OWN_ROOM\",\n  \"content\": \"Alice enters.\"\n}\n\n【处理要求】\n请根据以上原文和当前剧本场景内容，为这个场景生成完整的分镜JSON。"
+  },
+  {
+    "evidence": "storyboard-matrix-v2.json results.source-map.trace.model_request",
+    "original": "OWN_ORIGINAL",
+    "scene": {
+      "scene_number": "1-1",
+      "scene_name": "OWN_ROOM",
+      "content": "Alice enters.",
+      "_source_scene_index": 7,
+      "_source_scene_number": "OWN_7",
+      "_source_scene_name": "OWN_MAPPED",
+      "_internal": "OWN_KEEP_OR_DROP"
+    },
+    "expected_user": "【章节原文】\nOWN_ORIGINAL\n\n【当前剧本场景JSON（仅1个场景）】\n{\n  \"scene_number\": \"1-1\",\n  \"scene_name\": \"OWN_ROOM\",\n  \"content\": \"Alice enters.\"\n}\n\n【处理要求】\n请根据以上原文和当前剧本场景内容，为这个场景生成完整的分镜JSON。"
+  }
+]

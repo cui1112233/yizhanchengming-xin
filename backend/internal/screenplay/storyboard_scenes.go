@@ -101,6 +101,13 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 			vars["NEXT_SCENE_CONTENT"] = units[index+1].Content
 		}
 		user := unit.Content
+		if selected.SourceID > 0 {
+			var err error
+			user, err = prompt.StoryboardSceneUserMessage(episode.OriginalContent, unit.Content)
+			if err != nil {
+				return all, fmt.Errorf("第%d集第%d场消息构建失败：%w", episode.No, index+1, err)
+			}
+		}
 		if planning != "" {
 			user += "\n\n【本次分镜规划】\n" + planning
 		}
