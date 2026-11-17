@@ -2,6 +2,8 @@
 
 补证说明：本报告保留只读审计时的U编号；并行完成的`2026-11-17-novel-original-agent-correction.md`随后静态解出了17项路由和5个桥接名。其中U1的普通发送/动作确认已分别确定为`novels_send_message`/`novels_confirm_action`，内容继续为`novels_confirm_pipeline_checkpoint`。此补证不代表U2–U5或原生算法已恢复，也不把原路由表推断成实际调用次数。
 
+第二次补证：U6中的`Tln/qln`已从同哈希原包完整静态解码，精确UTF16/UTF8范围、公式、六正则和八维定义见`docs/reverse-engineering/2026-11-17-luoshui-novel-style-statistics.md`。下文U6“尚未定位helper”的表述为审计当时状态，现已被该证据更新；当前Go旧统计仍不等价，尚未据此实施替换。原生后写/AI味/长度归一化算法仍未知。
+
 日期：2026-11-17。结论：**当前通用聊天工作台不等于洛水当前版；仅保留六个名称和三栏宽度，不能宣称一比一。当前 UI 按用户反馈判定不通过，整体验收 HOLD。** 直接差异见下表的入口、表单、DTO和结果文件合同；本次不提出替代布局，也不修改产品代码。
 
 ## 证据边界与引用方法

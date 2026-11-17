@@ -33,6 +33,17 @@ C5a实施及审查完成：28fb3d38、修复2c59fe39；完整历史39/39，导�
 
 **C1a下一实施任务：正式章节导入API闭环**。依据原`NovelImportPage.readable.js:196–217,438–468`，详见SDD `task-C1-contract-mapping.md`。输入`bookId?、title?、chapters[{title,content,wordCount?}]、knowledgeBookIds[]、idempotencyKey`；已有作品不强制新书名，新作品名必填；仅导入正式章节，绝不创建模型run或后台分析。
 
+C1a已实施9f948ce7，独立规格/质量审查通过；独立实库验证持久重读、并发、回滚及全作品清理。运行环境未更新。
+
+**C1b后续任务：续写创作原专用导入窗接实接口**。只恢复这一已闭合入口，其他模式不擅自改成假表单。
+
+- [ ] 原版顺序：导入到书籍（可空则新建）→仅新建时书名→章节正文→多选文风→导入/取消；标题与按钮原文依据`NovelImportPage.readable.js:698–707,752–790`核对。点击续写入口打开该窗，不再以previousText立即生成冒充导入。
+- [ ] 独立实现原H拆章合同（恢复片段196–217）：标题与正文分离、保留源序、无标题兜底第1章，JS去空白UTF16计数；空正文校验。将数组提交C1a接口，选中文风ID不丢失。纯本地拆章测试独立预期，不直接执行原恢复代码。
+- [ ] 补齐所需的只读API：账号文风列表与指定作品已存章节列表，沿用账号校验；不造假选项、不取前端硬编码书名。新增Go服务/store最小读取及HTTP跨账号测试，无新迁移或模型调用。
+- [ ] 保存固定导入编号和冻结输入；丢回包仅恢复相同编号，禁止普通双击重复、输入被覆盖或换账号串结果。失败留窗留正文；成功提示“章节已导入”、刷新/选择返回真实book并显示服务器正式章节。不得自动建生成会话或发送模型请求来刷新右栏。
+- [ ] 改动范围：新`ContinuationImportDialog.jsx`及拆章辅助与测试、`NovelCreationPage.jsx/.css`必要接线；API封装、Go只读接口相关最小文件。资料组件与其他模式不重构。新增浏览器用例实际点击入口、两种目标、多文风、错误/重放/账号切换、刷新后读回，保留原草稿与作用域保护。
+- [ ] 先红绿后一次相关回归/构建，独立审查通过才进入后续；不启动4001或部署日常库，不把本入口通过当六模式全部还原。
+
 文件范围：新增`backend/internal/novelcreation/chapter_import.go`、`chapter_import_store.go`及领域/实库测试，现有store/memory/content-management接口最小扩展；新增`backend/internal/httpapi/novel_creation_import_routes.go`及路由测试、原routes注册；storage新增唯一导入回执迁移及schema测试。不得顺带改六表nullable或账号Agent，也不得部署当前日常数据库。
 
 - [ ] 写领域与HTTP红测，覆盖已有/新书、跨账号、归档/活动任务拒绝、同key重放/改内容冲突、全部章及首版本、失败整批回滚、续写记忆dirty、重读导出，provider调用即失败。
