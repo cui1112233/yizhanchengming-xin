@@ -1,0 +1,438 @@
+/* 主题风格层（scheme × mode）
+   选择器固定为 html[data-scheme='<风格>'][data-theme='<深浅>']，比 global.css 里的
+   :root / [data-theme='light'] 高一级，因此只覆盖颜色变量，不动任何页面布局与 JSX。
+   色值来源：docs/design/2026-11-12-ui-direction-research.md 第 3 章、
+   docs/design/2026-11-12-theme-palette-spec.md 第 14.1 章、
+   docs/design/2026-11-12-ui-direction-preview.html。
+   文档未给分风格取值的角色（--text-disabled / 画布 / 滚动条 / 阴影 / 遮罩）保持 global.css 原值。 */
+
+/* ---------- A 珊瑚·暖墨 ---------- */
+html[data-scheme='coral'][data-theme='dark'] {
+  --surface-base: #12100E;
+  --surface-panel: #1A1714;
+  --surface-input: #161310;
+  --surface-elevated: #2A251F;
+  --surface-2: #221E1A;
+  --surface-hover: #2A251F;
+  --surface-active: #332C25;
+  --border-default: #4A4239;
+  --border-strong: #8A7C6A;
+  --text-primary: #F5F0E8;
+  --text-secondary: #D6CEC2;
+  --text-tertiary: #A79C8C;
+  --text-link: #9DB4FF;
+  --text-danger: #FF7B85;
+  --text-warning: #F0BE63;
+  --text-success: #7BE0A8;
+  --theme-primary: #F07167;
+  --theme-primary-hover: #F58A7D;
+  --theme-primary-active: #D95B52;
+  --text-on-accent: #2B0F0C;
+  --focus-ring: rgba(240, 113, 103, 0.55);
+  --status-success-bg: rgba(123, 224, 168, 0.14);
+  --status-success-border: rgba(123, 224, 168, 0.36);
+  --status-warning-bg: rgba(240, 190, 99, 0.16);
+  --status-warning-border: rgba(240, 190, 99, 0.38);
+  --status-danger-bg: rgba(255, 123, 133, 0.14);
+  --status-danger-border: rgba(255, 123, 133, 0.36);
+  --status-info-bg: rgba(157, 180, 255, 0.14);
+  --status-info-border: rgba(157, 180, 255, 0.36);
+  --legacy-accent-dim: rgba(240, 113, 103, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+html[data-scheme='coral'][data-theme='light'] {
+  --surface-base: #F6F4F1;
+  --surface-panel: #FFFFFF;
+  --surface-input: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --surface-2: #F1EEE9;
+  --surface-hover: #EAE5DE;
+  --surface-active: #E1DBD2;
+  --border-default: #D8D1C7;
+  --border-strong: #8C8478;
+  --text-primary: #1C1917;
+  --text-secondary: #44403C;
+  --text-tertiary: #6B645C;
+  --text-link: #2F5FA8;
+  --text-danger: #B32633;
+  --text-warning: #8A5300;
+  --text-success: #1F7A4D;
+  --theme-primary: #D95B52;
+  --theme-primary-hover: #F07167;
+  --theme-primary-active: #B8463F;
+  --text-on-accent: #2B0F0C;
+  --focus-ring: rgba(184, 70, 63, 0.55);
+  --status-success-bg: #E9F7EF;
+  --status-success-border: #B7DFC7;
+  --status-warning-bg: #FDF4E0;
+  --status-warning-border: #E8CE97;
+  --status-danger-bg: #FBE9EA;
+  --status-danger-border: #EFB9BD;
+  --status-info-bg: #EAF0FB;
+  --status-info-border: #BDD0EE;
+  --legacy-accent-dim: rgba(217, 91, 82, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+/* ---------- B 深海青 ---------- */
+html[data-scheme='ocean'][data-theme='dark'] {
+  --surface-base: #07110F;
+  --surface-panel: #0C1917;
+  --surface-input: #081412;
+  --surface-elevated: #182B27;
+  --surface-2: #12221F;
+  --surface-hover: #182B27;
+  --surface-active: #1F3631;
+  --border-default: #314641;
+  --border-strong: #5C7C76;
+  --text-primary: #EAF4F1;
+  --text-secondary: #C2D6D1;
+  --text-tertiary: #8FA9A3;
+  --text-link: #93C5FD;
+  --text-danger: #FB7185;
+  --text-warning: #FACC15;
+  --text-success: #4ADE80;
+  --theme-primary: #2DD4BF;
+  --theme-primary-hover: #5EEAD4;
+  --theme-primary-active: #14B8A6;
+  --text-on-accent: #06201D;
+  --focus-ring: rgba(45, 212, 191, 0.55);
+  --status-success-bg: rgba(74, 222, 128, 0.14);
+  --status-success-border: rgba(74, 222, 128, 0.36);
+  --status-warning-bg: rgba(250, 204, 21, 0.16);
+  --status-warning-border: rgba(250, 204, 21, 0.38);
+  --status-danger-bg: rgba(251, 113, 133, 0.14);
+  --status-danger-border: rgba(251, 113, 133, 0.36);
+  --status-info-bg: rgba(147, 197, 253, 0.14);
+  --status-info-border: rgba(147, 197, 253, 0.36);
+  --legacy-accent-dim: rgba(45, 212, 191, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+html[data-scheme='ocean'][data-theme='light'] {
+  --surface-base: #F3F7F6;
+  --surface-panel: #FFFFFF;
+  --surface-input: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --surface-2: #EDF4F2;
+  --surface-hover: #E3EEEC;
+  --surface-active: #D8E8E4;
+  --border-default: #CBDCD8;
+  --border-strong: #6F8F89;
+  --text-primary: #0F1F1C;
+  --text-secondary: #334C47;
+  --text-tertiary: #5A746F;
+  --text-link: #1D4ED8;
+  --text-danger: #B91C1C;
+  --text-warning: #8A5300;
+  --text-success: #15803D;
+  --theme-primary: #0F766E;
+  --theme-primary-hover: #0D9488;
+  --theme-primary-active: #115E59;
+  --text-on-accent: #FFFFFF;
+  --focus-ring: rgba(15, 118, 110, 0.55);
+  --status-success-bg: #E8F7EE;
+  --status-success-border: #B7DFC7;
+  --status-warning-bg: #FBF3DC;
+  --status-warning-border: #E8D08F;
+  --status-danger-bg: #FBE9EA;
+  --status-danger-border: #EFB9BD;
+  --status-info-bg: #E8F0FE;
+  --status-info-border: #B9CDF5;
+  --legacy-accent-dim: rgba(15, 118, 110, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+/* ---------- C 石墨·电蓝 ---------- */
+html[data-scheme='graphite'][data-theme='dark'] {
+  --surface-base: #08090A;
+  --surface-panel: #101113;
+  --surface-input: #0B0C0E;
+  --surface-elevated: #1D1F23;
+  --surface-2: #17181B;
+  --surface-hover: #1D1F23;
+  --surface-active: #24262B;
+  --border-default: #2E3036;
+  --border-strong: #6B6F78;
+  --text-primary: #F7F8F8;
+  --text-secondary: #B4BBC8;
+  --text-tertiary: #8A8F98;
+  --text-link: #67E8F9;
+  --text-danger: #FF7B85;
+  --text-warning: #F5C451;
+  --text-success: #5EE0A0;
+  --theme-primary: #6E93FF;
+  --theme-primary-hover: #93B4FF;
+  --theme-primary-active: #4F7BFF;
+  --text-on-accent: #05070F;
+  --focus-ring: rgba(110, 147, 255, 0.55);
+  --status-success-bg: rgba(94, 224, 160, 0.14);
+  --status-success-border: rgba(94, 224, 160, 0.36);
+  --status-warning-bg: rgba(245, 196, 81, 0.16);
+  --status-warning-border: rgba(245, 196, 81, 0.38);
+  --status-danger-bg: rgba(255, 123, 133, 0.14);
+  --status-danger-border: rgba(255, 123, 133, 0.36);
+  --status-info-bg: rgba(103, 232, 249, 0.14);
+  --status-info-border: rgba(103, 232, 249, 0.36);
+  --legacy-accent-dim: rgba(110, 147, 255, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+html[data-scheme='graphite'][data-theme='light'] {
+  --surface-base: #FAFAFA;
+  --surface-panel: #FFFFFF;
+  --surface-input: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --surface-2: #F4F4F5;
+  --surface-hover: #EDEDEF;
+  --surface-active: #E4E4E7;
+  --border-default: #E0E0E3;
+  --border-strong: #8A8A93;
+  --text-primary: #0A0A0B;
+  --text-secondary: #3F3F46;
+  --text-tertiary: #6B6B74;
+  --text-link: #0E7490;
+  --text-danger: #C42B34;
+  --text-warning: #8A5300;
+  --text-success: #16794C;
+  --theme-primary: #2F5BEA;
+  --theme-primary-hover: #4F7BFF;
+  --theme-primary-active: #2447C4;
+  --text-on-accent: #FFFFFF;
+  --focus-ring: rgba(47, 91, 234, 0.55);
+  --status-success-bg: #E8F6EE;
+  --status-success-border: #B7DFC7;
+  --status-warning-bg: #FBF3DB;
+  --status-warning-border: #E6CD8A;
+  --status-danger-bg: #FBE9EB;
+  --status-danger-border: #EFB9BD;
+  --status-info-bg: #E7F5F8;
+  --status-info-border: #B3DCE5;
+  --legacy-accent-dim: rgba(47, 91, 234, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+/* ---------- D 墨紫 ---------- */
+html[data-scheme='violet'][data-theme='dark'] {
+  --surface-base: #0B0912;
+  --surface-panel: #141020;
+  --surface-input: #100C19;
+  --surface-elevated: #241D36;
+  --surface-2: #1B162B;
+  --surface-hover: #241D36;
+  --surface-active: #2E2544;
+  --border-default: #3A3050;
+  --border-strong: #756890;
+  --text-primary: #F3EFFA;
+  --text-secondary: #CFC5E2;
+  --text-tertiary: #9C90B5;
+  --text-link: #A8B2FF;
+  --text-danger: #FF7B85;
+  --text-warning: #F5C268;
+  --text-success: #6FE3AC;
+  --theme-primary: #A78BFA;
+  --theme-primary-hover: #BCA4FF;
+  --theme-primary-active: #8B6CF0;
+  --text-on-accent: #160F26;
+  --focus-ring: rgba(167, 139, 250, 0.55);
+  --status-success-bg: rgba(111, 227, 172, 0.14);
+  --status-success-border: rgba(111, 227, 172, 0.36);
+  --status-warning-bg: rgba(245, 194, 104, 0.16);
+  --status-warning-border: rgba(245, 194, 104, 0.38);
+  --status-danger-bg: rgba(255, 123, 133, 0.14);
+  --status-danger-border: rgba(255, 123, 133, 0.36);
+  --status-info-bg: rgba(168, 178, 255, 0.14);
+  --status-info-border: rgba(168, 178, 255, 0.36);
+  --legacy-accent-dim: rgba(167, 139, 250, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+html[data-scheme='violet'][data-theme='light'] {
+  --surface-base: #F8F6FB;
+  --surface-panel: #FFFFFF;
+  --surface-input: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --surface-2: #F2EEF8;
+  --surface-hover: #EAE4F4;
+  --surface-active: #E0D8EF;
+  --border-default: #DAD2E6;
+  --border-strong: #8B7FA0;
+  --text-primary: #1B1626;
+  --text-secondary: #453A5A;
+  --text-tertiary: #6B5F80;
+  --text-link: #3F55C5;
+  --text-danger: #B32633;
+  --text-warning: #8A5300;
+  --text-success: #167245;
+  --theme-primary: #6D4AE0;
+  --theme-primary-hover: #8B6CF0;
+  --theme-primary-active: #5B3BC7;
+  --text-on-accent: #FFFFFF;
+  --focus-ring: rgba(109, 74, 224, 0.55);
+  --status-success-bg: #E9F6EE;
+  --status-success-border: #B7DFC7;
+  --status-warning-bg: #FBF3DC;
+  --status-warning-border: #E8D08F;
+  --status-danger-bg: #FBE9EA;
+  --status-danger-border: #EFB9BD;
+  --status-info-bg: #ECEFFE;
+  --status-info-border: #C3CBF6;
+  --legacy-accent-dim: rgba(109, 74, 224, 0.14);
+  --legacy-card-hover: var(--surface-hover);
+  --admin-panel-hover: var(--surface-hover);
+  --admin-active: var(--surface-active);
+  --admin-active-line: var(--theme-primary);
+  --tag-text: var(--text-secondary);
+  --tag-bg: var(--surface-2);
+  --tag-border: var(--border-strong);
+}
+
+html[data-scheme='glass'][data-theme='dark'] {
+  --surface-base: #10131D; --surface-panel: #1A2030; --surface-2: #222B3D; --surface-input: #141C2B; --surface-elevated: #242D40; --surface-hover: #2D3950; --surface-active: #35445E;
+  --text-primary: #FFFFFF; --text-secondary: #F5F7FB; --text-tertiary: #E4EAF3;
+  --theme-primary: #B7CCF3; --theme-primary-hover: #D6E3FC; --theme-primary-active: #92B1E5; --text-on-accent: #111D30;
+  --border-default: #45516B; --border-strong: #7C8DAB;
+}
+html[data-scheme='glass'][data-theme='light'] {
+  --surface-base: #EAF0F7; --surface-panel: #F6F9FD; --surface-2: #E2E9F3; --surface-input: #F6F9FD; --surface-elevated: #F6F9FD; --surface-hover: #DEE7F4; --surface-active: #CEDCF0;
+  --text-primary: #192B42; --text-secondary: #3B526F; --text-tertiary: #526781;
+  --theme-primary: #486B94; --theme-primary-hover: #597FA9; --theme-primary-active: #365471; --text-on-accent: #FFFFFF;
+  --border-default: #B4C2D5; --border-strong: #748BA6;
+}
+
+/* ---------- 主题选择器（风格缩略卡 + 深浅分段） ---------- */
+.theme-picker-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 272px;
+}
+
+.theme-picker-group-label {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.theme-scheme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.theme-scheme-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+  color: var(--text-primary);
+  text-align: left;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.theme-scheme-card:hover { border-color: var(--border-strong); }
+
+.theme-scheme-card.is-selected {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 20%, transparent);
+}
+
+.theme-scheme-swatch {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--swatch-surface) 55%, transparent);
+  border-radius: 7px;
+  background: var(--swatch-page);
+}
+
+.theme-scheme-swatch-surface {
+  height: 16px;
+  border-radius: 4px;
+  background: var(--swatch-surface);
+}
+
+.theme-scheme-swatch-lines {
+  display: grid;
+  gap: 3px;
+}
+
+.theme-scheme-swatch-lines i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.32;
+}
+
+.theme-scheme-swatch-accent {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--swatch-primary);
+}
+
+.theme-scheme-name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.theme-scheme-card.is-selected .theme-scheme-name { font-weight: 600; }
+
+.theme-picker-panel .theme-segmented { width: 100%; }
+
+/* 分段控件的轨道跟着风格走：浅色用略深的次级面，深色用页面底，选中格仍然更亮。 */
+html[data-scheme] .theme-segmented { background: var(--surface-2); }
+html[data-scheme][data-theme='dark'] .theme-segmented { background: var(--surface-base); }
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-scheme-card { transition: none; }
+}
