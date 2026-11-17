@@ -504,3 +504,19 @@ body:has(.novel-creation-page) .ant-modal.ant-zoom-leave{
 }
 
 .novel-import-style-options { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Recovered .import-modal-card dimensions and solid light/dark card surfaces. */
+.novel-continuation-import { --novel-continuation-surface: #faf9f7; }
+html[data-theme="dark"] .novel-continuation-import { --novel-continuation-surface: #1a1a1e; }
+html[data-scheme][data-theme] body:has(.novel-creation-page) .novel-continuation-import :is(.ant-modal-content,.ant-modal-header),
+body:has(.novel-creation-page) .novel-continuation-import :is(.ant-modal-content,.ant-modal-header) {
+  background: var(--novel-continuation-surface)!important;
+}
+body:has(.novel-creation-page) .novel-continuation-import .ant-modal-content {
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 48px #0000001f, 0 0 0 1px #0000000a;
+}
+html[data-theme="dark"] body:has(.novel-creation-page) .novel-continuation-import .ant-modal-content {
+  box-shadow: 0 24px 48px #00000073, 0 0 0 1px #ffffff0f;
+}

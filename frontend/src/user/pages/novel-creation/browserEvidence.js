@@ -7,7 +7,7 @@ import {spawn} from 'node:child_process';
 
 // Attach while blank, then navigate. Loading a large React page before attachment
 // can starve the first inspection and turn a passing UI into a harness timeout.
-export async function runNovelBrowserDOM(browser,html,dir){
+export async function runNovelBrowserDOM(browser,html,dir,viewport={width:1440,height:900}){
  const child=spawn(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--host-resolver-rules=MAP * ~NOTFOUND','--remote-debugging-port=0','--user-data-dir='+path.join(dir,'profile'),'about:blank'],{windowsHide:true,stdio:'ignore'});
  const protocol=[];let socket;const pending=new Map();let id=0;
  try{
@@ -18,7 +18,7 @@ export async function runNovelBrowserDOM(browser,html,dir){
   assert.ok(page,'test page unavailable');socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
   socket.addEventListener('message',event=>{const data=JSON.parse(event.data);protocol.push({received:data.id,method:data.method,error:data.error,exception:data.params?.exceptionDetails?.text,description:data.params?.exceptionDetails?.exception?.description,args:data.method==='Runtime.consoleAPICalled'?data.params?.args?.map(x=>x.value).slice(0,2):undefined});if(data.id&&pending.has(data.id)){const entry=pending.get(data.id);pending.delete(data.id);clearTimeout(entry.timer);data.error?entry.reject(Error(data.error.message)):entry.resolve(data.result);}});
   const send=(method,params={})=>new Promise((resolve,reject)=>{const key=++id;const timer=setTimeout(()=>{pending.delete(key);reject(Error('test page inspection timed out'));},50000);pending.set(key,{resolve,reject,timer});protocol.push({sent:key,method,expression:params.expression?.slice(0,100)});socket.send(JSON.stringify({id:key,method,params}));});
-  await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:pathToFileURL(html).href});let state='';const deadline=Date.now()+90000;
+  await send('Page.enable');await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:pathToFileURL(html).href});let state='';const deadline=Date.now()+90000;
   while(Date.now()<deadline){const result=await send('Runtime.evaluate',{expression:'document.body?.dataset.result || ""',returnByValue:true});state=result.result?.value||'';if(state)break;await new Promise(r=>setTimeout(r,100));}
   const snapshot=await send('Runtime.evaluate',{expression:'window.__codexDOMSnapshot=document.documentElement.outerHTML;window.__codexDOMSnapshot.length',returnByValue:true});let output='';const size=snapshot.result?.value||0;for(let offset=0;offset<size;offset+=8192){const part=await send('Runtime.evaluate',{expression:'window.__codexDOMSnapshot.slice('+offset+','+(offset+8192)+')',returnByValue:true});output+=part.result?.value||'';}writeFileSync(path.join(dir,'result.html'),output);
   const detail=await send('Runtime.evaluate',{expression:'(document.body?.dataset.error || "browser did not finish").slice(0,4000)',returnByValue:true});

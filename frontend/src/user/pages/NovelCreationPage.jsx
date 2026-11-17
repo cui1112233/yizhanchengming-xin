@@ -27,6 +27,7 @@ export default function NovelCreationPage() {
   const [projects, setProjects] = useState([]), [retention, setRetention] = useState({}), [models, setModels] = useState([]);
   const [projectId, setProjectId] = useState(''), [activeMode, setActiveMode] = useState(() => localStorage.getItem('novel:mode:' + getCurrentUsername()) || 'long_original');
   const [sessions, setSessions] = useState([]), [sessionId, setSessionId] = useState(''), [snapshot, setSnapshot] = useState(null);
+  const [snapshotRead, setSnapshotRead] = useState(null);
   const [loading, setLoading] = useState(true), [connection, setConnection] = useState(''), [tool, setTool] = useState('');
   const [importOpen, setImportOpen] = useState(false), [memoOpen, setMemoOpen] = useState(false);
   const [continuationOpen, setContinuationOpen] = useState(false), [projectChapters, setProjectChapters] = useState(null), [sessionsLoadedKey, setSessionsLoadedKey] = useState('');
@@ -40,10 +41,15 @@ export default function NovelCreationPage() {
   const ownerScope = useWorkspaceScope(owner), listScope = useWorkspaceScope(`${owner}:${projectId}:${activeMode}`);
   const scopeKey = `${owner}:${projectId}:${sessionId}:${activeMode}`, scope = useWorkspaceScope(scopeKey);
   const projectReadKey = `${owner}:${projectId}`, projectReadScope = useWorkspaceScope(projectReadKey);
+  const chapterRevisions = useRef(new Map()), currentView = useRef();
+  currentView.current = { owner, projectId, scopeKey };
+  const chapterRevision = chapterRevisions.current.get(projectReadKey) || 0;
   const key = draftKey(owner, projectId, sessionId, activeMode), project = projects.find(p => p.id === projectId);
   const defaultDraft = { content: '', modeInputs: {}, knowledgeIds: [], noteIds: [], styleProfileId: '', modelId: project?.modelId || models[0]?.value || '', thinkingLevel: 'standard' };
   const draft = draftState?.key === key ? draftState.value : { ...defaultDraft, ...readSaved(key) };
-  const run = validRun(snapshot?.run), chapters = sessionId ? snapshot?.chapters || [] : projectChapters?.key === projectReadKey ? projectChapters.chapters : [], currentSession = sessions.find(s => s.id === sessionId);
+  const chapterRead = sessionId ? snapshotRead : projectChapters;
+  const chaptersReady = chapterRead?.key === (sessionId ? scopeKey : projectReadKey) && chapterRead.revision === chapterRevision && chapterRead.status === 'ready';
+  const run = validRun(snapshot?.run), chapters = chaptersReady ? (sessionId ? snapshot?.chapters || [] : projectChapters.chapters) : [], currentSession = sessions.find(s => s.id === sessionId);
   const archived = !!currentSession?.archivedAt || project?.status === 'archived' || project?.status === 'purging' || !!retention[`novel_creation:${projectId}`]?.archivedAt;
   const active = !!run && !TERMINAL.has(run.status), sending = sendKey === key;
   const intent = readSaved(key + ':intent', null);
@@ -51,6 +57,17 @@ export default function NovelCreationPage() {
   function changeDraft(patch) { const next = { ...draft, ...readSaved(key), ...patch }; localStorage.setItem(key, JSON.stringify(next)); setDraftState({ key, value: next }); }
   function clearDraftAt(target) { localStorage.removeItem(target); if (target === key) setDraftState({ key, value: { ...defaultDraft, content: '' } }); }
   function error(e) { if (scope.isCurrent() && !e?.aborted) message.error(e.message || '操作未完成，请稍后重试'); }
+  function recordImportedBook(result) {
+    if (!ownerScope.isCurrent()) return;
+    const importedKey = `${owner}:${result.book.id}`, revision = (chapterRevisions.current.get(importedKey) || 0) + 1;
+    chapterRevisions.current.set(importedKey, revision);
+    setProjects(old => [result.book, ...old.filter(p => p.id !== result.book.id)]);
+    setProjectChapters(old => old?.key === importedKey ? { key: importedKey, revision, status: 'loading', chapters: [] } : old);
+    const current = currentView.current;
+    if (current.owner === owner && current.projectId === result.book.id) {
+      setSnapshot(null); setSnapshotRead({ key: current.scopeKey, revision, status: 'loading' }); setRefresh(v => v + 1);
+    }
+  }
   const request = (path, input, options = {}) => novelProjectRequest(projectId, path, input, { signal: scope.signal, ...options });
   const modeName = MODES.find(([id]) => id === activeMode)?.[1] || '创作';
 
@@ -90,17 +107,21 @@ export default function NovelCreationPage() {
     // Session snapshots already contain chapters. Only sessionless books need this read.
     if (!projectId || sessionId || sessionsLoadedKey !== `${owner}:${projectId}:${activeMode}`) return;
     let disposed = false;
+    const revision = chapterRevisions.current.get(projectReadKey) || 0;
+    setProjectChapters({ key: projectReadKey, revision, status: 'loading', chapters: [] });
     projectReadScope.call(getNovelCreationProjectChapters(projectId, projectReadScope.signal), result => {
-      if (!disposed) setProjectChapters({ key: projectReadKey, chapters: result.chapters || [] });
-    }).catch(e => { if (!disposed && projectReadScope.isCurrent()) message.error(e.message || '章节暂时无法读取'); });
+      if (!disposed && revision === (chapterRevisions.current.get(projectReadKey) || 0)) { setProjectChapters({ key: projectReadKey, revision, status: 'ready', chapters: result.chapters || [] }); setConnection('已连接'); }
+    }).catch(e => { if (!disposed && projectReadScope.isCurrent() && revision === (chapterRevisions.current.get(projectReadKey) || 0)) { setProjectChapters({ key: projectReadKey, revision, status: 'error', chapters: [] }); setConnection('正式章节暂时无法读回，保留草稿；点击重新连接'); message.error(e.message || '章节暂时无法读取'); } });
     return () => { disposed = true; };
   }, [projectReadKey, sessionId, sessionsLoadedKey, refresh]);
   useEffect(() => {
     const sequence = ++snapshotSequence.current;
     setSnapshot(null); setConnection(''); setBlueprint(null); setManage(null); setActionBusy(false);
-    if (!sessionId) return;
+    if (!sessionId) { setSnapshotRead(null); return; }
+    const revision = chapterRevisions.current.get(projectReadKey) || 0;
+    setSnapshotRead({ key: scopeKey, revision, status: 'loading' });
     localStorage.setItem(`novel:session:${owner}:${projectId}:${activeMode}`, sessionId);
-    scope.call(getNovelCreationSessionSnapshot(sessionId, scope.signal), r => { if (sequence === snapshotSequence.current) { setSnapshot(r); setConnection('已连接'); } }).catch(() => { if (scope.isCurrent() && sequence === snapshotSequence.current) setConnection('暂时无法连接，保留草稿；点击重新连接'); });
+    scope.call(getNovelCreationSessionSnapshot(sessionId, scope.signal), r => { if (sequence === snapshotSequence.current && revision === (chapterRevisions.current.get(projectReadKey) || 0)) { setSnapshot(r); setSnapshotRead({ key: scopeKey, revision, status: 'ready' }); setConnection('已连接'); } }).catch(() => { if (scope.isCurrent() && sequence === snapshotSequence.current && revision === (chapterRevisions.current.get(projectReadKey) || 0)) { setSnapshotRead({ key: scopeKey, revision, status: 'error' }); setConnection('暂时无法连接，保留草稿；点击重新连接'); } });
   }, [scopeKey, refresh]);
   useEffect(() => {
     if (!run?.id || TERMINAL.has(run.status) || ['awaiting_confirmation', 'paused'].includes(run.status)) return;
@@ -160,6 +181,7 @@ export default function NovelCreationPage() {
     if (!prior) {
       if (active) return;
       if (activeMode === 'continuation') {
+        if (!chaptersReady) { message.warning('正式章节尚未读回，请稍后重试或重新连接'); return; }
         const lastChapter = chapters.reduce((last, chapter) => !last || chapter.number > last.number ? chapter : last, null);
         if (!lastChapter?.content?.trim()) { message.warning('请先导入正式章节'); return; }
         sendDraft.modeInputs.previousText = lastChapter.content;
@@ -276,10 +298,9 @@ export default function NovelCreationPage() {
         ]} />
       </aside></>}</>}
     </main>
-    <ContinuationImportDialog key={owner} owner={owner} open={continuationOpen} projects={projects} onCancel={() => setContinuationOpen(false)} onImported={result => {
+    <ContinuationImportDialog key={owner} owner={owner} open={continuationOpen} viewKey={scopeKey + ':' + tool} projects={projects} onCancel={() => setContinuationOpen(false)} onPersisted={recordImportedBook} onImported={result => {
       if (!ownerScope.isCurrent()) return;
-      setProjects(old => [result.book, ...old.filter(p => p.id !== result.book.id)]);
-      setProjectId(result.book.id); setTool(''); setContinuationOpen(false); setRefresh(v => v + 1);
+      setProjectId(result.book.id); setTool(''); setContinuationOpen(false);
     }} />
     <Modal rootClassName="novel-modal" open={projectModal} title="新建小说作品" okText="创建作品" cancelText="取消" onCancel={() => setProjectModal(false)} onOk={() => projectForm.submit()} destroyOnHidden>
       <Form form={projectForm} layout="vertical" onFinish={createProject} initialValues={{ genre: '都市', modelId: models[0]?.value, targetChapterWords: 2000 }}><Form.Item name="title" label="作品名称" rules={[{ required: true, whitespace: true, message: '请输入作品名称' }]}><Input /></Form.Item><Form.Item name="genre" label="题材" rules={[{ required: true, whitespace: true, message: '请输入题材' }]}><Input /></Form.Item><Form.Item name="modelId" label="文本模型" rules={[{ required: true, message: '请选择文本模型' }]}><Select options={models} /></Form.Item><Form.Item name="targetChapterWords" label="每章目标字数"><InputNumber min={800} max={10000} /></Form.Item>{[['world', '世界设定'], ['protagonist', '主角设定'], ['coreConflict', '核心冲突']].map(([name, label]) => <Form.Item key={name} name={name} label={label}><Input.TextArea rows={2} /></Form.Item>)}</Form>

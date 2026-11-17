@@ -6,7 +6,7 @@ import { splitContinuationChapters } from './continuationImport.js';
 import useWorkspaceScope from './useWorkspaceScope.js';
 
 const emptyDraft = { bookId: '', title: '', content: '', knowledgeBookIds: [] };
-export default function ContinuationImportDialog({ owner, open, projects, onCancel, onImported }) {
+export default function ContinuationImportDialog({ owner, open, viewKey, projects, onCancel, onPersisted, onImported }) {
   const storageKey = 'novel:continuation-import:' + owner;
   const scope = useWorkspaceScope(owner);
   const [intent, setIntent] = useState(() => readSaved(storageKey + ':intent', null));
@@ -14,7 +14,10 @@ export default function ContinuationImportDialog({ owner, open, projects, onCanc
   const [styles, setStyles] = useState([]), [stylesLoading, setStylesLoading] = useState(false), [styleError, setStyleError] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const flight = useRef(false), styleSequence = useRef(0);
+  const view = useRef();
+  if (!view.current || view.current.open !== open || view.current.key !== viewKey) view.current = { open, key: viewKey };
   const frozen = !!intent || busy;
+  function cancel() { view.current = { open: false, key: viewKey }; onCancel(); }
   async function loadStyles() {
     const sequence = ++styleSequence.current;
     setStylesLoading(true); setStyleError('');
@@ -44,14 +47,18 @@ export default function ContinuationImportDialog({ owner, open, projects, onCanc
       setIntent(pending);
     }
     flight.current = true; setBusy(true); setError('');
+    const submittedView = view.current;
     try {
       const result = await scope.call(importNovelCreationChapters(pending.payload, scope.signal));
       if (!result || !scope.isCurrent()) return;
+      // Saving remains real after closing the form. Update facts without taking over newer navigation.
+      onPersisted(result); message.success('章节已导入');
+      if (view.current !== submittedView || !view.current.open) return;
       localStorage.removeItem(storageKey + ':intent'); localStorage.removeItem(storageKey + ':draft');
       setIntent(null); setDraft({ ...emptyDraft });
-      onImported(result); message.success('章节已导入');
+      onImported(result);
     } catch (e) {
-      if (!scope.isCurrent()) return;
+      if (!scope.isCurrent() || view.current !== submittedView || !view.current.open) return;
       // Only definite rejection unlocks editing. Unknown results keep the original key/input.
       if (e.status >= 400 && e.status < 500 && ![408, 409, 429].includes(e.status)) {
         localStorage.removeItem(storageKey + ':intent'); setIntent(null);
@@ -59,7 +66,7 @@ export default function ContinuationImportDialog({ owner, open, projects, onCanc
       setError(e.message || '导入暂未完成，请稍后恢复原导入');
     } finally { flight.current = false; if (scope.isCurrent()) setBusy(false); }
   }
-  return <Modal rootClassName="novel-modal novel-continuation-import" open={open} title="续写创作" width={720} onCancel={onCancel} footer={<><Button onClick={onCancel}>取消</Button><Button type="primary" loading={busy} onClick={submit}>{intent && !busy ? '恢复原导入' : '导入章节'}</Button></>}>
+  return <Modal rootClassName="novel-modal novel-continuation-import" open={open} title="续写创作" width="min(640px, calc(100vw - 32px))" onCancel={cancel} footer={<><Button onClick={cancel}>取消</Button><Button type="primary" loading={busy} onClick={submit}>{intent && !busy ? '恢复原导入' : '导入章节'}</Button></>}>
     <p>导入已有章节，接续创作后续内容</p>
     <Form layout="vertical">
       <Form.Item label="导入到书籍（可选，不选则新建）"><Select aria-label="导入到书籍（可选，不选则新建）" allowClear disabled={frozen} value={draft.bookId || undefined} placeholder="选择已有书籍或留空新建" options={projects.filter(p => !['archived', 'purging'].includes(p.status)).map(p => ({ value: p.id, label: p.title || p.id }))} onChange={bookId => change({ bookId: bookId || '' })} /></Form.Item>
