@@ -502,3 +502,5 @@ body:has(.novel-creation-page) .ant-modal.ant-zoom-leave{
   display: none!important;
   pointer-events: none
 }
+
+.novel-import-style-options { display: flex; flex-wrap: wrap; gap: 12px; }

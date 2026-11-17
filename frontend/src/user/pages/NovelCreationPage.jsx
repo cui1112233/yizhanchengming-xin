@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { getCurrentAccount, getCurrentUsername } from '../../shared/api/auth.js';
 import { canManageModelCatalog, getConfig } from '../../shared/api/config.js';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog.js';
-import { getNovelCreationSessionSnapshot, getNovelCreationRun, novelProjectRequest, novelRequest } from '../../shared/api/novelCreation.js';
+import { getNovelCreationSessionSnapshot, getNovelCreationRun, getNovelCreationProjectChapters, novelProjectRequest, novelRequest } from '../../shared/api/novelCreation.js';
 import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention.js';
 import AgentPanel from './novel-creation/AgentPanel.jsx';
 import AutomationPanel from './novel-creation/AutomationPanel.jsx';
@@ -14,6 +14,7 @@ import NotesPanel from './novel-creation/NotesPanel.jsx';
 import ChaptersPanel from './novel-creation/ChaptersPanel.jsx';
 import RunCard from './novel-creation/RunCard.jsx';
 import BlueprintEditor from './novel-creation/BlueprintEditor.jsx';
+import ContinuationImportDialog from './novel-creation/ContinuationImportDialog.jsx';
 import useWorkspaceScope from './novel-creation/useWorkspaceScope.js';
 import { MODE_FIELDS, MODES, STATUS, TERMINAL, THINKING, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved, validRun } from './novel-creation/contracts.js';
 import './NovelCreationPage.css';
@@ -28,6 +29,7 @@ export default function NovelCreationPage() {
   const [sessions, setSessions] = useState([]), [sessionId, setSessionId] = useState(''), [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true), [connection, setConnection] = useState(''), [tool, setTool] = useState('');
   const [importOpen, setImportOpen] = useState(false), [memoOpen, setMemoOpen] = useState(false);
+  const [continuationOpen, setContinuationOpen] = useState(false), [projectChapters, setProjectChapters] = useState(null), [sessionsLoadedKey, setSessionsLoadedKey] = useState('');
   const memoPopup = useRef(null);
   const [projectModal, setProjectModal] = useState(false), [manage, setManage] = useState(null), [archiveOpen, setArchiveOpen] = useState(false);
   const [blueprint, setBlueprint] = useState(null), [batchOpen, setBatchOpen] = useState(false), [dashboard, setDashboard] = useState(null);
@@ -37,10 +39,11 @@ export default function NovelCreationPage() {
   const flight = useRef(null), resize = useRef(false), composition = useRef(false), listSequence = useRef(0), snapshotSequence = useRef(0);
   const ownerScope = useWorkspaceScope(owner), listScope = useWorkspaceScope(`${owner}:${projectId}:${activeMode}`);
   const scopeKey = `${owner}:${projectId}:${sessionId}:${activeMode}`, scope = useWorkspaceScope(scopeKey);
+  const projectReadKey = `${owner}:${projectId}`, projectReadScope = useWorkspaceScope(projectReadKey);
   const key = draftKey(owner, projectId, sessionId, activeMode), project = projects.find(p => p.id === projectId);
   const defaultDraft = { content: '', modeInputs: {}, knowledgeIds: [], noteIds: [], styleProfileId: '', modelId: project?.modelId || models[0]?.value || '', thinkingLevel: 'standard' };
   const draft = draftState?.key === key ? draftState.value : { ...defaultDraft, ...readSaved(key) };
-  const run = validRun(snapshot?.run), chapters = snapshot?.chapters || [], currentSession = sessions.find(s => s.id === sessionId);
+  const run = validRun(snapshot?.run), chapters = sessionId ? snapshot?.chapters || [] : projectChapters?.key === projectReadKey ? projectChapters.chapters : [], currentSession = sessions.find(s => s.id === sessionId);
   const archived = !!currentSession?.archivedAt || project?.status === 'archived' || project?.status === 'purging' || !!retention[`novel_creation:${projectId}`]?.archivedAt;
   const active = !!run && !TERMINAL.has(run.status), sending = sendKey === key;
   const intent = readSaved(key + ':intent', null);
@@ -57,7 +60,7 @@ export default function NovelCreationPage() {
     return () => { window.removeEventListener('storage', check); clearInterval(timer); };
   }, []);
   useEffect(() => {
-    setLoading(true); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false);
+    setLoading(true); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false); setContinuationOpen(false); setProjectChapters(null); setSessionsLoadedKey('');
     ownerScope.call(Promise.allSettled([novelRequest('/projects', undefined, { signal: ownerScope.signal }), listAvailableModels('text'), getProjectRetention(), getCurrentAccount(), getConfig()]), results => {
       if (results[0].status === 'fulfilled') { const items = results[0].value.projects || []; setProjects(items); const saved = localStorage.getItem('novel:project:' + owner); setProjectId(items.some(p => p.id === saved) ? saved : items[0]?.id || ''); }
       else message.error('作品列表暂时无法读取，请刷新重试');
@@ -69,6 +72,7 @@ export default function NovelCreationPage() {
   }, [owner]);
   useEffect(() => {
     const sequence = ++listSequence.current;
+    setSessionsLoadedKey('');
     setSessions([]); setSessionId(''); setSnapshot(null); setTool(''); setImportOpen(false); setMemoOpen(false); setBlueprint(null); setBatchOpen(false); setConnection(''); setReferences([]);
     localStorage.setItem('novel:mode:' + owner, activeMode);
     if (!projectId) return;
@@ -79,8 +83,18 @@ export default function NovelCreationPage() {
       const saved = localStorage.getItem(`novel:session:${owner}:${projectId}:${activeMode}`);
       const matching = items.filter(s => s.mode === activeMode && !s.archivedAt);
       setSessionId(matching.some(s => s.id === saved) ? saved : matching[0]?.id || '');
+      setSessionsLoadedKey(`${owner}:${projectId}:${activeMode}`);
     }).catch(e => { if (listScope.isCurrent()) message.error(e.message); });
   }, [owner, projectId, activeMode]);
+  useEffect(() => {
+    // Session snapshots already contain chapters. Only sessionless books need this read.
+    if (!projectId || sessionId || sessionsLoadedKey !== `${owner}:${projectId}:${activeMode}`) return;
+    let disposed = false;
+    projectReadScope.call(getNovelCreationProjectChapters(projectId, projectReadScope.signal), result => {
+      if (!disposed) setProjectChapters({ key: projectReadKey, chapters: result.chapters || [] });
+    }).catch(e => { if (!disposed && projectReadScope.isCurrent()) message.error(e.message || '章节暂时无法读取'); });
+    return () => { disposed = true; };
+  }, [projectReadKey, sessionId, sessionsLoadedKey, refresh]);
   useEffect(() => {
     const sequence = ++snapshotSequence.current;
     setSnapshot(null); setConnection(''); setBlueprint(null); setManage(null); setActionBusy(false);
@@ -139,15 +153,21 @@ export default function NovelCreationPage() {
   async function send(recover = false) {
     if (!scope.isCurrent()) return;
     if (flight.current === key || sending || archived) return;
-    if (!projectId) { setProjectModal(true); return; }
+    if (!projectId) { if (activeMode === 'continuation') message.warning('请先导入正式章节'); else setProjectModal(true); return; }
     const prior = readSaved(key + ':intent', null);
     if (prior && !recover) { message.info('上次提交尚未核对，请先恢复原提交'); return; }
+    const sendDraft = { ...draft, modeInputs: { ...draft.modeInputs } };
     if (!prior) {
       if (active) return;
+      if (activeMode === 'continuation') {
+        const lastChapter = chapters.reduce((last, chapter) => !last || chapter.number > last.number ? chapter : last, null);
+        if (!lastChapter?.content?.trim()) { message.warning('请先导入正式章节'); return; }
+        sendDraft.modeInputs.previousText = lastChapter.content;
+      }
       if (!draft.content.trim()) { message.warning('请输入创作要求'); return; }
       if (!availableModel(models, draft.modelId)) { message.warning('所选文本模型当前不可用，请重新选择'); return; }
       const field = MODE_FIELDS[activeMode];
-      if (field && !String(draft.modeInputs?.[field[0]] || '').trim() && !(activeMode.includes('imitation') && (draft.styleProfileId || draft.knowledgeIds?.length))) { message.warning(activeMode.includes('imitation') ? '请导入参考文本或选择文风' : '请填写' + field[1] + '或引用已保存内容'); return; }
+      if (field && !String(sendDraft.modeInputs?.[field[0]] || '').trim() && !(activeMode.includes('imitation') && (draft.styleProfileId || draft.knowledgeIds?.length))) { message.warning(activeMode.includes('imitation') ? '请导入参考文本或选择文风' : '请填写' + field[1] + '或引用已保存内容'); return; }
     }
     flight.current = key; setSendKey(key); let actualKey = key;
     try {
@@ -156,7 +176,7 @@ export default function NovelCreationPage() {
         const session = currentSession || (await scope.call(request('/sessions', { mode: activeMode, title: modeName + '会话', contextBudget: 120000 })))?.session;
         if (!session || !scope.isCurrent()) return;
         actualKey = draftKey(owner, projectId, session.id, activeMode);
-        submission = { sessionId: session.id, payload: { projectId, ...draft, content: draft.content.trim(), idempotencyKey: crypto.randomUUID() } };
+        submission = { sessionId: session.id, payload: { projectId, ...sendDraft, content: draft.content.trim(), idempotencyKey: crypto.randomUUID() } };
         localStorage.setItem(actualKey, JSON.stringify(draft)); localStorage.setItem(actualKey + ':intent', JSON.stringify(submission)); localStorage.setItem(key + ':intent', JSON.stringify(submission));
         if (!currentSession) setSessions(old => [session, ...old]);
       } else actualKey = draftKey(owner, projectId, submission.sessionId, activeMode);
@@ -212,7 +232,7 @@ export default function NovelCreationPage() {
     setTool(label); if (label === '数据看板' && projectId) { setDashboard(null); try { await scope.call(request('/dashboard'), r => setDashboard(r.dashboard)); } catch (e) { error(e); } }
   }
   const input = { ...draft, modeInputs: draft.modeInputs || {}, knowledgeIds: draft.knowledgeIds || [], noteIds: draft.noteIds || [], styleProfileId: draft.styleProfileId || '' };
-  const materialsProps = { projectId, selectedIds: draft.knowledgeIds || [], onSelect: knowledgeIds => changeDraft({ knowledgeIds }), onSelection: selection => { if (['continuation', 'fanfiction'].includes(activeMode)) changeDraft({ modeInputs: { ...draft.modeInputs, [MODE_FIELDS[activeMode][0]]: selection.content } }); }, onReferencesChanged: items => setReferences(old => [...new Map([...old, ...items].map(i => [i.id, i])).values()]), styleId: draft.styleProfileId, onStyle: styleProfileId => changeDraft({ styleProfileId }), onMaintenance: maintenance };
+  const materialsProps = { projectId, selectedIds: draft.knowledgeIds || [], onSelect: knowledgeIds => changeDraft({ knowledgeIds }), onSelection: selection => { if (activeMode === 'fanfiction') changeDraft({ modeInputs: { ...draft.modeInputs, [MODE_FIELDS[activeMode][0]]: selection.content } }); }, onReferencesChanged: items => setReferences(old => [...new Map([...old, ...items].map(i => [i.id, i])).values()]), styleId: draft.styleProfileId, onStyle: styleProfileId => changeDraft({ styleProfileId }), onMaintenance: maintenance };
   const archivedProjects = projects.filter(p => ['archived', 'purging'].includes(p.status) || retention[`novel_creation:${p.id}`]?.archivedAt);
   const visibleProjects = projects.filter(p => !archivedProjects.includes(p));
 
@@ -221,7 +241,7 @@ export default function NovelCreationPage() {
     <main className="novel-creation-workbench">
       <aside className="novel-creation-sidebar">
         <div className="novel-sidebar-content">
-        <h3>开始创作</h3><div className="novel-creation-mode-tabs">{MODES.map(([id, name]) => <button type="button" className={activeMode === id ? 'active' : ''} key={id} onClick={() => { setActiveMode(id); setTool(''); }}>{name}</button>)}</div>
+        <h3>开始创作</h3><div className="novel-creation-mode-tabs">{MODES.map(([id, name]) => <button type="button" className={activeMode === id ? 'active' : ''} key={id} onClick={() => { setActiveMode(id); setTool(''); if (id === 'continuation') setContinuationOpen(true); }}>{name}</button>)}</div>
         <div className="novel-sidebar-heading"><b>我的作品 {visibleProjects.length}</b><Button aria-label="新建作品" type="text" icon={<Plus size={16} />} onClick={() => setProjectModal(true)} /><Button aria-label="作品归档库" type="text" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)} /></div>
         <div className="novel-projects">{visibleProjects.map(p => <div key={p.id} className="novel-project"><button type="button" aria-label={`选择作品${p.title}`} className={projectId === p.id ? 'active' : ''} onClick={() => { setProjectId(p.id); setTool(''); }}>{p.title}</button>{projectId === p.id && <div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'project', action: 'rename', title: p.title })}>重命名作品</Button><Button size="small" onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>
         <div className="novel-session-heading">{modeName}会话</div><div className="novel-sessions">{sessions.filter(s => s.mode === activeMode).map(s => <div className="novel-session" key={s.id}><button type="button" disabled={!!s.archivedAt} className={sessionId === s.id ? 'active' : ''} onClick={() => { setSessionId(s.id); setTool(''); }}>{s.title}{s.archivedAt ? '（已归档）' : s.currentRunId ? ' · 有任务' : ''}</button><div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: 'rename', title: s.title })}>重命名会话</Button><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'archive' })}>{s.archivedAt ? '恢复会话' : '归档会话'}</Button></div></div>)}</div><Button onClick={() => createSession()} icon={<Plus size={14} />} disabled={archived}>新建会话</Button>
@@ -238,7 +258,7 @@ export default function NovelCreationPage() {
         </div>
         <div className="novel-creation-composer">
           {archived && <p role="status">此作品或会话已归档，恢复后才可以创作。</p>}
-          {MODE_FIELDS[activeMode] && <label>{MODE_FIELDS[activeMode][1]}<Input.TextArea aria-label={MODE_FIELDS[activeMode][1]} rows={2} value={draft.modeInputs?.[MODE_FIELDS[activeMode][0]] || ''} onChange={e => changeDraft({ modeInputs: { ...draft.modeInputs, [MODE_FIELDS[activeMode][0]]: e.target.value } })} placeholder={activeMode.includes('imitation') ? '参考文本与已保存文风可以二选一' : '也可在导入素材中选择正文或设定'} />{activeMode === 'continuation' && <Button size="small" disabled={!chapters.length} onClick={() => changeDraft({ modeInputs: { ...draft.modeInputs, previousText: [...chapters].sort((a, b) => a.number - b.number).at(-1)?.content || '' } })}>引用本作品最后一章</Button>}{activeMode === 'fanfiction' && <Button size="small" disabled={!project?.world && !project?.protagonist} onClick={() => changeDraft({ modeInputs: { ...draft.modeInputs, existingSetting: [project.world, project.protagonist, project.coreConflict].filter(Boolean).join('\n') } })}>使用本作品人物与世界设定</Button>}</label>}
+          {activeMode !== 'continuation' && MODE_FIELDS[activeMode] && <label>{MODE_FIELDS[activeMode][1]}<Input.TextArea aria-label={MODE_FIELDS[activeMode][1]} rows={2} value={draft.modeInputs?.[MODE_FIELDS[activeMode][0]] || ''} onChange={e => changeDraft({ modeInputs: { ...draft.modeInputs, [MODE_FIELDS[activeMode][0]]: e.target.value } })} placeholder={activeMode.includes('imitation') ? '参考文本与已保存文风可以二选一' : '也可在导入素材中选择正文或设定'} />{activeMode === 'fanfiction' && <Button size="small" disabled={!project?.world && !project?.protagonist} onClick={() => changeDraft({ modeInputs: { ...draft.modeInputs, existingSetting: [project.world, project.protagonist, project.coreConflict].filter(Boolean).join('\n') } })}>使用本作品人物与世界设定</Button>}</label>}
           <Input.TextArea aria-label="创作要求" value={draft.content} disabled={!!intent || sending} rows={3} placeholder="输入创作要求（Enter发送，Shift+Enter换行）" onChange={e => changeDraft({ content: e.target.value })} onCompositionStart={() => { composition.current = true; }} onCompositionEnd={() => { composition.current = false; }} onPressEnter={e => { if (!e.shiftKey && !composition.current && !e.nativeEvent?.isComposing && e.nativeEvent?.keyCode !== 229) { e.preventDefault(); send(); } }} />
           <div className="novel-reference-summary">参考资料 {draft.knowledgeIds?.length || 0} 份 · 备忘录 {draft.noteIds?.length || 0} 份 · {draft.styleProfileId ? '已选择文风' : '未选择文风'}</div>
           <div className="novel-creation-composer-controls"><Select aria-label="创作文本模型" value={draft.modelId || undefined} options={modelOptions(models, draft.modelId)} onChange={modelId => changeDraft({ modelId })} placeholder="选择授权模型" /><Select aria-label="创作思考强度" value={draft.thinkingLevel} options={THINKING} onChange={thinkingLevel => changeDraft({ thinkingLevel })} /><Button type="primary" icon={<Send size={14} />} loading={sending} disabled={archived || active || !!intent} onClick={() => send()}>开始创作</Button></div>
@@ -251,11 +271,16 @@ export default function NovelCreationPage() {
       {projectId && <><div className="novel-creation-resizer" role="separator" aria-label="调整资料栏宽度" onPointerDown={() => { resize.current = true; document.body.classList.add('novel-creation-resizing'); }} />
       <aside className="novel-creation-inspector"><div className="novel-current-reference"><h3>当前资料</h3><p>{project?.title} · {project?.genre}</p>{(draft.knowledgeIds || []).map(id => <small key={id}>{references.find(r => r.id === id)?.title || '已保存参考范围'}</small>)}</div>
         <Tabs defaultActiveKey="chapters" items={[
-          { key: 'chapters', label: `正文${chapters.length ? '（' + chapters.length + '）' : ''}`, children: projectId ? <ChaptersPanel key={scopeKey} projectId={projectId} sessionId={sessionId} chapters={chapters} run={run} canExportShort={snapshot?.canExportShort === true} onChapter={chapter => setSnapshot(old => ({ ...old, chapters: (old?.chapters || []).map(c => c.id === chapter.id ? chapter : c) }))} onMaintenance={maintenance} onBatch={() => setBatchOpen(true)} /> : <Empty description="选择作品后查看正文" /> },
+          { key: 'chapters', label: `正文${chapters.length ? '（' + chapters.length + '）' : ''}`, children: projectId ? <ChaptersPanel key={scopeKey} projectId={projectId} sessionId={sessionId} chapters={chapters} run={run} canExportShort={snapshot?.canExportShort === true} onChapter={chapter => sessionId ? setSnapshot(old => ({ ...old, chapters: (old?.chapters || []).map(c => c.id === chapter.id ? chapter : c) })) : setProjectChapters(old => old?.key === projectReadKey ? { ...old, chapters: old.chapters.map(c => c.id === chapter.id ? chapter : c) } : old)} onMaintenance={maintenance} onBatch={() => setBatchOpen(true)} /> : <Empty description="选择作品后查看正文" /> },
           ...(run ? [{ key: 'progress', label: '创作进度', children: <ol className="novel-timeline">{(snapshot.events || []).filter(e => e.type !== 'assistant.delta').map(e => <li key={e.eventId}><b>{STATUS[e.status] || '处理进度'}</b><p>{e.message}</p></li>)}</ol> }] : [])
         ]} />
       </aside></>}</>}
     </main>
+    <ContinuationImportDialog key={owner} owner={owner} open={continuationOpen} projects={projects} onCancel={() => setContinuationOpen(false)} onImported={result => {
+      if (!ownerScope.isCurrent()) return;
+      setProjects(old => [result.book, ...old.filter(p => p.id !== result.book.id)]);
+      setProjectId(result.book.id); setTool(''); setContinuationOpen(false); setRefresh(v => v + 1);
+    }} />
     <Modal rootClassName="novel-modal" open={projectModal} title="新建小说作品" okText="创建作品" cancelText="取消" onCancel={() => setProjectModal(false)} onOk={() => projectForm.submit()} destroyOnHidden>
       <Form form={projectForm} layout="vertical" onFinish={createProject} initialValues={{ genre: '都市', modelId: models[0]?.value, targetChapterWords: 2000 }}><Form.Item name="title" label="作品名称" rules={[{ required: true, whitespace: true, message: '请输入作品名称' }]}><Input /></Form.Item><Form.Item name="genre" label="题材" rules={[{ required: true, whitespace: true, message: '请输入题材' }]}><Input /></Form.Item><Form.Item name="modelId" label="文本模型" rules={[{ required: true, message: '请选择文本模型' }]}><Select options={models} /></Form.Item><Form.Item name="targetChapterWords" label="每章目标字数"><InputNumber min={800} max={10000} /></Form.Item>{[['world', '世界设定'], ['protagonist', '主角设定'], ['coreConflict', '核心冲突']].map(([name, label]) => <Form.Item key={name} name={name} label={label}><Input.TextArea rows={2} /></Form.Item>)}</Form>
     </Modal>

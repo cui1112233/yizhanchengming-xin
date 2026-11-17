@@ -23,6 +23,7 @@ type Store interface {
 	PutSlot(context.Context, string, string, ProjectSlot) error
 	ListDispatch(context.Context, int) ([]Execution, error)
 	GetStyleProfile(context.Context, string, string) (StyleProfile, error)
+	ListStyleProfiles(context.Context, string) ([]StyleProfileSummary, error)
 	SaveStyleProfile(context.Context, string, StyleProfile) (StyleProfile, error)
 	CreateProject(context.Context, string, CreateProjectInput) (Project, error)
 	GetProject(context.Context, string, string) (Project, error)

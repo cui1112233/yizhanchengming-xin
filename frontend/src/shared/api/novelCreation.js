@@ -13,6 +13,15 @@ export function novelProjectRequest(projectId, path = '', input, options) {
 export function getNovelCreationSessionSnapshot(sessionId, signal) {
   return novelRequest(`/sessions/${encodeURIComponent(sessionId)}/snapshot`, undefined, { signal });
 }
+export function listNovelCreationStyleProfiles(signal) {
+  return novelRequest('/style-profiles', undefined, { signal });
+}
+export function getNovelCreationProjectChapters(projectId, signal) {
+  return novelProjectRequest(projectId, '/chapters', undefined, { signal });
+}
+export function importNovelCreationChapters(input, signal) {
+  return novelRequest('/chapter-imports', input, { signal });
+}
 
 export function listNovelCreationModes() {
   return apiRequest('/api/novel-creation/modes');

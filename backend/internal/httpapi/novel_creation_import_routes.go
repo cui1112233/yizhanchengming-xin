@@ -9,6 +9,22 @@ import (
 )
 
 func registerNovelImportRoutes(handle func(string, func(http.ResponseWriter, *http.Request, string)), service *novelcreation.Service) {
+	handle("GET /api/novel-creation/style-profiles", func(w http.ResponseWriter, r *http.Request, owner string) {
+		styles, err := service.ListStyleProfiles(r.Context(), owner)
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"styles": styles})
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/chapters", func(w http.ResponseWriter, r *http.Request, owner string) {
+		chapters, err := service.ListProjectChapters(r.Context(), owner, r.PathValue("projectID"))
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"chapters": chapters})
+	})
 	handle("POST /api/novel-creation/chapter-imports", func(w http.ResponseWriter, r *http.Request, owner string) {
 		var in novelcreation.ImportChaptersInput
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, novelCreationJSONLimit))
