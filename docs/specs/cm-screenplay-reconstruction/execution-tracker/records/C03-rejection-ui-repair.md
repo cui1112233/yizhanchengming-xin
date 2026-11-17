@@ -21,3 +21,5 @@
 范围仍未完成：可用模型通道的真实成功回复、解析保存编辑链路及完整原版UI对齐。不能把这轮修复和受控测试算作真实生成成功。
 
 最终实页验收：c778175e在4001加载；模型页头实际显示[aistudio]gemini-3.8-flash且窄窗可见，分镜卡片2个场次；最终截图repaired-workspace.jpg。响应模块摘要与composition.json一致并确认no-store。旧unknown未迁移，真实模型0调用。
+
+身份补充：v2构建清单取HEAD期间共享目录已被其他工作提交为bfcbc84e，因此运行release标记为bfcbc84e，而实际源码仍是上述f416冻结副本加本轮4c050d24/c778175e补丁。已在composition.json分列snapshotHead与patchCommits；不据此声称bfcbc整份源码或其他模块已部署。
