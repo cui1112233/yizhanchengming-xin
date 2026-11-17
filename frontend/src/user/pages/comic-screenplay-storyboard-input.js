@@ -34,3 +34,11 @@ export async function createRawStoryboardChapter(projectId,{chapterId,readChapte
  try{return await saveChapters(projectId,{expected_revision:data.state.revision,chapters:[chapter]});}
  catch(error){try{const latest=await readChapters(projectId);if(latest.state?.chapters?.some(c=>c.id===chapterId&&c.source_text===source))return latest;}catch{}throw error;}
 }
+
+// Mirror the server's plain-script scene boundaries for a pre-generation count.
+export function storyboardSceneCount(content){
+ const text=String(content||'').trim();if(!text)return 0;
+ const heading=/^(?:[0-9]{1,3}\s*[-－—–]\s*[0-9]{1,3}(?:\s|[：:]|[\p{Script=Han}])|第[一二三四五六七八九十百千万\d]+[场幕]|场景\s*[一二三四五六七八九十百千万\d]+|scene\s*\d+|(?:int|ext|内景|外景|内\/外|外\/内|日景|夜景)[.．\s、:：-]|[0-9]+[.、]\s*(?:内景|外景|int|ext|场景))/iu;
+ const count=text.split(/\r?\n/).filter(line=>heading.test(line.replace(/^[*#> \t]+|[*#> \t]+$/g,'').trim())).length;
+ return count||1;
+}

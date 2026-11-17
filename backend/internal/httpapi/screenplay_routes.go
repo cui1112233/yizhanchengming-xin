@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -52,6 +53,23 @@ func (g screenplayTextGenerator) Generate(ctx context.Context, req screenplay.Te
 		Temperature: req.Temperature, MaxTokens: maxTokens,
 		DisableJSONResponse: !req.JSONResponse,
 	})
+	var rejected *batchfactoryv11.DirectorHTTPError
+	if errors.As(err, &rejected) && rejected != nil {
+		// A gateway failure or lost response can hide a completed paid call.
+		// Only explicit admission rejections may unlock an intentional retry.
+		definite := rejected.StatusCode == 400 || rejected.StatusCode == 401 || rejected.StatusCode == 403 || rejected.StatusCode == 404 || rejected.StatusCode == 422 || rejected.StatusCode == 429
+		if rejected.StatusCode == 503 {
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			definite = json.Unmarshal([]byte(rejected.Body), &body) == nil && body.Error.Code == "model_not_found"
+		}
+		if definite {
+			err = fmt.Errorf("%w: %w", screenplay.ErrModelRequestRejected, err)
+		}
+	}
 	return screenplay.TextResponse{Content: content, Model: req.Model}, err
 }
 

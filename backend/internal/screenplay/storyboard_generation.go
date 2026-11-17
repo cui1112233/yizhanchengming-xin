@@ -375,7 +375,7 @@ func (s *storyboardGenerationSession) call(ctx context.Context, episode int, pha
 		call := ep.Calls[phase]
 		if callErr != nil {
 			call.Status = "unknown"
-			if errors.Is(callErr, ErrAPIKeyMissing) || errors.Is(callErr, ErrInvalidArgument) {
+			if errors.Is(callErr, ErrAPIKeyMissing) || errors.Is(callErr, ErrInvalidArgument) || errors.Is(callErr, ErrModelRequestRejected) {
 				call.Status = "failed"
 			}
 			call.Error = callErr.Error()

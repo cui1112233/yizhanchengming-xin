@@ -26,3 +26,12 @@ test('建立原文章节：空原文与已有章节零写入，回包丢失核�
  await assert.rejects(createRawStoryboardChapter('p',{...deps,chapterId:'other'}),/已有章节/);assert.equal(writes,1);
  await assert.rejects(createRawStoryboardChapter('p',{...deps,readWorkspace:async()=>({project:{source_text:' '}})}),/没有已保存原文/);assert.equal(writes,1);
 });
+
+test('场次预览读取剧本标题而不是尚未生成的镜头，正文不误算标题',async()=>{
+ const {storyboardSceneCount}=await import('./comic-screenplay-storyboard-input.js');
+ assert.equal(storyboardSceneCount('## 1-1 客厅 夜 内\n林夏打开灯。\n## 1-2 阳台 夜 外\n雨停了。'),2);
+ assert.equal(storyboardSceneCount('Scene 1 Room\nHello\nScene 2 Balcony\nGoodbye'),2);
+ assert.equal(storyboardSceneCount('普通剧本正文，没有标题。'),1);
+ assert.equal(storyboardSceneCount(''),0);
+ assert.equal(storyboardSceneCount('第一场比赛已经结束。'),1);
+});

@@ -2,12 +2,63 @@ package httpapi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/screenplay"
 	"testing"
 	"time"
 )
+
+func TestScreenplayRejectedModelFailsWithoutAutomaticRetry(t *testing.T) {
+	cases := []struct {
+		name     string
+		upstream error
+		want     string
+	}{
+		{"model missing503", &batchfactoryv11.DirectorHTTPError{StatusCode: 503, Body: `{"error":{"code":"model_not_found"}}`}, "failed"},
+		{"wrapped401", fmt.Errorf("provider: %w", &batchfactoryv11.DirectorHTTPError{StatusCode: 401}), "failed"},
+		{"gateway503", &batchfactoryv11.DirectorHTTPError{StatusCode: 503, Body: `{"error":{"message":"gateway unavailable"}}`}, "unknown"},
+		{"unstructured body", &batchfactoryv11.DirectorHTTPError{StatusCode: 503, Body: `model_not_found`}, "unknown"},
+		{"transport loss", errors.New("connection reset after send"), "unknown"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			store := screenplay.NewMemoryStore()
+			_, err := store.CreateProject(ctx, screenplay.Project{ID: "reject-test", OwnerUsername: "alice", ModelID: "own", PermissionMode: screenplay.PermissionBypass})
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			gen := screenplayTextGenerator{owner: "alice", resolver: func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) {
+				return screenplayProviderFunc(func(context.Context, batchfactoryv11.TextCompletionRequest) (string, error) {
+					calls++
+					return "", tc.upstream
+				}), nil
+			}}
+			service := screenplay.StoryboardService{Store: store, Generator: gen}
+			req := screenplay.StoryboardRequest{Owner: "alice", ProjectID: "reject-test", Engine: screenplay.EngineXiaoluoV7, Content: "第1集\n甲打开窗。", IdempotencyKey: "rejection"}
+			_, _ = service.Generate(ctx, req)
+			state, err := store.LoadStoryboardGenerations(ctx, "alice", "reject-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			attempt := state.Attempts[req.IdempotencyKey]
+			if attempt == nil {
+				t.Fatal("missing saved attempt")
+			}
+			if got := attempt.Episodes[1].Calls["storyboard"].Status; got != tc.want {
+				t.Fatalf("status=%s want=%s", got, tc.want)
+			}
+			_, _ = service.Generate(ctx, req)
+			if calls != 1 {
+				t.Fatalf("replay billed %d calls", calls)
+			}
+		})
+	}
+}
 
 func TestScreenplaySceneGenerationUsesSingleAttemptAtResolverAndProvider(t *testing.T) {
 	ctx := context.Background()
