@@ -430,6 +430,19 @@ func (s *StoryboardService) generationCall(ctx context.Context, req StoryboardRe
 	if req.generationSession == nil {
 		return TextResponse{}, ErrInvalidState
 	}
+	// Parallel workers already own a slot. Single-scene, dependent-history and
+	// compatibility paths must share the same process bound without taking two.
+	if req.sceneOnlyIndex == nil && (phase == "storyboard" || strings.HasPrefix(phase, "storyboard_scene_")) {
+		select {
+		case storyboardSceneSlots <- struct{}{}:
+		case <-ctx.Done():
+			return TextResponse{}, ctx.Err()
+		}
+		defer func() { <-storyboardSceneSlots }()
+		if err := ctx.Err(); err != nil {
+			return TextResponse{}, err
+		}
+	}
 	return req.generationSession.call(ctx, episode, phase, input, s.Generator)
 }
 func (s *storyboardGenerationSession) recordAssets(ctx context.Context, episode int, assets []Asset) error {

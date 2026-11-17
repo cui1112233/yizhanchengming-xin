@@ -300,3 +300,22 @@ func TestStoryboardSceneConcurrencyNeverStartsCallAfterPersistedUnknown(t *testi
 		t.Fatal("new call submitted after unknown checkpoint", err, g.callCount())
 	}
 }
+
+func TestStoryboardSceneConcurrencySharedLimitAlsoCoversSerialHistoryPath(t *testing.T) {
+	for i := 0; i < cap(storyboardSceneSlots); i++ {
+		storyboardSceneSlots <- struct{}{}
+	}
+	defer func() {
+		for i := 0; i < cap(storyboardSceneSlots); i++ {
+			<-storyboardSceneSlots
+		}
+	}()
+	s, _, g := newStoryboardService(t, PermissionBypass)
+	g.responses = []string{zip164JSON}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := s.Generate(ctx, concurrentSceneInput("serial-capacity-full"))
+	if err == nil || g.callCount() != 0 {
+		t.Fatal("serial path bypassed shared scene capacity", err, g.callCount())
+	}
+}
