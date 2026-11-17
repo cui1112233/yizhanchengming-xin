@@ -435,6 +435,30 @@ func TestNovelFetchProcessStartPersistsRawAndContinuesAfterSensitiveAIFailure(t 
 	}
 }
 
+// conflictErrorNovelFetchQueue 模拟占用预检读取 Redis 失败，但原子入队仍然可用。
+type conflictErrorNovelFetchQueue struct {
+	*uniqueRecordingNovelFetchQueue
+}
+
+func (q *conflictErrorNovelFetchQueue) ConflictingBookIDs(context.Context, novelfetchworkshop.ProcessJob) (map[string]string, error) {
+	return nil, errors.New("redis connection failed")
+}
+
+func TestNovelFetchProcessStartFallsBackWhenConflictCheckFails(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &conflictErrorNovelFetchQueue{uniqueRecordingNovelFetchQueue: &uniqueRecordingNovelFetchQueue{}}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t测试书"}, now, secret)
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("process start should fall back to atomic enqueue, status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(queue.jobs) != 1 || len(queue.jobs[0].BookIDs) != 1 || queue.jobs[0].BookIDs[0] != "12345678901" {
+		t.Fatalf("books were not enqueued after conflict check failure: %#v", queue.jobs)
+	}
+}
+
 func TestProcessWorkshopConfiguredTextContinuesWithSafeFallbackByDefault(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutConfig(context.Background(), "tester", map[string]any{

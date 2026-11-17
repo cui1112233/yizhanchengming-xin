@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"sort"
@@ -2562,10 +2563,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if conflictQueue, ok := queue.(novelfetchworkshop.ProcessBookConflictQueue); ok {
 			detected, err := conflictQueue.ConflictingBookIDs(req.Context(), processJob)
 			if err != nil {
-				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 队列状态读取失败"})
-				return
+				// 占用预检只是优化：真正防重复由 EnqueueUniqueBooks 的原子去重保证。
+				// Redis 读抖动时退回整批原子入队，不能因为一次 MGET 失败就阻断开始。
+				log.Printf("novel fetch conflict check failed owner=%s batch=%s err=%v; falling back to atomic enqueue", identity.Username, batchID, err)
+			} else {
+				conflicts = detected
 			}
-			conflicts = detected
 		}
 		queuedBookIDs := make([]string, 0, len(bookIDs))
 		conflictBookIDs := make([]string, 0, len(conflicts))
