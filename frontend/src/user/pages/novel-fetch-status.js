@@ -131,12 +131,20 @@ export function filterNovelFetchTasks(rows = [], options = {}) {
   const mode = options.mode === 'date' ? 'date' : 'default';
   const selectedDate = String(options.date || '').trim();
   const today = dateKeyDayNumber(beijingDateKey(options.now instanceof Date ? options.now : new Date()));
+  // 默认视图只展示当前批次里未完成的书。历史批次没跑完的任务属于那一天的
+  // 批次，只在切到对应日期或历史批次时出现，不能混进当天任务列表。
+  const batchIds = new Set((Array.isArray(options.batchIds) ? options.batchIds : [])
+    .map(value => String(value ?? '').trim())
+    .filter(Boolean));
   return source.filter(row => {
     const identity = `${row.bookId ?? row.book_id ?? row.id ?? ''} ${row.bookName ?? row.book_name ?? row.title ?? ''}`.toLowerCase();
     if (query && !identity.includes(query)) return false;
     const taskDate = novelFetchTaskDateKey(row);
     if (mode === 'date') return taskDate === selectedDate;
-    if (novelFetchTaskStatus(row).status !== 'completed') return true;
+    if (novelFetchTaskStatus(row).status !== 'completed') {
+      if (!batchIds.size) return true;
+      return batchIds.has(String(row.bookId ?? row.book_id ?? row.id ?? '').trim());
+    }
     const taskDay = dateKeyDayNumber(taskDate);
     return Number.isFinite(taskDay) && taskDay >= today - 2 && taskDay <= today;
   });
@@ -194,6 +202,9 @@ export function novelFetchQueueSummary(status = {}) {
   const running = Number(status.processing_count ?? status.processingCount ?? counts.running) || 0;
   const queued = Number(status.pending_count ?? status.pendingCount ?? counts.queued) || 0;
   const waitingRetry = Number(counts.waiting_retry ?? counts.waitingRetry) || 0;
+  const scope = status.scope && typeof status.scope === 'object' ? status.scope : {};
+  const scopeDate = String(scope.date ?? '');
+  const scopeBatchId = String(scope.batch_id ?? scope.batchId ?? '');
   return {
     label: running + queued + waitingRetry > 0 ? '队列运行中' : '队列空闲',
     enabled: Boolean(status.auto_queue_enabled ?? status.autoQueueEnabled ?? status.enabled),
@@ -202,6 +213,10 @@ export function novelFetchQueueSummary(status = {}) {
     running,
     queued,
     waitingRetry,
+    scopeDate,
+    scopeBatchId,
+    scopeLabel: scopeDate || (scopeBatchId ? '当前批次' : '全部任务'),
+    matchedDocuments: Number(scope.matched_documents ?? scope.matchedDocuments) || 0,
     updatedAt: String(status.updated_at ?? status.updatedAt ?? '')
   };
 }

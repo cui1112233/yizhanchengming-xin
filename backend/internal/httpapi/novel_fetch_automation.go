@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -294,19 +295,24 @@ func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.S
 			// Age alone does not prove a queued job is orphaned. Never replace a
 			// job which Redis still owns, or retry when Redis cannot be checked.
 			jobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
-			if len(queues) == 0 || jobID == "" {
-				continue
+			if jobID != "" {
+				if len(queues) == 0 {
+					continue
+				}
+				checker, ok := queues[0].(interface {
+					ProcessJobExists(context.Context, string) (bool, error)
+				})
+				if !ok {
+					continue
+				}
+				exists, checkErr := checker.ProcessJobExists(ctx, jobID)
+				if checkErr != nil || exists {
+					continue
+				}
 			}
-			checker, ok := queues[0].(interface {
-				ProcessJobExists(context.Context, string) (bool, error)
-			})
-			if !ok {
-				continue
-			}
-			exists, checkErr := checker.ProcessJobExists(ctx, jobID)
-			if checkErr != nil || exists {
-				continue
-			}
+			// jobID 为空说明没有任何 Redis 任务持有这本书（常见于早期版本或
+			// 入队前中断），属于彻底的孤儿状态；继续跳过会让它永远显示“排队中”，
+			// 因此和超时任务一样转入等待重试，交给自动扫描重新入队。
 		}
 		if recoveryQueue != nil && status != "queued" {
 			staleJobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
@@ -424,6 +430,9 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		return nil, err
 	}
 	automationEnabled := novelFetchAutomationEnabled(settings)
+	// 自动队列只接管当前批次。旧批次里没跑完的书属于那一天的批次，
+	// 不能在今天被无声拉起；用户切到对应日期手动重跑即可。
+	currentBatchID := strings.TrimSpace(firstText(settings["novel_fetch_current_batch_id"], settings["novelFetchCurrentBatchId"]))
 	documents, err := store.ListDocuments(ctx, owner)
 	if err != nil {
 		return nil, err
@@ -440,6 +449,9 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	groupKey := ""
 	for _, document := range documents {
 		if len(bookIDs) >= 50 {
+			continue
+		}
+		if currentBatchID != "" && novelFetchDocumentBatchID(document) != currentBatchID {
 			continue
 		}
 		cancelled, cancelErr := reconcileNovelFetchCancellation(ctx, store, queue, owner, document)
@@ -658,7 +670,126 @@ func markNovelFetchAutomationSubmitResult(ctx context.Context, store novelfetchw
 	}
 }
 
+// novelFetchQueueScope 表示队列统计的批次范围。实时状态必须按当前批次或
+// 选定日期统计：未完成的旧批次如果混进来，用户看到的“排队 80 个”就会跟
+// 当天实际开始的书单完全对不上。
+type novelFetchQueueScope struct {
+	BatchID string
+	Date    string
+}
+
+func (scope novelFetchQueueScope) empty() bool {
+	return strings.TrimSpace(scope.BatchID) == "" && strings.TrimSpace(scope.Date) == ""
+}
+
+var novelFetchBeijingZone = time.FixedZone("CST", 8*60*60)
+
+func novelFetchLocalDateKey(at time.Time) string {
+	return at.In(novelFetchBeijingZone).Format("2006-01-02")
+}
+
+// novelFetchBatchTime 从批次 ID 还原创建时间。本服务的批次 ID 形如
+// batch-<UnixNano>、auto-batch-<UnixNano>；定时批次使用哈希后缀，无法
+// 还原时间，只能回退到文档里记录的批次时间。
+func novelFetchBatchTime(batchID string) time.Time {
+	text := strings.TrimSpace(batchID)
+	for _, prefix := range []string{"auto-batch-", "batch-"} {
+		if !strings.HasPrefix(text, prefix) {
+			continue
+		}
+		raw := strings.TrimPrefix(text, prefix)
+		if idx := strings.Index(raw, "-"); idx > 0 {
+			raw = raw[:idx]
+		}
+		if ns, err := strconv.ParseInt(raw, 10, 64); err == nil && ns > 0 {
+			return time.Unix(0, ns)
+		}
+	}
+	return time.Time{}
+}
+
+func novelFetchDocumentBatchID(document novelfetchworkshop.Document) string {
+	if document.Meta == nil {
+		return ""
+	}
+	return strings.TrimSpace(firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"]))
+}
+
+func novelFetchDocumentBatchTime(document novelfetchworkshop.Document) time.Time {
+	if at := novelFetchBatchTime(novelFetchDocumentBatchID(document)); !at.IsZero() {
+		return at
+	}
+	if document.Meta != nil {
+		for _, key := range []string{"batchCreatedAt", "currentBatchAt", "createdAt"} {
+			raw := strings.TrimSpace(firstText(document.Meta[key]))
+			if raw == "" {
+				continue
+			}
+			for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+				if parsed, err := time.Parse(layout, raw); err == nil {
+					return parsed
+				}
+			}
+		}
+	}
+	if raw := strings.TrimSpace(document.UpdatedAt); raw != "" {
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+			if parsed, err := time.Parse(layout, raw); err == nil {
+				return parsed
+			}
+		}
+	}
+	return time.Time{}
+}
+
+func novelFetchDocumentInScope(document novelfetchworkshop.Document, scope novelFetchQueueScope) bool {
+	if batchID := strings.TrimSpace(scope.BatchID); batchID != "" {
+		return novelFetchDocumentBatchID(document) == batchID
+	}
+	if date := strings.TrimSpace(scope.Date); date != "" {
+		at := novelFetchDocumentBatchTime(document)
+		return !at.IsZero() && novelFetchLocalDateKey(at) == date
+	}
+	return true
+}
+
+func novelFetchScopedJobMatches(job map[string]any, scope novelFetchQueueScope) bool {
+	if batchID := strings.TrimSpace(scope.BatchID); batchID != "" {
+		return strings.TrimSpace(firstText(job["batch_id"], job["batchId"])) == batchID
+	}
+	if date := strings.TrimSpace(scope.Date); date != "" {
+		raw := strings.TrimSpace(firstText(job["started_at"], job["startedAt"], job["updated_at"], job["updatedAt"]))
+		if raw == "" {
+			return false
+		}
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+			if parsed, err := time.Parse(layout, raw); err == nil {
+				return novelFetchLocalDateKey(parsed) == date
+			}
+		}
+	}
+	return true
+}
+
+func novelFetchScopedRunMatches(run novelfetchworkshop.RunRecord, scope novelFetchQueueScope) bool {
+	if batchID := strings.TrimSpace(scope.BatchID); batchID != "" {
+		return strings.TrimSpace(run.BookID) == batchID
+	}
+	if date := strings.TrimSpace(scope.Date); date != "" {
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+			if parsed, err := time.Parse(layout, strings.TrimSpace(run.StartedAt)); err == nil {
+				return novelFetchLocalDateKey(parsed) == date
+			}
+		}
+	}
+	return true
+}
+
 func novelFetchAutomationStatus(ctx context.Context, store novelfetchworkshop.Store, registry *workshopProcessRegistry, owner string) (map[string]any, error) {
+	return novelFetchAutomationStatusScoped(ctx, store, registry, owner, novelFetchQueueScope{})
+}
+
+func novelFetchAutomationStatusScoped(ctx context.Context, store novelfetchworkshop.Store, registry *workshopProcessRegistry, owner string, scope novelFetchQueueScope) (map[string]any, error) {
 	var settings map[string]any
 	var documents []novelfetchworkshop.Document
 	var err error
@@ -675,8 +806,20 @@ func novelFetchAutomationStatus(ctx context.Context, store novelfetchworkshop.St
 	if err != nil {
 		return nil, err
 	}
+	currentBatchID := strings.TrimSpace(firstText(settings["novel_fetch_current_batch_id"], settings["novelFetchCurrentBatchId"]))
+	scope.BatchID = strings.TrimSpace(scope.BatchID)
+	scope.Date = strings.TrimSpace(scope.Date)
+	// 默认只统计当前批次；显式传日期时统计该日期创建的批次。
+	if scope.empty() && currentBatchID != "" {
+		scope.BatchID = currentBatchID
+	}
 	counts := map[string]int{"running": 0, "queued": 0, "waiting_retry": 0, "waiting_configuration": 0, "waiting_login": 0, "failed": 0, "stopped": 0}
+	matched := 0
 	for _, document := range documents {
+		if !novelFetchDocumentInScope(document, scope) {
+			continue
+		}
+		matched++
 		task := legacyNovelFetchTask(document)
 		status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"], document.Meta["taskStatus"], task["ai_status"], document.Meta["aiStatus"]))
 		switch {
@@ -697,20 +840,34 @@ func novelFetchAutomationStatus(ctx context.Context, store novelfetchworkshop.St
 		}
 	}
 	latest := map[string]any{}
-	activeJobID := ""
-	if jobs := registry.latest(owner, 1); len(jobs) > 0 {
-		latest = jobs[0]
-	}
-	if len(latest) == 0 {
-		if runs, runErr := store.ListRuns(ctx, owner, ""); runErr == nil {
-			for _, run := range runs {
-				if run.Stage == "novel_fetch_process" {
-					latest = persistedWorkshopRun(run)
-					break
+	if !scope.empty() {
+		for _, job := range registry.latest(owner, 50) {
+			if novelFetchScopedJobMatches(job, scope) {
+				latest = job
+				break
+			}
+		}
+		if len(latest) == 0 {
+			if runs, runErr := store.ListRuns(ctx, owner, ""); runErr == nil {
+				for _, run := range runs {
+					if run.Stage == "novel_fetch_process" && novelFetchScopedRunMatches(run, scope) {
+						latest = persistedWorkshopRun(run)
+						break
+					}
 				}
 			}
 		}
+	} else if jobs := registry.latest(owner, 1); len(jobs) > 0 {
+		latest = jobs[0]
+	} else if runs, runErr := store.ListRuns(ctx, owner, ""); runErr == nil {
+		for _, run := range runs {
+			if run.Stage == "novel_fetch_process" {
+				latest = persistedWorkshopRun(run)
+				break
+			}
+		}
 	}
+	activeJobID := ""
 	status := strings.ToLower(firstText(latest["status"], latest["queue_state"]))
 	if status == "queued" || status == "running" || status == "waiting_retry" {
 		activeJobID = firstText(latest["id"])
@@ -719,6 +876,7 @@ func novelFetchAutomationStatus(ctx context.Context, store novelfetchworkshop.St
 		"ok": true, "enabled": novelFetchAutomationEnabled(settings), "auto_queue_enabled": novelFetchAutomationEnabled(settings),
 		"active_job_id": activeJobID, "counts": counts, "processing_count": counts["running"],
 		"pending_count": counts["queued"] + counts["waiting_retry"], "latest_job": novelFetchJobStatusSummary(latest),
+		"scope":      map[string]any{"batch_id": scope.BatchID, "date": scope.Date, "current_batch_id": currentBatchID, "matched_documents": matched},
 		"updated_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}, nil
 }

@@ -723,6 +723,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const [accountOptions, setAccountOptions] = useState([]);
   const [documentHidden, setDocumentHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const pollingRef = useRef({ realtimeBusy: false, queueBusy: false, tasksBusy: false, realtimeFailures: 0, taskFailures: 0, queueStatusSignature: '' });
+  const queueScopeRef = useRef({ batchId: '', date: '' });
   const taskDataSignatureRef = useRef('');
   const batchDataSignatureRef = useRef('');
   const inputFormatOption = INPUT_FORMAT_OPTIONS.find(item => item.value === inputFormat) || INPUT_FORMAT_OPTIONS[0];
@@ -744,19 +745,24 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   }, [processForm, savedProcessSettings, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled, textModel]);
 
   const selectedTask = useMemo(() => selectedTaskKeys[0] || '', [selectedTaskKeys]);
-  const visibleTasks = useMemo(() => {
-    return filterNovelFetchTasks(tasks, {
-      mode: taskDate ? 'date' : 'default',
-      date: taskDate,
-      query: taskSearch
-    });
-  }, [tasks, taskDate, taskSearch]);
   const currentBatchRows = useMemo(() => {
     const rows = currentBatch?.taskStates || currentBatch?.task_states;
     return Array.isArray(rows) ? rows : [];
   }, [currentBatch]);
   const currentBatchIds = useMemo(() => currentBatchBookIds(currentBatch || {}), [currentBatch]);
   const currentBatchStoppableIds = useMemo(() => stoppableCurrentBatchBookIds(currentBatch || {}), [currentBatch]);
+  // 轮询回调会捕获首次渲染的闭包，队列统计范围必须通过 ref 读取最新的
+  // 日期/当前批次，否则切到历史日期后横幅仍显示当前批次数字。
+  queueScopeRef.current = { batchId: taskDate ? '' : (currentBatch?.id || ''), date: taskDate };
+  const visibleTasks = useMemo(() => {
+    return filterNovelFetchTasks(tasks, {
+      mode: taskDate ? 'date' : 'default',
+      date: taskDate,
+      query: taskSearch,
+      // 默认视图只显示当前批次；历史批次未完成的任务要切换到对应日期才出现。
+      batchIds: currentBatchIds
+    });
+  }, [tasks, taskDate, taskSearch, currentBatchIds]);
   const latestCurrentBatchRows = useMemo(() => {
     if (!currentBatchIds.length) return [];
     const batchIds = new Set(currentBatchIds);
@@ -827,7 +833,8 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
 
   async function loadQueueStatus() {
     try {
-      const nextStatus = await getWorkshopRealtimeStatus();
+      const scope = queueScopeRef.current || {};
+      const nextStatus = await getWorkshopRealtimeStatus({ batchId: scope.batchId, date: scope.date });
       const meaningfulStatus = {
         enabled: nextStatus?.enabled,
         auto_queue_enabled: nextStatus?.auto_queue_enabled,
@@ -835,6 +842,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
         pending_count: nextStatus?.pending_count,
         processing_count: nextStatus?.processing_count,
         active_job_id: nextStatus?.active_job_id,
+        scope: nextStatus?.scope || {},
         latest_job: nextStatus?.latest_job ? {
           id: nextStatus.latest_job.id,
           status: nextStatus.latest_job.status
@@ -1092,6 +1100,11 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, []);
 
+  // 切换日期或当前批次后立刻重算队列横幅，避免等到下一次轮询才更新。
+  useEffect(() => {
+    loadQueueStatus();
+  }, [taskDate, currentBatch?.id]);
+
   useEffect(() => {
     // 运行状态、队列和完整任务列表分开刷新，避免空闲页面每两秒重拉整张任务表。
     const plan = novelFetchPollingPlan({ activeTab, processing, documentHidden, ...pollingRef.current });
@@ -1131,11 +1144,11 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       return;
     }
     dispatchGlobalStatus({
-      text: `批量测书队列：处理中 ${running} 个，排队 ${queued} 个。`,
+      text: `批量测书队列（${queueSummary.scopeLabel}）：处理中 ${running} 个，排队 ${queued} 个。`,
       tone: running > 0 ? 'working' : 'info',
       durationMs: 60000
     });
-  }, [queueSummary.running, queueSummary.queued]);
+  }, [queueSummary.running, queueSummary.queued, queueSummary.scopeLabel]);
 
   useEffect(() => {
     if (activeTab === 'config') loadConfig();
@@ -1953,7 +1966,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       <div className={`novel-fetch-automation-bar ${queueSummary.enabled ? 'is-enabled' : 'is-paused'}`}>
         <div className="novel-fetch-automation-heading"><div><strong>全自动队列</strong><span>{queueSummary.enabled ? '持续处理、自动上传并回读确认' : '已暂停，不会派发新的自动任务'}</span></div><V88Button variant={queueSummary.enabled ? 'danger' : 'primary'} loading={automationChanging} onClick={toggleAutomation}>{queueSummary.enabled ? '暂停全自动' : '开启全自动'}</V88Button></div>
         <div className="novel-fetch-automation-facts">
-          <span>已选 <b>{selectedTaskKeys.length}</b> 个</span><span>自动队列 <b>{queueSummary.enabled ? '已开启' : '已暂停'}</b></span><span>当前任务 <b>{queueSummary.activeJobId || '无'}</b></span><span>处理中 <b>{queueSummary.running}</b> 个</span><span>排队 <b>{queueSummary.queued}</b> 个</span>
+          <span>已选 <b>{selectedTaskKeys.length}</b> 个</span><span>自动队列 <b>{queueSummary.enabled ? '已开启' : '已暂停'}</b></span><span>当前任务 <b>{queueSummary.activeJobId || '无'}</b></span><span>{queueSummary.scopeLabel}：处理中 <b>{queueSummary.running}</b> 个</span><span>{queueSummary.scopeLabel}：排队 <b>{queueSummary.queued}</b> 个</span>
         </div>
         <div className="novel-fetch-automation-foot"><span>最近任务 {queueSummary.latestJob?.status || '暂无'}：{queueSummary.latestJob?.id || '—'}</span><span>刷新 {queueSummary.updatedAt ? formatScheduleTime(queueSummary.updatedAt) : '—'}</span></div>
       </div>

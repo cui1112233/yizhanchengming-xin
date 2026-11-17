@@ -44,8 +44,14 @@ export function workshopRealtimeStatusPath() {
   return '/api/novel-fetch-workshop/realtime/status';
 }
 
-export function getWorkshopRealtimeStatus() {
-  return apiRequest(workshopRealtimeStatusPath());
+// 队列统计必须带批次或日期：后端默认只统计当前批次，旧批次未完成的
+// 任务不会再混进当天横幅。
+export function getWorkshopRealtimeStatus({ batchId = '', date = '' } = {}) {
+  const params = new URLSearchParams();
+  if (batchId) params.set('batch_id', batchId);
+  if (date) params.set('date', date);
+  const query = params.toString();
+  return apiRequest(`${workshopRealtimeStatusPath()}${query ? `?${query}` : ''}`);
 }
 
 export function startWorkshopAutomation() {
