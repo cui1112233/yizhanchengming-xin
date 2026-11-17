@@ -74,9 +74,12 @@ func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req St
 				<-storyboardSceneSlots
 				results[index] = sceneResult{shots, err}
 				// An uncertain request must be reconciled before scheduling more paid work.
-				if err != nil && req.generationSession.callStatus(episode.No, fmt.Sprintf("storyboard_scene_%d", index+1)) == "unknown" {
-					cancel()
-					return
+				if err != nil {
+					status := req.generationSession.callStatus(episode.No, fmt.Sprintf("storyboard_scene_%d", index+1))
+					if status == "unknown" || status == "calling" {
+						cancel()
+						return
+					}
 				}
 			}
 		}()

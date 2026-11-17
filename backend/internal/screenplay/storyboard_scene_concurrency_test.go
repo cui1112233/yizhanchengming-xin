@@ -319,3 +319,37 @@ func TestStoryboardSceneConcurrencySharedLimitAlsoCoversSerialHistoryPath(t *tes
 		t.Fatal("serial path bypassed shared scene capacity", err, g.callCount())
 	}
 }
+
+type sceneResponseSaveFailStore struct {
+	*MemoryStore
+	failed atomic.Bool
+}
+
+func (s *sceneResponseSaveFailStore) MutateStoryboardGenerations(ctx context.Context, owner, project string, fn func(*StoryboardGenerationState) error) (StoryboardGenerationState, error) {
+	return s.MemoryStore.MutateStoryboardGenerations(ctx, owner, project, func(v *StoryboardGenerationState) error {
+		if err := fn(v); err != nil {
+			return err
+		}
+		for _, a := range v.Attempts {
+			for _, ep := range a.Episodes {
+				for _, call := range ep.Calls {
+					if call.Status == "received" && !s.failed.Swap(true) {
+						return errors.New("checkpoint storage unavailable")
+					}
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func TestStoryboardSceneConcurrencyStopsAfterResponseCheckpointFailure(t *testing.T) {
+	t.Setenv("QIANTIE_SCREENPLAY_SCENE_CONCURRENCY", "1")
+	_, store, g := newStoryboardService(t, PermissionBypass)
+	g.responses = []string{zip164JSON}
+	s := &StoryboardService{Store: &sceneResponseSaveFailStore{MemoryStore: store}, Generator: g}
+	_, err := s.Generate(context.Background(), concurrentSceneInput("checkpoint-save-failed"))
+	if err == nil || g.callCount() != 1 {
+		t.Fatal("new request after response could not be checkpointed", err, g.callCount())
+	}
+}
