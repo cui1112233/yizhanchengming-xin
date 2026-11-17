@@ -31,6 +31,14 @@ test('keeps profile, member, and security navigation available on every center p
   assert.doesNotMatch(source, /profileOpen \?/);
 });
 
+test('exposes the YZCM API console entry in the sidebar', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+
+  assert.match(source, /href="http:\/\/newapi\.yzcm\.site\/"/);
+  assert.match(source, /target="_blank"/);
+  assert.match(source, /YZCM API/);
+});
+
 test('integrated CSS does not retain the fixed overlay or second content offset', () => {
   const css = fs.readFileSync(cssPath, 'utf8');
 
