@@ -1,5 +1,18 @@
 # 小说创作链路修复实施计划
 
+> **2026-11-17纠偏：当前UI被用户明确拒绝，原Task1–7勾选仅保留历史实施事实，不代表洛水字面对齐通过。** 先依据已纠正规格和两份原版差异审计修订任务，不再按下文旧解释继续堆功能。重点撤回：通用新建表单前置、仿写仅文风输入、六模式共用单章产物、逐请求二次确认、本地检查模型化、六工具统一Drawer。当前不重启4001、不发起模型请求或公网发布。
+
+纠偏待办（原版合同映射，不是新布局方案）：
+
+- [ ] C1 六入口与原专用表单逐字段映射至HTTP/Go/持久实体；分清聊天、建书、短篇和章节导入。
+- [ ] C2 Agent原17路由/共享范围/37维及自定义项对照；原生本地检查和归一化算法先补证，未知不得自创冒充。
+- [ ] C3 撤回两项本地检查的额外模型步骤，按内容里程碑实现二次确认，保留调用恢复与去重保护。
+- [ ] C4 独立短篇产物/大纲/文件及长篇正式导入链；总字数、每章字数、目标章数分开。
+- [ ] C5 原左侧六项及底部工具、主工作区切换、专用弹窗、条件右栏；不得只改CSS或统一Drawer。
+- [ ] C6 分别验字段边界、零模型路径、实际持久产物和同状态原版画面；收费与公网验证继续单列。
+
+原始证据及当前代码定位见`docs/audit/2026-11-17-novel-original-ui-correction.md`、`docs/audit/2026-11-17-novel-original-agent-correction.md`。当前只完成纠偏分析和规格写回，以上尚未实施，不以旧测试绿灯抵销缺口。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** 按已批准规格补齐小说创作四块闭环，在本地4001留下真实可核验结果。
