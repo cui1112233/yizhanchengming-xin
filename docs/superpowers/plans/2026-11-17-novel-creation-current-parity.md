@@ -23,6 +23,28 @@
 
 ## Global Constraints
 
+### 当前纠偏执行顺序（用户已指令执行）
+
+先执行C5a原布局框架，随后C1/C2后端合同、C3处理语义、C4专用产物、C5b专用表单与右侧资料、C6总验收。C5a不是整体复刻验收，不触发4001更新；专用表单不能只显示而丢参数。
+
+**C5a文件**：`frontend/src/user/pages/NovelCreationPage.jsx`、`NovelCreationPage.css`；交互测试沿用`novel-creation`现有浏览器测试框架。
+
+C5a实施及审查完成：28fb3d38、修复2c59fe39；完整历史39/39，导航补丁后9/9，独立审查R1后6/6。只表示布局框架，不表示专用表单/语义/像素/4001已验收。
+
+**C1a下一实施任务：正式章节导入API闭环**。依据原`NovelImportPage.readable.js:196–217,438–468`，详见SDD `task-C1-contract-mapping.md`。输入`bookId?、title?、chapters[{title,content,wordCount?}]、knowledgeBookIds[]、idempotencyKey`；已有作品不强制新书名，新作品名必填；仅导入正式章节，绝不创建模型run或后台分析。
+
+文件范围：新增`backend/internal/novelcreation/chapter_import.go`、`chapter_import_store.go`及领域/实库测试，现有store/memory/content-management接口最小扩展；新增`backend/internal/httpapi/novel_creation_import_routes.go`及路由测试、原routes注册；storage新增唯一导入回执迁移及schema测试。不得顺带改六表nullable或账号Agent，也不得部署当前日常数据库。
+
+- [ ] 写领域与HTTP红测，覆盖已有/新书、跨账号、归档/活动任务拒绝、同key重放/改内容冲突、全部章及首版本、失败整批回滚、续写记忆dirty、重读导出，provider调用即失败。
+- [ ] receipt(owner,kind,key)唯一键与规范输入指纹；回执/新书/全部章节/首版本/continuity dirty同一事务，失败不留空书。已有书持项目锁分配max+1，不覆盖历史正文。客户端wordCount非权威；采用本站计字并注明非已恢复原算法。
+- [ ] 选中文风先校验归属并保存引用，不能不支持却默默丢弃；导入不分析文风、不生成事实。新书使用专用无模型构造，不放宽旧CreateProject或伪造模型ID。未知helper不自创冒充，入口阶段不做收费维护。
+- [ ] 保持现有未知结果/租约/保存恢复测试；新迁移不改旧SQL或校验值。先独立测试库验证实际DDL/事务再作完成结论，禁止日常库迁移或运行包更新；仅提交本任务文件并独立审查。
+
+- [ ] 先写失败交互测试：六入口连续且无自加三组；六工具只在左侧下部；Agent/风格/定时/看板切主工作区并能返回对话；导入为Modal、备忘录为独立浮层；切工具和返回保留当前草稿/会话。
+- [ ] 按原`NovelStudioSidebar/NovelStudioPage`恢复位置与容器，不改生成接口或把尚未支持的表单伪接通。保留原资料组件、权限校验、作用域和维护提交保护，移除统一工具Drawer。无作品下现有项目级后端限制明确报告，不能偷建作品、伪造全局配置或触发模型。
+- [ ] 空会话无作品时不常驻自加当前资料面板；已有作品的真实章节/进度暂保留，待C5b替换为原长短篇产物面板，不称完整复刻。
+- [ ] 运行新测试及既有小说浏览器回归；红绿证据保存SDD目录；仅提交本任务文件，独立审查后再进入下一项。原版截图仍未验收。
+
 - 已批准规格：`docs/superpowers/specs/2026-11-17-novel-creation-current-parity-design.md`；N01–N12逐项留证。
 - 基准是当前洛水安装版，旧ZIP只作历史参考；恢复片段只供分析，不复制到产品。
 - 用户要求直接在v88维护、不建分支；保留无关脏文件。按此要求覆盖技能的新分支/工作树建议。
