@@ -54,7 +54,7 @@ test('config save hydrates the form from the server response', () => {
 });
 
 test('AI version picker and maxTxt limits match backend capabilities', () => {
-  assert.match(page, /AI_VERSION_KEYS = Array\.from\(\{ length: 20 \}/);
+  assert.match(page, /AI_VERSION_KEYS = Array\.from\(\{ length: 5 \}/);
   assert.match(page, /max=\{200000\}/);
   assert.match(api, /JSON\.stringify\(\{ purpose, model: model \|\| '' \}\)/);
   assert.match(page, /testWorkshopAi\('rewrite', textModel\)/);

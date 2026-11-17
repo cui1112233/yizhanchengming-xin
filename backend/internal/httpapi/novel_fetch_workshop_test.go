@@ -2269,10 +2269,10 @@ func TestNovelFetchStartCollapsesZeroPaddedAIVersions(t *testing.T) {
 	invalid := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
 		"inputText":         "12345678903\t书三",
 		"platform_id":       "15",
-		"selected_versions": []string{"ai21"},
+		"selected_versions": []string{"ai6"},
 	}, now, secret)
 	if invalid.Code != http.StatusBadRequest {
-		t.Fatalf("ai21 status=%d, want 400 body=%s", invalid.Code, invalid.Body.String())
+		t.Fatalf("ai6 status=%d, want 400 body=%s", invalid.Code, invalid.Body.String())
 	}
 }
 

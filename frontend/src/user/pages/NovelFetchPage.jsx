@@ -55,8 +55,9 @@ const TABS = [
   { key: 'submit', label: '提交' },
   { key: 'logs', label: '记录' }
 ];
-// 后端支持 ai1~ai20，前端版本选择必须与后端能力一致，不能只暴露到 ai5。
-const AI_VERSION_KEYS = Array.from({ length: 20 }, (_, index) => `ai${index + 1}`);
+// 产品只配置了原文 + AI1~AI5 五个文案版本，版本档案也只有这五项；
+// 后端虽然能按编号生成更多版本，但页面不应暴露没有档案的空版本。
+const AI_VERSION_KEYS = Array.from({ length: 5 }, (_, index) => `ai${index + 1}`);
 const AI_VERSIONS = ['original', ...AI_VERSION_KEYS];
 const AI_VERSION_LABELS = Object.fromEntries([['original', '原文'], ...AI_VERSION_KEYS.map(key => [key, key.toUpperCase()])]);
 const REWRITE_METHOD_OPTIONS = [
@@ -705,7 +706,10 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   const [batchAiCount, setBatchAiCount] = useState(1);
   const [ruleApplyScope, setRuleApplyScope] = useState('both');
   const [configSection, setConfigSection] = useState('workflow');
-  const [selectedVersions, setSelectedVersions] = useState(() => savedProcessSettings.selectedVersions);
+  const [selectedVersions, setSelectedVersions] = useState(() => {
+    const savedVersions = (savedProcessSettings.selectedVersions || []).filter(version => AI_VERSIONS.includes(version));
+    return savedVersions.length ? savedVersions : ['original', 'ai1'];
+  });
   const [batchFactorySourceVersion, setBatchFactorySourceVersion] = useState('sensitive');
   const [rewriteMethods, setRewriteMethods] = useState(() => savedProcessSettings.rewriteMethods);
   const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => savedProcessSettings.sensitiveAiProcessEnabled);
