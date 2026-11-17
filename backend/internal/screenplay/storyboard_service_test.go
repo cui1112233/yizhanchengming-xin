@@ -22,7 +22,8 @@ func newStoryboardService(t *testing.T, mode PermissionMode) (*StoryboardService
 		t.Fatal(err)
 	}
 	generator := &fakeGenerator{responses: []string{storyboardJSON}}
-	return &StoryboardService{Store: store, Generator: generator}, store, generator
+	// Existing fixtures assert serial call order; dedicated concurrency tests use the default service.
+	return &StoryboardService{Store: store, Generator: generator, SceneConcurrency: 1}, store, generator
 }
 
 func TestResolveStoryboardEngine(t *testing.T) {

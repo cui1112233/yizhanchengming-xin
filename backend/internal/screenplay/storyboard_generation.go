@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -135,6 +136,7 @@ func (a StoryboardGenerationAttempt) replay() (StoryboardResult, error) {
 }
 
 type storyboardGenerationSession struct {
+	mu                  sync.Mutex
 	store               StoryboardGenerationStore
 	owner, project, key string
 	attempt             StoryboardGenerationAttempt
@@ -321,6 +323,8 @@ func sameGenerationEpisodes(a, b []int) bool {
 	return true
 }
 func (s *storyboardGenerationSession) mutate(ctx context.Context, fn func(*StoryboardGenerationAttempt) error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	state, e := s.store.MutateStoryboardGenerations(ctx, s.owner, s.project, func(v *StoryboardGenerationState) error {
 		a := v.Attempts[s.key]
 		if a == nil {
@@ -340,7 +344,10 @@ func (s *storyboardGenerationSession) mutate(ctx context.Context, fn func(*Story
 func (s *storyboardGenerationSession) call(ctx context.Context, episode int, phase string, request TextRequest, generator TextGenerator) (TextResponse, error) {
 	raw, _ := json.Marshal(request)
 	digest := contentDigest(string(raw))
-	if cached, ok := s.attempt.Episodes[episode].Calls[phase]; ok && cached.Status == "received" {
+	s.mu.Lock()
+	cached, ok := s.attempt.Episodes[episode].Calls[phase]
+	s.mu.Unlock()
+	if ok && cached.Status == "received" {
 		if cached.InputDigest != digest {
 			return TextResponse{}, fmt.Errorf("%w: 已收到模型结果的输入与续跑不一致", ErrRevisionConflict)
 		}
@@ -350,6 +357,11 @@ func (s *storyboardGenerationSession) call(ctx context.Context, episode int, pha
 		ep := a.Episodes[episode]
 		if a.Status != "running" || ep == nil {
 			return ErrInvalidState
+		}
+		for _, prior := range ep.Calls {
+			if prior.Status == "unknown" {
+				return fmt.Errorf("%w: 有场景请求结果未确认，请先核对任务，已停止继续提交", ErrInvalidState)
+			}
 		}
 		ep.Status = "calling"
 		ep.Calls[phase] = StoryboardGenerationCall{Status: "calling", InputDigest: digest}
@@ -392,10 +404,27 @@ func (s *storyboardGenerationSession) call(ctx context.Context, episode int, pha
 	if ctx.Err() != nil {
 		return response, ctx.Err()
 	}
-	if s.attempt.Episodes[episode].Calls[phase].Status == "unknown" {
+	if s.callStatus(episode, phase) == "unknown" {
 		return response, ErrInvalidState
 	}
 	return response, nil
+}
+
+func (s *storyboardGenerationSession) callStatus(episode int, phase string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.attempt.Episodes[episode].Calls[phase].Status
+}
+
+func (s *storyboardGenerationSession) episodeHasUnknown(episode int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, call := range s.attempt.Episodes[episode].Calls {
+		if call.Status == "unknown" || call.Status == "calling" {
+			return true
+		}
+	}
+	return false
 }
 func (s *StoryboardService) generationCall(ctx context.Context, req StoryboardRequest, episode int, phase string, input TextRequest) (TextResponse, error) {
 	if req.generationSession == nil {

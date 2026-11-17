@@ -27,6 +27,7 @@ type StoryboardRequest struct {
 	RetryOf                    string `json:"retry_of"`
 	ConfirmedRetry             bool   `json:"confirmed_retry"`
 	generationSession          *storyboardGenerationSession
+	sceneOnlyIndex             *int
 	ChapterID                  string           `json:"chapter_id"`
 	PlanningChapterID          string           `json:"planning_chapter_id"`
 	UsePlanning                *bool            `json:"use_planning"`
@@ -60,10 +61,12 @@ type StoryboardResult struct {
 
 // StoryboardService 实现能力 6（小洛 v7-15s）与能力 7（小云雀 v3）。
 type StoryboardService struct {
-	Authoring *AuthoringService
-	Store     Store
-	Generator TextGenerator
-	Prompts   *luoshui.Registry
+	// Zero uses the backend default; one preserves dependent/legacy serial calls.
+	SceneConcurrency int
+	Authoring        *AuthoringService
+	Store            Store
+	Generator        TextGenerator
+	Prompts          *luoshui.Registry
 }
 
 type episodeInput struct {
@@ -275,7 +278,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 			}
 			result.FailedEpisodes = append(result.FailedEpisodes, episode.No)
 			result.Warnings = append(result.Warnings, sceneErr.Error())
-			if session.attempt.Episodes[episode.No].Status == "unknown" {
+			if session.episodeHasUnknown(episode.No) {
 				return result, sceneErr
 			}
 			continue

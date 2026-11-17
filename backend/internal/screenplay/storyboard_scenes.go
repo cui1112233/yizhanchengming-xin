@@ -79,9 +79,15 @@ func splitStoryboardScenes(content string) ([]storyboardSceneInput, error) {
 }
 
 func (s *StoryboardService) generateSceneShots(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, planning, model string, useHistory bool, aspectRatio string) ([]StoryboardShot, error) {
+	if req.sceneOnlyIndex == nil && selected.SourceID > 0 && !useHistory && len(units) > 1 && s.SceneConcurrency != 1 {
+		return s.generateConcurrentScenes(ctx, req, episode, units, selected, roles, scenes, props, style, synopsis, prefix, planning, model, aspectRatio)
+	}
 	all := []StoryboardShot{}
 	var firstErr error
 	for index, unit := range units {
+		if req.sceneOnlyIndex != nil && index != *req.sceneOnlyIndex {
+			continue
+		}
 		if err := ctx.Err(); err != nil {
 			return all, err
 		}
@@ -159,7 +165,7 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 		}
 		if err != nil {
 			err = wrapAIError(err)
-			if ctx.Err() == nil && req.generationSession.attempt.Episodes[episode.No].Calls[phase].Status == "received" {
+			if ctx.Err() == nil && req.generationSession.callStatus(episode.No, phase) == "received" {
 				if saveErr := req.generationSession.mutate(context.WithoutCancel(ctx), func(a *StoryboardGenerationAttempt) error {
 					call := a.Episodes[episode.No].Calls[phase]
 					call.Status = "invalid"
@@ -177,7 +183,7 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 			if firstErr == nil {
 				firstErr = wrapped
 			}
-			if ctx.Err() != nil || req.generationSession.attempt.Episodes[episode.No].Calls[phase].Status == "unknown" {
+			if ctx.Err() != nil || req.generationSession.callStatus(episode.No, phase) == "unknown" {
 				return all, wrapped
 			}
 			continue
