@@ -1,6 +1,7 @@
 import { Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Spin, Tabs, message } from 'antd';
 import { Archive, BookOpen, Bot, CalendarClock, ChartColumn, FileText, NotebookPen, Plus, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getCurrentAccount, getCurrentUsername } from '../../shared/api/auth.js';
 import { canManageModelCatalog, getConfig } from '../../shared/api/config.js';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog.js';
@@ -26,6 +27,8 @@ export default function NovelCreationPage() {
   const [projectId, setProjectId] = useState(''), [activeMode, setActiveMode] = useState(() => localStorage.getItem('novel:mode:' + getCurrentUsername()) || 'long_original');
   const [sessions, setSessions] = useState([]), [sessionId, setSessionId] = useState(''), [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true), [connection, setConnection] = useState(''), [tool, setTool] = useState('');
+  const [importOpen, setImportOpen] = useState(false), [memoOpen, setMemoOpen] = useState(false);
+  const memoPopup = useRef(null);
   const [projectModal, setProjectModal] = useState(false), [manage, setManage] = useState(null), [archiveOpen, setArchiveOpen] = useState(false);
   const [blueprint, setBlueprint] = useState(null), [batchOpen, setBatchOpen] = useState(false), [dashboard, setDashboard] = useState(null);
   const [inspectorWidth, setInspectorWidth] = useState(() => width(localStorage.getItem('novel:inspector-width')));
@@ -54,7 +57,7 @@ export default function NovelCreationPage() {
     return () => { window.removeEventListener('storage', check); clearInterval(timer); };
   }, []);
   useEffect(() => {
-    setLoading(true); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool('');
+    setLoading(true); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false);
     ownerScope.call(Promise.allSettled([novelRequest('/projects', undefined, { signal: ownerScope.signal }), listAvailableModels('text'), getProjectRetention(), getCurrentAccount(), getConfig()]), results => {
       if (results[0].status === 'fulfilled') { const items = results[0].value.projects || []; setProjects(items); const saved = localStorage.getItem('novel:project:' + owner); setProjectId(items.some(p => p.id === saved) ? saved : items[0]?.id || ''); }
       else message.error('作品列表暂时无法读取，请刷新重试');
@@ -66,7 +69,7 @@ export default function NovelCreationPage() {
   }, [owner]);
   useEffect(() => {
     const sequence = ++listSequence.current;
-    setSessions([]); setSessionId(''); setSnapshot(null); setTool(''); setBlueprint(null); setBatchOpen(false); setConnection(''); setReferences([]);
+    setSessions([]); setSessionId(''); setSnapshot(null); setTool(''); setImportOpen(false); setMemoOpen(false); setBlueprint(null); setBatchOpen(false); setConnection(''); setReferences([]);
     localStorage.setItem('novel:mode:' + owner, activeMode);
     if (!projectId) return;
     localStorage.setItem('novel:project:' + owner, projectId);
@@ -99,6 +102,21 @@ export default function NovelCreationPage() {
     }
     timer = setTimeout(poll, 1500); return () => { disposed = true; clearTimeout(timer); };
   }, [scopeKey, run?.id, run?.status]);
+  useEffect(() => {
+    if (!memoOpen) return;
+    const previous = document.activeElement, popup = memoPopup.current;
+    popup?.querySelector('button')?.focus();
+    const keyboard = e => {
+      if (e.key === 'Escape') { e.preventDefault(); setMemoOpen(false); }
+      if (e.key !== 'Tab') return;
+      const controls = [...popup.querySelectorAll('button,input,textarea,[tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
+      const first = controls[0], last = controls.at(-1);
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+    };
+    popup?.addEventListener('keydown', keyboard);
+    return () => { popup?.removeEventListener('keydown', keyboard); if (previous?.isConnected) previous.focus(); };
+  }, [memoOpen]);
   useEffect(() => {
     const move = e => { if (resize.current) { const next = width(window.innerWidth - e.clientX); setInspectorWidth(next); localStorage.setItem('novel:inspector-width', String(next)); } };
     const end = () => { resize.current = false; document.body.classList.remove('novel-creation-resizing'); };
@@ -189,8 +207,9 @@ export default function NovelCreationPage() {
     try { await scope.call(novelRequest('/projects', values, { signal: scope.signal }), r => { setProjects(old => [r.project, ...old]); setProjectId(r.project.id); setProjectModal(false); projectForm.resetFields(); }); } catch (e) { error(e); }
   }
   async function openTool(label) {
-    if (!projectId) { message.info('请先选择或创建作品'); return; }
-    setTool(label); if (label === '数据看板') try { await scope.call(request('/dashboard'), r => setDashboard(r.dashboard)); } catch (e) { error(e); }
+    if (label === '导入素材') { setImportOpen(true); return; }
+    if (label === '备忘录') { setMemoOpen(true); return; }
+    setTool(label); if (label === '数据看板' && projectId) { setDashboard(null); try { await scope.call(request('/dashboard'), r => setDashboard(r.dashboard)); } catch (e) { error(e); } }
   }
   const input = { ...draft, modeInputs: draft.modeInputs || {}, knowledgeIds: draft.knowledgeIds || [], noteIds: draft.noteIds || [], styleProfileId: draft.styleProfileId || '' };
   const materialsProps = { projectId, selectedIds: draft.knowledgeIds || [], onSelect: knowledgeIds => changeDraft({ knowledgeIds }), onSelection: selection => { if (['continuation', 'fanfiction'].includes(activeMode)) changeDraft({ modeInputs: { ...draft.modeInputs, [MODE_FIELDS[activeMode][0]]: selection.content } }); }, onReferencesChanged: items => setReferences(old => [...new Map([...old, ...items].map(i => [i.id, i])).values()]), styleId: draft.styleProfileId, onStyle: styleProfileId => changeDraft({ styleProfileId }), onMaintenance: maintenance };
@@ -201,12 +220,17 @@ export default function NovelCreationPage() {
   return <div className="novel-creation-page" style={{ '--novel-inspector-width': inspectorWidth + 'px' }}>
     <main className="novel-creation-workbench">
       <aside className="novel-creation-sidebar">
-        <h3>开始创作</h3><div className="novel-mode-groups">{[['原创创作', MODES.slice(0, 2)], ['参考创作', MODES.slice(2, 4)], ['衍生创作', MODES.slice(4)]].map(([label, items]) => <div key={label}><small>{label}</small><div className="novel-creation-mode-tabs">{items.map(([id, name]) => <button type="button" className={activeMode === id ? 'active' : ''} key={id} onClick={() => setActiveMode(id)}>{name}</button>)}</div></div>)}</div>
+        <div className="novel-sidebar-content">
+        <h3>开始创作</h3><div className="novel-creation-mode-tabs">{MODES.map(([id, name]) => <button type="button" className={activeMode === id ? 'active' : ''} key={id} onClick={() => { setActiveMode(id); setTool(''); }}>{name}</button>)}</div>
         <div className="novel-sidebar-heading"><b>我的作品 {visibleProjects.length}</b><Button aria-label="新建作品" type="text" icon={<Plus size={16} />} onClick={() => setProjectModal(true)} /><Button aria-label="作品归档库" type="text" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)} /></div>
-        <div className="novel-projects">{visibleProjects.map(p => <div key={p.id} className="novel-project"><button type="button" aria-label={`选择作品${p.title}`} className={projectId === p.id ? 'active' : ''} onClick={() => setProjectId(p.id)}>{p.title}</button>{projectId === p.id && <div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'project', action: 'rename', title: p.title })}>重命名作品</Button><Button size="small" onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>
-        <div className="novel-session-heading">{modeName}会话</div><div className="novel-sessions">{sessions.filter(s => s.mode === activeMode).map(s => <div className="novel-session" key={s.id}><button type="button" disabled={!!s.archivedAt} className={sessionId === s.id ? 'active' : ''} onClick={() => setSessionId(s.id)}>{s.title}{s.archivedAt ? '（已归档）' : s.currentRunId ? ' · 有任务' : ''}</button><div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: 'rename', title: s.title })}>重命名会话</Button><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'archive' })}>{s.archivedAt ? '恢复会话' : '归档会话'}</Button></div></div>)}</div><Button onClick={() => createSession()} icon={<Plus size={14} />} disabled={archived}>新建会话</Button>
+        <div className="novel-projects">{visibleProjects.map(p => <div key={p.id} className="novel-project"><button type="button" aria-label={`选择作品${p.title}`} className={projectId === p.id ? 'active' : ''} onClick={() => { setProjectId(p.id); setTool(''); }}>{p.title}</button>{projectId === p.id && <div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'project', action: 'rename', title: p.title })}>重命名作品</Button><Button size="small" onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>
+        <div className="novel-session-heading">{modeName}会话</div><div className="novel-sessions">{sessions.filter(s => s.mode === activeMode).map(s => <div className="novel-session" key={s.id}><button type="button" disabled={!!s.archivedAt} className={sessionId === s.id ? 'active' : ''} onClick={() => { setSessionId(s.id); setTool(''); }}>{s.title}{s.archivedAt ? '（已归档）' : s.currentRunId ? ' · 有任务' : ''}</button><div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: 'rename', title: s.title })}>重命名会话</Button><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'archive' })}>{s.archivedAt ? '恢复会话' : '归档会话'}</Button></div></div>)}</div><Button onClick={() => createSession()} icon={<Plus size={14} />} disabled={archived}>新建会话</Button>
+        </div><nav className="novel-creation-toolbar" aria-label="创作工具">{TOOLS.map(([label, Icon]) => <Button key={label} type="text" className={tool === label ? 'active' : ''} icon={<Icon size={16} />} onClick={() => openTool(label)}>{label}</Button>)}</nav>
       </aside>
-      <section className="novel-creation-conversation">
+      {tool ? <section className="novel-creation-tool-workspace" aria-label={tool}>
+        <header className="novel-chat-heading"><Button onClick={() => setTool('')}>返回对话</Button><b>{tool}</b></header>
+        <div className="novel-tool-content" key={scopeKey + ':' + tool}>{!projectId ? <Empty description="请先选择作品后使用此工具" /> : tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} /> : tool === '写作风格' ? <MaterialsPanel {...materialsProps} styleMode /> : tool === '定时写作' ? <AutomationPanel projectId={projectId} sessionId={sessionId} mode={activeMode} input={input} models={models} ensureSession={() => createSession(false)} /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <dl>{[['章节数', dashboard.chapterCount], ['总字数', dashboard.totalWords], ['任务总数', dashboard.runTotal], ['成功率', `${Number(dashboard.successRate ?? 0).toFixed(1)}%`]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : <Empty description="暂无统计" />}</div>}</div>
+      </section> : <><section className="novel-creation-conversation">
         <header className="novel-chat-heading"><b>{currentSession?.title || modeName}</b>{connection && <button type="button" className="novel-connection" onClick={() => setRefresh(v => v + 1)}>{connection}</button>}</header>
         <div className="novel-creation-chat-scroll">{!snapshot?.messages?.length && !run && <div className="novel-creation-welcome"><BookOpen size={36} /><h3>{modeName}</h3><p>写下人物、世界、冲突或创作方向，选择资料后开始创作。</p></div>}
           {(snapshot?.messages || []).map((m, i) => <article key={m.id || i} className={`novel-creation-message ${m.role}`}><b>{m.role === 'user' ? '我' : '创作助手'}</b><p>{m.content}</p></article>)}
@@ -224,13 +248,13 @@ export default function NovelCreationPage() {
           {maintenanceIntent && <div className="novel-notice" role="status">资料分析提交结果尚未核对，将使用原来的提交编号恢复。<Button onClick={() => maintenance(maintenanceIntent.kind, maintenanceIntent.styleId)}>恢复分析提交</Button></div>}
         </div>
       </section>
-      <div className="novel-creation-resizer" role="separator" aria-label="调整资料栏宽度" onPointerDown={() => { resize.current = true; document.body.classList.add('novel-creation-resizing'); }} />
-      <aside className="novel-creation-inspector"><div className="novel-creation-toolbar">{TOOLS.map(([label, Icon]) => <Button key={label} icon={<Icon size={14} />} onClick={() => openTool(label)}>{label}</Button>)}</div><div className="novel-current-reference"><h3>当前资料</h3><p>{project?.title || '尚未选择作品'} · {project?.genre || '选择作品后显示资料'}</p>{(draft.knowledgeIds || []).map(id => <small key={id}>{references.find(r => r.id === id)?.title || '已保存参考范围'}</small>)}</div>
+      {projectId && <><div className="novel-creation-resizer" role="separator" aria-label="调整资料栏宽度" onPointerDown={() => { resize.current = true; document.body.classList.add('novel-creation-resizing'); }} />
+      <aside className="novel-creation-inspector"><div className="novel-current-reference"><h3>当前资料</h3><p>{project?.title} · {project?.genre}</p>{(draft.knowledgeIds || []).map(id => <small key={id}>{references.find(r => r.id === id)?.title || '已保存参考范围'}</small>)}</div>
         <Tabs defaultActiveKey="chapters" items={[
           { key: 'chapters', label: `正文${chapters.length ? '（' + chapters.length + '）' : ''}`, children: projectId ? <ChaptersPanel key={scopeKey} projectId={projectId} sessionId={sessionId} chapters={chapters} run={run} canExportShort={snapshot?.canExportShort === true} onChapter={chapter => setSnapshot(old => ({ ...old, chapters: (old?.chapters || []).map(c => c.id === chapter.id ? chapter : c) }))} onMaintenance={maintenance} onBatch={() => setBatchOpen(true)} /> : <Empty description="选择作品后查看正文" /> },
           ...(run ? [{ key: 'progress', label: '创作进度', children: <ol className="novel-timeline">{(snapshot.events || []).filter(e => e.type !== 'assistant.delta').map(e => <li key={e.eventId}><b>{STATUS[e.status] || '处理进度'}</b><p>{e.message}</p></li>)}</ol> }] : [])
         ]} />
-      </aside>
+      </aside></>}</>}
     </main>
     <Modal rootClassName="novel-modal" open={projectModal} title="新建小说作品" okText="创建作品" cancelText="取消" onCancel={() => setProjectModal(false)} onOk={() => projectForm.submit()} destroyOnHidden>
       <Form form={projectForm} layout="vertical" onFinish={createProject} initialValues={{ genre: '都市', modelId: models[0]?.value, targetChapterWords: 2000 }}><Form.Item name="title" label="作品名称" rules={[{ required: true, whitespace: true, message: '请输入作品名称' }]}><Input /></Form.Item><Form.Item name="genre" label="题材" rules={[{ required: true, whitespace: true, message: '请输入题材' }]}><Input /></Form.Item><Form.Item name="modelId" label="文本模型" rules={[{ required: true, message: '请选择文本模型' }]}><Select options={models} /></Form.Item><Form.Item name="targetChapterWords" label="每章目标字数"><InputNumber min={800} max={10000} /></Form.Item>{[['world', '世界设定'], ['protagonist', '主角设定'], ['coreConflict', '核心冲突']].map(([name, label]) => <Form.Item key={name} name={name} label={label}><Input.TextArea rows={2} /></Form.Item>)}</Form>
@@ -238,9 +262,8 @@ export default function NovelCreationPage() {
     <Modal rootClassName="novel-modal" open={!!manage} title={manage?.action === 'rename' ? '重命名' : manage?.action === 'restore' ? '恢复' : '归档'} okText={manage?.action === 'rename' ? '保存名称' : manage?.action === 'restore' ? '确认恢复' : '确认归档'} cancelText="取消" onCancel={() => setManage(null)} onOk={projectAction}>{manage?.action === 'rename' ? <Input aria-label="新名称" value={manage.title} onChange={e => setManage(old => ({ ...old, title: e.target.value }))} /> : <p>{manage?.action === 'restore' ? '恢复会重新计算保留时间；自动写作保持暂停。' : '进入可恢复的归档；正在创作时请先停止任务。'}</p>}</Modal>
     <BlueprintEditor value={blueprint} onChange={setBlueprint} onCancel={() => setBlueprint(null)} onConfirm={value => runAction('confirm', { blueprint: value })} />
     <Modal rootClassName="novel-modal" open={batchOpen} title="批量续写" width={720} footer={null} onCancel={() => setBatchOpen(false)} destroyOnHidden>{batchOpen && projectId && <AutomationPanel key={scopeKey} projectId={projectId} sessionId={sessionId} mode={activeMode} input={input} models={models} kind="batches" ensureSession={() => createSession(false)} />}</Modal>
-    <Drawer rootClassName="novel-drawer" open={!!tool} title={tool} width={520} onClose={() => setTool('')} destroyOnHidden>
-      {tool && projectId && <div key={scopeKey + ':' + tool}>{tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} /> : ['导入素材', '写作风格'].includes(tool) ? <MaterialsPanel {...materialsProps} styleMode={tool === '写作风格'} /> : tool === '备忘录' ? <NotesPanel projectId={projectId} selectedIds={draft.noteIds || []} onSelect={noteIds => changeDraft({ noteIds })} /> : tool === '定时写作' ? <AutomationPanel projectId={projectId} sessionId={sessionId} mode={activeMode} input={input} models={models} ensureSession={() => createSession(false)} /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <dl>{[['章节数', dashboard.chapterCount], ['总字数', dashboard.totalWords], ['任务总数', dashboard.runTotal], ['成功率', `${Number(dashboard.successRate ?? 0).toFixed(1)}%`]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : <Empty description="暂无统计" />}</div>}</div>}
-    </Drawer>
+    <Modal rootClassName="novel-modal novel-import-modal" open={importOpen} title="导入素材" width={720} footer={null} onCancel={() => setImportOpen(false)} destroyOnHidden>{importOpen && (projectId ? <MaterialsPanel key={scopeKey} {...materialsProps} /> : <Empty description="请先选择作品后导入素材" />)}</Modal>
+    {memoOpen && createPortal(<div className="novel-memo-overlay" onClick={e => { if (e.target === e.currentTarget) setMemoOpen(false); }}><section ref={memoPopup} className="novel-memo-popup" role="dialog" aria-modal="true" aria-labelledby="novel-memo-title"><header className="novel-chat-heading"><b id="novel-memo-title">备忘录</b><Button aria-label="关闭备忘录" onClick={() => setMemoOpen(false)}>关闭</Button></header>{projectId ? <NotesPanel key={scopeKey} projectId={projectId} selectedIds={draft.noteIds || []} onSelect={noteIds => changeDraft({ noteIds })} /> : <Empty description="请先选择作品后使用备忘录" />}</section></div>, document.body)}
     <Drawer rootClassName="novel-drawer" open={archiveOpen} title="作品归档库" width={520} onClose={() => setArchiveOpen(false)}>{archivedProjects.map(p => { const purging = p.status === 'purging' || retention[`novel_creation:${p.id}`]?.purging; return <div className="novel-item" key={p.id}><b>{p.title}</b><p>{purging ? '作品正在清理，暂不可恢复' : '归档后可恢复；恢复后重新计算保留时间'}</p><Button disabled={purging} onClick={async () => { try { await ownerScope.call(novelProjectRequest(p.id, '/restore', {}, { signal: ownerScope.signal }), () => { setProjects(old => old.map(item => item.id === p.id ? { ...item, status: 'active' } : item)); setRetention(old => ({ ...old, [`novel_creation:${p.id}`]: {} })); message.success('作品已恢复，自动写作保持暂停'); }); } catch (e) { if (ownerScope.isCurrent()) message.error(e.message); } }}>恢复作品</Button></div>; })}</Drawer>
   </div>;
 }

@@ -21,7 +21,7 @@
   width: 260px;
   flex: 0 0 260px;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 16px 12px;
   border-right: 1px solid var(--border-default,#ddd);
   display: flex;
@@ -33,20 +33,27 @@
   margin: 0 0 4px
 }
 
-.novel-mode-groups{
+.novel-sidebar-content{
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px
+  gap: 10px
 }
 
-.novel-mode-groups small,.novel-session-heading{
+.novel-sidebar-content>*{
+  flex-shrink: 0
+}
+
+.novel-session-heading{
   color: var(--text-secondary,#777);
   font-size: 12px
 }
 
 .novel-creation-mode-tabs{
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 5px;
   margin-top: 5px
 }
@@ -117,7 +124,7 @@
   overflow: auto
 }
 
-.novel-creation-conversation{
+.novel-creation-conversation,.novel-creation-tool-workspace{
   flex: 1;
   min-width: 290px;
   min-height: 0;
@@ -240,16 +247,55 @@ body.novel-creation-resizing{
 
 .novel-creation-toolbar{
   display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 6px;
-  padding: 10px 10px 0;
-  max-height: min(52vh,520px);
-  overflow: auto
+  grid-template-columns: 1fr;
+  flex-shrink: 0;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-default,#ddd)
 }
 
 .novel-creation-toolbar .ant-btn{
+  justify-content: flex-start;
   font-size: 12px;
   padding-inline: 6px
+}
+
+.novel-creation-toolbar .ant-btn.active{
+  color: var(--theme-primary,#7360d9);
+  background: color-mix(in srgb,var(--theme-primary,#7360d9) 12%,transparent)
+}
+
+.novel-tool-content{
+  flex: 1;
+  min-height: 0;
+  overflow: auto
+}
+
+.novel-memo-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10,15,25,.62)
+}
+
+.novel-memo-popup{
+  width: min(760px,100%);
+  max-height: 85dvh;
+  overflow: auto;
+  border: 1px solid var(--border-default,#ddd);
+  border-radius: 12px;
+  color: var(--text-primary,#202534);
+  background: var(--surface-base,#fff);
+  box-shadow: 0 20px 70px rgba(0,0,0,.25)
+}
+
+.novel-memo-popup *{
+  box-sizing: border-box
 }
 
 .novel-current-reference{
@@ -424,8 +470,8 @@ body.novel-creation-resizing{
 
 /* Body portals inherit the solid root palette, including above glass rules. */
 
-html[data-scheme][data-theme] body:has(.novel-creation-page) :is(.ant-modal-content,.ant-modal-header,.ant-drawer-content,.ant-drawer-header),
-body:has(.novel-creation-page) .ant-modal-content,body:has(.novel-creation-page) .ant-modal-header,body:has(.novel-creation-page) .ant-drawer-content,body:has(.novel-creation-page) .ant-drawer-header{
+html[data-scheme][data-theme] body:has(.novel-creation-page) :is(.ant-modal-content,.ant-modal-header,.ant-drawer-content,.ant-drawer-header,.novel-memo-popup,.novel-memo-popup .novel-chat-heading),
+body:has(.novel-creation-page) .ant-modal-content,body:has(.novel-creation-page) .ant-modal-header,body:has(.novel-creation-page) .ant-drawer-content,body:has(.novel-creation-page) .ant-drawer-header,body:has(.novel-creation-page) .novel-memo-popup,body:has(.novel-creation-page) .novel-memo-popup .novel-chat-heading{
   background: var(--surface-base,#fff)!important;
   background-image: none!important;
   backdrop-filter: none!important;
