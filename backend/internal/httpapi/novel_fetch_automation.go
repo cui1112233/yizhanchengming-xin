@@ -294,19 +294,24 @@ func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.S
 			// Age alone does not prove a queued job is orphaned. Never replace a
 			// job which Redis still owns, or retry when Redis cannot be checked.
 			jobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
-			if len(queues) == 0 || jobID == "" {
-				continue
+			if jobID != "" {
+				if len(queues) == 0 {
+					continue
+				}
+				checker, ok := queues[0].(interface {
+					ProcessJobExists(context.Context, string) (bool, error)
+				})
+				if !ok {
+					continue
+				}
+				exists, checkErr := checker.ProcessJobExists(ctx, jobID)
+				if checkErr != nil || exists {
+					continue
+				}
 			}
-			checker, ok := queues[0].(interface {
-				ProcessJobExists(context.Context, string) (bool, error)
-			})
-			if !ok {
-				continue
-			}
-			exists, checkErr := checker.ProcessJobExists(ctx, jobID)
-			if checkErr != nil || exists {
-				continue
-			}
+			// jobID 为空说明没有任何 Redis 任务持有这本书（常见于早期版本或
+			// 入队前中断），属于彻底的孤儿状态；继续跳过会让它永远显示“排队中”，
+			// 因此和超时任务一样转入等待重试，交给自动扫描重新入队。
 		}
 		if recoveryQueue != nil && status != "queued" {
 			staleJobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
