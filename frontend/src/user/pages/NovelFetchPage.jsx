@@ -1694,12 +1694,12 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
   }
   async function retryAllFailedTasks() {
     const failed = tasks
-      .filter(task => novelFetchTaskStatus(task).status === 'failed')
+      .filter(task => currentBatchIds.includes(task.bookId || task.book_id) && novelFetchTaskStatus(task).status === 'failed')
       .map(task => task.bookId || task.book_id)
       .filter(Boolean);
-    if (!failed.length) return message.info('全部任务中没有失败项');
+    if (!failed.length) return message.info('当前批次没有失败任务');
     setTaskActionBusy('retry-all-failed');
-    try { const result = await retryWorkshopTasks(failed); await Promise.all([loadTasks(), loadCurrentBatch()]); message[result.failed ? 'warning' : 'success'](`重试已处理：${novelFetchBatchResultSummary(result)}`); } catch (error) { message.error(error.message || '重试全部失败任务失败'); } finally { setTaskActionBusy(''); }
+    try { const result = await retryWorkshopTasks(failed); await Promise.all([loadTasks(), loadCurrentBatch()]); message[result.failed ? 'warning' : 'success'](`重试已处理：${novelFetchBatchResultSummary(result)}`); } catch (error) { message.error(error.message || '重试当前批次失败任务失败'); } finally { setTaskActionBusy(''); }
   }
   function selectAllTasks() { setSelectedTaskKeys(visibleTasks.map(task => task.bookId || task.book_id).filter(Boolean)); }
   function shiftTaskDate(days) {
@@ -1719,21 +1719,15 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     try { await applyWorkshopRules(ids, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success('已完成全部任务规则处理'); } catch (error) { message.error(error.message || '规则处理失败'); } finally { setTaskActionBusy(''); }
   }
   async function applyRulesToAllTasks() {
-    const ids = tasks.map(task => task.bookId || task.book_id).filter(Boolean);
-    if (!ids.length) return message.warning('当前没有可处理任务');
+    const ids = currentBatchIds;
+    if (!ids.length) return message.warning('当前批次没有可处理任务');
     setTaskActionBusy('rules-all');
-    try { await applyWorkshopRules(ids, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success(`已处理全部 ${ids.length} 个任务`); } catch (error) { message.error(error.message || '规则处理全部任务失败'); } finally { setTaskActionBusy(''); }
+    try { await applyWorkshopRules(ids, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success(`已处理当前批次 ${ids.length} 个任务`); } catch (error) { message.error(error.message || '规则处理当前批次任务失败'); } finally { setTaskActionBusy(''); }
   }
   async function submitVisibleTasks() {
     const ids = currentBatchIds;
     if (!ids.length) return message.info('当前没有可提交任务');
     const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), '当前批次提交已处理');
-    if (result) setWebSubmitResults(result.results || []);
-  }
-  async function submitAllTasks() {
-    const ids = tasks.map(task => task.bookId || task.book_id).filter(Boolean);
-    if (!ids.length) return message.info('当前没有可提交任务');
-    const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), `已提交全部 ${ids.length} 个任务`);
     if (result) setWebSubmitResults(result.results || []);
   }
   async function deleteTasksByFilter(filter, emptyMessage, scopeIds = null) {
@@ -2033,10 +2027,10 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
           <V88Button variant="secondary" loading={taskActionBusy === 'retry-all-failed'} onClick={retryAllFailedTasks}>重试全部失败</V88Button>
           <Select className="novel-fetch-rule-scope" value={ruleApplyScope} onChange={setRuleApplyScope} options={[{ value: 'both', label: '规则处理原文 + AI' }, { value: 'original', label: '只处理原文' }, { value: 'ai', label: '只处理 AI' }]} />
           <V88Button variant="secondary" loading={taskActionBusy === 'rules-all'} onClick={applyRulesToAllTasks}>规则处理全部</V88Button>
-          <V88Button variant="primary" onClick={() => Modal.confirm({ title: '提交全部任务？', content: `将提交任务列表中的 ${tasks.length} 个任务。`, onOk: submitAllTasks })}>提交全部</V88Button>
+          <V88Button variant="primary" loading={webSubmitLoading} onClick={() => Modal.confirm({ title: '提交当前批次？', content: `将提交当前批次的 ${currentBatchIds.length} 个任务。`, onOk: submitVisibleTasks })}>提交当前批次</V88Button>
           <span className="novel-fetch-toolbar-spacer" />
-          <V88Button variant="danger" onClick={() => deleteTasksByFilter(task => novelFetchTaskStatus(task).status === 'failed', '当前没有失败任务')}>删除失败</V88Button>
-          <V88Button variant="danger" onClick={() => deleteTasksByFilter(() => true, '当前没有任务')}>删除全部</V88Button>
+          <V88Button variant="danger" onClick={() => deleteTasksByFilter(task => novelFetchTaskStatus(task).status === 'failed', '当前批次没有失败任务', currentBatchIds)}>删除失败</V88Button>
+          <V88Button variant="danger" onClick={() => deleteTasksByFilter(() => true, '当前批次没有任务', currentBatchIds)}>删除全部</V88Button>
         </div>
         {selectedTaskKeys.length ? <div className="novel-fetch-task-selection-bar">
           <Typography.Text strong>已选 {selectedTaskKeys.length} 个任务</Typography.Text>
