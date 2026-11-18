@@ -69,6 +69,15 @@ func (s *Service) StartScheduler(ctx context.Context, owner, project string, in 
 		if projectReadOnly(p.Status) {
 			return archivedError()
 		}
+		priorPlans, e := tx.ListSchedules(ctx, owner, project)
+		if e != nil {
+			return e
+		}
+		for _, prior := range priorPlans {
+			if prior.Status != "stopped" && prior.Status != "completed" {
+				return inputError("此作品已有未停止的调度计划，请先恢复或停止原计划，避免重复生产")
+			}
+		}
 		session, e := writableSession(ctx, tx, owner, project, in.SessionID)
 		if e != nil {
 			return e

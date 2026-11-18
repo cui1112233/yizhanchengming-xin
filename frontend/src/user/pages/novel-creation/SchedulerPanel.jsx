@@ -1,12 +1,12 @@
 import {Button,InputNumber,Select} from 'antd';
 import {useEffect,useRef,useState} from 'react';
 import {novelProjectRequest} from '../../../shared/api/novelCreation.js';
-import {readSaved} from './contracts.js';
+import {readSaved,STATUS} from './contracts.js';
 import useWorkspaceScope from './useWorkspaceScope.js';
 import './SchedulerPanel.css';
 import AutomationPanel from './AutomationPanel.jsx';
 
-export default function SchedulerPanel({owner,projectId,sessionId,mode,modelId,models=[],ensureSession}) {
+export default function SchedulerPanel({owner,projectId,sessionId,mode,modelId,models=[],ensureSession,onOpenSession}) {
  const scope=useWorkspaceScope(`${owner}:${projectId}`),cache=`novel:scheduler-start:${encodeURIComponent(owner)}:${encodeURIComponent(projectId||'_')}`;
  const [items,setItems]=useState([]),[selected,setSelected]=useState(''),[ready,setReady]=useState(!projectId),[error,setError]=useState(''),[busy,setBusy]=useState(false),[pending,setPending]=useState(()=>readSaved(cache,null));
  const [legacy,setLegacy]=useState(false);
@@ -40,6 +40,8 @@ export default function SchedulerPanel({owner,projectId,sessionId,mode,modelId,m
   <div className="novel-scheduler-status"><span>状态：<b role="status">{status}</b></span>{plan&&<span>今日 {plan.dailySavedChapters??0} 章 | 累计 {plan.totalSavedChapters??0} 章</span>}</div>
   {error&&<p role="alert">{error}</p>}{projectId&&!ready&&<Button onClick={load}>重新读取状态</Button>}
   {(plan?.consecutiveFailures>0||plan?.lastFailure||plan?.lastError||plan?.configurationError)&&<p role="alert">连续失败 {plan.consecutiveFailures??0} 次{plan.lastFailure||plan.lastError||plan.configurationError?` — ${plan.lastFailure||plan.lastError||plan.configurationError}`:''}</p>}
+  {plan?.waitingReason&&<p role="status">{STATUS[plan.waitingReason]||plan.waitingReason}</p>}
+  {plan?.sessionId&&onOpenSession&&<Button type="link" onClick={()=>onOpenSession(plan.sessionId)}>查看创作会话</Button>}
   {pending&&<p role="status">启动结果尚未核对，将查询原编号，不会自动重新启动。<Button disabled={busy} loading={busy} onClick={recover}>核对启动结果</Button></p>}
   {running||paused?<div className="novel-scheduler-controls"><Button loading={busy} onClick={()=>control(paused?'resume':'pause')}>{paused?'恢复':'暂停'}</Button><Button danger loading={busy} onClick={()=>control('stop')}>停止</Button></div>:<>
    <div className="novel-scheduler-fields"><label>写作间隔（分钟）<InputNumber controls={false} aria-label="写作间隔（分钟）" min={1} max={1440} value={minutes} onChange={setMinutes} disabled={busy||!!pending}/></label><label>每日上限<InputNumber controls={false} aria-label="每日上限" min={1} max={100} value={cap} onChange={setCap} disabled={busy||!!pending}/></label><label>连续失败暂停阈值<InputNumber controls={false} aria-label="连续失败暂停阈值" min={1} max={10} value={failures} onChange={setFailures} disabled={busy||!!pending}/></label></div>

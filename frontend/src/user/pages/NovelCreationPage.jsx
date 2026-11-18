@@ -315,6 +315,17 @@ export default function NovelCreationPage() {
     if (!scope.isCurrent()) return;
     try { await scope.call(novelRequest('/projects', values, { signal: scope.signal }), r => { localStorage.setItem('novel:view:'+owner,'book');setProjects(old => [r.project, ...old]); setProjectId(r.project.id); setProjectModal(false); projectForm.resetFields(); }); } catch (e) { error(e); }
   }
+  async function openScheduledSession(id) {
+    try {
+      const result = await scope.call(getNovelCreationSessionSnapshot(id, scope.signal));
+      if (!result) return;
+      const target = result.session;
+      if (!target?.id || target.projectId !== projectId) throw Error('调度会话与当前作品不匹配，请重新读取状态');
+      localStorage.setItem(`novel:session:${owner}:${projectId}:${target.mode}`, target.id);
+      localStorage.setItem(`novel:project-mode:${owner}:${projectId}`, target.mode);
+      setActiveMode(target.mode); setSessionId(target.id); setSnapshot(result); setTool('');
+    } catch (e) { error(e); }
+  }
   async function openTool(label) {
     if (label === '导入素材') { setImportOpen(true); return; }
     if (label === '备忘录') { setMemoOpen(true); return; }
@@ -339,7 +350,7 @@ export default function NovelCreationPage() {
       </aside>
       {tool ? <section className="novel-creation-tool-workspace" aria-label={tool}>
         <header className="novel-chat-heading"><Button onClick={() => setTool('')}>返回对话</Button><b>{tool}</b></header>
-        <div className="novel-tool-content" key={scopeKey + ':' + tool}>{tool === '定时写作' ? <SchedulerPanel key={projectReadKey} owner={owner} projectId={projectId} sessionId={sessionId} mode={activeMode} modelId={draft.modelId} models={models} ensureSession={() => createSession(false)}/> : !projectId ? <Empty description="请先选择作品后使用此工具" /> : tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} mode={activeMode} /> : tool === '写作风格' ? <MaterialsPanel {...materialsProps} styleMode /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <dl>{[['章节数', dashboard.chapterCount], ['总字数', dashboard.totalWords], ['任务总数', dashboard.runTotal], ['成功率', `${Number(dashboard.successRate ?? 0).toFixed(1)}%`]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : <Empty description="暂无统计" />}</div>}</div>
+        <div className="novel-tool-content" key={scopeKey + ':' + tool}>{tool === '定时写作' ? <SchedulerPanel key={projectReadKey} owner={owner} projectId={projectId} sessionId={sessionId} mode={activeMode} modelId={draft.modelId} models={models} ensureSession={() => createSession(false)} onOpenSession={openScheduledSession}/> : !projectId ? <Empty description="请先选择作品后使用此工具" /> : tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} mode={activeMode} /> : tool === '写作风格' ? <MaterialsPanel {...materialsProps} styleMode /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <dl>{[['章节数', dashboard.chapterCount], ['总字数', dashboard.totalWords], ['任务总数', dashboard.runTotal], ['成功率', `${Number(dashboard.successRate ?? 0).toFixed(1)}%`]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : <Empty description="暂无统计" />}</div>}</div>
       </section> : studioView ? <StudioChat key={`${owner}:${studioSessionId}`} owner={owner} sessionId={studioSessionId} models={models} onSessionSelected={id=>setStudioSessionId(id)} onSessionCreated={item=>setStudioSessions(old=>[item,...old.filter(x=>x.id!==item.id)])} onTransition={result=>{setProjects(old=>[result.project,...old.filter(x=>x.id!==result.project.id)]);localStorage.setItem('novel:view:'+owner,'book');localStorage.setItem('novel:project:'+owner,result.project.id);localStorage.setItem(`novel:session:${owner}:${result.project.id}:long_original`,result.productionSession.id);setProjectId(result.project.id);setActiveMode('long_original');setSessionId(result.productionSession.id);setTool('');setRefresh(v=>v+1);}}/> : <><section className="novel-creation-conversation">
         <header className="novel-chat-heading"><b>{currentSession?.title || modeName}</b>{connection && <button type="button" className="novel-connection" onClick={() => setRefresh(v => v + 1)}>{connection}</button>}</header>
         <div className="novel-creation-chat-scroll">{!snapshot?.messages?.length && !run && <div className="novel-creation-welcome"><p>告诉我你想写什么——题材、世界观、主角、核心冲突。</p></div>}
