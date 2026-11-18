@@ -178,6 +178,23 @@ $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $releaseDir 're
 Copy-Item -LiteralPath $binaryPath -Destination (Join-Path $releaseRoot 'qiantie-server-linux-amd64') -Force
 Copy-Item -LiteralPath (Join-Path $releaseDir 'release.json') -Destination (Join-Path $releaseRoot 'release.json') -Force
 
+# /api/runtime-build-info 和更新说明读取的是生产 runtime-release.json，
+# 之前依赖人工维护，出现过“二进制已替换、SHA 和入口仍是旧值”的追溯缺口。
+# 这里随发布包一起生成，并在部署时一并同步。
+$runtimeManifest = [ordered]@{
+  binaryPath          = $TargetPath
+  frontendEntry       = $frontendEntry
+  releaseId           = "qiantie-$timestamp-$shortSha"
+  buildId             = "$timestamp-$shortSha"
+  sourceSnapshot      = "$gitSha merged into v88 via scripts/deploy-go-embedded.ps1"
+  sha256              = $hash
+  frontendSourceState = $frontendSourceState
+  gitSha              = $gitSha
+  activatedAtUtc      = (Get-Date).ToUniversalTime().ToString('o')
+}
+$runtimeManifestPath = Join-Path $releaseDir 'runtime-release.json'
+$runtimeManifest | ConvertTo-Json | Set-Content -LiteralPath $runtimeManifestPath -Encoding utf8
+
 Write-Host "4/5 本地发布包已生成：$releaseDir"
 Write-Host "Git SHA：$gitSha"
 Write-Host "SHA-256：$hash"
@@ -217,9 +234,22 @@ if ($Deploy) {
     throw "上传二进制失败：重试 $uploadAttempts 次后仍未通过 SHA-256 校验。"
   }
   Write-Host "上传已通过 SHA-256 校验（第 $attempt 次）。"
+  $remoteManifest = "/tmp/qiantie-runtime-release-$timestamp.json"
+  Invoke-NativeWithTimeout 'scp' (@('-P', "$SshPort") + $connectionOptions + @($runtimeManifestPath, "${remote}:$remoteManifest")) 120
+  $remoteDir = ($TargetPath -replace '/[^/]+$', '')
+  if ([string]::IsNullOrWhiteSpace($remoteDir)) { $remoteDir = '/' }
+  $remoteEnvFile = "$remoteDir/qiantie.env"
   # 远端目标是正在运行的二进制，直接 install 覆盖会触发 ETXTBSY；
   # 先装到同目录的 .new 再 mv，保证原子替换。
-  $remoteCommand = "set -eu; sudo install -D -m 0755 '$remoteTemp' '$TargetPath.new'; sudo mv -f '$TargetPath.new' '$TargetPath'; rm -f '$remoteTemp'; sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
+  # 环境变量和 runtime-release.json 必须在重启前写入，重启后立即生效。
+  $remoteCommand = "set -eu; " +
+    "if [ -f '$remoteEnvFile' ]; then " +
+      "if grep -q '^QIANTIE_RELEASE_SHA=' '$remoteEnvFile'; then sudo sed -i 's|^QIANTIE_RELEASE_SHA=.*|QIANTIE_RELEASE_SHA=$gitSha|' '$remoteEnvFile'; " +
+      "else echo 'QIANTIE_RELEASE_SHA=$gitSha' | sudo tee -a '$remoteEnvFile' >/dev/null; fi; " +
+    "fi; " +
+    "sudo install -m 0644 '$remoteManifest' '$remoteDir/runtime-release.json'; rm -f '$remoteManifest'; " +
+    "sudo install -D -m 0755 '$remoteTemp' '$TargetPath.new'; sudo mv -f '$TargetPath.new' '$TargetPath'; rm -f '$remoteTemp'; " +
+    "sudo systemctl restart '$ServiceName'; sudo systemctl is-active --quiet '$ServiceName'"
   Invoke-NativeWithTimeout 'ssh' (@('-p', "$SshPort") + $connectionOptions + @($remote, $remoteCommand)) 300
   Write-Host "远端服务已重启并通过 systemd 健康检查：$ServiceName"
 
