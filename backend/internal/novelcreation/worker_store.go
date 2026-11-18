@@ -128,6 +128,7 @@ func (s *MemoryStore) atomicCreate(ctx context.Context, owner, project string, r
 		}
 	}
 	c := NewMemoryStore()
+	c.studios = maps.Clone(s.studios)
 	c.submissions = maps.Clone(s.submissions)
 	c.nextID, c.nextEventID = s.nextID, s.nextEventID
 	c.contentRecords = maps.Clone(s.contentRecords)
@@ -163,6 +164,7 @@ func (s *MemoryStore) atomicCreate(ctx context.Context, owner, project string, r
 	}
 	s.nextID, s.nextEventID = c.nextID, c.nextEventID
 	s.submissions = c.submissions
+	s.studios = c.studios
 	s.contentRecords = c.contentRecords
 	s.projects, s.sessions, s.messages, s.runs, s.runByKey, s.runEvents = c.projects, c.sessions, c.messages, c.runs, c.runByKey, c.runEvents
 	s.chapterBundles, s.chapterVersions, s.settings, s.foundations = c.chapterBundles, c.chapterVersions, c.settings, c.foundations

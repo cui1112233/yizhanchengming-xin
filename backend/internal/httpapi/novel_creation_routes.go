@@ -56,6 +56,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 
 	registerNovelContentRoutes(handle, decode, service)
 	registerNovelImportRoutes(handle, service)
+	registerNovelStudioRoutes(handle, decode, service, starter)
 	handle("GET /api/novel-creation/modes", func(w http.ResponseWriter, _ *http.Request, _ string) {
 		modes := make([]map[string]any, 0, len(novelCreationModes))
 		for _, mode := range novelCreationModes {

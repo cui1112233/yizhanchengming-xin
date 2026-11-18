@@ -11,6 +11,7 @@ import (
 )
 
 type MemoryStore struct {
+	studios          map[string]json.RawMessage
 	submissions      map[string]submissionReceipt
 	contentRecords   map[string]ContentRecord
 	automationRounds map[string]string
@@ -38,6 +39,7 @@ type MemoryStore struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
+		studios:          make(map[string]json.RawMessage),
 		submissions:      make(map[string]submissionReceipt),
 		contentRecords:   make(map[string]ContentRecord),
 		automationRounds: make(map[string]string),

@@ -10,6 +10,7 @@ import (
 // Store is the durable boundary for the novel-creation domain. Production
 // implementations persist through MySQL; MemoryStore exists for unit tests.
 type Store interface {
+	StudioStore
 	ChapterImportStore
 	ContentStore
 	ContentManagementStore
