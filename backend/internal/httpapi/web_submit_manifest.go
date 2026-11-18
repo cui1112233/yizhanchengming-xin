@@ -7,12 +7,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 )
 
-const webSubmitManifestVersion = 1
+const (
+	webSubmitManifestVersion     = 1
+	webSubmitManifestStaleSecond = 360
+)
 
 // webSubmitManifest 在第一次上传前把提交计划落盘，并逐项记录状态。
 // 崩溃后可以从 executing/unknown 区分“已派发但未确认”和“从未派发”，
@@ -35,8 +39,12 @@ func webSubmitManifestKey(id, version string) string {
 	return strings.TrimSpace(id) + "\x00" + strings.TrimSpace(version)
 }
 
+func webSubmitManifestDir(usersDir, owner string) (string, error) {
+	return UserScopedPath(usersDir, owner, "web-submit", "manifests")
+}
+
 func newWebSubmitManifest(usersDir, owner, runID, reason string, plan map[string]any) (*webSubmitManifest, error) {
-	dir, err := UserScopedPath(usersDir, owner, "web-submit", "manifests")
+	dir, err := webSubmitManifestDir(usersDir, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -168,13 +176,125 @@ func (m *webSubmitManifest) finish(status string) {
 }
 
 func (m *webSubmitManifest) flush() error {
-	raw, err := json.MarshalIndent(m.data, "", "  ")
+	return writeWebSubmitManifest(m.path, m.data)
+}
+
+func writeWebSubmitManifest(path string, data map[string]any) error {
+	raw, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}
-	temp := m.path + ".tmp"
+	temp := path + ".tmp"
 	if err := os.WriteFile(temp, raw, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(temp, m.path)
+	return os.Rename(temp, path)
+}
+
+// recoverStaleWebSubmitManifests 在拿到提交锁后调用：把超过 360 秒仍停留在
+// planned/executing 的旧清单收尾，executing 项转为 unknown。
+// 下一次提交只会做远端回读，不会重复派发。
+func recoverStaleWebSubmitManifests(usersDir, owner string) int {
+	dir, err := webSubmitManifestDir(usersDir, owner)
+	if err != nil {
+		return 0
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	now := time.Now().UTC()
+	recovered := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		data := map[string]any{}
+		if json.Unmarshal(raw, &data) != nil {
+			continue
+		}
+		status := strings.TrimSpace(toString(data["status"]))
+		if status != "planned" && status != "executing" {
+			continue
+		}
+		updated, err := time.Parse(time.RFC3339Nano, firstText(data["updated_at"], data["created_at"]))
+		if err != nil || now.Sub(updated) < webSubmitManifestStaleSecond*time.Second {
+			continue
+		}
+		unknown := 0
+		for _, rawItem := range arrayOrEmpty(data["items"]) {
+			item := mapOrEmpty(rawItem)
+			if toString(item["state"]) != "executing" {
+				continue
+			}
+			item["state"] = "unknown"
+			item["reason"] = "recovered_after_crash"
+			item["error"] = "提交进程中断，结果未知；下次提交只做远端核对"
+			item["updated_at"] = now.Format(time.RFC3339Nano)
+			unknown++
+		}
+		data["status"] = "recovered"
+		data["executing_count"] = 0
+		data["unknown_count"] = intValue(data["unknown_count"]) + unknown
+		data["updated_at"] = now.Format(time.RFC3339Nano)
+		if writeWebSubmitManifest(path, data) == nil {
+			recovered++
+		}
+	}
+	return recovered
+}
+
+// listWebSubmitManifests 返回最近的提交清单，按更新时间倒序，供历史/排障使用。
+func listWebSubmitManifests(usersDir, owner string, limit int) []any {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	dir, err := webSubmitManifestDir(usersDir, owner)
+	if err != nil {
+		return []any{}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return []any{}
+	}
+	type candidate struct {
+		path    string
+		updated time.Time
+	}
+	candidates := make([]candidate, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		candidates = append(candidates, candidate{path: filepath.Join(dir, entry.Name()), updated: info.ModTime()})
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].updated.After(candidates[j].updated) })
+	out := make([]any, 0, limit)
+	for _, item := range candidates {
+		if len(out) >= limit {
+			break
+		}
+		raw, err := os.ReadFile(item.path)
+		if err != nil {
+			continue
+		}
+		data := map[string]any{}
+		if json.Unmarshal(raw, &data) != nil {
+			continue
+		}
+		out = append(out, data)
+	}
+	return out
 }

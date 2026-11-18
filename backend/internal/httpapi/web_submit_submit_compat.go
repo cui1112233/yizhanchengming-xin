@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -123,6 +124,19 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 	// Keep both paths on the same handler so the Go 4001 page cannot 404.
 	root.Handle("POST /api/batch-rewrite/web-submit/submit", submitHandler)
 	root.Handle("POST /api/web-submit/submit", submitHandler)
+	// 提交清单读取：用于提交历史、排障和崩溃后确认上次轮次的落盘状态。
+	manifestHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		recoverStaleWebSubmitManifests(usersDir, identity.Username)
+		limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "runs": listWebSubmitManifests(usersDir, identity.Username, limit)})
+	}))
+	root.Handle("GET /api/batch-rewrite/web-submit/manifests", manifestHandler)
+	root.Handle("GET /api/web-submit/manifests", manifestHandler)
 }
 
 func webSubmitSkipSubmitted(web map[string]any) bool {

@@ -83,6 +83,8 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		return result, &webSubmitRequestError{Status: http.StatusConflict, Message: guardErr.Error()}
 	}
 	defer release()
+	// 拿到提交锁说明当前没有并发提交，可以安全收尾上次崩溃遗留的 executing 清单。
+	recoverStaleWebSubmitManifests(usersDir, owner)
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
 		return result, &webSubmitRequestError{Status: http.StatusInternalServerError, Message: "读取提交配置失败"}
