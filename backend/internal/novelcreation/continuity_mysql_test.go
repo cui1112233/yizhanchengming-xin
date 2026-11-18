@@ -87,9 +87,9 @@ func TestMySQLContinuityRetrySavesImmutableNewVersion(t *testing.T) {
 	mock.ExpectQuery("SELECT 1 FROM novel_runs").WithArgs("alice", b.RunID, b.ProjectID).WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	mock.ExpectExec("INSERT INTO novel_chapters").WillReturnResult(sqlmock.NewResult(1, 1))
 	// The historical row must never be updated on a duplicate chapter/version key.
-	mock.ExpectExec(`(?s)^INSERT INTO novel_chapter_versions .*VALUES \(\?, \?, \?, \?, \?, \?, \?, \?, \?\)$`).WithArgs(b.ChapterVersion.ID, "alice", b.ProjectID, b.Chapter.ID, b.RunID, 2, b.Chapter.Content, []byte(b.ChapterVersion.Snapshot), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`(?s)^INSERT INTO novel_chapter_versions .*VALUES \(\?, \?, \?, \?, \?, \?, \?, \?, \?\)$`).WithArgs(b.ChapterVersion.ID, "alice", b.ProjectID, b.Chapter.ID, b.RunID, 2, b.Chapter.Content, string(b.ChapterVersion.Snapshot), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec("INSERT INTO novel_memories").WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec("UPDATE novel_runs SET status").WithArgs(b.FinalRunStatus, []byte(b.RuntimeSnapshot), sqlmock.AnyArg(), sqlmock.AnyArg(), "alice", b.RunID, b.ProjectID).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("UPDATE novel_runs SET status").WithArgs(b.FinalRunStatus, string(b.RuntimeSnapshot), sqlmock.AnyArg(), sqlmock.AnyArg(), "alice", b.RunID, b.ProjectID).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 	if err := store.SaveChapterBundle(ctx, "alice", b); err != nil {
 		t.Fatal(err)

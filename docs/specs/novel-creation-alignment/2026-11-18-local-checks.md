@@ -28,3 +28,11 @@
 2. 完整前章/旧标题/人称等检查输入的持久快照与版本校验。
 3. 六模式专有输入、短篇独立产物与蓝图检查点。
 4. 真实模型成功→保存→重开；预算0，本轮不调用。
+
+## 用户指定原件及实页追加发现
+
+用户本轮明确指定F:/软件/洛水2026/洛水2026。已重新计算该目录dist/assets/index-C1aA08SG.js摘要5278a6d1b525152a6e9542c9d245bd90c658b84db3d94be9198ee2ac98306d4a，modules/novels.pyd摘要0471b2a77ee1aad06f4dd30e58b2515ed89b3a20d780ad5ae0f64ab3e4552853，均与小说已取证原件完全一致。小说来源这一项已核定，之前的未确认表述由本节更新；不代表其他模块/整个目录所有字节已逐项比对。
+
+9f60f3e6已构建并在4001核验SHA与HTTP，但实际创建验收作品出现novel persistence failed，尚不宣称可用。进一步只读MySQL测试复现：生产main.go:databaseDSN开启InterpolateParams，部分原JSON字节参数被当作BLOB；同样的SELECT JSON_TYPE(CAST(? AS JSON))在预编译和参数直传两种模式有差异。小说存储统一在sqlDatabase和sqlBoundTx归一化合法JSON字节为字符串，保留NULL/非JSON二进制且不改调用者快照。真实MySQL只读测试覆盖两模式、直接/事务、两JSON类型和两种查询路径，修复后全小说领域包通过；更新两个旧sqlmock断言为文本绑定。没有更改全站MySQL开关或数据库结构。
+
+本地实页重新创建/重开与设置保存待接着验收，不调用生成模型。

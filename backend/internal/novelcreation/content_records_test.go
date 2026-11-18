@@ -14,7 +14,7 @@ func TestContentRecordSQLScopedRoundTripAndManualRollback(t *testing.T) {
 	ctx := context.Background()
 	data := json.RawMessage(`{"Job":{"ID":"d","Status":"failed"},"Object":{"Key":"novel-documents/owned/d"}}`)
 	r := ContentRecord{Owner: "alice", ProjectID: "p", Kind: "document", ID: "d", Status: "failed", Data: data}
-	m.ExpectExec("INSERT INTO novel_content_records.*ON DUPLICATE KEY UPDATE").WithArgs("alice", "p", "document", "d", "failed", nil, []byte(data)).WillReturnResult(sqlmock.NewResult(0, 1))
+	m.ExpectExec("INSERT INTO novel_content_records.*ON DUPLICATE KEY UPDATE").WithArgs("alice", "p", "document", "d", "failed", nil, string(data)).WillReturnResult(sqlmock.NewResult(0, 1))
 	if e := st.PutContentRecord(ctx, r); e != nil {
 		t.Fatal(e)
 	}

@@ -241,6 +241,35 @@ type sqlTransaction interface {
 }
 type sqlDatabase struct{ *sql.DB }
 
+// mysql's interpolated []byte parameters carry a binary charset. Novel JSON
+// columns require text JSON, including inside transactions. Leave unrelated
+// binary values and NULLs intact; never mutate the caller's frozen arguments.
+func novelSQLArgs(args []any) []any {
+	out := append([]any(nil), args...)
+	for i, arg := range out {
+		switch v := arg.(type) {
+		case json.RawMessage:
+			if json.Valid(v) {
+				out[i] = string(v)
+			}
+		case []byte:
+			if json.Valid(v) {
+				out[i] = string(v)
+			}
+		}
+	}
+	return out
+}
+func (d sqlDatabase) ExecContext(c context.Context, q string, a ...any) (sql.Result, error) {
+	return d.DB.ExecContext(c, q, novelSQLArgs(a)...)
+}
+func (d sqlDatabase) QueryContext(c context.Context, q string, a ...any) (*sql.Rows, error) {
+	return d.DB.QueryContext(c, q, novelSQLArgs(a)...)
+}
+func (d sqlDatabase) QueryRowContext(c context.Context, q string, a ...any) *sql.Row {
+	return d.DB.QueryRowContext(c, q, novelSQLArgs(a)...)
+}
+
 func (d sqlDatabase) BeginTx(ctx context.Context, o *sql.TxOptions) (sqlTransaction, error) {
 	tx, e := d.DB.BeginTx(ctx, o)
 	if e != nil {
@@ -252,6 +281,16 @@ func (d sqlDatabase) BeginTx(ctx context.Context, o *sql.TxOptions) (sqlTransact
 type sqlBoundTx struct {
 	*sql.Tx
 	owns bool
+}
+
+func (t sqlBoundTx) ExecContext(c context.Context, q string, a ...any) (sql.Result, error) {
+	return t.Tx.ExecContext(c, q, novelSQLArgs(a)...)
+}
+func (t sqlBoundTx) QueryContext(c context.Context, q string, a ...any) (*sql.Rows, error) {
+	return t.Tx.QueryContext(c, q, novelSQLArgs(a)...)
+}
+func (t sqlBoundTx) QueryRowContext(c context.Context, q string, a ...any) *sql.Row {
+	return t.Tx.QueryRowContext(c, q, novelSQLArgs(a)...)
 }
 
 func (t sqlBoundTx) BeginTx(context.Context, *sql.TxOptions) (sqlTransaction, error) {
