@@ -150,10 +150,12 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	status := RunSucceeded
 	eventType := "run.completed"
 	message := "短篇成品已保存"
+	progress := 100
 	if result.Status == "awaiting_confirmation" {
 		status = RunAwaitingConfirmation
 		eventType = "run.checkpoint"
 		message = "短篇大纲已保存，请修改或确认后继续"
+		progress = 20
 	}
 	var out Run
 	var event RunEvent
@@ -184,7 +186,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		if er != nil {
 			return er
 		}
-		event, er = tx.AppendRunEvent(ctx, owner, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: eventType, Status: status, Message: message, Progress: 100})
+		event, er = tx.AppendRunEvent(ctx, owner, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: eventType, Status: status, Message: message, Progress: progress})
 		if er != nil {
 			return er
 		}
