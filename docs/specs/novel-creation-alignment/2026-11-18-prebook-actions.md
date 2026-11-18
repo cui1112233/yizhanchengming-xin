@@ -61,3 +61,5 @@ POST /studio-sessions/{id}/actions/cancel → StudioSnapshot。
 | 页面确认/取消真实请求 | frontend/src/user/pages/novel-creation/StudioChat.jsx:65 |
 | 返回正式作品及生产会话 | frontend/src/user/pages/NovelCreationPage.jsx:299 |
 | CM独立系统提示词 | backend/internal/prompt/novelcreation/studio.go:5 |
+
+补充最终观察：免费界面验收后，4001被共享工作区的另一次本地构建替换为backend/qiantie-local.exe（进程43752，入口/assets/user-C4zA_WWd.js，仍标记1886b338）。本轮未覆盖该进程；再次GET studio-sessions=200，原未关联会话仍可读。先前候选身份与截图是本轮验收时记录，最新观察单独存于归档latest-runtime-observation.json。
