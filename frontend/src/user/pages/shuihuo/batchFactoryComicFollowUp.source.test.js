@@ -19,12 +19,9 @@ test('漫画页行内展示正在生成页数，未开始时提示已提交重�
   assert.match(source, /已提交重试，等待开始/);
 });
 
-test('失败提示与主图包在同一个网格单元，避免压住分页条与候选图', () => {
+test('失败详情不再常驻行内漫画格，交给任务/日志与媒体库明细', () => {
   assert.match(source, /batch-factory-inline-comic-stage/);
-  const stageIndex = source.indexOf('batch-factory-inline-comic-stage');
-  const noticeIndex = source.indexOf('lineMode title="漫画页生成失败"');
-  const primaryIndex = source.indexOf('className="batch-factory-inline-comic-primary"');
-  assert.ok(stageIndex > 0 && noticeIndex > stageIndex && primaryIndex > noticeIndex);
+  assert.ok(!source.includes('lineMode title="漫画页生成失败"'), '行内漫画格不应再渲染漫画页生成失败错误条');
 });
 
 test('生成中有动态反馈：运行标记、忙碌态与 CM 环形指示器', () => {
