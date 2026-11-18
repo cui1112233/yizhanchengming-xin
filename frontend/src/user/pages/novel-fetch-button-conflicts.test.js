@@ -78,11 +78,12 @@ test('submit selected refuses to submit when nothing is checked', async () => {
   assert.equal(requests.length, 0);
 });
 
-test('submit all submits every visible task id, not the current batch', async () => {
+test('submit all delegates the full scope to the backend instead of filtered ids', async () => {
   const requests = [];
   let confirmOptions = null;
   await handler('submitAllTasks', {
-    visibleTaskIds: ['a', 'b', 'c'],
+    tasks: [{ bookId: 'a' }],
+    visibleTaskIds: ['a'],
     message: { info() {} },
     Modal: { confirm: options => { confirmOptions = options; } },
     handleWebSubmit: async fn => fn(),
@@ -91,8 +92,9 @@ test('submit all submits every visible task id, not the current batch', async ()
     loadTasks: async () => {}, loadCurrentBatch: async () => {}
   })();
   assert.ok(confirmOptions);
+  assert.match(confirmOptions.content, /全部任务/);
   await confirmOptions.onOk();
-  assert.equal(JSON.stringify(requests), JSON.stringify([{ taskIds: ['a', 'b', 'c'] }]));
+  assert.equal(JSON.stringify(requests), JSON.stringify([{ mode: 'all' }]));
 });
 
 test('submit page confirmation no longer requires or sends a preview revision', async () => {

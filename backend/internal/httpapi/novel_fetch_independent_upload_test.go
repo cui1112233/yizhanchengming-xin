@@ -154,7 +154,7 @@ func TestCancelledNovelFetchScheduleCannotBeReopenedByWorker(t *testing.T) {
 func TestWebSubmitRechecksAIBodyAndBlocksRefusalBeforeUpload(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
-	_ = store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true}}})
+	_ = store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true, "min_file_size": 0, "organization": "org-1"}}})
 	document := readyIndependentUploadDocument("12345678")
 	document.Meta["platformId"] = "1"
 	_ = store.PutDocument(ctx, "tester", document)
@@ -168,11 +168,23 @@ func TestWebSubmitRechecksAIBodyAndBlocksRefusalBeforeUpload(t *testing.T) {
 	}
 	connector := &configuredSubmitConnector{}
 	result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{document.BookID}, Versions: []string{"ai1"}}, nil, connector)
-	if err != nil || result.Failed != 1 || connector.submitCalls != 0 {
+	if err != nil || result.Failed != 0 || connector.submitCalls != 0 {
 		t.Fatalf("bad AI body reached remote: %#v err=%v submits=%d", result, err, connector.submitCalls)
 	}
+	if len(result.Results) != 1 || result.Results[0].(map[string]any)["status"] != "waiting_generate" {
+		t.Fatalf("invalid AI body must wait for regeneration: %#v", result.Results)
+	}
 	stored, _ := store.GetDocument(ctx, "tester", document.BookID)
-	if !strings.Contains(firstText(mapOrEmpty(stored.Meta["siteSubmitFailedErrors"])["ai1"]), "正文复检未通过") {
-		t.Fatalf("missing actionable failure: %#v", stored.Meta)
+	if stored.Meta["siteSubmitStatus"] != "waiting_generate" {
+		t.Fatalf("missing waiting_generate status: %#v", stored.Meta)
+	}
+	logged := false
+	for _, raw := range stored.Logs {
+		if entry, ok := raw.(map[string]any); ok && strings.Contains(firstText(entry["error"]), "正文复检未通过") {
+			logged = true
+		}
+	}
+	if !logged {
+		t.Fatalf("missing actionable failure log: %#v", stored.Logs)
 	}
 }

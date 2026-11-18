@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -26,13 +27,23 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 		}
 		var body struct {
 			TaskIDs  []string `json:"taskIds"`
+			IDs      []string `json:"ids"`
+			Mode     string   `json:"mode"`
 			Versions []string `json:"versions"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
 		}
-		payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
+		if len(body.TaskIDs) == 0 {
+			body.TaskIDs = body.IDs
+		}
+		taskIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, body.Mode, body.TaskIDs, workshopSubmitFailed)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务失败"})
+			return
+		}
+		payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, taskIDs, body.Versions)
 		if status != http.StatusOK {
 			writeJSON(w, status, map[string]string{"error": message})
 			return
@@ -43,7 +54,9 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 }
 
 // buildWebSubmitPlanPayload builds the read-only submission plan shared by the
-// preview endpoint and the dry_run submit mode.
+// preview endpoint and the dry_run submit mode. 除 groups/skipped 外还返回
+// requested/planned/deferred/missing 与 plan_complete，调用方可以据此判断
+// 计划是否丢项，而不是只从 groups 是否为空猜测。
 func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Store, owner string, taskIDs, requestedVersions []string) (map[string]any, int, string) {
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
@@ -58,45 +71,88 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 	if len(versions) == 0 {
 		versions = []string{"ai1"}
 	}
-	if len(taskIDs) == 0 {
+	ids := cleanStrings(taskIDs)
+	if len(ids) == 0 {
 		return nil, http.StatusBadRequest, "没有收到选中的任务。请在任务列表勾选复选框后重新提交。"
 	}
 	groups := map[string]map[string]any{}
 	order := []string{}
 	skipped := []any{}
+	requestedItems := []any{}
+	requestedKeys := map[string]bool{}
 	skipSubmitted := webSubmitSkipSubmitted(web)
 	minTextChars := intValue(web["min_text_chars"])
-	for _, rawID := range taskIDs {
-		id := strings.TrimSpace(rawID)
-		if id == "" {
-			continue
-		}
+	minFileSize := webSubmitMinFileSize(web)
+	for _, id := range ids {
 		doc, getErr := store.GetDocument(ctx, owner, id)
 		if getErr != nil {
 			skipped = append(skipped, map[string]any{"id": id, "status": "failed", "error": "任务不存在"})
 			continue
 		}
 		meta := doc.Meta
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		done := firstConfiguredValue(meta["siteSubmitDoneVersions"], meta["site_submit_done_versions"])
+		pending := mapOrEmpty(meta["siteSubmitPendingConfirmation"])
+		executing := anyStrings(meta["siteSubmitExecutingVersions"])
 		for _, version := range versions {
-			if skipSubmitted && (containsVersion(meta["siteSubmitDoneVersions"], version) || containsVersion(meta["site_submit_done_versions"], version)) {
-				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "该版本已确认提交"})
+			requestedItems = append(requestedItems, map[string]any{"id": id, "version": version})
+			requestedKeys[webSubmitManifestKey(id, version)] = true
+			if skipSubmitted && containsVersion(done, version) {
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "reason": "confirmed_result", "error": "该版本已确认提交"})
 				continue
 			}
-			if styleNeedsResolution(meta) {
-				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "blocked", "error": webSubmitUnclassifiedStyleError})
+			if _, ok := pending[version]; ok {
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "unknown", "reason": "remote_confirmation_required", "deferred": true, "error": "上次提交结果未知，需先远端核对；不会重复上传"})
 				continue
 			}
-			content, bodyErr := store.GetBody(ctx, owner, id, version)
-			if bodyErr != nil || strings.TrimSpace(content.Content) == "" {
-				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "未找到正文版本"})
-				continue
-			}
-			if minTextChars > 0 && len([]rune(content.Content)) < minTextChars {
-				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "正文少于最少字数"})
+			if containsVersion(executing, version) {
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "executing", "reason": "submission_in_progress", "deferred": true, "error": "该版本已有提交正在执行，已阻止重复派发"})
 				continue
 			}
 			profile := webSubmitProfile(web, version)
 			platform := firstText(profile["platform_id"], profile["platformId"], meta["platformId"], meta["platform_id"])
+			if gaps := submissionClassificationGaps(platform, submissionResolvedGender(doc), submissionResolvedStyle(meta)); len(gaps) > 0 {
+				status := "waiting_config"
+				if styleNeedsResolution(meta) {
+					status = "waiting_classify"
+				}
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": status, "reason": status, "deferred": true, "error": submissionGapError(gaps)})
+				continue
+			}
+			content, bodyErr := store.GetBody(ctx, owner, id, version)
+			if bodyErr != nil || strings.TrimSpace(content.Content) == "" {
+				status := "waiting_generate"
+				if strings.EqualFold(version, "original") {
+					status = "waiting_original"
+				}
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": status, "reason": "file_missing", "deferred": true, "error": "正文尚未生成"})
+				continue
+			}
+			if minFileSize > 0 && len([]byte(content.Content)) < minFileSize {
+				status := "waiting_generate"
+				if strings.EqualFold(version, "original") {
+					status = "waiting_original"
+				}
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": status, "reason": "file_too_small", "deferred": true, "error": fmt.Sprintf("正文不足 %d 字节", minFileSize)})
+				continue
+			}
+			if minTextChars > 0 && len([]rune(content.Content)) < minTextChars {
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "waiting_generate", "reason": "text_too_short", "deferred": true, "error": "正文少于最少字数"})
+				continue
+			}
+			if strings.HasPrefix(strings.ToLower(version), "ai") {
+				if err := novelfetchworkshop.ValidateRewriteProse(content.Content); err != nil {
+					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "waiting_generate", "reason": "ai_output_rejected", "deferred": true, "error": "AI 正文复检未通过：" + err.Error()})
+					continue
+				}
+			}
+			organization := webSubmitOrganization(web, profile)
+			if organization == "" {
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "waiting_config", "reason": "organization_missing", "deferred": true, "error": "网站上传配置缺少组织归属，请先同步或重新保存上传配置"})
+				continue
+			}
 			gender, style := submissionGenderStyle(doc)
 			profileID := "default"
 			profileName := "默认配置"
@@ -107,12 +163,12 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 			key := strings.Join([]string{platform, gender, style, version, profileID}, "-")
 			group, exists := groups[key]
 			if !exists {
-				group = map[string]any{"group_id": key, "group_key": key, "status": "ready", "version": version, "summary": map[string]any{"platformId": platform, "gender": gender, "style": style, "profile_id": profileID, "profile_name": profileName, "organization": webSubmitOrganization(web, profile)}, "advanced": webSubmitAdvanced(web, profile), "items": []any{}}
+				group = map[string]any{"group_id": key, "group_key": key, "status": "ready", "version": version, "summary": map[string]any{"platformId": platform, "gender": gender, "style": style, "profile_id": profileID, "profile_name": profileName, "organization": organization}, "advanced": webSubmitAdvanced(web, profile), "items": []any{}}
 				groups[key] = group
 				order = append(order, key)
 			}
 			items := group["items"].([]any)
-			items = append(items, map[string]any{"id": id, "version": version, "size": len([]rune(content.Content)), "profile_id": profileID, "profile_name": profileName, "confirmation_only": false})
+			items = append(items, map[string]any{"id": id, "version": version, "size": len([]byte(content.Content)), "profile_id": profileID, "profile_name": profileName, "confirmation_only": false})
 			group["items"] = items
 		}
 	}
@@ -120,13 +176,52 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 	for _, key := range order {
 		result = append(result, groups[key])
 	}
-	plan := map[string]any{"material_limit": 8, "groups": result, "skipped": skipped}
-	revision, err := webSubmitPreviewRevision(ctx, store, owner, taskIDs, requestedVersions)
+	deferredItems := []any{}
+	deferredKeys := map[string]bool{}
+	for _, raw := range skipped {
+		item := mapOrEmpty(raw)
+		if item["deferred"] != true {
+			continue
+		}
+		deferredItems = append(deferredItems, item)
+		if id, version := firstText(item["id"]), firstText(item["version"]); id != "" && version != "" {
+			deferredKeys[webSubmitManifestKey(id, version)] = true
+		}
+	}
+	plannedItems := []any{}
+	plannedKeys := map[string]bool{}
+	for _, rawGroup := range result {
+		group := mapOrEmpty(rawGroup)
+		for _, rawItem := range arrayOrEmpty(group["items"]) {
+			item := mapOrEmpty(rawItem)
+			id, version := firstText(item["id"]), firstText(item["version"])
+			plannedItems = append(plannedItems, map[string]any{"id": id, "version": version})
+			plannedKeys[webSubmitManifestKey(id, version)] = true
+		}
+	}
+	missingItems := []any{}
+	for _, rawItem := range requestedItems {
+		item := mapOrEmpty(rawItem)
+		key := webSubmitManifestKey(firstText(item["id"]), firstText(item["version"]))
+		if plannedKeys[key] || deferredKeys[key] {
+			continue
+		}
+		missingItems = append(missingItems, item)
+	}
+	planComplete := true
+	for key := range requestedKeys {
+		if !plannedKeys[key] && !deferredKeys[key] {
+			planComplete = false
+			break
+		}
+	}
+	plan := map[string]any{"material_limit": 8, "groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete}
+	revision, err := webSubmitPreviewRevision(ctx, store, owner, ids, requestedVersions)
 	if err != nil {
 		return nil, http.StatusInternalServerError, "生成提交预览校验失败"
 	}
 	plan["revision"] = revision
-	return map[string]any{"material_limit": 8, "groups": result, "skipped": skipped, "plan": plan}, http.StatusOK, ""
+	return map[string]any{"ok": true, "requested": len(ids), "material_limit": 8, "groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete, "plan": plan}, http.StatusOK, ""
 }
 
 func anyStrings(value any) []string {

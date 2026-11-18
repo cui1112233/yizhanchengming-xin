@@ -46,7 +46,7 @@ func TestExpiredUploadAccountPausesWithoutUnknownReceiptAndResumesAfterLogin(t *
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
 	usersDir := t.TempDir()
-	_ = store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true}}})
+	_ = store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true, "min_file_size": 0, "organization": "org-1"}}})
 	for _, id := range []string{"12345678", "22345678"} {
 		doc := readyIndependentUploadDocument(id)
 		doc.Meta["platformId"] = "2"

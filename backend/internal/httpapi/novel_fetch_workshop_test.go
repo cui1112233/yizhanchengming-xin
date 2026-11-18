@@ -748,7 +748,7 @@ func TestNovelFetchAutomationConfigurationBlockDoesNotRetry(t *testing.T) {
 	const bookID = "blocked-style-book"
 	if err := store.PutDocument(context.Background(), owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{
 		"status": "completed", "siteSubmitStatus": "pending_upload",
-		"siteSubmitFailedErrors": map[string]any{"ai1": webSubmitUnclassifiedStyleError},
+		"siteSubmitFailedErrors": map[string]any{"ai1": "无法映射网站字段：风格类型"},
 	}}); err != nil {
 		t.Fatal(err)
 	}

@@ -88,6 +88,8 @@ const submitStatusLabels = {
   waiting_classify: '等待确认分类',
   waiting_generate: '待生成',
   pending_generate: '待生成',
+  waiting_original: '待原文',
+  blocked: '已阻塞',
   executing: '执行中',
   processing: '执行中',
   running: '执行中',

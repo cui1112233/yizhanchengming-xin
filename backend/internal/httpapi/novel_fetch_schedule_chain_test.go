@@ -82,7 +82,7 @@ func TestScheduledBookFullChainAndReadbackRecovery(t *testing.T) {
 			due := time.Now().UTC().Add(time.Second)
 			err := store.PutConfig(ctx, owner, map[string]any{
 				"novel_fetch_automation": map[string]any{"enabled": true},
-				"appConfig":              map[string]any{"web_submit": map[string]any{"enabled": true, "submit_versions": []any{"ai1"}}},
+				"appConfig":              map[string]any{"web_submit": map[string]any{"enabled": true, "submit_versions": []any{"ai1"}, "min_file_size": 0, "organization": "org-1"}},
 			})
 			if err != nil {
 				t.Fatal(err)

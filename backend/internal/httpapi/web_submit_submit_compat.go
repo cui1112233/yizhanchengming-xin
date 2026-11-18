@@ -45,7 +45,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			body.TaskIDs = body.IDs
 		}
 		// 参考实现支持 mode=selected|failed|all 的提交范围；
-		// failed 只重提上次站点提交失败的书籍。
+		// all 表示当前账号全部可见任务，不受页面日期/搜索过滤影响。
 		resolvedIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, body.Mode, body.TaskIDs, workshopSubmitFailed)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务失败"})
@@ -54,25 +54,46 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		body.TaskIDs = resolvedIDs
 		// 参考实现的提交不依赖预览令牌，预览只用于查看。这里保留字段兼容旧前端，
 		// 但不再因为后台 meta 变化而拒绝提交；提交时按最新正文和配置重新生成计划。
-		// dry_run 与参考实现一致：只生成提交计划，不执行上传，也不写提交记录。
+		planPayload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
+		if status != http.StatusOK {
+			writeJSON(w, status, map[string]string{"error": message})
+			return
+		}
+		// 无论 dry_run 还是真实提交，都先把计划落盘成 manifest；
+		// 崩溃后可以据此识别 executing/unknown，避免重复派发。
+		runID := newWebSubmitRunID()
+		manifest, manifestErr := newWebSubmitManifest(usersDir, identity.Username, runID, map[bool]string{true: "dry_run", false: "manual_submit"}[body.DryRun], planPayload)
+		if manifestErr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "提交计划落盘失败，请检查数据目录后重试"})
+			return
+		}
 		if body.DryRun {
-			payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
-			if status != http.StatusOK {
-				writeJSON(w, status, map[string]string{"error": message})
-				return
-			}
+			manifest.finish("dry_run")
 			writeJSON(w, http.StatusOK, map[string]any{
-				"ok":             true,
-				"dry_run":        true,
-				"groups":         payload["groups"],
-				"skipped":        payload["skipped"],
-				"plan":           payload["plan"],
-				"material_limit": payload["material_limit"],
+				"ok":                true,
+				"dry_run":           true,
+				"requested":         planPayload["requested"],
+				"group_count":       len(arrayOrEmpty(planPayload["groups"])),
+				"success_groups":    0,
+				"failed_groups":     0,
+				"results":           []any{},
+				"skipped":           planPayload["skipped"],
+				"deferred_items":    planPayload["deferred_items"],
+				"requested_items":   planPayload["requested_items"],
+				"planned_items":     planPayload["planned_items"],
+				"missing_items":     planPayload["missing_items"],
+				"versions":          planPayload["versions"],
+				"plan_complete":     planPayload["plan_complete"],
+				"submission_run_id": runID,
+				"groups":            planPayload["groups"],
+				"plan":              planPayload["plan"],
+				"material_limit":    planPayload["material_limit"],
 			})
 			return
 		}
-		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly}, genderJudgeResolver, targets...)
+		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly, Manifest: manifest}, genderJudgeResolver, targets...)
 		if err != nil {
+			manifest.finish("aborted")
 			status := http.StatusInternalServerError
 			if requestErr, ok := err.(*webSubmitRequestError); ok {
 				status = requestErr.Status
@@ -80,9 +101,22 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
+		manifest.finish("completed")
 		// 保持 200 以兼容旧前端：非 2xx 会让老客户端直接进入硬失败分支并丢掉逐版本结果。
 		// 整体成败通过 ok + result(all_ok/partial/all_failed) + 每个失败项的 code/message 表达。
-		writeJSON(w, http.StatusOK, map[string]any{"ok": result.Failed == 0, "result": webSubmitOverallResult(result.Success, result.Failed), "operation_id": result.OperationID, "results": decorateWebSubmitResults(result.Results), "success_groups": result.Success, "failed_groups": result.Failed})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":                result.Failed == 0,
+			"result":            webSubmitOverallResult(result.Success, result.Failed),
+			"operation_id":      result.OperationID,
+			"submission_run_id": runID,
+			"requested":         len(body.TaskIDs),
+			"group_count":       len(arrayOrEmpty(planPayload["groups"])),
+			"success_groups":    result.Success,
+			"failed_groups":     result.Failed,
+			"skipped":           planPayload["skipped"],
+			"deferred_items":    planPayload["deferred_items"],
+			"results":           decorateWebSubmitResults(result.Results),
+		})
 	}))
 	// The legacy workbench calls /api/web-submit/submit, while the canonical
 	// compatibility route lives under /api/batch-rewrite/web-submit/submit.
@@ -130,7 +164,52 @@ func webSubmitAdvanced(web, profile map[string]any) map[string]any {
 }
 
 func webSubmitOrganization(web, profile map[string]any) string {
-	return firstText(web["organization"], profile["organization"], mapOrEmpty(profile["advanced"])["organization"], "1")
+	// 与参考实现一致：配置里没有组织归属时不再默认 "1" 静默提交，
+	// 而是由提交计划阻塞为 waiting_config，提示用户先同步组织。
+	return firstText(web["organization"], profile["organization"], mapOrEmpty(profile["advanced"])["organization"])
+}
+
+// webSubmitMinFileSize 与参考实现一致：默认 3KB，避免把空文件或明显过短的正文推到网站。
+func webSubmitMinFileSize(web map[string]any) int {
+	if value, ok := web["min_file_size"]; ok {
+		return intValue(value)
+	}
+	return 3 * 1024
+}
+
+func submissionResolvedGender(doc novelfetchworkshop.Document) string {
+	gender, _ := submissionGenderStyle(doc)
+	if genderNeedsResolution(gender) {
+		return ""
+	}
+	return strings.TrimSpace(gender)
+}
+
+func submissionResolvedStyle(meta map[string]any) string {
+	if styleNeedsResolution(meta) {
+		return ""
+	}
+	return strings.TrimSpace(firstText(meta["style"], meta["styleName"], meta["style_name"]))
+}
+
+// submissionClassificationGaps 对齐参考实现：平台、男女频、风格类型缺失时
+// 都不允许提交，而不是只阻塞风格。
+func submissionClassificationGaps(platform, gender, style string) []string {
+	gaps := []string{}
+	if strings.TrimSpace(platform) == "" {
+		gaps = append(gaps, "平台")
+	}
+	if strings.TrimSpace(gender) == "" {
+		gaps = append(gaps, "男女频")
+	}
+	if strings.TrimSpace(style) == "" {
+		gaps = append(gaps, "风格类型")
+	}
+	return gaps
+}
+
+func submissionGapError(gaps []string) string {
+	return "无法映射网站字段：" + strings.Join(gaps, "、")
 }
 
 func submissionGenderStyle(doc novelfetchworkshop.Document) (string, string) {
@@ -154,8 +233,6 @@ func resolveSubmissionGender(ctx context.Context, doc *novelfetchworkshop.Docume
 	doc.GenderConfidence = decision.Confidence
 	syncNovelFetchClassificationMetadata(doc)
 }
-
-const webSubmitUnclassifiedStyleError = "该任务尚未识别或选择上传风格，无法提交到视频管理系统。"
 
 func styleNeedsResolution(meta map[string]any) bool {
 	style := strings.TrimSpace(firstText(meta["style"], meta["styleName"], meta["style_name"]))
@@ -229,6 +306,10 @@ func webSubmitStatusText(status string) string {
 		return "等待确认分类"
 	case "waiting_generate", "pending_generate":
 		return "待生成"
+	case "waiting_original":
+		return "待原文"
+	case "blocked":
+		return "已阻塞"
 	case "executing", "processing", "running":
 		return "执行中"
 	case "deferred":
