@@ -4261,9 +4261,9 @@ body.shuihuo-reference-shell
 @media (prefers-reduced-motion: reduce){
   .cm-loader-dash,.cm-loader-spin,.batch-factory-inline-comic-stage.is-busy::after,.batch-factory-inline-comic-stage.is-pending::after,.batch-factory-inline-comic-stage.is-busy .batch-factory-inline-comic-primary{animation:none}
 }
-/* 自动生产进行中的整行光感：按阶段换色，沿卡片边缘流动一圈，
-   让“资产 / 提示词 / 漫画出图 / 发布”四个阶段一眼可辨。 */
-@property --bf-flow-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+/* 自动生产进行中的整行光感：按阶段换色，顶部一条静态光带，
+   让“资产 / 提示词 / 漫画出图 / 发布”四个阶段一眼可辨；
+   不做流动动画，避免长列表里出现持续移动的元素。 */
 .batch-factory-book-row{position:relative}
 .batch-factory-book-row.is-automation-running{
   --bf-flow-color:#38bdf8;
@@ -4274,8 +4274,7 @@ body.shuihuo-reference-shell
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_prompt_recovery']{--bf-flow-color:#a78bfa}
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_images']{--bf-flow-color:#fbbf24}
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_publish']{--bf-flow-color:#34d399}
-/* 执行中的流动光带：用 transform 平移一条渐变光带，只走合成层，
-   避免对整行做 conic-gradient + mask 的逐帧重绘（多行同时执行时会明显掉帧）。*/
+/* 执行中的静态光带：顶部 2px 实色条，仅按阶段换色，不播放动画。 */
 .batch-factory-book-row.is-automation-running::before{
   content:'';
   position:absolute;
@@ -4284,17 +4283,10 @@ body.shuihuo-reference-shell
   top:0;
   height:2px;
   border-radius:inherit;
-  background:linear-gradient(90deg,transparent 0%,var(--bf-flow-color) 45%,color-mix(in srgb,var(--bf-flow-color) 60%,#fff) 50%,var(--bf-flow-color) 55%,transparent 100%);
-  opacity:.95;
-  transform:translate3d(-100%,0,0);
-  animation:bf-book-flow 2.4s linear infinite;
-  will-change:transform;
+  background:var(--bf-flow-color);
+  opacity:.75;
   pointer-events:none;
   contain:paint;
-}
-@keyframes bf-book-flow{from{transform:translate3d(-100%,0,0)}to{transform:translate3d(100%,0,0)}}
-@media (prefers-reduced-motion: reduce){
-  .batch-factory-book-row.is-automation-running::before{animation:none;opacity:.55}
 }
 
 .batch-factory-comic-source{display:grid;gap:7px;padding:9px;border:1px solid var(--sh-line);border-radius:6px;background:var(--sh-panel)}
