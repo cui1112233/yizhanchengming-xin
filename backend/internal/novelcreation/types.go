@@ -156,9 +156,11 @@ type AgentSettings struct {
 	EnablePostWrite         bool              `json:"enablePostWrite"`
 	EnableAiTells           bool              `json:"enableAiTells"`
 	RequireSecondaryConfirm bool              `json:"requireSecondaryConfirm"`
-	TargetChapterWords      int               `json:"targetChapterWords"`
-	MaxRevisionRounds       int               `json:"maxRevisionRounds"`
-	ThinkingLevel           string            `json:"thinkingLevel"`
+	// Nil preserves historical mode-specific content checkpoints.
+	PauseAfterBlueprint *bool  `json:"pauseAfterBlueprint,omitempty"`
+	TargetChapterWords  int    `json:"targetChapterWords"`
+	MaxRevisionRounds   int    `json:"maxRevisionRounds"`
+	ThinkingLevel       string `json:"thinkingLevel"`
 }
 
 // ProjectNote is a free-form memo bound to a project.

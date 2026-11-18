@@ -141,7 +141,6 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	} else if found {
 		confirmedFoundation = foundationPlanFromSnapshot(foundation.Snapshot)
 	}
-	checkpoint := len(confirmedFoundation) == 0 && modeUsesCheckpoint(session.Mode)
 	message, err := s.store.AppendMessage(ctx, owner, Message{
 		SessionID: input.SessionID, ProjectID: input.ProjectID, Role: "user", Content: input.Content,
 		Status: "accepted", ModelID: input.ModelID, ThinkingLevel: input.ThinkingLevel,
@@ -154,6 +153,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		return Run{}, err
 	}
 	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	checkpoint := len(confirmedFoundation) == 0 && blueprintPauseRequired(settings.Agent, session.Mode)
 	if imitation != nil {
 		settings.Agent.TargetChapterWords = imitation.Input.TargetWordCount
 	}

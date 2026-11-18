@@ -6,17 +6,17 @@ import './AgentPanel.css';
 import useWorkspaceScope from './useWorkspaceScope.js';
 import { PHASES, THINKING, availableModel, modelOptions } from './contracts.js';
 
-export default function AgentPanel({ projectId, models }) {
+export default function AgentPanel({ projectId, models, mode }) {
   const [form] = Form.useForm(); const [settings, setSettings] = useState(null); const [busy, setBusy] = useState(false);
-  const saving = useRef(false);
+  const saving = useRef(false), pauseTouched = useRef(false);
   const scope = useWorkspaceScope(projectId);
   useEffect(() => {
     scope.call(novelProjectRequest(projectId, '/settings', undefined, { signal: scope.signal }), r => {
-      setSettings(r.settings || {}); const a = r.settings?.agent || {};
+      pauseTouched.current = false; setSettings(r.settings || {}); const a = r.settings?.agent || {};
       form.setFieldsValue({ ...a, reviewPrompts: a.reviewPrompts || [], customWritePrompts: a.customWritePrompts || [], targetChapterWords: a.targetChapterWords ?? 2000, maxRevisionRounds: a.maxRevisionRounds ?? 3,
         passScore: a.passScore ?? 80, baseTemperature: a.baseTemperature ?? 0.65, temperatureStep: a.temperatureStep ?? 0.15,
         thinkingLevel: a.thinkingLevel ?? 'standard', enableLengthNorm: a.enableLengthNorm ?? true,
-        enablePostWrite: a.enablePostWrite ?? true, enableAiTells: a.enableAiTells ?? true, requireSecondaryConfirm: a.requireSecondaryConfirm ?? false });
+        enablePostWrite: a.enablePostWrite ?? true, enableAiTells: a.enableAiTells ?? true, requireSecondaryConfirm: a.requireSecondaryConfirm ?? false, pauseAfterBlueprint: a.pauseAfterBlueprint ?? (mode ? ['long_original','long_imitation'].includes(mode) : true) });
     }).catch(e => message.error(e.message));
   }, [projectId]);
   async function save() {
@@ -24,6 +24,7 @@ export default function AgentPanel({ projectId, models }) {
     saving.current = true;
     try {
       const agent = await form.validateFields();
+      if (settings?.agent?.pauseAfterBlueprint == null && !pauseTouched.current) delete agent.pauseAfterBlueprint;
       if (Object.values(agent.modelRoutes || {}).some(id => id && !availableModel(models, id))) { message.warning('分步骤原模型已不可用，请重新选择或清空'); return; }
       setBusy(true);
       await scope.call(novelProjectRequest(projectId, '/settings', { styleProfile: settings?.styleProfile || '', rules: settings?.rules || [], agent }, { method: 'PUT', signal: scope.signal }), r => { setSettings(r.settings); message.success('Agent设置已保存'); });
@@ -43,10 +44,12 @@ export default function AgentPanel({ projectId, models }) {
       ].map(([key, label, min, max, step]) => <Form.Item key={key} name={key} label={label}><InputNumber aria-label={label} min={min} max={max} step={step} /></Form.Item>)}</div>
       <div className="novel-agent-switches">{[
         ['enableLengthNorm', '字数偏离超过45%时整理（调用模型）'], ['enablePostWrite', '后写校验（本地，不改正文）'],
-        ['enableAiTells', '表达指标（本地统计，供人工判断）'], ['requireSecondaryConfirm', '每次后续模型调用前确认']
-      ].map(([key, label]) => <Form.Item key={key} name={key} label={label} valuePropName="checked"><Switch aria-label={label} /></Form.Item>)}</div>
+        ['enableAiTells', '表达指标（本地统计，供人工判断）'], ['pauseAfterBlueprint', '大纲/蓝图生成后暂停']
+      ].map(([key, label]) => <Form.Item key={key} name={key} label={label} valuePropName="checked"><Switch aria-label={label} onChange={() => { if (key === 'pauseAfterBlueprint') pauseTouched.current = true; }} /></Form.Item>)}</div>
       <p>后写校验与表达指标不调用模型。表达指标尚未验证与原版AI味算法一致。</p>
     </section>
+    <p>大纲、蓝图或基础设定生成后暂停，可修改已保存内容后继续。旧作品未明确设置时保留原有暂停规则。</p>
+    <section className="novel-agent-section"><h3>模型调用确认</h3><Form.Item name="requireSecondaryConfirm" label="每次后续模型调用前确认" valuePropName="checked"><Switch aria-label="每次后续模型调用前确认" /></Form.Item><p>此项保留旧设置的逐次调用保护，与上面的内容暂停分别生效。</p></section>
     <AgentRequirements />
     <AgentRequirements writing />
     <section className="novel-agent-section"><h3>当前作品设置</h3><div className="novel-form-grid">

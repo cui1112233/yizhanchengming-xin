@@ -252,6 +252,10 @@ func NormalizeAgentSettings(input AgentSettings, fallbackTargetWords int) AgentS
 	if rounds > maxMaxRevisionRounds {
 		rounds = maxMaxRevisionRounds
 	}
+	if input.PauseAfterBlueprint != nil {
+		v := *input.PauseAfterBlueprint
+		input.PauseAfterBlueprint = &v
+	}
 	input.TargetChapterWords = target
 	input.MaxRevisionRounds = rounds
 	input.ThinkingLevel = normalizeThinkingLevel(input.ThinkingLevel)
@@ -402,4 +406,13 @@ func validAgentRoute(key string) bool {
 		return true
 	}
 	return false
+}
+
+// blueprintPauseRequired is independent of per-provider-call approval. Missing
+// values preserve historical settings; frozen runs keep their own checkpoint.
+func blueprintPauseRequired(a AgentSettings, mode string) bool {
+	if a.PauseAfterBlueprint != nil {
+		return *a.PauseAfterBlueprint
+	}
+	return modeUsesCheckpoint(mode)
 }
