@@ -1,21 +1,21 @@
 {
   "count": 75,
   "counts": {
-    "部分实现": 29,
-    "合同不同": 11,
+    "部分实现": 30,
+    "合同不同": 10,
     "缺失": 20,
     "已有实现待对照": 10,
     "尚未验证": 5
   },
   "missingEvidenceAnchors": [],
-  "sourceHead": "03a19395",
+  "sourceHead": "d9c8b335",
   "runtimeObserved": {
     "port": 4001,
-    "git_sha": "03a19395",
-    "entry": "/assets/user-zrHdi5r8.js"
+    "git_sha": "d9c8b335",
+    "entry": "/assets/user-C-PYiuT7.js"
   },
   "paidCalls": 0,
   "productFilesChanged": 17,
   "originalNativeParity": false,
-  "note": "75项为审计范围；短仿写六行升为部分实现，完全等价0项。真实模型调用0。"
+  "note": "75项为已列审计范围；本轮确认/调度纠错使A10为部分实现，完全等价仍为0。付费调用0。"
 }

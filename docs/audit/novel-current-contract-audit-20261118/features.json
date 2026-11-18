@@ -2166,7 +2166,7 @@
     "id": "A10",
     "area": "Agent与提示词",
     "feature": "生产二次确认与文件重读",
-    "status": "合同不同",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCheckpointCard.readable.js",
@@ -2176,19 +2176,19 @@
       "sha256": "6435dca232cb7ae0197686c7d011e41d070178e18bedcee3db5a285c66a12a20"
     },
     "current": {
-      "file": "backend/internal/novelcreation/model_confirmation.go",
-      "line": 17,
-      "anchor": "next_model_call",
+      "file": "backend/internal/novelcreation/validation.go",
+      "line": 413,
+      "anchor": "func blueprintPauseRequired",
       "anchorFound": true,
-      "sha256": "aab82dbc0f1a20c6d0fae3e453a7b2564b58cf260d6e01e924a8bc50cffb6229"
+      "sha256": "28fe17246a9085d2329ea29793a01ed67b7177c3855b5ddd0dcbed335a44da52"
     },
     "evidenceIds": [
       "ev_c04ce66b900162f7d9151b85fbc203b6e1612680f9ac491bb9a38305ee00a4f2"
     ],
-    "finding": "原是大纲/蓝图/设定后暂停；CM还有逐模型请求确认，含义不同。",
+    "finding": "内容暂停与逐模型调用确认已分离；可空新字段保留旧记录缺省，任务冻结新检查点。全局设置继承和任意原版业务文件编辑/重读仍未全部等价。",
     "acceptance": "保存资料→继续读新版本；稍后、取消、重复继续各有明确结果。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 d9c8b335；新浏览器7/7、隔离MySQL、假模型到期保存计数通过；真实付费调用0",
+    "implementation": "a56b9a2a / d9c8b335；docs/acceptance/2026-11-19-novel-confirmation-scheduler.md",
     "baselineStatus": "合同不同",
     "baselineFinding": "原是大纲/蓝图/设定后暂停；CM还有逐模型请求确认，含义不同。",
     "additionalCurrentEvidence": [],
@@ -2272,19 +2272,19 @@
       "sha256": "b51c2c9db2f3bded40462b9d838c9517b069730d8de385e1d4ceae5ae38e5a5a"
     },
     "current": {
-      "file": "frontend/src/user/pages/novel-creation/AutomationPanel.jsx",
-      "line": 19,
-      "anchor": "intervalMinutes: 30",
+      "file": "frontend/src/user/pages/novel-creation/SchedulerPanel.jsx",
+      "line": 9,
+      "anchor": "export default function",
       "anchorFound": true,
-      "sha256": "7ed6ef009077701bd3682f195933588cf424d1c2fc8971dd5f4f0e94baad168a"
+      "sha256": "40a0c6f6b2026e543ff3ef484886c2cea57d087c4c7e7ef340f3b17a3bd9dcc1"
     },
     "evidenceIds": [
       "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78"
     ],
-    "finding": "30分钟/每日10/连续失败3的默认方向相符，CM有完整持久任务；原全局调度器状态与CM多计划UI不同。",
+    "finding": "专用三参数调度器、状态与真实启停/恢复、原编号核对、等待原因与回原会话已接通。历史多计划管理保留；原全局调度作用范围、私有算法/真实服务同输入仍未证明一致。",
     "acceptance": "启动/暂停/恢复/停止/日限/失败限/重启后状态逐项比较，保存不得误立即生成。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 d9c8b335；新浏览器7/7、隔离MySQL、假模型到期保存计数通过；真实付费调用0",
+    "implementation": "a56b9a2a / d9c8b335；docs/acceptance/2026-11-19-novel-confirmation-scheduler.md",
     "baselineStatus": "部分实现",
     "baselineFinding": "30分钟/每日10/连续失败3的默认方向相符，CM有完整持久任务；原全局调度器状态与CM多计划UI不同。",
     "additionalCurrentEvidence": [],
