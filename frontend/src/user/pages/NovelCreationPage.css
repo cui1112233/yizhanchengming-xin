@@ -552,3 +552,7 @@ html[data-theme="dark"] body:has(.novel-creation-page) .novel-continuation-impor
 .novel-reference-editor-panel label { font-size:12px; line-height:1.7; }
 .novel-reference-editor-panel textarea.ant-input { min-height:130px; margin-top:6px; font-weight:400!important; font-size:13px!important; }
 body:has(.novel-creation-page) .legacy-sidebar.collapsed .legacy-nav a { min-height:36px; height:36px; padding:8px; border:0!important; border-radius:9px!important; box-shadow:none!important; }
+.novel-creation-page .novel-sidebar-content { flex:0 1 auto; }
+.novel-creation-page .novel-sidebar-content .novel-sessions { flex:0 0 auto; min-height:0; }
+.novel-creation-page .novel-creation-toolbar { margin-top:12px; }
+body:has(.novel-creation-page) .legacy-sidebar.collapsed :is(.legacy-nav-icon,.legacy-sidebar-tool .legacy-nav-icon) { width:22px!important; height:22px!important; min-width:22px!important; padding:0!important; border:0!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; }
