@@ -307,3 +307,10 @@ test('Agent空值阻止保存、失败保留草稿、重试与重新进入可读
  type(document.querySelector('[aria-label="写作要求1内容"]'),'失败后保留的要求');await tick();fail=true;click(button('保存Agent设置'));await wait(()=>document.body.textContent.includes('保存暂时失败'));assert(document.querySelector('[aria-label="写作要求1内容"]').value==='失败后保留的要求','failed save lost draft');
  fail=false;click(button('保存Agent设置'));await wait(()=>saved);await closeTool();click(button('Agent设置'));await wait(()=>document.querySelector('[aria-label="写作要求1内容"]')?.value==='失败后保留的要求');click(button('删除写作要求1'));await tick();saved=null;click(button('保存Agent设置'));await wait(()=>saved);assert(saved.agent.customWritePrompts.length===0,'deleted requirement resurrected');assert(!window.calls.some(c=>c.method==='POST'&&c.url!=='/api/client-errors'),'failure/retry generated');
 `,'agent-requirements-failure'));
+
+
+test('Agent跟随深色磨砂主题，分组不能白底白字', {skip:!browser},async()=>run(String.raw`
+ document.documentElement.style.setProperty('--surface-elevated','rgb(23,35,43)');document.documentElement.style.setProperty('--surface-panel','rgb(23,35,43)');document.documentElement.style.setProperty('--text-primary','#ffffff');
+ await open();window.step='agent dark';click(button('Agent设置'));await wait(()=>button('保存Agent设置')&&!button('保存Agent设置').disabled);
+ const section=document.querySelector('.novel-agent-section');assert(getComputedStyle(section).backgroundColor==='rgb(23, 35, 43)','section ignores theme');assert(getComputedStyle(section).color==='rgb(255, 255, 255)','text ignores theme');assert(getComputedStyle(document.querySelector('.novel-agent-footer')).backgroundColor==='rgb(23, 35, 43)','footer ignores theme');
+`,'agent-dark-theme'));
