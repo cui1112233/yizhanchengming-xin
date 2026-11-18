@@ -91,6 +91,15 @@ export function stopWorkshopTasks(ids) {
   });
 }
 
+// 按作业停止：传 job_id 时停止该作业；不传时停止当前账号所有未完成任务，
+// 并按参考实现默认暂停自动队列（pause_auto_queue 可显式关闭）。
+export function stopWorkshopProcess(payload = {}) {
+  return apiRequest('/api/novel-fetch-workshop/process/stop', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
 export function listWorkshopSchedules() {
   return apiRequest('/api/novel-fetch-workshop/schedules');
 }

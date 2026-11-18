@@ -151,8 +151,12 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 	stopSelected := func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			IDs     []string `json:"ids"`
-			BookIDs []string `json:"bookIds"`
+			IDs                 []string `json:"ids"`
+			BookIDs             []string `json:"bookIds"`
+			JobID               string   `json:"job_id"`
+			JobIDCamel          string   `json:"jobId"`
+			PauseAutoQueue      *bool    `json:"pause_auto_queue"`
+			PauseAutoQueueCamel *bool    `json:"pauseAutoQueue"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			return
@@ -160,6 +164,24 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		ids := input.IDs
 		if len(ids) == 0 {
 			ids = input.BookIDs
+		}
+		// 参考实现的 /api/process/stop 是按作业停止：不传具体书籍时，
+		// 会停止当前范围内所有仍在排队/执行的任务，并默认暂停自动队列。
+		if len(ids) == 0 {
+			documents, err := store.ListDocuments(req.Context(), identity.Username)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
+				return
+			}
+			for _, document := range documents {
+				status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"], document.Meta["taskStatus"]))
+				switch {
+				case strings.Contains(status, "completed"), strings.Contains(status, "done"), strings.Contains(status, "success"),
+					strings.Contains(status, "stopped"), strings.Contains(status, "cancel"), strings.Contains(status, "failed"):
+					continue
+				}
+				ids = append(ids, document.BookID)
+			}
 		}
 		rows := make([]novelfetchworkshop.Document, 0, len(ids))
 		stoppableIDs := make([]string, 0, len(ids))
@@ -193,7 +215,16 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 				updated++
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": updated})
+		pauseAuto := true
+		if input.PauseAutoQueue != nil {
+			pauseAuto = *input.PauseAutoQueue
+		} else if input.PauseAutoQueueCamel != nil {
+			pauseAuto = *input.PauseAutoQueueCamel
+		}
+		if pauseAuto {
+			_ = saveNovelFetchAutomationEnabled(req.Context(), store, identity.Username, false)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": updated, "job_id": firstText(input.JobID, input.JobIDCamel), "auto_queue_paused": pauseAuto})
 	}
 	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/stop-selected", stopSelected)
 	// Keep the old process-level stop action functional. Older pages posted
@@ -602,11 +633,46 @@ func cancelWorkshopSchedule(w http.ResponseWriter, req *http.Request, store nove
 	writeJSON(w, http.StatusNotFound, map[string]any{"error": "定时任务不存在"})
 }
 
+// resolveWorkshopTaskIDs 兼容参考实现的 mode=selected|failed|all。
+// 与源码 resolve_batch_ids 一致：mode 优先于 ids；未传或 selected 时只使用显式 ids。
+func resolveWorkshopTaskIDs(ctx context.Context, store novelfetchworkshop.Store, owner, mode string, ids []string, isFailed func(novelfetchworkshop.Document) bool) ([]string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	if normalized != "all" && normalized != "failed" {
+		return uniqueNovelFetchTaskIDs(ids), nil
+	}
+	documents, err := store.ListDocuments(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0, len(documents))
+	for _, document := range documents {
+		if normalized == "failed" && (isFailed == nil || !isFailed(document)) {
+			continue
+		}
+		result = append(result, document.BookID)
+	}
+	return result, nil
+}
+
+// workshopTaskFailed 与源码 task_is_failed 对齐：任务处理失败即视为失败任务。
+func workshopTaskFailed(document novelfetchworkshop.Document) bool {
+	status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"]))
+	return strings.Contains(status, "fail") || strings.Contains(status, "error")
+}
+
+// workshopSubmitFailed 与源码 resolve_web_submit_ids 的 failed 分支对齐：
+// 只重提上次提交失败的书籍。
+func workshopSubmitFailed(document novelfetchworkshop.Document) bool {
+	status := strings.ToLower(firstText(document.Meta["siteSubmitStatus"], document.Meta["site_submit_status"]))
+	return strings.Contains(status, "fail")
+}
+
 func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, key string) {
 	identity, _ := BridgeIdentityFromContext(req.Context())
 	var in struct {
 		IDs     []string `json:"ids"`
 		BookIDs []string `json:"bookIds"`
+		Mode    string   `json:"mode"`
 		Count   int      `json:"count"`
 	}
 	if err := decodeNovelFetchJSON(w, req, &in); err != nil {
@@ -616,7 +682,12 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	if len(ids) == 0 {
 		ids = in.BookIDs
 	}
-	uniqueIDs := uniqueNovelFetchTaskIDs(ids)
+	resolvedIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, in.Mode, ids, workshopTaskFailed)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取任务失败"})
+		return
+	}
+	uniqueIDs := uniqueNovelFetchTaskIDs(resolvedIDs)
 	if in.Count < 1 || in.Count > 20 {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "AI 数量须为 1 到 20"})
 		return
@@ -663,6 +734,7 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	var in struct {
 		IDs                []string `json:"ids"`
 		BookIDs            []string `json:"bookIds"`
+		Mode               string   `json:"mode"`
 		Text               string   `json:"text"`
 		SensitiveAIEnabled bool     `json:"sensitive_ai_enabled"`
 		Scope              string   `json:"scope"`
@@ -674,6 +746,12 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	if len(ids) == 0 {
 		ids = in.BookIDs
 	}
+	resolvedIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, in.Mode, ids, workshopTaskFailed)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取任务失败"})
+		return
+	}
+	ids = resolvedIDs
 	settings, _ := store.GetConfig(req.Context(), identity.Username)
 	var provider novelfetchworkshop.RewriteProvider
 	if in.SensitiveAIEnabled && resolveProvider != nil {

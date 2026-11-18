@@ -26,6 +26,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		var body struct {
 			TaskIDs         []string `json:"taskIds"`
 			IDs             []string `json:"ids"`
+			Mode            string   `json:"mode"`
 			Versions        []string `json:"versions"`
 			OperationID     string   `json:"operationId"`
 			ReadbackOnly    bool     `json:"readback_only"`
@@ -38,6 +39,14 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		if len(body.TaskIDs) == 0 {
 			body.TaskIDs = body.IDs
 		}
+		// 参考实现支持 mode=selected|failed|all 的提交范围；
+		// failed 只重提上次站点提交失败的书籍。
+		resolvedIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, body.Mode, body.TaskIDs, workshopSubmitFailed)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务失败"})
+			return
+		}
+		body.TaskIDs = resolvedIDs
 		if body.PreviewRevision != "" {
 			revision, err := webSubmitPreviewRevision(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
 			if err != nil || revision != body.PreviewRevision {

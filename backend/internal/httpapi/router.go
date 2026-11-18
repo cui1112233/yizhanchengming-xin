@@ -26,8 +26,8 @@ import (
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelcreation"
 	"qiantie/backend/internal/novelfetchworkshop"
-	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/projectretention"
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/releasenotes"
 	"qiantie/backend/internal/runtimeaudit"
 	"qiantie/backend/internal/screenplay"
@@ -789,6 +789,17 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("/api/batch-rewrite/process/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/rules/ai-suggest", novelAuth.Middleware(http.HandlerFunc(legacyRulesSuggestAlias)))
 		root.Handle("/api/batch-rewrite/rules/preview", novelAuth.Middleware(http.HandlerFunc(legacyRulesPreviewAlias)))
+		// 参考实现直接暴露 /api/rules/*；补齐同名入口，避免旧页面或脚本 404。
+		legacyRootRulesAlias := func(to string) http.HandlerFunc {
+			return func(w http.ResponseWriter, req *http.Request) {
+				clone := req.Clone(req.Context())
+				clone.URL.Path = to
+				novelFetch.ServeHTTP(w, clone)
+			}
+		}
+		root.Handle("POST /api/rules/preview", novelAuth.Middleware(legacyRootRulesAlias("/api/novel-fetch-workshop/rules/preview")))
+		root.Handle("POST /api/rules/trace", novelAuth.Middleware(legacyRootRulesAlias("/api/novel-fetch-workshop/rules/trace")))
+		root.Handle("POST /api/rules/ai-suggest", novelAuth.Middleware(legacyRootRulesAlias("/api/novel-fetch-workshop/rules/suggest")))
 		root.Handle("GET /api/batch-rewrite/logs", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("GET /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("POST /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
@@ -900,6 +911,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("PUT /api/tasks/", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
 		root.Handle("DELETE /api/tasks/", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
 		root.Handle("/api/web-submit/", sessionOnlyNovelAuth.Middleware(http.HandlerFunc(legacyWebSubmitAlias)))
+		RegisterNovelFetchIntegrations(root, sessionOnlyNovelAuth, options.NovelFetchStore, options.NovelFetchQueue)
 		registerCanonicalNovelFetchWebSubmitAliases(root, auth)
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore, options.UserConfigStore, options.AuthStore, options.MemberProfileStore)
 	}

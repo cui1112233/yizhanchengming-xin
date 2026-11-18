@@ -2771,15 +2771,21 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
 			IDs                []string `json:"ids"`
+			Mode               string   `json:"mode"`
 			SensitiveAIEnabled bool     `json:"sensitive_ai_enabled"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
 			return
 		}
-		ids := make([]string, 0, len(input.IDs))
+		resolvedIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, input.Mode, input.IDs, workshopTaskFailed)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取任务失败"})
+			return
+		}
+		ids := make([]string, 0, len(resolvedIDs))
 		seen := map[string]bool{}
-		for _, raw := range input.IDs {
+		for _, raw := range resolvedIDs {
 			id := strings.TrimSpace(raw)
 			if !novelFetchBookIDPattern.MatchString(id) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "非法的书籍ID"})
@@ -3168,12 +3174,26 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "AI 改文模型未配置"})
 			return
 		}
+		// 参考实现 /api/rules/ai-suggest 使用 snake_case 的 rule_type/sample_text；
+		// 这里同时接受两种写法，避免旧页面调用时拿到空文本。
 		var input struct {
-			Text     string `json:"text"`
-			RuleType string `json:"ruleType"`
-			Goal     string `json:"goal"`
+			Text          string `json:"text"`
+			SampleText    string `json:"sample_text"`
+			RuleType      string `json:"ruleType"`
+			RuleTypeSnake string `json:"rule_type"`
+			Goal          string `json:"goal"`
 		}
-		if err := decodeNovelFetchJSON(w, req, &input); err != nil || strings.TrimSpace(input.Text) == "" {
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+			return
+		}
+		if strings.TrimSpace(input.Text) == "" {
+			input.Text = input.SampleText
+		}
+		if strings.TrimSpace(input.RuleType) == "" {
+			input.RuleType = input.RuleTypeSnake
+		}
+		if strings.TrimSpace(input.Text) == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入待分析文本"})
 			return
 		}
@@ -3185,7 +3205,9 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "suggestions": content})
 	})
 
-	mux.HandleFunc("POST /api/novel-fetch-workshop/rules/preview", func(w http.ResponseWriter, req *http.Request) {
+	// 参考实现的 /api/rules/preview 与 /api/rules/trace 复用同一套规则处理，
+	// 只是 trace 只返回分阶段结果。这里保持同样的输入解析和配置覆盖逻辑。
+	previewWorkshopRules := func(w http.ResponseWriter, req *http.Request, traceOnly bool) {
 		var input struct {
 			Text         string         `json:"text"`
 			Scope        string         `json:"scope"`
@@ -3236,8 +3258,14 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if len(layout) == 0 {
 			layout = mapOrEmpty(settings["layout"])
 		}
+		if traceOnly {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stages": trace})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "text": result, "result": result, "trace": trace, "config": layout})
-	})
+	}
+	mux.HandleFunc("POST /api/novel-fetch-workshop/rules/preview", func(w http.ResponseWriter, req *http.Request) { previewWorkshopRules(w, req, false) })
+	mux.HandleFunc("POST /api/novel-fetch-workshop/rules/trace", func(w http.ResponseWriter, req *http.Request) { previewWorkshopRules(w, req, true) })
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/knowledge/repair-imported-sensitive", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -3571,14 +3599,20 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("DELETE /api/novel-fetch-workshop/tasks", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var body struct {
-			IDs []string `json:"ids"`
+			IDs  []string `json:"ids"`
+			Mode string   `json:"mode"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
 			return
 		}
-		ids := make([]string, 0, len(body.IDs))
-		for _, raw := range body.IDs {
+		resolvedIDs, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, body.Mode, body.IDs, workshopTaskFailed)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
+			return
+		}
+		ids := make([]string, 0, len(resolvedIDs))
+		for _, raw := range resolvedIDs {
 			id := strings.TrimSpace(raw)
 			if !novelFetchBookIDPattern.MatchString(id) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "非法的书籍ID"})

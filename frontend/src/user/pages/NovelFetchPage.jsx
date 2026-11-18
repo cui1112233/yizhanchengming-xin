@@ -17,7 +17,7 @@ import {
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
   updateWorkshopAiCount, applyWorkshopRules,
   saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, startWorkshopAutomation, pauseWorkshopAutomation, suggestWorkshopRules, testWorkshopAi, reprocessWorkshopSensitive, getWorkshopRealtimeStatus,
-  getWorkshopCurrentBatch, getWorkshopBatches, rerunWorkshopBatch, stopWorkshopTasks
+  getWorkshopCurrentBatch, getWorkshopBatches, rerunWorkshopBatch, stopWorkshopTasks, stopWorkshopProcess
 } from '../../shared/api/novelFetchWorkshop';
 import { createNovelFetchIntake } from '../../shared/api/batchFactory';
 import { listAvailableModels as listAvailableTextModels, modelSelectOptions } from '../../shared/api/modelCatalog';
@@ -1191,10 +1191,16 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     const normalizedInputText = serializeNovelFetchRows(parsed.rows);
     return { inputText: normalizedInputText, parsed, metadata: { input_format: inputFormat, column_preset: inputFormatLabel, column_order: inputColumnOrder } };
   }
-  function handleCancelProcess() {
+  async function handleCancelProcess() {
     if (!processing) return;
     processCancelRef.current = true;
-    message.info('正在停止等待，后台任务不会中断');
+    try {
+      const result = await stopWorkshopProcess({ job_id: processJob?.id || '', pause_auto_queue: true });
+      message.warning(`已停止后台处理${result?.updated ? `（${result.updated} 个任务）` : ''}，自动队列已暂停`);
+      await loadTasks({ silent: true });
+    } catch (error) {
+      message.error(error.message || '停止后台处理失败');
+    }
   }
   async function handleProcess() {
     const values = await processForm.validateFields();
@@ -1237,7 +1243,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
       }
       if (processCancelRef.current) {
         setProcessRows(current => current.map(row => (row.status === 'loading' ? { ...row, status: 'pending' } : row)));
-        message.info('已停止等待，后台任务仍在处理，请到任务列表查看进度');
+        message.info('已停止等待，并已请求停止后台任务，请到任务列表确认进度');
         loadTasks({ silent: true });
         return;
       }
