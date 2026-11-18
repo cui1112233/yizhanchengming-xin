@@ -1736,6 +1736,26 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
     const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), '当前批次提交已处理');
     if (result) setWebSubmitResults(result.results || []);
   }
+  // 参考实现的「提交选中」是直接提交 selectedTaskIds，而不是只切换到提交页；
+  // 这里保持同一语义，避免勾选后点按钮却没有任何提交动作。
+  async function submitSelectedTasks() {
+    const ids = [...selectedTaskKeys];
+    if (!ids.length) return message.warning('请先选择需要提交的任务');
+    Modal.confirm({
+      title: '提交选中任务？',
+      content: `将提交选中的 ${ids.length} 个任务到视频管理系统，系统会按平台、男女频、风格类型自动分组上传。`,
+      okText: '确认提交',
+      onOk: async () => {
+        const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), '选中任务提交已处理');
+        if (!result) return;
+        setWebSubmitResults(result.results || []);
+        setWebSubmitHistory(current => [...(result.results || []), ...current]);
+        setSubmitView('result');
+        changeTab('submit');
+        await Promise.all([loadTasks(), loadCurrentBatch()]);
+      }
+    });
+  }
   async function deleteTasksByFilter(filter, emptyMessage, scopeIds = null) {
     const ids = tasks.filter(task => (scopeIds === null || scopeIds.includes(task.bookId || task.book_id)) && filter(task)).map(task => task.bookId || task.book_id).filter(Boolean);
     if (!ids.length) return message.info(emptyMessage);
@@ -2049,7 +2069,7 @@ export function LegacyNovelFetchPage({ theme = 'dark' }) {
           <V88Button variant="secondary" loading={taskActionBusy === 'ai-count'} onClick={updateSelectedAiCount}>调整选中</V88Button>
           <V88Button variant="secondary" loading={taskActionBusy === 'rules-selected'} onClick={applySelectedRules}>规则处理选中</V88Button>
           <V88Button variant="secondary" icon={<Factory size={16} />} title={`入厂内容：${batchFactoryVersionLabel(batchFactorySourceVersion)}`} onClick={transferToBatchFactory}>进入批量工厂</V88Button>
-          <V88Button variant="primary" onClick={() => changeTab('submit')}>提交选中</V88Button>
+          <V88Button variant="primary" loading={webSubmitLoading} onClick={submitSelectedTasks}>提交选中</V88Button>
           <V88Button variant="danger" onClick={handleDeleteTasks}>删除选中</V88Button>
         </div> : null}
         <Table className="novel-fetch-task-table" scroll={{ x: 1420 }} rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20, showSizeChanger: true }} locale={{ emptyText: <V88EmptyState title="当前筛选下没有任务" description="调整查看日期、搜索条件或刷新任务后再试。" action={<V88Button size="small" variant="secondary" onClick={() => { loadTasks(); loadCurrentBatch(); }}>刷新任务</V88Button>} /> }} columns={[
