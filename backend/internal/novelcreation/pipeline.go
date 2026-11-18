@@ -40,16 +40,19 @@ type EventSink interface {
 // Runtime is used only for cancellation checks; durable writes remain the
 // caller's responsibility after Run returns a complete ChapterBundle.
 type RunContext struct {
-	OwnerUsername    string
-	Run              Run
-	Project          Project
-	Session          Session
-	UserMessage      string
-	ChapterNumber    int
-	PreviousChapters []PreviousChapter
-	PreviousTruth    json.RawMessage
-	PreviousMemory   json.RawMessage
-	Runtime          Runtime
+	LongImitation         *LongImitationCreation
+	ImitationAnalysis     *LongImitationAnalysis
+	ImitationRequirements *LongImitationRequirements
+	OwnerUsername         string
+	Run                   Run
+	Project               Project
+	Session               Session
+	UserMessage           string
+	ChapterNumber         int
+	PreviousChapters      []PreviousChapter
+	PreviousTruth         json.RawMessage
+	PreviousMemory        json.RawMessage
+	Runtime               Runtime
 	// ModeInputs is the validated mode-specific contract payload.
 	ModeInputs map[string]string
 	// StyleProfile and Rules are project-level writing constraints injected into
@@ -203,6 +206,27 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	if err := p.checkCancelled(ctx, input); err != nil {
 		return ChapterBundle{}, err
 	}
+	if input.LongImitation != nil && input.ChapterNumber > input.LongImitation.Input.TargetChapters {
+		return ChapterBundle{}, &DomainError{Code: ErrInvalidTransition, Message: "已达到目标章数"}
+	}
+	if input.LongImitation != nil {
+		input.ModeInputs = nil
+	}
+	requirements, requirementsErr := p.imitationRequirements(ctx, input, sink)
+	if requirementsErr != nil {
+		return ChapterBundle{}, requirementsErr
+	}
+	input.ImitationRequirements = requirements
+	if input.LongImitation != nil && input.ImitationAnalysis == nil && len(input.ConfirmedFoundation) == 0 {
+		if e := p.emitStage(ctx, input, sink, RunPlanning, "正在拆解参考文风、情绪曲线与原创方向", 5); e != nil {
+			return ChapterBundle{}, e
+		}
+	}
+	analysis, analysisErr := p.imitationAnalysis(ctx, input, sink)
+	if analysisErr != nil {
+		return ChapterBundle{}, analysisErr
+	}
+	input.ImitationAnalysis = analysis
 
 	var provider batchfactoryv11.DirectorProvider
 	var err error
@@ -225,11 +249,15 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		},
 		"user_message": input.UserMessage,
 	}
+	if input.LongImitation != nil {
+		foundationPayload["creation_brief"] = imitationModelBrief(input)
+		foundationPayload["long_imitation_analysis"] = analysis
+	}
 	var foundation foundationPlanOutput
 	var foundationRaw json.RawMessage
 	if len(input.ConfirmedFoundation) > 0 {
 		if err := decodeAndValidate(string(input.ConfirmedFoundation), &foundation, func() error {
-			return validateFoundation(foundation)
+			return validateImitationFoundation(foundation, input.LongImitation)
 		}); err != nil {
 			return ChapterBundle{}, &DomainError{Code: ErrInvalidOutput, Message: "confirmed foundation is invalid", Cause: err}
 		}
@@ -238,7 +266,7 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		foundationRaw, err = p.callJSON(ctx, input, sink, provider, modelCallSpec{
 			definition: novelprompt.FoundationPlan, step: RunPlanning,
 			userPayload: foundationPayload, temperature: 0.4, maxTokens: 6000,
-			validate: func() error { return validateFoundation(foundation) },
+			validate: func() error { return validateImitationFoundation(foundation, input.LongImitation) },
 		}, &foundation)
 		if err != nil {
 			return ChapterBundle{}, err
@@ -271,7 +299,9 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 			"user_message":         input.UserMessage,
 		},
 		temperature: 0.35, maxTokens: 3500,
-		validate: func() error { return validateChapterPlan(plan, chapterNumber, foundation.Volumes) },
+		validate: func() error {
+			return validateImitationPlan(plan, chapterNumber, foundation.Volumes, input.LongImitation)
+		},
 	}, &plan)
 	if err != nil {
 		return ChapterBundle{}, err
@@ -521,6 +551,21 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 }
 
 func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, spec modelCallSpec, target any) (json.RawMessage, error) {
+	if input.LongImitation != nil && spec.definition.ID != novelprompt.LongImitationRequirements.ID {
+		spec.definition.SystemPrompt += novelprompt.LongImitationSystemSupplement
+		if payload, ok := spec.userPayload.(map[string]any); ok {
+			copy := map[string]any{}
+			for k, v := range payload {
+				copy[k] = v
+			}
+			copy["creation_brief"] = imitationModelBrief(input)
+			copy["long_imitation_analysis"] = input.ImitationAnalysis
+			spec.userPayload = copy
+		}
+		if input.Project.TargetChapterWords > 8000 && spec.maxTokens >= 12000 {
+			spec.maxTokens = input.Project.TargetChapterWords*2 + 4000
+		}
+	}
 	if input.Agent != nil {
 		spec.temperature = input.Agent.BaseTemperature
 		if spec.definition.ID == novelprompt.ChapterRevision.ID {
@@ -548,9 +593,20 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 	if err != nil {
 		return nil, err
 	}
+	// Apply the same envelope guard before either decode path, including a
+	// schema-repair response, so malformed oversize results stay locally cached.
+	if input.LongImitation != nil {
+		if limitError := checkImitationRawReply(spec.definition.ID, reply); limitError != nil {
+			return nil, limitError
+		}
+	}
 	validationErr := decodeAndValidate(reply, target, spec.validate)
 	if validationErr == nil {
 		return json.RawMessage(reply), nil
+	}
+	var imitationLimit *imitationOutputLimitError
+	if input.LongImitation != nil && errors.As(validationErr, &imitationLimit) {
+		return nil, imitationLimitFailure(imitationLimit)
 	}
 
 	repairPrompt, marshalErr := marshalPromptPayload(map[string]any{
@@ -573,7 +629,16 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 	if err != nil {
 		return nil, err
 	}
+	if input.LongImitation != nil {
+		if limitError := checkImitationRawReply(spec.definition.ID, repairedReply); limitError != nil {
+			return nil, limitError
+		}
+	}
 	if err := decodeAndValidate(repairedReply, target, spec.validate); err != nil {
+		var imitationLimit *imitationOutputLimitError
+		if input.LongImitation != nil && errors.As(err, &imitationLimit) {
+			return nil, imitationLimitFailure(imitationLimit)
+		}
 		return nil, invalidOutputError(spec.definition, err)
 	}
 	return json.RawMessage(repairedReply), nil
@@ -600,7 +665,7 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 		}
 		route := strings.Split(strings.TrimPrefix(key, "novel-creation."), ":")[0]
 		routeKey := route
-		if route == "style-analysis" {
+		if route == "style-analysis" || route == "long-imitation-analysis" || route == "long-imitation-requirements" {
 			routeKey = "foundation-plan"
 		}
 		modelID := input.Agent.ModelRoutes[routeKey]

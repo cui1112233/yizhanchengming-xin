@@ -117,6 +117,15 @@ func (s *Service) prepareGenerationInput(ctx context.Context, owner, projectID, 
 	// An explicitly selected style or reference material satisfies imitation's
 	// alternative input path. Other modes keep their own required fields.
 	modeInputs := input.ModeInputs
+	if session.Mode == longImitationKind {
+		creation, e := loadLongImitation(ctx, s.store, owner, projectID)
+		if e != nil {
+			return result, e
+		}
+		if creation != nil {
+			modeInputs = map[string]string{"referenceText": creation.EffectiveReferenceText}
+		}
+	}
 	if (session.Mode == "long_imitation" || session.Mode == "short_imitation") && strings.TrimSpace(modeInputs["referenceText"]) == "" {
 		if input.StyleProfileID != "" || len(result.Knowledge) > 0 {
 			input.ModeInputs = nil

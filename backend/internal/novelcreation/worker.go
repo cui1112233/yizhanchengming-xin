@@ -379,7 +379,7 @@ func (g *guardedStore) SaveFoundation(ctx context.Context, owner string, v Found
 	return guarded(ctx, g.Store, g.lease, func(tx Store, e *Execution) error { return tx.SaveFoundation(ctx, owner, v) })
 }
 
-func (g *guardedStore) finishRun(ctx context.Context, owner string, u RunUpdate, f *Foundation, event RunEvent) (out Run, persisted RunEvent, err error) {
+func (g *guardedStore) finishRun(ctx context.Context, owner string, u RunUpdate, f *Foundation, event RunEvent, afterFoundation ...func(Store) error) (out Run, persisted RunEvent, err error) {
 	if owner != g.lease.Owner || u.ID != g.lease.RunID || event.RunID != g.lease.RunID {
 		return out, persisted, leaseLost()
 	}
@@ -399,6 +399,11 @@ func (g *guardedStore) finishRun(ctx context.Context, owner string, u RunUpdate,
 			}
 			if er := tx.SaveFoundation(ctx, owner, *f); er != nil {
 				return er
+			}
+			for _, fn := range afterFoundation {
+				if er := fn(tx); er != nil {
+					return er
+				}
 			}
 		}
 		var er error

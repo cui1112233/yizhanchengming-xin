@@ -113,15 +113,27 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
-	continuity, err := s.loadContinuity(ctx, owner, input.ProjectID, chapters)
-	if err != nil {
-		return Run{}, err
-	}
 	chapterNumber := 1
 	for _, chapter := range chapters {
 		if chapter.Number >= chapterNumber {
 			chapterNumber = chapter.Number + 1
 		}
+	}
+	imitation, err := loadLongImitation(ctx, s.store, owner, input.ProjectID)
+	if err != nil {
+		return Run{}, err
+	}
+	if imitation != nil && session.Mode != longImitationKind {
+		return Run{}, inputError("此作品按仿写长篇配置生产，请使用仿写长篇会话继续")
+	}
+	if imitation != nil {
+		if imitation != nil && chapterNumber > imitation.Input.TargetChapters {
+			return Run{}, &DomainError{Code: ErrInvalidTransition, Message: "已达到本作品目标章数，已停止继续生成"}
+		}
+	}
+	continuity, err := s.loadContinuity(ctx, owner, input.ProjectID, chapters)
+	if err != nil {
+		return Run{}, err
 	}
 	var confirmedFoundation json.RawMessage
 	if foundation, found, findErr := s.store.GetFoundation(ctx, owner, input.ProjectID); findErr != nil {
@@ -142,6 +154,9 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		return Run{}, err
 	}
 	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	if imitation != nil {
+		settings.Agent.TargetChapterWords = imitation.Input.TargetWordCount
+	}
 	snapshotFields := map[string]any{
 		"project_settings":       settings,
 		"agent_contract_version": 1,
@@ -153,6 +168,9 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 		"previous_truth": continuity.Truth, "previous_memory": continuity.Memory,
 		"previous_chapters": continuity.Chapters,
 		"message_id":        message.ID,
+	}
+	if imitation != nil {
+		snapshotFields["long_imitation"] = imitation
 	}
 	if len(confirmedFoundation) > 0 {
 		snapshotFields["confirmed_foundation"] = json.RawMessage(confirmedFoundation)
@@ -198,23 +216,24 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
-		AgentContractVersion int                 `json:"agent_contract_version"`
-		Settings             *ProjectSettings    `json:"project_settings"`
-		StyleProfile         *string             `json:"style_profile"`
-		Notes                []ProjectNote       `json:"notes"`
-		UserMessage          string              `json:"user_message"`
-		Mode                 string              `json:"mode"`
-		ModeInputs           map[string]string   `json:"mode_inputs"`
-		ChapterNumber        int                 `json:"chapter_number"`
-		Checkpoint           bool                `json:"checkpoint"`
-		ConfirmedFoundation  json.RawMessage     `json:"confirmed_foundation"`
-		KnowledgeIDs         []string            `json:"knowledge_ids"`
-		KnowledgeMaterials   []KnowledgeMaterial `json:"knowledge_materials"`
-		ExpectedTarget       *PreviousChapter    `json:"expected_target"`
-		RetryOfRunID         string              `json:"retry_of_run_id"`
-		PreviousChapters     []PreviousChapter   `json:"previous_chapters"`
-		PreviousTruth        json.RawMessage     `json:"previous_truth"`
-		PreviousMemory       json.RawMessage     `json:"previous_memory"`
+		LongImitation        *LongImitationCreation `json:"long_imitation"`
+		AgentContractVersion int                    `json:"agent_contract_version"`
+		Settings             *ProjectSettings       `json:"project_settings"`
+		StyleProfile         *string                `json:"style_profile"`
+		Notes                []ProjectNote          `json:"notes"`
+		UserMessage          string                 `json:"user_message"`
+		Mode                 string                 `json:"mode"`
+		ModeInputs           map[string]string      `json:"mode_inputs"`
+		ChapterNumber        int                    `json:"chapter_number"`
+		Checkpoint           bool                   `json:"checkpoint"`
+		ConfirmedFoundation  json.RawMessage        `json:"confirmed_foundation"`
+		KnowledgeIDs         []string               `json:"knowledge_ids"`
+		KnowledgeMaterials   []KnowledgeMaterial    `json:"knowledge_materials"`
+		ExpectedTarget       *PreviousChapter       `json:"expected_target"`
+		RetryOfRunID         string                 `json:"retry_of_run_id"`
+		PreviousChapters     []PreviousChapter      `json:"previous_chapters"`
+		PreviousTruth        json.RawMessage        `json:"previous_truth"`
+		PreviousMemory       json.RawMessage        `json:"previous_memory"`
 	}
 	if err := json.Unmarshal(run.PromptSnapshot, &prompt); err != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "创作输入快照损坏", err)
@@ -233,6 +252,9 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		settings = *prompt.Settings
 	}
 	agent := NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	if prompt.LongImitation != nil {
+		agent.TargetChapterWords = prompt.LongImitation.Input.TargetWordCount
+	}
 	var effectiveAgent *AgentSettings
 	if prompt.AgentContractVersion > 0 {
 		effectiveAgent = &agent
@@ -262,7 +284,28 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		styleProfile = *prompt.StyleProfile
 	}
 	sink := serviceEventSink{service: s, owner: owner}
+	var imitationAnalysis *LongImitationAnalysis
+	var imitationRequirements *LongImitationRequirements
+	if prompt.LongImitation != nil {
+		var a LongImitationAnalysis
+		found, e := readContent(ctx, s.store, owner, run.ProjectID, longImitationKind, "analysis", &a)
+		if e != nil {
+			return s.recoverDurableWriteFailure(ctx, owner, run, e)
+		}
+		if found {
+			imitationAnalysis = &a
+		}
+		var r LongImitationRequirements
+		found, e = readContent(ctx, s.store, owner, run.ProjectID, longImitationKind, "requirements", &r)
+		if e != nil {
+			return s.recoverDurableWriteFailure(ctx, owner, run, e)
+		}
+		if found {
+			imitationRequirements = &r
+		}
+	}
 	bundle, runErr := s.pipeline.Run(ctx, RunContext{
+		LongImitation: prompt.LongImitation, ImitationAnalysis: imitationAnalysis, ImitationRequirements: imitationRequirements,
 		OwnerUsername: owner, Run: run, Project: project, Session: session,
 		UserMessage: prompt.UserMessage, ChapterNumber: prompt.ChapterNumber,
 		PreviousTruth: prompt.PreviousTruth, PreviousMemory: prompt.PreviousMemory, PreviousChapters: prompt.PreviousChapters, Runtime: s.runtime,
@@ -547,7 +590,13 @@ func (s *Service) finishCheckpoint(ctx context.Context, owner string, run Run, b
 	if !ok {
 		return run, leaseLost()
 	}
-	updated, event, err := g.finishRun(ctx, owner, RunUpdate{ID: run.ID, Status: RunAwaitingConfirmation, RuntimeSnapshot: bundle.RuntimeSnapshot}, &bundle.Foundation, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: "run.checkpoint", Status: RunAwaitingConfirmation, Message: "创作蓝图已生成，等待确认", Progress: 20})
+	var input struct {
+		Creation *LongImitationCreation `json:"long_imitation"`
+	}
+	_ = json.Unmarshal(run.PromptSnapshot, &input)
+	updated, event, err := g.finishRun(ctx, owner, RunUpdate{ID: run.ID, Status: RunAwaitingConfirmation, RuntimeSnapshot: bundle.RuntimeSnapshot}, &bundle.Foundation, RunEvent{RunID: run.ID, ProjectID: run.ProjectID, SessionID: run.SessionID, Type: "run.checkpoint", Status: RunAwaitingConfirmation, Message: "创作蓝图已生成，等待确认", Progress: 20}, func(tx Store) error {
+		return applyImitationTitle(ctx, tx, owner, run, bundle.Foundation, input.Creation)
+	})
 	if err != nil {
 		return run, err
 	}
@@ -590,6 +639,9 @@ func (s *Service) confirmRun(ctx context.Context, owner, runID string, blueprint
 	confirmed := blueprint
 	if len(confirmed) > 0 {
 		if err := validateFoundationDocument(confirmed); err != nil {
+			return Run{}, err
+		}
+		if err := validateImitationConfirmation(source.PromptSnapshot, confirmed); err != nil {
 			return Run{}, err
 		}
 		now := time.Now().UTC()
@@ -652,6 +704,13 @@ func (s *Service) GetProjectSettings(ctx context.Context, owner, projectID strin
 		return ProjectSettings{}, err
 	}
 	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	creation, e := loadLongImitation(ctx, s.store, owner, projectID)
+	if e != nil {
+		return ProjectSettings{}, e
+	}
+	if creation != nil {
+		settings.Agent.TargetChapterWords = creation.Input.TargetWordCount
+	}
 	return settings, nil
 }
 
@@ -667,10 +726,18 @@ func (s *Service) updateProjectSettings(ctx context.Context, owner, projectID st
 	if err := validateAgentRequirements(input.Agent); err != nil {
 		return ProjectSettings{}, err
 	}
+	agent := NormalizeAgentSettings(input.Agent, project.TargetChapterWords)
+	creation, e := loadLongImitation(ctx, s.store, owner, projectID)
+	if e != nil {
+		return ProjectSettings{}, e
+	}
+	if creation != nil {
+		agent.TargetChapterWords = creation.Input.TargetWordCount
+	}
 	return s.store.UpdateProjectSettings(ctx, owner, projectID, ProjectSettings{
 		StyleProfile: strings.TrimSpace(input.StyleProfile),
 		Rules:        normalizeRules(input.Rules),
-		Agent:        NormalizeAgentSettings(input.Agent, project.TargetChapterWords),
+		Agent:        agent,
 	})
 }
 

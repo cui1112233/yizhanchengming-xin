@@ -53,10 +53,12 @@
 
 .novel-creation-mode-tabs{
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
   margin-top: 5px
 }
+
+.novel-creation-mode-tabs button{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-height:68px;padding:10px 12px!important}
 
 .novel-creation-mode-tabs button,.novel-project>button,.novel-session>button{
   border: 1px solid transparent;
@@ -499,7 +501,11 @@ body:has(.novel-creation-page) .ant-modal-content,body:has(.novel-creation-page)
 }
 
 body:has(.novel-creation-page) .ant-modal.ant-zoom-leave{
-  display: none!important;
+  pointer-events: none
+}
+
+/* Keep the exit animation alive so Antd can remove its full-screen wrapper. */
+body:has(.novel-creation-page) .ant-modal-wrap:has(.ant-zoom-leave){
   pointer-events: none
 }
 
