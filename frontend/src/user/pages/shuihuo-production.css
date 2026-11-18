@@ -4261,33 +4261,43 @@ body.shuihuo-reference-shell
 @media (prefers-reduced-motion: reduce){
   .cm-loader-dash,.cm-loader-spin,.batch-factory-inline-comic-stage.is-busy::after,.batch-factory-inline-comic-stage.is-pending::after,.batch-factory-inline-comic-stage.is-busy .batch-factory-inline-comic-primary{animation:none}
 }
-/* 自动生产进行中的整行光感：按阶段换色，顶部一条静态光带，
-   让“资产 / 提示词 / 漫画出图 / 发布”四个阶段一眼可辨；
-   不做流动动画，避免长列表里出现持续移动的元素。 */
+/* 自动生产进行中的光效：整行保留一圈静态微光定位到这本书，
+   流动光带围绕“当前阶段对应的格子”边框转动——
+   资产→资产设置、分段/提示词→提示词格、漫画图片→漫画格、发布→操作格。 */
 .batch-factory-book-row{position:relative}
 .batch-factory-book-row.is-automation-running{
   --bf-flow-color:#38bdf8;
   box-shadow:0 0 0 1px color-mix(in srgb,var(--bf-flow-color) 38%,transparent),0 0 22px -6px var(--bf-flow-color);
 }
-.batch-factory-book-row.is-automation-running[data-automation-stage='comic_assets']{--bf-flow-color:#38bdf8}
+.batch-factory-book-row.is-automation-running[data-automation-stage='comic_assets'],
+.batch-factory-book-row.is-automation-running[data-automation-stage='comic_asset_images']{--bf-flow-color:#38bdf8}
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_bootstrap'],
-.batch-factory-book-row.is-automation-running[data-automation-stage='comic_prompt_recovery']{--bf-flow-color:#a78bfa}
+.batch-factory-book-row.is-automation-running[data-automation-stage='comic_prompt_recovery'],
+.batch-factory-book-row.is-automation-running[data-automation-stage='comic_resume'],
+.batch-factory-book-row.is-automation-running[data-automation-stage='audio_planning']{--bf-flow-color:#a78bfa}
 .batch-factory-book-row.is-automation-running[data-automation-stage='comic_images']{--bf-flow-color:#fbbf24}
-.batch-factory-book-row.is-automation-running[data-automation-stage='comic_publish']{--bf-flow-color:#34d399}
-/* 执行中的静态光带：顶部 2px 实色条，仅按阶段换色，不播放动画。 */
-.batch-factory-book-row.is-automation-running::before{
+.batch-factory-book-row.is-automation-running[data-automation-stage='comic_publish'],
+.batch-factory-book-row.is-automation-running[data-automation-stage='waiting_submit']{--bf-flow-color:#34d399}
+/* 流动光带画在 is-automation-cell 格子的边框上：conic 渐变旋转，
+   颜色继承整行按阶段设置的 --bf-flow-color；
+   不支持 @property 的浏览器只显示静态渐变环，不影响布局。 */
+@property --bf-flow-angle{syntax:'<angle>';inherits:false;initial-value:0deg}
+.batch-factory-book-row .is-automation-cell{position:relative}
+.batch-factory-book-row.is-automation-running .is-automation-cell::after{
   content:'';
   position:absolute;
-  left:0;
-  right:0;
-  top:0;
-  height:2px;
+  inset:0;
   border-radius:inherit;
-  background:var(--bf-flow-color);
-  opacity:.75;
+  padding:1.5px;
+  background:conic-gradient(from var(--bf-flow-angle),transparent 0 302deg,var(--bf-flow-color,#38bdf8) 330deg,#fff 348deg,transparent 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  animation:bf-cell-flow 2.6s linear infinite;
   pointer-events:none;
-  contain:paint;
 }
+@keyframes bf-cell-flow{to{--bf-flow-angle:360deg}}
 
 .batch-factory-comic-source{display:grid;gap:7px;padding:9px;border:1px solid var(--sh-line);border-radius:6px;background:var(--sh-panel)}
 .batch-factory-comic-source header,.batch-factory-comic-source header>div,.batch-factory-comic-source-split{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}

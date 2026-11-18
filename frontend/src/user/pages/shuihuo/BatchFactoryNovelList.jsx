@@ -1115,12 +1115,13 @@ function DeferredInlineBookPrompts(props) {
     return () => observer.disconnect();
   }, [loaded]);
   if (loaded) return <InlineBookPrompts {...props} />;
-  return <div ref={placeholderRef} className="shuihuo-workbench-cell batch-factory-storyboard-cell">
+  return <div ref={placeholderRef} className={`shuihuo-workbench-cell batch-factory-storyboard-cell${props.automationActive ? ' is-automation-cell' : ''}`}>
     <div className="batch-factory-cell-empty">滚动到附近后加载分镜提示词。</div>
   </div>;
 }
 
-function InlineBookPrompts({ batch, book, batchId, settingsRevision, productionMode = 'video', selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage }) {
+function InlineBookPrompts({ batch, book, batchId, settingsRevision, productionMode = 'video', automationActive = false, selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage }) {
+  const promptCellClassName = `shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell${automationActive ? ' is-automation-cell' : ''}`;
   const videos = book?.videos || [];
 	const h3Cards = h3DirectorCards(book);
   const precompiledWorkspace = resolvePrecompiledVideoWorkspace(book);
@@ -1192,7 +1193,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, productionM
 			if (next) selectVideo(next.key);
 		};
 		const camera = h3Card.camera || {};
-		return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell">
+		return <div className={promptCellClassName}>
 			<div className="batch-factory-cell-shell batch-factory-prompt-entry-card is-h3-director-card">
 				<header className="batch-factory-cell-head"><div><b>导演分镜卡 {h3CardIndex + 1}</b><small>视频提示词：{h3VideoPromptLabel} · 已提取，尚未编译 VIDEO</small></div></header>
 				<button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(h3Frame?.key || '')}>
@@ -1209,12 +1210,12 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, productionM
 		</div>;
 	}
 
-  if (!video) return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell"><div className="batch-factory-cell-shell"><div className="batch-factory-cell-empty">AI 推理后会在这里显示当前书的分镜提示词。</div></div></div>;
+  if (!video) return <div className={promptCellClassName}><div className="batch-factory-cell-shell"><div className="batch-factory-cell-empty">AI 推理后会在这里显示当前书的分镜提示词。</div></div></div>;
 
   const stateLabel = promptKind === 'visual' ? (hasVisualPrompt ? '漫画已生成' : '待生成') : loading ? '编译中' : videoPrompt.trim() ? (smartUnifiedPending ? '基线未获取' : '最终已编译') : '待生成';
   const videoPromptLabel = selectedVideoPromptLabel(effectiveBookSettings(batch, book));
 
-  return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell">
+  return <div className={promptCellClassName}>
     <div className="batch-factory-cell-shell batch-factory-prompt-entry-card">
       <header className="batch-factory-cell-head">
         <div><b>{productionMode === 'comic' ? `漫画页 ${String(selectedIndex + 1).padStart(2, '0')}` : storyboardVideoLabel(video, selectedIndex)}</b><small>{promptKind === 'visual' ? '漫画提示词' : '最终视频提示词'}</small></div>
@@ -3202,6 +3203,22 @@ function DeferredInlineComicLibrary(props) {
     <div className="batch-factory-cell-empty">滚动到附近后加载漫画页。</div>
   </div>;
 }
+
+
+// 自动生产执行中，流动光带围绕“当前阶段对应的格子”转，而不是整条书行：
+// 资产类阶段围绕“资产设置”，分段/提示词/配音围绕提示词格，
+// 漫画图片围绕漫画格，发布围绕操作格。
+const AUTOMATION_STAGE_CELL = {
+  comic_assets: 'assets',
+  comic_asset_images: 'assets',
+  comic_bootstrap: 'prompts',
+  comic_prompt_recovery: 'prompts',
+  comic_resume: 'prompts',
+  audio_planning: 'prompts',
+  comic_images: 'comic',
+  comic_publish: 'actions',
+  waiting_submit: 'actions',
+};
 
 function mergeAutomationLogSnapshot(previous, next) {
   if (!next || typeof next !== 'object') return previous;
@@ -5863,11 +5880,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
               automationState,
               automationBook,
             });
-            // 自动生产正在执行时给整行加静态光边：阶段不同颜色不同，
-            // 用户在长列表里也能直接看到“这本文在跑什么”。
+            // 自动生产正在执行时：整行保留一圈静态微光方便定位这本书，
+            // 流动光带围绕“当前阶段对应的格子”边框转（CSS 按阶段取色）。
             const automationRunningStage = automationState === 'running' && String(automationBook?.status || '').toLowerCase() === 'running'
               ? String(automationBook?.stage || '').trim()
               : '';
+            const automationActiveCell = AUTOMATION_STAGE_CELL[automationRunningStage] || '';
             return (
               <article
                 className={`shuihuo-workbench-row batch-factory-book-row${automationRunningStage ? ' is-automation-running' : ''}`}
@@ -6026,7 +6044,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                         <button
                           type="button"
                           key={region.key}
-                          className={`batch-factory-book-config-region is-${status.tone}`}
+                          className={`batch-factory-book-config-region is-${status.tone}${automationActiveCell === 'assets' && region.key === 'assets' ? ' is-automation-cell' : ''}`}
                           onClick={() =>
                             region.key === "assets"
                               ? setAssetBook(book)
@@ -6046,6 +6064,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                   batchId={batch?.id}
                   settingsRevision={batch?.settingsState?.revision}
                   productionMode={productionMode}
+                  automationActive={automationActiveCell === 'prompts'}
                   selectedVideoId={
                     rowStoryboardSelection[book.id] || videos[0]?.id || ""
                   }
@@ -6060,7 +6079,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     setPromptBook(book);
                   }}
                 />
-                <div className="shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell">
+                <div className={`shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell${automationActiveCell === 'comic' ? ' is-automation-cell' : ''}`}>
                   {productionMode === "comic" ? (
                     <DeferredInlineComicLibrary
                       batchId={batch?.id}
@@ -6116,7 +6135,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     />
                   )}
                 </div>
-                <div className="shuihuo-workbench-cell batch-factory-actions">
+                <div className={`shuihuo-workbench-cell batch-factory-actions${automationActiveCell === 'actions' ? ' is-automation-cell' : ''}`}>
                   <div className="batch-factory-action-group is-utility">
                     <span>资料与流程</span>
                     <div className="batch-factory-action-button-grid">
