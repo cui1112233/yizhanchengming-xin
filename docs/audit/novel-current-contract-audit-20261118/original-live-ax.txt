@@ -1,0 +1,217 @@
+Window: "洛水 v2.9.4", App: pythonw.exe.
+	0 window (窗口) 洛水 v2.9.4 Secondary Actions: Raise
+		1 pane (窗格) ID: 266274
+			2 pane (窗格) 分镜编辑器 - [InPrivate]
+				3 pane (窗格) (disabled)
+				4 pane (区域) 分镜编辑器 - Web 内容 (InPrivate)
+					5 pane (区域)
+						6 pane (区域)
+						7 pane (区域)
+							8 pane (区域)
+								9 pane (区域)
+								10 pane (区域)
+									11 pane (区域)
+										12 pane (区域)
+											13 pane (区域)
+												14 pane (区域)
+												15 document (文档) 分镜编辑器 Value: http://127.0.0.1:8496/index.html ID: RootWebArea
+													16 group (组)
+														25 group (组)
+														51 group (组)
+															52 button (按钮) 短剧创作
+																53 image (图形)
+																54 text (文本) 短剧
+																55 text (文本) 创作
+																56 image (图形)
+															57 button (按钮) 展开侧边栏
+																58 image (图形)
+														1952 menu (菜单)
+															1953 menu item (菜单项目) 首页
+																1954 image (图形)
+															1955 menu item (菜单项目) 小说创作
+																1956 image (图形)
+															1957 menu item (菜单项目) 角色库
+																1958 image (图形)
+															1959 menu item (菜单项目) 音色库
+																1960 image (图形)
+															1961 menu item (菜单项目) 漫剧解说 1
+																1962 image (图形)
+															1963 group (组)
+																1964 image (图形)
+																1965 text (文本) 内容创作
+																1966 menu item (菜单项目) 短剧工作室 0
+																	1967 image (图形)
+																1968 menu item (菜单项目) 剧本创作 1
+																	1969 image (图形)
+																1970 menu item (菜单项目) momo画布 1
+																	1971 image (图形)
+																1972 menu item (菜单项目) 绘画
+																	1973 image (图形)
+															1974 group (组)
+																1975 image (图形)
+																1976 text (文本) AI剪辑视频
+																1977 menu item (菜单项目) AI-CUT
+																	1978 image (图形)
+															1979 group (组)
+																1980 image (图形)
+																1981 text (文本) 社区与服务
+																1982 menu item (菜单项目) 教程
+																	1983 image (图形)
+																1984 menu item (菜单项目) 插件
+																	1985 image (图形)
+																1986 menu item (菜单项目) 社区 183
+																	1987 image (图形)
+																1988 menu item (菜单项目) 我的资产
+																	1989 image (图形)
+																1990 menu item (菜单项目) 反馈
+																	1991 image (图形)
+																1992 menu item (菜单项目) 在线客服
+																	1993 image (图形)
+														26 group (组)
+															2963 button (按钮) 展开侧边栏 Description: 展开侧边栏
+																2964 image (图形)
+															101 button (按钮) 用户协议 Description: 用户协议
+																102 image (图形)
+															103 button (按钮) 检查更新 Description: 检查更新
+																104 image (图形)
+															105 button (按钮) 消息中心 Description: 消息中心
+																106 image (图形)
+															107 group (组) Description: 用户信息
+																108 image (图形)
+															109 button (按钮) 社群 Description: 社群
+																110 image (图形)
+															111 button (按钮) 教程 Description: 教程
+																112 image (图形)
+															113 button (按钮) 全局设置 Description: 全局设置
+																114 image (图形)
+															27 button (按钮) 最小化 Description: 最小化
+																28 image (图形)
+															29 button (按钮) 还原 Description: 还原
+																219 image (图形)
+															31 button (按钮) 关闭 Description: 关闭
+																32 image (图形)
+														2965 group (补充)
+															2966 text (文本) 开始创作
+															2967 button (按钮) 长篇原创
+															2968 button (按钮) 短篇原创
+															2969 button (按钮) 仿写长篇
+															2970 button (按钮) 仿写短篇
+															2971 button (按钮) 番外创作
+															2972 button (按钮) 续写创作
+															2973 button (按钮) 我的作品 0
+																2974 image (图形)
+															2975 text (文本) 还没有作品
+															2976 button (按钮) 会话记录
+																2977 image (图形)
+															2978 text (文本) 当前分类暂无会话，点击下方新建
+															2979 button (按钮) 新建会话
+																2980 image (图形)
+															2981 button (按钮) 写作风格
+															2982 button (按钮) 导入素材
+															2983 button (按钮) Agent 设置
+															2984 button (按钮) 定时写作
+															2985 button (按钮) 数据看板
+															2986 button (按钮) 备忘录
+														2987 group (主要)
+															2988 text (文本) 告诉我你想写什么——题材、世界观、主角、核心冲突。
+															2989 text field (编辑) (settable, string) 输入指令… 可在模型列表中设置思考强度 (Enter 发送，Shift+Enter 换行) Description: 输入指令… 可在模型列表中设置思考强度 (Enter 发送，Shift+Enter 换行)
+															2990 group (组)
+																2991 image (图形)
+																2992 text (文本) glm-5.2-小鱼漫漫
+																2993 text (文本) 小鱼漫漫
+																2994 image (图形)
+															2995 button (按钮) 展开思考 Description: 展开思考
+																2996 image (图形)
+															2997 button (按钮)
+																2998 image (图形)
+															2999 button (按钮)
+																3000 image (图形)
+															3001 button (按钮) (disabled)
+																3002 image (图形)
+														3163 group (标题)
+															3164 text (标题) 仿写创作
+															3165 text (文本) 参考原文风格，创作全新原创故事
+															3166 button (按钮) 关闭
+														3167 text (文本) 暂定标题（可选）
+														3168 group (组)
+															3169 text field (编辑) (settable, string) 留空则自动生成 Description: 留空则自动生成
+															3170 text (文本) 留空则自动生成
+														3171 text (文本) 参考原文
+														3172 text (文本) *
+														3173 text (文本) 0 字
+														3174 group (组)
+															3175 text field (编辑) (settable, string) 粘贴参考小说全文（至少 100 字），或上传 txt / docx 自动填入 Description: 粘贴参考小说全文（至少 100 字），或上传 txt / docx 自动填入
+															3176 text (文本) 粘贴参考小说全文（至少 100 字），或上传 txt / docx 自动填入
+														3177 text (文本) 粘贴或上传要仿写的参考原文，系统将自动拆解情绪曲线与核心价值观
+														3178 text (文本) 上传参考文件（可选）
+														3179 button (按钮) + 选择文件（docx / txt）
+														3180 text (文本) 每章字数
+														3181 group (组)
+															3182 text field (编辑) (settable, string) 5000 Description: 5000 Value: 5000
+														3183 button (按钮) 3000
+														3184 button (按钮) 4000
+														3185 button (按钮) 5000
+														3186 button (按钮) 6000
+														3187 button (按钮) 8000
+														3188 button (按钮) 1万
+														3189 text (文本) 可自由填写每章字数，也可点选常用字数
+														3190 text (文本) 目标章节数
+														3191 group (组)
+															3192 text field (编辑) (settable, string) 100 Description: 100 Value: 100
+														3193 button (按钮) 50
+														3194 button (按钮) 100
+														3195 button (按钮) 150
+														3196 button (按钮) 200
+														3197 button (按钮) 300
+														3198 text (文本) 长篇默认 100 章，可按需调整
+														3199 text (文本) 读者偏好
+														3200 group (组)
+															3201 text field (编辑) (settable, string) 填写题材偏好，如：玄幻、都市 Description: 填写题材偏好，如：玄幻、都市
+															3202 text (文本) 填写题材偏好，如：玄幻、都市
+														3203 button (按钮) 玄幻
+														3204 button (按钮) 都市
+														3205 button (按钮) 仙侠
+														3206 button (按钮) 科幻
+														3207 button (按钮) 历史
+														3208 button (按钮) 悬疑
+														3209 button (按钮) 言情
+														3210 button (按钮) 武侠
+														3211 button (按钮) 奇幻
+														3212 button (按钮) 灵异
+														3213 button (按钮) 末世
+														3214 button (按钮) 系统
+														3215 text (文本) 可自由填写，点选标签会自动追加
+														3216 text (文本) 原创故事想法（可选）
+														3217 group (组)
+															3218 text field (编辑) (settable, string) 剧情、主角、核心冲突（原创剧情） Description: 剧情、主角、核心冲突（原创剧情）
+															3219 text (文本) 剧情、主角、核心冲突（原创剧情）
+														3220 text (文本) 仿写方向（可选）
+														3221 group (组)
+															3222 text field (编辑) (settable, string) 留空则默认采用拆书后的方向一；可填「方向二：…」 Description: 留空则默认采用拆书后的方向一；可填「方向二：…」
+															3223 text (文本) 留空则默认采用拆书后的方向一；可填「方向二：…」
+														3224 text (文本) 补充信息（可选）
+														3225 group (组)
+															3226 text field (编辑) (settable, string) 填写额外要求，如人设、情节走向、必须出现的桥段、禁忌点等 Description: 填写额外要求，如人设、情节走向、必须出现的桥段、禁忌点等
+															3227 text (文本) 填写额外要求，如人设、情节走向、必须出现的桥段、禁忌点等
+														3228 text (文本) 文风设置（多选）
+														3229 group (组)
+															3230 text (文本) 暂无可用文风
+														3231 text (文本) 关联备忘录（可选）
+														3232 group (组)
+															3233 group (组)
+																3234 image (图形) loading
+															3235 text (文本) 选择备忘录作为参考素材
+														3236 group (页脚)
+															3237 button (按钮) 取消
+															3238 button (按钮) 创建作品
+								48 pane (区域)
+						49 pane (区域)
+
+Document text: ```
+￼
+```
+
+Focused element: 15 document (文档) 分镜编辑器 Value: http://127.0.0.1:8496/index.html ID: RootWebArea
+
+Document text:
+￼

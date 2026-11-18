@@ -1,0 +1,451 @@
+[
+  {
+    "file": "frontend/src/user/pages/novel-creation/AgentPanel.css",
+    "bytes": 2595,
+    "sha256": "b0ff4399942435e1e87b4f9c97c5e08405714ac9531e96fd40e4d5f9b39c95d7"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/AgentPanel.jsx",
+    "bytes": 5154,
+    "sha256": "dd6f41f7d6fe0e5a02b2e734561228230bf085076bf90a3ae2e865abed2ab0d9"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/AgentRequirements.jsx",
+    "bytes": 2925,
+    "sha256": "48fd51fc9379000b0bd01c023dd36acce0c88454f2b1a078db653df810910c2d"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/AutomationPanel.jsx",
+    "bytes": 13254,
+    "sha256": "7ed6ef009077701bd3682f195933588cf424d1c2fc8971dd5f4f0e94baad168a"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/BlueprintEditor.jsx",
+    "bytes": 2849,
+    "sha256": "9bbccf108b8589159878490158b35a0015613322b9e9c3d463b1c2d5eeb45e22"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/browserEvidence.js",
+    "bytes": 5351,
+    "sha256": "f9e31e29149f36754661d59ed2f14030166e54eba4416ed3a961ae3a6f274a64"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+    "bytes": 5219,
+    "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/ComposerToolbar.css",
+    "bytes": 3334,
+    "sha256": "48adc5c8c169cb1cbe08b75d1904169189c368610c7fe65f2fe80d0f7ebbb31f"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/ComposerToolbar.jsx",
+    "bytes": 2421,
+    "sha256": "5fe122a2f0e0aca4a93d6ef5c4ddd5615db0a11a0882502aa8b262389d239986"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/continuationImport.js",
+    "bytes": 1097,
+    "sha256": "1137871267bdbc83835580e4153dd0168a0b9de74495ed859cd6cda99b3af647"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/ContinuationImportDialog.jsx",
+    "bytes": 6642,
+    "sha256": "3f5036c0b7aa3a3f860c9be8073d08ac95b3be41b265f1aa4e58eeb3b5c2596a"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/contracts.js",
+    "bytes": 3505,
+    "sha256": "14a0c45f27c3d83a1ea741421b6592da680c0b6f2bc95f9b67c03c3a992ce005"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/LongImitationContext.jsx",
+    "bytes": 5196,
+    "sha256": "37786f5151f46a2dbe7c1199beae33b7558105b1bcb77425150934307cfaca40"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/LongImitationDialog.css",
+    "bytes": 5577,
+    "sha256": "14645c266a3e30489e42704452bebb54dfd68b35fdb924c485d78530ac6c5c49"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/LongImitationDialog.jsx",
+    "bytes": 22992,
+    "sha256": "ace68cf67ebb898e1a9c5a1542a47cfb7b214278e8d7dd6b4f67439b73c91ab0"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/longImitationDraftStore.js",
+    "bytes": 1584,
+    "sha256": "79c51209e4293636853aab23aabcd82992dcc9f6b1f1bbc457a84819f3c4fa5a"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/longImitationInputs.js",
+    "bytes": 1885,
+    "sha256": "2d4a3eb03e914f1884853488622159c5dbb30795687c474f018fe2f408874aae"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/MaterialsPanel.jsx",
+    "bytes": 10902,
+    "sha256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/NotesPanel.jsx",
+    "bytes": 2425,
+    "sha256": "cf676187c1ec6963e07dcc292976bf7f213a6520f204a1f6577e08785d86ff78"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/RunCard.jsx",
+    "bytes": 5814,
+    "sha256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/StudioChat.css",
+    "bytes": 1967,
+    "sha256": "6e083b3d85862ad0a48579680537c66affdd163961d5de2a27ca10b071bf3a79"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/StudioChat.jsx",
+    "bytes": 12693,
+    "sha256": "07f2bd14e1b515992ac1bfa7b2b35c98c6e662ff0eab3388635eb8511be944f4"
+  },
+  {
+    "file": "frontend/src/user/pages/novel-creation/useWorkspaceScope.js",
+    "bytes": 855,
+    "sha256": "005f0921a693adb4c7e0b5ebc1daccf97d4914cf56c72c3510508e2febdfcb22"
+  },
+  {
+    "file": "backend/internal/novelcreation/agent_requirements.go",
+    "bytes": 2821,
+    "sha256": "c7b5c23fd5b4356f91a8f0440ac50432036a5f52541f35e8e0eeb48e728eef1d"
+  },
+  {
+    "file": "backend/internal/novelcreation/archive.go",
+    "bytes": 6806,
+    "sha256": "509985cf320f021993dfaa7c772894c459dae9f42079241d5618f300022db0ef"
+  },
+  {
+    "file": "backend/internal/novelcreation/automation_creation.go",
+    "bytes": 2760,
+    "sha256": "b9e49f285a954e6c060e69ac99f76e96349a5acdf7dc0e91743109a7f249b733"
+  },
+  {
+    "file": "backend/internal/novelcreation/automation_input.go",
+    "bytes": 7889,
+    "sha256": "58ec799a86a90e87c368c24e7cd9f7b8ebf46bc31c9d397eeeb140128cce80cc"
+  },
+  {
+    "file": "backend/internal/novelcreation/automation_state.go",
+    "bytes": 10556,
+    "sha256": "dedab2665940252467d97052ce9a1f9d8d40b7fb4ab5e4d44a8431b34657d8d6"
+  },
+  {
+    "file": "backend/internal/novelcreation/batch.go",
+    "bytes": 12571,
+    "sha256": "ef0c8e588d0bc0b273ec89de1869224753c8c5bdb8ce1436969d1a48874951e5"
+  },
+  {
+    "file": "backend/internal/novelcreation/chapter_import.go",
+    "bytes": 6955,
+    "sha256": "6bebaa929c3f4f156ad12e804e78df059804998d03b443495ca84a7c6a391756"
+  },
+  {
+    "file": "backend/internal/novelcreation/chapter_import_store.go",
+    "bytes": 6089,
+    "sha256": "7021ba8ca38413aa0946378da98d1957616ca85f8858596af34d8c0beb6ffa36"
+  },
+  {
+    "file": "backend/internal/novelcreation/content_management.go",
+    "bytes": 6695,
+    "sha256": "38e49278e06fd2e7bc67e13463e2e0a7a9d561800ecfe34b60047a97648672b5"
+  },
+  {
+    "file": "backend/internal/novelcreation/content_management_store.go",
+    "bytes": 5028,
+    "sha256": "012560d10dd8715476b7469ea417f90d3c210417c7706f222f7b65308ca299bf"
+  },
+  {
+    "file": "backend/internal/novelcreation/content_records.go",
+    "bytes": 6334,
+    "sha256": "e58b1a3e20e1cef70c5373040b90e4b78812d98f26b0020b6cdd4d5e6a174c04"
+  },
+  {
+    "file": "backend/internal/novelcreation/continuity.go",
+    "bytes": 9728,
+    "sha256": "e4c7c5020d03b4c03c96d411752450ecd6c118f98beef774ad4a4cba9f5f4105"
+  },
+  {
+    "file": "backend/internal/novelcreation/document_tos.go",
+    "bytes": 1674,
+    "sha256": "ea3455f96c2ed5d0e16b36716c87d04749b91f43b4d9dc06aeab7dd6d5f6779f"
+  },
+  {
+    "file": "backend/internal/novelcreation/exports.go",
+    "bytes": 5333,
+    "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
+  },
+  {
+    "file": "backend/internal/novelcreation/import_reads.go",
+    "bytes": 2188,
+    "sha256": "c9ef33b6623be67db984574c5c99a860185b0e0d8b110550dcaf2a5c29e63a77"
+  },
+  {
+    "file": "backend/internal/novelcreation/local_checks.go",
+    "bytes": 8671,
+    "sha256": "7bc7b9c148a0bd920c40ecf7e10d8e9a5454d041102d2a65454ac1d1aaea60cb"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation.go",
+    "bytes": 12163,
+    "sha256": "a68ab172de60c3fe00f04c96fc3017ccd7b08d841a0f30b289d3bbe51acf4dbe"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation_chunking.go",
+    "bytes": 10960,
+    "sha256": "c1432c2eb2abcf1b38462d2378bb00e04ff4e4a9b40dc7b173cd3fae6f133863"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation_parse.go",
+    "bytes": 1690,
+    "sha256": "dbf24121c3cec68b396830a6ba2a66e9c718d5c8922c8cc6b4c1440b1187cc01"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation_pipeline.go",
+    "bytes": 7306,
+    "sha256": "6c4c6b70f19d6080d1c2afb7a0fc535f85d659e9289f5f8f38caeee390237067"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation_statistics.go",
+    "bytes": 7924,
+    "sha256": "fb4351e5f15cbe1348f951b482fdf5aad6e4f573da76ddad74bbbc2a7f736a12"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation_store.go",
+    "bytes": 2173,
+    "sha256": "b49029da4f2f72ba9dc2251c6fac989f10dcd65bf116b8e2d8a14742888067fe"
+  },
+  {
+    "file": "backend/internal/novelcreation/long_imitation_summary.go",
+    "bytes": 1305,
+    "sha256": "715655e7a3ace200fd709054d06f7c8c05ecdf605ed3a82708415294f9da9944"
+  },
+  {
+    "file": "backend/internal/novelcreation/maintenance.go",
+    "bytes": 13500,
+    "sha256": "201a998c900bffae5fc9e58d0029f0191fdd0608e5c7ad7c391c481ae3522eeb"
+  },
+  {
+    "file": "backend/internal/novelcreation/materials.go",
+    "bytes": 15987,
+    "sha256": "bebbcb583c327479c94e231c574df3108a979bc9f9bf52babb5467178eb77e61"
+  },
+  {
+    "file": "backend/internal/novelcreation/memory_store.go",
+    "bytes": 32030,
+    "sha256": "d63dff6cce86e5ed789288c94c79c308abacf828175eff1ab343e28528b01dda"
+  },
+  {
+    "file": "backend/internal/novelcreation/model_confirmation.go",
+    "bytes": 7085,
+    "sha256": "aab82dbc0f1a20c6d0fae3e453a7b2564b58cf260d6e01e924a8bc50cffb6229"
+  },
+  {
+    "file": "backend/internal/novelcreation/mysql_store.go",
+    "bytes": 64170,
+    "sha256": "e0cbafbe445a8c7af414fbc2613c680507850ac782750161f45a6510fe0c3371"
+  },
+  {
+    "file": "backend/internal/novelcreation/pipeline.go",
+    "bytes": 48361,
+    "sha256": "b413a6c7cac5463d3dcb080b57da0f16340d77bf11289595d3e8e9a402b15edd"
+  },
+  {
+    "file": "backend/internal/novelcreation/runtime.go",
+    "bytes": 8738,
+    "sha256": "75b637a8dee4773bfd581202ed3bf6d6e5262d6ad395b29e041f2354d065c27e"
+  },
+  {
+    "file": "backend/internal/novelcreation/scheduler.go",
+    "bytes": 16677,
+    "sha256": "07e50b8b48fee56f798a0d88f51ca2199296ea70f0fcaf934aa9b369b58a297c"
+  },
+  {
+    "file": "backend/internal/novelcreation/service.go",
+    "bytes": 37560,
+    "sha256": "69cff03fa929c2dc26859c97c99501329b396a6862350421ba422167cdd71052"
+  },
+  {
+    "file": "backend/internal/novelcreation/store.go",
+    "bytes": 10473,
+    "sha256": "6467f34bc05d067ede2dd20d411cdfab1cddd7181a5fc9471f63bcc4c7d6c28a"
+  },
+  {
+    "file": "backend/internal/novelcreation/studio_service.go",
+    "bytes": 19618,
+    "sha256": "dee31b4b44b36f981103b6fc8dc6ee94a7187eb3d0c1391371c822e4b3c091cf"
+  },
+  {
+    "file": "backend/internal/novelcreation/studio_store.go",
+    "bytes": 4773,
+    "sha256": "fe174e267e446742362571a503cce902d01076b170e4877909cd9dc337ecc7b9"
+  },
+  {
+    "file": "backend/internal/novelcreation/studio_types.go",
+    "bytes": 3877,
+    "sha256": "fe68810e09d9614e8db7041a866559143393b545d57698d626c20d1da60cadc3"
+  },
+  {
+    "file": "backend/internal/novelcreation/styles.go",
+    "bytes": 4318,
+    "sha256": "b9cc4148f867091f2d02eb21965dc5bae80686999130ef97b3a8f77ae21043c2"
+  },
+  {
+    "file": "backend/internal/novelcreation/types.go",
+    "bytes": 10283,
+    "sha256": "ae4ccb7cc5effb270ee406969231eecf79b72041ded824a45d4922f74f93b694"
+  },
+  {
+    "file": "backend/internal/novelcreation/validation.go",
+    "bytes": 13163,
+    "sha256": "15a538a85fd8326e619b8fc6d6107640407e674e02caabceef52399a9eff0987"
+  },
+  {
+    "file": "backend/internal/novelcreation/worker.go",
+    "bytes": 24590,
+    "sha256": "51df78c7d53a3d263abce70a424e16b3ea9decb17c9991bf8ce2ab34b02e3209"
+  },
+  {
+    "file": "backend/internal/novelcreation/worker_store.go",
+    "bytes": 15043,
+    "sha256": "ee1845bbc8f4a2155d22125295f1e550ce78a92ea04e0cca723a10a260190d55"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/bridge-u2-u5.readable.js",
+    "bytes": 2468,
+    "sha256": "fed46d4b8a998ad94e36508b99f4a30fcc0115ac443fc713ad3e52fca8c5d757"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+    "bytes": 19047,
+    "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelBatchDialog.readable.js",
+    "bytes": 5211,
+    "sha256": "8fc797a3116c4f82722da5d72398aec422242da253f7ffa6e32dfd0e28b0ea59"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCheckpointCard.readable.js",
+    "bytes": 1488,
+    "sha256": "6435dca232cb7ae0197686c7d011e41d070178e18bedcee3db5a285c66a12a20"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelConfirmCard.readable.js",
+    "bytes": 4029,
+    "sha256": "c7169b08913cdfe3d94178f1a8e7228a240c5485e5a1903e11379fb40d5afa2b"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCoverPreview.readable.js",
+    "bytes": 3190,
+    "sha256": "65347219a3c4ee9c36f8b4b35bbed9ca3724ff1199f72b059694b222cc73ba1b"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCreateIcon.readable.js",
+    "bytes": 8237,
+    "sha256": "616b27c18a260f7e5aa041582b9333c0a0a9b3efd422c371b6059eb654f0103d"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelDashboard.readable.js",
+    "bytes": 2681,
+    "sha256": "d773542945a54a3ccd895256d0e0f1262bea1817956515cc364a59c3d3effe62"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelHooksPanel.readable.js",
+    "bytes": 2482,
+    "sha256": "a810cf9c2e40a2035a574370d5979072a9ba73a762722559f3df68ade1b15d40"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImitationShortDialog.readable.js",
+    "bytes": 14045,
+    "sha256": "d663478fbbcf4ddf86244cffc786125bc263a47e35ee858fe3281fcb893a5043"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportModal.readable.js",
+    "bytes": 1684,
+    "sha256": "2cd4810cd70bb99d01172044983d5553ae2954fc9c4834e6c685c482f1f13575"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+    "bytes": 33779,
+    "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelPanelArtifactView.readable.js",
+    "bytes": 2968,
+    "sha256": "98d856d6b53781f08c65420f061fd5cd98ad18dd32e9069abfe9cdeb6797bdea"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelQuickActions.readable.js",
+    "bytes": 1402,
+    "sha256": "8640014474293b659c461e1c83e6a25d3fc5f899f2b4dfe968a70c79f53461b7"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelSchedulerPanel.readable.js",
+    "bytes": 7979,
+    "sha256": "b51c2c9db2f3bded40462b9d838c9517b069730d8de385e1d4ceae5ae38e5a5a"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStreamingIndicator.readable.js",
+    "bytes": 750,
+    "sha256": "fd0e0adc46c6244d2d5361ee2443bc58f5864c6db583a91d11bb0b04d66a5d58"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
+    "bytes": 13213,
+    "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+    "bytes": 31890,
+    "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioPage.readable.js",
+    "bytes": 71136,
+    "sha256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
+    "bytes": 9735,
+    "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+    "bytes": 12991,
+    "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStylePanel.readable.js",
+    "bytes": 10841,
+    "sha256": "7e77ff4e319c1109cac14d9b5968e23a9115b33aef52f49f15f130467dcc53e0"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelThinkingBlock.readable.js",
+    "bytes": 1542,
+    "sha256": "ef005e52234a03b7d7cf370ad7122ae85b33d092d962247bcd23675e5b15e10c"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelToolSteps.readable.js",
+    "bytes": 8945,
+    "sha256": "7880ab4a851e3421499afc0757099377785a6e91f4f77293672e8dbcbe99a0e8"
+  },
+  {
+    "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/style-helpers.decoded.js",
+    "bytes": 9722,
+    "sha256": "3c5c0bb5e72b116231edaee77eea8ff5174f3e6705ad31119862ce582f8a9bfd"
+  },
+  {
+    "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+    "sha256": "8972e04874dcda395c61d833c4f2aadd3d003868b4066cf2383f830769e31855"
+  }
+]

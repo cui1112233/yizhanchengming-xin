@@ -1,0 +1,21 @@
+{
+  "count": 75,
+  "counts": {
+    "部分实现": 23,
+    "合同不同": 12,
+    "缺失": 25,
+    "已有实现待对照": 10,
+    "尚未验证": 5
+  },
+  "missingEvidenceAnchors": [],
+  "sourceHead": "8ab7e06f4783ab17c9cd79d053a58984ea8c3ebd",
+  "runtimeObserved": {
+    "port": 4001,
+    "git_sha": "c4054404",
+    "entry": "/assets/user-LoEy2Yrp.js"
+  },
+  "paidCalls": 0,
+  "productFilesChanged": 0,
+  "originalNativeParity": false,
+  "note": "75项是已有审计范围，不是原软件功能总数。静态相似和自身测试通过不代表原版运行等价。"
+}
