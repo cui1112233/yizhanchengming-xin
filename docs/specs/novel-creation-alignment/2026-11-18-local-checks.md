@@ -36,3 +36,7 @@
 9f60f3e6已构建并在4001核验SHA与HTTP，但实际创建验收作品出现novel persistence failed，尚不宣称可用。进一步只读MySQL测试复现：生产main.go:databaseDSN开启InterpolateParams，部分原JSON字节参数被当作BLOB；同样的SELECT JSON_TYPE(CAST(? AS JSON))在预编译和参数直传两种模式有差异。小说存储统一在sqlDatabase和sqlBoundTx归一化合法JSON字节为字符串，保留NULL/非JSON二进制且不改调用者快照。真实MySQL只读测试覆盖两模式、直接/事务、两JSON类型和两种查询路径，修复后全小说领域包通过；更新两个旧sqlmock断言为文本绑定。没有更改全站MySQL开关或数据库结构。
 
 本地实页重新创建/重开与设置保存待接着验收，不调用生成模型。
+
+## 表单保存第二项纠偏
+
+63149d10已修JSON传输并在4001实际创建“本地检查验收 · 不调用模型”成功，未生成正文。随后Agent保存真实返回400。根因AgentPanel.jsx把GET返回的projectId、updatedAt等只读字段原样展开进PUT，而novel_creation_routes.go的严格输入只接受styleProfile/rules/agent。旧浏览器替身没有返回这两个只读字段且未拒绝未知字段，因此掩盖断点。已补齐真实DTO并严格校验的浏览器红测，确实复现timeout agent；改为显式三个可写字段后两项浏览器测试通过。只修改当前验收作品的设置，未生成模型内容。

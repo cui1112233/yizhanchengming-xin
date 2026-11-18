@@ -22,7 +22,7 @@ export default function AgentPanel({ projectId, models }) {
       const agent = await form.validateFields();
       if (Object.values(agent.modelRoutes || {}).some(id => id && !availableModel(models, id))) { message.warning('分步骤原模型已不可用，请重新选择或清空'); return; }
       setBusy(true);
-      await scope.call(novelProjectRequest(projectId, '/settings', { ...settings, agent }, { method: 'PUT', signal: scope.signal }), r => { setSettings(r.settings); message.success('Agent设置已保存'); });
+      await scope.call(novelProjectRequest(projectId, '/settings', { styleProfile: settings?.styleProfile || '', rules: settings?.rules || [], agent }, { method: 'PUT', signal: scope.signal }), r => { setSettings(r.settings); message.success('Agent设置已保存'); });
     } catch (e) { if (!e.errorFields) message.error(e.message); } finally { if (scope.isCurrent()) setBusy(false); }
   }
   return <Form form={form} layout="vertical" className="novel-panel">
