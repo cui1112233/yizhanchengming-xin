@@ -1,6 +1,8 @@
 import LongImitationContext from './novel-creation/LongImitationContext.jsx';
 import LongImitationDialog from './novel-creation/LongImitationDialog.jsx';
 import ComposerToolbar from './novel-creation/ComposerToolbar.jsx';
+import ShortStoryDialog from './novel-creation/ShortStoryDialog.jsx';
+import ShortStoryPanel from './novel-creation/ShortStoryPanel.jsx';
 import { Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Spin, Tabs, message } from 'antd';
 import { Archive, BookOpen, Bot, CalendarClock, ChartColumn, FileText, FilePlus2, CornerDownRight, Pencil, NotebookPen, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -38,6 +40,7 @@ export default function NovelCreationPage() {
   const [importOpen, setImportOpen] = useState(false), [memoOpen, setMemoOpen] = useState(false);
   const [longImitationOpen, setLongImitationOpen] = useState(false), [longImitationEntry, setLongImitationEntry] = useState(0);
   const [longImitationCreation,setLongImitationCreation]=useState(null);
+  const [shortDialog, setShortDialog] = useState(null), [shortStoryData, setShortStoryData] = useState(null);
   const [continuationOpen, setContinuationOpen] = useState(false), [projectChapters, setProjectChapters] = useState(null), [sessionsLoadedKey, setSessionsLoadedKey] = useState('');
   const memoPopup = useRef(null);
   const [projectModal, setProjectModal] = useState(false), [manage, setManage] = useState(null), [archiveOpen, setArchiveOpen] = useState(false);
@@ -49,6 +52,7 @@ export default function NovelCreationPage() {
   const ownerScope = useWorkspaceScope(owner), listScope = useWorkspaceScope(`${owner}:${projectId}:${activeMode}`);
   const scopeKey = `${owner}:${projectId}:${sessionId}:${activeMode}`, scope = useWorkspaceScope(scopeKey);
   const projectReadKey = `${owner}:${projectId}`, projectReadScope = useWorkspaceScope(projectReadKey);
+  const shortStory = shortStoryData?.key === projectReadKey ? shortStoryData.story : null;
   const chapterRevisions = useRef(new Map()), currentView = useRef(), studioNavigation = useRef({key:'',epoch:0});
   const studioViewKey=JSON.stringify([owner,projectId,activeMode,studioSessionId,tool]);
   if(studioNavigation.current.key!==studioViewKey)studioNavigation.current={key:studioViewKey,epoch:studioNavigation.current.epoch+1};
@@ -82,6 +86,29 @@ export default function NovelCreationPage() {
   const request = (path, input, options = {}) => novelProjectRequest(projectId, path, input, { signal: scope.signal, ...options });
   const studioView = !projectId && activeMode === 'long_original';
   const modeName = MODES.find(([id]) => id === activeMode)?.[1] || '创作';
+  useEffect(() => {
+    if (!projectId) { setShortStoryData(null); return; }
+    projectReadScope.call(novelProjectRequest(projectId, '/short-story', undefined, { signal: projectReadScope.signal }), result => {
+      setShortStoryData({ key: projectReadKey, story: result.story });
+      if (result.story?.input?.mode) setActiveMode(result.story.input.mode);
+    }).catch(() => {});
+  }, [projectReadKey]);
+
+  function enterCreation(id) {
+    setTool('');
+    if (id === 'long_imitation') { setLongImitationEntry(n=>n+1); setLongImitationOpen(true); return; }
+    if (id === 'continuation' || id === 'fanfiction') {
+      setActiveMode(id);
+      if (id === 'continuation') setContinuationOpen(true);
+      return;
+    }
+    // A creation entry is not a mode switch inside whichever old book happened
+    // to be selected. Keep that book accessible only through its own entry.
+    setProjectId(''); setSessionId(''); setSnapshot(null); setShortStoryData(null);
+    localStorage.setItem('novel:view:'+owner,'studio'); setActiveMode(id);
+    if (id === 'short_imitation') setShortDialog(id);
+    if (id === 'continuation') setContinuationOpen(true);
+  }
 
   useEffect(() => {
     const check = () => { const next = getCurrentUsername(); setOwner(previous => previous === next ? previous : next); };
@@ -89,7 +116,7 @@ export default function NovelCreationPage() {
     return () => { window.removeEventListener('storage', check); clearInterval(timer); };
   }, []);
   useEffect(() => {
-    setLoading(true); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false); setContinuationOpen(false); setLongImitationOpen(false); setProjectChapters(null); setSessionsLoadedKey(''); setStudioSessions([]); setStudioSessionId(localStorage.getItem('novel:studio:selected:'+owner)||'');
+    setLoading(true); setShortDialog(null); setShortStoryData(null); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false); setContinuationOpen(false); setLongImitationOpen(false); setProjectChapters(null); setSessionsLoadedKey(''); setStudioSessions([]); setStudioSessionId(localStorage.getItem('novel:studio:selected:'+owner)||'');
     ownerScope.call(novelRequest('/studio-sessions',undefined,{signal:ownerScope.signal}),r=>setStudioSessions(r.sessions||[])).catch(()=>{});
     ownerScope.call(Promise.allSettled([novelRequest('/projects', undefined, { signal: ownerScope.signal }), listAvailableModels('text'), getProjectRetention(), getCurrentAccount(), getConfig()]), results => {
       if (results[0].status === 'fulfilled') { const items = results[0].value.projects || []; setProjects(items); const saved = localStorage.getItem('novel:project:' + owner); setProjectId(localStorage.getItem('novel:view:'+owner)==='studio'?'':items.some(p => p.id === saved) ? saved : items[0]?.id || ''); }
@@ -211,6 +238,7 @@ export default function NovelCreationPage() {
   }
   async function send(recover = false) {
     if (!scope.isCurrent()) return;
+    if (activeMode === 'short_imitation') { setShortDialog(activeMode); return; }
     if (flight.current === key || sending || archived) return;
     if (!projectId) { if (activeMode === 'continuation') message.warning('请先导入正式章节'); else setProjectModal(true); return; }
     const prior = readSaved(key + ':intent', null);
@@ -301,7 +329,7 @@ export default function NovelCreationPage() {
     <main className="novel-creation-workbench">
       <aside className="novel-creation-sidebar">
         <div className="novel-sidebar-content">
-        <h3>开始创作</h3><div className="novel-creation-mode-tabs">{MODES.map(([id, name]) => { const Icon=creationIcons[id]; return <button type="button" className={(longImitationOpen ? id==='long_imitation' : activeMode === id) ? 'active' : ''} key={id} onClick={() => { if(id==='long_imitation'){setLongImitationEntry(n=>n+1);setLongImitationOpen(true);return;} setActiveMode(id); setTool(''); if(id==='long_original'){setProjectId('');localStorage.setItem('novel:view:'+owner,'studio');} if (id === 'continuation') setContinuationOpen(true); }}><Icon size={15} aria-hidden="true"/><span>{name}</span></button>; })}</div>
+        <h3>开始创作</h3><div className="novel-creation-mode-tabs">{MODES.map(([id, name]) => { const Icon=creationIcons[id]; return <button type="button" className={(longImitationOpen ? id==='long_imitation' : activeMode === id) ? 'active' : ''} key={id} onClick={() => enterCreation(id)}><Icon size={15} aria-hidden="true"/><span>{name}</span></button>; })}</div>
         <div className="novel-sidebar-heading"><b>我的作品 {visibleProjects.length}</b><Button aria-label="新建作品" type="text" icon={<Plus size={16} />} onClick={() => setProjectModal(true)} /><Button aria-label="作品归档库" type="text" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)} /></div>
         <div className="novel-projects">{visibleProjects.map(p => <div key={p.id} className="novel-project"><button type="button" aria-label={`选择作品${p.title}`} className={projectId === p.id ? 'active' : ''} onClick={() => { localStorage.setItem('novel:view:'+owner,'book');setProjectId(p.id);const savedMode=localStorage.getItem(`novel:project-mode:${owner}:${p.id}`);if(savedMode)setActiveMode(savedMode);setTool(''); }}>{p.title}</button>{projectId === p.id && <div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'project', action: 'rename', title: p.title })}>重命名作品</Button><Button size="small" onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>
         {studioSessions.length>0&&<><div className="novel-session-heading">创作会话记录</div><div className="novel-sessions">{studioSessions.map(item=><div className="novel-session" key={item.id}><button type="button" className={studioView&&studioSessionId===item.id?'active':''} onClick={()=>{setActiveMode('long_original');setProjectId('');setStudioSessionId(item.id);setTool('');localStorage.setItem('novel:studio:selected:'+owner,item.id);localStorage.setItem('novel:view:'+owner,'studio');}}>{item.title}{item.projectId?' · 已建作品':''}</button></div>)}</div></>}
@@ -330,16 +358,20 @@ export default function NovelCreationPage() {
           {maintenanceIntent && <div className="novel-notice" role="status">资料分析提交结果尚未核对，将使用原来的提交编号恢复。<Button onClick={() => maintenance(maintenanceIntent.kind, maintenanceIntent.styleId)}>恢复分析提交</Button></div>}
         </div>
       </section>
-      {projectId && <><div className="novel-creation-resizer" role="separator" aria-label="调整资料栏宽度" onPointerDown={() => { resize.current = true; document.body.classList.add('novel-creation-resizing'); }} />
-      <aside className="novel-creation-inspector"><div className="novel-current-reference"><h3>当前资料</h3><p>{project?.title} · {project?.genre}</p>{(draft.knowledgeIds || []).map(id => <small key={id}>{references.find(r => r.id === id)?.title || '已保存参考范围'}</small>)}</div>
+      {projectId && (shortStory || chapters.length > 0 || run || draft.knowledgeIds?.length) && <><div className="novel-creation-resizer" role="separator" aria-label="调整资料栏宽度" onPointerDown={() => { resize.current = true; document.body.classList.add('novel-creation-resizing'); }} />
+      <aside className="novel-creation-inspector">{shortStory ? <ShortStoryPanel key={projectReadKey} owner={owner} projectId={projectId} refreshKey={`${refresh}:${snapshot?.run?.status || ""}`} onRun={nextRun=>{setSnapshot(old=>({...old,run:nextRun,events:[]}));setRefresh(v=>v+1);}} onTitle={title=>setProjects(old=>old.map(p=>p.id===projectId && title ? {...p,title} : p))}/> : <><div className="novel-current-reference"><h3>当前资料</h3><p>{project?.title} · {project?.genre}</p>{(draft.knowledgeIds || []).map(id => <small key={id}>{references.find(r => r.id === id)?.title || '已保存参考范围'}</small>)}</div>
         <Tabs defaultActiveKey="chapters" items={[
           { key: 'chapters', label: `正文${chapters.length ? '（' + chapters.length + '）' : ''}`, children: projectId ? <ChaptersPanel key={scopeKey} projectId={projectId} sessionId={sessionId} chapters={chapters} run={run} canExportShort={snapshot?.canExportShort === true} onChapter={chapter => sessionId ? setSnapshot(old => ({ ...old, chapters: (old?.chapters || []).map(c => c.id === chapter.id ? chapter : c) })) : setProjectChapters(old => old?.key === projectReadKey ? { ...old, chapters: old.chapters.map(c => c.id === chapter.id ? chapter : c) } : old)} onMaintenance={maintenance} onBatch={() => setBatchOpen(true)} /> : <Empty description="选择作品后查看正文" /> },
           ...(run ? [{ key: 'progress', label: '创作进度', children: <ol className="novel-timeline">{(snapshot.events || []).filter(e => e.type !== 'assistant.delta').map(e => <li key={e.eventId}><b>{STATUS[e.status] || '处理进度'}</b><p>{e.message}</p></li>)}</ol> }] : [])
         ]} />
-      </aside></>}</>}
+      </>}</aside></>}</>}
     </main>
     <LongImitationDialog key={'long-imitation:'+owner} owner={owner} open={longImitationOpen} viewKey={`${scopeKey}:${tool}:${longImitationEntry}`} models={models} modelId={draft.modelId} thinkingLevel={draft.thinkingLevel} onCancel={()=>setLongImitationOpen(false)} onPersisted={result=>setProjects(old=>{const previous=old.find(p=>p.id===result.project.id);const newer=previous?.updatedAt && result.project.updatedAt && Date.parse(previous.updatedAt)>Date.parse(result.project.updatedAt);return [newer?previous:result.project,...old.filter(p=>p.id!==result.project.id)];})} onCreated={result=>{
       localStorage.setItem('novel:view:'+owner,'book');localStorage.setItem('novel:project:'+owner,result.project.id);localStorage.setItem(`novel:session:${owner}:${result.project.id}:long_imitation`,result.session.id);localStorage.setItem(`novel:project-mode:${owner}:${result.project.id}`,'long_imitation');setProjectId(result.project.id);setActiveMode('long_imitation');setSessionId(result.session.id);setLongImitationOpen(false);setTool('');setRefresh(n=>n+1);
+    }}/>
+    <ShortStoryDialog key={`${owner}:${shortDialog || 'short_imitation'}`} owner={owner} mode={shortDialog || 'short_imitation'} open={!!shortDialog} viewKey={scopeKey + ':' + tool} models={models} modelId={draft.modelId} thinkingLevel={draft.thinkingLevel} projects={visibleProjects} onCancel={()=>setShortDialog(null)} onPersisted={result=>setProjects(old=>[result.project,...old.filter(p=>p.id!==result.project.id)])} onCreated={result=>{
+      localStorage.setItem('novel:view:'+owner,'book');localStorage.setItem('novel:project:'+owner,result.project.id);localStorage.setItem(`novel:session:${owner}:${result.project.id}:${result.story.input.mode}`,result.session.id);localStorage.setItem(`novel:project-mode:${owner}:${result.project.id}`,result.story.input.mode);
+      setProjectId(result.project.id);setSessionId(result.session.id);setActiveMode(result.story.input.mode);setShortStoryData({key:`${owner}:${result.project.id}`,story:result.story});setShortDialog(null);setSnapshot({run:result.run,messages:[],events:[]});setRefresh(n=>n+1);
     }}/>
     <ContinuationImportDialog key={owner} owner={owner} open={continuationOpen} viewKey={scopeKey + ':' + tool} projects={projects} onCancel={() => setContinuationOpen(false)} onPersisted={recordImportedBook} onImported={result => {
       if (!ownerScope.isCurrent()) return;

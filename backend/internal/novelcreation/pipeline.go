@@ -668,6 +668,18 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 		if route == "style-analysis" || route == "long-imitation-analysis" || route == "long-imitation-requirements" {
 			routeKey = "foundation-plan"
 		}
+		switch route {
+		case "short-source-analysis", "short-outline", "short-outline-revision":
+			routeKey = "foundation-plan"
+		case "short-body":
+			routeKey = "chapter-draft"
+		case "short-review":
+			routeKey = "chapter-audit"
+		case "short-body-revision":
+			routeKey = "chapter-revision"
+		case "short-recommendation", "short-continuity":
+			routeKey = "memory-index"
+		}
 		modelID := input.Agent.ModelRoutes[routeKey]
 		if modelID == "" {
 			modelID = input.Run.ModelID

@@ -204,6 +204,12 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 	if isTerminalRunStatus(run.Status) {
 		return run, nil
 	}
+	var shortSnapshot struct {
+		Story *ShortStory `json:"short_story"`
+	}
+	if json.Unmarshal(run.PromptSnapshot, &shortSnapshot) == nil && shortSnapshot.Story != nil {
+		return s.runShortStory(ctx, owner, run)
+	}
 	if s.pipeline == nil || s.runtime == nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "小说创作运行服务尚未配置", nil)
 	}

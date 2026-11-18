@@ -21,11 +21,11 @@ func WithUserRequirements(d promptcatalog.Definition, review, writing []UserRequ
 		}
 	}
 	switch d.ID {
-	case ChapterDraft.ID, LengthNormalize.ID:
+	case ChapterDraft.ID, LengthNormalize.ID, ShortBodyPrompt.ID:
 		appendItems("自定义写作要求", writing)
-	case ChapterAudit.ID, AgentChapterAudit.ID:
+	case ChapterAudit.ID, AgentChapterAudit.ID, ShortReviewPrompt.ID:
 		appendItems("自定义补充审稿要求", review)
-	case ChapterRevision.ID:
+	case ChapterRevision.ID, ShortBodyRevision.ID, ShortOutlineRevision.ID:
 		appendItems("自定义写作要求", writing)
 		appendItems("自定义补充审稿要求", review)
 	}
