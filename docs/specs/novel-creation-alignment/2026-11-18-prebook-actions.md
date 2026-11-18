@@ -30,7 +30,7 @@ POST /studio-sessions/{id}/actions/cancel → StudioSnapshot。
 - [x] 后端存储/模型规划/确认/取消/恢复；单元及真实隔离MySQL验证。
 - [x] HTTP身份/严格参数/状态码和无隐藏作品回归。
 - [x] 页面从空态或长篇入口进入无书会话；建议卡、确认、取消、刷新与迟到响应。
-- [ ] 构建并核对本地4001身份；无费界面验收，付费生成仍不运行。
+- [x] 构建并核对本地4001身份；无费界面验收，付费生成仍不运行。
 
 本轮真实模型测试预算为0，测试使用明确标注的受控提供方；不把受控文本当作线上生成结果。
 
@@ -40,8 +40,24 @@ POST /studio-sessions/{id}/actions/cancel → StudioSnapshot。
 
 测试：领域/存储/提示词普通测试通过；HTTP NovelCreation|NovelStudio通过。独立MySQL 8.4.11已验证双迁移、隔离、重开、事务回滚、重复确认和持久派发。三组临时数据库/专用用户均清理，剩余0。最终SQL日志：`_local-archive-20261028/novel-parity-20261117/novelparity202611175d8bc221f865-20261118-173125-test.log`。
 
-浏览器受控接口：65项首次63通过，2项旧入口预期调整后定向2/2通过；新增“讨论确认→正式生产视图→刷新恢复”1/1通过。控制接口不等于真实模型生成。前端生产构建通过（保留已有大包提醒）。race测试因CGO未启用不可用；普通并发确认测试通过。
+浏览器受控接口：65项首次63通过，2项旧入口预期调整后定向2/2通过；新增“讨论确认→正式生产视图→刷新恢复”1/1通过。最终完整重复回归66/66通过，0失败、0跳过（browser-tests.log）。控制接口不等于真实模型生成。前端生产构建通过（保留已有大包提醒）。race测试因CGO未启用不可用；普通并发确认测试通过。
 
 可靠性补修：坏格式保留草稿；明确发送前拒绝解除锁定；无书/已分配会话间迁移完整输入；旧账号/会话/新建迟到回包不抢导航；超长回复保存有标记的预览、原长度和哈希。实际限制上下文预算，确认交接最后冻结的有界输入。思考强度是提示词要求，不伪装成上游原生reasoning参数。
 
-待完成：本地4001运行身份和免费界面读回；真实付费规划/正文结果、原版同状态像素与native提示词仍未验证。本轮只交付长篇原创切片，不给其余模式盖章。
+本地已交付：代码提交1886b338。4001新进程48032运行novel-core01-20261118/qiantie-core01.exe，接口git_sha=1886b338，入口/assets/user-BEB_z00c.js。实际空会话→刷新读回通过：原作品1个、新增未关联作品会话1个、模型调用0。截图4001-prebook-restored.jpg、runtime-acceptance.json及build-info.json在同名归档。首轮实测遇本地MySQL handler commit长等，后续已读回成功；未改数据库配置或重启数据库。构建来自共享脏工作区，不能称隔离干净提交构建。
+
+待完成：真实付费规划/正文结果、原版同状态像素与native提示词仍未验证。本轮只交付长篇原创切片，不给其余模式盖章。
+
+## 当前代码定位（提交1886b338）
+
+| 规则 | 文件与行号 |
+|---|---|
+| 不建隐藏作品的会话创建 | backend/internal/novelcreation/studio_service.go:101 |
+| 有界历史输入 | backend/internal/novelcreation/studio_service.go:74 |
+| 持久消息与规划状态 | backend/internal/novelcreation/studio_service.go:235 |
+| 取消不建作品 | backend/internal/novelcreation/studio_service.go:453 |
+| 确认及事务交接 | backend/internal/novelcreation/studio_service.go:483 |
+| MySQL固定编号及行锁 | backend/internal/novelcreation/studio_store.go:40、99 |
+| 页面确认/取消真实请求 | frontend/src/user/pages/novel-creation/StudioChat.jsx:65 |
+| 返回正式作品及生产会话 | frontend/src/user/pages/NovelCreationPage.jsx:299 |
+| CM独立系统提示词 | backend/internal/prompt/novelcreation/studio.go:5 |
