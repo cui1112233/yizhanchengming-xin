@@ -526,3 +526,29 @@ body:has(.novel-creation-page) .novel-continuation-import .ant-modal-content {
 html[data-theme="dark"] body:has(.novel-creation-page) .novel-continuation-import .ant-modal-content {
   box-shadow: 0 24px 48px #00000073, 0 0 0 1px #ffffff0f;
 }
+
+/* Compact reference proportions, with the existing glass palette. */
+.novel-creation-page .novel-creation-sidebar { width:240px; flex-basis:240px; padding:20px 12px 12px; }
+.novel-creation-page .novel-creation-sidebar h3 { font-size:15px; font-weight:600; margin:0 0 8px; }
+.novel-creation-page .novel-creation-mode-tabs { gap:4px; }
+.novel-creation-page .novel-creation-mode-tabs button { min-height:68px; gap:10px; border-radius:10px; font-weight:400!important; box-shadow:none!important; }
+.novel-creation-page .novel-creation-mode-tabs button.active { color:var(--text-primary)!important; background:color-mix(in srgb,var(--text-primary) 6%,transparent)!important; border-color:color-mix(in srgb,var(--text-primary) 18%,transparent)!important; }
+.novel-creation-page .novel-sidebar-heading b { font-size:13px; font-weight:500; color:var(--text-secondary); }
+.novel-creation-page .novel-creation-toolbar .ant-btn { height:36px; justify-content:flex-start; font-size:13px; font-weight:400!important; }
+.novel-creation-page .novel-chat-heading { min-height:44px; padding:10px 20px; font-size:12px; }
+.novel-creation-page .novel-chat-heading b { font-weight:500; }
+.novel-creation-page .novel-creation-conversation .novel-creation-welcome { margin:68px auto 0; padding:0; max-width:620px; }
+.novel-creation-page .novel-creation-welcome p { font-size:14px; font-weight:400!important; line-height:1.7; color:var(--text-secondary)!important; }
+.novel-creation-page .novel-creation-conversation .novel-creation-composer--compact { width:min(1120px,calc(100% - 48px)); align-self:center; margin:0 auto 20px; padding:12px 14px 10px; gap:8px; max-height:none; overflow:visible; border-radius:16px; box-shadow:none; }
+.novel-creation-page .novel-creation-composer--compact > textarea.ant-input { height:66px; min-height:66px; font-size:14px!important; font-weight:400!important; }
+.novel-creation-page .novel-creation-composer--compact > textarea.ant-input::placeholder { font-weight:400!important; color:color-mix(in srgb,var(--text-primary) 42%,transparent)!important; }
+.novel-creation-page .novel-composer-model .ant-select-selection-item { font-size:12px; font-weight:400!important; }
+.novel-creation-page .novel-creation-composer--compact > p { margin:0; font-size:12px; font-weight:400; }
+.novel-reference-editor { position:relative; font-size:12px; color:var(--text-secondary); }
+.novel-reference-editor > summary { list-style:none; display:flex; align-items:center; gap:6px; padding:5px 7px; border-radius:8px; white-space:nowrap; cursor:pointer; font-weight:400!important; }
+.novel-reference-editor > summary::-webkit-details-marker { display:none; }
+.novel-reference-editor > summary:hover,.novel-reference-editor[open] > summary { background:color-mix(in srgb,var(--text-primary) 6%,transparent); }
+.novel-reference-editor-panel { position:absolute; left:0; bottom:calc(100% + 12px); width:min(460px,70vw); max-height:300px; overflow:auto; padding:16px; border:1px solid var(--border-default); border-radius:12px; background:var(--surface-elevated); backdrop-filter:blur(28px); box-shadow:0 12px 40px #00000024; z-index:15; }
+.novel-reference-editor-panel label { font-size:12px; line-height:1.7; }
+.novel-reference-editor-panel textarea.ant-input { min-height:130px; margin-top:6px; font-weight:400!important; font-size:13px!important; }
+body:has(.novel-creation-page) .legacy-sidebar.collapsed .legacy-nav a { min-height:36px; height:36px; padding:8px; border:0!important; border-radius:9px!important; box-shadow:none!important; }

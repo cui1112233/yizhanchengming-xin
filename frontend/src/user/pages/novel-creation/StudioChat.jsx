@@ -70,7 +70,7 @@ export default function StudioChat({owner,sessionId='',newSessionToken=0,models=
   <header className="novel-chat-heading"><b>{snapshot?.session?.title||'长篇原创'}</b><span>创作对话</span></header>
   <div className="novel-creation-chat-scroll">
    {loading&&<Spin aria-label="读取创作会话"/>}
-   {!snapshot?.messages?.length&&<div className="novel-creation-welcome"><BookOpen size={36}/><h3>开始你的故事</h3><p>告诉我你想写什么——题材、世界观、主角、核心冲突。</p><small>先讨论创作方向，确认后再创建作品。</small></div>}
+   {!snapshot?.messages?.length&&<div className="novel-creation-welcome"><p>告诉我你想写什么——题材、世界观、主角、核心冲突。</p></div>}
    {(snapshot?.messages||[]).map(m=><article key={m.id} className={`novel-creation-message ${m.role}`}><b>{m.role==='user'?'我':'小Y'}</b><p>{m.content}</p></article>)}
    {action&&<section className="novel-studio-action" aria-label="创建作品建议"><h3><Sparkles size={17}/> {action.status==='confirmed'?'作品已创建':action.status==='cancelled'?'已取消':action.status==='superseded'?'已更新创作建议':'确认创建作品'}</h3><dl>{[['作品名称',action.book?.title],['题材',action.book?.genre],['世界设定',action.book?.world],['主角',action.book?.protagonist],['核心冲突',action.book?.coreConflict],['每章目标字数',action.book?.targetChapterWords]].map(([label,value])=>value!==undefined&&value!==''&&<div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     {canConfirm&&<div className="novel-actions"><Button type="primary" loading={actionBusy} disabled={busy||!!intent||!availableModel(models,draft.modelId)} onClick={()=>act(false)}>确认创建作品</Button><Button disabled={busy||actionBusy} onClick={()=>act(true)}>取消创建</Button></div>}
