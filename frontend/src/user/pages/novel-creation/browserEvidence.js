@@ -8,11 +8,16 @@ import {spawn} from 'node:child_process';
 // Attach while blank, then navigate. Loading a large React page before attachment
 // can starve the first inspection and turn a passing UI into a harness timeout.
 export async function runNovelBrowserDOM(browser,html,dir,viewport={width:1440,height:900}){
- const child=spawn(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--host-resolver-rules=MAP * ~NOTFOUND','--remote-debugging-port=0','--user-data-dir='+path.join(dir,'profile'),'about:blank'],{windowsHide:true,stdio:'ignore'});
+ // Match Playwright's isolated Chromium setup for hidden Windows test windows:
+ // https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromiumSwitches.ts
+ const child=spawn(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding','--edge-skip-compat-layer-relaunch','--host-resolver-rules=MAP * ~NOTFOUND','--remote-debugging-port=0','--user-data-dir='+path.join(dir,'profile'),'about:blank'],{windowsHide:true,stdio:'ignore'});
  const protocol=[];let socket;const pending=new Map();let id=0;
  try{
   const portFile=path.join(dir,'profile','DevToolsActivePort');let port;
-  for(let n=0;n<100;n++){if(existsSync(portFile)){try{port=Number(readFileSync(portFile,'utf8').split('\n')[0]);if(port)break;}catch(e){if(e.code!=='EBUSY')throw e;}}if(child.exitCode!==null)throw Error('test browser exited before inspection');await new Promise(r=>setTimeout(r,100));}
+  // A new Chromium profile can start slowly on a busy Windows workstation.
+  // Only browser readiness gets this allowance; all page assertions stay intact.
+  const startupDeadline=Date.now()+Math.min(60000,Math.max(10000,Number(process.env.NOVEL_BROWSER_STARTUP_TIMEOUT_MS)||45000));
+  while(Date.now()<startupDeadline){if(existsSync(portFile)){try{port=Number(readFileSync(portFile,'utf8').split('\n')[0]);if(port)break;}catch(e){if(e.code!=='EBUSY')throw e;}}if(child.exitCode!==null)throw Error('test browser exited before inspection');await new Promise(r=>setTimeout(r,100));}
   assert.ok(port,'test browser did not expose its inspection port');
   let page;for(let n=0;n<50;n++){try{page=(await(await fetch('http://127.0.0.1:'+port+'/json/list')).json()).find(p=>p.type==='page');if(page)break;}catch{}await new Promise(r=>setTimeout(r,100));}
   assert.ok(page,'test page unavailable');socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
