@@ -916,8 +916,30 @@ func comicPagePromptContent(comicPrompt, imagePrompt string) string {
 	return "【分格导演描述】\n" + comicPrompt + "\n\n【本页基础出图描述】\n" + imagePrompt
 }
 
+// comicVerboseLogEnabled 控制漫画页高频过程日志（start/target/references 等）。
+// 生产上每页会产生多条 journal 行，默认关闭；排查时设置
+// QIANTIE_COMIC_VERBOSE_LOG=1 即可恢复。每页仍保留一条完成/失败摘要。
+func comicVerboseLogEnabled() bool {
+	return os.Getenv("QIANTIE_COMIC_VERBOSE_LOG") == "1"
+}
+
+func comicVerboseLogf(format string, args ...any) {
+	if comicVerboseLogEnabled() {
+		log.Printf(format, args...)
+	}
+}
+
 func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bookID, videoID string, input batchfactoryv11.UpsertComicPageInput) (page batchfactoryv11.ComicPage, image batchfactoryv11.ComicPageImage, err error) {
-	log.Printf("comic page start batch=%s book=%s video=%s provider=%s model=%s", batchID, bookID, videoID, input.Provider, input.ModelID)
+	startedAt := time.Now()
+	// 每页只保留这一条摘要，避免 completed 页面继续产生过程日志。
+	defer func() {
+		if err != nil {
+			log.Printf("comic page failed batch=%s book=%s video=%s elapsed_ms=%d reason=%v", batchID, bookID, videoID, time.Since(startedAt).Milliseconds(), err)
+			return
+		}
+		log.Printf("comic page done batch=%s book=%s video=%s elapsed_ms=%d", batchID, bookID, videoID, time.Since(startedAt).Milliseconds())
+	}()
+	comicVerboseLogf("comic page start batch=%s book=%s video=%s provider=%s model=%s", batchID, bookID, videoID, input.Provider, input.ModelID)
 	comicStore, ok := g.store.(batchfactoryv11.ComicPageStore)
 	if !ok || g.files == nil || g.catalogStore == nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: 漫画图片生成服务尚未配置", batchfactoryv11.ErrUnavailable)
@@ -1045,7 +1067,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
-	log.Printf("comic page references batch=%s book=%s video=%s assets=%d", batchID, bookID, videoID, len(assetImageURLs))
+	comicVerboseLogf("comic page references batch=%s book=%s video=%s assets=%d", batchID, bookID, videoID, len(assetImageURLs))
 	contract, err := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposePage, "", comicPagePromptContent(input.ComicPrompt, input.ImagePrompt), assetImageURLs, input.ReferenceImageURLs)
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
@@ -1091,7 +1113,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
-	log.Printf("comic page target batch=%s book=%s video=%s provider=%s model=%s", batchID, bookID, videoID, target.Provider, target.ModelID)
+	comicVerboseLogf("comic page target batch=%s book=%s video=%s provider=%s model=%s", batchID, bookID, videoID, target.Provider, target.ModelID)
 	generationCtx, cancelGeneration := comicPageGenerationContext(ctx)
 	defer cancelGeneration()
 	// 单页重试不能绕过统一配置的出图并发上限。
@@ -1121,16 +1143,16 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if batchfactoryv11.ComicPageIllustratedTextPreset(effective) {
 		switch {
 		case selectedPage.ComicSourceSegment == nil || strings.TrimSpace(selectedPage.ComicSourceSegment.SourceText) == "":
-			log.Printf("comic page literal text skipped batch=%s book=%s video=%s reason=no_current_page", batchID, bookID, videoID)
+			comicVerboseLogf("comic page literal text skipped batch=%s book=%s video=%s reason=no_current_page", batchID, bookID, videoID)
 		case literalTextInjected:
-			log.Printf("comic page literal text injected batch=%s book=%s video=%s chars=%d", batchID, bookID, videoID, len(selectedPage.ComicSourceSegment.SourceText))
+			comicVerboseLogf("comic page literal text injected batch=%s book=%s video=%s chars=%d", batchID, bookID, videoID, len(selectedPage.ComicSourceSegment.SourceText))
 			// 默认关闭；只在显式审计时打印实际写入出图 prompt 的约束块，便于逐字核对。
 			if os.Getenv("QIANTIE_COMIC_LITERAL_TEXT_AUDIT_LOG") == "1" {
 				block := batchfactoryv11.ComicPageLiteralTextBlock(selectedPage.ComicSourceSegment.SourceText)
 				log.Printf("comic page literal text audit batch=%s book=%s video=%s prompt_chars=%d block_offset=%d block=%q", batchID, bookID, videoID, len(generationPrompt), strings.LastIndex(generationPrompt, block), block)
 			}
 		case strings.Contains(generationPrompt, selectedPage.ComicSourceSegment.SourceText):
-			log.Printf("comic page literal text deduped batch=%s book=%s video=%s", batchID, bookID, videoID)
+			comicVerboseLogf("comic page literal text deduped batch=%s book=%s video=%s", batchID, bookID, videoID)
 		}
 	}
 	stopSlowPageHeartbeat := comicSlowPageHeartbeat(ctx, selectedPage.Label)
