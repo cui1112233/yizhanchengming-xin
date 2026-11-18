@@ -456,6 +456,19 @@ func TestDecorateWebSubmitResultsAddsFailureCodes(t *testing.T) {
 	if pending["code"] != "WEB_SUBMIT_PENDING_CONFIRMATION" || strings.TrimSpace(toString(pending["message"])) == "" {
 		t.Fatalf("pending=%#v", pending)
 	}
+	// 同一套中文状态词汇：接口直接给出 status_label，页面不再显示英文原始状态。
+	if got := decorated[0].(map[string]any)["status_label"]; got != "已提交" {
+		t.Fatalf("submitted label=%#v", got)
+	}
+	if got := bad["status_label"]; got != "失败" {
+		t.Fatalf("failed label=%#v", got)
+	}
+	if got := pending["status_label"]; got != "待远端核验" {
+		t.Fatalf("pending label=%#v", got)
+	}
+	if got := webSubmitStatusText("waiting_configuration"); got != "等待配置" {
+		t.Fatalf("waiting label=%#v", got)
+	}
 }
 
 func stringsReader(value string) *strings.Reader { return strings.NewReader(value) }

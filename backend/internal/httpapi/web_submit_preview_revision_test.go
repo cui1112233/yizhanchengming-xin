@@ -12,7 +12,7 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-func TestWebSubmitRejectsChangedPreviewBeforeCallingTarget(t *testing.T) {
+func TestWebSubmitIgnoresChangedPreviewAndProceeds(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
 	_ = store.PutConfig(ctx, "tester", map[string]any{})
@@ -38,7 +38,9 @@ func TestWebSubmitRejectsChangedPreviewBeforeCallingTarget(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
-	if res.Code != http.StatusConflict || connector.submitCalls != 0 || !strings.Contains(res.Body.String(), "重新生成提交预览") {
-		t.Fatalf("stale preview accepted: %d %s calls=%d", res.Code, res.Body.String(), connector.submitCalls)
+	// 参考实现的提交不依赖预览令牌；预览过期不能再返回 409，
+	// 请求应继续进入提交执行，由真实前置条件（这里未启用网站提交）决定结果。
+	if res.Code == http.StatusConflict || strings.Contains(res.Body.String(), "重新生成提交预览") || !strings.Contains(res.Body.String(), "尚未启用") {
+		t.Fatalf("stale preview still blocked submit: %d %s calls=%d", res.Code, res.Body.String(), connector.submitCalls)
 	}
 }

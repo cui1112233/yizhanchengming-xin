@@ -68,6 +68,43 @@ export function novelFetchBatchResultSummary(result = {}) {
   return `请求 ${requested} 项，已处理 ${updated} 项，跳过 ${skipped} 项，失败 ${failed} 项`;
 }
 
+const submitStatusLabels = {
+  submitted: '已提交',
+  success: '已提交',
+  done: '已提交',
+  uploaded: '已提交',
+  pending_confirmation: '待远端核验',
+  pending_verification: '待远端核验',
+  unknown: '结果未知',
+  partial: '部分接收',
+  pending_upload: '待提交',
+  pending: '待提交',
+  pending_submit: '待提交',
+  queued: '待提交',
+  waiting_configuration: '等待配置',
+  waiting_config: '等待配置',
+  waiting_login: '等待登录',
+  waiting_classification: '等待确认分类',
+  waiting_classify: '等待确认分类',
+  waiting_generate: '待生成',
+  pending_generate: '待生成',
+  executing: '执行中',
+  processing: '执行中',
+  running: '执行中',
+  deferred: '已延后',
+  skipped: '已跳过',
+  failed: '失败',
+  error: '失败',
+  stopped: '已停止'
+};
+
+// 提交状态只保留一套展示词汇：后端历史字段（pending_upload/error 等）
+// 和新字段（waiting_config/unknown 等）都从这里翻译，页面不再直接显示英文状态。
+export function webSubmitStatusLabel(status) {
+  const key = text(status);
+  return submitStatusLabels[key] || String(status ?? '').trim() || '未开始';
+}
+
 export function novelFetchSubmissionLabel(row = {}) {
   const submitStatus = text(row.siteSubmitStatus ?? row.site_submit_status);
   const versions = key => (Array.isArray(row[key]) ? row[key] : []).map(value => String(value || '').trim()).filter(Boolean).join('、');
@@ -83,7 +120,7 @@ export function novelFetchSubmissionLabel(row = {}) {
     const waiting = versions('site_submit_waiting_generate_versions');
     return `待生成${waiting ? ` ${waiting.toUpperCase()}` : ''}`;
   }
-  if (submitStatus) return novelFetchStageLabel(submitStatus);
+  if (submitStatus) return webSubmitStatusLabel(submitStatus);
   const aiStatus = row.aiStatus ?? row.ai_status;
   const aiCount = Number(row.aiGeneratedCount ?? row.ai_generated_count) || 0;
   return aiCount > 0 || done(aiStatus) ? '待提交' : '—';

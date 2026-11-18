@@ -5,7 +5,8 @@ import vm from 'node:vm';
 
 const page = fs.readFileSync(new URL('./NovelFetchPage.jsx', import.meta.url), 'utf8');
 function handler(name, context) {
-  const start = page.indexOf(`  async function ${name}(`);
+  let start = page.indexOf(`  async function ${name}(`);
+  if (start < 0) start = page.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = page.indexOf('\n  }', start) + 4;
   return vm.runInNewContext(`(${page.slice(start, end)})`, context);
@@ -75,6 +76,41 @@ test('submit selected refuses to submit when nothing is checked', async () => {
   })();
   assert.match(warned, /请先选择/);
   assert.equal(requests.length, 0);
+});
+
+test('submit all submits every visible task id, not the current batch', async () => {
+  const requests = [];
+  let confirmOptions = null;
+  await handler('submitAllTasks', {
+    visibleTaskIds: ['a', 'b', 'c'],
+    message: { info() {} },
+    Modal: { confirm: options => { confirmOptions = options; } },
+    handleWebSubmit: async fn => fn(),
+    startWebSubmit: async body => { requests.push(body); return { results: [] }; },
+    setWebSubmitResults() {}, setWebSubmitHistory() {}, setSubmitView() {}, changeTab() {},
+    loadTasks: async () => {}, loadCurrentBatch: async () => {}
+  })();
+  assert.ok(confirmOptions);
+  await confirmOptions.onOk();
+  assert.equal(JSON.stringify(requests), JSON.stringify([{ taskIds: ['a', 'b', 'c'] }]));
+});
+
+test('submit page confirmation no longer requires or sends a preview revision', async () => {
+  const requests = [];
+  let warned = '';
+  let confirmOptions = null;
+  await handler('confirmWebSubmit', {
+    selectedTaskKeys: ['a'],
+    message: { warning: text => { warned = text; } },
+    Modal: { confirm: options => { confirmOptions = options; } },
+    handleWebSubmit: async fn => fn(),
+    startWebSubmit: async body => { requests.push(body); return { results: [] }; },
+    setWebSubmitResults() {}, setWebSubmitHistory() {}, setSubmitView() {}
+  })();
+  assert.equal(warned, '');
+  assert.ok(confirmOptions);
+  await confirmOptions.onOk();
+  assert.equal(JSON.stringify(requests), JSON.stringify([{ taskIds: ['a'] }]));
 });
 
 test('retry reports partial failure rather than unconditional success', async () => {

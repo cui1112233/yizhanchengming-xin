@@ -52,13 +52,8 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			return
 		}
 		body.TaskIDs = resolvedIDs
-		if body.PreviewRevision != "" {
-			revision, err := webSubmitPreviewRevision(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
-			if err != nil || revision != body.PreviewRevision {
-				writeJSON(w, http.StatusConflict, map[string]string{"error": "正文、版本或提交配置已变化，请重新生成提交预览后确认"})
-				return
-			}
-		}
+		// 参考实现的提交不依赖预览令牌，预览只用于查看。这里保留字段兼容旧前端，
+		// 但不再因为后台 meta 变化而拒绝提交；提交时按最新正文和配置重新生成计划。
 		// dry_run 与参考实现一致：只生成提交计划，不执行上传，也不写提交记录。
 		if body.DryRun {
 			payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
@@ -212,6 +207,43 @@ func webSubmitOverallResult(success, failed int) string {
 	}
 }
 
+// webSubmitStatusText 把历史状态（pending_upload/error/pending_confirmation）
+// 和新状态（waiting_config/unknown 等）收敛成同一套中文词汇，接口和页面共用。
+func webSubmitStatusText(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "submitted", "success", "done", "uploaded":
+		return "已提交"
+	case "pending_confirmation", "pending_verification":
+		return "待远端核验"
+	case "unknown":
+		return "结果未知"
+	case "partial":
+		return "部分接收"
+	case "pending_upload", "pending", "pending_submit", "queued":
+		return "待提交"
+	case "waiting_configuration", "waiting_config":
+		return "等待配置"
+	case "waiting_login":
+		return "等待登录"
+	case "waiting_classification", "waiting_classify":
+		return "等待确认分类"
+	case "waiting_generate", "pending_generate":
+		return "待生成"
+	case "executing", "processing", "running":
+		return "执行中"
+	case "deferred":
+		return "已延后"
+	case "skipped":
+		return "已跳过"
+	case "failed", "error":
+		return "失败"
+	case "stopped":
+		return "已停止"
+	default:
+		return strings.TrimSpace(status)
+	}
+}
+
 // decorateWebSubmitResults 为失败项补齐 code/message，便于前端逐条展示可操作原因。
 func decorateWebSubmitResults(items []any) []any {
 	if len(items) == 0 {
@@ -224,9 +256,12 @@ func decorateWebSubmitResults(items []any) []any {
 			decorated = append(decorated, item)
 			continue
 		}
-		cloned := make(map[string]any, len(row)+2)
+		cloned := make(map[string]any, len(row)+3)
 		for key, value := range row {
 			cloned[key] = value
+		}
+		if status := toString(cloned["status"]); strings.TrimSpace(status) != "" {
+			cloned["status_label"] = webSubmitStatusText(status)
 		}
 		switch strings.ToLower(strings.TrimSpace(toString(cloned["status"]))) {
 		case "pending_confirmation":

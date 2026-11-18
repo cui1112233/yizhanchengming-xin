@@ -173,6 +173,15 @@ test('submission status explains version-level blockers from the legacy contract
   assert.equal(novelFetchSubmissionLabel({ site_submit_status: 'waiting_generate', site_submit_waiting_generate_versions: ['ai1'] }), '待生成 AI1');
 });
 
+test('submit status uses one Chinese vocabulary for legacy and canonical values', () => {
+  assert.equal(statusHelpers.webSubmitStatusLabel('pending_confirmation'), '待远端核验');
+  assert.equal(statusHelpers.webSubmitStatusLabel('pending_upload'), '待提交');
+  assert.equal(statusHelpers.webSubmitStatusLabel('waiting_configuration'), '等待配置');
+  assert.equal(statusHelpers.webSubmitStatusLabel('error'), '失败');
+  assert.equal(statusHelpers.webSubmitStatusLabel('skipped'), '已跳过');
+  assert.equal(novelFetchSubmissionLabel({ site_submit_status: 'pending_upload' }), '待提交');
+});
+
 test('current batch marks AI1 complete only when AI1 content is actually available', () => {
   assert.equal(novelFetchVersionReady({ ai_status: 'waiting_ai_config' }, 'ai1'), false);
   assert.equal(novelFetchVersionReady({ ai_status: 'ai_done' }, 'ai1'), true);
@@ -253,7 +262,7 @@ test('stop action excludes completed and pending-submit tasks', () => {
   ] }), ['queued', 'running']);
 });
 
-test('default task view keeps recent completed tasks and all unfinished tasks', () => {
+test('default task view keeps every visible task like the reference workbench', () => {
   const rows = [
     { book_id: 'recent-ok', status: 'completed', created_at: '2026-10-17T08:00:00+08:00' },
     { book_id: 'old-ok', status: 'completed', created_at: '2026-10-10T08:00:00+08:00' },
@@ -263,11 +272,11 @@ test('default task view keeps recent completed tasks and all unfinished tasks', 
 
   assert.deepEqual(
     filterNovelFetchTasks(rows, { mode: 'default', now: new Date('2026-10-18T12:00:00+08:00') }).map(row => row.book_id),
-    ['recent-ok', 'old-failed', 'old-running']
+    ['recent-ok', 'old-ok', 'old-failed', 'old-running']
   );
 });
 
-test('default task view keeps unfinished books from the current batch only', () => {
+test('default task view no longer hides unfinished books by batch', () => {
   const rows = [
     { book_id: 'current-failed', status: 'failed', created_at: '2026-09-01T08:00:00+08:00' },
     { book_id: 'current-running', status: 'processing', created_at: '2026-09-02T08:00:00+08:00' },
@@ -281,7 +290,7 @@ test('default task view keeps unfinished books from the current batch only', () 
       batchIds: ['current-failed', 'current-running'],
       now: new Date('2026-10-18T12:00:00+08:00')
     }).map(row => row.book_id),
-    ['current-failed', 'current-running', 'recent-ok']
+    ['current-failed', 'current-running', 'history-queued', 'recent-ok']
   );
 });
 
