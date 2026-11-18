@@ -103,3 +103,18 @@ test('资产分析原文回退：显示真实来源并发送原文，空章保�
  assert(document.body.textContent.includes('分析来源：章节原文'),'raw source not explicit');await click('资产分析');assert(window.sent===raw.content,'analysis did not receive real source');root.unmount();document.body.dataset.result='passed';
  })().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
 `));
+
+test('独立重新解析按当前资产类别执行，忙碌和只读时不可提交', { skip: !browser }, async () => runBrowser(`
+ import React from 'react';import{createRoot}from'react-dom/client';import Stage from './ComicScreenplayAssetStage.jsx';
+ ${helpers}
+ window.fetch=async()=>response({items:[],settings:{revision:1}});
+ (async()=>{
+ const root=createRoot(document.getElementById('root'));const calls=[];
+ const props={projectId:'p',workspace:{project:{source_text:'真实保存的原文'},assets:[]},canGenerate:true,degree:'standard',onReparse:type=>calls.push(type)};
+ root.render(<Stage {...props}/>);await tick();await tick();
+ await click('重新解析');assert(calls.join(',')==='character','wrong asset kind');
+ root.render(<Stage {...props} working="character"/>);await tick();assert(button('重新解析').disabled,'busy request can be duplicated');
+ root.render(<Stage {...props} readOnly/>);await tick();assert(button('重新解析').disabled,'reader can submit generation');
+ root.unmount();document.body.dataset.result='passed';
+ })().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message});
+`));

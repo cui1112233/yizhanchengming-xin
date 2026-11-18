@@ -519,6 +519,7 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 	})
 	handle("POST /api/comic-screenplays/projects/{id}/assets/extract", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
+			Mode        string                 `json:"mode"`
 			Type        screenplay.AssetType   `json:"type"`
 			Degree      screenplay.AssetDegree `json:"degree"`
 			Content     string                 `json:"content"`
@@ -532,7 +533,17 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			return
 		}
 		service := screenplay.AssetService{Store: store, Generator: screenplayTextGenerator{owner: owner, resolver: resolver}}
-		result, err := service.Extract(req.Context(), screenplay.AssetRequest{Owner: owner, ProjectID: req.PathValue("id"), Type: input.Type, Degree: input.Degree, Content: input.Content, Chapters: input.Chapters, Model: input.Model, Concurrency: input.Concurrency, Confirmed: input.Confirmed, MissingOnly: input.MissingOnly})
+		request := screenplay.AssetRequest{Owner: owner, ProjectID: req.PathValue("id"), Type: input.Type, Degree: input.Degree, Content: input.Content, Chapters: input.Chapters, Model: input.Model, Concurrency: input.Concurrency, Confirmed: input.Confirmed, MissingOnly: input.MissingOnly}
+		var result screenplay.AssetResult
+		var err error
+		switch input.Mode {
+		case "":
+			result, err = service.Extract(req.Context(), request)
+		case "standalone":
+			result, err = service.Reparse(req.Context(), request)
+		default:
+			err = fmt.Errorf("%w: 未知资产解析入口", screenplay.ErrInvalidArgument)
+		}
 		if err != nil {
 			// 部分批次失败：已成功提取的资产已经落库，把 partial_failure、
 			// failed_batches 和已保存资产一起返回，前端据此明确提示失败批次，
