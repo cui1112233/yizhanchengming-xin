@@ -220,8 +220,13 @@ func NewRouter(options RouterOptions) http.Handler {
 		// 启动时默认不自动恢复（只做 RecoverInterruptedJobs 标记）。自动恢复会
 		// 把书重新置为 running 并立即重新派发，缺少执行器/发布配置时会产生
 		// 一批无效重试；需要显式开启 QIANTIE_AUTOMATION_RESUME_ON_BOOT=1。
-		resumeAutomationOnBoot(options.AutomationCoordinator)
-		options.AutomationCoordinator.StartScheduledDispatcher()
+		// 恢复过程会做全局预检（含网络探测），生产上曾阻塞 37 秒才开始监听 4000；
+		// 改为后台执行，保证 HTTP 先就绪，避免重启窗口内 nginx 502。
+		coordinator := options.AutomationCoordinator
+		go func() {
+			resumeAutomationOnBoot(coordinator)
+			coordinator.StartScheduledDispatcher()
+		}()
 	}
 	// 生产任务心跳超时兜底：启动时清理历史遗留的 running/queued，
 	// 避免服务中断后父任务永久停在“制作中”。阈值取 30 分钟。
