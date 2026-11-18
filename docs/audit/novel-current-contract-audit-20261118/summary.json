@@ -1,21 +1,21 @@
 {
   "count": 75,
   "counts": {
-    "部分实现": 23,
-    "合同不同": 12,
-    "缺失": 25,
+    "部分实现": 29,
+    "合同不同": 11,
+    "缺失": 20,
     "已有实现待对照": 10,
     "尚未验证": 5
   },
   "missingEvidenceAnchors": [],
-  "sourceHead": "8ab7e06f4783ab17c9cd79d053a58984ea8c3ebd",
+  "sourceHead": "03a19395",
   "runtimeObserved": {
     "port": 4001,
-    "git_sha": "c4054404",
-    "entry": "/assets/user-LoEy2Yrp.js"
+    "git_sha": "03a19395",
+    "entry": "/assets/user-zrHdi5r8.js"
   },
   "paidCalls": 0,
-  "productFilesChanged": 0,
+  "productFilesChanged": 17,
   "originalNativeParity": false,
-  "note": "75项是已有审计范围，不是原软件功能总数。静态相似和自身测试通过不代表原版运行等价。"
+  "note": "75项为审计范围；短仿写六行升为部分实现，完全等价0项。真实模型调用0。"
 }

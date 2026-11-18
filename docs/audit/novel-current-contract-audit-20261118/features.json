@@ -54,7 +54,7 @@
     "evidenceIds": [
       "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6"
     ],
-    "finding": "原版短篇大纲/正文/审核/打包与独立storyId；CM短篇结果是一个ChapterVersion。",
+    "finding": "短篇原创的聊天建议动作仍未接独立短篇执行器，不能用本轮仿写短篇交付替代；后端基础独立story能力已写入，但该入口尚未对齐。",
     "acceptance": "以独立短篇结构保存大纲、正文和成品；重新打开与导出仍是同一结果。",
     "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
     "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
@@ -139,7 +139,7 @@
     "id": "E05",
     "area": "六种创作",
     "feature": "仿写短篇专用弹窗",
-    "status": "缺失",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImitationShortDialog.readable.js",
@@ -149,19 +149,19 @@
       "sha256": "d663478fbbcf4ddf86244cffc786125bc263a47e35ee858fe3281fcb893a5043"
     },
     "current": {
-      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
-      "line": 304,
-      "anchor": "MODES.map",
+      "file": "frontend/src/user/pages/novel-creation/ShortStoryDialog.jsx",
+      "line": 12,
+      "anchor": "export default function",
       "anchorFound": true,
-      "sha256": "8972e04874dcda395c61d833c4f2aadd3d003868b4066cf2383f830769e31855"
+      "sha256": "eea37899d4fe83a8468c64cabd2babaff9cbd5ce8dd99928cbc2da307e4c0cca"
     },
     "evidenceIds": [
       "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395"
     ],
-    "finding": "专用弹窗缺失；不能用Agent设置页或通用参考框代替。",
+    "finding": "已新增独立600px仿写短篇弹窗和原版字段，4001已检查空值/99/100与取消；主题沿用CM。所有滚动状态、上传现场和原版像素等价仍未全部验收。",
     "acceptance": "标题、上传、字数快捷值、偏好、标签、备忘录、关联作品及取消均有真实动作。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 03a19395；免费受控界面4项通过；独立MySQL全链读回通过；真实付费模型0次",
+    "implementation": "75d1b502 / 03a19395；详见docs/acceptance/2026-11-18-novel-short-story.md",
     "baselineStatus": "缺失",
     "baselineFinding": "专用弹窗缺失；不能用Agent设置页或通用参考框代替。",
     "additionalCurrentEvidence": [
@@ -180,13 +180,14 @@
         "sha256": "8972e04874dcda395c61d833c4f2aadd3d003868b4066cf2383f830769e31855"
       }
     ],
-    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json"
+    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json",
+    "beforeShortStoryStatus": "缺失"
   },
   {
     "id": "E06",
     "area": "六种创作",
     "feature": "短仿写总字数和篇章数",
-    "status": "合同不同",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImitationShortDialog.readable.js",
@@ -196,19 +197,19 @@
       "sha256": "d663478fbbcf4ddf86244cffc786125bc263a47e35ee858fe3281fcb893a5043"
     },
     "current": {
-      "file": "backend/internal/novelcreation/validation.go",
-      "line": 10,
-      "anchor": "defaultTargetChapterWords",
+      "file": "backend/internal/novelcreation/short_story.go",
+      "line": 78,
+      "anchor": "func normalizeShortStory",
       "anchorFound": true,
-      "sha256": "15a538a85fd8326e619b8fc6d6107640407e674e02caabceef52399a9eff0987"
+      "sha256": "5d81298c87f4e7a3cf7bbfb1c4618662c7387cb2c7caae9dac036c755e449118"
     },
     "evidenceIds": [
       "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395"
     ],
-    "finding": "原版总字数13000默认、篇章1；CM默认每章2000、章字数最多8000，两者单位与范围不同。",
+    "finding": "总字数13000/目标篇章1独立传递；2万字单章采用有界分段且仍保存1章，已有假模型测试。超上限API明确报错及草稿恢复为CM适配，未证明原生50万字生成能力。",
     "acceptance": "分别定义总字数/每章字数，不通过放大单章上限伪装专用短篇合同。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 03a19395；免费受控界面4项通过；独立MySQL全链读回通过；真实付费模型0次",
+    "implementation": "75d1b502 / 03a19395；详见docs/acceptance/2026-11-18-novel-short-story.md",
     "baselineStatus": "合同不同",
     "baselineFinding": "原版总字数13000默认、篇章1；CM默认每章2000、章字数最多8000，两者单位与范围不同。",
     "additionalCurrentEvidence": [
@@ -227,7 +228,8 @@
         "sha256": "15a538a85fd8326e619b8fc6d6107640407e674e02caabceef52399a9eff0987"
       }
     ],
-    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json"
+    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json",
+    "beforeShortStoryStatus": "合同不同"
   },
   {
     "id": "E07",
@@ -1216,7 +1218,7 @@
     "id": "V03",
     "area": "资料与产物",
     "feature": "核心文件与文件浏览",
-    "status": "缺失",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
@@ -1226,23 +1228,24 @@
       "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
     },
     "current": {
-      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
-      "line": 25,
-      "anchor": "return <div",
+      "file": "frontend/src/user/pages/novel-creation/ShortStoryPanel.jsx",
+      "line": 7,
+      "anchor": "export default function",
       "anchorFound": true,
-      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+      "sha256": "531f240ca3a153aa92ec14643fb35363be0ada9f62dbb8b8a02e8c31367b8637"
     },
     "evidenceIds": [
       "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77"
     ],
-    "finding": "缺核心文件树/文件详情，现有蓝图弹窗不能覆盖全部文件。",
+    "finding": "短仿写已能查看并下载独立大纲/章节/推荐文件；普通长篇核心文件树、任意文件编辑及全版本合同仍缺。",
     "acceptance": "列目录→读取→编辑→保存→重新打开，路径与所属作品校验。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 03a19395；免费受控界面4项通过；独立MySQL全链读回通过；真实付费模型0次",
+    "implementation": "75d1b502 / 03a19395；详见docs/acceptance/2026-11-18-novel-short-story.md",
     "baselineStatus": "缺失",
     "baselineFinding": "缺核心文件树/文件详情，现有蓝图弹窗不能覆盖全部文件。",
     "additionalCurrentEvidence": [],
-    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json"
+    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json",
+    "beforeShortStoryStatus": "缺失"
   },
   {
     "id": "V04",
@@ -1384,7 +1387,7 @@
     "id": "V08",
     "area": "资料与产物",
     "feature": "短篇大纲查看/编辑",
-    "status": "缺失",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
@@ -1394,19 +1397,19 @@
       "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
     },
     "current": {
-      "file": "frontend/src/user/pages/novel-creation/BlueprintEditor.jsx",
-      "line": 13,
-      "anchor": "value.volumes",
+      "file": "backend/internal/novelcreation/short_story.go",
+      "line": 285,
+      "anchor": "func (s *Service) EditShortStoryOutline",
       "anchorFound": true,
-      "sha256": "9bbccf108b8589159878490158b35a0015613322b9e9c3d463b1c2d5eeb45e22"
+      "sha256": "5d81298c87f4e7a3cf7bbfb1c4618662c7387cb2c7caae9dac036c755e449118"
     },
     "evidenceIds": [
       "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
     ],
-    "finding": "长篇卷章蓝图不是短篇完整大纲文件；缺专用输出/编辑/继续。",
+    "finding": "短仿写有独立大纲预览、字段编辑、版本校验、保存和确认继续，真实隔离MySQL读回通过；原生任意大纲文件编辑仍非等价。",
     "acceptance": "大纲修改成功后继续必须读取保存版本，不用旧快照。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 03a19395；免费受控界面4项通过；独立MySQL全链读回通过；真实付费模型0次",
+    "implementation": "75d1b502 / 03a19395；详见docs/acceptance/2026-11-18-novel-short-story.md",
     "baselineStatus": "缺失",
     "baselineFinding": "长篇卷章蓝图不是短篇完整大纲文件；缺专用输出/编辑/继续。",
     "additionalCurrentEvidence": [
@@ -1418,13 +1421,14 @@
         "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
       }
     ],
-    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json"
+    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json",
+    "beforeShortStoryStatus": "缺失"
   },
   {
     "id": "V09",
     "area": "资料与产物",
     "feature": "短篇成品文件",
-    "status": "缺失",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
@@ -1434,19 +1438,19 @@
       "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
     },
     "current": {
-      "file": "backend/internal/novelcreation/exports.go",
-      "line": 101,
-      "anchor": "func (s *Service) GetShortResult",
+      "file": "backend/internal/novelcreation/short_story_pipeline.go",
+      "line": 205,
+      "anchor": "func (p *Pipeline) buildShortStory",
       "anchorFound": true,
-      "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
+      "sha256": "89e60c22d4256476429a470c6872ac4dfa5b7e08b85a33016be748fe69cc362a"
     },
     "evidenceIds": [
       "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
     ],
-    "finding": "原artifacts列表与文件编辑缺失，现有一个ChapterVersion无法承载。",
+    "finding": "短仿写独立storyId/artifacts已保存、预览和下载；不再借用普通ChapterVersion。原版成品文件任意编辑/版本与真实同输入质量对照未完成。",
     "acceptance": "正文、大纲等成品分文件读取与导出，空结果不能标完成。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 03a19395；免费受控界面4项通过；独立MySQL全链读回通过；真实付费模型0次",
+    "implementation": "75d1b502 / 03a19395；详见docs/acceptance/2026-11-18-novel-short-story.md",
     "baselineStatus": "缺失",
     "baselineFinding": "原artifacts列表与文件编辑缺失，现有一个ChapterVersion无法承载。",
     "additionalCurrentEvidence": [
@@ -1458,13 +1462,14 @@
         "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
       }
     ],
-    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json"
+    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json",
+    "beforeShortStoryStatus": "缺失"
   },
   {
     "id": "V10",
     "area": "资料与产物",
     "feature": "短篇推荐文案",
-    "status": "缺失",
+    "status": "部分实现",
     "priority": "P1",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
@@ -1474,19 +1479,19 @@
       "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
     },
     "current": {
-      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
-      "line": 25,
-      "anchor": "return <div",
+      "file": "frontend/src/user/pages/novel-creation/ShortStoryPanel.jsx",
+      "line": 7,
+      "anchor": "export default function",
       "anchorFound": true,
-      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+      "sha256": "531f240ca3a153aa92ec14643fb35363be0ada9f62dbb8b8a02e8c31367b8637"
     },
     "evidenceIds": [
       "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
     ],
-    "finding": "缺推荐预览、完整推荐与保存字段。",
+    "finding": "短仿写推荐有独立保存字段、摘要/完整预览与下载；测试使用本地假模型，尚未做原/CM真实生成推荐对照。",
     "acceptance": "推荐和正文分开保存/查看，失败不得以空文案成功。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 03a19395；免费受控界面4项通过；独立MySQL全链读回通过；真实付费模型0次",
+    "implementation": "75d1b502 / 03a19395；详见docs/acceptance/2026-11-18-novel-short-story.md",
     "baselineStatus": "缺失",
     "baselineFinding": "缺推荐预览、完整推荐与保存字段。",
     "additionalCurrentEvidence": [
@@ -1498,7 +1503,8 @@
         "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
       }
     ],
-    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json"
+    "reviewLevel": "原版恢复源码与当前静态合同复核；现场覆盖另见ui-observations.json",
+    "beforeShortStoryStatus": "缺失"
   },
   {
     "id": "V11",
