@@ -1,0 +1,2102 @@
+[
+  {
+    "id": "E01",
+    "area": "六种创作",
+    "feature": "长篇原创首次发送与建书确认",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioPage.readable.js",
+      "line": 420,
+      "anchor": "async function De",
+      "anchorFound": true,
+      "sha256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 95,
+      "anchor": "if (!projectId)",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389"
+    ],
+    "finding": "原版允许先建无书会话，聊天返回创建作品建议并确认；CM先要求新建作品，随后直接进入通用章链。",
+    "acceptance": "空作品状态发创作意图→建议动作→确认建书→会话归入作品；取消不得生成。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E02",
+    "area": "六种创作",
+    "feature": "短篇原创专用产物流程",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelConfirmCard.readable.js",
+      "line": 37,
+      "anchor": "short_run",
+      "anchorFound": true,
+      "sha256": "c7169b08913cdfe3d94178f1a8e7228a240c5485e5a1903e11379fb40d5afa2b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/exports.go",
+      "line": 101,
+      "anchor": "func (s *Service) GetShortResult",
+      "anchorFound": true,
+      "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
+    },
+    "evidenceIds": [
+      "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6"
+    ],
+    "finding": "原版短篇大纲/正文/审核/打包与独立storyId；CM短篇结果是一个ChapterVersion。",
+    "acceptance": "以独立短篇结构保存大纲、正文和成品；重新打开与导出仍是同一结果。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E03",
+    "area": "六种创作",
+    "feature": "仿写长篇专用导入窗",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 130,
+      "anchor": "仿写创作",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 266,
+      "anchor": "MODES.map",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "原版进入专用仿写表单；CM只切模式和通用参考文本框。",
+    "acceptance": "点击仿写长篇打开对应表单，取消返回原草稿；控件顺序和图标对照截图。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E04",
+    "area": "六种创作",
+    "feature": "长仿写参数与参考规则",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 375,
+      "anchor": "targetChapters",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/validation.go",
+      "line": 83,
+      "anchor": "modeInputFieldCatalog",
+      "anchorFound": true,
+      "sha256": "15a538a85fd8326e619b8fc6d6107640407e674e02caabceef52399a9eff0987"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "原版每章字数、目标章数、storyIdea、偏好、选定方向、补充信息等；CM白名单仅referenceText。",
+    "acceptance": "逐字段保存并传入正确步骤；空/99/100字边界与原文分块不能被静默截断。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E05",
+    "area": "六种创作",
+    "feature": "仿写短篇专用弹窗",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImitationShortDialog.readable.js",
+      "line": 181,
+      "anchor": "仿写短篇",
+      "anchorFound": true,
+      "sha256": "d663478fbbcf4ddf86244cffc786125bc263a47e35ee858fe3281fcb893a5043"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 266,
+      "anchor": "MODES.map",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395"
+    ],
+    "finding": "专用弹窗缺失；不能用Agent设置页或通用参考框代替。",
+    "acceptance": "标题、上传、字数快捷值、偏好、标签、备忘录、关联作品及取消均有真实动作。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E06",
+    "area": "六种创作",
+    "feature": "短仿写总字数和篇章数",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImitationShortDialog.readable.js",
+      "line": 153,
+      "anchor": "targetWordCount",
+      "anchorFound": true,
+      "sha256": "d663478fbbcf4ddf86244cffc786125bc263a47e35ee858fe3281fcb893a5043"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/validation.go",
+      "line": 10,
+      "anchor": "defaultTargetChapterWords",
+      "anchorFound": true,
+      "sha256": "15a538a85fd8326e619b8fc6d6107640407e674e02caabceef52399a9eff0987"
+    },
+    "evidenceIds": [
+      "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395"
+    ],
+    "finding": "原版总字数13000默认、篇章1；CM默认每章2000、章字数最多8000，两者单位与范围不同。",
+    "acceptance": "分别定义总字数/每章字数，不通过放大单章上限伪装专用短篇合同。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E07",
+    "area": "六种创作",
+    "feature": "番外正传关联与四类型",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 437,
+      "anchor": "spinoffType",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 283,
+      "anchor": "existingSetting",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "原版有parentBookId和sequel/prequel/parallel/if分支；CM番外标签实际用fanfiction和一段existingSetting。",
+    "acceptance": "可选正传并保留关联ID；每种番外类型加载相应规则，不仅拼一段世界设定。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E08",
+    "area": "六种创作",
+    "feature": "同人与番外语义区分",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 116,
+      "anchor": "fanfic",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/contracts.js",
+      "line": 3,
+      "anchor": "fanfiction",
+      "anchorFound": true,
+      "sha256": "14a0c45f27c3d83a1ea741421b6592da680c0b6f2bc95f9b67c03c3a992ce005"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "原导入器有fanfic和spinoff两个分支；CM把番外入口映射为fanfiction，模式合同仍叫同人。",
+    "acceptance": "入口名称、请求模式、上下文和输出归属一致，既有作品数据不能错归类。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E09",
+    "area": "六种创作",
+    "feature": "续写导入正式章节",
+    "status": "部分实现",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 461,
+      "anchor": "bookId",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ContinuationImportDialog.jsx",
+      "line": 36,
+      "anchor": "async function submit",
+      "anchorFound": true,
+      "sha256": "3f5036c0b7aa3a3f860c9be8073d08ac95b3be41b265f1aa4e58eeb3b5c2596a"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "已存在专用续写导入、目标书/新书、分章、多文风选择和正式保存；不能继续列为完全缺失。原版文件选择和形态仍未同状态验收。",
+    "acceptance": "粘贴/上传→预览分章→目标书→一次保存→关闭重开；重复请求不重复入库。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "E10",
+    "area": "六种创作",
+    "feature": "无书会话与正式作品的关系",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "create-session",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/service.go",
+      "line": 78,
+      "anchor": "func (s *Service) sendMessage",
+      "anchorFound": true,
+      "sha256": "b268fe5b19900dade9a1e9c08645591d0aeaff2e861bda077369319b8680e063"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "原版存在独立会话、建书后归档到书籍；CM普通会话和工具普遍要求project。",
+    "acceptance": "无书讨论与有书生产分别建模，创建失败或取消不得生成空作品。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L01",
+    "area": "布局与导航",
+    "feature": "六入口排列与模式图标",
+    "status": "合同不同",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 250,
+      "anchor": "开始创作",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 266,
+      "anchor": "novel-creation-mode-tabs",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "原版截图两列带模式图标；CM单列文字按钮，未使用原模式图标组件。",
+    "acceptance": "在约定主题下逐入口对照位置、图标语义、尺寸、选中态、悬停及键盘焦点。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L02",
+    "area": "布局与导航",
+    "feature": "作品类型筛选",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 50,
+      "anchor": "novel_book_filter",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 259,
+      "anchor": "visibleProjects",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "原版有全部/类型筛选并保留选择；CM只区分归档与未归档。",
+    "acceptance": "切换筛选后作品和会话归属正确，刷新保留筛选且不创建任务。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L03",
+    "area": "布局与导航",
+    "feature": "每本书展开嵌套会话",
+    "status": "合同不同",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "toggle-book",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 269,
+      "anchor": "novel-sessions",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "原版作品展开显示其会话并能在书下新建；CM扁平作品列表+当前模式会话。",
+    "acceptance": "逐书展开/折叠/切会话，不互相覆盖，保留未发草稿。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L04",
+    "area": "布局与导航",
+    "feature": "会话相对时间与运行标记",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 351,
+      "anchor": "updatedAt",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 269,
+      "anchor": "有任务",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "CM有当前运行标记，但无原列表相对更新时间样式与完整组别。",
+    "acceptance": "时间、运行中、选中态与书籍关系能在刷新后正确恢复。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L05",
+    "area": "布局与导航",
+    "feature": "作品与会话重命名",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "rename-session",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 269,
+      "anchor": "重命名会话",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "当前有真实重命名入口；交互位置/弹窗及空值边界尚未与原版同状态比较。",
+    "acceptance": "空名拒绝、取消不改名、失败保留输入、重复点击不重复提交。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L06",
+    "area": "布局与导航",
+    "feature": "作品快捷导出",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "export-book",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 28,
+      "anchor": "导出整本",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "CM有正文导出，但没有原侧栏同位置动作和全部产物合同。",
+    "acceptance": "侧栏导出应指向选中作品，格式与保存内容一致；空作品明确提示。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L07",
+    "area": "布局与导航",
+    "feature": "删除与可恢复归档",
+    "status": "合同不同",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "delete-book",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 268,
+      "anchor": "归档作品",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "CM采用可恢复归档，原版有删除动作。不得擅自永久删除来追求界面一致。",
+    "acceptance": "明确保留/删除策略、文案与恢复动作；归档后自动任务保持暂停。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "L08",
+    "area": "布局与导航",
+    "feature": "六工具进入位置与返回",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "open-style",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 251,
+      "anchor": "async function openTool",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "已修成左下工具、主区工具页、导入弹窗与独立备忘录弹层；旧报告统一Drawer结论过时。",
+    "acceptance": "逐工具进出、返回、切作品、关弹窗后保留原会话草稿；再做原版同状态截图。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C01",
+    "area": "聊天与动作",
+    "feature": "聊天发送与快捷键",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 248,
+      "anchor": "Enter",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 284,
+      "anchor": "onCompositionStart",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "CM有真实发送/Enter/Shift+Enter和中文输入保护；不代表原版会话/动作解析相同。",
+    "acceptance": "中文组合输入不误发、连续点击不重复提交、失败保留草稿。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C02",
+    "area": "聊天与动作",
+    "feature": "可调上下文长度",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 253,
+      "anchor": "contextLength",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 168,
+      "anchor": "contextBudget: 120000",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "原版有上下文长度控件；CM会话预算写死120000，没有用户调整入口。",
+    "acceptance": "按模型能力限定预算，修改值真正进入请求及冻结快照。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C03",
+    "area": "聊天与动作",
+    "feature": "清除上下文与Ctrl+K",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 48,
+      "anchor": "clear-context",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 281,
+      "anchor": "novel-creation-composer",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "当前聊天区没有原清上下文按钮/动作；不能以新建会话代替。",
+    "acceptance": "清除只影响约定范围，正文作品不丢；取消/失败不清会话。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C04",
+    "area": "聊天与动作",
+    "feature": "回复复制",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 286,
+      "anchor": "复制",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 278,
+      "anchor": "novel-creation-message",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "当前消息只有角色和文本，无复制控件。",
+    "acceptance": "复制完整对应回复；失败提示且不改正文。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C05",
+    "area": "聊天与动作",
+    "feature": "消息存档",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 48,
+      "anchor": "archive-message",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 278,
+      "anchor": "novel-creation-message",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "原消息可存档；当前只有作品/会话归档，不是同一种动作。",
+    "acceptance": "保存选定消息及来源，不能误归档整本或创建生成任务。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C06",
+    "area": "聊天与动作",
+    "feature": "单条消息及配对回复删除",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 48,
+      "anchor": "delete-message",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 278,
+      "anchor": "novel-creation-message",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "原区分用户消息及对应回复/单AI回复；CM消息没有删除入口。",
+    "acceptance": "必须先明确可恢复策略；不能混淆删除对话与删除正式章节。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C07",
+    "area": "聊天与动作",
+    "feature": "流式正文展示",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioPage.readable.js",
+      "line": 926,
+      "anchor": "chat.delta",
+      "anchorFound": true,
+      "sha256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 278,
+      "anchor": "m.content",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389"
+    ],
+    "finding": "当前只渲染snapshot.messages及RunCard，没有原delta正文流显示合同。",
+    "acceptance": "分会话接流、重连补齐、切会话不串文；保存结果与最后文本一致。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C08",
+    "area": "聊天与动作",
+    "feature": "思考块展开与耗时",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelThinkingBlock.readable.js",
+      "line": 49,
+      "anchor": "思考了",
+      "anchorFound": true,
+      "sha256": "ef005e52234a03b7d7cf370ad7122ae85b33d092d962247bcd23675e5b15e10c"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/RunCard.jsx",
+      "line": 22,
+      "anchor": "实际模型与参数",
+      "anchorFound": true,
+      "sha256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908"
+    },
+    "evidenceIds": [
+      "ev_fd0f8e9cec3f4907363e4066e0676f2c8b9742aacaea5ebb840d9449605e8c1b"
+    ],
+    "finding": "参数详情不是原思考过程块，当前没有该折叠/耗时显示。",
+    "acceptance": "只显示提供方真实返回的思考字段；未提供时不捏造内容或耗时。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C09",
+    "area": "聊天与动作",
+    "feature": "模型与思考强度选择",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioChat.readable.js",
+      "line": 231,
+      "anchor": "选择模型",
+      "anchorFound": true,
+      "sha256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 286,
+      "anchor": "创作文本模型",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33"
+    ],
+    "finding": "已有自己的模型目录与思考选项；这是用户要求保留的适配，原搜索/分组/能力控制仍待对照。",
+    "acceptance": "所有选项来自自家已配置模型；不显示不可用的原渠道或无效思考参数。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C10",
+    "area": "聊天与动作",
+    "feature": "建议动作确认卡",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelConfirmCard.readable.js",
+      "line": 33,
+      "anchor": "create_book",
+      "anchorFound": true,
+      "sha256": "c7169b08913cdfe3d94178f1a8e7228a240c5485e5a1903e11379fb40d5afa2b"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/RunCard.jsx",
+      "line": 18,
+      "anchor": "awaiting_confirmation",
+      "anchorFound": true,
+      "sha256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908"
+    },
+    "evidenceIds": [
+      "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6"
+    ],
+    "finding": "原聊天返回action，确认后才建书/写章等；当前运行蓝图确认不是这套待执行动作卡。",
+    "acceptance": "建议→显示参数→确认或取消；刷新恢复同一待执行动作，防重复。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C11",
+    "area": "聊天与动作",
+    "feature": "快捷写下一章",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelQuickActions.readable.js",
+      "line": 11,
+      "anchor": "write-next",
+      "anchorFound": true,
+      "sha256": "8640014474293b659c461e1c83e6a25d3fc5f899f2b4dfe968a70c79f53461b7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 266,
+      "anchor": "开始创作",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_abaf9c7dc782cc4887b11db79979e7841e5710eeadbc53d0ac7f746eada9deca"
+    ],
+    "finding": "当前可通过普通发送写章，但缺少原同位置快捷动作及相同确认语义。",
+    "acceptance": "对当前作品最后章节写下一章，空作品和运行中状态正确处理。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C12",
+    "area": "聊天与动作",
+    "feature": "独立手动审稿",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelQuickActions.readable.js",
+      "line": 11,
+      "anchor": "audit",
+      "anchorFound": true,
+      "sha256": "8640014474293b659c461e1c83e6a25d3fc5f899f2b4dfe968a70c79f53461b7"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/maintenance.go",
+      "line": 48,
+      "anchor": "func (s *Service) QueueMaintenance",
+      "anchorFound": true,
+      "sha256": "201a998c900bffae5fc9e58d0029f0191fdd0608e5c7ad7c391c481ae3522eeb"
+    },
+    "evidenceIds": [
+      "ev_abaf9c7dc782cc4887b11db79979e7841e5710eeadbc53d0ac7f746eada9deca"
+    ],
+    "finding": "自动生产中审核存在；当前维护只开放文风分析/事实刷新，未见对应手动审稿入口。",
+    "acceptance": "选定已保存章节→独立审核→保存报告，不隐式生成新正文。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C13",
+    "area": "聊天与动作",
+    "feature": "独立手动修订",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelQuickActions.readable.js",
+      "line": 11,
+      "anchor": "revise",
+      "anchorFound": true,
+      "sha256": "8640014474293b659c461e1c83e6a25d3fc5f899f2b4dfe968a70c79f53461b7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/RunCard.jsx",
+      "line": 19,
+      "anchor": "从失败处重试",
+      "anchorFound": true,
+      "sha256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908"
+    },
+    "evidenceIds": [
+      "ev_abaf9c7dc782cc4887b11db79979e7841e5710eeadbc53d0ac7f746eada9deca"
+    ],
+    "finding": "失败重试不是对已保存章节主动修订；缺同位置选择/执行/版本结果链。",
+    "acceptance": "指定章节和审核问题修订，保留旧版本，取消不覆盖正文。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C14",
+    "area": "聊天与动作",
+    "feature": "原工具阶段与日志",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelToolSteps.readable.js",
+      "line": 7,
+      "anchor": "execution:",
+      "anchorFound": true,
+      "sha256": "7880ab4a851e3421499afc0757099377785a6e91f4f77293672e8dbcbe99a0e8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/RunCard.jsx",
+      "line": 1,
+      "anchor": "Progress",
+      "anchorFound": true,
+      "sha256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908"
+    },
+    "evidenceIds": [
+      "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96"
+    ],
+    "finding": "CM有持久run/百分比/错误，原按tool动态阶段与日志卡没有完全对应。",
+    "acceptance": "每个模式显示实际执行阶段，不填虚构步骤或把11阶段当11次外呼。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "C15",
+    "area": "聊天与动作",
+    "feature": "停止、失败重试、结果未知",
+    "status": "已有实现待对照",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelToolSteps.readable.js",
+      "line": 203,
+      "anchor": "重试",
+      "anchorFound": true,
+      "sha256": "7880ab4a851e3421499afc0757099377785a6e91f4f77293672e8dbcbe99a0e8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/RunCard.jsx",
+      "line": 14,
+      "anchor": "上游结果待确认",
+      "anchorFound": true,
+      "sha256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908"
+    },
+    "evidenceIds": [
+      "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96"
+    ],
+    "finding": "当前有停止后续步骤、原任务恢复、结果未知不自动重试；这是已有真实保护，原native细节尚未知。",
+    "acceptance": "运行中停止、已发请求、丢回包、保存失败分别验收；禁止重试造成重复收费。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V01",
+    "area": "资料与产物",
+    "feature": "已保存章节选择/编辑/版本",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
+      "line": 225,
+      "anchor": "章节",
+      "anchorFound": true,
+      "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 32,
+      "anchor": "保存新版本",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77"
+    ],
+    "finding": "当前能编辑正文、版本历史与恢复；不应列为无功能，列表/编辑形态仍不同。",
+    "acceptance": "保存新版本→刷新读回→恢复旧内容生成新版本，冲突保留草稿。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V02",
+    "area": "资料与产物",
+    "feature": "角色档案列表",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
+      "line": 261,
+      "anchor": "角色",
+      "anchorFound": true,
+      "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 25,
+      "anchor": "return <div",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77"
+    ],
+    "finding": "当前右栏仅正文列表，缺原角色主次分类及档案浏览。",
+    "acceptance": "从真实生成/保存的人物数据读取，空态明确，不用示例角色充数。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V03",
+    "area": "资料与产物",
+    "feature": "核心文件与文件浏览",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
+      "line": 287,
+      "anchor": "核心文件",
+      "anchorFound": true,
+      "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 25,
+      "anchor": "return <div",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77"
+    ],
+    "finding": "缺核心文件树/文件详情，现有蓝图弹窗不能覆盖全部文件。",
+    "acceptance": "列目录→读取→编辑→保存→重新打开，路径与所属作品校验。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V04",
+    "area": "资料与产物",
+    "feature": "世界观摘要与完整设定",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
+      "line": 58,
+      "anchor": "worldviewSummary",
+      "anchorFound": true,
+      "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 25,
+      "anchor": "return <div",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77"
+    ],
+    "finding": "当前项目创建表单的world字段不等于原右栏摘要和完整设定文件。",
+    "acceptance": "摘要由实际设定读取，完整文件可编辑并供下一阶段使用。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V05",
+    "area": "资料与产物",
+    "feature": "封面资源与预览",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCoverPreview.readable.js",
+      "line": 100,
+      "anchor": "图片加载失败",
+      "anchorFound": true,
+      "sha256": "65347219a3c4ee9c36f8b4b35bbed9ca3724ff1199f72b059694b222cc73ba1b"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 25,
+      "anchor": "return <div",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_211c796a4afc9bff054886de1e5c5d45fcd6097d3c4da13cc7db49058205eca2"
+    ],
+    "finding": "当前小说资料区未提供原封面资源列表/预览与加载失败状态。",
+    "acceptance": "只显示当前作品真实封面；无图/坏图/多图可辨识。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V06",
+    "area": "资料与产物",
+    "feature": "生成封面专用动作",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelConfirmCard.readable.js",
+      "line": 39,
+      "anchor": "generate_cover",
+      "anchorFound": true,
+      "sha256": "c7169b08913cdfe3d94178f1a8e7228a240c5485e5a1903e11379fb40d5afa2b"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AgentPanel.jsx",
+      "line": 34,
+      "anchor": "模型路由",
+      "anchorFound": true,
+      "sha256": "dd6f41f7d6fe0e5a02b2e734561228230bf085076bf90a3ae2e865abed2ab0d9"
+    },
+    "evidenceIds": [
+      "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6"
+    ],
+    "finding": "原有封面确认动作和独立图像模型；当前只列文本步骤，未接对应功能。",
+    "acceptance": "自家图像模型选择→确认费用→生成→归档封面；无预算本轮不调用。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V07",
+    "area": "资料与产物",
+    "feature": "短篇章节结构",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
+      "line": 193,
+      "anchor": "章节结构",
+      "anchorFound": true,
+      "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 7,
+      "anchor": "canExportShort",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
+    ],
+    "finding": "当前短篇只是通用章列表的一次结果，没有独立短篇章节结构。",
+    "acceptance": "短篇多章结构、编号和字数来自同一story实体。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V08",
+    "area": "资料与产物",
+    "feature": "短篇大纲查看/编辑",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
+      "line": 153,
+      "anchor": "短篇大纲",
+      "anchorFound": true,
+      "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/BlueprintEditor.jsx",
+      "line": 13,
+      "anchor": "value.volumes",
+      "anchorFound": true,
+      "sha256": "9bbccf108b8589159878490158b35a0015613322b9e9c3d463b1c2d5eeb45e22"
+    },
+    "evidenceIds": [
+      "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
+    ],
+    "finding": "长篇卷章蓝图不是短篇完整大纲文件；缺专用输出/编辑/继续。",
+    "acceptance": "大纲修改成功后继续必须读取保存版本，不用旧快照。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V09",
+    "area": "资料与产物",
+    "feature": "短篇成品文件",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
+      "line": 223,
+      "anchor": "成品文件",
+      "anchorFound": true,
+      "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/exports.go",
+      "line": 101,
+      "anchor": "func (s *Service) GetShortResult",
+      "anchorFound": true,
+      "sha256": "28811eb736a6904f94c512ec4940767674c2d8d209b7b74d1bdaa869a67d2861"
+    },
+    "evidenceIds": [
+      "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
+    ],
+    "finding": "原artifacts列表与文件编辑缺失，现有一个ChapterVersion无法承载。",
+    "acceptance": "正文、大纲等成品分文件读取与导出，空结果不能标完成。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V10",
+    "area": "资料与产物",
+    "feature": "短篇推荐文案",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioShortPanel.readable.js",
+      "line": 53,
+      "anchor": "salesPreview",
+      "anchorFound": true,
+      "sha256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 25,
+      "anchor": "return <div",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba"
+    ],
+    "finding": "缺推荐预览、完整推荐与保存字段。",
+    "acceptance": "推荐和正文分开保存/查看，失败不得以空文案成功。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V11",
+    "area": "资料与产物",
+    "feature": "通用资料详情编辑器",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelPanelArtifactView.readable.js",
+      "line": 63,
+      "anchor": "保存",
+      "anchorFound": true,
+      "sha256": "98d856d6b53781f08c65420f061fd5cd98ad18dd32e9069abfe9cdeb6797bdea"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/BlueprintEditor.jsx",
+      "line": 6,
+      "anchor": "确认或修改创作蓝图",
+      "anchorFound": true,
+      "sha256": "9bbccf108b8589159878490158b35a0015613322b9e9c3d463b1c2d5eeb45e22"
+    },
+    "evidenceIds": [
+      "ev_dfb2b0f2e292cdea966ed54eab5f50caaef87632a64dc864d21c94652b297573"
+    ],
+    "finding": "CM只有结构化蓝图和章节编辑，不能打开原任意业务资料文件。",
+    "acceptance": "读取/编辑/取消/保存失败留草稿，保存后可重新打开验证。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V12",
+    "area": "资料与产物",
+    "feature": "编辑章节后真相同步与回放",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioBookPanel.readable.js",
+      "line": 173,
+      "anchor": "syncTruth",
+      "anchorFound": true,
+      "sha256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/ChaptersPanel.jsx",
+      "line": 27,
+      "anchor": "continuity?.dirtyFrom",
+      "anchorFound": true,
+      "sha256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e"
+    },
+    "evidenceIds": [
+      "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77"
+    ],
+    "finding": "CM修改后标记dirty再显式刷新事实记忆；原保存payload含syncTruth/replayFrom，原算法未知。",
+    "acceptance": "明确自动/手动同步策略，后续创作不能读脏记忆；不宣称算法已复原。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "V13",
+    "area": "资料与产物",
+    "feature": "资料栏显隐/宽度/拖动",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioPage.readable.js",
+      "line": 137,
+      "anchor": "38",
+      "anchorFound": true,
+      "sha256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 262,
+      "anchor": "novel-inspector-width",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389"
+    ],
+    "finding": "当前有可拖宽资料栏与按页显隐，不能据此说内容、默认宽度和像素全一致。",
+    "acceptance": "同尺寸原/CM量测最小最大宽度、空态、工具页返回和主题适配。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S01",
+    "area": "文风与资料",
+    "feature": "独立文风新增编辑表单",
+    "status": "合同不同",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStylePanel.readable.js",
+      "line": 49,
+      "anchor": "styleGuide",
+      "anchorFound": true,
+      "sha256": "7e77ff4e319c1109cac14d9b5968e23a9115b33aef52f49f15f130467dcc53e0"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/MaterialsPanel.jsx",
+      "line": 7,
+      "anchor": "styleMode",
+      "anchorFound": true,
+      "sha256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316"
+    },
+    "evidenceIds": [
+      "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa"
+    ],
+    "finding": "原直接名称/原文/指南编辑；当前复用资料解析与单文风选择，流程不同。",
+    "acceptance": "新建/编辑/取消/保存分别处理原文和可编辑指南，保存失败不清输入。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S02",
+    "area": "文风与资料",
+    "feature": "文风多选与应用到对话",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStylePanel.readable.js",
+      "line": 11,
+      "anchor": "selectedStyleIds",
+      "anchorFound": true,
+      "sha256": "7e77ff4e319c1109cac14d9b5968e23a9115b33aef52f49f15f130467dcc53e0"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/MaterialsPanel.jsx",
+      "line": 7,
+      "anchor": "styleId",
+      "anchorFound": true,
+      "sha256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316"
+    },
+    "evidenceIds": [
+      "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa"
+    ],
+    "finding": "原数组选择并应用；CM只有单styleProfileId，不能以普通资料多选冒充。",
+    "acceptance": "多文风选择、取消选择和应用真实进入请求，并保留顺序/来源。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S03",
+    "area": "文风与资料",
+    "feature": "指南为空时分析策略",
+    "status": "合同不同",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStylePanel.readable.js",
+      "line": 231,
+      "anchor": "留空则保存时自动分析",
+      "anchorFound": true,
+      "sha256": "7e77ff4e319c1109cac14d9b5968e23a9115b33aef52f49f15f130467dcc53e0"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/styles.go",
+      "line": 49,
+      "anchor": "CreateStyleFromDocument",
+      "anchorFound": true,
+      "sha256": "b9cc4148f867091f2d02eb21965dc5bae80686999130ef97b3a8f77ae21043c2"
+    },
+    "evidenceIds": [
+      "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa"
+    ],
+    "finding": "原UI声明空指南保存时自动分析；CM保存统计，AI分析单独点击。原native费用与算法未知。",
+    "acceptance": "明确是否调用模型及失败提示；未取得预算不偷偷自动分析。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S04",
+    "area": "文风与资料",
+    "feature": "原文风八维/统计指纹",
+    "status": "合同不同",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 379,
+      "anchor": "styleDimensions",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/styles.go",
+      "line": 29,
+      "anchor": "func styleStats",
+      "anchorFound": true,
+      "sha256": "b9cc4148f867091f2d02eb21965dc5bae80686999130ef97b3a8f77ae21043c2"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "原Tln/qln静态合同已恢复，CM仍是runes、单换行分段与简单句长，不能称等价。",
+    "acceptance": "同一含emoji/空行/对话样本，两侧统计与八维字段逐值比较。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S05",
+    "area": "文风与资料",
+    "feature": "上传/粘贴资料真实解析",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 225,
+      "anchor": "read_file_content",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/MaterialsPanel.jsx",
+      "line": 31,
+      "anchor": "async function upload",
+      "anchorFound": true,
+      "sha256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "CM有真实TXT/DOCX/PDF上传、解析状态与章节范围；原文件选择/追加和资料用途不同。",
+    "acceptance": "空文件/坏文件/重复/部分失败/取消上传都验收；现有能力保留。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S06",
+    "area": "文风与资料",
+    "feature": "长参考分块与当前截取上限",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelImportPage.readable.js",
+      "line": 380,
+      "anchor": "referenceChunks",
+      "anchorFound": true,
+      "sha256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/MaterialsPanel.jsx",
+      "line": 43,
+      "anchor": "12000",
+      "anchorFound": true,
+      "sha256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316"
+    },
+    "evidenceIds": [
+      "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e"
+    ],
+    "finding": "原仿写参考分块合同与CM每份选文最多12000字不同，不能静默丢后文。",
+    "acceptance": "明确长文本分块、来源、顺序和总上下文限制；超限有提示。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S07",
+    "area": "文风与资料",
+    "feature": "文风删除/编辑完整管理",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStylePanel.readable.js",
+      "line": 191,
+      "anchor": "已删除",
+      "anchorFound": true,
+      "sha256": "7e77ff4e319c1109cac14d9b5968e23a9115b33aef52f49f15f130467dcc53e0"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/MaterialsPanel.jsx",
+      "line": 52,
+      "anchor": "styles.map",
+      "anchorFound": true,
+      "sha256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316"
+    },
+    "evidenceIds": [
+      "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa"
+    ],
+    "finding": "CM选用和建立文风存在；没有同一完整管理列表中的全部编辑/删除/多选动作。",
+    "acceptance": "关联中的文风删除后有明确失效提示，不能静默换模型或随机换风格。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "S08",
+    "area": "文风与资料",
+    "feature": "备忘录弹层与选择",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioSidebar.readable.js",
+      "line": 41,
+      "anchor": "open-memo",
+      "anchorFound": true,
+      "sha256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/NotesPanel.jsx",
+      "line": 5,
+      "anchor": "selectedIds",
+      "anchorFound": true,
+      "sha256": "cf676187c1ec6963e07dcc292976bf7f213a6520f204a1f6577e08785d86ff78"
+    },
+    "evidenceIds": [
+      "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16"
+    ],
+    "finding": "独立弹层与CRUD已实现；原共享笔记/会话与当前按作品noteIds、正文拼接语义仍不同。",
+    "acceptance": "切作品、选多笔记、编辑、取消、重复保存和来源追溯一致。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A01",
+    "area": "Agent与提示词",
+    "feature": "原17项模型分工",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 212,
+      "anchor": "crn",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AgentPanel.jsx",
+      "line": 35,
+      "anchor": "PHASES.filter",
+      "anchorFound": true,
+      "sha256": "dd6f41f7d6fe0e5a02b2e734561228230bf085076bf90a3ae2e865abed2ab0d9"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "原17配置包含聊天/编排/校验/卷压缩/互动/封面；CM仅8个实际收费步骤。不能添加空选项宣称接通。",
+    "acceptance": "每项建立真实执行节点映射及输入输出；仍使用自家模型候选。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A02",
+    "area": "Agent与提示词",
+    "feature": "37项审核维度",
+    "status": "缺失",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 354,
+      "anchor": "37 项",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AgentRequirements.jsx",
+      "line": 9,
+      "anchor": "自定义补充审稿提示词",
+      "anchorFound": true,
+      "sha256": "48fd51fc9379000b0bd01c023dd36acce0c88454f2b1a078db653df810910c2d"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "自定义补充已补不等于内置37维、不可改说明、全选/全不选及勾选注入。",
+    "acceptance": "原目录逐项有来源，启停真实影响审核；不捏造37条凑数。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A03",
+    "area": "Agent与提示词",
+    "feature": "Agent保存范围",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 463,
+      "anchor": "本地数据目录",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/service.go",
+      "line": 658,
+      "anchor": "updateProjectSettings",
+      "anchorFound": true,
+      "sha256": "b268fe5b19900dade9a1e9c08645591d0aeaff2e861bda077369319b8680e063"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "原无作品/会话限定参数，CM按owner+project；原profile隔离物理实现仍未知。",
+    "acceptance": "自家账号隔离下定义共享默认/作品覆盖；先核对范围再迁移，不串用户。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A04",
+    "area": "Agent与提示词",
+    "feature": "补充审稿新增停用删除与注入",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 172,
+      "anchor": "自定义审稿",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/agent_requirements.go",
+      "line": 11,
+      "anchor": "validateAgentRequirements",
+      "anchorFound": true,
+      "sha256": "c7b5c23fd5b4356f91a8f0440ac50432036a5f52541f35e8e0eeb48e728eef1d"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "本批已真实补入reviewPrompts、校验、冻结和审核/修订注入，不再列为全缺。",
+    "acceptance": "新增/关/删/空/重复/保存失败/刷新，确认实际请求内容对应。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A05",
+    "area": "Agent与提示词",
+    "feature": "三类写作要求",
+    "status": "已有实现待对照",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 127,
+      "anchor": "customWritePrompts",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/agent_requirements.go",
+      "line": 57,
+      "anchor": "agentRequirementsSystemPrompt",
+      "anchorFound": true,
+      "sha256": "c7b5c23fd5b4356f91a8f0440ac50432036a5f52541f35e8e0eeb48e728eef1d"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "已补分类与写作/修订注入；六模式本身不同仍会影响产物，不能以此证明模式完整。",
+    "acceptance": "长篇/短篇/仿写不串用、停用不传、格式修复继承同样要求。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A06",
+    "area": "Agent与提示词",
+    "feature": "审稿循环与升温算法",
+    "status": "尚未验证",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 29,
+      "anchor": "temperatureStep",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/pipeline.go",
+      "line": 529,
+      "anchor": "TemperatureStep",
+      "anchorFound": true,
+      "sha256": "bfe94a8e4498c53c7cef5005368e0f434fedf081beb5b3c1d99b62d2177ee006"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "UI数值与零值已支持；首轮偏移/同分回退/否决项/温度上限未证实与原native一致。",
+    "acceptance": "恢复或观察原规则后逐边界对照；不把当前有界循环写成原算法。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A07",
+    "area": "Agent与提示词",
+    "feature": "后写校验与跨章输入",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 342,
+      "anchor": "零 LLM",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/local_checks.go",
+      "line": 30,
+      "anchor": "PostWrite",
+      "anchorFound": true,
+      "sha256": "7bc7b9c148a0bd920c40ecf7e10d8e9a5454d041102d2a65454ac1d1aaea60cb"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "15规则本地实现已补，跨章完整正文/标题/人称等生产输入仍不齐；显式未检查不是已通过。",
+    "acceptance": "正常、重复、错标题、人称及跨章样本；不调用模型、不改正文。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A08",
+    "area": "Agent与提示词",
+    "feature": "AI味检测",
+    "status": "尚未验证",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 346,
+      "anchor": "AI 味检测",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/local_checks.go",
+      "line": 310,
+      "anchor": "func localExpressionMetrics",
+      "anchorFound": true,
+      "sha256": "7bc7b9c148a0bd920c40ecf7e10d8e9a5454d041102d2a65454ac1d1aaea60cb"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "当前是明确标注CM自有统计，不是已恢复的原分类算法。",
+    "acceptance": "原算法/词表/边界未恢复前，保留真实指标但不得标原版一致。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A09",
+    "area": "Agent与提示词",
+    "feature": "长度归一化",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
+      "line": 336,
+      "anchor": "45%",
+      "anchorFound": true,
+      "sha256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/local_checks.go",
+      "line": 112,
+      "anchor": "45",
+      "anchorFound": true,
+      "sha256": "7bc7b9c148a0bd920c40ecf7e10d8e9a5454d041102d2a65454ac1d1aaea60cb"
+    },
+    "evidenceIds": [
+      "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
+    ],
+    "finding": "已补严格超过45%才触发模型；原计字、路由和扩缩策略还未全部恢复。",
+    "acceptance": "44.9/45/45.1%、中英文emoji、扩写与压缩，核对是否触发和实际字数。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A10",
+    "area": "Agent与提示词",
+    "feature": "生产二次确认与文件重读",
+    "status": "合同不同",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCheckpointCard.readable.js",
+      "line": 22,
+      "anchor": "确认创作蓝图",
+      "anchorFound": true,
+      "sha256": "6435dca232cb7ae0197686c7d011e41d070178e18bedcee3db5a285c66a12a20"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/model_confirmation.go",
+      "line": 17,
+      "anchor": "next_model_call",
+      "anchorFound": true,
+      "sha256": "aab82dbc0f1a20c6d0fae3e453a7b2564b58cf260d6e01e924a8bc50cffb6229"
+    },
+    "evidenceIds": [
+      "ev_c04ce66b900162f7d9151b85fbc203b6e1612680f9ac491bb9a38305ee00a4f2"
+    ],
+    "finding": "原是大纲/蓝图/设定后暂停；CM还有逐模型请求确认，含义不同。",
+    "acceptance": "保存资料→继续读新版本；稍后、取消、重复继续各有明确结果。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A11",
+    "area": "Agent与提示词",
+    "feature": "原系统提示词与路由调用次序",
+    "status": "尚未验证",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioPage.readable.js",
+      "line": 307,
+      "anchor": "imitation_short_run",
+      "anchorFound": true,
+      "sha256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac"
+    },
+    "current": {
+      "file": "backend/internal/prompt/novelcreation/definitions.go",
+      "line": 8,
+      "anchor": "FoundationPlan",
+      "anchorFound": true,
+      "sha256": "0fe51c9992da7b88863714f99e710e73271b81e5b337fa1d606d0e7144d0d8e5"
+    },
+    "evidenceIds": [
+      "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389"
+    ],
+    "finding": "当前后端提示词是本项目独立合同，原native完整提示词/实际角色次序没有全部恢复。不能因标签同名就称已配对。",
+    "acceptance": "逐阶段登记原来源、输入变量和输出schema；缺证保留未知，不声称全部复制。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "A12",
+    "area": "Agent与提示词",
+    "feature": "互动世界相关建议与模型配置",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelConfirmCard.readable.js",
+      "line": 38,
+      "anchor": "play_start",
+      "anchorFound": true,
+      "sha256": "c7169b08913cdfe3d94178f1a8e7228a240c5485e5a1903e11379fb40d5afa2b"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AgentPanel.jsx",
+      "line": 34,
+      "anchor": "模型路由",
+      "anchorFound": true,
+      "sha256": "dd6f41f7d6fe0e5a02b2e734561228230bf085076bf90a3ae2e865abed2ab0d9"
+    },
+    "evidenceIds": [
+      "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6"
+    ],
+    "finding": "原建议动作和Agent枚举包含互动世界；当前六入口以外也没有对应完整玩法执行。",
+    "acceptance": "先明确本模块是否纳入互动，再接真实状态推进；不可摆放无功能按钮。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "T01",
+    "area": "自动写作",
+    "feature": "定时写作默认与启停",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelSchedulerPanel.readable.js",
+      "line": 21,
+      "anchor": "Nt(30)",
+      "anchorFound": true,
+      "sha256": "b51c2c9db2f3bded40462b9d838c9517b069730d8de385e1d4ceae5ae38e5a5a"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AutomationPanel.jsx",
+      "line": 19,
+      "anchor": "intervalMinutes: 30",
+      "anchorFound": true,
+      "sha256": "7ed6ef009077701bd3682f195933588cf424d1c2fc8971dd5f4f0e94baad168a"
+    },
+    "evidenceIds": [
+      "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78"
+    ],
+    "finding": "30分钟/每日10/连续失败3的默认方向相符，CM有完整持久任务；原全局调度器状态与CM多计划UI不同。",
+    "acceptance": "启动/暂停/恢复/停止/日限/失败限/重启后状态逐项比较，保存不得误立即生成。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "T02",
+    "area": "自动写作",
+    "feature": "批量写作默认/进度/取消",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelBatchDialog.readable.js",
+      "line": 20,
+      "anchor": "Nt(5)",
+      "anchorFound": true,
+      "sha256": "8fc797a3116c4f82722da5d72398aec422242da253f7ffa6e32dfd0e28b0ea59"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AutomationPanel.jsx",
+      "line": 19,
+      "anchor": "totalChapters: 5",
+      "anchorFound": true,
+      "sha256": "7ed6ef009077701bd3682f195933588cf424d1c2fc8971dd5f4f0e94baad168a"
+    },
+    "evidenceIds": [
+      "ev_33e257223bb78fc6627f919558deacc0208716236a835fbadf616346ed5b0ea2"
+    ],
+    "finding": "默认5章失败3次相符；CM是统一自动任务表单与持久队列，原简洁进度弹窗不同。",
+    "acceptance": "逐章保存计数，取消后不多启动一章，失败重试不重复已完成章。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "T03",
+    "area": "自动写作",
+    "feature": "自动任务引用与冻结",
+    "status": "已有实现待对照",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelSchedulerPanel.readable.js",
+      "line": 8,
+      "anchor": "sessionId",
+      "anchorFound": true,
+      "sha256": "b51c2c9db2f3bded40462b9d838c9517b069730d8de385e1d4ceae5ae38e5a5a"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AutomationPanel.jsx",
+      "line": 25,
+      "anchor": "idempotencyKey",
+      "anchorFound": true,
+      "sha256": "7ed6ef009077701bd3682f195933588cf424d1c2fc8971dd5f4f0e94baad168a"
+    },
+    "evidenceIds": [
+      "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78"
+    ],
+    "finding": "CM已有模型/引用/模式快照、原编号恢复和状态控制；这是可靠性实现，不是原入口形态等价。",
+    "acceptance": "丢回包恢复、修改计划、切会话、资料失效时禁止串模式或重建重复任务。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "D01",
+    "area": "看板与伏笔",
+    "feature": "总章数/总字数/平均字数",
+    "status": "部分实现",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelDashboard.readable.js",
+      "line": 46,
+      "anchor": "平均字数",
+      "anchorFound": true,
+      "sha256": "d773542945a54a3ccd895256d0e0f1262bea1817956515cc364a59c3d3effe62"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 274,
+      "anchor": "dashboard.chapterCount",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_be8f13955c4b618aa7216c588c662fc9a06da71d9d71bbf08485785b45affeca"
+    ],
+    "finding": "CM只有章数/字数/任务数/成功率，缺原平均字数和相同统计口径。",
+    "acceptance": "以已保存章节为基准对照，空/零字数/失败章状态清楚。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "D02",
+    "area": "看板与伏笔",
+    "feature": "章节状态分布与字数趋势图",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelDashboard.readable.js",
+      "line": 54,
+      "anchor": "章节字数趋势",
+      "anchorFound": true,
+      "sha256": "d773542945a54a3ccd895256d0e0f1262bea1817956515cc364a59c3d3effe62"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 274,
+      "anchor": "dashboard.successRate",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_be8f13955c4b618aa7216c588c662fc9a06da71d9d71bbf08485785b45affeca"
+    ],
+    "finding": "CM没有原按章节状态分布条与逐章字数趋势。",
+    "acceptance": "真实章节状态和字数驱动，空数据不显示虚构图形。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "D03",
+    "area": "看板与伏笔",
+    "feature": "伏笔管理与活跃/已解决筛选",
+    "status": "缺失",
+    "priority": "P1",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelHooksPanel.readable.js",
+      "line": 40,
+      "anchor": "已解决",
+      "anchorFound": true,
+      "sha256": "a810cf9c2e40a2035a574370d5979072a9ba73a762722559f3df68ade1b15d40"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 274,
+      "anchor": "dashboard.successRate",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_302e52d1c91af8de1b99d7d632e09980e779dd1033fc540ab699d0bba83fd240"
+    ],
+    "finding": "原看板实际挂载伏笔组件，显示起始/推进/解决；CM看板无该列表和状态合同。",
+    "acceptance": "真实伏笔记录可筛选并追溯章节；没有数据时明确空态。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "Q01",
+    "area": "验收与可靠性",
+    "feature": "已保存数据与失败恢复保护",
+    "status": "已有实现待对照",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelToolSteps.readable.js",
+      "line": 203,
+      "anchor": "重试",
+      "anchorFound": true,
+      "sha256": "7880ab4a851e3421499afc0757099377785a6e91f4f77293672e8dbcbe99a0e8"
+    },
+    "current": {
+      "file": "backend/internal/novelcreation/worker_store.go",
+      "line": 381,
+      "anchor": "save_pending",
+      "anchorFound": true,
+      "sha256": "e383c2b544915e5ea4509a79ada9e8d09600b6532633d4e74aa6aff9f7f0cb9d"
+    },
+    "evidenceIds": [
+      "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96"
+    ],
+    "finding": "持久派发、租约、恢复保存和未知结果保护已做，必须保留；原native同等实现尚未证明。",
+    "acceptance": "数据库落盘、刷新、重复操作、断网、取消后回包、重启恢复逐状态测试。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "Q02",
+    "area": "验收与可靠性",
+    "feature": "主题/图标/同状态截图",
+    "status": "尚未验证",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelCreateIcon.readable.js",
+      "line": 5,
+      "anchor": "__name",
+      "anchorFound": true,
+      "sha256": "616b27c18a260f7e5aa041582b9333c0a0a9b3efd422c371b6059eb654f0103d"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/novel-creation/AgentPanel.css",
+      "line": 3,
+      "anchor": "surface-elevated",
+      "anchorFound": true,
+      "sha256": "b0ff4399942435e1e87b4f9c97c5e08405714ac9531e96fd40e4d5f9b39c95d7"
+    },
+    "evidenceIds": [
+      "ev_ac128bab24fd40b42fd4d98ed478d7987ab33e53ad59fc9a629be4d7c6a15b5e"
+    ],
+    "finding": "当前沿用用户要求的玻璃主题；原模式图标/控件几何与全部弹窗没有完成同状态对照。",
+    "acceptance": "约定保留自家主题，逐页对齐布局、图标、顺序、状态、对比度；不以主题差异掩盖缺控件。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  },
+  {
+    "id": "Q03",
+    "area": "验收与可靠性",
+    "feature": "每个按钮真实效果",
+    "status": "尚未验证",
+    "priority": "P0",
+    "original": {
+      "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelStudioPage.readable.js",
+      "line": 5,
+      "anchor": "__name",
+      "anchorFound": true,
+      "sha256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac"
+    },
+    "current": {
+      "file": "frontend/src/user/pages/NovelCreationPage.jsx",
+      "line": 25,
+      "anchor": "export default",
+      "anchorFound": true,
+      "sha256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb"
+    },
+    "evidenceIds": [
+      "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389"
+    ],
+    "finding": "本轮枚举声明和静态调用，不是原应用每个按钮都运行过；自动测试通过也不等于原/CM完整对照。",
+    "acceptance": "每控件建立页面/前置状态/输入/请求/数据变化/结果/失败/取消/刷新证据，完成后才标已对齐。",
+    "runtimeAcceptance": "本轮未执行原/CM同输入运行对照",
+    "implementation": "待按依赖顺序修复或验收"
+  }
+]

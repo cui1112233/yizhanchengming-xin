@@ -1,0 +1,827 @@
+[
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "evidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "sourceSHA256": "192ef916bb550e4b4fc57dc47df791b89944b7fd7f06887e38d871a4a0ba1b5b",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 34,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 29,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 30,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelBatchDialog.readable.js",
+    "evidenceId": "ev_33e257223bb78fc6627f919558deacc0208716236a835fbadf616346ed5b0ea2",
+    "sourceSHA256": "8fc797a3116c4f82722da5d72398aec422242da253f7ffa6e32dfd0e28b0ea59",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 9,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 7,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 9,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelCheckpointCard.readable.js",
+    "evidenceId": "ev_c04ce66b900162f7d9151b85fbc203b6e1612680f9ac491bb9a38305ee00a4f2",
+    "sourceSHA256": "6435dca232cb7ae0197686c7d011e41d070178e18bedcee3db5a285c66a12a20",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 1,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 1,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 2,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelConfirmCard.readable.js",
+    "evidenceId": "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6",
+    "sourceSHA256": "c7169b08913cdfe3d94178f1a8e7228a240c5485e5a1903e11379fb40d5afa2b",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 1,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 1,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 2,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelCoverPreview.readable.js",
+    "evidenceId": "ev_211c796a4afc9bff054886de1e5c5d45fcd6097d3c4da13cc7db49058205eca2",
+    "sourceSHA256": "65347219a3c4ee9c36f8b4b35bbed9ca3724ff1199f72b059694b222cc73ba1b",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 3,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 3,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 4,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelCreateIcon.readable.js",
+    "evidenceId": "ev_ac128bab24fd40b42fd4d98ed478d7987ab33e53ad59fc9a629be4d7c6a15b5e",
+    "sourceSHA256": "616b27c18a260f7e5aa041582b9333c0a0a9b3efd422c371b6059eb654f0103d",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 1,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 1,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 2,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelDashboard.readable.js",
+    "evidenceId": "ev_be8f13955c4b618aa7216c588c662fc9a06da71d9d71bbf08485785b45affeca",
+    "sourceSHA256": "d773542945a54a3ccd895256d0e0f1262bea1817956515cc364a59c3d3effe62",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 2,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 2,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 3,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelHooksPanel.readable.js",
+    "evidenceId": "ev_302e52d1c91af8de1b99d7d632e09980e779dd1033fc540ab699d0bba83fd240",
+    "sourceSHA256": "a810cf9c2e40a2035a574370d5979072a9ba73a762722559f3df68ade1b15d40",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 4,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 4,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 5,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "evidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "sourceSHA256": "d663478fbbcf4ddf86244cffc786125bc263a47e35ee858fe3281fcb893a5043",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 20,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 15,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 16,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportModal.readable.js",
+    "evidenceId": "ev_45c824e1809bac9bda5c8d0d4b24424f23fa0eb5670da12c20037dad1f60e2c0",
+    "sourceSHA256": "2cd4810cd70bb99d01172044983d5553ae2954fc9c4834e6c685c482f1f13575",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 6,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 5,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 6,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "evidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "sourceSHA256": "51cd3e6e69cc65808929d519e0f71a1bef8d8bfb2f4ae3275e3e718e38a3eba8",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 47,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 38,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 39,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelPanelArtifactView.readable.js",
+    "evidenceId": "ev_dfb2b0f2e292cdea966ed54eab5f50caaef87632a64dc864d21c94652b297573",
+    "sourceSHA256": "98d856d6b53781f08c65420f061fd5cd98ad18dd32e9069abfe9cdeb6797bdea",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 4,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 4,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 5,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelQuickActions.readable.js",
+    "evidenceId": "ev_abaf9c7dc782cc4887b11db79979e7841e5710eeadbc53d0ac7f746eada9deca",
+    "sourceSHA256": "8640014474293b659c461e1c83e6a25d3fc5f899f2b4dfe968a70c79f53461b7",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 2,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 2,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 3,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelSchedulerPanel.readable.js",
+    "evidenceId": "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78",
+    "sourceSHA256": "b51c2c9db2f3bded40462b9d838c9517b069730d8de385e1d4ceae5ae38e5a5a",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 18,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 15,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 16,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStreamingIndicator.readable.js",
+    "evidenceId": "ev_26ce5850aa72920ca6d2301d7ba24b564f3889f1f26d00d5f8ac1162d3555718",
+    "sourceSHA256": "fd0e0adc46c6244d2d5361ee2443bc58f5864c6db583a91d11bb0b04d66a5d58",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 1,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 1,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 2,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "evidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "sourceSHA256": "3e6ef9c9423153c5a26065e15faab03ae192bfee859486aaaf82b88161472ae7",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 19,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 18,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 19,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "evidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "sourceSHA256": "46b7db36883c6d470fb421b5bc3d255889a2758de686803bdd913ab5b5848c38",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 54,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 35,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 40,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioPage.readable.js",
+    "evidenceId": "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389",
+    "sourceSHA256": "b6f8c8f93ea04370e53b1600aa6477b07195d99b0a8e8b8e400663d4ee3915ac",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 268,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 127,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 146,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "evidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "sourceSHA256": "d2731b006d58d55191838675b3d75a17ad85cdb4067c167f658647216d7a70e6",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 19,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 15,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 16,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "evidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "sourceSHA256": "cc0b62b49ff59d2605dbdd22d847c07d5a38e1429910e0206668b6b533d51fd5",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 21,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 20,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 22,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "evidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "sourceSHA256": "7e77ff4e319c1109cac14d9b5968e23a9115b33aef52f49f15f130467dcc53e0",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 26,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 22,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 23,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelThinkingBlock.readable.js",
+    "evidenceId": "ev_fd0f8e9cec3f4907363e4066e0676f2c8b9742aacaea5ebb840d9449605e8c1b",
+    "sourceSHA256": "ef005e52234a03b7d7cf370ad7122ae85b33d092d962247bcd23675e5b15e10c",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 2,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 2,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 3,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelToolSteps.readable.js",
+    "evidenceId": "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96",
+    "sourceSHA256": "7880ab4a851e3421499afc0757099377785a6e91f4f77293672e8dbcbe99a0e8",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 4,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 4,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 5,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "evidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "sourceSHA256": "7db6d5e61e9ad8f36136afd7f93fc820df27254aa4e3ee1e9aa615016fbd7efb",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 180,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 67,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 119,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AgentPanel.jsx",
+    "evidenceId": "ev_540831975c88b999d25450b9c6fea2419a6940dca14d987e18e91af7d25f24f4",
+    "sourceSHA256": "dd6f41f7d6fe0e5a02b2e734561228230bf085076bf90a3ae2e865abed2ab0d9",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 6,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 2,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 6,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AgentRequirements.jsx",
+    "evidenceId": "ev_a925db7eecbfd344d478e0c8e8b8ebbbf9a3dc79bdb068c36f6560744c35d768",
+    "sourceSHA256": "48fd51fc9379000b0bd01c023dd36acce0c88454f2b1a078db653df810910c2d",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 8,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 4,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 8,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "evidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "sourceSHA256": "7ed6ef009077701bd3682f195933588cf424d1c2fc8971dd5f4f0e94baad168a",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 42,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 20,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 27,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\BlueprintEditor.jsx",
+    "evidenceId": "ev_01857e9b25fac83479e54df71aac045b4ced062e592c3b0cb65f67a20c089bef",
+    "sourceSHA256": "9bbccf108b8589159878490158b35a0015613322b9e9c3d463b1c2d5eeb45e22",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 32,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 13,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 21,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "evidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "sourceSHA256": "9ad427b6f73ff30a5bb03419cb05a6c4a3b1b705571a2d9d6662315dfab69c2e",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 34,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 15,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 24,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ContinuationImportDialog.jsx",
+    "evidenceId": "ev_ce2743d0c241d1d241123623512348184ac46b27189b861680756b4655638b4d",
+    "sourceSHA256": "3f5036c0b7aa3a3f860c9be8073d08ac95b3be41b265f1aa4e58eeb3b5c2596a",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 34,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 9,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 23,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "evidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "sourceSHA256": "af10e5346dc366958c0909d2a7d02e68335c534b5c8e549a7d19df811a200316",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 55,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 26,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 37,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\NotesPanel.jsx",
+    "evidenceId": "ev_54a750adfe9a05b43bfb7fa9c1b812300cdd91990041c9fd32ff20a5f25502b8",
+    "sourceSHA256": "cf676187c1ec6963e07dcc292976bf7f213a6520f204a1f6577e08785d86ff78",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 20,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 8,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 15,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  },
+  {
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\RunCard.jsx",
+    "evidenceId": "ev_f2689d81e85e0c7d25d3c6dd70f5d3a4180bdea0bfdab8ff83006d5658e2a7e2",
+    "sourceSHA256": "d58a73eb66b6ff7b4ff4be301ffd36c1d88e604a5bef343f9d35856455a6a908",
+    "stats": {
+      "api_operations": 0,
+      "bundle_modules": 0,
+      "edges": 7,
+      "endpoints": 0,
+      "files": 1,
+      "functions": 4,
+      "ipc_channels": 0,
+      "listed": 1,
+      "modules": 1,
+      "nodes": 7,
+      "paired_channels": 0
+    },
+    "limitations": [
+      {
+        "code": "static_only",
+        "message": "Static reading only: code built at run time (eval, computed requires, remote content) is invisible; IPC pairs need literal channel names."
+      }
+    ]
+  }
+]

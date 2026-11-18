@@ -1,0 +1,1775 @@
+[
+  {
+    "id": "original:NovelAgentSettings.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 273,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"back\"))\n    }, \"← 返回对话\"), n[11] || (n[11] = zr(\"h2\", null, \"Agent 设置\", -1)), n[12] || (n[12] = zr(\"p\", null, \"为各节点指定模型路由（如写作用好模型、审稿用便宜模型）。审稿维度与自定义提示词会注入审稿节点。\", -1))]), Qr(Tt(IB), {\n      ",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 357,
+    "handlerPrefix": "onClick: n[9] || (n[9] = e => g(!0))\n      }, {\n        default: Sn(() => [...(n[30] || (n[30] = [jr(\"全选\", -1)]))]),\n        _: 1\n      }), Qr(Tt(gS), {\n        size: \"tiny\",\n        quaternary: \"\",\n        onClick: n[10",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 364,
+    "handlerPrefix": "onClick: n[10] || (n[10] = e => g(!1))\n      }, {\n        default: Sn(() => [...(n[31] || (n[31] = [jr(\"全不选\", -1)]))]),\n        _: 1\n      })])]), r.value ? Er(\"\", !0) : (Cr(), Ir(\"div\", Jrn, [(Cr(!0), Ir(br, null, Va(f.",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 384,
+    "handlerPrefix": "onClick: k\n      }, {\n        default: Sn(() => [...(n[32] || (n[32] = [jr(\"+ 新增\", -1)]))]),\n        _: 1\n      })]), r.value ? Er(\"\", !0) : (Cr(), Ir(\"div\", tln, [m.value.length ? Er(\"\", !0) : (Cr(), Ir(\"div\", nln, \"暂无自",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 403,
+    "handlerPrefix": "onClick: t => function (e) {\n          u.value = u.value.filter(t => t.id !== e.id);\n        }(e)\n      }, \"删除\", 8, oln)]), Qr(Tt(r_), {\n        value: e.content,\n        type: \"textarea\",\n        autosize: {\n          m",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 420,
+    "handlerPrefix": "onClick: _\n      }, {\n        default: Sn(() => [...(n[34] || (n[34] = [jr(\"+ 新增\", -1)]))]),\n        _: 1\n      })]), r.value ? Er(\"\", !0) : (Cr(), Ir(\"div\", iln, [c.value.length ? Er(\"\", !0) : (Cr(), Ir(\"div\", sln, \"暂无自",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 447,
+    "handlerPrefix": "onClick: t => function (e) {\n          c.value = c.value.filter(t => t.id !== e.id);\n        }(e)\n      }, \"删除\", 8, cln)]), Qr(Tt(r_), {\n        value: e.content,\n        type: \"textarea\",\n        autosize: {\n          m",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelAgentSettings.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelAgentSettings.readable.js",
+    "line": 467,
+    "handlerPrefix": "onClick: b\n    }, {\n      default: Sn(() => [...(n[36] || (n[36] = [jr(\"保存设置\", -1)]))]),\n      _: 1\n    }, 8, [\"loading\", \"disabled\"])])], 2));\n  }\n};\n",
+    "componentEvidenceId": "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelBatchDialog.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelBatchDialog.readable.js",
+    "line": 126,
+    "handlerPrefix": "onClick: v\n        }, {\n          default: Sn(() => [...(n[5] || (n[5] = [jr(\" 取消 \", -1)]))]),\n          _: 1\n        })], 64)) : (Cr(), Ir(br, {\n          key: 0\n        }, [zr(\"label\", fun, [n[2] || (n[2] = zr(\"span\", ",
+    "componentEvidenceId": "ev_33e257223bb78fc6627f919558deacc0208716236a835fbadf616346ed5b0ea2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelBatchDialog.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelBatchDialog.readable.js",
+    "line": 147,
+    "handlerPrefix": "onClick: d\n        }, {\n          default: Sn(() => [...(n[4] || (n[4] = [jr(\" 开始批量写作 \", -1)]))]),\n          _: 1\n        })], 64))], 2)];\n      }),\n      _: 1\n    }, 8, [\"show\", \"closable\", \"mask-closable\"]));\n  }\n};\n",
+    "componentEvidenceId": "ev_33e257223bb78fc6627f919558deacc0208716236a835fbadf616346ed5b0ea2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelCheckpointCard.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelCheckpointCard.readable.js",
+    "line": 33,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"confirm\"))\n    }, Y(l.value), 9, pgn), zr(\"button\", {\n      type: \"button\",\n      class: \"checkpoint-btn secondary\",\n      disabled: e.loading,\n      onClick: n[1] || (n[1] = e => a(\"dism",
+    "componentEvidenceId": "ev_c04ce66b900162f7d9151b85fbc203b6e1612680f9ac491bb9a38305ee00a4f2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelCheckpointCard.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelCheckpointCard.readable.js",
+    "line": 38,
+    "handlerPrefix": "onClick: n[1] || (n[1] = e => a(\"dismiss\"))\n    }, \" 稍后 \", 8, fgn)])]));\n  }\n};\n",
+    "componentEvidenceId": "ev_c04ce66b900162f7d9151b85fbc203b6e1612680f9ac491bb9a38305ee00a4f2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelConfirmCard.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelConfirmCard.readable.js",
+    "line": 96,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"confirm\"))\n    }, Y(c.value), 9, qen), zr(\"button\", {\n      type: \"button\",\n      class: \"confirm-btn confirm-btn-secondary\",\n      disabled: e.loading || e.streaming,\n      onClick: n[1]",
+    "componentEvidenceId": "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelConfirmCard.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelConfirmCard.readable.js",
+    "line": 101,
+    "handlerPrefix": "onClick: n[1] || (n[1] = e => a(\"dismiss\"))\n    }, \"取消\", 8, Ten)]))], 2));\n  }\n};\n",
+    "componentEvidenceId": "ev_102cdd3e022c3d3bcfaa326b4584ea6a3abb5ec4981e5b4c2f0ea3245355dcf6",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelHooksPanel.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelHooksPanel.readable.js",
+    "line": 37,
+    "handlerPrefix": "onClick: t => n.value = e\n    }, Y({\n      active: \"活跃\",\n      resolved: \"已解决\",\n      all: \"全部\"\n    }[e]), 11, Aun)), 64))]), a.value.length ? (Cr(), Ir(\"div\", qun, [(Cr(!0), Ir(br, null, Va(a.value, e => (Cr(), Ir(\"div\"",
+    "componentEvidenceId": "ev_302e52d1c91af8de1b99d7d632e09980e779dd1033fc540ab699d0bba83fd240",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 185,
+    "handlerPrefix": "onClick: M\n      }, \"×\", 8, Rsn)])]), Qr(Tt(IB), {\n        class: \"card-scroll\",\n        style: {\n          maxHeight: \"min(58vh, 520px)\"\n        }\n      }, {\n        default: Sn(() => [zr(\"div\", Msn, [zr(\"div\", Osn, [n[",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 215,
+    "handlerPrefix": "onClick: N\n        }, Y(l.value ? \"正在读取…\" : \"+ 选择文件（docx / txt）\"), 9, qsn), s.value.length ? (Cr(), Ir(\"div\", Tsn, [(Cr(!0), Ir(br, null, Va(s.value, (e, t) => (Cr(), Ir(\"div\", {\n          key: t,\n          class: \"attac",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 222,
+    "handlerPrefix": "onClick: e => {\n            return n = t, void s.value.splice(n, 1);\n            var n;\n          }\n        }, \"×\", 8, Qsn)]))), 128))])) : Er(\"\", !0), s.value.length ? (Cr(), Ir(\"div\", Dsn, \" 文件内容已自动填入上方参考原文，可继续编辑 \")) :",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 243,
+    "handlerPrefix": "onClick: t => {\n            return n = e.value, void (c.value = n);\n            var n;\n          }\n        }, Y(e.label), 11, Esn)), 64))]), n[16] || (n[16] = zr(\"div\", {\n          class: \"field-hint\"\n        }, \"可自由填写字数",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 260,
+    "handlerPrefix": "onClick: t => function (e) {\n            const t = p.value.trim();\n            if (!t) return void (p.value = e);\n            t.split(/[、,，\\s]+/).filter(Boolean).includes(e) || (p.value = `${t}、${e}`);\n          }(e)\n   ",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 293,
+    "handlerPrefix": "onClick: t => function (e) {\n            const t = f.value.indexOf(e);\n            t >= 0 ? f.value.splice(t, 1) : f.value.push(e);\n          }(e)\n        }, Y(e), 11, $sn)), 64))])]), zr(\"div\", Ysn, [n[23] || (n[23] = z",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 329,
+    "handlerPrefix": "onClick: M\n      }, {\n        default: Sn(() => [...(n[26] || (n[26] = [jr(\"取消\", -1)]))]),\n        _: 1\n      }, 8, [\"disabled\"]), Qr(Tt(gS), {\n        type: \"primary\",\n        disabled: !C.value,\n        onClick: G\n    ",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImitationShortDialog.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImitationShortDialog.readable.js",
+    "line": 336,
+    "handlerPrefix": "onClick: G\n      }, {\n        default: Sn(() => [...(n[27] || (n[27] = [jr(\" 开始仿写 \", -1)]))]),\n        _: 1\n      }, 8, [\"disabled\"])])])], 2)]),\n      _: 1\n    }, 8, [\"show\", \"mask-closable\"]));\n  }\n};\n",
+    "componentEvidenceId": "ev_b426eb57fcb7d99a020011ddc75881f8cc0983a7ad3063cf29a21d41f1d42395",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 493,
+    "handlerPrefix": "onClick: le\n    }, \"×\")])])) : (Cr(), Ir(\"header\", Zln, [zr(\"button\", {\n      type: \"button\",\n      class: \"back-btn\",\n      onClick: le\n    }, \"← 返回对话\"), n[26] || (n[26] = zr(\"h2\", null, \"导入素材\", -1)), n[27] || (n[27] = ",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 497,
+    "handlerPrefix": "onClick: le\n    }, \"← 返回对话\"), n[26] || (n[26] = zr(\"h2\", null, \"导入素材\", -1)), n[27] || (n[27] = zr(\"p\", null, \"创建同人、番外、仿写或续写项目，可从文风设置多选参考风格。\", -1))])), q.value ? Er(\"\", !0) : (Cr(), Ir(\"div\", ein, [(Cr(), Ir(br, null, Va(",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 504,
+    "handlerPrefix": "onClick: t => Q.value = e.key\n    }, [zr(\"span\", null, Y(e.label), 1)], 10, tin)), 64))])), Qr(Tt(IB), {\n      class: \"form-scroll\",\n      style: B(q.value ? {\n        maxHeight: \"min(58vh, 520px)\"\n      } : void 0)\n    ",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 537,
+    "handlerPrefix": "onClick: X\n      }, Y(g.value ? \"正在读取…\" : \"+ 选择文件（docx / txt）\"), 9, sin), y.value.length ? (Cr(), Ir(\"div\", uin, [(Cr(!0), Ir(br, null, Va(y.value, (e, t) => (Cr(), Ir(\"div\", {\n        key: t,\n        class: \"attach-item",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 544,
+    "handlerPrefix": "onClick: e => {\n          return n = t, y.value.splice(n, 1), void (y.value.length || (b.value = [], k.value = []));\n          var n;\n        }\n      }, \"×\", 8, din)]))), 128))])) : Er(\"\", !0), y.value.length && !E.value",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 554,
+    "handlerPrefix": "onClick: n[2] || (n[2] = e => $(3))\n      }, \"最近3章\", 2)) : Er(\"\", !0), zr(\"button\", {\n        type: \"button\",\n        class: K([\"chapter-chip\", {\n          active: 5 === V.value\n        }]),\n        onClick: n[3] || (n[3",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 560,
+    "handlerPrefix": "onClick: n[3] || (n[3] = e => $(5))\n      }, \"最近5章\", 2), b.value.length > 10 ? (Cr(), Ir(\"button\", {\n        key: 1,\n        type: \"button\",\n        class: K([\"chapter-chip\", {\n          active: 10 === V.value\n        }]",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 567,
+    "handlerPrefix": "onClick: n[4] || (n[4] = e => $(10))\n      }, \"最近10章\", 2)) : Er(\"\", !0), zr(\"button\", {\n        type: \"button\",\n        class: K([\"chapter-chip outline\", {\n          active: \"custom\" === V.value\n        }]),\n        onCl",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:9",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 573,
+    "handlerPrefix": "onClick: te\n      }, \"选择章节\", 2)]), zr(\"div\", hin, [jr(\" 共识别 \" + Y(b.value.length) + \" 章 · 已选择 \", 1), zr(\"strong\", null, Y(F.value.count), 1), n[32] || (n[32] = jr(\" 章，共 \", -1)), zr(\"strong\", null, Y(F.value.totalWords.to",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:10",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 605,
+    "handlerPrefix": "onClick: t => {\n          return n = e.value, void (_.value = n);\n          var n;\n        }\n      }, Y(e.label), 11, qin)), 64))]), n[44] || (n[44] = zr(\"div\", {\n        class: \"field-hint\"\n      }, \"可自由填写每章字数，也可点选常用字数\"",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:11",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 628,
+    "handlerPrefix": "onClick: t => S.value = e.value\n      }, Y(e.label), 11, Qin)), 64))]), n[46] || (n[46] = zr(\"div\", {\n        class: \"field-hint\"\n      }, \"长篇默认 100 章，可按需调整\", -1))])]), zr(\"div\", Din, [n[47] || (n[47] = zr(\"label\", null,",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:12",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 642,
+    "handlerPrefix": "onClick: t => function (e) {\n          const t = C.value.trim();\n          if (!t) return void (C.value = e);\n          t.split(/[、,，\\s]+/).filter(Boolean).includes(e) || (C.value = `${t}、${e}`);\n        }(e)\n      }, Y(",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:13",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 778,
+    "handlerPrefix": "onClick: le\n    }, {\n      default: Sn(() => [...(n[61] || (n[61] = [jr(\"取消\", -1)]))]),\n      _: 1\n    })) : Er(\"\", !0), Qr(Tt(gS), {\n      type: \"primary\",\n      loading: l.value,\n      class: \"submit-btn\",\n      onClic",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:14",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 786,
+    "handlerPrefix": "onClick: ie\n    }, {\n      default: Sn(() => [jr(Y(L.value), 1)]),\n      _: 1\n    }, 8, [\"loading\"])], 2)], 2), Qr(Tt(wA), {\n      show: x.value,\n      \"onUpdate:show\": n[25] || (n[25] = e => x.value = e),\n      \"auto-fo",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:15",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 808,
+    "handlerPrefix": "onClick: n[22] || (n[22] = e => x.value = !1)\n      }, \"×\")]), zr(\"div\", fsn, [zr(\"button\", {\n        type: \"button\",\n        class: \"cd-action-btn\",\n        onClick: ae\n      }, \" 全选 \" + Y(b.value.length) + \" 章 \", 1), z",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:16",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 812,
+    "handlerPrefix": "onClick: ae\n      }, \" 全选 \" + Y(b.value.length) + \" 章 \", 1), zr(\"button\", {\n        type: \"button\",\n        class: \"cd-action-btn\",\n        onClick: oe\n      }, \"清空\")]), Qr(Tt(IB), {\n        class: \"chapter-dialog-scroll",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:17",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 816,
+    "handlerPrefix": "onClick: oe\n      }, \"清空\")]), Qr(Tt(IB), {\n        class: \"chapter-dialog-scroll\",\n        style: {\n          maxHeight: \"min(50vh, 400px)\"\n        }\n      }, {\n        default: Sn(() => [zr(\"div\", msn, [(Cr(!0), Ir(br, ",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:18",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 828,
+    "handlerPrefix": "onClick: Zi(e => ne(t), [\"prevent\"])\n        }, [Qr(Tt(aM), {\n          checked: w.value.includes(t),\n          onClick: n[23] || (n[23] = Zi(() => {}, [\"stop\"])),\n          \"onUpdate:checked\": e => ne(t)\n        }, null",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:19",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 831,
+    "handlerPrefix": "onClick: n[23] || (n[23] = Zi(() => {}, [\"stop\"])),\n          \"onUpdate:checked\": e => ne(t)\n        }, null, 8, [\"checked\", \"onUpdate:checked\"]), zr(\"span\", Wsn, Y(e.title), 1), zr(\"span\", gsn, Y((e.wordCount || 0).toLo",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:20",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 841,
+    "handlerPrefix": "onClick: n[24] || (n[24] = e => x.value = !1)\n      }, {\n        default: Sn(() => [...(n[65] || (n[65] = [jr(\"取消\", -1)]))]),\n        _: 1\n      }), Qr(Tt(gS), {\n        type: \"primary\",\n        onClick: re\n      }, {\n  ",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelImportPage.readable.js:21",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelImportPage.readable.js",
+    "line": 847,
+    "handlerPrefix": "onClick: re\n      }, {\n        default: Sn(() => [...(n[66] || (n[66] = [jr(\"确认选择\", -1)]))]),\n        _: 1\n      })])])], 2)]),\n      _: 1\n    }, 8, [\"show\"])], 64));\n  }\n};\n",
+    "componentEvidenceId": "ev_44444b0ca9c841035b5ef993ec6135bee1ff91566401f9746aaa8115c6e9cc5e",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelPanelArtifactView.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelPanelArtifactView.readable.js",
+    "line": 52,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"back\"))\n    }, [Qr(Tt($I), {\n      component: Tt(yU),\n      size: 16\n    }, null, 8, [\"component\"])]), zr(\"span\", Znn, Y(e.title || \"资料详情\"), 1), zr(\"div\", Xnn, [e.readOnly || e.loading ||",
+    "componentEvidenceId": "ev_dfb2b0f2e292cdea966ed54eab5f50caaef87632a64dc864d21c94652b297573",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelPanelArtifactView.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelPanelArtifactView.readable.js",
+    "line": 65,
+    "handlerPrefix": "onClick: s\n    }, [e.saving ? (Cr(), Nr(Tt(VB), {\n      key: 0,\n      size: 14\n    })) : (Cr(), Nr(Tt($I), {\n      key: 1,\n      component: Tt(xJ),\n      size: 15\n    }, null, 8, [\"component\"]))], 8, $nn), zr(\"button\", {",
+    "componentEvidenceId": "ev_dfb2b0f2e292cdea966ed54eab5f50caaef87632a64dc864d21c94652b297573",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelPanelArtifactView.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelPanelArtifactView.readable.js",
+    "line": 77,
+    "handlerPrefix": "onClick: i\n    }, [Qr(Tt($I), {\n      component: Tt(eH),\n      size: 15\n    }, null, 8, [\"component\"])])], 64)) : (Cr(), Ir(\"button\", {\n      key: 0,\n      type: \"button\",\n      class: \"icon-btn\",\n      title: \"编辑\",\n    ",
+    "componentEvidenceId": "ev_dfb2b0f2e292cdea966ed54eab5f50caaef87632a64dc864d21c94652b297573",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelPanelArtifactView.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelPanelArtifactView.readable.js",
+    "line": 86,
+    "handlerPrefix": "onClick: l\n    }, [Qr(Tt($I), {\n      component: Tt($H),\n      size: 15\n    }, null, 8, [\"component\"])]))], 64))])]), Qr(Tt(IB), {\n      class: \"artifact-scroll\"\n    }, {\n      default: Sn(() => [e.loading ? (Cr(), Ir(\"d",
+    "componentEvidenceId": "ev_dfb2b0f2e292cdea966ed54eab5f50caaef87632a64dc864d21c94652b297573",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelQuickActions.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelQuickActions.readable.js",
+    "line": 44,
+    "handlerPrefix": "onClick: e => {\n        var a;\n        \"write-next\" === (a = t.key) ? n(\"write-next\") : \"write-batch\" === a ? n(\"write-batch\") : \"audit\" === a ? n(\"audit\") : \"revise\" === a && n(\"revise\");\n      }\n    }, Y(t.label), 11, ",
+    "componentEvidenceId": "ev_abaf9c7dc782cc4887b11db79979e7841e5710eeadbc53d0ac7f746eada9deca",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelSchedulerPanel.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelSchedulerPanel.readable.js",
+    "line": 165,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"back\"))\n      }, \"← 返回\"), n[4] || (n[4] = zr(\"h3\", null, \"自动写作调度器\", -1))]), zr(\"div\", kun, [zr(\"div\", xun, [n[5] || (n[5] = zr(\"span\", null, \"状态：\", -1)), Qr(Tt(uw), {\n        type: v.valu",
+    "componentEvidenceId": "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelSchedulerPanel.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelSchedulerPanel.readable.js",
+    "line": 176,
+    "handlerPrefix": "onClick: h\n      }, {\n        default: Sn(() => {\n          var e;\n          return [jr(Y(\"paused\" === (null == (e = l.value) ? void 0 : e.status) ? \"恢复\" : \"暂停\"), 1)];\n        }),\n        _: 1\n      }, 8, [\"loading\"]), Q",
+    "componentEvidenceId": "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelSchedulerPanel.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelSchedulerPanel.readable.js",
+    "line": 186,
+    "handlerPrefix": "onClick: m\n      }, {\n        default: Sn(() => [...(n[10] || (n[10] = [jr(\"停止\", -1)]))]),\n        _: 1\n      }, 8, [\"loading\"])])) : (Cr(), Ir(\"div\", Sun, [zr(\"label\", Cun, [n[6] || (n[6] = zr(\"span\", null, \"写作间隔（分钟）\", ",
+    "componentEvidenceId": "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelSchedulerPanel.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelSchedulerPanel.readable.js",
+    "line": 212,
+    "handlerPrefix": "onClick: f\n      }, {\n        default: Sn(() => [...(n[9] || (n[9] = [jr(\"启动调度器\", -1)]))]),\n        _: 1\n      }, 8, [\"loading\"])])), (null == (g = l.value) ? void 0 : g.nextWriteIn) > 0 ? (Cr(), Ir(\"div\", Oun, \" 下次写作：约 ",
+    "componentEvidenceId": "ev_e211619bb2d8329389490dfb96eaabcf5c12ad4c62eaae69f218763086441f78",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 214,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"update:collapsed\", !0))\n      }, \"−\")]), Qr(Tt(IB), {\n        class: \"panel-scroll\"\n      }, {\n        default: Sn(() => [zr(\"section\", wan, [zr(\"button\", {\n          type: \"button\",\n    ",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 221,
+    "handlerPrefix": "onClick: n[1] || (n[1] = e => g(\"chapters\"))\n        }, [Qr(Tt($I), {\n          component: c.value.chapters ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[6] || (n[6] = zr(\"span\", null, \"章节\",",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 229,
+    "handlerPrefix": "onClick: t => function (e) {\n            b({\n              type: \"chapter\",\n              chapterNumber: e.number,\n              title: `第 ${e.number} 章 ${e.title}`\n            });\n          }(e)\n        }, [Qr(Tt($I), {",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 243,
+    "handlerPrefix": "onClick: Zi(t => function (e) {\n            b({\n              type: \"chapter\",\n              chapterNumber: e.number,\n              title: `第 ${e.number} 章 ${e.title}`,\n              autoEdit: !0\n            });\n        ",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 257,
+    "handlerPrefix": "onClick: n[2] || (n[2] = e => g(\"characters\"))\n        }, [Qr(Tt($I), {\n          component: c.value.characters ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[7] || (n[7] = zr(\"span\", null, \"",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 266,
+    "handlerPrefix": "onClick: t => function (e) {\n              b({\n                type: \"character\",\n                key: e.path.replace(/\\.md$/, \"\"),\n                title: e.name\n              });\n            }(e)\n          }, [Qr(Tt($I)",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 283,
+    "handlerPrefix": "onClick: n[3] || (n[3] = e => g(\"foundation\"))\n        }, [Qr(Tt($I), {\n          component: c.value.foundation ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[8] || (n[8] = zr(\"span\", null, \"",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 291,
+    "handlerPrefix": "onClick: t => function (e) {\n            b({\n              type: \"foundation\",\n              key: e.key,\n              title: e.label\n            });\n          }(e)\n        }, [Qr(Tt($I), {\n          component: Tt(FZ),\n ",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:9",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 305,
+    "handlerPrefix": "onClick: Zi(t => function (e) {\n            b({\n              type: \"foundation\",\n              key: e.key,\n              title: e.label,\n              autoEdit: !0\n            });\n          }(e), [\"stop\"])\n        }, [Q",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:10",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 319,
+    "handlerPrefix": "onClick: n[4] || (n[4] = e => g(\"covers\"))\n        }, [Qr(Tt($I), {\n          component: c.value.covers ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[9] || (n[9] = zr(\"span\", null, \"封面资源\", -",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:11",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 333,
+    "handlerPrefix": "onClick: n[5] || (n[5] = e => g(\"worldview\"))\n        }, [Qr(Tt($I), {\n          component: c.value.worldview ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[10] || (n[10] = zr(\"span\", null, \"",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioBookPanel.readable.js:12",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioBookPanel.readable.js",
+    "line": 340,
+    "handlerPrefix": "onClick: k\n        }, \"查看完整设定 →\")], 512), [[Xl, c.value.worldview]])])]),\n        _: 1\n      })], 64)) : (Cr(), Nr(nan, {\n        key: 1,\n        title: h.value,\n        content: i.value,\n        loading: s.value,\n      ",
+    "componentEvidenceId": "ev_57fcade461d98616e319bdeaf303708e9edb8790a5cec2879bd6dfaeb5b50d77",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 365,
+    "handlerPrefix": "onClick: e => pe(t, o)\n        }, [r.value === ce(t, o) ? (Cr(), Nr(Tt($I), {\n          key: 0,\n          component: Tt(xJ),\n          size: 14\n        }, null, 8, [\"component\"])) : (Cr(), Nr(Tt($I), {\n          key: 1,\n",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 384,
+    "handlerPrefix": "onClick: e => fe(t)\n        }, [Qr(Tt($I), {\n          component: Tt(L5),\n          size: 14\n        }, null, 8, [\"component\"])], 8, rnn)]),\n        default: Sn(() => [n[32] || (n[32] = jr(\" 存档 \", -1))]),\n        _: 2\n  ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 403,
+    "handlerPrefix": "onClick: n[0] || (n[0] = Zi(() => {}, [\"stop\"]))\n          }, [Qr(Tt($I), {\n            component: Tt(k8),\n            size: 14\n          }, null, 8, [\"component\"])])]),\n          default: Sn(() => [n[33] || (n[33] = jr(",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 446,
+    "handlerPrefix": "onClick: e => pe(t, o)\n        }, [r.value === ce(t, o) ? (Cr(), Nr(Tt($I), {\n          key: 0,\n          component: Tt(xJ),\n          size: 14\n        }, null, 8, [\"component\"])) : (Cr(), Nr(Tt($I), {\n          key: 1,\n",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 465,
+    "handlerPrefix": "onClick: e => fe(t)\n        }, [Qr(Tt($I), {\n          component: Tt(L5),\n          size: 14\n        }, null, 8, [\"component\"])], 8, dnn)]),\n        default: Sn(() => [n[35] || (n[35] = jr(\" 存档 \", -1))]),\n        _: 2\n  ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 484,
+    "handlerPrefix": "onClick: n[3] || (n[3] = Zi(() => {}, [\"stop\"]))\n          }, [Qr(Tt($I), {\n            component: Tt(k8),\n            size: 14\n          }, null, 8, [\"component\"])])]),\n          default: Sn(() => [n[36] || (n[36] = jr(",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 523,
+    "handlerPrefix": "onClick: he\n        }, [\"__streaming__\" === r.value ? (Cr(), Nr(Tt($I), {\n          key: 0,\n          component: Tt(xJ),\n          size: 14\n        }, null, 8, [\"component\"])) : (Cr(), Nr(Tt($I), {\n          key: 1,\n    ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 577,
+    "handlerPrefix": "onClick: t => function (e) {\n          var t;\n          const n = i.value;\n          if (!n) return;\n          const a = null == (t = n.$el) ? void 0 : t.querySelector(\".n-scrollbar-container\");\n          if (!a) return;",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:9",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 623,
+    "handlerPrefix": "onClick: ue\n    }, [zr(\"span\", {\n      class: \"model-trigger-icon\",\n      innerHTML: Tt(hme)(e.selectedModel)\n    }, null, 8, Rnn), zr(\"span\", Mnn, Y(X.value), 1), $.value ? (Cr(), Ir(\"span\", {\n      key: 0,\n      class:",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:10",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 640,
+    "handlerPrefix": "onClick: n[15] || (n[15] = e => f.value = !f.value)\n    }, [...(n[41] || (n[41] = [zr(\"svg\", {\n      width: \"18\",\n      height: \"18\",\n      viewBox: \"0 0 1024 1024\",\n      fill: \"currentColor\"\n    }, [zr(\"path\", {\n      ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:11",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 661,
+    "handlerPrefix": "onClick: n[16] || (n[16] = t => {\n        a(\"update:thinkingAutoExpand\", !e.thinkingAutoExpand), f.value = !1;\n      })\n    }, [...(n[42] || (n[42] = [zr(\"div\", {\n      class: \"thinking-switch-thumb\"\n    }, null, -1)]))]",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:12",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 669,
+    "handlerPrefix": "onClick: n[17] || (n[17] = e => f.value = !1)\n    })) : Er(\"\", !0)]), zr(\"div\", Nnn, [Qr(Tt(PI), {\n      trigger: \"hover\",\n      placement: \"top\"\n    }, {\n      trigger: Sn(() => [zr(\"button\", {\n        class: \"tb-icon-b",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:13",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 676,
+    "handlerPrefix": "onClick: n[18] || (n[18] = e => h.value = !h.value)\n      }, [Qr(Tt($I), {\n        component: Tt(e2),\n        size: 18\n      }, null, 8, [\"component\"])])]),\n      default: Sn(() => [jr(\" 上下文长度: \" + Y(g.value), 1)]),\n    ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:14",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 690,
+    "handlerPrefix": "onClick: ie\n    }, [zr(\"div\", {\n      class: \"ctx-slider-fill\",\n      style: B({\n        width: y.value + \"%\"\n      })\n    }, null, 4), zr(\"div\", {\n      class: \"ctx-slider-thumb\",\n      style: B({\n        left: y.value ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:15",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 702,
+    "handlerPrefix": "onClick: n[19] || (n[19] = e => m.value = 1e5)\n    }, \"100k\"), zr(\"span\", {\n      onClick: n[20] || (n[20] = e => m.value = 2e5)\n    }, \"200k\"), zr(\"span\", {\n      onClick: n[21] || (n[21] = e => m.value = 3e5)\n    }, \"3",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:16",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 704,
+    "handlerPrefix": "onClick: n[20] || (n[20] = e => m.value = 2e5)\n    }, \"200k\"), zr(\"span\", {\n      onClick: n[21] || (n[21] = e => m.value = 3e5)\n    }, \"300k\"), zr(\"span\", {\n      onClick: n[22] || (n[22] = e => m.value = 4e5)\n    }, \"4",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:17",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 706,
+    "handlerPrefix": "onClick: n[21] || (n[21] = e => m.value = 3e5)\n    }, \"300k\"), zr(\"span\", {\n      onClick: n[22] || (n[22] = e => m.value = 4e5)\n    }, \"400k\"), zr(\"span\", {\n      onClick: n[23] || (n[23] = e => m.value = 1e6)\n    }, \"1",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:18",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 708,
+    "handlerPrefix": "onClick: n[22] || (n[22] = e => m.value = 4e5)\n    }, \"400k\"), zr(\"span\", {\n      onClick: n[23] || (n[23] = e => m.value = 1e6)\n    }, \"1m\"), zr(\"span\", {\n      onClick: n[24] || (n[24] = e => m.value = Unn)\n    }, [Qr(",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:19",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 710,
+    "handlerPrefix": "onClick: n[23] || (n[23] = e => m.value = 1e6)\n    }, \"1m\"), zr(\"span\", {\n      onClick: n[24] || (n[24] = e => m.value = Unn)\n    }, [Qr(Tt($I), {\n      component: Tt(HY),\n      size: 14\n    }, null, 8, [\"component\"])])",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:20",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 712,
+    "handlerPrefix": "onClick: n[24] || (n[24] = e => m.value = Unn)\n    }, [Qr(Tt($I), {\n      component: Tt(HY),\n      size: 14\n    }, null, 8, [\"component\"])])])], 2)) : Er(\"\", !0), h.value ? (Cr(), Ir(\"div\", {\n      key: 1,\n      class: \"",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:21",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 719,
+    "handlerPrefix": "onClick: n[25] || (n[25] = e => h.value = !1)\n    })) : Er(\"\", !0)]), Qr(Tt(PI), {\n      trigger: \"hover\",\n      placement: \"top\"\n    }, {\n      trigger: Sn(() => [zr(\"button\", {\n        class: \"tb-icon-btn\",\n        onC",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:22",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 726,
+    "handlerPrefix": "onClick: se\n      }, [Qr(Tt($I), {\n        component: Tt(V5),\n        size: 18\n      }, null, 8, [\"component\"])])]),\n      default: Sn(() => [n[45] || (n[45] = jr(\" 清除上下文 (Ctrl+K) \", -1))]),\n      _: 1\n    })]), zr(\"div\"",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:23",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 737,
+    "handlerPrefix": "onClick: n[26] || (n[26] = e => a(\"cancel\"))\n    }, [...(n[46] || (n[46] = [zr(\"svg\", {\n      width: \"16\",\n      height: \"16\",\n      viewBox: \"0 0 24 24\",\n      fill: \"currentColor\"\n    }, [zr(\"rect\", {\n      x: \"6\",\n   ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:24",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 756,
+    "handlerPrefix": "onClick: re\n    }, [Qr(Tt($I), {\n      component: Tt(BU),\n      size: 18\n    }, null, 8, [\"component\"])], 10, znn))])])])])])]), Qr(Tt(wA), {\n      show: c.value,\n      \"onUpdate:show\": n[29] || (n[29] = e => c.value = e",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:25",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 785,
+    "handlerPrefix": "onClick: n[28] || (n[28] = e => c.value = !1)\n      }, [Qr(Tt($I), {\n        component: Tt(eH),\n        size: 16\n      }, null, 8, [\"component\"])])]), zr(\"div\", Dnn, [(Cr(!0), Ir(br, null, Va(Tt(p), e => (Cr(), Ir(\"butto",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:26",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 796,
+    "handlerPrefix": "onClick: t => {\n          return n = e.key, void (v.value = v.value === n ? \"\" : n);\n          var n;\n        }\n      }, Y(e.label), 11, Lnn))), 128))]), zr(\"div\", jnn, [(Cr(!0), Ir(br, null, Va(te.value, t => (Cr(), Ir(",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioChat.readable.js:27",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioChat.readable.js",
+    "line": 805,
+    "handlerPrefix": "onClick: e => {\n          return n = t.value, a(\"update:selectedModel\", n), void (c.value = !1);\n          var n;\n        }\n      }, [zr(\"span\", {\n        class: \"model-item-icon\",\n        innerHTML: Tt(hme)(t.value)\n   ",
+    "componentEvidenceId": "ev_c8f870165cdb6b93d6ea769b6f375f89f2bc463ef2bca39ad8483107ba6c7b33",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioPage.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioPage.readable.js",
+    "line": 1305,
+    "handlerPrefix": "onClick: () => async function (e, t) {\n            a.destroyAll();\n            try {\n              const a = await async function (e, t = \"md\") {\n                var n, a;\n                const o = \"#MCr\",\n              ",
+    "componentEvidenceId": "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioPage.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioPage.readable.js",
+    "line": 1565,
+    "handlerPrefix": "onClick: n[4] || (n[4] = e => ee.value = !1)\n      }, Y(pe.value), 1)])) : Er(\"\", !0), ve.value && !ee.value ? (Cr(), Ir(br, {\n        key: 1\n      }, [zr(\"div\", {\n        class: \"panel-resizer\",\n        onMousedown: ne\n",
+    "componentEvidenceId": "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioPage.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioPage.readable.js",
+    "line": 1622,
+    "handlerPrefix": "onClick: We\n      }, \"← 返回\"), n[16] || (n[16] = zr(\"span\", {\n        class: \"panel-page-title\"\n      }, \"定时写作\", -1))]), zr(\"div\", qgn, [Qr(Nun, {\n        \"book-id\": g.value,\n        \"is-dark-mode\": e.isDarkMode\n      }, ",
+    "componentEvidenceId": "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioPage.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioPage.readable.js",
+    "line": 1632,
+    "handlerPrefix": "onClick: We\n      }, \"← 返回\"), n[17] || (n[17] = zr(\"span\", {\n        class: \"panel-page-title\"\n      }, \"数据看板\", -1))]), zr(\"div\", zgn, [Qr(scn, {\n        chapters: (null == (S = p.value) ? void 0 : S.chapters) || [],\n   ",
+    "componentEvidenceId": "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioPage.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioPage.readable.js",
+    "line": 1697,
+    "handlerPrefix": "onClick: n[15] || (n[15] = Zi(e => re.value = !1, [\"self\"]))\n        }, [zr(\"div\", {\n          class: K([\"memo-popup\", {\n            \"is-dark\": e.isDarkMode\n          }])\n        }, [Qr(sgn, {\n          ref_key: \"noteboo",
+    "componentEvidenceId": "ev_ab1ec87d7b639d8eed18d18b284304d936f4768662c24fb4262eae196ac6a389",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 176,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"update:collapsed\", !0))\n      }, \"−\")]), Qr(Tt(IB), {\n        class: \"panel-scroll\"\n      }, {\n        default: Sn(() => [m.value ? (Cr(), Ir(\"section\", $an, [zr(\"div\", Yan, [n[5] || (n[5",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 189,
+    "handlerPrefix": "onClick: n[1] || (n[1] = e => g(\"chapters\"))\n        }, [Qr(Tt($I), {\n          component: c.value.chapters ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[6] || (n[6] = zr(\"span\", null, \"章节结构",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 197,
+    "handlerPrefix": "onClick: t => x({\n            key: \"final/full.md\",\n            title: e.title\n          })\n        }, [Qr(Tt($I), {\n          component: Tt(FZ),\n          size: 14\n        }, null, 8, [\"component\"]), zr(\"span\", aon, Y(e",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 207,
+    "handlerPrefix": "onClick: n[2] || (n[2] = e => g(\"outline\"))\n        }, [Qr(Tt($I), {\n          component: c.value.outline ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[7] || (n[7] = zr(\"span\", null, \"大纲\", -",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 215,
+    "handlerPrefix": "onClick: w\n        }, \" 查看完整大纲 → \")) : Er(\"\", !0)], 512), [[Xl, c.value.outline]])]), zr(\"section\", con, [zr(\"button\", {\n          type: \"button\",\n          class: \"section-head\",\n          onClick: n[3] || (n[3] = e => ",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 219,
+    "handlerPrefix": "onClick: n[3] || (n[3] = e => g(\"artifacts\"))\n        }, [Qr(Tt($I), {\n          component: c.value.artifacts ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[8] || (n[8] = zr(\"span\", null, \"成品",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 227,
+    "handlerPrefix": "onClick: t => x(e)\n        }, [Qr(Tt($I), {\n          component: Tt(FZ),\n          size: 14\n        }, null, 8, [\"component\"]), zr(\"span\", pon, Y(e.label), 1), zr(\"button\", {\n          type: \"button\",\n          class: \"r",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 235,
+    "handlerPrefix": "onClick: Zi(t => function (e) {\n            b({\n              key: e.key,\n              title: e.label || e.title || \"文件\",\n              autoEdit: !0\n            });\n          }(e), [\"stop\"])\n        }, [Qr(Tt($I), {\n   ",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:9",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 248,
+    "handlerPrefix": "onClick: n[4] || (n[4] = e => g(\"sales\"))\n        }, [Qr(Tt($I), {\n          component: c.value.sales ? Tt(OJ) : Tt(AJ),\n          size: 14\n        }, null, 8, [\"component\"]), n[9] || (n[9] = zr(\"span\", null, \"推荐\", -1))]",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioShortPanel.readable.js:10",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioShortPanel.readable.js",
+    "line": 255,
+    "handlerPrefix": "onClick: _\n        }, \"查看完整推荐 →\")], 512), [[Xl, c.value.sales]])])) : Er(\"\", !0)]),\n        _: 1\n      })], 64)) : (Cr(), Nr(nan, {\n        key: 1,\n        title: W.value,\n        content: i.value,\n        loading: s.val",
+    "componentEvidenceId": "ev_2f63a1a6c767459a08e9d2564878542c7079a7af0b80d1f45a185411ac6f59ba",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 255,
+    "handlerPrefix": "onClick: e => function (e) {\n        if (\"imitation-short\" === e.key) return a(\"switch-workflow\", \"imitation-short\"), void a(\"open-imitation-short\");\n        a(\"switch-workflow\", e.key), \"short\" !== e.key && \"book-create",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 265,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => o.value = !o.value)\n    }, [Qr(Tt($I), {\n      component: Tt(AJ),\n      size: 12,\n      class: K({\n        rotated: o.value\n      })\n    }, null, 8, [\"component\", \"class\"]), n[4] || (n[4] = ",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 277,
+    "handlerPrefix": "onClick: e => a(\"toggle-book\", t.id)\n    }, [Qr(Tt($I), {\n      component: Tt(AJ),\n      size: 12,\n      class: K({\n        rotated: e.expandedBooks[t.id]\n      })\n    }, null, 8, [\"component\", \"class\"])], 8, Y9t), zr(\"b",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 288,
+    "handlerPrefix": "onClick: e => a(\"open-book\", t.id)\n    }, [Qr(Tt($I), {\n      component: Tt(C$),\n      size: 14\n    }, null, 8, [\"component\"]), zr(\"span\", ten, Y(t.title), 1)], 10, een), zr(\"span\", nen, [zr(\"button\", {\n      class: \"ico",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 295,
+    "handlerPrefix": "onClick: Zi(e => a(\"rename-book\", t), [\"stop\"])\n    }, [Qr(Tt($I), {\n      component: Tt(k2),\n      size: 12\n    }, null, 8, [\"component\"])], 8, aen), zr(\"button\", {\n      class: \"icon-btn\",\n      title: \"导出\",\n      onCl",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 302,
+    "handlerPrefix": "onClick: Zi(e => a(\"export-book\", t), [\"stop\"])\n    }, [Qr(Tt($I), {\n      component: Tt(aX),\n      size: 12\n    }, null, 8, [\"component\"])], 8, oen), zr(\"button\", {\n      class: \"icon-btn danger\",\n      title: \"删除\",\n   ",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 309,
+    "handlerPrefix": "onClick: Zi(e => a(\"delete-book\", t), [\"stop\"])\n    }, [Qr(Tt($I), {\n      component: Tt(k8),\n      size: 12\n    }, null, 8, [\"component\"])], 8, ren)])]), e.expandedBooks[t.id] ? (Cr(), Ir(\"div\", len, [(e.bookSessions[t.",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:8",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 320,
+    "handlerPrefix": "onClick: e => a(\"open-session\", t.id)\n    }, [u(t.id) ? (Cr(), Ir(\"span\", uen)) : Er(\"\", !0), Qr(b9t, {\n      name: v(t),\n      size: 16\n    }, null, 8, [\"name\"]), zr(\"span\", cen, Y(p(t)), 1)], 10, sen)]))), 128)), zr(\"b",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:9",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 326,
+    "handlerPrefix": "onClick: e => a(\"create-book-session\", t.id)\n    }, [Qr(Tt($I), {\n      component: Tt(FV),\n      size: 12\n    }, null, 8, [\"component\"]), n[5] || (n[5] = zr(\"span\", null, \"新建会话\", -1))], 8, den)])) : Er(\"\", !0)]))), 128))",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:10",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 333,
+    "handlerPrefix": "onClick: n[1] || (n[1] = e => r.value = !r.value)\n    }, [Qr(Tt($I), {\n      component: Tt(AJ),\n      size: 12,\n      class: K({\n        rotated: r.value\n      })\n    }, null, 8, [\"component\", \"class\"]), n[6] || (n[6] = ",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:11",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 347,
+    "handlerPrefix": "onClick: e => a(\"open-session\", t.id)\n    }, [u(t.id) ? (Cr(), Ir(\"span\", hen)) : Er(\"\", !0), Qr(b9t, {\n      name: v(t),\n      size: 16\n    }, null, 8, [\"name\"]), zr(\"span\", Wen, Y(p(t)), 1), zr(\"span\", gen, Y(f(t.updat",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:12",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 353,
+    "handlerPrefix": "onClick: Zi(e => a(\"rename-session\", t), [\"stop\"])\n    }, [Qr(Tt($I), {\n      component: Tt(k2),\n      size: 12\n    }, null, 8, [\"component\"])], 8, ben), zr(\"button\", {\n      class: \"icon-btn danger\",\n      onClick: Zi(e",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:13",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 359,
+    "handlerPrefix": "onClick: Zi(e => a(\"delete-session\", t), [\"stop\"])\n    }, [Qr(Tt($I), {\n      component: Tt(k8),\n      size: 12\n    }, null, 8, [\"component\"])], 8, ken)])], 10, men)]))), 128)), zr(\"button\", {\n      class: \"session-item ",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:14",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 365,
+    "handlerPrefix": "onClick: n[2] || (n[2] = t => a(\"create-session\", e.activeWorkflow))\n    }, [Qr(Tt($I), {\n      component: Tt(FV),\n      size: 12\n    }, null, 8, [\"component\"]), n[7] || (n[7] = zr(\"span\", null, \"新建会话\", -1))])], 512), [[",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStudioSidebar.readable.js:15",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStudioSidebar.readable.js",
+    "line": 375,
+    "handlerPrefix": "onClick: e => {\n        var n;\n        \"style\" === (n = t.key) ? a(\"open-style\") : \"import\" === n ? a(\"open-import-modal\") : \"agent-settings\" === n ? a(\"open-agent-settings\") : \"scheduler\" === n ? a(\"open-scheduler\") : \"",
+    "componentEvidenceId": "ev_77141d2f306fc5e57f52588a93a44ec8ad08f582af128b37f95e0d4312a96c16",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 209,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => a(\"back\"))\n    }, \"← 返回对话\"), n[5] || (n[5] = zr(\"h2\", null, \"写作风格\", -1)), n[6] || (n[6] = zr(\"p\", null, \"在此管理写作风格知识库：新建名称、粘贴参考文本，或导入 txt / md / docx 等文件（可多选）。\", -1))]), Qr(Tt(IB), {\n      cl",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 217,
+    "handlerPrefix": "onClick: p\n      }, \"+ 新建\")) : Er(\"\", !0)]), zr(\"label\", _on, [n[7] || (n[7] = zr(\"span\", null, \"风格名称\", -1)), Qr(Tt(r_), {\n        value: i.value,\n        \"onUpdate:value\": n[1] || (n[1] = e => i.value = e),\n        plac",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 242,
+    "handlerPrefix": "onClick: h\n      }, {\n        default: Sn(() => [...(n[10] || (n[10] = [jr(\"导入文件\", -1)]))]),\n        _: 1\n      }, 8, [\"loading\"]), Qr(Tt(gS), {\n        type: \"primary\",\n        loading: c.value,\n        onClick: m\n     ",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:4",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 249,
+    "handlerPrefix": "onClick: m\n      }, {\n        default: Sn(() => [...(n[11] || (n[11] = [jr(\"保存\", -1)]))]),\n        _: 1\n      }, 8, [\"loading\"])])]), zr(\"section\", Ron, [n[12] || (n[12] = zr(\"h3\", null, \"已有风格\", -1)), e.styleSources.leng",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:5",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 267,
+    "handlerPrefix": "onClick: Zi(t => f(e), [\"prevent\"])\n          }, [zr(\"div\", Non, Y(e.title), 1), zr(\"div\", Gon, [jr(Y(e.sourceChars ? `${e.sourceChars} 字参考` : \"无参考文本\") + \" \", 1), (null == (t = e.sourceFiles) ? void 0 : t.length) ? (Cr()",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:6",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 271,
+    "handlerPrefix": "onClick: t => W(e)\n          }, \"删除\", 8, qon)]);\n        }), 128))]),\n        _: 1\n      }, 8, [\"value\"])) : (Cr(), Ir(\"div\", Mon, \"还没有风格。请在上方新建并保存。\"))])]),\n      _: 1\n    }), zr(\"footer\", Ton, [zr(\"span\", zon, \"已选 \" + Y",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelStylePanel.readable.js:7",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelStylePanel.readable.js",
+    "line": 279,
+    "handlerPrefix": "onClick: g\n    }, {\n      default: Sn(() => [...(n[13] || (n[13] = [jr(\"应用\", -1)]))]),\n      _: 1\n    })])], 2));\n  }\n};\n",
+    "componentEvidenceId": "ev_a87188231852d6980f63d1260589f95f793326febff8d266061a54d60575ffaa",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelThinkingBlock.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelThinkingBlock.readable.js",
+    "line": 42,
+    "handlerPrefix": "onClick: i\n    }, [Qr(Tt($I), {\n      component: Tt(OJ),\n      size: 14,\n      class: K([\"chevron\", {\n        open: o.value\n      }])\n    }, null, 8, [\"component\", \"class\"]), zr(\"span\", null, \"思考了 \" + Y(e.seconds || 1) +",
+    "componentEvidenceId": "ev_fd0f8e9cec3f4907363e4066e0676f2c8b9742aacaea5ebb840d9449605e8c1b",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelToolSteps.readable.js:1",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelToolSteps.readable.js",
+    "line": 152,
+    "handlerPrefix": "onClick: n[0] || (n[0] = e => o.value = !o.value)\n    }, [zr(\"span\", gtn, [jr(Y(d.value), 1), v.value ? (Cr(), Ir(\"span\", ytn, Y(v.value), 1)) : Er(\"\", !0)]), zr(\"div\", btn, [p.value ? (Cr(), Ir(\"span\", ktn, Y(p.value), ",
+    "componentEvidenceId": "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelToolSteps.readable.js:2",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelToolSteps.readable.js",
+    "line": 202,
+    "handlerPrefix": "onClick: n[3] || (n[3] = Zi(e => a(\"retry\"), [\"stop\"]))\n    }, \"重试\")) : Er(\"\", !0)])) : \"error\" === i.value.status && i.value.summary ? (Cr(), Ir(\"div\", Qtn, [jr(Y(i.value.summary) + \" \", 1), zr(\"button\", {\n      type: \"",
+    "componentEvidenceId": "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "original:NovelToolSteps.readable.js:3",
+    "side": "original",
+    "file": "_local-archive-20261028\\luoshui-novel-audit-20261117\\recovered\\frontend-current\\NovelToolSteps.readable.js",
+    "line": 206,
+    "handlerPrefix": "onClick: n[4] || (n[4] = Zi(e => a(\"retry\"), [\"stop\"]))\n    }, \"重试\")])) : Er(\"\", !0), k.value ? (Cr(), Nr(Zen, {\n      key: 5,\n      \"image-path\": b.value,\n      alt: \"封面预览\"\n    }, null, 8, [\"image-path\"])) : Er(\"\", !0),",
+    "componentEvidenceId": "ev_d37ad7f377c0dda693b51bae7c51460cdc1fe988cd4c10975fb03a085b9dfe96",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 266,
+    "handlerPrefix": "onClick={() => { setActiveMode(id); setTool(''); if (id === 'continuation') setContinuationOpen(true); }}>{name}</button>)}</div>\n        <div className=\"novel-sidebar-heading\"><b>我的作品 {visibleProjects.length}</b><Button",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 267,
+    "handlerPrefix": "onClick={() => setProjectModal(true)} /><Button aria-label=\"作品归档库\" type=\"text\" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)} /></div>\n        <div className=\"novel-projects\">{visibleProjects.map(p => ",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 267,
+    "handlerPrefix": "onClick={() => setArchiveOpen(true)} /></div>\n        <div className=\"novel-projects\">{visibleProjects.map(p => <div key={p.id} className=\"novel-project\"><button type=\"button\" aria-label={`选择作品${p.title}`} className={pro",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 268,
+    "handlerPrefix": "onClick={() => { setProjectId(p.id); setTool(''); }}>{p.title}</button>{projectId === p.id && <div className=\"novel-actions\"><Button size=\"small\" onClick={() => setManage({ type: 'project', action: 'rename', title: p.tit",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:5",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 268,
+    "handlerPrefix": "onClick={() => setManage({ type: 'project', action: 'rename', title: p.title })}>重命名作品</Button><Button size=\"small\" onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>\n   ",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:6",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 268,
+    "handlerPrefix": "onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>\n        <div className=\"novel-session-heading\">{modeName}会话</div><div className=\"novel-sessions\">{sessions.filter(s => ",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:7",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 269,
+    "handlerPrefix": "onClick={() => { setSessionId(s.id); setTool(''); }}>{s.title}{s.archivedAt ? '（已归档）' : s.currentRunId ? ' · 有任务' : ''}</button><div className=\"novel-actions\"><Button size=\"small\" onClick={() => setManage({ type: 'sessio",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:8",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 269,
+    "handlerPrefix": "onClick={() => setManage({ type: 'session', id: s.id, action: 'rename', title: s.title })}>重命名会话</Button><Button size=\"small\" onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'arch",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:9",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 269,
+    "handlerPrefix": "onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'archive' })}>{s.archivedAt ? '恢复会话' : '归档会话'}</Button></div></div>)}</div><Button onClick={() => createSession()} icon={<Plus size",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:10",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 269,
+    "handlerPrefix": "onClick={() => createSession()} icon={<Plus size={14} />} disabled={archived}>新建会话</Button>\n        </div><nav className=\"novel-creation-toolbar\" aria-label=\"创作工具\">{TOOLS.map(([label, Icon]) => <Button key={label} type=\"",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:11",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 270,
+    "handlerPrefix": "onClick={() => openTool(label)}>{label}</Button>)}</nav>\n      </aside>\n      {tool ? <section className=\"novel-creation-tool-workspace\" aria-label={tool}>\n        <header className=\"novel-chat-heading\"><Button onClick={",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:12",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 273,
+    "handlerPrefix": "onClick={() => setTool('')}>返回对话</Button><b>{tool}</b></header>\n        <div className=\"novel-tool-content\" key={scopeKey + ':' + tool}>{!projectId ? <Empty description=\"请先选择作品后使用此工具\" /> : tool === 'Agent设置' ? <AgentPane",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:13",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 276,
+    "handlerPrefix": "onClick={() => setRefresh(v => v + 1)}>{connection}</button>}</header>\n        <div className=\"novel-creation-chat-scroll\">{!snapshot?.messages?.length && !run && <div className=\"novel-creation-welcome\"><BookOpen size={3",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:14",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 283,
+    "handlerPrefix": "onClick={() => changeDraft({ modeInputs: { ...draft.modeInputs, existingSetting: [project.world, project.protagonist, project.coreConflict].filter(Boolean).join('\\n') } })}>使用本作品人物与世界设定</Button>}</label>}\n          <Inpu",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:15",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 286,
+    "handlerPrefix": "onClick={() => send()}>开始创作</Button></div>\n          {draft.modelId && !availableModel(models, draft.modelId) && <p role=\"alert\">原来选择的模型已不可用，请重新选择授权模型。</p>}\n          {!models.length && <p>{account?.canManageApi === true",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:16",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 289,
+    "handlerPrefix": "onClick={() => send(true)}>恢复原提交</Button></div>}\n          {maintenanceIntent && <div className=\"novel-notice\" role=\"status\">资料分析提交结果尚未核对，将使用原来的提交编号恢复。<Button onClick={() => maintenance(maintenanceIntent.kind, maintenanc",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:17",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 290,
+    "handlerPrefix": "onClick={() => maintenance(maintenanceIntent.kind, maintenanceIntent.styleId)}>恢复分析提交</Button></div>}\n        </div>\n      </section>\n      {projectId && <><div className=\"novel-creation-resizer\" role=\"separator\" aria-la",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:18",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 312,
+    "handlerPrefix": "onClick={e => { if (e.target === e.currentTarget) setMemoOpen(false); }}><section ref={memoPopup} className=\"novel-memo-popup\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"novel-memo-title\"><header className=\"novel-c",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:19",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 312,
+    "handlerPrefix": "onClick={() => setMemoOpen(false)}>关闭</Button></header>{projectId ? <NotesPanel key={scopeKey} projectId={projectId} selectedIds={draft.noteIds || []} onSelect={noteIds => changeDraft({ noteIds })} /> : <Empty descriptio",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NovelCreationPage.jsx:20",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\NovelCreationPage.jsx",
+    "line": 313,
+    "handlerPrefix": "onClick={async () => { try { await ownerScope.call(novelProjectRequest(p.id, '/restore', {}, { signal: ownerScope.signal }), () => { setProjects(old => old.map(item => item.id === p.id ? { ...item, status: 'active' } : i",
+    "componentEvidenceId": "ev_e4a52c4fed093ec28b6fc0c3c63d6a1b8a83b2d86b21024100fa1124bb641a7f",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AgentPanel.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AgentPanel.jsx",
+    "line": 56,
+    "handlerPrefix": "onClick={save}>保存Agent设置</Button></footer>\n  </Form>;\n}\n",
+    "componentEvidenceId": "ev_540831975c88b999d25450b9c6fea2419a6940dca14d987e18e91af7d25f24f4",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AgentRequirements.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AgentRequirements.jsx",
+    "line": 10,
+    "handlerPrefix": "onClick={()=>add({id:crypto.randomUUID(),kind:writing?undefined:'custom',category:writing?'long_fiction':undefined,title:writing?'自定义写作要求':'自定义审稿',content:'',enabled:true})}>新增{label}</Button></div>\n   {!fields.length&&<",
+    "componentEvidenceId": "ev_a925db7eecbfd344d478e0c8e8b8ebbbf9a3dc79bdb068c36f6560744c35d768",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AgentRequirements.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AgentRequirements.jsx",
+    "line": 19,
+    "handlerPrefix": "onClick={()=>remove(name)}>删除</Button>\n    </div>\n    <Form.Item {...rest} name={[name,'content']} dependencies={[[field,name,'enabled']]} rules={[{max:8000,message:'每条要求最多8000字'},({getFieldValue})=>({validator(_,value){",
+    "componentEvidenceId": "ev_a925db7eecbfd344d478e0c8e8b8ebbbf9a3dc79bdb068c36f6560744c35d768",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 78,
+    "handlerPrefix": "onClick={recoverCreation}>恢复原创建请求</Button></div>}\n    {editing?.loading && <p role=\"status\">正在读取原计划会话与模式…</p>}{editing?.error && <div role=\"alert\">{editing.error}<Button onClick={() => editPlan(editing.plan)}>重新读取原会话</Bu",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 79,
+    "handlerPrefix": "onClick={() => editPlan(editing.plan)}>重新读取原会话</Button></div>}\n    <Form form={form} layout=\"vertical\" initialValues={initial} disabled={!!editing && (editing.loading || !!editing.error)}>\n      <div className=\"novel-for",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 90,
+    "handlerPrefix": "onClick={save}>{editing ? '保存定时修改' : batch ? '开始批量续写' : '创建定时任务'}</Button>{editing && <Button disabled={false} onClick={() => { ++editEpoch.current; setEditing(null); form.resetFields(); form.setFieldsValue(initial); }}>",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 90,
+    "handlerPrefix": "onClick={() => { ++editEpoch.current; setEditing(null); form.resetFields(); form.setFieldsValue(initial); }}>取消修改</Button>}</div>\n    </Form>\n    {items.map(item => <section key={item.id} className=\"novel-item\"><b>{STATU",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:5",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 98,
+    "handlerPrefix": "onClick={() => control(item, 'pause')}>暂停</Button>}\n        {(batch ? ['paused', 'failed'] : ['paused', 'stopped', 'failed']).includes(item.status) && <Button onClick={() => control(item, 'resume')}>继续</Button>}\n        ",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:6",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 99,
+    "handlerPrefix": "onClick={() => control(item, 'resume')}>继续</Button>}\n        {batch && item.status === 'stopped' && <small>此批次已停止，如需继续写作请新建批次。</small>}\n        {!['completed', 'stopped'].includes(item.status) && <Button onClick={() => c",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:7",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 101,
+    "handlerPrefix": "onClick={() => control(item, 'stop')}>停止</Button>}\n        {!batch && <><Button onClick={() => action(() => scope.call(request(`/schedules/${item.id}/run`, {}), () => { message.success('已请求立即执行，请查看会话'); load(); }))}>立即执行",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:8",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 102,
+    "handlerPrefix": "onClick={() => action(() => scope.call(request(`/schedules/${item.id}/run`, {}), () => { message.success('已请求立即执行，请查看会话'); load(); }))}>立即执行</Button><Button onClick={() => editPlan(item)}>修改配置</Button></>}\n        <Butto",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:9",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 102,
+    "handlerPrefix": "onClick={() => editPlan(item)}>修改配置</Button></>}\n        <Button onClick={() => action(() => scope.call(request(`/${kind}/${item.id}/logs`), r => setItems(old => old.map(i => i.id === item.id ? { ...i, rounds: r.rounds |",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:AutomationPanel.jsx:10",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\AutomationPanel.jsx",
+    "line": 103,
+    "handlerPrefix": "onClick={() => action(() => scope.call(request(`/${kind}/${item.id}/logs`), r => setItems(old => old.map(i => i.id === item.id ? { ...i, rounds: r.rounds || [] } : i))))}>刷新逐轮日志</Button>\n      </div>\n      <ol className=",
+    "componentEvidenceId": "ev_cfc2032974ec0cabe8c4076dee231db17352ce0a59f5d99af95bb3575410e4d5",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:BlueprintEditor.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\BlueprintEditor.jsx",
+    "line": 11,
+    "handlerPrefix": "onClick={() => update('characters', value.characters.filter((_, j) => j !== i))}>移除此人物</Button></section>)}\n      <Button onClick={() => update('characters', [...(value.characters || []), { name: '', role: '', goal: '', ",
+    "componentEvidenceId": "ev_01857e9b25fac83479e54df71aac045b4ced062e592c3b0cb65f67a20c089bef",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:BlueprintEditor.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\BlueprintEditor.jsx",
+    "line": 12,
+    "handlerPrefix": "onClick={() => update('characters', [...(value.characters || []), { name: '', role: '', goal: '', conflict: '' }])}>添加人物</Button>\n      <h3>卷章安排</h3>{(value.volumes || []).map((row, i) => <section className=\"novel-item\" ",
+    "componentEvidenceId": "ev_01857e9b25fac83479e54df71aac045b4ced062e592c3b0cb65f67a20c089bef",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:BlueprintEditor.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\BlueprintEditor.jsx",
+    "line": 13,
+    "handlerPrefix": "onClick={() => update('volumes', value.volumes.filter((_, j) => j !== i))}>移除此卷</Button></section>)}\n      <Button onClick={() => update('volumes', [...(value.volumes || []), { number: (value.volumes?.length || 0) + 1, t",
+    "componentEvidenceId": "ev_01857e9b25fac83479e54df71aac045b4ced062e592c3b0cb65f67a20c089bef",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:BlueprintEditor.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\BlueprintEditor.jsx",
+    "line": 14,
+    "handlerPrefix": "onClick={() => update('volumes', [...(value.volumes || []), { number: (value.volumes?.length || 0) + 1, title: '', goal: '', chapterRange: [1, 10] }])}>添加卷章安排</Button>\n    </div>}\n  </Modal>;\n}\n",
+    "componentEvidenceId": "ev_01857e9b25fac83479e54df71aac045b4ced062e592c3b0cb65f67a20c089bef",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 26,
+    "handlerPrefix": "onClick={onBatch}>批量续写</Button></div>\n    {continuity?.dirtyFrom > 0 && <div className=\"novel-notice\" role=\"status\">从第{continuity.dirtyFrom}章起事实与记忆待刷新。<Button onClick={() => onMaintenance('continuity_refresh')}>刷新事实与记忆</",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 27,
+    "handlerPrefix": "onClick={() => onMaintenance('continuity_refresh')}>刷新事实与记忆</Button></div>}\n    <div className=\"novel-actions\"><Select aria-label=\"导出格式\" value={format} onChange={setFormat} options={[{ value: 'txt', label: 'TXT' }, { val",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 28,
+    "handlerPrefix": "onClick={() => exportSaved()}>导出整本</Button>{savedShort && <Button onClick={() => exportSaved(true)}>导出本次短篇</Button>}</div>\n    <small>只导出已保存正文。{chapters.length === 0 ? '暂无可导出正文' : ''}</small>{error && <p role=\"alert\">{er",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 28,
+    "handlerPrefix": "onClick={() => exportSaved(true)}>导出本次短篇</Button>}</div>\n    <small>只导出已保存正文。{chapters.length === 0 ? '暂无可导出正文' : ''}</small>{error && <p role=\"alert\">{error}</p>}\n    <div className=\"novel-chapter-list\">{chapters.map(c ",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:5",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 30,
+    "handlerPrefix": "onClick={() => setSelected(c.id)}>{c.title} · 版本{c.version}</Button>)}</div>\n    {chapter && <article className=\"novel-chapter\"><h3>{chapter.title}</h3><small>版本 {chapter.version} · {chapter.wordCount ?? chapter.content?",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:6",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 31,
+    "handlerPrefix": "onClick={() => { setError(''); setEdit({ id: chapter.id, expectedVersion: chapter.version, title: chapter.title, content: chapter.content }); }}>编辑正文</Button><Button onClick={() => safe(() => scope.call(request(`/chapter",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:7",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 31,
+    "handlerPrefix": "onClick={() => safe(() => scope.call(request(`/chapters/${chapter.id}/versions`), r => setVersions({ chapterId: chapter.id, expectedVersion: chapter.version, entries: r.versions || [] })))}>版本历史</Button></div><p>{chapter",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ChaptersPanel.jsx:8",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ChaptersPanel.jsx",
+    "line": 36,
+    "handlerPrefix": "onClick={() => safe(() => scope.call(request(`/chapters/${versions.chapterId}/restore`, { expectedVersion: versions.expectedVersion, version: v.version }), r => { onChapter(r.chapter); setVersions(null); refreshContinuit",
+    "componentEvidenceId": "ev_03e806075c47308ed3dbef61ca7bae3c90b214c38b42b81f5a5172f8fb1e6983",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ContinuationImportDialog.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ContinuationImportDialog.jsx",
+    "line": 69,
+    "handlerPrefix": "onClick={cancel}>取消</Button><Button type=\"primary\" loading={busy} onClick={submit}>{intent && !busy ? '恢复原导入' : '导入章节'}</Button></>}>\n    <p>导入已有章节，接续创作后续内容</p>\n    <Form layout=\"vertical\">\n      <Form.Item label=\"导入到书籍（",
+    "componentEvidenceId": "ev_ce2743d0c241d1d241123623512348184ac46b27189b861680756b4655638b4d",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ContinuationImportDialog.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ContinuationImportDialog.jsx",
+    "line": 69,
+    "handlerPrefix": "onClick={submit}>{intent && !busy ? '恢复原导入' : '导入章节'}</Button></>}>\n    <p>导入已有章节，接续创作后续内容</p>\n    <Form layout=\"vertical\">\n      <Form.Item label=\"导入到书籍（可选，不选则新建）\"><Select aria-label=\"导入到书籍（可选，不选则新建）\" allowClear disable",
+    "componentEvidenceId": "ev_ce2743d0c241d1d241123623512348184ac46b27189b861680756b4655638b4d",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:ContinuationImportDialog.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\ContinuationImportDialog.jsx",
+    "line": 75,
+    "handlerPrefix": "onClick={loadStyles}>重新读取文风</Button></p>}</Form.Item>\n    </Form>\n    {error && <p role=\"alert\">{error}</p>}\n    {intent && !busy && <p role=\"status\">上次导入结果尚未核对。已保留原正文和导入编号，请恢复原导入。</p>}\n  </Modal>;\n}\n",
+    "componentEvidenceId": "ev_ce2743d0c241d1d241123623512348184ac46b27189b861680756b4655638b4d",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 52,
+    "handlerPrefix": "onClick={() => action(() => scope.call(novelRequest(`/style-profiles/${encodeURIComponent(ownedStyleId.trim())}`, undefined, { signal: scope.signal }), r => { setStyles(old => [...old.filter(s => s.profile.id !== r.style",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 55,
+    "handlerPrefix": "onClick={() => action(() => scope.call(request('/documents/paste', { title, content }), r => { setDocs(old => [r.document, ...old]); setContent(''); message.success('文本已解析'); }))}>解析粘贴文本</Button>\n      <label className=\"",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 66,
+    "handlerPrefix": "onClick={() => selectChapters(doc)}>保存参考范围</Button><Button onClick={() => setEdit({ ...doc, chapters: doc.chapters.map(c => ({ ...c })) })}>编辑与预览分段</Button></div>\n          {doc.selection && <Checkbox checked={selectedId",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 66,
+    "handlerPrefix": "onClick={() => setEdit({ ...doc, chapters: doc.chapters.map(c => ({ ...c })) })}>编辑与预览分段</Button></div>\n          {doc.selection && <Checkbox checked={selectedIds.includes(doc.selection.id)} onChange={e => { if (e.target",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:5",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 68,
+    "handlerPrefix": "onClick={() => action(() => scope.call(request('/styles', { documentId: doc.id, title: doc.filename, description }), r => { setStyles(old => [r.style, ...old]); onStyle(r.style.profile.id); message.success('文风统计已保存，未调用模型",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:6",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 70,
+    "handlerPrefix": "onClick={() => action(() => scope.call(request(`/documents/${doc.id}/retry`, {}), r => setDocs(old => old.map(d => d.id === doc.id ? r.document : d))))}>重试解析原件</Button>}\n          {doc.status === 'uploading' && !doc.canR",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:7",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 72,
+    "handlerPrefix": "onClick={() => action(() => scope.call(request(`/documents/${doc.id}`, undefined, { method: 'DELETE' }), () => { setDocs(old => old.filter(d => d.id !== doc.id)); onSelect(selectedIds.filter(id => id !== doc.selection?.i",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:MaterialsPanel.jsx:8",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\MaterialsPanel.jsx",
+    "line": 75,
+    "handlerPrefix": "onClick={() => onMaintenance('style_analysis', s.profile.id)}>AI分析文风</Button></>}</section>)}\n    <Modal title=\"编辑与预览分段\" open={!!edit} width={720} okText=\"保存新版本\" cancelText=\"取消\" onCancel={() => setEdit(null)} onOk={() =>",
+    "componentEvidenceId": "ev_eb6081669f48cc524dfeca22d277a585ff67aa7fdc451d97b84b3db0ef1f8180",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NotesPanel.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\NotesPanel.jsx",
+    "line": 13,
+    "handlerPrefix": "onClick={() => safe(() => scope.call(request(`/notes${edit.id ? '/' + edit.id : ''}`, { title: edit.title, content: edit.content }, edit.id ? 'PUT' : 'POST'), r => { setNotes(old => edit.id ? old.map(n => n.id === edit.i",
+    "componentEvidenceId": "ev_54a750adfe9a05b43bfb7fa9c1b812300cdd91990041c9fd32ff20a5f25502b8",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NotesPanel.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\NotesPanel.jsx",
+    "line": 13,
+    "handlerPrefix": "onClick={() => setEdit({ title: '', content: '' })}>取消编辑</Button>}</div>\n    {notes.map(note => <section key={note.id} className=\"novel-item\"><Checkbox checked={selectedIds.includes(note.id)} onChange={e => onSelect(e.ta",
+    "componentEvidenceId": "ev_54a750adfe9a05b43bfb7fa9c1b812300cdd91990041c9fd32ff20a5f25502b8",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NotesPanel.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\NotesPanel.jsx",
+    "line": 14,
+    "handlerPrefix": "onClick={() => setEdit({ ...note })}>编辑</Button><Button danger onClick={() => safe(() => scope.call(request('/notes/' + note.id, undefined, 'DELETE'), () => { setNotes(old => old.filter(n => n.id !== note.id)); onSelect(",
+    "componentEvidenceId": "ev_54a750adfe9a05b43bfb7fa9c1b812300cdd91990041c9fd32ff20a5f25502b8",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:NotesPanel.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\NotesPanel.jsx",
+    "line": 14,
+    "handlerPrefix": "onClick={() => safe(() => scope.call(request('/notes/' + note.id, undefined, 'DELETE'), () => { setNotes(old => old.filter(n => n.id !== note.id)); onSelect(selectedIds.filter(id => id !== note.id)); }))}>删除备忘录</Button><",
+    "componentEvidenceId": "ev_54a750adfe9a05b43bfb7fa9c1b812300cdd91990041c9fd32ff20a5f25502b8",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:RunCard.jsx:1",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\RunCard.jsx",
+    "line": 18,
+    "handlerPrefix": "onClick={() => onAction('confirm', secondary ? { confirmationId: runtime.confirmationId } : {})}>{secondary ? '确认下一次模型调用' : '确认蓝图'}</Button>{!secondary && <Button onClick={() => onBlueprint(runtime.foundationPlan || {})}",
+    "componentEvidenceId": "ev_f2689d81e85e0c7d25d3c6dd70f5d3a4180bdea0bfdab8ff83006d5658e2a7e2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:RunCard.jsx:2",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\RunCard.jsx",
+    "line": 18,
+    "handlerPrefix": "onClick={() => onBlueprint(runtime.foundationPlan || {})}>修改蓝图</Button>}</div></>}\n    <div className=\"novel-actions\">{!unknown && (run.status === 'failed' || ['ready', 'save_pending'].includes(snapshot.executionState)) ",
+    "componentEvidenceId": "ev_f2689d81e85e0c7d25d3c6dd70f5d3a4180bdea0bfdab8ff83006d5658e2a7e2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:RunCard.jsx:3",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\RunCard.jsx",
+    "line": 19,
+    "handlerPrefix": "onClick={() => onAction('retry', {})}>{snapshot.executionState === 'save_pending' ? '恢复保存结果' : '从失败处重试'}</Button>}\n      {!TERMINAL.has(run.status) && <Button onClick={() => onAction('cancel', {})}>停止后续步骤</Button>}</div>",
+    "componentEvidenceId": "ev_f2689d81e85e0c7d25d3c6dd70f5d3a4180bdea0bfdab8ff83006d5658e2a7e2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  },
+  {
+    "id": "cm:RunCard.jsx:4",
+    "side": "cm",
+    "file": "frontend\\src\\user\\pages\\novel-creation\\RunCard.jsx",
+    "line": 20,
+    "handlerPrefix": "onClick={() => onAction('cancel', {})}>停止后续步骤</Button>}</div>\n    {run.status === 'cancelled' && <small>已停止后续步骤，已发送请求可能仍由上游处理。</small>}\n    {calls.length > 0 && <details><summary>实际模型与参数</summary><p>“不支持，未发送”表示提供方不接受此参数，",
+    "componentEvidenceId": "ev_f2689d81e85e0c7d25d3c6dd70f5d3a4180bdea0bfdab8ff83006d5658e2a7e2",
+    "status": "仅静态声明已枚举；待逐状态实测"
+  }
+]

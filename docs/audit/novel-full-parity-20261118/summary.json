@@ -1,0 +1,33 @@
+{
+  "scope": "原包中所有23个Novel命名组件与当前对应前端；全原生/每个运行状态不在已验证范围",
+  "features": 75,
+  "byStatus": {
+    "合同不同": 18,
+    "缺失": 28,
+    "部分实现": 14,
+    "已有实现待对照": 10,
+    "尚未验证": 5
+  },
+  "byArea": {
+    "六种创作": 10,
+    "布局与导航": 8,
+    "聊天与动作": 15,
+    "资料与产物": 13,
+    "文风与资料": 8,
+    "Agent与提示词": 12,
+    "自动写作": 3,
+    "看板与伏笔": 3,
+    "验收与可靠性": 3
+  },
+  "originalComponents": 23,
+  "currentComponents": 10,
+  "unmappedRestoredNovelComponents": [],
+  "declaredClickHandlers": {
+    "original": 133,
+    "cm": 64
+  },
+  "unresolvedSourceAnchors": 0,
+  "paidCalls": 0,
+  "actualButtonExecutionsThisAudit": 0,
+  "sameStateOriginalScreenshotsThisAudit": 0
+}
