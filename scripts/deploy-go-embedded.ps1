@@ -235,7 +235,23 @@ if ($Deploy) {
   }
   Write-Host "上传已通过 SHA-256 校验（第 $attempt 次）。"
   $remoteManifest = "/tmp/qiantie-runtime-release-$timestamp.json"
-  Invoke-NativeWithTimeout 'scp' (@('-P', "$SshPort") + $connectionOptions + @($runtimeManifestPath, "${remote}:$remoteManifest")) 120
+  # 生产出口 IP 会轮换，SSH 偶发超时；元数据同步失败时不能继续重启，
+  # 否则又会出现“二进制已换、SHA 仍旧”的不可追溯发布。
+  $manifestAttempts = 5
+  $manifestUploaded = $false
+  for ($manifestAttempt = 1; $manifestAttempt -le $manifestAttempts; $manifestAttempt++) {
+    try {
+      Invoke-NativeWithTimeout 'scp' (@('-P', "$SshPort") + $connectionOptions + @($runtimeManifestPath, "${remote}:$remoteManifest")) 120
+      $manifestUploaded = $true
+      break
+    } catch {
+      Write-Warning "第 $manifestAttempt/$manifestAttempts 次同步 runtime-release.json 失败：$($_.Exception.Message)"
+      if ($manifestAttempt -lt $manifestAttempts) { Start-Sleep -Seconds 8 }
+    }
+  }
+  if (-not $manifestUploaded) {
+    throw "同步 runtime-release.json 失败：已中止重启，生产仍运行旧版本。"
+  }
   $remoteDir = ($TargetPath -replace '/[^/]+$', '')
   if ([string]::IsNullOrWhiteSpace($remoteDir)) { $remoteDir = '/' }
   $remoteEnvFile = "$remoteDir/qiantie.env"
