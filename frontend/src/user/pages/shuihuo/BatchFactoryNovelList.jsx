@@ -3521,6 +3521,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [isDeveloper, setIsDeveloper] = useState(false);
   const [viewingBook, setViewingBookRaw] = useState(null);
   const [sensitiveDetailBook, setSensitiveDetailBook] = useState(null);
+  // 详情弹窗里的处理提醒（敏感处理/AI 判断）只在需要人工处理时展示；
+  // 用户收起后按 书ID+类型 记住，不再常驻。
+  const [detailNoticeDismissed, setDetailNoticeDismissed] = useState({});
   const [rawSourceBook, setRawSourceBook] = useState(null);
   const [sourceEditorBook, setSourceEditorBook] = useState(null);
   const [sourceEditorValue, setSourceEditorValue] = useState('');
@@ -6564,18 +6567,25 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     {sensitiveDetail.stages.length ? sensitiveDetail.stages.map(stage => `${stage.title || stage.stage}${stage.changed ? '（已处理）' : ''}`).join(' → ') : '—'}
                   </Descriptions.Item>
                 </Descriptions>
-                {sensitiveDetail.status ? (
+                {sensitiveDetail.status && !['failed', 'review_required', 'partial'].includes(sensitiveDetail.status) && sensitiveDetail.items.length ? (
+                  <Button size="small" type="link" onClick={() => setSensitiveDetailBook(viewingBook)}>查看敏感替换明细（{sensitiveDetail.items.length} 处）</Button>
+                ) : null}
+                {sensitiveDetail.status && ['failed', 'review_required', 'partial'].includes(sensitiveDetail.status) && !detailNoticeDismissed[`${viewingBook.id}:sensitive`] ? (
                   <Alert
-                    type={['failed', 'review_required', 'partial'].includes(sensitiveDetail.status) ? "warning" : "success"}
+                    type="warning"
                     showIcon
+                    closable
+                    onClose={() => setDetailNoticeDismissed(map => ({ ...map, [`${viewingBook.id}:sensitive`]: true }))}
                     message={`敏感处理：命中 ${sensitiveDetail.hitCount} 处，已替换 ${sensitiveDetail.replacedCount} 处${sensitiveDetail.status === 'review_required' ? '，有未处理命中待人工确认' : ''}`}
-                    description={sensitiveDetail.items.length ? <Button size="small" onClick={() => setSensitiveDetailBook(viewingBook)}>查看替换明细</Button> : '未发现需替换内容。'}
+                    description={sensitiveDetail.items.length ? <Button size="small" onClick={() => setSensitiveDetailBook(viewingBook)}>查看替换明细</Button> : '未发现需替换内容。完整处理状态可在上方资料区或任务/日志中查看。'}
                   />
                 ) : null}
-                {!classifyBusy ? (
+                {!classifyBusy && classifyFailed && !detailNoticeDismissed[`${viewingBook.id}:classify`] ? (
                   <Alert
-                    type={classifyFailed ? "warning" : "info"}
+                    type="warning"
                     showIcon
+                    closable
+                    onClose={() => setDetailNoticeDismissed(map => ({ ...map, [`${viewingBook.id}:classify`]: true }))}
                     message={`AI 判断：${classificationLabel(viewingBook.sourceMetadata)}`}
                     description={classificationDetail(
                       viewingBook.sourceMetadata,
