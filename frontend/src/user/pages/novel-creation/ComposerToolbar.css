@@ -1,8 +1,9 @@
-.novel-creation-composer.novel-creation-composer--compact {
+.novel-creation-composer.novel-creation-composer--compact,
+.novel-studio-chat .novel-creation-composer.novel-creation-composer--compact {
   flex-shrink: 0;
   margin: 0 24px 20px;
-  padding: 14px 14px 10px;
-  gap: 10px;
+  padding: 12px 14px 10px;
+  gap: 8px;
   border: 1px solid var(--border-default, #d9d9df);
   border-radius: 18px;
   background: var(--surface-panel, rgba(255, 255, 255, .7));
@@ -20,9 +21,9 @@
   border-radius: 0;
   background: transparent !important;
   box-shadow: none !important;
-  font-size: 14px;
+  font-size: 14px !important;
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.65 !important;
   resize: none;
 }
 .novel-creation-composer--compact > textarea.ant-input::placeholder {
@@ -51,6 +52,7 @@
 .novel-composer-setting .ant-input-number { width: 100%; }
 .novel-composer-popover .ant-popover-inner { background: var(--surface-elevated, #fff); border: 1px solid var(--border-default, #ddd); backdrop-filter: blur(28px); }
 @media (max-width: 900px) {
-  .novel-creation-composer.novel-creation-composer--compact { margin: 0 12px 12px; padding: 12px; }
+  .novel-creation-composer.novel-creation-composer--compact,
+  .novel-studio-chat .novel-creation-composer.novel-creation-composer--compact { margin: 0 12px 12px; padding: 12px; }
   .novel-composer-tools { gap: 4px; }
 }
