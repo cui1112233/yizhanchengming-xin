@@ -1,10 +1,11 @@
-import { Button, Input, InputNumber, Select, Spin } from 'antd';
-import { BookOpen, Send, Sparkles } from 'lucide-react';
+import { Button, Input, Spin } from 'antd';
+import { BookOpen, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { novelRequest } from '../../../shared/api/novelCreation.js';
-import { availableModel, readSaved, THINKING } from './contracts.js';
+import { availableModel, readSaved } from './contracts.js';
 import useWorkspaceScope from './useWorkspaceScope.js';
 import './StudioChat.css';
+import ComposerToolbar from './ComposerToolbar.jsx';
 
 const waiting = new Set(['prepared', 'may_have_sent', 'received']);
 const terminal = new Set(['completed', 'rejected', 'invalid_output']);
@@ -81,9 +82,9 @@ export default function StudioChat({owner,sessionId='',newSessionToken=0,models=
    {error&&<div className="novel-studio-error" role="alert"><p>{error}</p>{localID&&!intent&&<Button onClick={check}>重新读取会话</Button>}</div>}
    {intent&&<div className="novel-studio-recovery" role="status"><p>原请求已保留，先核对结果，避免重复调用模型。</p><Button disabled={busy} onClick={intent.sessionId?check:recoverCreation}>核对原请求</Button>{unconfirmed&&snapshot?.session?.id===intent.sessionId&&<Button disabled={busy} onClick={sendPrepared}>发送原消息</Button>}</div>}
   </div>
-  <div className="novel-creation-composer">
+  <div className="novel-creation-composer novel-creation-composer--compact">
    <Input.TextArea aria-label="创作要求" value={draft.content} disabled={linked||busy||!!intent||waiting.has(snapshot?.turn?.state)||loading} rows={3} placeholder="输入指令… Enter 发送，Shift+Enter 换行" onChange={e=>change({content:e.target.value})} onCompositionStart={()=>{composition.current=true;}} onCompositionEnd={()=>{composition.current=false;}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&!composition.current){e.preventDefault();send();}}}/>
-   <div className="novel-actions"><Select aria-label="创作文本模型" value={draft.modelId||undefined} disabled={busy||!!intent} onChange={modelId=>change({modelId})} options={models}/><span className="novel-studio-thinking-label">思考要求（提示词）</span><Select aria-label="创作思考要求" value={draft.thinkingLevel} disabled={busy||!!intent} onChange={thinkingLevel=>change({thinkingLevel})} options={THINKING}/><label className="novel-studio-context">上下文字数<InputNumber aria-label="上下文字数" value={draft.contextBudget} min={4000} max={64000} step={1000} disabled={busy||!!intent} onChange={contextBudget=>change({contextBudget})}/></label><Button type="primary" icon={<Send size={15}/>} loading={busy} disabled={linked||busy||!!intent||loading||waiting.has(snapshot?.turn?.state)} onClick={send}>发送</Button></div>
+   <ComposerToolbar models={models} modelId={draft.modelId} onModelChange={modelId=>change({modelId})} thinkingLevel={draft.thinkingLevel} thinkingLabel="创作思考要求" onThinkingChange={thinkingLevel=>change({thinkingLevel})} contextBudget={draft.contextBudget} onBudgetChange={contextBudget=>change({contextBudget})} locked={busy||!!intent} sending={busy} disabled={linked||busy||!!intent||loading||waiting.has(snapshot?.turn?.state)} hasContent={!!draft.content.trim()} onSend={send}/>
   </div>
  </section>;
 }

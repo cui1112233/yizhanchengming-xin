@@ -1,5 +1,6 @@
+import ComposerToolbar from './novel-creation/ComposerToolbar.jsx';
 import { Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Spin, Tabs, message } from 'antd';
-import { Archive, BookOpen, Bot, CalendarClock, ChartColumn, FileText, NotebookPen, Plus, Send } from 'lucide-react';
+import { Archive, BookOpen, Bot, CalendarClock, ChartColumn, FileText, NotebookPen, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getCurrentAccount, getCurrentUsername } from '../../shared/api/auth.js';
@@ -17,7 +18,7 @@ import BlueprintEditor from './novel-creation/BlueprintEditor.jsx';
 import StudioChat from './novel-creation/StudioChat.jsx';
 import ContinuationImportDialog from './novel-creation/ContinuationImportDialog.jsx';
 import useWorkspaceScope from './novel-creation/useWorkspaceScope.js';
-import { MODE_FIELDS, MODES, STATUS, TERMINAL, THINKING, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved, validRun } from './novel-creation/contracts.js';
+import { MODE_FIELDS, MODES, STATUS, TERMINAL, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved, validRun } from './novel-creation/contracts.js';
 import './NovelCreationPage.css';
 
 const TOOLS = [['写作风格', FileText], ['导入素材', BookOpen], ['Agent设置', Bot], ['定时写作', CalendarClock], ['数据看板', ChartColumn], ['备忘录', NotebookPen]];
@@ -302,12 +303,12 @@ export default function NovelCreationPage() {
           {(snapshot?.messages || []).map((m, i) => <article key={m.id || i} className={`novel-creation-message ${m.role}`}><b>{m.role === 'user' ? '我' : '创作助手'}</b><p>{m.content}</p></article>)}
           <RunCard snapshot={snapshot} onAction={runAction} onBlueprint={setBlueprint} busy={actionBusy} />
         </div>
-        <div className="novel-creation-composer">
+        <div className="novel-creation-composer novel-creation-composer--compact">
           {archived && <p role="status">此作品或会话已归档，恢复后才可以创作。</p>}
           {activeMode !== 'continuation' && MODE_FIELDS[activeMode] && <label>{MODE_FIELDS[activeMode][1]}<Input.TextArea aria-label={MODE_FIELDS[activeMode][1]} rows={2} value={draft.modeInputs?.[MODE_FIELDS[activeMode][0]] || ''} onChange={e => changeDraft({ modeInputs: { ...draft.modeInputs, [MODE_FIELDS[activeMode][0]]: e.target.value } })} placeholder={activeMode.includes('imitation') ? '参考文本与已保存文风可以二选一' : '也可在导入素材中选择正文或设定'} />{activeMode === 'fanfiction' && <Button size="small" disabled={!project?.world && !project?.protagonist} onClick={() => changeDraft({ modeInputs: { ...draft.modeInputs, existingSetting: [project.world, project.protagonist, project.coreConflict].filter(Boolean).join('\n') } })}>使用本作品人物与世界设定</Button>}</label>}
           <Input.TextArea aria-label="创作要求" value={draft.content} disabled={!!intent || sending} rows={3} placeholder="输入创作要求（Enter发送，Shift+Enter换行）" onChange={e => changeDraft({ content: e.target.value })} onCompositionStart={() => { composition.current = true; }} onCompositionEnd={() => { composition.current = false; }} onPressEnter={e => { if (!e.shiftKey && !composition.current && !e.nativeEvent?.isComposing && e.nativeEvent?.keyCode !== 229) { e.preventDefault(); send(); } }} />
           <div className="novel-reference-summary">参考资料 {draft.knowledgeIds?.length || 0} 份 · 备忘录 {draft.noteIds?.length || 0} 份 · {draft.styleProfileId ? '已选择文风' : '未选择文风'}</div>
-          <div className="novel-creation-composer-controls"><Select aria-label="创作文本模型" value={draft.modelId || undefined} options={modelOptions(models, draft.modelId)} onChange={modelId => changeDraft({ modelId })} placeholder="选择授权模型" /><Select aria-label="创作思考强度" value={draft.thinkingLevel} options={THINKING} onChange={thinkingLevel => changeDraft({ thinkingLevel })} /><Button type="primary" icon={<Send size={14} />} loading={sending} disabled={archived || active || !!intent} onClick={() => send()}>开始创作</Button></div>
+          <ComposerToolbar models={modelOptions(models, draft.modelId)} modelId={draft.modelId} onModelChange={modelId=>changeDraft({modelId})} thinkingLevel={draft.thinkingLevel} onThinkingChange={thinkingLevel=>changeDraft({thinkingLevel})} locked={sending||!!intent} sending={sending} disabled={archived||active||!!intent} hasContent={!!draft.content.trim()} sendLabel="开始创作" onSend={()=>send()}/>
           {draft.modelId && !availableModel(models, draft.modelId) && <p role="alert">原来选择的模型已不可用，请重新选择授权模型。</p>}
           {!models.length && <p>{account?.canManageApi === true ? '暂无可用文本模型，请在模型管理中检查配置。' : '暂无授权文本模型，请联系管理员。'}</p>}
           {intent && <div className="novel-notice" role="status">上次提交结果尚未核对。草稿已保留，恢复时只重复原来的提交编号。<Button loading={sending} onClick={() => send(true)}>恢复原提交</Button></div>}

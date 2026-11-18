@@ -1,0 +1,56 @@
+.novel-creation-composer.novel-creation-composer--compact {
+  flex-shrink: 0;
+  margin: 0 24px 20px;
+  padding: 14px 14px 10px;
+  gap: 10px;
+  border: 1px solid var(--border-default, #d9d9df);
+  border-radius: 18px;
+  background: var(--surface-panel, rgba(255, 255, 255, .7));
+  backdrop-filter: blur(24px);
+  transition: border-color .18s, box-shadow .18s;
+}
+.novel-creation-composer--compact:focus-within {
+  border-color: color-mix(in srgb, var(--text-primary, #7363e8) 30%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-primary, #7363e8) 4%, transparent);
+}
+.novel-creation-composer--compact > textarea.ant-input {
+  min-height: 66px;
+  padding: 0 2px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  resize: none;
+}
+.novel-creation-composer--compact > textarea.ant-input::placeholder {
+  color: color-mix(in srgb, var(--text-primary, #202534) 48%, transparent) !important;
+  opacity: 1;
+}
+.novel-composer-toolbar, .novel-composer-tools, .novel-composer-model {
+  display: flex;
+  align-items: center;
+}
+.novel-composer-toolbar { justify-content: space-between; gap: 10px; }
+.novel-composer-tools { gap: 8px; min-width: 0; }
+.novel-composer-model { gap: 2px; min-width: 0; color: var(--text-secondary, #84848e); }
+.novel-composer-model > svg { flex-shrink: 0; color: #8c7cf0; }
+.novel-composer-model .ant-select { width: 186px; max-width: 30vw; font-size: 12px; }
+.novel-composer-model .ant-select-selector { padding-inline: 6px !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.novel-composer-model .ant-select-selection-item { color: var(--text-secondary, #74747f); }
+.novel-composer-tool.ant-btn { width: 30px; height: 30px; padding: 0; color: var(--text-secondary, #74747f); border-radius: 9px; }
+.novel-composer-tool.ant-btn:hover { color: var(--text-primary, #7363e8); background: color-mix(in srgb, currentColor 7%, transparent); }
+.novel-composer-send.ant-btn { flex-shrink: 0; width: 34px; height: 34px; color: var(--text-secondary, #9b9ba5); background: color-mix(in srgb, var(--text-primary, #202534) 8%, transparent); }
+.novel-composer-send.is-ready.ant-btn:not(:disabled) { color: #fff; background: #8070df; }
+.novel-composer-send.is-ready.ant-btn:not(:disabled):hover { color: #fff; background: #9383ea; }
+.novel-composer-setting { display: flex; flex-direction: column; gap: 10px; width: 230px; padding: 4px; color: var(--text-primary, #202534); }
+.novel-composer-setting p { margin: 0; font-size: 12px; color: var(--text-secondary, #777); }
+.novel-composer-setting label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.novel-composer-setting .ant-input-number { width: 100%; }
+.novel-composer-popover .ant-popover-inner { background: var(--surface-elevated, #fff); border: 1px solid var(--border-default, #ddd); backdrop-filter: blur(28px); }
+@media (max-width: 900px) {
+  .novel-creation-composer.novel-creation-composer--compact { margin: 0 12px 12px; padding: 12px; }
+  .novel-composer-tools { gap: 4px; }
+}
