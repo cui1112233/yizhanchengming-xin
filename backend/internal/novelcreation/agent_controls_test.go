@@ -62,7 +62,7 @@ func TestAgentOptionalStepsUseFinalContentAndEachToggle(t *testing.T) {
 	for _, tc := range []struct {
 		name, raw string
 		optional  int
-	}{{"all", `{}`, 3}, {"length off", `{"enableLengthNorm":false}`, 2}, {"post off", `{"enablePostWrite":false}`, 2}, {"expression off", `{"enableAiTells":false}`, 2}, {"all off", `{"enableLengthNorm":false,"enablePostWrite":false,"enableAiTells":false}`, 0}} {
+	}{{"all", `{}`, 1}, {"length off", `{"enableLengthNorm":false}`, 0}, {"post off", `{"enablePostWrite":false}`, 1}, {"expression off", `{"enableAiTells":false}`, 1}, {"all off", `{"enableLengthNorm":false,"enablePostWrite":false,"enableAiTells":false}`, 0}} {
 		t.Run(tc.name, func(t *testing.T) {
 			input := fixturePipelineRunContext(NewMemoryRuntime())
 			var a AgentSettings
@@ -502,12 +502,12 @@ func TestAgentBlueprintChildKeepsSameSecondaryHistoryAndOneBatchCount(t *testing
 func TestAgentEveryPhaseRouteReachesItsActualProvider(t *testing.T) {
 	input := fixturePipelineRunContext(NewMemoryRuntime())
 	a := NormalizeAgentSettings(AgentSettings{}, 2000)
-	order := []string{"foundation-plan", "chapter-plan", "chapter-draft", "length-normalize", "post-write", "ai-tells", "chapter-audit", "chapter-revision", "chapter-audit", "truth-settlement", "memory-index"}
+	order := []string{"foundation-plan", "chapter-plan", "chapter-draft", "length-normalize", "chapter-audit", "chapter-revision", "chapter-audit", "truth-settlement", "memory-index"}
 	for _, phase := range order {
 		a.ModelRoutes[phase] = phase + "-model"
 	}
 	input.Agent = &a
-	provider := &queuedPipelineProvider{responses: []string{foundationJSON, chapterPlanJSON, draftJSON, draftJSON, draftJSON, draftJSON, failedAuditJSON, revisedJSON, passedAuditJSON, settlementJSON, memoryJSON}}
+	provider := &queuedPipelineProvider{responses: []string{foundationJSON, chapterPlanJSON, draftJSON, draftJSON, failedAuditJSON, revisedJSON, passedAuditJSON, settlementJSON, memoryJSON}}
 	var actual []string
 	pipeline := NewPipeline(func(_ context.Context, _, id string) (batchfactoryv11.DirectorProvider, error) {
 		actual = append(actual, id)

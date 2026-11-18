@@ -33,9 +33,9 @@ export default function AgentPanel({ projectId, models }) {
     ].map(([key, label, min, max, step]) => <Form.Item key={key} name={key} label={label}><InputNumber aria-label={label} min={min} max={max} step={step} /></Form.Item>)}</div>
     <Form.Item name="thinkingLevel" label="默认思考强度"><Select options={THINKING} /></Form.Item>
     {[
-      ['enableLengthNorm', '长度整理'], ['enablePostWrite', '正文后处理'], ['enableAiTells', '表达检查'], ['requireSecondaryConfirm', '每次后续模型调用前确认']
+      ['enableLengthNorm', '字数偏离超过45%时整理（调用模型）'], ['enablePostWrite', '后写校验（本地，不改正文）'], ['enableAiTells', '表达指标（本地统计，供人工判断）'], ['requireSecondaryConfirm', '每次后续模型调用前确认']
     ].map(([key, label]) => <Form.Item key={key} name={key} label={label} valuePropName="checked"><Switch aria-label={label} /></Form.Item>)}
-    <h3>分步骤模型</h3>{PHASES.map(([key, label]) => <Form.Item key={key} name={['modelRoutes', key]} label={label}>
+    <p>后写校验与表达指标不调用模型。表达指标尚未验证与原版AI味算法一致。</p><h3>分步骤模型</h3>{PHASES.filter(([key])=>!['post-write','ai-tells'].includes(key)).map(([key, label]) => <Form.Item key={key} name={['modelRoutes', key]} label={label}>
       <Select aria-label={`${label}模型`} allowClear placeholder="使用本次选中模型" options={modelOptions(models, settings?.agent?.modelRoutes?.[key])} />
     </Form.Item>)}
     <Button type="primary" disabled={!settings} loading={busy} onClick={save}>保存Agent设置</Button>

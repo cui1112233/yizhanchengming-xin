@@ -260,6 +260,9 @@ func NormalizeAgentSettings(input AgentSettings, fallbackTargetWords int) AgentS
 	input.TemperatureStep = boundedAgentNumber(input.TemperatureStep, 0, .5, .15)
 	routes := map[string]string{}
 	for key, value := range input.ModelRoutes {
+		if key == "post-write" || key == "ai-tells" {
+			continue
+		}
 		if validAgentRoute(key) && strings.TrimSpace(value) != "" {
 			routes[key] = strings.TrimSpace(value)
 		}

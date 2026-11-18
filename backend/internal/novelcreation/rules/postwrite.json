@@ -1,0 +1,152 @@
+{
+  "constants": {
+    "NOT_BUT_PATTERN": "不是[^，。！？\\n]{2,30}而是",
+    "DASH_PATTERN": "——",
+    "ANALYSIS_TERMS": [
+      "核心动机",
+      "信息边界",
+      "沉没成本",
+      "认知共鸣",
+      "叙事张力",
+      "情绪曲线",
+      "人物弧光",
+      "戏剧冲突",
+      "节奏把控",
+      "叙事节奏",
+      "人物塑造",
+      "角色动机",
+      "心理描写",
+      "情节推动",
+      "悬念设置",
+      "叙事视角",
+      "主观能动性",
+      "底层逻辑",
+      "价值共鸣",
+      "共情点"
+    ],
+    "CHAPTER_NUMBER_PATTERN": {
+      "pattern": "第\\s*\\d+\\s*章|Chapter\\s+\\d+",
+      "flags": "re.IGNORECASE"
+    },
+    "DUPLICATE_TITLE_NORMALIZATION": "[，。！？、：；''（）\\s]",
+    "SURPRISE_MARKERS_ZH": [
+      "仿佛",
+      "忽然",
+      "竟然",
+      "猛地",
+      "猛然",
+      "不禁",
+      "宛如"
+    ],
+    "META_NARRATION_PATTERNS": [
+      "到这里[，,].*算是",
+      "接下来[，,].*就是",
+      "故事发展到了",
+      "至此[，,]",
+      "写到这[，,里]"
+    ],
+    "PREACHING_WORDS": [
+      "显然",
+      "毋庸置疑",
+      "不言而喻",
+      "众所周知",
+      "不难看出",
+      "可想而知"
+    ],
+    "COLLECTIVE_SHOCK": "(全场|众人|在场所有人|围观者)[^，。]{0,8}(震惊|哗然|惊呆|目瞪口呆|倒吸一口凉气)",
+    "LE_SENTENCE_SPLIT": "[。！？!?\\n]+",
+    "THIRD_PERSON_INNER": "[他她](?:觉得|感到|意识到|明白|想起|脑子里|心里|太阳穴)"
+  },
+  "rules": [
+    {
+      "id": "pw_not_but",
+      "severity": "error",
+      "category": "禁止句式",
+      "message": "检测到「不是…而是…」句式 %s 处，请用直接陈述替代"
+    },
+    {
+      "id": "pw_dash",
+      "severity": "error",
+      "category": "破折号禁用",
+      "message": "检测到破折号（——）%s 处，请用逗号或句号替代"
+    },
+    {
+      "id": "pw_analysis_terms",
+      "severity": "error",
+      "category": "分析术语入文",
+      "message": "正文中出现分析术语：%s，请用叙事语言替代"
+    },
+    {
+      "id": "pw_chapter_ref",
+      "severity": "error",
+      "category": "章节编号入文",
+      "message": "正文出现章节编号引用（%s），角色不知道自己在第几章"
+    },
+    {
+      "id": "pw_dup_title",
+      "severity": "error",
+      "category": "标题重复",
+      "message": "章节标题「%s」与已有标题重复"
+    },
+    {
+      "id": "pw_surprise_density",
+      "severity": "warning",
+      "category": "惊叹标记密度",
+      "message": "惊叹标记（仿佛/忽然/竟然等）共 %s 处，建议每 %s 字不超过 1 个（当前允许 %s）"
+    },
+    {
+      "id": "pw_fatigue",
+      "severity": "warning",
+      "category": "疲劳词重复",
+      "message": "疲劳词重复：%s，每章同一疲劳词建议不超过 1 次"
+    },
+    {
+      "id": "pw_meta_narration",
+      "severity": "warning",
+      "category": "元叙事",
+      "message": "检测到元叙事模式（如「到这里算是」「接下来就是」），请用情节推进代替旁白总结"
+    },
+    {
+      "id": "pw_preaching",
+      "severity": "warning",
+      "category": "作者说教",
+      "message": "说教词汇过多：%s，应让读者自行判断而非作者下结论"
+    },
+    {
+      "id": "pw_collective_shock",
+      "severity": "warning",
+      "category": "群体震惊",
+      "message": "「全场/众人震惊」等群体反应出现 %s 次，属于网文套路，建议用个体视角替代"
+    },
+    {
+      "id": "pw_consecutive_le",
+      "severity": "warning",
+      "category": "连续了字句",
+      "message": "连续 %s 句以「了」收尾，节奏拖沓，建议变换句式"
+    },
+    {
+      "id": "pw_para_overflow",
+      "severity": "warning",
+      "category": "段落溢出",
+      "message": "%s 个段落超过 %s 字，影响移动端阅读体验"
+    },
+    {
+      "id": "pw_cross_repeat",
+      "severity": "warning",
+      "category": "跨章重复",
+      "message": "与前文有 %s 组 %s 字重复片段，如：%s"
+    },
+    {
+      "id": "pw_dialogue_pressure",
+      "severity": "info",
+      "category": "对话压力",
+      "message": "全章几乎无对话（对话段落占比 %s），多人场景建议加入对白推进情节"
+    },
+    {
+      "id": "pw_person_drift",
+      "severity": "error",
+      "category": "叙述人称漂移",
+      "message": "第一人称小说中出现大量第三人称内心描写（他/她觉得等 %s 处），且主角名「%s」出现 %s 次多于「我」%s 次"
+    }
+  ]
+}

@@ -313,24 +313,14 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	draft.Content = strings.TrimSpace(draft.Content)
 	bestContent := draft.Content
 	bestContentRaw := draftRaw
-	if input.Agent != nil {
-		for _, optional := range []struct {
-			enabled    bool
-			definition promptcatalog.Definition
-		}{
-			{input.Agent.EnableLengthNorm, novelprompt.LengthNormalize}, {input.Agent.EnablePostWrite, novelprompt.PostWrite}, {input.Agent.EnableAiTells, novelprompt.AiTells},
-		} {
-			if !optional.enabled {
-				continue
-			}
-			var processed chapterDraftOutput
-			processedRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{definition: optional.definition, step: RunNormalizing, userPayload: map[string]any{"chapter_content": bestContent, "chapter_plan": plan, "target_chapter_words": input.Project.TargetChapterWords, "rules": input.Rules, "style_profile": input.StyleProfile}, maxTokens: 12000, validate: func() error { return requireText("content", processed.Content) }}, &processed)
-			if callErr != nil {
-				return ChapterBundle{}, callErr
-			}
-			bestContent = strings.TrimSpace(processed.Content)
-			bestContentRaw = processedRaw
+	if input.Agent != nil && input.Agent.EnableLengthNorm && needsLengthNormalization(bestContent, input.Project.TargetChapterWords) {
+		var processed chapterDraftOutput
+		processedRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{definition: novelprompt.LengthNormalize, step: RunNormalizing, userPayload: map[string]any{"chapter_content": bestContent, "chapter_plan": plan, "target_chapter_words": input.Project.TargetChapterWords, "rules": input.Rules, "style_profile": input.StyleProfile}, maxTokens: 12000, validate: func() error { return requireText("content", processed.Content) }}, &processed)
+		if callErr != nil {
+			return ChapterBundle{}, callErr
 		}
+		bestContent = strings.TrimSpace(processed.Content)
+		bestContentRaw = processedRaw
 	}
 
 	if err := p.emitStage(ctx, input, sink, RunAuditing, "正在审核章节", 55); err != nil {
@@ -402,6 +392,33 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		finalStatus = RunSucceededWithWarnings
 	}
 
+	var localChecks json.RawMessage
+	if input.Agent != nil && (input.Agent.EnablePostWrite || input.Agent.EnableAiTells) {
+		checks := map[string]any{"model_calls": 0, "content_rewritten": false}
+		if input.Agent.EnablePostWrite {
+			titles := []string{}
+			// Full previous chapter texts are not currently present in RunContext.
+			// Do not feed bounded endings to the full cross-chapter check.
+			result := ValidatePostWrite(bestContent, PostWriteInput{Title: plan.Title, ExistingTitles: titles})
+			checks["post_write"] = result
+			checks["cross_chapter_status"] = "not_checked_missing_full_text"
+			if !result.Passed {
+				finalStatus = RunSucceededWithWarnings
+			}
+		}
+		if input.Agent.EnableAiTells {
+			checks["expression_metrics"] = localExpressionMetrics(bestContent)
+		}
+		payload, marshalErr := json.Marshal(checks)
+		if marshalErr != nil {
+			return ChapterBundle{}, marshalErr
+		}
+		localChecks = payload
+		if err := p.emit(ctx, input, sink, RunEvent{Type: "run.local_checks", Step: string(RunNormalizing), Status: RunNormalizing, Message: "本地文字检查完成，未调用模型、未改写正文", Progress: 75, Payload: payload}); err != nil {
+			return ChapterBundle{}, err
+		}
+	}
+
 	if err := p.emitStage(ctx, input, sink, RunSettling, "正在结算事实、人物变化和伏笔", 80); err != nil {
 		return ChapterBundle{}, err
 	}
@@ -446,6 +463,17 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	bundle, err := buildChapterBundle(input, selectedVolume, foundationRaw, plan, planRaw, bestContent, bestContentRaw, bestAuditRaw, settlementRaw, memoryRaw, audits, revisions, finalStatus)
 	if err != nil {
 		return ChapterBundle{}, &DomainError{Code: ErrPersistenceFailed, Message: "failed to assemble chapter bundle", Cause: err}
+	}
+	if len(localChecks) > 0 {
+		var snapshot map[string]json.RawMessage
+		if err = json.Unmarshal(bundle.RuntimeSnapshot, &snapshot); err != nil {
+			return ChapterBundle{}, err
+		}
+		snapshot["localChecks"] = localChecks
+		bundle.RuntimeSnapshot, err = json.Marshal(snapshot)
+		if err != nil {
+			return ChapterBundle{}, err
+		}
 	}
 	return bundle, nil
 }

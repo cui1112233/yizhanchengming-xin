@@ -194,7 +194,7 @@ func TestServiceSendMessageRedisFailureStillPersistsDispatch(t *testing.T) {
 
 func TestServiceRunUsesServerOwnerAcquiresLockPersistsEventsAndBundle(t *testing.T) {
 	provider := &queuedPipelineProvider{responses: []string{
-		foundationJSON, chapterPlanJSON, draftJSON, draftJSON, draftJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON,
+		foundationJSON, chapterPlanJSON, draftJSON, draftJSON, passedAuditJSON, settlementJSON, memoryJSON,
 	}}
 	store := NewMemoryStore()
 	runtime := NewMemoryRuntime()
@@ -226,8 +226,14 @@ func TestServiceRunUsesServerOwnerAcquiresLockPersistsEventsAndBundle(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Status != RunSucceeded || len(provider.requests) != 9 {
+	if completed.Status != RunSucceeded || len(provider.requests) != 7 {
 		t.Fatalf("completed=%+v provider requests=%d", completed, len(provider.requests))
+	}
+	var checkSnapshot struct {
+		LocalChecks map[string]json.RawMessage `json:"localChecks"`
+	}
+	if json.Unmarshal(completed.RuntimeSnapshot, &checkSnapshot) != nil || len(checkSnapshot.LocalChecks["post_write"]) == 0 {
+		t.Fatal("saved run lost local validation report")
 	}
 	snapshot, err := service.GetSnapshot(context.Background(), "alice", run.ID, 0)
 	if err != nil {
