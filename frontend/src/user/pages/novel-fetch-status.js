@@ -119,34 +119,18 @@ export function novelFetchTaskDateKey(row = {}) {
   return Number.isNaN(date.getTime()) ? raw.slice(0, 10) : beijingDateKey(date);
 }
 
-function dateKeyDayNumber(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return Number.NaN;
-  return Math.floor(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86400000);
-}
-
 export function filterNovelFetchTasks(rows = [], options = {}) {
   const source = Array.isArray(rows) ? rows : [];
   const query = String(options.query || '').trim().toLowerCase();
   const mode = options.mode === 'date' ? 'date' : 'default';
   const selectedDate = String(options.date || '').trim();
-  const today = dateKeyDayNumber(beijingDateKey(options.now instanceof Date ? options.now : new Date()));
-  // 默认视图只展示当前批次里未完成的书。历史批次没跑完的任务属于那一天的
-  // 批次，只在切到对应日期或历史批次时出现，不能混进当天任务列表。
-  const batchIds = new Set((Array.isArray(options.batchIds) ? options.batchIds : [])
-    .map(value => String(value ?? '').trim())
-    .filter(Boolean));
+  // 参考实现的默认视图返回当前身份的全部可见任务，只有显式切到日期视图
+  // 才按日期过滤；这里保持同一语义，不再用「近 3 天」截断历史任务。
   return source.filter(row => {
     const identity = `${row.bookId ?? row.book_id ?? row.id ?? ''} ${row.bookName ?? row.book_name ?? row.title ?? ''}`.toLowerCase();
     if (query && !identity.includes(query)) return false;
-    const taskDate = novelFetchTaskDateKey(row);
-    if (mode === 'date') return taskDate === selectedDate;
-    if (novelFetchTaskStatus(row).status !== 'completed') {
-      if (!batchIds.size) return true;
-      return batchIds.has(String(row.bookId ?? row.book_id ?? row.id ?? '').trim());
-    }
-    const taskDay = dateKeyDayNumber(taskDate);
-    return Number.isFinite(taskDay) && taskDay >= today - 2 && taskDay <= today;
+    if (mode === 'date') return novelFetchTaskDateKey(row) === selectedDate;
+    return true;
   });
 }
 

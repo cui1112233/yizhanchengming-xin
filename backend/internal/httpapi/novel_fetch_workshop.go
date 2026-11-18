@@ -2447,6 +2447,39 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, result)
 	})
 
+	// 手动入队：参考实现的 /api/process/queue/start 只处理显式选中的任务，
+	// 不能复用 automation/start（那会启动整批自动队列）。
+	mux.HandleFunc("POST /api/novel-fetch-workshop/process/queue/start", func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			IDs     []string `json:"ids"`
+			TaskIDs []string `json:"taskIds"`
+			Mode    string   `json:"mode"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+			return
+		}
+		if len(input.IDs) == 0 {
+			input.IDs = input.TaskIDs
+		}
+		resolved, err := resolveWorkshopTaskIDs(req.Context(), store, identity.Username, input.Mode, input.IDs, workshopTaskFailed)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
+			return
+		}
+		jobIDs, skipped, err := dispatchNovelFetchManualQueue(req.Context(), store, queue, identity.Username, resolved, time.Now())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "入队失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "requested": len(resolved), "queued": len(jobIDs) > 0, "job_ids": jobIDs, "skipped": skipped})
+	})
+
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process/start", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {

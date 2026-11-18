@@ -503,6 +503,11 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	if len(bookIDs) == 0 {
 		return nil, nil
 	}
+	return enqueueNovelFetchGroupJob(ctx, store, queue, owner, selectedJob, bookIDs, batchID, platformID, maxTxt, now, settings)
+}
+
+// enqueueNovelFetchGroupJob 复用自动队列与手动入队的同一套去重和状态落库逻辑。
+func enqueueNovelFetchGroupJob(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, selectedJob novelfetchworkshop.ProcessJob, bookIDs []string, batchID, platformID string, maxTxt int, now time.Time, settings map[string]any) (*novelfetchworkshop.ProcessJob, error) {
 	stamp := now.UnixNano()
 	if batchID == "" {
 		batchID = fmt.Sprintf("auto-batch-%d", stamp)
@@ -574,6 +579,75 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		return nil, err
 	}
 	return &job, nil
+}
+
+// dispatchNovelFetchManualQueue 处理 /api/process/queue/start：只入队显式选中的
+// 书籍（或 failed/all 解析结果），不会拉起整批自动队列。
+func dispatchNovelFetchManualQueue(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, ids []string, now time.Time) ([]string, []string, error) {
+	if queue == nil || len(ids) == 0 {
+		return nil, ids, nil
+	}
+	settings, err := store.GetConfig(ctx, owner)
+	if err != nil {
+		return nil, nil, err
+	}
+	documents, err := store.ListDocuments(ctx, owner)
+	if err != nil {
+		return nil, nil, err
+	}
+	byID := make(map[string]novelfetchworkshop.Document, len(documents))
+	for _, document := range documents {
+		byID[document.BookID] = document
+	}
+	groups := map[string][]string{}
+	templates := map[string]novelfetchworkshop.ProcessJob{}
+	order := []string{}
+	skipped := []string{}
+	seen := map[string]bool{}
+	for _, rawID := range ids {
+		id := strings.TrimSpace(rawID)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		document, exists := byID[id]
+		if !exists {
+			skipped = append(skipped, id)
+			continue
+		}
+		// 正文在独立存储里，先补齐 refs 才能判断任务是否真的可入队。
+		if refs, refsErr := store.ListBodyRefs(ctx, owner, id); refsErr == nil && len(refs) > 0 {
+			if document.BodyRefs == nil {
+				document.BodyRefs = map[string]novelfetchworkshop.BodyRef{}
+			}
+			for _, ref := range refs {
+				document.BodyRefs[ref.VersionID] = ref
+			}
+		}
+		if !novelFetchAutomationEligible(document, now) {
+			skipped = append(skipped, id)
+			continue
+		}
+		candidate := novelFetchRecoveryJob(document, settings, owner, true)
+		key := novelFetchRecoveryGroup(candidate)
+		if _, exists := templates[key]; !exists {
+			templates[key] = candidate
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], id)
+	}
+	jobIDs := []string{}
+	for _, key := range order {
+		template := templates[key]
+		job, enqueueErr := enqueueNovelFetchGroupJob(ctx, store, queue, owner, template, groups[key], template.BatchID, template.PlatformID, template.MaxTxt, now, settings)
+		if enqueueErr != nil {
+			return jobIDs, skipped, enqueueErr
+		}
+		if job != nil {
+			jobIDs = append(jobIDs, job.ID)
+		}
+	}
+	return jobIDs, skipped, nil
 }
 
 // novelFetchEnqueueMaxAttempts 是入队失败的自动重试上限。参考实现里重试

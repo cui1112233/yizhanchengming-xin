@@ -788,6 +788,13 @@ func NewRouter(options RouterOptions) http.Handler {
 		}
 		root.Handle("/api/batch-rewrite/knowledge/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/knowledge", novelAuth.Middleware(http.HandlerFunc(legacyKnowledgeSummaryAlias)))
+		// 参考实现还暴露裸 /api/knowledge 与 GET /api/work-form，补兼容别名。
+		root.Handle("GET /api/knowledge", novelAuth.Middleware(http.HandlerFunc(legacyKnowledgeSummaryAlias)))
+		root.Handle("GET /api/work-form", novelCompatAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = "/api/batch-rewrite/work-form"
+			root.ServeHTTP(w, clone)
+		})))
 		root.Handle("/api/batch-rewrite/opening/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/ai/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/process", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
@@ -874,13 +881,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("POST /api/process", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
 		root.Handle("POST /api/process/start", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
 		root.Handle("POST /api/process/stop", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
-		root.Handle("POST /api/process/queue/start", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// The Go worker's automation switch is the durable replacement for the
-			// old in-memory manual queue starter.
-			clone := req.Clone(req.Context())
-			clone.URL.Path = "/api/novel-fetch-workshop/automation/start"
-			novelFetch.ServeHTTP(w, clone)
-		})))
+		root.Handle("POST /api/process/queue/start", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
 		root.Handle("GET /api/process/queue/status", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			clone.URL.Path = "/api/novel-fetch-workshop/realtime/status"

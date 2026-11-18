@@ -31,6 +31,11 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			OperationID     string   `json:"operationId"`
 			ReadbackOnly    bool     `json:"readback_only"`
 			PreviewRevision string   `json:"previewRevision"`
+			// 参考实现接收 force/grouped/dry_run；其中 force 与 grouped
+			// 在提交计划里没有独立分支，dry_run 只生成计划不执行上传。
+			Force   bool `json:"force"`
+			Grouped bool `json:"grouped"`
+			DryRun  bool `json:"dry_run"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
@@ -53,6 +58,23 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "正文、版本或提交配置已变化，请重新生成提交预览后确认"})
 				return
 			}
+		}
+		// dry_run 与参考实现一致：只生成提交计划，不执行上传，也不写提交记录。
+		if body.DryRun {
+			payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
+			if status != http.StatusOK {
+				writeJSON(w, status, map[string]string{"error": message})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"ok":             true,
+				"dry_run":        true,
+				"groups":         payload["groups"],
+				"skipped":        payload["skipped"],
+				"plan":           payload["plan"],
+				"material_limit": payload["material_limit"],
+			})
+			return
 		}
 		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly}, genderJudgeResolver, targets...)
 		if err != nil {
