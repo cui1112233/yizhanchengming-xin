@@ -664,6 +664,9 @@ func (s *Service) updateProjectSettings(ctx context.Context, owner, projectID st
 	if err != nil {
 		return ProjectSettings{}, err
 	}
+	if err := validateAgentRequirements(input.Agent); err != nil {
+		return ProjectSettings{}, err
+	}
 	return s.store.UpdateProjectSettings(ctx, owner, projectID, ProjectSettings{
 		StyleProfile: strings.TrimSpace(input.StyleProfile),
 		Rules:        normalizeRules(input.Rules),

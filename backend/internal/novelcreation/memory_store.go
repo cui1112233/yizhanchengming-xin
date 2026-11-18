@@ -523,6 +523,7 @@ func (s *MemoryStore) UpdateProjectSettings(_ context.Context, owner, projectID 
 		Agent: NormalizeAgentSettings(input.Agent, project.TargetChapterWords), UpdatedAt: time.Now().UTC(),
 	}
 	s.settings[memoryKey(owner, projectID)] = settings
+	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
 	return settings, nil
 }
 

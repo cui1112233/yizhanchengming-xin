@@ -134,7 +134,19 @@ type CreateMaterialInput struct {
 }
 
 // AgentSettings controls generation volume and revision rounds per project.
+// AgentPrompt is a user-authored, enabled requirement; system presets stay in prompt/.
+type AgentPrompt struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind,omitempty"`
+	Category string `json:"category,omitempty"`
+	Title    string `json:"title"`
+	Content  string `json:"content"`
+	Enabled  bool   `json:"enabled"`
+}
+
 type AgentSettings struct {
+	ReviewPrompts           []AgentPrompt     `json:"reviewPrompts"`
+	CustomWritePrompts      []AgentPrompt     `json:"customWritePrompts"`
 	Version                 int               `json:"version"`
 	ModelRoutes             map[string]string `json:"modelRoutes"`
 	PassScore               float64           `json:"passScore"`

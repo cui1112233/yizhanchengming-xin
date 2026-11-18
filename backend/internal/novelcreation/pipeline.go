@@ -539,7 +539,7 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		return nil, &DomainError{Code: ErrInvalidOutput, Message: "failed to build model input", Cause: err}
 	}
 	request := batchfactoryv11.TextCompletionRequest{
-		SystemPrompt: outputContractSystemPrompt(spec.definition),
+		SystemPrompt: agentRequirementsSystemPrompt(input, spec.definition),
 		UserPrompt:   userPrompt,
 		Temperature:  spec.temperature,
 		MaxTokens:    spec.maxTokens,
@@ -564,7 +564,7 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 		return nil, invalidOutputError(spec.definition, validationErr)
 	}
 	repairRequest := batchfactoryv11.TextCompletionRequest{
-		SystemPrompt: outputContractSystemPrompt(spec.definition) + "\n\n" + novelprompt.StructureRepairSystem,
+		SystemPrompt: agentRequirementsSystemPrompt(input, spec.definition) + "\n\n" + novelprompt.StructureRepairSystem,
 		UserPrompt:   repairPrompt,
 		Temperature:  0.1,
 		MaxTokens:    spec.maxTokens,

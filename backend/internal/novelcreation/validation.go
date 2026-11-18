@@ -268,6 +268,8 @@ func NormalizeAgentSettings(input AgentSettings, fallbackTargetWords int) AgentS
 		}
 	}
 	input.ModelRoutes = routes
+	input.ReviewPrompts = append([]AgentPrompt{}, input.ReviewPrompts...)
+	input.CustomWritePrompts = append([]AgentPrompt{}, input.CustomWritePrompts...)
 	return input
 }
 

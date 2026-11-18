@@ -62,7 +62,7 @@ const choose=async(label,value)=>{const el=document.querySelector('[aria-label="
 async function run(code, name) {
  const bundle=await build({stdin:{resolveDir:here,loader:'jsx',contents:fixture+`\n(async()=>{${code};document.body.dataset.result='passed'})().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.message;document.body.dataset.calls=JSON.stringify(window.calls)});`},bundle:true,write:false,minify:true,jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},loader:{'.css':'empty'}});
  const base=path.resolve(here,'../../../../_local-archive-20261028/novel-task7-browser');mkdirSync(base,{recursive:true});const dir=mkdtempSync(path.join(base,name+'-'));writeFileSync(path.join(dir,'test.js'),bundle.outputFiles[0].text);
- const html=path.join(dir,'test.html');writeFileSync(html,'<meta charset="utf-8"><style>body{margin:0;background:#f4f5f7}:root{--text-primary:#172033;--text-secondary:#666;--surface-panel:#fff;--surface-elevated:#fff;--border-default:#ddd;--theme-primary:#7259d9}'+readFileSync(path.join(here,'NovelCreationPage.css'),'utf8')+'</style><div id="root"></div><script src="test.js"></script>');await runNovelBrowserDOM(browser,html,dir);return dir;
+ const html=path.join(dir,'test.html');writeFileSync(html,'<meta charset="utf-8"><style>body{margin:0;background:#f4f5f7}:root{--text-primary:#172033;--text-secondary:#666;--surface-panel:#fff;--surface-elevated:#fff;--border-default:#ddd;--theme-primary:#7259d9}'+readFileSync(path.join(here,'NovelCreationPage.css'),'utf8')+readFileSync(path.join(here,'novel-creation/AgentPanel.css'),'utf8')+'</style><div id="root"></div><script src="test.js"></script>');await runNovelBrowserDOM(browser,html,dir);return dir;
 }
 const continuationSetup = String.raw`
  const baseFetch=window.fetch;let importedBooks=[project,other],imported={p1:chapters,p2:[]};window.imports=[];
@@ -289,3 +289,21 @@ test('刷新后的本地检查读取持久报告且不发模型或修改正文',
  assert(detail.textContent.includes('检测到破折号'),'durable issues missing');assert(detail.textContent.includes('未提供完整前章正文'),'skipped check hidden');assert(detail.textContent.includes('显然：2次'),'metrics missing');
  assert(!window.calls.some(c=>c.method==='POST'),'read-only report generated or rewrote content');
 `,'local-checks'));
+
+
+test('Agent自定义要求可新增停用分类删除保存，不触发生成', {skip:!browser},async()=>run(String.raw`
+ await open();window.step='agent requirements';click(button('Agent设置'));await wait(()=>button('保存Agent设置')&&!button('保存Agent设置').disabled);
+ click(button('新增补充审稿'));await tick();type(document.querySelector('[aria-label="补充审稿1标题"]'),'检查伏笔');type(document.querySelector('[aria-label="补充审稿1内容"]'),'检查伏笔是否回收');await tick();
+ click(button('新增写作要求'));await tick();type(document.querySelector('[aria-label="写作要求1标题"]'),'短篇要求');type(document.querySelector('[aria-label="写作要求1内容"]'),'结尾完成冲突');await choose('写作要求1类别','短篇小说');await tick();
+ click(button('新增写作要求'));await tick();click(button('删除写作要求2'));await tick();
+ click(button('保存Agent设置'));await wait(()=>window.agent?.customWritePrompts?.length===1);assert(window.agent.reviewPrompts[0].content==='检查伏笔是否回收','review lost');assert(window.agent.customWritePrompts[0].category==='short_fiction','category lost');assert(window.agent.customWritePrompts[0].enabled,'enabled lost');
+ click(document.querySelector('[aria-label="启用补充审稿1"]'));await tick();window.agent=null;click(button('保存Agent设置'));await wait(()=>window.agent);assert(!window.agent.reviewPrompts[0].enabled,'disabled not saved');assert(!window.calls.some(c=>c.method==='POST'),'configuration generated content');
+`,'agent-requirements'));
+
+
+test('Agent空值阻止保存、失败保留草稿、重试与重新进入可读回要求', {skip:!browser},async()=>run(String.raw`
+ const previousFetch=window.fetch;let saved=null,fail=false;window.fetch=(url,options={})=>{if(String(url).endsWith('/settings')){if(options.method==='PUT'){if(fail)return response({error:'保存暂时失败'},500);saved=JSON.parse(options.body);return previousFetch(url,options)}if(saved)return response({settings:{...saved,projectId:'p1',updatedAt:'2026-11-18T00:00:00Z'}})}return previousFetch(url,options)};
+ await open();window.step='requirements invalid';click(button('Agent设置'));await wait(()=>button('保存Agent设置')&&!button('保存Agent设置').disabled);click(button('新增写作要求'));await tick();click(button('保存Agent设置'));await tick();await tick();assert(!saved,'enabled empty requirement saved');
+ type(document.querySelector('[aria-label="写作要求1内容"]'),'失败后保留的要求');await tick();fail=true;click(button('保存Agent设置'));await wait(()=>document.body.textContent.includes('保存暂时失败'));assert(document.querySelector('[aria-label="写作要求1内容"]').value==='失败后保留的要求','failed save lost draft');
+ fail=false;click(button('保存Agent设置'));await wait(()=>saved);await closeTool();click(button('Agent设置'));await wait(()=>document.querySelector('[aria-label="写作要求1内容"]')?.value==='失败后保留的要求');click(button('删除写作要求1'));await tick();saved=null;click(button('保存Agent设置'));await wait(()=>saved);assert(saved.agent.customWritePrompts.length===0,'deleted requirement resurrected');assert(!window.calls.some(c=>c.method==='POST'&&c.url!=='/api/client-errors'),'failure/retry generated');
+`,'agent-requirements-failure'));
