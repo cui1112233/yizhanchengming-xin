@@ -20,3 +20,19 @@ Go：go test ./internal/prompt/luoshui ./internal/screenplay ./internal/httpapi 
 ## 仍缺
 
 CD01可选主Agent顺序、每步原回复/产物/状态保存仍未实现；原四档入口与单独解析属于不同协议，不应混淆。真实供应商成功生成、全媒体成品以及全页面逐像素均未验收。不得把本批称为整条复刻完成。
+
+## 4001实页验收及构建来源
+
+源码提交59ea76181520abca0ee02428357b9f2bea92ec28。构建使用上一4001已验证冻结来源，叠加本提交后端文件；前端从匹配基线独立构建，只更新ComicScreenplayPage嵌入块，其45个直接依赖逐字节一致，其余嵌入资源保持。不是把当前所有未提交工作一起发布。composition.json与runtime-manifest.json登记组合来源。
+
+重启前30项已登录任务接口无运行任务；4001新二进制pid5028，health正常，runtime-build-info两个SHA均为59ea7618，实际HTTP取回漫画块摘要与候选构建相同。真实4001接口：未知mode和空正文均400，不进入模型；没有付费请求。
+
+新增浏览器按钮测试1项通过（忙碌及只读不可提交）。CUA已在真实4001打开保留验收作品→资产→重新解析，看到完整确认说明，再取消，回到原资产页，未提交生成。截图与runtime-acceptance.json位于analysis/repair-native-assets-20261118。这不等于真实供应商正常回复已通过，也不等于全部UI对齐。
+
+## 代码定位
+
+- backend/internal/prompt/luoshui/native_assets.go:12
+- backend/internal/screenplay/assets_reparse.go:13
+- backend/internal/httpapi/screenplay_routes.go:542
+- frontend/src/user/pages/ComicScreenplayPage.jsx:653
+- frontend/src/user/pages/ComicScreenplayAssetStage.jsx:74
