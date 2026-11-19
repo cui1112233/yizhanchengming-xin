@@ -8,7 +8,7 @@ TestReviewDimensionsContextAndRevisionEffect先失败于审核请求缺style_pro
 
 TestReviewDimensionFindingRealMySQL在隔离MySQL8.4通过：测试模型8次响应，首次审稿70分→修订→复审92分，重新建Store读取最终正文已变更，数据库落下2条novel_audits、1条novel_revisions。整包novelcreation/prompt及HTTP相关测试通过。测试使用受控假模型，证明请求、修订、复审和持久化接通；不等于真实模型判断准确率或原版native质量已验证。没有真实收费调用。
 
-产品提交：`e4fe05a1`。本地4001运行同提交标记，入口`/assets/user-B66IWgQt.js`，二进制位于`_local-archive-20261028/novel-review-dimensions-20261119/qiantie-review-dimensions.exe`。未发布公网。
+首轮产品提交：`e4fe05a1`；补充上下文及效果验证提交：`285fe517`。本地4001已更新到后者标记，入口仍为`/assets/user-B66IWgQt.js`，二进制`_local-archive-20261028/novel-review-dimensions-20261119/qiantie-review-effect.exe`，清单`effect-manifest.json`，health正常且页面200。未发布公网。
 
 ## 原版依据
 

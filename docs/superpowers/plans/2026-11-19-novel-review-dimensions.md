@@ -12,5 +12,6 @@
 - [x] 前端失败测试→37行列表、计数、批量选择、保存和错误恢复。
 - [x] Go、浏览器、真实MySQL验证；构建嵌入二进制更新4001。
 - [x] 登记证据与剩余差距，见docs/acceptance/2026-11-19-novel-review-dimensions.md。
+- [x] 用户追加有效性复核：补齐审稿/修订冻结文风、模式原设定、规则、备忘、素材和基础设定；37项逐条请求检查、具体问题→修订→复审→保存测试及真实MySQL2审稿/1修订落盘通过，285fe517已更新4001。未消耗真实模型额度，不冒充真实判断质量验收。
 
 来源：docs/reverse-engineering/novel-review-dimensions-20261119；提取脚本scripts/extract-novel-review-dimensions.py。原版UI依据NovelAgentSettings.readable.js:354起及用户截图。不会据此宣称原native私有算法或整软件等价。
