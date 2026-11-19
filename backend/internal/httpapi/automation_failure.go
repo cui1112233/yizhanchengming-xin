@@ -193,7 +193,9 @@ func isVideoModerationFailure(err error) bool {
 		return false
 	}
 	message := err.Error()
-	if !strings.Contains(message, "视频任务失败") {
+	// 审核拒绝既可能发生在等待生成结果（"视频任务失败"），也可能发生在提交
+	// 阶段被渠道直接拒绝（"视频模型提交失败"）。两种都要触发自动去敏重试。
+	if !strings.Contains(message, "视频任务失败") && !strings.Contains(message, "视频模型提交失败") {
 		return false
 	}
 	for _, keyword := range []string{"内容不符合", "内容审核", "审核拒绝", "违规", "敏感", "content policy", "moderation"} {
