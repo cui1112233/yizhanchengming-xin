@@ -33,8 +33,12 @@ func TestLuoshuiAdminPresetsExposeEmbeddedCorpus(t *testing.T) {
 }
 
 func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
-	if slots := LuoshuiPluginSlots(); len(slots) != 7 {
-		t.Fatalf("slots=%d want=7", len(slots))
+	// 漫剧创作已拆为独立后台模块，CM 插件只剩 5 个功能 + 未归属。
+	if slots := LuoshuiPluginSlots(); len(slots) != 6 {
+		t.Fatalf("slots=%d want=6", len(slots))
+	}
+	if slots := ComicScreenplaySlots(); len(slots) != 1 || slots[0]["id"] != "plugin.comic-screenplay" {
+		t.Fatalf("comic slots=%v", slots)
 	}
 	counts := make(map[string]int)
 	orders := make(map[string][]string)
@@ -68,6 +72,18 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 	if strings.Join(orders["plugin.comic-screenplay"], ",") != strings.Join(comicScreenplayPromptIDs, ",") {
 		t.Fatalf("漫剧创作顺序错误: got=%v want=%v", orders["plugin.comic-screenplay"], comicScreenplayPromptIDs)
 	}
+	// 模块归属：漫剧创作条目在独立模块，CM 插件条目留在 CM 插件模块。
+	for _, item := range LuoshuiAdminPresets() {
+		lock, _ := item["protocolLock"].(map[string]any)
+		slot, _ := lock["slot"].(string)
+		module, _ := item["module"].(string)
+		if slot == "plugin.comic-screenplay" && module != ComicScreenplayAdminModule {
+			t.Fatalf("漫剧创作条目模块错误: %+v", item)
+		}
+		if slot != "plugin.comic-screenplay" && module != LuoshuiAdminModule {
+			t.Fatalf("CM 插件条目模块错误: %+v", item)
+		}
+	}
 	for _, item := range LuoshuiAdminPresets() {
 		name, _ := item["name"].(string)
 		if strings.Contains(name, "洛水") || strings.Contains(name, "小洛") {
@@ -76,8 +92,64 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 	}
 }
 
+// 模块拆分后的视图合并：漫剧创作视图吃独立模块基线 + 历史 CM 插件模块下的覆盖；
+// CM 插件视图不再混入漫剧创作条目。
+func TestMergePresetsSplitByModule(t *testing.T) {
+	all := LuoshuiAdminPresets()
+	comicCount := 0
+	for _, item := range all {
+		if item["module"] == ComicScreenplayAdminModule {
+			comicCount++
+		}
+	}
+	if comicCount != 19 {
+		t.Fatalf("comic builtin=%d want=19", comicCount)
+	}
+	legacy := map[string]any{
+		"id":      LuoshuiOverridePresetID("storyboard_xiaoluo_v7_15s"),
+		"module":  LuoshuiAdminModule,
+		"name":    "15秒分镜",
+		"version": 1,
+		"status":  "published",
+		"body":    "历史覆盖正文",
+	}
+	comic := MergeComicScreenplayAdminPresets([]map[string]any{legacy})
+	found := false
+	for _, item := range comic {
+		if item["id"] == "luoshui.storyboard_xiaoluo_v7_15s" {
+			found = true
+			if item["body"] != "历史覆盖正文" {
+				t.Fatalf("历史覆盖未生效: %+v", item)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("漫剧创作视图缺少分镜词条目")
+	}
+	plugin := MergeLuoshuiAdminPresets(nil)
+	for _, item := range plugin {
+		if item["module"] == ComicScreenplayAdminModule {
+			t.Fatalf("CM 插件视图不应出现漫剧创作条目: %+v", item)
+		}
+	}
+	// 非基线条目的覆盖在漫剧创作固定目录中被丢弃，不追加。
+	stray := MergeComicScreenplayAdminPresets([]map[string]any{{
+		"id": "luoshui.plugin_cover_design", "module": LuoshuiAdminModule, "version": 1, "status": "published", "body": "x",
+	}})
+	if len(stray) != comicCount {
+		t.Fatalf("stray len=%d want=%d", len(stray), comicCount)
+	}
+}
+
 func TestMergeLuoshuiAdminPresetsPrefersOverrides(t *testing.T) {
 	items := LuoshuiAdminPresets()
+	// CM 插件视图只含 CM 插件模块的基线条目；漫剧创作条目已拆独立模块。
+	pluginCount := 0
+	for _, item := range items {
+		if item["module"] == LuoshuiAdminModule {
+			pluginCount++
+		}
+	}
 	override := map[string]any{
 		"id":          LuoshuiOverridePresetID("plugin_cover_design"),
 		"module":      LuoshuiAdminModule,
@@ -89,8 +161,10 @@ func TestMergeLuoshuiAdminPresetsPrefersOverrides(t *testing.T) {
 		"body":        "管理员草稿",
 	}
 	merged := MergeLuoshuiAdminPresets([]map[string]any{override})
-	if len(merged) != len(items) {
-		t.Fatalf("len=%d want=%d", len(merged), len(items))
+	// 覆盖命中基线条目时原位替换，列表长度不变；只有未匹配基线的
+	// 自建条目才会追加在尾部（本用例没有）。
+	if len(merged) != pluginCount {
+		t.Fatalf("len=%d want=%d", len(merged), pluginCount)
 	}
 	found := false
 	for _, item := range merged {
@@ -115,7 +189,7 @@ func TestMergeLuoshuiAdminPresetsPrefersOverrides(t *testing.T) {
 func TestMergeLuoshuiAdminPresetsLocksComicScreenplaySlot(t *testing.T) {
 	override := map[string]any{
 		"id":           LuoshuiOverridePresetID("a1_novel_to_screenplay"),
-		"module":       LuoshuiAdminModule,
+		"module":       ComicScreenplayAdminModule,
 		"name":         "小说转漫剧 A1",
 		"version":      1,
 		"revision":     2,
@@ -123,7 +197,7 @@ func TestMergeLuoshuiAdminPresetsLocksComicScreenplaySlot(t *testing.T) {
 		"body":         "管理员改过的正文",
 		"protocolLock": map[string]any{"slot": "plugin.unassigned", "format": "text"},
 	}
-	merged := MergeLuoshuiAdminPresets([]map[string]any{override})
+	merged := MergeComicScreenplayAdminPresets([]map[string]any{override})
 	for _, item := range merged {
 		if item["id"] != "luoshui.a1_novel_to_screenplay" {
 			continue

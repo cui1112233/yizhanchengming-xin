@@ -5,12 +5,17 @@ import { archivePreset, createPresetDraft, deletePreset, listAdminPresetSlots, l
 
 const modules = [
   { label: '私人定制', value: 'script' },
-  { label: '小说获取', value: 'novel-fetch' },
+  { label: '批量测书', value: 'novel-fetch' },
   { label: '小说创作', value: 'novel-creation' },
   { label: '水货生产', value: 'shuihuo-production' },
   { label: '批量工厂', value: 'batch-factory' },
+  { label: '漫剧创作', value: 'comic-screenplay' },
   { label: 'CM 插件', value: 'luoshui-plugin' }
 ];
+
+// 内嵌语料基线模块（漫剧创作 / CM 插件）：条目与顺序由代码固定，只读基线 +
+// 管理员覆盖版本，不支持从这里自建预设词。
+const builtinCorpusModules = new Set(['comic-screenplay', 'luoshui-plugin']);
 
 const batchFactoryGenerationModes = [
   { label: '视频生成', value: 'video' },
@@ -315,7 +320,7 @@ export function PresetLibraryPage() {
       }
       // CM 插件分区按语料清单顺序展示；插件运行时也按同一顺序引用，
       // 不能被其它模块的 formatPriority 排序打乱。
-      setPresets(module === 'luoshui-plugin' ? allPresets : sortPresets(allPresets));
+      setPresets(builtinCorpusModules.has(module) ? allPresets : sortPresets(allPresets));
       setSlots(slotResult.slots || []);
     } catch (requestError) {
       setPresets([]);
@@ -513,7 +518,7 @@ export function PresetLibraryPage() {
         ? <Space size={4}><span>{name}</span><Tag color="blue">内置</Tag></Space>
         : name
     },
-    ...(module === 'luoshui-plugin' ? [] : [{ title: '预设词 ID', dataIndex: 'id', width: 190, ellipsis: true }]),
+    ...(builtinCorpusModules.has(module) ? [] : [{ title: '预设词 ID', dataIndex: 'id', width: 190, ellipsis: true }]),
     { title: '说明', dataIndex: 'description', ellipsis: true },
     {
       title: '归属', dataIndex: 'slot', width: 150,
@@ -599,15 +604,18 @@ export function PresetLibraryPage() {
   // “添加预设词”都会直接写入当前分区对应的归属，不需要再二次选择。
   const librarySections = useMemo(() => {
     const knownSlots = new Set(slots.map(slot => slot.id));
-    const cmModule = module === 'luoshui-plugin';
+    const cmModule = builtinCorpusModules.has(module);
+    const isCmPlugin = module === 'luoshui-plugin';
     const novelModule = module === 'novel-creation';
     const sections = slots.map(slot => ({
       key: slot.id,
       title: slot.label,
       description: cmModule
-        ? (slot.id === 'plugin.unassigned'
+        ? (isCmPlugin && slot.id === 'plugin.unassigned'
             ? '这些条目不被 5 个插件功能引用；批量链路条目编辑发布后生效，历史存档条目不受影响。'
-            : '条目与顺序由插件代码固定；编辑并发布正文后生效。')
+            : module === 'comic-screenplay'
+              ? '漫剧创作链路在用的提示词；编辑并发布正文后立即生效，删除覆盖版本可回退内置默认。'
+              : '条目与顺序由插件代码固定；编辑并发布正文后生效。')
         : novelModule
           ? '对应小说创作实际调用；编辑并发布后用于新任务，已排队任务保留创建时的版本。输出格式与流程条件由后端固定。'
           : '此处新增的预设词会直接归入该调用位置。',

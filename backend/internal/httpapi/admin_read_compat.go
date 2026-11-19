@@ -128,6 +128,15 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		if req.URL.Query().Get("module") == prompt.LuoshuiAdminModule {
 			items = prompt.MergeLuoshuiAdminPresets(items)
 		}
+		if req.URL.Query().Get("module") == prompt.ComicScreenplayAdminModule {
+			// 漫剧创作视图跨模块合并：历史覆盖记录可能存在旧的 CM 插件模块名下。
+			all, err := adminStore.ListAll()
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			}
+			items = prompt.MergeComicScreenplayAdminPresets(all)
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"presets": items})
 	})))
 	root.Handle("GET /api/admin/presets/{id}/{version}", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -244,6 +253,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}
 		if req.URL.Query().Get("module") == prompt.LuoshuiAdminModule {
 			writeJSON(w, http.StatusOK, map[string]any{"slots": prompt.LuoshuiPluginSlots()})
+			return
+		}
+		if req.URL.Query().Get("module") == prompt.ComicScreenplayAdminModule {
+			writeJSON(w, http.StatusOK, map[string]any{"slots": prompt.ComicScreenplaySlots()})
 			return
 		}
 		items, err := catalog.All(req.URL.Query().Get("module"))

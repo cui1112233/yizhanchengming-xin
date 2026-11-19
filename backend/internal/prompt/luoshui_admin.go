@@ -40,15 +40,15 @@ var comicScreenplayPromptIDs = []string{
 	"v88_synopsis",
 }
 
-// 分组顺序固定：先按 5 个插件功能，再是漫剧创作链路，最后是未归属。每个
-// 功能内部严格按 pluginToolPrompts 的 Go 切片顺序，保证与插件下拉一致。
+// 分组顺序固定：先按 5 个插件功能，再是未归属。漫剧创作链路已拆为独立
+// 后台模块「漫剧创作」（ComicScreenplayAdminModule），不在本列表里。
+// 每个功能内部严格按 pluginToolPrompts 的 Go 切片顺序，保证与插件下拉一致。
 var luoshuiAdminGroups = []LuoshuiAdminGroup{
 	{Slot: "plugin.novel-to-drama", Label: "小说转剧", ToolID: "novel-to-drama"},
 	{Slot: "plugin.storyboard-master", Label: "分镜大师", ToolID: "storyboard-master"},
 	{Slot: "plugin.viral-opening", Label: "爆款开头", ToolID: "viral-opening"},
 	{Slot: "plugin.character-edit", Label: "角色修改", ToolID: "character-edit"},
 	{Slot: "plugin.cover-generation", Label: "封面生成", ToolID: "cover-generation"},
-	{Slot: "plugin.comic-screenplay", Label: "漫剧创作", IDs: comicScreenplayPromptIDs, Runtime: true},
 	{Slot: "plugin.unassigned", Label: "未归属", ToolID: ""},
 }
 
@@ -94,7 +94,8 @@ func LuoshuiPluginSlots() []map[string]string {
 }
 
 // LuoshuiAdminPresets 把内嵌语料按功能转换成管理后台预设词列表。
-// 每个功能只放该功能实际引用的条目；未归属的条目单独放在最后一个分区。
+// 5 个插件功能与未归属条目归「CM 插件」模块；漫剧创作链路条目归独立
+// 「漫剧创作」模块。每个功能只放该功能实际引用的条目。
 func LuoshuiAdminPresets() []map[string]any {
 	registry, err := luoshui.Default()
 	if err != nil {
@@ -107,6 +108,11 @@ func LuoshuiAdminPresets() []map[string]any {
 			entries[id] = entry
 		}
 	}
+	comicChain := make(map[string]bool, len(comicScreenplayPromptIDs))
+	for _, id := range comicScreenplayPromptIDs {
+		comicChain[id] = true
+	}
+	comicGroup := LuoshuiAdminGroup{Slot: "plugin.comic-screenplay", Label: "漫剧创作", Runtime: true}
 	items := make([]map[string]any, 0, len(ids))
 	assigned := make(map[string]bool, len(ids))
 	index := 0
@@ -135,21 +141,42 @@ func LuoshuiAdminPresets() []map[string]any {
 			}
 			continue
 		}
+		// 未归属：漫剧创作链路条目已归属独立模块，不收进来。
 		for _, id := range ids {
-			if assigned[id] {
+			if assigned[id] || comicChain[id] {
 				continue
 			}
 			items = append(items, luoshuiAdminItem(entries[id], group, index, true))
 			index++
 		}
 	}
+	// 漫剧创作独立模块：按「剧本 → 资产 → 分镜 → 审核/概要」固定顺序。
+	for _, id := range comicScreenplayPromptIDs {
+		entry, ok := entries[id]
+		if !ok || assigned[id] {
+			continue
+		}
+		assigned[id] = true
+		items = append(items, luoshuiAdminItem(entry, comicGroup, index, false))
+		index++
+	}
 	return items
 }
 
+// ComicScreenplaySlots 返回「漫剧创作」独立模块的分区（单分区固定目录）。
+func ComicScreenplaySlots() []map[string]string {
+	return []map[string]string{{"id": "plugin.comic-screenplay", "label": "漫剧创作", "mode": "primary"}}
+}
+
 func luoshuiAdminItem(entry luoshui.Entry, group LuoshuiAdminGroup, index int, unassigned bool) map[string]any {
+	// 漫剧创作链路条目归属独立后台模块；其余条目留在 CM 插件模块。
+	module := LuoshuiAdminModule
+	if group.Slot == "plugin.comic-screenplay" {
+		module = ComicScreenplayAdminModule
+	}
 	return map[string]any{
 		"id":                LuoshuiOverridePresetID(entry.ID),
-		"module":            LuoshuiAdminModule,
+		"module":            module,
 		"name":              entry.Name,
 		"kind":              "base",
 		"description":       luoshuiAdminDescription(entry, group, unassigned),
@@ -216,10 +243,31 @@ func LuoshuiAdminPreset(id string, version int) (map[string]any, bool) {
 	return nil, false
 }
 
-// MergeLuoshuiAdminPresets 把内嵌基线与管理员覆盖版本合并成后台列表。
+// MergeLuoshuiAdminPresets 把内嵌基线与管理员覆盖版本合并成「CM 插件」视图：
+// 只含 CM 插件模块的内嵌条目，漫剧创作条目归独立模块视图。
 // 同一 ID 的覆盖版本优先；删除覆盖记录后自然回退到内嵌原文。
 func MergeLuoshuiAdminPresets(overrides []map[string]any) []map[string]any {
-	builtin := LuoshuiAdminPresets()
+	return mergeLuoshuiAdminByModule(LuoshuiAdminModule, overrides, true)
+}
+
+// MergeComicScreenplayAdminPresets 把内嵌基线与管理员覆盖版本合并成
+// 「漫剧创作」视图。固定目录不追加自建条目；覆盖记录按预设词 ID 匹配，
+// 不限历史模块归属（旧「CM 插件」模块下的覆盖记录同样生效）。
+func MergeComicScreenplayAdminPresets(overrides []map[string]any) []map[string]any {
+	return mergeLuoshuiAdminByModule(ComicScreenplayAdminModule, overrides, false)
+}
+
+// mergeLuoshuiAdminByModule 按 module 圈定内嵌基线后合并覆盖版本。
+// appendExtras=true 时（CM 插件视图）把未匹配基线的覆盖记录追加在尾部，
+// 兼容历史自建条目；false（漫剧创作视图）则丢弃非基线条目。
+func mergeLuoshuiAdminByModule(module string, overrides []map[string]any, appendExtras bool) []map[string]any {
+	builtinAll := LuoshuiAdminPresets()
+	builtin := make([]map[string]any, 0, len(builtinAll))
+	for _, item := range builtinAll {
+		if stringValue(item["module"]) == module {
+			builtin = append(builtin, item)
+		}
+	}
 	if len(builtin) == 0 {
 		return overrides
 	}
@@ -254,7 +302,9 @@ func MergeLuoshuiAdminPresets(overrides []map[string]any) []map[string]any {
 			result = append(result, base)
 		}
 	}
-	result = append(result, extra...)
+	if appendExtras {
+		result = append(result, extra...)
+	}
 	// Existing published records may still have the previous display names.
 	// Keep IDs and prompt bodies intact so saved projects continue to resolve.
 	renames := strings.NewReplacer("小洛", "小Y", "小罗", "小Y", "洛水", "CM")

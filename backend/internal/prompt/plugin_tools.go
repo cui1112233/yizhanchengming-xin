@@ -19,6 +19,11 @@ type PluginPromptOption struct {
 // 基线，管理员保存的版本以同一 corpusID 为键叠加，插件引用顺序不受影响。
 const LuoshuiAdminModule = "luoshui-plugin"
 
+// ComicScreenplayAdminModule 是管理后台「漫剧创作」独立模块名。漫剧创作是
+// V88 核心功能而非插件，提示词从 CM 插件模块拆出独立展示；语料基线与
+// 覆盖机制与 CM 插件共用（同一 corpusID，同一 LuoshuiOverridePresetID）。
+const ComicScreenplayAdminModule = "comic-screenplay"
+
 var luoshuiOverrideCatalog atomic.Pointer[Catalog]
 
 // SetLuoshuiOverrideCatalog 在路由装配时注入管理后台使用的预设词目录；
@@ -35,14 +40,15 @@ func LuoshuiOverridePresetID(corpusID string) string {
 }
 
 // luoshuiOverrideBody 读取已发布的管理员覆盖版本。只有发布状态且正文非空的
-// 记录才生效，草稿和归档记录仍回退到内嵌原文。
+// 记录才生效，草稿和归档记录仍回退到内嵌原文。模块归属兼容「CM 插件」与
+// 独立「漫剧创作」两个模块（历史覆盖记录存于前者，新记录存于后者）。
 func luoshuiOverrideBody(corpusID string) (string, bool) {
 	catalog := luoshuiOverrideCatalog.Load()
 	if catalog == nil {
 		return "", false
 	}
 	record, found, err := catalog.PublishedByID(LuoshuiOverridePresetID(corpusID))
-	if err != nil || !found || record.Module != LuoshuiAdminModule {
+	if err != nil || !found || (record.Module != LuoshuiAdminModule && record.Module != ComicScreenplayAdminModule) {
 		return "", false
 	}
 	body := strings.TrimSpace(record.Body)

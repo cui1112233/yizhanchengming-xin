@@ -90,8 +90,11 @@ test('uses slot-bound plus rows except for fixed runtime prompt registries', () 
   assert.match(source, /children: presetTable\(section\.items, section\.createSlot\)/);
 });
 
-test('hides the internal preset ID column only for the CM plugin module', () => {
-  assert.match(source, /module === 'luoshui-plugin' \? \[\] : \[\{ title: '预设词 ID'/);
+test('hides the internal preset ID column only for builtin corpus modules', () => {
+  assert.match(source, /builtinCorpusModules\.has\(module\) \? \[\] : \[\{ title: '预设词 ID'/);
+  // 漫剧创作是独立后台模块，与 CM 插件共用内嵌语料基线机制。
+  assert.match(source, /const builtinCorpusModules = new Set\(\['comic-screenplay', 'luoshui-plugin'\]\)/);
+  assert.match(source, /label: '漫剧创作', value: 'comic-screenplay'/);
 });
 
 test('puts comic child-section plus rows below their own prompt tables', () => {

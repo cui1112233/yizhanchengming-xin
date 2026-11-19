@@ -58,6 +58,26 @@ func (s *AdminStore) List(module string) ([]map[string]any, error) {
 	return result, nil
 }
 
+// ListAll 返回全部模块的覆盖记录。「漫剧创作」独立模块视图需要跨模块读取：
+// 历史覆盖记录可能存在旧的 CM 插件模块名下，按预设词 ID 匹配后照样生效。
+func (s *AdminStore) ListAll() ([]map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items, err := s.readLocked()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, 0, len(items))
+	result = append(result, items...)
+	sort.Slice(result, func(i, j int) bool {
+		if stringValue(result[i]["id"]) == stringValue(result[j]["id"]) {
+			return intValue(result[i]["version"]) < intValue(result[j]["version"])
+		}
+		return stringValue(result[i]["id"]) < stringValue(result[j]["id"])
+	})
+	return result, nil
+}
+
 func (s *AdminStore) Get(id string, version int) (map[string]any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
