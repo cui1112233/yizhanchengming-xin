@@ -44,6 +44,14 @@ import (
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
+// novelFetchClassificationTimeout caps each classification LLM call (男女频/
+// 风格判断)。这些调用只产出几十字节 JSON，但底层 OpenAICompatibleProvider 的
+// 请求超时是 directorProviderRequestTimeout（300 秒）且内部还会重试 3 次，
+// 外层 style 判断又重试 3 次——模型网关挂起时「AI 判断发布信息」要转
+// 二十多分钟才兜底。给分类链路单独一个短超时，快速失败走默认风格兜底。
+// 包级变量以便测试在必要时收紧验证。
+var novelFetchClassificationTimeout = 60 * time.Second
+
 type novelFetchRewriteAdapter struct {
 	provider *batchfactoryv11.OpenAICompatibleProvider
 }
@@ -87,7 +95,9 @@ func (p ownerTextProvider) Complete(ctx context.Context, request batchfactoryv11
 }
 
 func (a novelFetchRewriteAdapter) Complete(ctx context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
-	return a.provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+	callCtx, cancel := context.WithTimeout(ctx, novelFetchClassificationTimeout)
+	defer cancel()
+	return a.provider.Complete(callCtx, batchfactoryv11.TextCompletionRequest{
 		SystemPrompt:        request.SystemPrompt,
 		UserPrompt:          request.UserPrompt,
 		Temperature:         request.Temperature,
@@ -281,7 +291,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	var novelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
 	if textProvider != nil {
 		novelFetchAIGenderJudge = func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
-			return textProvider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+			judgeCtx, cancel := context.WithTimeout(ctx, novelFetchClassificationTimeout)
+			defer cancel()
+			return textProvider.Complete(judgeCtx, batchfactoryv11.TextCompletionRequest{
 				SystemPrompt:        "你是小说男女频分类助手。只输出 JSON：{\"gender\":\"男频或女频\",\"confidence\":0.0,\"reason\":\"判断依据\"}。confidence 范围为 0 到 1；依据不足时 gender 留空、confidence 设为 0 并说明原因。不要输出 JSON 以外的内容。",
 				UserPrompt:          "请根据以下分类信息和正文片段判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre + "；正文片段=" + genderTextExcerpt(info.Text),
 				Temperature:         0,
