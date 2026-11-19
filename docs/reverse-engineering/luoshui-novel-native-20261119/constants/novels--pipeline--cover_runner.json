@@ -1,0 +1,2121 @@
+{
+  "moduleName": "novels.pipeline.cover_runner",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3950008,
+  "payloadRange": [
+    3950041,
+    3952419
+  ],
+  "payloadSha256": "7616cefb6a33641b3cc7b297784c8c3c0637f27151d69f865dd491c873390c48",
+  "declaredConstants": 98,
+  "parsedConstants": 98,
+  "stoppedAt": 3952418,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3950043,
+        3950048
+      ],
+      "value": "ctx",
+      "index": 0
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950048,
+        3950058
+      ],
+      "value": "<lambda>",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950058,
+        3950098
+      ],
+      "value": "CoverRunner.__init__.<locals>.<lambda>",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950098,
+        3950105
+      ],
+      "value": "_emit",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950105,
+        3950123
+      ],
+      "value": "_image_generator",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950123,
+        3950130
+      ],
+      "value": "mkdir",
+      "index": 5
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950130,
+        3950134
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              3950132,
+              3950133
+            ],
+            "value": true
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3950133,
+              3950134
+            ],
+            "value": {
+              "previous": {
+                "tag": "t",
+                "fileRange": [
+                  3950132,
+                  3950133
+                ],
+                "value": true
+              }
+            }
+          }
+        ]
+      },
+      "index": 6
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950134,
+        3950155
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950136,
+              3950145
+            ],
+            "value": "parents"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950145,
+              3950155
+            ],
+            "value": "exist_ok"
+          }
+        ]
+      },
+      "index": 7
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950155,
+        3950277
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3950157,
+              3950169
+            ],
+            "value": "tool:start"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950169,
+              3950185
+            ],
+            "value": "generate_cover"
+          },
+          {
+            "tag": "L",
+            "fileRange": [
+              3950185,
+              3950277
+            ],
+            "value": {
+              "type": "list",
+              "items": [
+                {
+                  "tag": "D",
+                  "fileRange": [
+                    3950187,
+                    3950235
+                  ],
+                  "value": {
+                    "type": "dict",
+                    "keys": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          3950189,
+                          3950195
+                        ],
+                        "value": "name"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          3950195,
+                          3950203
+                        ],
+                        "value": "status"
+                      }
+                    ],
+                    "values": [
+                      {
+                        "tag": "u",
+                        "fileRange": [
+                          3950203,
+                          3950226
+                        ],
+                        "value": "生成封面提示词"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          3950226,
+                          3950235
+                        ],
+                        "value": "pending"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "tag": "D",
+                  "fileRange": [
+                    3950235,
+                    3950277
+                  ],
+                  "value": {
+                    "type": "dict",
+                    "keys": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          3950237,
+                          3950243
+                        ],
+                        "value": "name"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          3950243,
+                          3950251
+                        ],
+                        "value": "status"
+                      }
+                    ],
+                    "values": [
+                      {
+                        "tag": "u",
+                        "fileRange": [
+                          3950251,
+                          3950268
+                        ],
+                        "value": "生成封面图"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          3950268,
+                          3950277
+                        ],
+                        "value": "pending"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950277,
+        3950293
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950279,
+              3950285
+            ],
+            "value": "tool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950285,
+              3950293
+            ],
+            "value": "stages"
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950293,
+        3950352
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3950295,
+              3950310
+            ],
+            "value": "tool:progress"
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3950310,
+              3950312
+            ],
+            "value": 0
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950312,
+              3950320
+            ],
+            "value": "active"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3950320,
+              3950352
+            ],
+            "value": "正在生成封面提示词..."
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950352,
+        3950383
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950354,
+              3950366
+            ],
+            "value": "stageIndex"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950366,
+              3950374
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950374,
+              3950383
+            ],
+            "value": "message"
+          }
+        ]
+      },
+      "index": 11
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3950383,
+        3950658
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950385,
+              3950391
+            ],
+            "value": "role"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950391,
+              3950400
+            ],
+            "value": "content"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950400,
+              3950408
+            ],
+            "value": "system"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3950408,
+              3950658
+            ],
+            "value": "你是小说封面美术指导。根据书名与故事信息，输出英文为主的绘图提示词（适合 AI 绘图），并附一行中文画面说明。格式：\n=== COVER_PROMPT ===\n（英文 prompt）\n=== COVER_CAPTION ===\n（中文说明）"
+          }
+        ]
+      },
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950658,
+        3950664
+      ],
+      "value": "role",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950664,
+        3950670
+      ],
+      "value": "user",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950670,
+        3950679
+      ],
+      "value": "content",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950679,
+        3950690
+      ],
+      "value": "书名：",
+      "index": 16
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3950690,
+        3950691
+      ],
+      "value": "",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950691,
+        3950703
+      ],
+      "value": "\n题材：",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950703,
+        3950715
+      ],
+      "value": "\n简介：",
+      "index": 19
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3950715,
+        3950721
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3950716,
+              3950717
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3950717,
+              3950720
+            ],
+            "value": 1200
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3950720,
+              3950721
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950721,
+        3950733
+      ],
+      "value": "\n风格：",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950733,
+        3950765
+      ],
+      "value": "网文封面，电影海报感",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950765,
+        3950771
+      ],
+      "value": "chat",
+      "index": 23
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3950771,
+        3950810
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950773,
+              3950785
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950785,
+              3950798
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3950798,
+              3950801
+            ],
+            "value": 1200
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3950801,
+              3950810
+            ],
+            "value": 0.6
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950810,
+        3950817
+      ],
+      "value": "strip",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950817,
+        3950833
+      ],
+      "value": "_extract_block",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950833,
+        3950847
+      ],
+      "value": "COVER_PROMPT",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950847,
+        3950862
+      ],
+      "value": "COVER_CAPTION",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950862,
+        3950879
+      ],
+      "value": "cover-prompt.md",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950879,
+        3950895
+      ],
+      "value": "FileRepository",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3950895,
+        3950907
+      ],
+      "value": "write_text",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950907,
+        3950911
+      ],
+      "value": "# ",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950911,
+        3950941
+      ],
+      "value": " 封面\n\n## 绘图提示词\n",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3950941,
+        3950961
+      ],
+      "value": "\n\n## 画面说明\n",
+      "index": 34
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        3950961,
+        3950963
+      ],
+      "value": "\n",
+      "index": 35
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950963,
+        3950993
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3950965,
+              3950980
+            ],
+            "value": "tool:progress"
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3950980,
+              3950982
+            ],
+            "value": 0
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3950982,
+              3950993
+            ],
+            "value": "completed"
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3950993,
+        3951015
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3950995,
+              3951007
+            ],
+            "value": "stageIndex"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951007,
+              3951015
+            ],
+            "value": "status"
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951015,
+        3951068
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3951017,
+              3951032
+            ],
+            "value": "tool:progress"
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3951032,
+              3951034
+            ],
+            "value": 1
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951034,
+              3951042
+            ],
+            "value": "active"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3951042,
+              3951068
+            ],
+            "value": "正在生成封面图..."
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951068,
+        3951078
+      ],
+      "value": "callable",
+      "index": 39
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951078,
+        3951128
+      ],
+      "value": "未配置绘图接口，仅保存封面提示词",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951128,
+        3951139
+      ],
+      "value": "completed",
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951139,
+        3951159
+      ],
+      "value": "封面图已生成",
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951159,
+        3951176
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3951161,
+              3951176
+            ],
+            "value": "tool:progress"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951176,
+        3951192
+      ],
+      "value": "generate_cover",
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951192,
+        3951204
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3951194,
+              3951204
+            ],
+            "value": "tool:end"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951204,
+        3951254
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951206,
+              3951212
+            ],
+            "value": "tool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951212,
+              3951221
+            ],
+            "value": "success"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951221,
+              3951238
+            ],
+            "value": "coverPromptPath"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951238,
+              3951254
+            ],
+            "value": "coverImagePath"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951254,
+        3951261
+      ],
+      "value": "title",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951261,
+        3951278
+      ],
+      "value": "coverPromptPath",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951278,
+        3951294
+      ],
+      "value": "coverImagePath",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951294,
+        3951306
+      ],
+      "value": "coverError",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951306,
+        3951310
+      ],
+      "value": "re",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951310,
+        3951318
+      ],
+      "value": "search",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951318,
+        3951326
+      ],
+      "value": "===\\s*",
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951326,
+        3951334
+      ],
+      "value": "escape",
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951334,
+        3951380
+      ],
+      "value": "\\s*===\\s*([\\s\\S]*?)(?====\\s*[A-Z_]+\\s*===|$)",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951380,
+        3951387
+      ],
+      "value": "group",
+      "index": 56
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951387,
+        3951391
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3951389,
+              3951391
+            ],
+            "value": 1
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951391,
+        3951400
+      ],
+      "value": "__doc__",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951400,
+        3951410
+      ],
+      "value": "__file__",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951410,
+        3951418
+      ],
+      "value": "origin",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951418,
+        3951432
+      ],
+      "value": "has_location",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951432,
+        3951444
+      ],
+      "value": "__cached__",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951444,
+        3951457
+      ],
+      "value": "annotations",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951457,
+        3951466
+      ],
+      "value": "pathlib",
+      "index": 64
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951466,
+        3951474
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951468,
+              3951474
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951474,
+        3951480
+      ],
+      "value": "Path",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951480,
+        3951485
+      ],
+      "value": "Any",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951485,
+        3951495
+      ],
+      "value": "Callable",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951495,
+        3951501
+      ],
+      "value": "Dict",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951501,
+        3951511
+      ],
+      "value": "Optional",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951511,
+        3951530
+      ],
+      "value": "agents.base_agent",
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951530,
+        3951546
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951532,
+              3951546
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3951546,
+        3951548
+      ],
+      "value": 2,
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951548,
+        3951562
+      ],
+      "value": "AgentContext",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951562,
+        3951587
+      ],
+      "value": "storage.file_repository",
+      "index": 75
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3951587,
+        3951605
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951589,
+              3951605
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951605,
+        3951617
+      ],
+      "value": "__module__",
+      "index": 77
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951617,
+        3951630
+      ],
+      "value": "CoverRunner",
+      "index": 78
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951630,
+        3951644
+      ],
+      "value": "__qualname__",
+      "index": 79
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3951644,
+        3951680
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951646,
+              3951661
+            ],
+            "value": "event_emitter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951661,
+              3951678
+            ],
+            "value": "image_generator"
+          }
+        ],
+        "values": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3951678,
+              3951679
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3951679,
+              3951680
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3951680,
+        3951817
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951682,
+              3951687
+            ],
+            "value": "ctx"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951687,
+              3951702
+            ],
+            "value": "event_emitter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951702,
+              3951719
+            ],
+            "value": "image_generator"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951719,
+              3951733
+            ],
+            "value": "AgentContext"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3951733,
+              3951764
+            ],
+            "value": "Optional[Callable[..., None]]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3951764,
+              3951817
+            ],
+            "value": "Optional[Callable[[str, str, Path], Optional[str]]]"
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3951817,
+        3951827
+      ],
+      "value": "__init__",
+      "index": 82
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3951827,
+        3951849
+      ],
+      "value": "CoverRunner.__init__",
+      "index": 83
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3951849,
+        3951899
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951851,
+              3951860
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951860,
+              3951867
+            ],
+            "value": "genre"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951867,
+              3951879
+            ],
+            "value": "style_hint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951879,
+              3951895
+            ],
+            "value": "generate_image"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              3951895,
+              3951896
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3951896,
+              3951897
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  3951895,
+                  3951896
+                ],
+                "value": ""
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3951897,
+              3951898
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3951896,
+                  3951897
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "s",
+                    "fileRange": [
+                      3951895,
+                      3951896
+                    ],
+                    "value": ""
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "t",
+            "fileRange": [
+              3951898,
+              3951899
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3951899,
+        3952008
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951901,
+              3951913
+            ],
+            "value": "output_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951913,
+              3951920
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951920,
+              3951929
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951929,
+              3951936
+            ],
+            "value": "genre"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951936,
+              3951948
+            ],
+            "value": "style_hint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951948,
+              3951964
+            ],
+            "value": "generate_image"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951964,
+              3951972
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3951972,
+              3951978
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951978,
+              3951983
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3951983,
+              3951984
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3951978,
+                  3951983
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3951984,
+              3951985
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3951983,
+                  3951984
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3951978,
+                      3951983
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3951985,
+              3951986
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3951984,
+                  3951985
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3951983,
+                      3951984
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          3951978,
+                          3951983
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3951986,
+              3951992
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3951992,
+              3952008
+            ],
+            "value": "Dict[str, Any]"
+          }
+        ]
+      },
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3952008,
+        3952018
+      ],
+      "value": "generate",
+      "index": 86
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3952018,
+        3952040
+      ],
+      "value": "CoverRunner.generate",
+      "index": 87
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3952040,
+        3952067
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3952042,
+              3952047
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952047,
+              3952052
+            ],
+            "value": "tag"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952052,
+              3952060
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3952060,
+              3952065
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3952065,
+              3952066
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3952060,
+                  3952065
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3952066,
+              3952067
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3952065,
+                  3952066
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3952060,
+                      3952065
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 88
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3952067,
+        3952095
+      ],
+      "value": "CoverRunner._extract_block",
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3952095,
+        3952128
+      ],
+      "value": "novels\\pipeline\\cover_runner.py",
+      "index": 90
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3952128,
+        3952134
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              3952130,
+              3952132
+            ],
+            "value": "a"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              3952132,
+              3952134
+            ],
+            "value": "k"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3952134,
+        3952173
+      ],
+      "value": "<module novels.pipeline.cover_runner>",
+      "index": 92
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3952173,
+        3952218
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3952175,
+              3952181
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952181,
+              3952186
+            ],
+            "value": "ctx"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952186,
+              3952201
+            ],
+            "value": "event_emitter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952201,
+              3952218
+            ],
+            "value": "image_generator"
+          }
+        ]
+      },
+      "index": 93
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3952218,
+        3952241
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3952220,
+              3952225
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952225,
+              3952230
+            ],
+            "value": "tag"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952230,
+              3952234
+            ],
+            "value": "re"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952234,
+              3952241
+            ],
+            "value": "match"
+          }
+        ]
+      },
+      "index": 94
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3952241,
+        3952398
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3952243,
+              3952249
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952249,
+              3952261
+            ],
+            "value": "output_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952261,
+              3952268
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952268,
+              3952277
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952277,
+              3952284
+            ],
+            "value": "genre"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952284,
+              3952296
+            ],
+            "value": "style_hint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952296,
+              3952312
+            ],
+            "value": "generate_image"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952312,
+              3952322
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952322,
+              3952327
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952327,
+              3952335
+            ],
+            "value": "prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952335,
+              3952344
+            ],
+            "value": "caption"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952344,
+              3952357
+            ],
+            "value": "prompt_path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952357,
+              3952369
+            ],
+            "value": "image_path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952369,
+              3952382
+            ],
+            "value": "image_error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952382,
+              3952393
+            ],
+            "value": "generated"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3952393,
+              3952398
+            ],
+            "value": "exc"
+          }
+        ]
+      },
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3952398,
+        3952408
+      ],
+      "value": "__name__",
+      "index": 96
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3952408,
+        3952418
+      ],
+      "value": "__spec__",
+      "index": 97
+    }
+  ]
+}

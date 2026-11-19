@@ -160,6 +160,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	snapshotFields := map[string]any{
 		"project_settings":       settings,
 		"agent_contract_version": 1,
+		"review_cycle_version":   1,
 		"source_type":            input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
@@ -224,6 +225,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 	var prompt struct {
 		LongImitation        *LongImitationCreation `json:"long_imitation"`
 		AgentContractVersion int                    `json:"agent_contract_version"`
+		ReviewCycleVersion   int                    `json:"review_cycle_version"`
 		Settings             *ProjectSettings       `json:"project_settings"`
 		StyleProfile         *string                `json:"style_profile"`
 		Notes                []ProjectNote          `json:"notes"`
@@ -321,6 +323,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		KnowledgeMaterials:  prompt.KnowledgeMaterials,
 		MaxRevisionRounds:   agent.MaxRevisionRounds,
 		Agent:               effectiveAgent,
+		ReviewCycleVersion:  prompt.ReviewCycleVersion,
 	}, sink)
 	if runErr != nil {
 		if IsCode(runErr, ErrSecondaryConfirmation) {

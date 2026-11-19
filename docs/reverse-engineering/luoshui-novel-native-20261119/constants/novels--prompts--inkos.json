@@ -1,0 +1,278 @@
+{
+  "moduleName": "novels.prompts.inkos",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4107903,
+  "payloadRange": [
+    4107928,
+    4108384
+  ],
+  "payloadSha256": "47b07517bb1af605be53b6e38aad660a3136d7ee344805b006c866b5f630c434",
+  "declaredConstants": 22,
+  "parsedConstants": 22,
+  "stoppedAt": 4108383,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4107930,
+        4108017
+      ],
+      "value": "InkOS prompt ports — verbatim Chinese/English prompt corpus from open-source InkOS.",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108017,
+        4108026
+      ],
+      "value": "__doc__",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108026,
+        4108036
+      ],
+      "value": "__file__",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108036,
+        4108042
+      ],
+      "value": "path",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108042,
+        4108051
+      ],
+      "value": "dirname",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108051,
+        4108057
+      ],
+      "value": "join",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108057,
+        4108066
+      ],
+      "value": "environ",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108066,
+        4108071
+      ],
+      "value": "get",
+      "index": 7
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4108071,
+        4108111
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4108073,
+              4108096
+            ],
+            "value": "NUITKA_PACKAGE_novels"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4108096,
+              4108111
+            ],
+            "value": "\\not_existing"
+          }
+        ]
+      },
+      "index": 8
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108111,
+        4108126
+      ],
+      "value": "prompts\\inkos",
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4108126,
+        4108174
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4108128,
+              4108159
+            ],
+            "value": "NUITKA_PACKAGE_novels_prompts"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4108159,
+              4108174
+            ],
+            "value": "\\not_existing"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108174,
+        4108181
+      ],
+      "value": "inkos",
+      "index": 11
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4108181,
+        4108235
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4108183,
+              4108220
+            ],
+            "value": "NUITKA_PACKAGE_novels_prompts_inkos"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4108220,
+              4108235
+            ],
+            "value": "\\not_existing"
+          }
+        ]
+      },
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108235,
+        4108245
+      ],
+      "value": "__path__",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108245,
+        4108253
+      ],
+      "value": "origin",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108253,
+        4108267
+      ],
+      "value": "has_location",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108267,
+        4108295
+      ],
+      "value": "submodule_search_locations",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108295,
+        4108307
+      ],
+      "value": "__cached__",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108307,
+        4108341
+      ],
+      "value": "novels\\prompts\\inkos\\__init__.py",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108341,
+        4108372
+      ],
+      "value": "<module novels.prompts.inkos>",
+      "index": 19
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4108372,
+        4108373
+      ],
+      "value": "",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108373,
+        4108383
+      ],
+      "value": "__spec__",
+      "index": 21
+    }
+  ]
+}

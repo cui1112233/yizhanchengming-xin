@@ -1,0 +1,1136 @@
+{
+  "moduleName": "novels.prompts.inkos.fanfic_prompt_sections",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4142977,
+  "payloadRange": [
+    4143025,
+    4146220
+  ],
+  "payloadSha256": "1f8009a998768049c295c9833b9d9533d3f7ae07db93248000c10655efbe296c",
+  "declaredConstants": 61,
+  "parsedConstants": 61,
+  "stoppedAt": 4146219,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4143027,
+        4143053
+      ],
+      "value": "\n## 同人正典参照\n\n",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143053,
+        4143069
+      ],
+      "value": "MODE_PREAMBLES",
+      "index": 1
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4143069,
+        4143070
+      ],
+      "value": "",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143070,
+        4143130
+      ],
+      "value": "\n\n以下是原作正典信息，写作时必须参照：\n\n",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143130,
+        4143134
+      ],
+      "value": "re",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143134,
+        4143142
+      ],
+      "value": "search",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143142,
+        4143213
+      ],
+      "value": "## 角色档案[\\s\\S]*?\\n(\\|[^\\n]+\\|\\n\\|[-|\\s]+\\|\\n(?:\\|[^\\n]+\\|\\n)*)",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143213,
+        4143220
+      ],
+      "value": "group",
+      "index": 7
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4143220,
+        4143224
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4143222,
+              4143224
+            ],
+            "value": 1
+          }
+        ]
+      },
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143224,
+        4143231
+      ],
+      "value": "split",
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4143231,
+        4143235
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4143233,
+              4143235
+            ],
+            "value": "\n"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143235,
+        4143247
+      ],
+      "value": "startswith",
+      "index": 11
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4143247,
+        4143251
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4143249,
+              4143251
+            ],
+            "value": "|"
+          }
+        ]
+      },
+      "index": 12
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4143251,
+        4143258
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4143253,
+              4143258
+            ],
+            "value": "|--"
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4143258,
+        4143270
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4143260,
+              4143270
+            ],
+            "value": "| 角色"
+          }
+        ]
+      },
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143270,
+        4143277
+      ],
+      "value": "strip",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143277,
+        4143283
+      ],
+      "value": "rows",
+      "index": 16
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4143283,
+        4143285
+      ],
+      "value": 3,
+      "index": 17
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4143285,
+        4143287
+      ],
+      "value": 4,
+      "index": 18
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4143287,
+        4143289
+      ],
+      "value": 5,
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143289,
+        4143295
+      ],
+      "value": "### ",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143295,
+        4143318
+      ],
+      "value": "（素材未提及）",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143318,
+        4143341
+      ],
+      "value": "- 口头禅/语癖：",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143341,
+        4143360
+      ],
+      "value": "- 说话风格：",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143360,
+        4143379
+      ],
+      "value": "- 典型行为：",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143379,
+        4143389
+      ],
+      "value": "profiles",
+      "index": 25
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4143389,
+        4143391
+      ],
+      "value": "\n",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143391,
+        4143395
+      ],
+      "value": "\n\n",
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143395,
+        4143566
+      ],
+      "value": "\n## 角色语音参照（同人写作专用）\n\n以下角色的对话和行为必须参照原作特征。写对话时，先想\"这个角色在原作里会怎么说\"。\n\n",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143566,
+        4143609
+      ],
+      "value": "\n允许的偏离（不视为违规）：\n",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143609,
+        4143676
+      ],
+      "value": "\n## 同人写作自检（在 PRE_WRITE_CHECK 中额外检查）\n\n",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143676,
+        4143689
+      ],
+      "value": "MODE_CHECKS",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143689,
+        4143693
+      ],
+      "value": "- ",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143693,
+        4143704
+      ],
+      "value": "<genexpr>",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4143704,
+        4143755
+      ],
+      "value": "build_fanfic_mode_instructions.<locals>.<genexpr>",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143755,
+        4143764
+      ],
+      "value": "__doc__",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143764,
+        4143774
+      ],
+      "value": "__file__",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143774,
+        4143782
+      ],
+      "value": "origin",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143782,
+        4143796
+      ],
+      "value": "has_location",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143796,
+        4143808
+      ],
+      "value": "__cached__",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143808,
+        4143825
+      ],
+      "value": "__annotations__",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143825,
+        4143838
+      ],
+      "value": "annotations",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143838,
+        4143847
+      ],
+      "value": "Literal",
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4143847,
+        4143869
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4143849,
+              4143856
+            ],
+            "value": "canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4143856,
+              4143860
+            ],
+            "value": "au"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4143860,
+              4143865
+            ],
+            "value": "ooc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4143865,
+              4143869
+            ],
+            "value": "cp"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4143869,
+        4143881
+      ],
+      "value": "FanficMode",
+      "index": 44
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4143881,
+        4144948
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4143883,
+              4143890
+            ],
+            "value": "canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4143890,
+              4143894
+            ],
+            "value": "au"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4143894,
+              4143899
+            ],
+            "value": "ooc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4143899,
+              4143903
+            ],
+            "value": "cp"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4143903,
+              4144146
+            ],
+            "value": "你正在写**原作向同人**。严格遵守正典：\n- 角色的语癖、说话风格、行为模式必须与原作一致\n- 世界规则不可违反\n- 关键事件时间线不可矛盾\n- 可以填充原作空白、探索未详述的角度"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4144146,
+              4144443
+            ],
+            "value": "你正在写**AU（平行世界）同人**：\n- 世界规则可以改变（已在 allowedDeviations 中声明的偏离）\n- 角色的核心性格和说话方式应保持辨识度——读者要能认出是谁\n- AU 设定偏离必须内部一致（改了一条规则，相关的都要跟着变）"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4144443,
+              4144684
+            ],
+            "value": "你正在写**OOC 同人**：\n- 角色在极端情境下可以偏离性格底色\n- 但偏离必须有情境驱动，不能无缘无故变性格\n- 保留角色的语癖和说话特征——即使性格变了，说话方式也应有辨识度"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4144684,
+              4144948
+            ],
+            "value": "你正在写**CP 同人**，以角色互动和关系发展为核心：\n- 配对双方每章必须有有效互动\n- 互动风格要有化学反应——不是两个人在同一个场景各干各的\n- 关系发展应有节奏感：推进、试探、阻碍、突破"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4144948,
+        4144971
+      ],
+      "value": "dict[FanficMode, str]",
+      "index": 46
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4144971,
+        4145650
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4144973,
+              4144980
+            ],
+            "value": "canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4144980,
+              4144984
+            ],
+            "value": "au"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4144984,
+              4144989
+            ],
+            "value": "ooc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4144989,
+              4144993
+            ],
+            "value": "cp"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4144993,
+              4145159
+            ],
+            "value": "- 正典合规检查：本章是否违反原作设定？角色对话是否符合原作语癖？\n- 信息边界检查：角色是否引用了不该知道的信息？"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4145159,
+              4145310
+            ],
+            "value": "- AU 偏离清单：本章改变了哪些世界规则？改变是否内部一致？\n- 角色辨识度检查：读者能否从对话中认出角色？"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4145310,
+              4145481
+            ],
+            "value": "- OOC 偏离记录：角色在哪些方面偏离了性格底色？偏离驱动力是什么？\n- 语癖保留检查：即使 OOC，说话方式是否还有原作特征？"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4145481,
+              4145650
+            ],
+            "value": "- CP 互动检查：配对双方本章是否有有效互动？关系发展是否推进？\n- 互动质量检查：互动是否有化学反应（不是各干各的）？"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4145650,
+        4145702
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145652,
+              4145666
+            ],
+            "value": "fanfic_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145666,
+              4145672
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145672,
+              4145680
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145680,
+              4145685
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145685,
+              4145697
+            ],
+            "value": "FanficMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145697,
+              4145702
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4145702,
+        4145730
+      ],
+      "value": "build_fanfic_canon_section",
+      "index": 49
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4145730,
+        4145760
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145732,
+              4145746
+            ],
+            "value": "fanfic_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145746,
+              4145754
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145754,
+              4145759
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4145759,
+              4145760
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4145754,
+                  4145759
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4145760,
+        4145792
+      ],
+      "value": "build_character_voice_profiles",
+      "index": 51
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4145792,
+        4145856
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145794,
+              4145800
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145800,
+              4145820
+            ],
+            "value": "allowed_deviations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145820,
+              4145828
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145828,
+              4145840
+            ],
+            "value": "FanficMode"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4145840,
+              4145851
+            ],
+            "value": "list[str]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4145851,
+              4145856
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4145856,
+        4145888
+      ],
+      "value": "build_fanfic_mode_instructions",
+      "index": 53
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4145888,
+        4145936
+      ],
+      "value": "novels\\prompts\\inkos\\fanfic_prompt_sections.py",
+      "index": 54
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4145936,
+        4145944
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4145938,
+              4145942
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4145942,
+              4145944
+            ],
+            "value": "d"
+          }
+        ]
+      },
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4145944,
+        4145998
+      ],
+      "value": "<module novels.prompts.inkos.fanfic_prompt_sections>",
+      "index": 56
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4145998,
+        4146124
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4146000,
+              4146014
+            ],
+            "value": "fanfic_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146014,
+              4146020
+            ],
+            "value": "rows"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146020,
+              4146030
+            ],
+            "value": "profiles"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146030,
+              4146043
+            ],
+            "value": "table_match"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146043,
+              4146049
+            ],
+            "value": "line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146049,
+              4146056
+            ],
+            "value": "cells"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146056,
+              4146062
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146062,
+              4146076
+            ],
+            "value": "catchphrases"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146076,
+              4146092
+            ],
+            "value": "speaking_style"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146092,
+              4146102
+            ],
+            "value": "behavior"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146102,
+              4146109
+            ],
+            "value": "parts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146109,
+              4146124
+            ],
+            "value": "profile_block"
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4146124,
+        4146146
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4146126,
+              4146140
+            ],
+            "value": "fanfic_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146140,
+              4146146
+            ],
+            "value": "mode"
+          }
+        ]
+      },
+      "index": 58
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4146146,
+        4146209
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4146148,
+              4146154
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146154,
+              4146174
+            ],
+            "value": "allowed_deviations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146174,
+              4146192
+            ],
+            "value": "deviations_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4146192,
+              4146209
+            ],
+            "value": "deviation_lines"
+          }
+        ]
+      },
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4146209,
+        4146219
+      ],
+      "value": "__spec__",
+      "index": 60
+    }
+  ]
+}

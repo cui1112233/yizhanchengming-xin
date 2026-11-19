@@ -1,0 +1,931 @@
+{
+  "moduleName": "novels.prompts.inkos.composer_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4104649,
+  "payloadRange": [
+    4104691,
+    4107903
+  ],
+  "payloadSha256": "96bfe0a60bae0fdb8b26c99721315c61d1d5a491b4c47be2739d826938fb975a",
+  "declaredConstants": 77,
+  "parsedConstants": 77,
+  "stoppedAt": 4107902,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4104693,
+        4104697
+      ],
+      "value": "en",
+      "index": 0
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4104697,
+        4105035
+      ],
+      "value": "You are InkOS's semantic outline-section selector.\nSelect only the outline sections needed for the current chapter. Prefer semantic relevance over keyword overlap.\nReturn strict JSON only: {\"selectedSources\":[\"...\"]}. Use exact source ids from the candidates. If uncertain, include the safest relevant anchors rather than inventing ids.",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105035,
+        4105352
+      ],
+      "value": "你是 InkOS 的语义大纲选段器。\n只选择当前章节真正需要的大纲段落。按语义相关性判断，不要按关键词重合机械选择。\n只返回严格 JSON：{\"selectedSources\":[\"...\"]}。必须使用候选里的精确 source id；不确定时选最安全的相关锚点，不要编造 id。",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4105352,
+        4105362
+      ],
+      "value": "language",
+      "index": 3
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4105362,
+        4105364
+      ],
+      "value": "\n",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105364,
+        4105372
+      ],
+      "value": "File: ",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4105372,
+        4105383
+      ],
+      "value": "file_name",
+      "index": 6
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4105383,
+        4105384
+      ],
+      "value": "",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105384,
+        4105395
+      ],
+      "value": "Chapter: ",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4105395,
+        4105411
+      ],
+      "value": "chapter_number",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105411,
+        4105419
+      ],
+      "value": "Goal: ",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4105419,
+        4105425
+      ],
+      "value": "goal",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105425,
+        4105441
+      ],
+      "value": "Outline node: ",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4105441,
+        4105455
+      ],
+      "value": "outline_node",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105455,
+        4105468
+      ],
+      "value": "Candidates:",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4105468,
+        4105486
+      ],
+      "value": "candidates_block",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105486,
+        4105497
+      ],
+      "value": "文件：",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105497,
+        4105511
+      ],
+      "value": "章节：第",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105511,
+        4105516
+      ],
+      "value": "章",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105516,
+        4105527
+      ],
+      "value": "目标：",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105527,
+        4105544
+      ],
+      "value": "大纲节点：",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105544,
+        4105561
+      ],
+      "value": "候选段落：",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105561,
+        4105941
+      ],
+      "value": "You are InkOS's semantic context compiler.\nOnly compile the COMPRESSIBLE CONTEXT. The PROTECTED CONTEXT is binding reference material and must not be rewritten, summarized as a substitute, or weakened.\nOutput concise Markdown with source pointers. Preserve names, unresolved promises, evidence, timing, and constraints that may affect the next chapter. Drop low-relevance noise.",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4105941,
+        4106273
+      ],
+      "value": "你是 InkOS 的语义上下文编译器。\n只能编译【可压缩上下文】。【受保护上下文】是绑定参照，不得改写、不得替代总结、不得削弱。\n输出简洁 Markdown，保留来源指针。保留会影响下一章的人名、未兑现承诺、证据、时间点和约束，丢弃低相关噪声。",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106273,
+        4106314
+      ],
+      "value": "Target budget for compiled context: <= ",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4106314,
+        4106332
+      ],
+      "value": "max_input_tokens",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106332,
+        4106357
+      ],
+      "value": " estimated input tokens",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106357,
+        4106412
+      ],
+      "value": "## Protected Context (reference only, do not compile)",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4106412,
+        4106429
+      ],
+      "value": "protected_block",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106429,
+        4106437
+      ],
+      "value": "(none)",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106437,
+        4106477
+      ],
+      "value": "## Compressible Context (compile this)",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4106477,
+        4106497
+      ],
+      "value": "compressible_block",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106497,
+        4106533
+      ],
+      "value": "压缩后目标预算：不超过 ",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106533,
+        4106555
+      ],
+      "value": " 估算输入 tokens",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106555,
+        4106617
+      ],
+      "value": "## 受保护上下文（只作为参照，不要编译它）",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106617,
+        4106628
+      ],
+      "value": "（无）",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106628,
+        4106678
+      ],
+      "value": "## 可压缩上下文（只编译这一部分）",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106678,
+        4106908
+      ],
+      "value": "You are a writing-context compressor. Compress the input into a writing context package of no more than 2500 words, keeping the facts, conflicts, hooks, and constraints most critical for writing chapter N. Use Markdown sections.",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4106908,
+        4107097
+      ],
+      "value": "你是写作上下文压缩器。将输入压缩为不超过 2500 字的写作上下文包，保留对写第 N 章最关键的事实、冲突、伏笔与约束。使用 Markdown 小节。",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107097,
+        4107106
+      ],
+      "value": "__doc__",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107106,
+        4107116
+      ],
+      "value": "__file__",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107116,
+        4107124
+      ],
+      "value": "origin",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107124,
+        4107138
+      ],
+      "value": "has_location",
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107138,
+        4107150
+      ],
+      "value": "__cached__",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107150,
+        4107163
+      ],
+      "value": "annotations",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107163,
+        4107176
+      ],
+      "value": "dataclasses",
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107176,
+        4107189
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107178,
+              4107189
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107189,
+        4107200
+      ],
+      "value": "dataclass",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107200,
+        4107209
+      ],
+      "value": "Literal",
+      "index": 48
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107209,
+        4107219
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107211,
+              4107215
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107215,
+              4107219
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107219,
+        4107229
+      ],
+      "value": "Language",
+      "index": 50
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107229,
+        4107235
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107231,
+              4107235
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4107235,
+        4107270
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107237,
+              4107247
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107247,
+              4107255
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107255,
+              4107265
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107265,
+              4107270
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107270,
+        4107316
+      ],
+      "value": "build_outline_section_selector_system_prompt",
+      "index": 53
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107316,
+        4107319
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4107318,
+              4107319
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107319,
+        4107328
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107321,
+              4107328
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107328,
+        4107340
+      ],
+      "value": "__module__",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107340,
+        4107372
+      ],
+      "value": "OutlineSectionSelectionRequest",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107372,
+        4107386
+      ],
+      "value": "__qualname__",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107386,
+        4107403
+      ],
+      "value": "__annotations__",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107403,
+        4107408
+      ],
+      "value": "str",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107408,
+        4107413
+      ],
+      "value": "int",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107413,
+        4107417
+      ],
+      "value": "zh",
+      "index": 62
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4107417,
+        4107473
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107419,
+              4107428
+            ],
+            "value": "request"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107428,
+              4107436
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107436,
+              4107468
+            ],
+            "value": "OutlineSectionSelectionRequest"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107468,
+              4107473
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107473,
+        4107517
+      ],
+      "value": "build_outline_section_selector_user_prompt",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107517,
+        4107568
+      ],
+      "value": "build_compressible_context_compiler_system_prompt",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107568,
+        4107603
+      ],
+      "value": "CompressibleContextCompileRequest",
+      "index": 66
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4107603,
+        4107662
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107605,
+              4107614
+            ],
+            "value": "request"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107614,
+              4107622
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107622,
+              4107657
+            ],
+            "value": "CompressibleContextCompileRequest"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4107657,
+              4107662
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107662,
+        4107711
+      ],
+      "value": "build_compressible_context_compiler_user_prompt",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107711,
+        4107756
+      ],
+      "value": "build_legacy_context_compress_system_prompt",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4107756,
+        4107798
+      ],
+      "value": "novels\\prompts\\inkos\\composer_prompts.py",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4107798,
+        4107846
+      ],
+      "value": "<module novels.prompts.inkos.composer_prompts>",
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107846,
+        4107859
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107848,
+              4107859
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107859,
+        4107871
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107861,
+              4107871
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4107871,
+        4107882
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4107873,
+              4107882
+            ],
+            "value": "request"
+          }
+        ]
+      },
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107882,
+        4107892
+      ],
+      "value": "__name__",
+      "index": 75
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4107892,
+        4107902
+      ],
+      "value": "__spec__",
+      "index": 76
+    }
+  ]
+}

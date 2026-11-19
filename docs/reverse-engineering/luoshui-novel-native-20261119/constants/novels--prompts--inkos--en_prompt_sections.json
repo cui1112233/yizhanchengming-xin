@@ -1,0 +1,749 @@
+{
+  "moduleName": "novels.prompts.inkos.en_prompt_sections",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4131741,
+  "payloadRange": [
+    4131785,
+    4140892
+  ],
+  "payloadSha256": "e874eb9219052e2c55b3bc7ed84944e3809a25c256f2ea3d2da159dc63618daa",
+  "declaredConstants": 55,
+  "parsedConstants": 55,
+  "stoppedAt": 4140891,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4131787,
+        4131863
+      ],
+      "value": "Outline anchor: Which volume_outline plot point does this chapter advance?",
+      "index": 0
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4131863,
+        4131911
+      ],
+      "value": "POV: Whose perspective? Consistent throughout?",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4131911,
+        4131987
+      ],
+      "value": "Hook planted: What question/promise/threat carries reader to next chapter?",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4131987,
+        4132052
+      ],
+      "value": "Sensory grounding: At least 2 non-visual senses per major scene",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132052,
+        4132136
+      ],
+      "value": "Character consistency: Does every character act from their established motivation?",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132136,
+        4132211
+      ],
+      "value": "Information boundary: No character references info they haven't witnessed",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132211,
+        4132237
+      ],
+      "value": "Pacing: Chapter targets ",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4132237,
+        4132255
+      ],
+      "value": "chapterWordCount",
+      "index": 7
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4132255,
+        4132256
+      ],
+      "value": "",
+      "index": 8
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132256,
+        4132266
+      ],
+      "value": " words. ",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4132266,
+        4132278
+      ],
+      "value": "pacingRule",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132278,
+        4132344
+      ],
+      "value": "Show don't tell: Are emotions shown through action, not labeled?",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132344,
+        4132400
+      ],
+      "value": "AI-tell check: No banned analytical language in prose?",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132400,
+        4132458
+      ],
+      "value": "Conflict: What is the core tension driving this chapter?",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4132458,
+        4132463
+      ],
+      "value": "get",
+      "index": 14
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4132463,
+        4132479
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4132465,
+              4132479
+            ],
+            "value": "powerScaling"
+          }
+        ]
+      },
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132479,
+        4132542
+      ],
+      "value": "Power scaling: Does any power usage follow established rules?",
+      "index": 16
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4132542,
+        4132561
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4132544,
+              4132561
+            ],
+            "value": "numericalSystem"
+          }
+        ]
+      },
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132561,
+        4132627
+      ],
+      "value": "Numerical check: Are all stats/resources consistent with ledger?",
+      "index": 18
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4132627,
+        4132629
+      ],
+      "value": "\n",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132629,
+        4132708
+      ],
+      "value": "## Pre-Write Checklist\n\nBefore writing, output a PRE_WRITE_CHECK addressing:\n",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132708,
+        4132712
+      ],
+      "value": ". ",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132712,
+        4132723
+      ],
+      "value": "<genexpr>",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132723,
+        4132777
+      ],
+      "value": "build_english_pre_write_checklist.<locals>.<genexpr>",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132777,
+        4132802
+      ],
+      "value": "You are a professional ",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4132802,
+        4132808
+      ],
+      "value": "name",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132808,
+        4132924
+      ],
+      "value": " web fiction author writing for English-speaking platforms (Royal Road, Kindle Unlimited, Scribble Hub).\n\nTarget: ",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132924,
+        4132946
+      ],
+      "value": " words per chapter, ",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4132946,
+        4132962
+      ],
+      "value": "targetChapters",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4132962,
+        4133122
+      ],
+      "value": " total chapters.\n\nWrite in English. Vary sentence length. Mix short punchy sentences with longer flowing ones. Maintain consistent narrative voice throughout.",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133122,
+        4133131
+      ],
+      "value": "__doc__",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133131,
+        4133141
+      ],
+      "value": "__file__",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133141,
+        4133149
+      ],
+      "value": "origin",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133149,
+        4133163
+      ],
+      "value": "has_location",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133163,
+        4133175
+      ],
+      "value": "__cached__",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133175,
+        4133188
+      ],
+      "value": "annotations",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4133188,
+        4133193
+      ],
+      "value": "Any",
+      "index": 36
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4133193,
+        4133231
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4133195,
+              4133202
+            ],
+            "value": "_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4133202,
+              4133210
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4133210,
+              4133226
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4133226,
+              4133231
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4133231,
+        4137803
+      ],
+      "value": "## Universal Writing Rules\n\n### Character Rules\n1. **Consistency**: Behavior driven by \"past experience + current interests + core personality.\" Never break character without cause.\n2. **Dimensionality**: Core trait + contrasting detail = real person. Perfect characters are failed characters.\n3. **No puppets**: Side characters must have independent motivation and agency. MC's strength comes from outmaneuvering smart people, not steamrolling idiots.\n4. **Voice distinction**: Different characters must speak differently—vocabulary, sentence length, slang, verbal tics.\n5. **Relationship logic**: Any relationship change must be set up by events and motivated by interests.\n\n### Narrative Technique\n6. **Show, don't tell**: Convey through action and sensory detail, not exposition. Values expressed through behavior, not declared.\n7. **Sensory grounding**: Each scene includes 1-2 sensory details beyond the visual.\n8. **Chapter hooks**: Every chapter ending needs a hook—question, reveal, threat, promise.\n9. **Information layering**: Worldbuilding emerges through action. Key lore revealed at plot-critical moments. Never dump exposition.\n10. **Description serves narrative**: Environment descriptions set mood or foreshadow. One line is enough.\n11. **Downtime earns its place**: Quiet scenes must plant hooks, advance relationships, or build contrast. Pure filler is padding.\n12. **Dialogue-driven**: In scenes with character interaction, deliver conflict and information through dialogue first, narration second. Solo/escape/exploration scenes are exempt.\n\n### Logic / Consistency\n12. **World rules are law**: Once established, physics/magic/social rules cannot bend for plot convenience.\n13. **Cost matters**: Every power, ability, or advantage must have a cost or limitation that creates real trade-offs.\n14. **Consequences stick**: Actions have consequences. Characters can't escape repercussions through luck or author fiat.\n15. **No reset buttons**: The world must change permanently in response to major events.\n\n### Reader Psychology\n16. **Promise and payoff**: Every planted hook must be resolved. Every mystery must have an answer.\n17. **Escalation**: Each conflict should feel higher-stakes than the last—either externally or emotionally.\n18. **Reader proxy**: One character should react with surprise/excitement/fear when remarkable things happen, giving readers permission to feel the same.\n19. **Pacing breathing room**: After a high-intensity sequence, give 0.5-1 chapter of lower intensity before the next escalation.\n\n### Beat Density & Rhythm (hard ruler)\n- **A payoff beat roughly every ~200 words**: a small win, a sharp line, a reversal, a charged exchange, an emotional tug. The page should never go flat for long.\n- **A forward hook roughly every ~350 words**: a small \"what happens next?\" pull. You don't have to resolve it, you have to plant it.\n- **A full setup → tension → unresolved arc every ~700-1000 words**: give the reader a concrete reason to keep going.\n- No stretch of ~200+ words that is pure description, backstory, or interior monologue without advancing the chapter goal or creating a beat. If it doesn't pull, cut it or rewrite it.\n- **Density comes from semantic weight inside paragraphs, not from chopping them up.** Most narrative (non-dialogue) paragraphs should carry real weight — a few sentences, roughly 30-100 words. Dialogue lines are naturally short and do not count as \"short paragraphs.\"\n- **One-line paragraphs are punctuation, not default rhythm.** Reserve them for: (1) an opening reversal line, (2) the final cliffhanger line, (3) a rare hammer-blow beat. Cap at ~5 per chapter.\n- **Never stack 3+ one-line paragraphs in a row.** After two short beats, the next paragraph must be a full narrative paragraph that re-gathers the action, detail, or emotion and resets the reader's breathing.\n\n### Chapter Cut (80/20 cliffhanger, hard ruler)\n- **Never finish the chapter's story inside the chapter.** Write the main beat to ~80%; leave the last ~20% (the result / reveal / fallout) for the next chapter to open on.\n- End ~80% of chapters at the action-climax moment — the blow about to land, the door swinging open, the name not yet spoken — and let the reader turn the page for the result. The other ~20% may close on a beat of earned calm.\n- **Structure outranks word count.** Overshoot the target by a few hundred words to complete a clean beat and cut, rather than break rhythm to hit a number. Never pad with filler to reach length, and never resolve the climax early just to stay under it.",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4137803,
+        4137829
+      ],
+      "value": "build_english_core_rules",
+      "index": 39
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4137829,
+        4137844
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4137831,
+              4137839
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4137839,
+              4137844
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4137844,
+        4139969
+      ],
+      "value": "## Anti-AI Iron Laws\n\n**[IRON LAW 1]** The narrator never tells the reader what to conclude.\nIf the reader can infer intent from action, the narrator must not state it.\n- ✗ \"He realized this was the most important battle of his life.\"\n- ✓ Just write the battle—let the stakes speak.\n\n**[IRON LAW 2]** No analytical/report language in prose.\nBanned in narrative text: \"core motivation,\" \"information asymmetry,\" \"strategic advantage,\" \"calculated risk,\" \"optimal outcome,\" \"key takeaway,\" \"it's worth noting.\"\n- ✗ \"His core motivation was survival.\"\n- ✓ \"He needed to get out. That was it. Everything else was noise.\"\n\n**[IRON LAW 3]** AI-tell words are rate-limited (max 1 per 3,000 words):\ndelve, tapestry, testament, intricate, pivotal, vibrant, embark, comprehensive, nuanced, landscape (metaphorical), realm (metaphorical), foster, underscore.\n\n**[IRON LAW 4]** No repetitive image cycling.\nIf the same metaphor appears twice, the third occurrence MUST switch to a new image.\n\n**[IRON LAW 5]** Planning terms never appear in chapter text.\n\"Current situation,\" \"core motivation,\" \"information boundary\" are PRE_WRITE_CHECK tools only.\n\n**[IRON LAW 6]** Ban the \"Not X; Y\" construction. Max once per chapter.\n- ✗ \"It wasn't fear. It was something deeper.\"\n- ✓ State the thing directly.\n\n**[IRON LAW 7]** Ban lists of three in descriptive prose. Max once per 2,000 words.\n- ✗ \"ancient, terrible, and vast\"\n- ✓ Use pairs or single precise words.\n\n### Anti-AI Example Table\n\n| AI Pattern | Human Version | Why |\n|---|---|---|\n| He felt a surge of anger. | He slammed the table. The water glass toppled. | Action externalizes emotion |\n| She was overwhelmed with sadness. | She held the phone with both hands, knuckles white. | Physical detail replaces label |\n| However, things were not as simple. | Yeah, right. Nothing's ever that easy. | Character voice replaces narrator hedge |\n| He saw a shadow move across the wall. | A shadow slid across the wall. | Remove filter word \"saw\" |\n| \"I won't do it,\" she exclaimed defiantly. | \"I won't do it.\" She crossed her arms. | Action beat > adverb + fancy tag |",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4139969,
+        4139998
+      ],
+      "value": "build_english_anti_ai_rules",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4139998,
+        4140572
+      ],
+      "value": "## Character Psychology Method (Internal Planning Tool)\n\nBefore writing any character's action or dialogue, run this mental checklist (NOT in prose):\n1. **Situation**: What does this character know RIGHT NOW? (Information boundary)\n2. **Want**: What do they want in this scene? (Immediate goal)\n3. **Personality filter**: How does their personality shape their approach?\n4. **Action**: What do they DO? (Behavior, not internal monologue)\n5. **Reaction**: How do others respond to their action?\n\nThis method is for YOUR planning. The terms never appear in the chapter text.",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140572,
+        4140604
+      ],
+      "value": "build_english_character_method",
+      "index": 44
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4140604,
+        4140661
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4140606,
+              4140612
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140612,
+              4140616
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140616,
+              4140624
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4140624,
+              4140640
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4140640,
+              4140656
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140656,
+              4140661
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140661,
+        4140696
+      ],
+      "value": "build_english_pre_write_checklist",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140696,
+        4140723
+      ],
+      "value": "build_english_genre_intro",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4140723,
+        4140767
+      ],
+      "value": "novels\\prompts\\inkos\\en_prompt_sections.py",
+      "index": 48
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4140767,
+        4140781
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4140769,
+              4140773
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4140773,
+              4140775
+            ],
+            "value": "i"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140775,
+              4140781
+            ],
+            "value": "item"
+          }
+        ]
+      },
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4140781,
+        4140831
+      ],
+      "value": "<module novels.prompts.inkos.en_prompt_sections>",
+      "index": 50
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4140831,
+        4140840
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4140833,
+              4140840
+            ],
+            "value": "_book"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4140840,
+        4140852
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4140842,
+              4140848
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140848,
+              4140852
+            ],
+            "value": "gp"
+          }
+        ]
+      },
+      "index": 52
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4140852,
+        4140881
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4140854,
+              4140860
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140860,
+              4140864
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140864,
+              4140871
+            ],
+            "value": "items"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4140871,
+              4140881
+            ],
+            "value": "numbered"
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140881,
+        4140891
+      ],
+      "value": "__spec__",
+      "index": 54
+    }
+  ]
+}

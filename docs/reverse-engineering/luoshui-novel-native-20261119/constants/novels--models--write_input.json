@@ -1,0 +1,311 @@
+{
+  "moduleName": "novels.models.write_input",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3944530,
+  "payloadRange": [
+    3944560,
+    3944911
+  ],
+  "payloadSha256": "ad77ce7f950820d386bd07f8e2ebcb3746dec8fd4adf4891784e8df7e376b630",
+  "declaredConstants": 27,
+  "parsedConstants": 27,
+  "stoppedAt": 3944910,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3944562,
+        3944571
+      ],
+      "value": "__doc__",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944571,
+        3944581
+      ],
+      "value": "__file__",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944581,
+        3944589
+      ],
+      "value": "origin",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944589,
+        3944603
+      ],
+      "value": "has_location",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944603,
+        3944615
+      ],
+      "value": "__cached__",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944615,
+        3944628
+      ],
+      "value": "annotations",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944628,
+        3944641
+      ],
+      "value": "dataclasses",
+      "index": 6
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3944641,
+        3944654
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3944643,
+              3944654
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944654,
+        3944665
+      ],
+      "value": "dataclass",
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3944665,
+        3944668
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              3944667,
+              3944668
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3944668,
+        3944677
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3944670,
+              3944677
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944677,
+        3944689
+      ],
+      "value": "__module__",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944689,
+        3944708
+      ],
+      "value": "WriteChapterInput",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944708,
+        3944722
+      ],
+      "value": "__qualname__",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944722,
+        3944739
+      ],
+      "value": "__annotations__",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944739,
+        3944744
+      ],
+      "value": "int",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944744,
+        3944760
+      ],
+      "value": "chapter_number",
+      "index": 16
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3944760,
+        3944761
+      ],
+      "value": "",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944761,
+        3944777
+      ],
+      "value": "chapter_intent",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944777,
+        3944782
+      ],
+      "value": "str",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944782,
+        3944799
+      ],
+      "value": "context_package",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944799,
+        3944811
+      ],
+      "value": "rule_stack",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3944811,
+        3944841
+      ],
+      "value": "novels\\models\\write_input.py",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3944841,
+        3944877
+      ],
+      "value": "<module novels.models.write_input>",
+      "index": 23
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3944877,
+        3944890
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3944879,
+              3944890
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944890,
+        3944900
+      ],
+      "value": "__name__",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3944900,
+        3944910
+      ],
+      "value": "__spec__",
+      "index": 26
+    }
+  ]
+}

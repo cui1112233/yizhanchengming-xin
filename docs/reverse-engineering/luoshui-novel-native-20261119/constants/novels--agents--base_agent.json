@@ -1,0 +1,1659 @@
+{
+  "moduleName": "novels.agents.base_agent",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3891078,
+  "payloadRange": [
+    3891107,
+    3892967
+  ],
+  "payloadSha256": "dbd42c68bd5193dd5e750a286918ed793dce5c68f9be8ecd30e73eee0d50ea24",
+  "declaredConstants": 101,
+  "parsedConstants": 101,
+  "stoppedAt": 3892966,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3891109,
+        3891119
+      ],
+      "value": "callable",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891119,
+        3891134
+      ],
+      "value": "event_emitter",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3891134,
+        3891151
+      ],
+      "value": "utils.llm_retry",
+      "index": 2
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891151,
+        3891169
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891153,
+              3891169
+            ],
+            "value": "retry_llm_call"
+          }
+        ]
+      },
+      "index": 3
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3891169,
+        3891171
+      ],
+      "value": 2,
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891171,
+        3891187
+      ],
+      "value": "retry_llm_call",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891187,
+        3891211
+      ],
+      "value": "codex_reasoning_effort",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891211,
+        3891236
+      ],
+      "value": "claude_reasoning_effort",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891236,
+        3891241
+      ],
+      "value": "pop",
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891241,
+        3891257
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891243,
+              3891256
+            ],
+            "value": "stage_label"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3891256,
+              3891257
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3891257,
+        3891258
+      ],
+      "value": "",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891258,
+        3891265
+      ],
+      "value": "strip",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891265,
+        3891280
+      ],
+      "value": "stream_output",
+      "index": 12
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3891280,
+        3891295
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891282,
+              3891290
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891290,
+              3891295
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891295,
+        3891302
+      ],
+      "value": "_call",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3891302,
+        3891336
+      ],
+      "value": "AgentContext.chat.<locals>._call",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3891336,
+        3891344
+      ],
+      "value": "agent-",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891344,
+        3891351
+      ],
+      "value": "model",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891351,
+        3891360
+      ],
+      "value": "default",
+      "index": 18
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891360,
+        3891369
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891362,
+              3891369
+            ],
+            "value": "label"
+          }
+        ]
+      },
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891369,
+        3891375
+      ],
+      "value": "self",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891375,
+        3891381
+      ],
+      "value": "emit",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891381,
+        3891394
+      ],
+      "value": "stage_label",
+      "index": 22
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891394,
+        3891415
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3891396,
+              3891415
+            ],
+            "value": "chat.stream.start"
+          }
+        ]
+      },
+      "index": 23
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891415,
+        3891424
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891417,
+              3891424
+            ],
+            "value": "stage"
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3891424,
+        3891451
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891426,
+              3891432
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3891432,
+              3891440
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891440,
+              3891445
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3891445,
+              3891451
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891451,
+        3891462
+      ],
+      "value": "_on_delta",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3891462,
+        3891515
+      ],
+      "value": "AgentContext.chat.<locals>._call.<locals>._on_delta",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891515,
+        3891530
+      ],
+      "value": "_on_reasoning",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3891530,
+        3891587
+      ],
+      "value": "AgentContext.chat.<locals>._call.<locals>._on_reasoning",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891587,
+        3891595
+      ],
+      "value": "client",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891595,
+        3891608
+      ],
+      "value": "chat_stream",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891608,
+        3891618
+      ],
+      "value": "messages",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891618,
+        3891633
+      ],
+      "value": "should_cancel",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891633,
+        3891643
+      ],
+      "value": "on_delta",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891643,
+        3891657
+      ],
+      "value": "on_reasoning",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891657,
+        3891673
+      ],
+      "value": "channel_kwargs",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891673,
+        3891681
+      ],
+      "value": "kwargs",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891681,
+        3891690
+      ],
+      "value": "content",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891690,
+        3891696
+      ],
+      "value": "chat",
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891696,
+        3891710
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3891698,
+              3891710
+            ],
+            "value": "chat.delta"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891710,
+        3891725
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891712,
+              3891718
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3891718,
+              3891725
+            ],
+            "value": "stage"
+          }
+        ]
+      },
+      "index": 41
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891725,
+        3891745
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3891727,
+              3891745
+            ],
+            "value": "chat.stream.done"
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891745,
+        3891760
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891747,
+              3891754
+            ],
+            "value": "stage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3891754,
+              3891760
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891760,
+        3891784
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3891762,
+              3891784
+            ],
+            "value": "chat.reasoning.delta"
+          }
+        ]
+      },
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891784,
+        3891796
+      ],
+      "value": "splitlines",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891796,
+        3891800
+      ],
+      "value": "re",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891800,
+        3891807
+      ],
+      "value": "match",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3891807,
+        3891824
+      ],
+      "value": "^##\\s+(.+?)\\s*$",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891824,
+        3891837
+      ],
+      "value": "current_key",
+      "index": 49
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        3891837,
+        3891839
+      ],
+      "value": "\n",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891839,
+        3891854
+      ],
+      "value": "current_lines",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891854,
+        3891864
+      ],
+      "value": "sections",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891864,
+        3891871
+      ],
+      "value": "group",
+      "index": 53
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891871,
+        3891875
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3891873,
+              3891875
+            ],
+            "value": 1
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891875,
+        3891884
+      ],
+      "value": "__doc__",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891884,
+        3891894
+      ],
+      "value": "__file__",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891894,
+        3891902
+      ],
+      "value": "origin",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891902,
+        3891916
+      ],
+      "value": "has_location",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891916,
+        3891928
+      ],
+      "value": "__cached__",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891928,
+        3891941
+      ],
+      "value": "annotations",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891941,
+        3891954
+      ],
+      "value": "dataclasses",
+      "index": 61
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3891954,
+        3891967
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3891956,
+              3891967
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891967,
+        3891978
+      ],
+      "value": "dataclass",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891978,
+        3891988
+      ],
+      "value": "Callable",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891988,
+        3891994
+      ],
+      "value": "Dict",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3891994,
+        3892000
+      ],
+      "value": "List",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892000,
+        3892010
+      ],
+      "value": "Optional",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892010,
+        3892025
+      ],
+      "value": "TYPE_CHECKING",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892025,
+        3892042
+      ],
+      "value": "utils.ai_client",
+      "index": 69
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892042,
+        3892060
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892044,
+              3892060
+            ],
+            "value": "NovelsAIClient"
+          }
+        ]
+      },
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892060,
+        3892076
+      ],
+      "value": "NovelsAIClient",
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892076,
+        3892079
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              3892078,
+              3892079
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892079,
+        3892088
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892081,
+              3892088
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892088,
+        3892100
+      ],
+      "value": "__module__",
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892100,
+        3892114
+      ],
+      "value": "AgentContext",
+      "index": 75
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892114,
+        3892128
+      ],
+      "value": "__qualname__",
+      "index": 76
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892128,
+        3892145
+      ],
+      "value": "__annotations__",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892145,
+        3892160
+      ],
+      "value": "Optional[str]",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892160,
+        3892190
+      ],
+      "value": "Optional[Callable[[], bool]]",
+      "index": 79
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892190,
+        3892221
+      ],
+      "value": "Optional[Callable[..., None]]",
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892221,
+        3892237
+      ],
+      "value": "settings_store",
+      "index": 81
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892237,
+        3892269
+      ],
+      "value": "Optional['AgentSettingsStore']",
+      "index": 82
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3892269,
+        3892302
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892271,
+              3892283
+            ],
+            "value": "event_type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892283,
+              3892291
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892291,
+              3892296
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892296,
+              3892302
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892302,
+        3892321
+      ],
+      "value": "AgentContext.emit",
+      "index": 84
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3892321,
+        3892368
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892323,
+              3892333
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892333,
+              3892341
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3892341,
+              3892363
+            ],
+            "value": "List[Dict[str, str]]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892363,
+              3892368
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892368,
+        3892387
+      ],
+      "value": "AgentContext.chat",
+      "index": 86
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3892387,
+        3892427
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892389,
+              3892398
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892398,
+              3892406
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892406,
+              3892411
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3892411,
+              3892427
+            ],
+            "value": "Dict[str, str]"
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892427,
+        3892443
+      ],
+      "value": "parse_sections",
+      "index": 88
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892443,
+        3892472
+      ],
+      "value": "novels\\agents\\base_agent.py",
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3892472,
+        3892507
+      ],
+      "value": "<module novels.agents.base_agent>",
+      "index": 90
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892507,
+        3892520
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892509,
+              3892520
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892520,
+        3892644
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892522,
+              3892533
+            ],
+            "value": "_on_delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892533,
+              3892548
+            ],
+            "value": "_on_reasoning"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892548,
+              3892559
+            ],
+            "value": "stream_fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892559,
+              3892567
+            ],
+            "value": "result"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892567,
+              3892576
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892576,
+              3892591
+            ],
+            "value": "stream_output"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892591,
+              3892597
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892597,
+              3892610
+            ],
+            "value": "stage_label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892610,
+              3892620
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892620,
+              3892636
+            ],
+            "value": "channel_kwargs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892636,
+              3892644
+            ],
+            "value": "kwargs"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892644,
+        3892714
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892646,
+              3892662
+            ],
+            "value": "channel_kwargs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892662,
+              3892670
+            ],
+            "value": "kwargs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892670,
+              3892680
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892680,
+              3892686
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892686,
+              3892699
+            ],
+            "value": "stage_label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892699,
+              3892714
+            ],
+            "value": "stream_output"
+          }
+        ]
+      },
+      "index": 93
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892714,
+        3892741
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892716,
+              3892722
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892722,
+              3892728
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892728,
+              3892741
+            ],
+            "value": "stage_label"
+          }
+        ]
+      },
+      "index": 94
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892741,
+        3892762
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892743,
+              3892749
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892749,
+              3892762
+            ],
+            "value": "stage_label"
+          }
+        ]
+      },
+      "index": 95
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892762,
+        3892855
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892764,
+              3892770
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892770,
+              3892780
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892780,
+              3892788
+            ],
+            "value": "kwargs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892788,
+              3892804
+            ],
+            "value": "channel_kwargs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892804,
+              3892820
+            ],
+            "value": "retry_llm_call"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892820,
+              3892833
+            ],
+            "value": "stage_label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892833,
+              3892848
+            ],
+            "value": "stream_output"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892848,
+              3892855
+            ],
+            "value": "_call"
+          }
+        ]
+      },
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892855,
+        3892884
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892857,
+              3892863
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892863,
+              3892875
+            ],
+            "value": "event_type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892875,
+              3892884
+            ],
+            "value": "payload"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3892884,
+        3892946
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3892886,
+              3892895
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892895,
+              3892905
+            ],
+            "value": "sections"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892905,
+              3892920
+            ],
+            "value": "current_lines"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892920,
+              3892933
+            ],
+            "value": "current_key"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892933,
+              3892939
+            ],
+            "value": "line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3892939,
+              3892946
+            ],
+            "value": "match"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892946,
+        3892956
+      ],
+      "value": "__name__",
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3892956,
+        3892966
+      ],
+      "value": "__spec__",
+      "index": 100
+    }
+  ]
+}

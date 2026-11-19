@@ -1,0 +1,215 @@
+{
+  "moduleName": "novels.utils.cancellation",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4421380,
+  "payloadRange": [
+    4421410,
+    4421736
+  ],
+  "payloadSha256": "d50a0238e58e0023249b74dadfe582701b13a7c7c6e96c07bf052006ac15ecac",
+  "declaredConstants": 20,
+  "parsedConstants": 20,
+  "stoppedAt": 4421735,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4421412,
+        4421421
+      ],
+      "value": "__doc__",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421421,
+        4421431
+      ],
+      "value": "__file__",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421431,
+        4421439
+      ],
+      "value": "origin",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421439,
+        4421453
+      ],
+      "value": "has_location",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421453,
+        4421465
+      ],
+      "value": "__cached__",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421465,
+        4421478
+      ],
+      "value": "annotations",
+      "index": 5
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4421478,
+        4421494
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "E",
+            "fileRange": [
+              4421480,
+              4421494
+            ],
+            "value": {
+              "builtinTag": "E",
+              "name": "RuntimeError"
+            }
+          }
+        ]
+      },
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421494,
+        4421507
+      ],
+      "value": "__prepare__",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421507,
+        4421532
+      ],
+      "value": "OperationCancelledError",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421532,
+        4421545
+      ],
+      "value": "__getitem__",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4421545,
+        4421593
+      ],
+      "value": "%s.__prepare__() must return a mapping, not %s",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421593,
+        4421603
+      ],
+      "value": "__name__",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4421603,
+        4421616
+      ],
+      "value": "<metaclass>",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421616,
+        4421628
+      ],
+      "value": "__module__",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421628,
+        4421642
+      ],
+      "value": "__qualname__",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421642,
+        4421658
+      ],
+      "value": "__orig_bases__",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4421658,
+        4421688
+      ],
+      "value": "novels\\utils\\cancellation.py",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4421688,
+        4421724
+      ],
+      "value": "<module novels.utils.cancellation>",
+      "index": 17
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4421724,
+        4421725
+      ],
+      "value": "",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4421725,
+        4421735
+      ],
+      "value": "__spec__",
+      "index": 19
+    }
+  ]
+}

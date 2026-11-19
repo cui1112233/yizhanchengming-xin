@@ -1,0 +1,8467 @@
+{
+  "moduleName": "novels.prompts.inkos.continuity_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4108384,
+  "payloadRange": [
+    4108428,
+    4131741
+  ],
+  "payloadSha256": "385b75dadcbb4c7baf20cfd3328c6fc61face780c85325d6f0b303ea43de7177",
+  "declaredConstants": 199,
+  "parsedConstants": 199,
+  "stoppedAt": 4131740,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4108430,
+        4108434
+      ],
+      "value": "en",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108434,
+        4108444
+      ],
+      "value": "critical",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108444,
+        4108459
+      ],
+      "value": "Strict check.",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108459,
+        4108465
+      ],
+      "value": "info",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108465,
+        4108501
+      ],
+      "value": "Log only; do not fail the chapter.",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108501,
+        4108517
+      ],
+      "value": "Warning level.",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108517,
+        4108537
+      ],
+      "value": "（严格检查）",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108537,
+        4108572
+      ],
+      "value": "（仅记录，不判定失败）",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108572,
+        4108592
+      ],
+      "value": "（警告级别）",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108592,
+        4108597
+      ],
+      "value": "get",
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4108597,
+        4108621
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4108599,
+              4108621
+            ],
+            "value": "fatigueWordsOverride"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4108621,
+        4108637
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4108623,
+              4108637
+            ],
+            "value": "fatigueWords"
+          }
+        ]
+      },
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108637,
+        4108644
+      ],
+      "value": "notes",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108644,
+        4108648
+      ],
+      "value": "zh",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108648,
+        4108653
+      ],
+      "value": "ooc",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108653,
+        4108789
+      ],
+      "value": "OOC模式下角色可偏离性格底色，此维度仅记录不判定失败。参照 fanfic_canon.md 角色档案评估偏离程度。",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108789,
+        4108927
+      ],
+      "value": "In OOC mode, personality drift can be intentional; record only, do not fail. Evaluate against the character dossiers in fanfic_canon.md.",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4108927,
+        4108934
+      ],
+      "value": "canon",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4108934,
+        4109064
+      ],
+      "value": "原作向同人：角色必须严格遵守性格底色。参照 fanfic_canon.md 角色档案中的性格底色和行为模式。",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109064,
+        4109204
+      ],
+      "value": "Canon-faithful fanfic: characters must stay close to their original personality core. Evaluate against fanfic_canon.md character dossiers.",
+      "index": 19
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4109204,
+        4109206
+      ],
+      "value": 10,
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109206,
+        4109211
+      ],
+      "value": "、",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109211,
+        4109215
+      ],
+      "value": ", ",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109215,
+        4109232
+      ],
+      "value": "Fatigue words: ",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109232,
+        4109361
+      ],
+      "value": ". Also check AI tell markers (仿佛/不禁/宛如/竟然/忽然/猛地); warn when any appears more than once per 3,000 words.",
+      "index": 24
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4109361,
+        4109362
+      ],
+      "value": "",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109362,
+        4109379
+      ],
+      "value": "高疲劳词：",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109379,
+        4109493
+      ],
+      "value": "。同时检查AI标记词（仿佛/不禁/宛如/竟然/忽然/猛地）密度，每3000字超过1次即warning",
+      "index": 27
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4109493,
+        4109514
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4109495,
+              4109514
+            ],
+            "value": "satisfactionTypes"
+          }
+        ]
+      },
+      "index": 28
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4109514,
+        4109516
+      ],
+      "value": 15,
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109516,
+        4109533
+      ],
+      "value": "爽点类型：",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109533,
+        4109538
+      ],
+      "value": "。",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109538,
+        4109870
+      ],
+      "value": "检查欲望驱动：本章是否制造了情绪缺口（读者渴望释放）或完成了超出预期的兑现？只满足读者70%期待的兑现等于爽点虚化。如果本章处于小目标周期的后效阶段，检查是否展示了具体改变——不只是情绪反应，而是地位、关系或资源的实际变化。",
+      "index": 32
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4109870,
+        4109872
+      ],
+      "value": 7,
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4109872,
+        4110434
+      ],
+      "value": "检查节奏波形：最近 3-5 章是否形成了完整的「蓄压→升级→爆发→后效」周期？如果连续 5 章没有爆发（兑现/回报/翻转），标记为节奏停滞。如果上一章是爆发/高潮/大反转，本章是否写出了改变？如果直接跳到新蓄压而没有展示前一波爆发的影响，标记为「高潮后影响缺失」。非冲突章节中的日常/过渡/对话段落，是否至少承担了一项任务：埋伏笔、推关系、建立反差、准备下一轮蓄压。纯水日常标记为流水账风险。",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4110434,
+        4111038
+      ],
+      "value": "Check pacing rhythm: Do the recent 3-5 chapters form a complete mini-goal cycle (build-up → escalation → climax → aftermath)? If 5+ consecutive chapters pass without a climax (payoff/reward/reversal), flag as pacing stagnation. If the previous chapter was a climax/big reversal, does this chapter show change (relationships shifted, status changed, costs paid)? If it jumps straight to new build-up without showing impact, flag as 'post-climax impact missing'. Daily/transition scenes must carry at least one task: plant a hook, advance a relationship, set up contrast, or prepare the next cycle.",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4111038,
+        4111054
+      ],
+      "value": "Payoff types: ",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4111054,
+        4111058
+      ],
+      "value": ". ",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4111058,
+        4111464
+      ],
+      "value": "Check desire engine: Has the chapter created an emotional gap (reader wants release) OR delivered a payoff that exceeds expectations? A payoff that only satisfies 70% of built-up anticipation counts as diluted. If this chapter is in the aftermath phase of a mini-goal cycle, verify that consequences are shown — not just emotional reactions, but concrete changes to status, relationships, or resources.",
+      "index": 38
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4111464,
+        4114525
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4111466,
+              4111468
+            ],
+            "value": 6
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111468,
+              4111470
+            ],
+            "value": 19
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111470,
+              4111472
+            ],
+            "value": 24
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111472,
+              4111474
+            ],
+            "value": 25
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111474,
+              4111476
+            ],
+            "value": 26
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111476,
+              4111478
+            ],
+            "value": 28
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111478,
+              4111480
+            ],
+            "value": 29
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111480,
+              4111482
+            ],
+            "value": 30
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111482,
+              4111484
+            ],
+            "value": 31
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111484,
+              4111486
+            ],
+            "value": 32
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4111486,
+              4111488
+            ],
+            "value": 33
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4111488,
+              4112810
+            ],
+            "value": "Phase 7 hook-debt 升级规则（含 hotfix 2/3）。阅读 pending_hooks.md 伏笔池时不要只看\"有没有悬而未决的伏笔\"，要读状态列中的 stale / blocked 标记、core_hook 列、depends_on 列、以及升级列：\n\n• critical 级别仅适用于升级=是（promoted=true）的伏笔。非升级的 stale/blocked 伏笔一律保持 info——升级标志是降噪的开关，因为架构师阶段会产出大量非承重的伏笔种子。\n• 升级=是且 core_hook=是 的伏笔过期超过 10 章未回收 → warning 升级为 critical。全书只有 3-7 条核心伏笔，任何一条漂移这么久都是烂尾前兆。\n• 升级=是的受阻伏笔，状态列中\"受阻于 X (已阻 Y 章)\"且 Y ≥ 6 → warning。\"已阻 Y 章\"这个字面 token 直接读自账本，不要猜。描述中要写出具体的上游 hook_id，让 planner 能安排落地路径。\n• 卷尾（volume_map 中任一卷的末章）仍有升级=是的主线伏笔处于 open 或 stale 且没有显式\"延至下一卷\"规划 → critical。\n• 升级=否的 stale 伏笔 → info 级记录，不判本章失败，但保留以便 planner 安排清理。\n\ndescription 中要明确引用 hook_id，并把状态列中 stale / blocked 的原文标记字面抄进去。本维度只审结构，不评价伏笔文笔。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4112810,
+              4112875
+            ],
+            "value": "检查视角切换是否有过渡、是否与设定视角一致"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4112875,
+              4113036
+            ],
+            "value": "对照 subplot_board 和 chapter_summaries：标记那些沉寂到接近被遗忘的支线，或近期连续只被重复提及、没有真实推进的支线。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113036,
+              4113265
+            ],
+            "value": "对照 emotional_arcs 和 chapter_summaries：标记主要角色在一段时间内始终停留在同一种情绪压力形态、没有新压力、释放、转折或重估的情况。注意区分'处境未变'和'内心未变'。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113265,
+              4113491
+            ],
+            "value": "对照 chapter_summaries 的章节类型分布：当近期章节长时间停留在同一种模式、把节奏压平，或回收/释放/高潮章节缺席过久时给出 warning。请明确列出最近章节的类型序列。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113491,
+              4113541
+            ],
+            "value": "检查番外事件是否与正典约束表矛盾"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113541,
+              4113630
+            ],
+            "value": "检查角色是否引用了分歧点之后才揭示的信息（参照信息边界表）"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113630,
+              4113710
+            ],
+            "value": "检查番外是否违反正传世界规则（力量体系、地理、阵营）"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113710,
+              4113773
+            ],
+            "value": "检查番外是否越权回收正传伏笔（warning级别）"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4113773,
+              4114054
+            ],
+            "value": "检查：章尾是否重新点燃好奇心，已经承诺的回收是否按伏笔自身节奏落地，压力是否得到释放，读者期待缺口是在持续累积还是在被满足。如果刚经历高潮，检查后效章节是否在开启新周期前展示了具体改变。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4114054,
+              4114525
+            ],
+            "value": "对照随章提供的 chapter_memo。成稿是否兑现了 memo 中的 goal，并在 7 段正文（当前任务 / 该兑现·暂不掀 / 日常过渡功能 / 关键抉择三连问 / 章尾必须发生的改变 / 不要做 等）中留下可见落地痕迹？任何段落缺失或被写反 → critical。提醒：稀疏 memo 合法（喘息章 memo 可以只有 goal + 骨架 body），只检查 memo 实际写出的段落，不能因为 memo 稀疏就判 incomplete。"
+          }
+        ]
+      },
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4114525,
+        4114535
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4114527,
+              4114529
+            ],
+            "value": 34
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4114529,
+              4114531
+            ],
+            "value": 35
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4114531,
+              4114533
+            ],
+            "value": 36
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4114533,
+              4114535
+            ],
+            "value": 37
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4114535,
+        4114555
+      ],
+      "value": "severity_overrides",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4114555,
+        4114564
+      ],
+      "value": "warning",
+      "index": 42
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4114564,
+        4115013
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4114566,
+              4114568
+            ],
+            "value": 34
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4114568,
+              4114570
+            ],
+            "value": 35
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4114570,
+              4114572
+            ],
+            "value": 36
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4114572,
+              4114574
+            ],
+            "value": 37
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4114574,
+              4114704
+            ],
+            "value": "检查角色的语癖、说话风格、行为模式是否与 fanfic_canon.md 角色档案一致。偏离必须有情境驱动。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4114704,
+              4114816
+            ],
+            "value": "检查章节内容是否违反 fanfic_canon.md 中的世界规则（地理、力量体系、阵营关系）。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4114816,
+              4114943
+            ],
+            "value": "检查角色之间的关系互动是否合理，是否与 fanfic_canon.md 中标注的关键关系一致或有合理发展。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4114943,
+              4115013
+            ],
+            "value": "检查章节是否与 fanfic_canon.md 关键事件时间线矛盾。"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115013,
+        4115032
+      ],
+      "value": "FANFIC_DIMENSIONS",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115032,
+        4115036
+      ],
+      "value": "id",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115036,
+        4115042
+      ],
+      "value": "base",
+      "index": 46
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115042,
+        4115054
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115044,
+              4115054
+            ],
+            "value": "baseNote"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4115054,
+        4115056
+      ],
+      "value": " ",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115056,
+        4115086
+      ],
+      "value": "_format_fanfic_severity_note",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115086,
+        4115094
+      ],
+      "value": "sorted",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115094,
+        4115112
+      ],
+      "value": "DIMENSION_LABELS",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115112,
+        4115122
+      ],
+      "value": "language",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115122,
+        4115139
+      ],
+      "value": "DIMENSION_HINTS",
+      "index": 53
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115139,
+        4115145
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115141,
+              4115145
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115145,
+        4115154
+      ],
+      "value": "catalog",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115154,
+        4115160
+      ],
+      "value": "dim_",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115160,
+        4115173
+      ],
+      "value": "dimensionId",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115173,
+        4115180
+      ],
+      "value": "title",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115180,
+        4115189
+      ],
+      "value": "content",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115189,
+        4115198
+      ],
+      "value": "enabled",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115198,
+        4115229
+      ],
+      "value": "DEFAULT_ENABLED_DIMENSION_IDS",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115229,
+        4115235
+      ],
+      "value": "kind",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115235,
+        4115246
+      ],
+      "value": "dimension",
+      "index": 63
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115246,
+        4115265
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115248,
+              4115265
+            ],
+            "value": "auditDimensions"
+          }
+        ]
+      },
+      "index": 64
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4115265,
+        4115321
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4115267,
+              4115269
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115269,
+              4115271
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115271,
+              4115273
+            ],
+            "value": 3
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115273,
+              4115275
+            ],
+            "value": 4
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115275,
+              4115277
+            ],
+            "value": 5
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115277,
+              4115279
+            ],
+            "value": 6
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115279,
+              4115281
+            ],
+            "value": 7
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115281,
+              4115283
+            ],
+            "value": 8
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115283,
+              4115285
+            ],
+            "value": 9
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115285,
+              4115287
+            ],
+            "value": 10
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115287,
+              4115289
+            ],
+            "value": 11
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115289,
+              4115291
+            ],
+            "value": 12
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115291,
+              4115293
+            ],
+            "value": 13
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115293,
+              4115295
+            ],
+            "value": 14
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115295,
+              4115297
+            ],
+            "value": 15
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115297,
+              4115299
+            ],
+            "value": 16
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115299,
+              4115301
+            ],
+            "value": 17
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115301,
+              4115303
+            ],
+            "value": 18
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115303,
+              4115305
+            ],
+            "value": 19
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115305,
+              4115307
+            ],
+            "value": 20
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115307,
+              4115309
+            ],
+            "value": 21
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115309,
+              4115311
+            ],
+            "value": 22
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115311,
+              4115313
+            ],
+            "value": 23
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115313,
+              4115315
+            ],
+            "value": 24
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115315,
+              4115317
+            ],
+            "value": 25
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115317,
+              4115319
+            ],
+            "value": 26
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115319,
+              4115321
+            ],
+            "value": 27
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115321,
+        4115350
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115323,
+              4115350
+            ],
+            "value": "additionalAuditDimensions"
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115350,
+        4115357
+      ],
+      "value": "items",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115357,
+        4115365
+      ],
+      "value": "update",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115365,
+        4115377
+      ],
+      "value": "active_ids",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115377,
+        4115382
+      ],
+      "value": "add",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115382,
+        4115394
+      ],
+      "value": "name_to_id",
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115394,
+        4115398
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4115396,
+              4115398
+            ],
+            "value": 32
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115398,
+        4115402
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4115400,
+              4115402
+            ],
+            "value": 33
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115402,
+        4115417
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115404,
+              4115417
+            ],
+            "value": "eraResearch"
+          }
+        ]
+      },
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115417,
+        4115433
+      ],
+      "value": "eraConstraints",
+      "index": 75
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115433,
+        4115444
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115435,
+              4115444
+            ],
+            "value": "enabled"
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115444,
+        4115448
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4115446,
+              4115448
+            ],
+            "value": 12
+          }
+        ]
+      },
+      "index": 77
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4115448,
+        4115458
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4115450,
+              4115452
+            ],
+            "value": 28
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115452,
+              4115454
+            ],
+            "value": 29
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115454,
+              4115456
+            ],
+            "value": 30
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4115456,
+              4115458
+            ],
+            "value": 31
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115458,
+        4115487
+      ],
+      "value": "get_fanfic_dimension_config",
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115487,
+        4115508
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115489,
+              4115508
+            ],
+            "value": "allowedDeviations"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115508,
+        4115525
+      ],
+      "value": "deactivated_ids",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115525,
+        4115534
+      ],
+      "value": "discard",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115534,
+        4115556
+      ],
+      "value": "build_dimension_note",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115556,
+        4115560
+      ],
+      "value": "gp",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115560,
+        4115572
+      ],
+      "value": "book_rules",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115572,
+        4115585
+      ],
+      "value": "fanfic_mode",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115585,
+        4115600
+      ],
+      "value": "fanfic_config",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115600,
+        4115606
+      ],
+      "value": "dims",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115606,
+        4115622
+      ],
+      "value": "AuditDimension",
+      "index": 89
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4115622,
+        4115640
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4115624,
+              4115628
+            ],
+            "value": "id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4115628,
+              4115634
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4115634,
+              4115640
+            ],
+            "value": "note"
+          }
+        ]
+      },
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115640,
+        4115646
+      ],
+      "value": "note",
+      "index": 91
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4115646,
+        4115651
+      ],
+      "value": "（",
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4115651,
+        4115656
+      ],
+      "value": "）",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4115656,
+        4115660
+      ],
+      "value": " (",
+      "index": 94
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4115660,
+        4115662
+      ],
+      "value": ")",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115662,
+        4115669
+      ],
+      "value": "lines",
+      "index": 96
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4115669,
+        4115675
+      ],
+      "value": "name",
+      "index": 97
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4115675,
+        4115677
+      ],
+      "value": "\n",
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4115677,
+        4115696
+      ],
+      "value": "You are a strict ",
+      "index": 99
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4115696,
+        4115829
+      ],
+      "value": " web-fiction structural editor. Audit the chapter for completion and structure, not for prose craft. ALL OUTPUT MUST BE IN ENGLISH.",
+      "index": 100
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4115829,
+        4118236
+      ],
+      "value": "\n\n## Reviewer Scope (hard constraints)\n\nYou audit completion and structure only. Your job is to decide whether the chapter delivers the plan, keeps characters and timelines intact, and moves the book forward. Wording, sentence rhythm, paragraph shape, punctuation, imagery, and other prose-surface choices are NOT yours — those belong to the Polisher pass that runs after you. If you notice prose-surface issues, you may flag them with severity \"info\" so the Polisher can see them, but they do not count toward passed / overall_score and they must never be critical.\n\nYou audit twelve structural reader-pain patterns: dragging / flat openings, blurry worldbuilding disconnected from reality, contradictory character setup, tangled POV, mainline drift or stagnation, weak conflict with missing payoff, pacing loss of control and abrupt transitions, character inconsistency across the arc, thin/one-note characters without contrast, stiff emotion expression and abrupt relationship jumps, imbalanced cheats/power gifts, and settings that never land in concrete action. Alongside these, keep the engineering dimensions listed below (OOC, timeline coherence, information boundary, hook debt, cross-chapter repetition, lexical fatigue, length band, title fatigue, paragraph shape).\n\nSparse chapter_memo is legitimate. Breather / aftermath / transition chapters may ship a memo that only contains goal + a skeleton body — do NOT flag such memos as incomplete, and do NOT penalise the chapter for lacking content against sections the memo itself does not populate. Judge drift only against what the memo actually says.\n\nIf the chapter memo, rule stack, or supplied context specifies content proportions between lines (politics/romance, career/relationship, case/character, etc.), audit whether those lines appear as actual scenes, dialogue, action, or relationship movement. A line that is only summarized in one sentence counts as missing. Mark it critical only when the memo explicitly required it for this chapter.\n\nFor every issue, set repair_scope as a typed routing hint: \"local\" for wording, paragraph shape, small repetition, or narrow sentence-level fixes; \"structural\" for plot drift, timeline break, missing scene/payoff, character logic collapse, POV/knowledge boundary failure, or anything requiring a rewritten scene/chapter; \"unknown\" only when you genuinely cannot decide.\n\nAudit dimensions:\n",
+      "index": 101
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4118236,
+        4119130
+      ],
+      "value": "\n\nOutput format MUST be JSON:\n{\n  \"passed\": true/false,\n  \"overall_score\": 0-100,\n  \"issues\": [\n\t    {\n\t      \"severity\": \"critical|warning|info\",\n\t      \"repair_scope\": \"local|structural|unknown\",\n\t      \"category\": \"dimension name\",\n\t      \"description\": \"specific issue description\",\n\t      \"suggestion\": \"fix suggestion\"\n\t    }\n  ],\n  \"summary\": \"one-sentence audit conclusion\"\n}\n\npassed is false ONLY when critical-severity issues exist.\n\noverall_score calibration:\n- 95-100: Publishable as-is, no noticeable issues\n- 85-94: Minor blemishes but smooth reading, the reader won't break immersion\n- 75-84: Noticeable problems but the story backbone holds, needs revision but not urgent\n- 65-74: Multiple issues hurt the reading experience, pacing or continuity has gaps\n- < 65: Structural breakdown, needs major rewrite\nScore holistically — do not let a single minor issue tank the score.",
+      "index": 102
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4119130,
+        4119153
+      ],
+      "value": "你是一位严格的",
+      "index": 103
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4119153,
+        4119233
+      ],
+      "value": "网络小说结构审稿编辑。你只审完成度 + 结构，不审文笔。",
+      "index": 104
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4119233,
+        4120907
+      ],
+      "value": "\n\n## 审稿边界（硬约束）\n\n你不审文笔、不审排版、不审句式——这些归 Polisher。你发现的文笔问题只能以 severity=\"info\" 标注供 Polisher 参考，不计入 reviewer 的 passed/overall_score，也绝不可标为 critical。\n\n你审 12 条结构类雷点：开篇拖沓/平淡、世界观模糊脱现实、人设矛盾、视角杂乱、主线偏离/停滞、冲突乏力爽点缺失、节奏失控过渡生硬、人设前后矛盾、人物单薄无反差、情感表达生硬/关系突兀、金手指失衡、设定无落地。同时保留工程维度（OOC、timeline 一致、信息越界、hook-debt、跨章重复、词汇疲劳、章节字数、标题疲劳、段落形状）。\n\n稀疏 memo 是合法状态。喘息章 / 后效章 / 过渡章的 memo 可以只有 goal + 骨架 body——此类 memo 不判 incomplete，也不能因为 memo 没写的段落就扣成稿的分。只按 memo 实际写出来的内容判偏离。\n\n如果章节备忘、规则栈或输入上下文明确指定多条剧情线的比例（权谋/感情、事业/恋爱、案件/人物等），要审它们是否真正落成了场景、对话、行动或关系变化。只用一句总结带过的线，视为缺失。只有当 memo 明确要求本章必须推进该线时，才标 critical。\n\n每条 issue 必须给 repair_scope 作为 typed 路由提示：\"local\" 表示措辞、段落形状、小重复、句段级小修；\"structural\" 表示主线偏离、时间线断裂、场面/回报缺失、人物逻辑崩、视角/信息边界失败，或任何需要重写场景/整章的问题；只有确实无法判断时才写 \"unknown\"。\n\n审查维度：\n",
+      "index": 105
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4120907,
+        4121749
+      ],
+      "value": "\n\n输出格式必须为 JSON：\n{\n  \"passed\": true/false,\n  \"overall_score\": 0-100,\n  \"issues\": [\n\t    {\n\t      \"severity\": \"critical|warning|info\",\n\t      \"repair_scope\": \"local|structural|unknown\",\n\t      \"category\": \"审查维度名称\",\n\t      \"description\": \"具体问题描述\",\n\t      \"suggestion\": \"修改建议\"\n\t    }\n  ],\n  \"summary\": \"一句话总结审查结论\"\n}\n\n只有当存在 critical 级别问题时，passed 才为 false。\n\noverall_score 评分校准：\n- 95-100：可直接发布，无明显问题\n- 85-94：有小瑕疵但整体流畅可读，读者不会出戏\n- 75-84：有明显问题但故事主干完整，需要修但不紧急\n- 65-74：多处影响阅读体验的问题，节奏或连续性有断裂\n- < 65：结构性问题，需要大幅重写\n综合评分，不要因为单一小问题大幅拉低分数。",
+      "index": 106
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121749,
+        4121766
+      ],
+      "value": "Review chapter ",
+      "index": 107
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121766,
+        4121793
+      ],
+      "value": ".\n\n## Current State Card\n",
+      "index": 108
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121793,
+        4121801
+      ],
+      "value": "(none)",
+      "index": 109
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121801,
+        4121837
+      ],
+      "value": "\n\n## Chapter Content Under Review\n",
+      "index": 110
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121837,
+        4121851
+      ],
+      "value": "请审查第",
+      "index": 111
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121851,
+        4121880
+      ],
+      "value": "章。\n\n## 当前状态卡\n",
+      "index": 112
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121880,
+        4121891
+      ],
+      "value": "（无）",
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121891,
+        4121917
+      ],
+      "value": "\n\n## 待审章节内容\n",
+      "index": 114
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4121917,
+        4121932
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4121919,
+              4121932
+            ],
+            "value": "protagonist"
+          }
+        ]
+      },
+      "index": 115
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4121932,
+        4121941
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4121934,
+              4121940
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4121940,
+              4121941
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 116
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4121941,
+        4121960
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4121943,
+              4121960
+            ],
+            "value": "personalityLock"
+          }
+        ]
+      },
+      "index": 117
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4121960,
+        4121985
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4121962,
+              4121985
+            ],
+            "value": "behavioralConstraints"
+          }
+        ]
+      },
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4121985,
+        4122007
+      ],
+      "value": "\n\nProtagonist lock: ",
+      "index": 119
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122007,
+        4122030
+      ],
+      "value": "; personality locks: ",
+      "index": 120
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122030,
+        4122058
+      ],
+      "value": "; behavioral constraints: ",
+      "index": 121
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4122058,
+        4122060
+      ],
+      "value": ".",
+      "index": 122
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122060,
+        4122084
+      ],
+      "value": "\n主角人设锁定：",
+      "index": 123
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122084,
+        4122089
+      ],
+      "value": "，",
+      "index": 124
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122089,
+        4122109
+      ],
+      "value": "，行为约束：",
+      "index": 125
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122109,
+        4122120
+      ],
+      "value": "<genexpr>",
+      "index": 126
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122120,
+        4122164
+      ],
+      "value": "build_protagonist_block.<locals>.<genexpr>",
+      "index": 127
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122164,
+        4122379
+      ],
+      "value": "\n\nYou have web-search capability (search_web / fetch_url). For real-world eras, people, events, geography, or policies, you must verify with search_web instead of relying on memory. Cross-check at least 2 sources.",
+      "index": 128
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4122379,
+        4122602
+      ],
+      "value": "\n\n你有联网搜索能力（search_web / fetch_url）。对于涉及真实年代、人物、事件、地理、政策的内容，你必须用search_web核实，不可凭记忆判断。至少对比2个来源交叉验证。",
+      "index": 129
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122602,
+        4122611
+      ],
+      "value": "__doc__",
+      "index": 130
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122611,
+        4122621
+      ],
+      "value": "__file__",
+      "index": 131
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122621,
+        4122629
+      ],
+      "value": "origin",
+      "index": 132
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122629,
+        4122643
+      ],
+      "value": "has_location",
+      "index": 133
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122643,
+        4122655
+      ],
+      "value": "__cached__",
+      "index": 134
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122655,
+        4122672
+      ],
+      "value": "__annotations__",
+      "index": 135
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122672,
+        4122685
+      ],
+      "value": "annotations",
+      "index": 136
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122685,
+        4122698
+      ],
+      "value": "dataclasses",
+      "index": 137
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4122698,
+        4122711
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4122700,
+              4122711
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 138
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122711,
+        4122722
+      ],
+      "value": "dataclass",
+      "index": 139
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122722,
+        4122727
+      ],
+      "value": "Any",
+      "index": 140
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122727,
+        4122736
+      ],
+      "value": "Literal",
+      "index": 141
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122736,
+        4122746
+      ],
+      "value": "Optional",
+      "index": 142
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122746,
+        4122765
+      ],
+      "value": "fanfic_dimensions",
+      "index": 143
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4122765,
+        4122850
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4122767,
+              4122786
+            ],
+            "value": "FANFIC_DIMENSIONS"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4122786,
+              4122809
+            ],
+            "value": "FanficDimensionConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4122809,
+              4122821
+            ],
+            "value": "FanficMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4122821,
+              4122850
+            ],
+            "value": "get_fanfic_dimension_config"
+          }
+        ]
+      },
+      "index": 144
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122850,
+        4122873
+      ],
+      "value": "FanficDimensionConfig",
+      "index": 145
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122873,
+        4122885
+      ],
+      "value": "FanficMode",
+      "index": 146
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122885,
+        4122909
+      ],
+      "value": "genre_profile_defaults",
+      "index": 147
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4122909,
+        4122925
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4122911,
+              4122925
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 148
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122925,
+        4122939
+      ],
+      "value": "GenreProfile",
+      "index": 149
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4122939,
+        4122949
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4122941,
+              4122945
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4122945,
+              4122949
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 150
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4122949,
+        4122959
+      ],
+      "value": "Language",
+      "index": 151
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4122959,
+        4124923
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4122961,
+              4122963
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122963,
+              4122965
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122965,
+              4122967
+            ],
+            "value": 3
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122967,
+              4122969
+            ],
+            "value": 4
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122969,
+              4122971
+            ],
+            "value": 5
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122971,
+              4122973
+            ],
+            "value": 6
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122973,
+              4122975
+            ],
+            "value": 7
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122975,
+              4122977
+            ],
+            "value": 8
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122977,
+              4122979
+            ],
+            "value": 9
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122979,
+              4122981
+            ],
+            "value": 10
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122981,
+              4122983
+            ],
+            "value": 11
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122983,
+              4122985
+            ],
+            "value": 12
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122985,
+              4122987
+            ],
+            "value": 13
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122987,
+              4122989
+            ],
+            "value": 14
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122989,
+              4122991
+            ],
+            "value": 15
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122991,
+              4122993
+            ],
+            "value": 16
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122993,
+              4122995
+            ],
+            "value": 17
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122995,
+              4122997
+            ],
+            "value": 18
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122997,
+              4122999
+            ],
+            "value": 19
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4122999,
+              4123001
+            ],
+            "value": 20
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123001,
+              4123003
+            ],
+            "value": 21
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123003,
+              4123005
+            ],
+            "value": 22
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123005,
+              4123007
+            ],
+            "value": 23
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123007,
+              4123009
+            ],
+            "value": 24
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123009,
+              4123011
+            ],
+            "value": 25
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123011,
+              4123013
+            ],
+            "value": 26
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123013,
+              4123015
+            ],
+            "value": 27
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123015,
+              4123017
+            ],
+            "value": 28
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123017,
+              4123019
+            ],
+            "value": 29
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123019,
+              4123021
+            ],
+            "value": 30
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123021,
+              4123023
+            ],
+            "value": 31
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123023,
+              4123025
+            ],
+            "value": 32
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123025,
+              4123027
+            ],
+            "value": 33
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123027,
+              4123029
+            ],
+            "value": 34
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123029,
+              4123031
+            ],
+            "value": 35
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123031,
+              4123033
+            ],
+            "value": 36
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4123033,
+              4123035
+            ],
+            "value": 37
+          }
+        ],
+        "values": [
+          {
+            "tag": "D",
+            "fileRange": [
+              4123035,
+              4123067
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123037,
+                    4123041
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123041,
+                    4123045
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123045,
+                    4123056
+                  ],
+                  "value": "OOC检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123056,
+                    4123067
+                  ],
+                  "value": "OOC Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123067,
+              4123110
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123069,
+                    4123073
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123073,
+                    4123077
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123077,
+                    4123094
+                  ],
+                  "value": "时间线检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123094,
+                    4123110
+                  ],
+                  "value": "Timeline Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123110,
+              4123155
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123112,
+                    4123116
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123116,
+                    4123120
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123120,
+                    4123134
+                  ],
+                  "value": "设定冲突"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123134,
+                    4123155
+                  ],
+                  "value": "Lore Conflict Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123155,
+              4123200
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123157,
+                    4123161
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123161,
+                    4123165
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123165,
+                    4123179
+                  ],
+                  "value": "战力崩坏"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123179,
+                    4123200
+                  ],
+                  "value": "Power Scaling Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123200,
+              4123253
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123202,
+                    4123206
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123206,
+                    4123210
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123210,
+                    4123224
+                  ],
+                  "value": "数值检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123224,
+                    4123253
+                  ],
+                  "value": "Numerical Consistency Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123253,
+              4123289
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123255,
+                    4123259
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123259,
+                    4123263
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123263,
+                    4123277
+                  ],
+                  "value": "伏笔检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123277,
+                    4123289
+                  ],
+                  "value": "Hook Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123289,
+              4123327
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123291,
+                    4123295
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123295,
+                    4123299
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123299,
+                    4123313
+                  ],
+                  "value": "节奏检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123313,
+                    4123327
+                  ],
+                  "value": "Pacing Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123327,
+              4123364
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123329,
+                    4123333
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123333,
+                    4123337
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123337,
+                    4123351
+                  ],
+                  "value": "文风检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123351,
+                    4123364
+                  ],
+                  "value": "Style Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123364,
+              4123416
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123366,
+                    4123370
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123370,
+                    4123374
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123374,
+                    4123388
+                  ],
+                  "value": "信息越界"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123388,
+                    4123416
+                  ],
+                  "value": "Information Boundary Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123416,
+              4123463
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123418,
+                    4123422
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123422,
+                    4123426
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123426,
+                    4123440
+                  ],
+                  "value": "词汇疲劳"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123440,
+                    4123463
+                  ],
+                  "value": "Lexical Fatigue Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123463,
+              4123513
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123465,
+                    4123469
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123469,
+                    4123473
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123473,
+                    4123490
+                  ],
+                  "value": "利益链断裂"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123490,
+                    4123513
+                  ],
+                  "value": "Incentive Chain Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123513,
+              4123557
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123515,
+                    4123519
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123519,
+                    4123523
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123523,
+                    4123537
+                  ],
+                  "value": "年代考据"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123537,
+                    4123557
+                  ],
+                  "value": "Era Accuracy Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123557,
+              4123614
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123559,
+                    4123563
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123563,
+                    4123567
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123567,
+                    4123581
+                  ],
+                  "value": "配角降智"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123581,
+                    4123614
+                  ],
+                  "value": "Side Character Competence Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123614,
+              4123686
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123616,
+                    4123620
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123620,
+                    4123624
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123624,
+                    4123644
+                  ],
+                  "value": "配角工具人化"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123644,
+                    4123686
+                  ],
+                  "value": "Side Character Instrumentalization Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123686,
+              4123733
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123688,
+                    4123692
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123692,
+                    4123696
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123696,
+                    4123710
+                  ],
+                  "value": "爽点虚化"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123710,
+                    4123733
+                  ],
+                  "value": "Payoff Dilution Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123733,
+              4123786
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123735,
+                    4123739
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123739,
+                    4123743
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123743,
+                    4123757
+                  ],
+                  "value": "台词失真"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123757,
+                    4123786
+                  ],
+                  "value": "Dialogue Authenticity Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123786,
+              4123830
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123788,
+                    4123792
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123792,
+                    4123796
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123796,
+                    4123807
+                  ],
+                  "value": "流水账"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123807,
+                    4123830
+                  ],
+                  "value": "Chronicle Drift Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123830,
+              4123889
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123832,
+                    4123836
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123836,
+                    4123840
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123840,
+                    4123857
+                  ],
+                  "value": "知识库污染"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123857,
+                    4123889
+                  ],
+                  "value": "Knowledge Base Pollution Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123889,
+              4123939
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123891,
+                    4123895
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123895,
+                    4123899
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123899,
+                    4123916
+                  ],
+                  "value": "视角一致性"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123916,
+                    4123939
+                  ],
+                  "value": "POV Consistency Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123939,
+              4123991
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123941,
+                    4123945
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123945,
+                    4123949
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123949,
+                    4123963
+                  ],
+                  "value": "段落等长"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4123963,
+                    4123991
+                  ],
+                  "value": "Paragraph Uniformity Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4123991,
+              4124037
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123993,
+                    4123997
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4123997,
+                    4124001
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124001,
+                    4124015
+                  ],
+                  "value": "套话密度"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124015,
+                    4124037
+                  ],
+                  "value": "Cliche Density Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124037,
+              4124087
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124039,
+                    4124043
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124043,
+                    4124047
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124047,
+                    4124064
+                  ],
+                  "value": "公式化转折"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124064,
+                    4124087
+                  ],
+                  "value": "Formulaic Twist Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124087,
+              4124141
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124089,
+                    4124093
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124093,
+                    4124097
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124097,
+                    4124114
+                  ],
+                  "value": "列表式结构"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124114,
+                    4124141
+                  ],
+                  "value": "List-like Structure Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124141,
+              4124191
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124143,
+                    4124147
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124147,
+                    4124151
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124151,
+                    4124165
+                  ],
+                  "value": "支线停滞"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124165,
+                    4124191
+                  ],
+                  "value": "Subplot Stagnation Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124191,
+              4124235
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124193,
+                    4124197
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124197,
+                    4124201
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124201,
+                    4124215
+                  ],
+                  "value": "弧线平坦"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124215,
+                    4124235
+                  ],
+                  "value": "Arc Flatline Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124235,
+              4124282
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124237,
+                    4124241
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124241,
+                    4124245
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124245,
+                    4124259
+                  ],
+                  "value": "节奏单调"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124259,
+                    4124282
+                  ],
+                  "value": "Pacing Monotony Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124282,
+              4124334
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124284,
+                    4124288
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124288,
+                    4124292
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124292,
+                    4124309
+                  ],
+                  "value": "敏感词检查"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124309,
+                    4124334
+                  ],
+                  "value": "Sensitive Content Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124334,
+              4124395
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124336,
+                    4124340
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124340,
+                    4124344
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124344,
+                    4124364
+                  ],
+                  "value": "正传事件冲突"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124364,
+                    4124395
+                  ],
+                  "value": "Mainline Canon Event Conflict"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124395,
+              4124454
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124397,
+                    4124401
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124401,
+                    4124405
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124405,
+                    4124425
+                  ],
+                  "value": "未来信息泄露"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124425,
+                    4124454
+                  ],
+                  "value": "Future Knowledge Leak Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124454,
+              4124522
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124456,
+                    4124460
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124460,
+                    4124464
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124464,
+                    4124493
+                  ],
+                  "value": "世界规则跨书一致性"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124493,
+                    4124522
+                  ],
+                  "value": "Cross-Book World Rule Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124522,
+              4124582
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124524,
+                    4124528
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124528,
+                    4124532
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124532,
+                    4124552
+                  ],
+                  "value": "番外伏笔隔离"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124552,
+                    4124582
+                  ],
+                  "value": "Spinoff Hook Isolation Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124582,
+              4124638
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124584,
+                    4124588
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124588,
+                    4124592
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124592,
+                    4124612
+                  ],
+                  "value": "读者期待管理"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124612,
+                    4124638
+                  ],
+                  "value": "Reader Expectation Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124638,
+              4124694
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124640,
+                    4124644
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124644,
+                    4124648
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124648,
+                    4124668
+                  ],
+                  "value": "章节备忘偏离"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124668,
+                    4124694
+                  ],
+                  "value": "Chapter Memo Drift Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124694,
+              4124747
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124696,
+                    4124700
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124700,
+                    4124704
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124704,
+                    4124721
+                  ],
+                  "value": "角色还原度"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124721,
+                    4124747
+                  ],
+                  "value": "Character Fidelity Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124747,
+              4124806
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124749,
+                    4124753
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124753,
+                    4124757
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124757,
+                    4124777
+                  ],
+                  "value": "世界规则遵守"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124777,
+                    4124806
+                  ],
+                  "value": "World Rule Compliance Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124806,
+              4124859
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124808,
+                    4124812
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124812,
+                    4124816
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124816,
+                    4124830
+                  ],
+                  "value": "关系动态"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124830,
+                    4124859
+                  ],
+                  "value": "Relationship Dynamics Check"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4124859,
+              4124923
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124861,
+                    4124865
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4124865,
+                    4124869
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124869,
+                    4124892
+                  ],
+                  "value": "正典事件一致性"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4124892,
+                    4124923
+                  ],
+                  "value": "Canon Event Consistency Check"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 152
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4124923,
+        4124950
+      ],
+      "value": "dict[int, dict[str, str]]",
+      "index": 153
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4124950,
+        4129596
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4124952,
+              4124954
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124954,
+              4124956
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124956,
+              4124958
+            ],
+            "value": 3
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124958,
+              4124960
+            ],
+            "value": 4
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124960,
+              4124962
+            ],
+            "value": 5
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124962,
+              4124964
+            ],
+            "value": 6
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124964,
+              4124966
+            ],
+            "value": 7
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124966,
+              4124968
+            ],
+            "value": 8
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124968,
+              4124970
+            ],
+            "value": 9
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124970,
+              4124972
+            ],
+            "value": 10
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124972,
+              4124974
+            ],
+            "value": 11
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124974,
+              4124976
+            ],
+            "value": 12
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124976,
+              4124978
+            ],
+            "value": 13
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124978,
+              4124980
+            ],
+            "value": 14
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124980,
+              4124982
+            ],
+            "value": 15
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124982,
+              4124984
+            ],
+            "value": 16
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124984,
+              4124986
+            ],
+            "value": 17
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124986,
+              4124988
+            ],
+            "value": 18
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124988,
+              4124990
+            ],
+            "value": 19
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124990,
+              4124992
+            ],
+            "value": 20
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124992,
+              4124994
+            ],
+            "value": 21
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124994,
+              4124996
+            ],
+            "value": 22
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124996,
+              4124998
+            ],
+            "value": 23
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4124998,
+              4125000
+            ],
+            "value": 24
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125000,
+              4125002
+            ],
+            "value": 25
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125002,
+              4125004
+            ],
+            "value": 26
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125004,
+              4125006
+            ],
+            "value": 27
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125006,
+              4125008
+            ],
+            "value": 28
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125008,
+              4125010
+            ],
+            "value": 29
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125010,
+              4125012
+            ],
+            "value": 30
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125012,
+              4125014
+            ],
+            "value": 31
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125014,
+              4125016
+            ],
+            "value": 32
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125016,
+              4125018
+            ],
+            "value": 33
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125018,
+              4125020
+            ],
+            "value": 34
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125020,
+              4125022
+            ],
+            "value": 35
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125022,
+              4125024
+            ],
+            "value": 36
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4125024,
+              4125026
+            ],
+            "value": 37
+          }
+        ],
+        "values": [
+          {
+            "tag": "D",
+            "fileRange": [
+              4125026,
+              4125169
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125028,
+                    4125032
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125032,
+                    4125036
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125036,
+                    4125104
+                  ],
+                  "value": "角色言行是否偏离已建立的性格底色与行为模式。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125104,
+                    4125169
+                  ],
+                  "value": "Whether character behavior drifts from established personality."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125169,
+              4125301
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125171,
+                    4125175
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125175,
+                    4125179
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125179,
+                    4125238
+                  ],
+                  "value": "事件顺序、时间跨度与前后章节是否矛盾。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125238,
+                    4125301
+                  ],
+                  "value": "Whether event order and time spans contradict prior chapters."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125301,
+              4125435
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125303,
+                    4125307
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125307,
+                    4125311
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125311,
+                    4125379
+                  ],
+                  "value": "世界观、规则、设定是否与前文或设定文档冲突。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125379,
+                    4125435
+                  ],
+                  "value": "Whether lore or world rules conflict with prior canon."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125435,
+              4125561
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125437,
+                    4125441
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125441,
+                    4125445
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125445,
+                    4125501
+                  ],
+                  "value": "战力、能力层级是否无理由暴涨或崩坏。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125501,
+                    4125561
+                  ],
+                  "value": "Whether power levels spike or break scaling without cause."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125561,
+              4125689
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125563,
+                    4125567
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125567,
+                    4125571
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125571,
+                    4125633
+                  ],
+                  "value": "数值、等级、资源等量化设定是否前后一致。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125633,
+                    4125689
+                  ],
+                  "value": "Whether numbers, ranks, and resources stay consistent."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125689,
+              4125835
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125691,
+                    4125695
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125695,
+                    4125699
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125699,
+                    4125773
+                  ],
+                  "value": "伏笔是否按节奏回收，是否存在长期悬空或逻辑硬伤。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125773,
+                    4125835
+                  ],
+                  "value": "Whether hooks are paid off on schedule without logic breaks."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125835,
+              4125991
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125837,
+                    4125841
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125841,
+                    4125845
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125845,
+                    4125925
+                  ],
+                  "value": "本章是否有推进、冲突、钩子与情绪起伏，避免空转注水。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4125925,
+                    4125991
+                  ],
+                  "value": "Whether the chapter advances plot, conflict, hooks, and emotion."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4125991,
+              4126120
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125993,
+                    4125997
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4125997,
+                    4126001
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126001,
+                    4126066
+                  ],
+                  "value": "叙述口吻、修辞密度是否与全书文风指南一致。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126066,
+                    4126120
+                  ],
+                  "value": "Whether prose style matches the project style guide."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126120,
+              4126243
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126122,
+                    4126126
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126126,
+                    4126130
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126130,
+                    4126183
+                  ],
+                  "value": "角色是否获知超出其信息边界的知识。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126183,
+                    4126243
+                  ],
+                  "value": "Whether characters know beyond their information boundary."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126243,
+              4126365
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126245,
+                    4126249
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126249,
+                    4126253
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126253,
+                    4126304
+                  ],
+                  "value": "高疲劳词与 AI 标记词是否过密重复。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126304,
+                    4126365
+                  ],
+                  "value": "Whether fatigue words and AI-tell markers repeat too often."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126365,
+              4126481
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126367,
+                    4126371
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126371,
+                    4126375
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126375,
+                    4126428
+                  ],
+                  "value": "角色动机与利益链是否断裂或不合理。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126428,
+                    4126481
+                  ],
+                  "value": "Whether incentive chains break or feel unmotivated."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126481,
+              4126608
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126483,
+                    4126487
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126487,
+                    4126491
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126491,
+                    4126550
+                  ],
+                  "value": "时代背景、器物、称谓是否符合考据约束。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126550,
+                    4126608
+                  ],
+                  "value": "Whether era-specific details match research constraints."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126608,
+              4126724
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126610,
+                    4126614
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126614,
+                    4126618
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126618,
+                    4126662
+                  ],
+                  "value": "配角是否无故降智以衬托主角。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126662,
+                    4126724
+                  ],
+                  "value": "Whether side characters are dumbed down for the protagonist."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126724,
+              4126840
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126726,
+                    4126730
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126730,
+                    4126734
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126734,
+                    4126787
+                  ],
+                  "value": "配角是否沦为只为主角服务的工具人。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126787,
+                    4126840
+                  ],
+                  "value": "Whether side characters exist only as plot devices."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126840,
+              4126959
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126842,
+                    4126846
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126846,
+                    4126850
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126850,
+                    4126909
+                  ],
+                  "value": "爽点是否虚化，情绪缺口与兑现是否到位。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126909,
+                    4126959
+                  ],
+                  "value": "Whether payoffs feel diluted or under-delivered."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4126959,
+              4127080
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126961,
+                    4126965
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4126965,
+                    4126969
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4126969,
+                    4127028
+                  ],
+                  "value": "台词是否符合人物身份、语境与口语习惯。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127028,
+                    4127080
+                  ],
+                  "value": "Whether dialogue fits character voice and context."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127080,
+              4127213
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127082,
+                    4127086
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127086,
+                    4127090
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127090,
+                    4127152
+                  ],
+                  "value": "是否陷入只记事件、缺少戏剧张力的流水账。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127152,
+                    4127213
+                  ],
+                  "value": "Whether the chapter reads as event chronicle without drama."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127213,
+              4127348
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127215,
+                    4127219
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127219,
+                    4127223
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127223,
+                    4127288
+                  ],
+                  "value": "是否混入与本书无关的知识库或外部设定污染。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127288,
+                    4127348
+                  ],
+                  "value": "Whether foreign knowledge-base content pollutes the story."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127348,
+              4127470
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127350,
+                    4127354
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127354,
+                    4127358
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127358,
+                    4127420
+                  ],
+                  "value": "视角切换是否有过渡，是否与设定视角一致。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127420,
+                    4127470
+                  ],
+                  "value": "Whether POV shifts are motivated and consistent."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127470,
+              4127588
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127472,
+                    4127476
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127476,
+                    4127480
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127480,
+                    4127536
+                  ],
+                  "value": "段落长度是否过于均匀，缺乏节奏变化。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127536,
+                    4127588
+                  ],
+                  "value": "Whether paragraph lengths are unnaturally uniform."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127588,
+              4127707
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127590,
+                    4127594
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127594,
+                    4127598
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127598,
+                    4127645
+                  ],
+                  "value": "陈词滥调、模板化表达是否过密。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127645,
+                    4127707
+                  ],
+                  "value": "Whether clichés and formulaic phrasing cluster too densely."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127707,
+              4127803
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127709,
+                    4127713
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127713,
+                    4127717
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127717,
+                    4127755
+                  ],
+                  "value": "转折是否公式化、可预测。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127755,
+                    4127803
+                  ],
+                  "value": "Whether twists feel formulaic and predictable."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127803,
+              4127914
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127805,
+                    4127809
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127809,
+                    4127813
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127813,
+                    4127863
+                  ],
+                  "value": "正文是否呈现列表式、条目化结构。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127863,
+                    4127914
+                  ],
+                  "value": "Whether prose collapses into list-like structure."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4127914,
+              4128038
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127916,
+                    4127920
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4127920,
+                    4127924
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127924,
+                    4127983
+                  ],
+                  "value": "支线是否长期停滞或只被重复提及无推进。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4127983,
+                    4128038
+                  ],
+                  "value": "Whether subplots stagnate or repeat without progress."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128038,
+              4128154
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128040,
+                    4128044
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128044,
+                    4128048
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128048,
+                    4128104
+                  ],
+                  "value": "主要角色情绪弧线是否长期平坦无变化。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128104,
+                    4128154
+                  ],
+                  "value": "Whether major emotional arcs stay flat too long."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128154,
+              4128282
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128156,
+                    4128160
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128160,
+                    4128164
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128164,
+                    4128229
+                  ],
+                  "value": "近期章节类型是否单调，高潮与释放是否缺席。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128229,
+                    4128282
+                  ],
+                  "value": "Whether recent chapter types flatten pacing rhythm."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128282,
+              4128384
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128284,
+                    4128288
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128288,
+                    4128292
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128292,
+                    4128333
+                  ],
+                  "value": "是否触及需规避的敏感内容。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128333,
+                    4128384
+                  ],
+                  "value": "Whether sensitive content boundaries are crossed."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128384,
+              4128495
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128386,
+                    4128390
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128390,
+                    4128394
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128394,
+                    4128444
+                  ],
+                  "value": "番外事件是否与正传正典约束矛盾。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128444,
+                    4128495
+                  ],
+                  "value": "Whether spinoff events contradict mainline canon."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128495,
+              4128625
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128497,
+                    4128501
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128501,
+                    4128505
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128505,
+                    4128564
+                  ],
+                  "value": "是否泄露分歧点之后才应揭示的未来信息。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128564,
+                    4128625
+                  ],
+                  "value": "Whether future knowledge leaks before the divergence point."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128625,
+              4128752
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128627,
+                    4128631
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128631,
+                    4128635
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128635,
+                    4128706
+                  ],
+                  "value": "番外是否违反正传世界规则（力量、地理、阵营）。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128706,
+                    4128752
+                  ],
+                  "value": "Whether spinoff breaks mainline world rules."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128752,
+              4128856
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128754,
+                    4128758
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128758,
+                    4128762
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128762,
+                    4128803
+                  ],
+                  "value": "番外是否越权回收正传伏笔。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128803,
+                    4128856
+                  ],
+                  "value": "Whether spinoff resolves mainline hooks improperly."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128856,
+              4128995
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128858,
+                    4128862
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128862,
+                    4128866
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128866,
+                    4128937
+                  ],
+                  "value": "章尾是否重燃好奇，读者期待是否在累积或被满足。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4128937,
+                    4128995
+                  ],
+                  "value": "Whether chapter endings manage reader anticipation well."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4128995,
+              4129119
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4128997,
+                    4129001
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129001,
+                    4129005
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129005,
+                    4129067
+                  ],
+                  "value": "成稿是否兑现本章 memo 中的目标与段落要求。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129067,
+                    4129119
+                  ],
+                  "value": "Whether the draft fulfills the chapter memo goals."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4129119,
+              4129244
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129121,
+                    4129125
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129125,
+                    4129129
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129129,
+                    4129188
+                  ],
+                  "value": "角色语癖、行为是否与同人正典档案一致。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129188,
+                    4129244
+                  ],
+                  "value": "Whether character voice matches fanfic canon dossiers."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4129244,
+              4129354
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129246,
+                    4129250
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129250,
+                    4129254
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129254,
+                    4129301
+                  ],
+                  "value": "是否违反同人正典中的世界规则。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129301,
+                    4129354
+                  ],
+                  "value": "Whether fanfic world rules from canon are violated."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4129354,
+              4129483
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129356,
+                    4129360
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129360,
+                    4129364
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129364,
+                    4129429
+                  ],
+                  "value": "角色关系互动是否合理、符合档案或发展逻辑。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129429,
+                    4129483
+                  ],
+                  "value": "Whether relationship dynamics follow canon or logic."
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4129483,
+              4129596
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129485,
+                    4129489
+                  ],
+                  "value": "zh"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4129489,
+                    4129493
+                  ],
+                  "value": "en"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129493,
+                    4129546
+                  ],
+                  "value": "是否与同人正典关键事件时间线矛盾。"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4129546,
+                    4129596
+                  ],
+                  "value": "Whether events contradict fanfic canon timeline."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 154
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4129596,
+        4129656
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4129598,
+              4129600
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129600,
+              4129602
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129602,
+              4129604
+            ],
+            "value": 3
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129604,
+              4129606
+            ],
+            "value": 4
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129606,
+              4129608
+            ],
+            "value": 5
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129608,
+              4129610
+            ],
+            "value": 6
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129610,
+              4129612
+            ],
+            "value": 7
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129612,
+              4129614
+            ],
+            "value": 8
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129614,
+              4129616
+            ],
+            "value": 9
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129616,
+              4129618
+            ],
+            "value": 10
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129618,
+              4129620
+            ],
+            "value": 11
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129620,
+              4129622
+            ],
+            "value": 12
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129622,
+              4129624
+            ],
+            "value": 13
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129624,
+              4129626
+            ],
+            "value": 14
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129626,
+              4129628
+            ],
+            "value": 15
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129628,
+              4129630
+            ],
+            "value": 16
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129630,
+              4129632
+            ],
+            "value": 17
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129632,
+              4129634
+            ],
+            "value": 18
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129634,
+              4129636
+            ],
+            "value": 19
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129636,
+              4129638
+            ],
+            "value": 20
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129638,
+              4129640
+            ],
+            "value": 21
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129640,
+              4129642
+            ],
+            "value": 22
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129642,
+              4129644
+            ],
+            "value": 23
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129644,
+              4129646
+            ],
+            "value": 24
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129646,
+              4129648
+            ],
+            "value": 25
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129648,
+              4129650
+            ],
+            "value": 26
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129650,
+              4129652
+            ],
+            "value": 27
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129652,
+              4129654
+            ],
+            "value": 32
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4129654,
+              4129656
+            ],
+            "value": 33
+          }
+        ]
+      },
+      "index": 155
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4129656,
+        4129666
+      ],
+      "value": "set[int]",
+      "index": 156
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4129666,
+        4129669
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4129668,
+              4129669
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 157
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4129669,
+        4129678
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129671,
+              4129678
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 158
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4129678,
+        4129690
+      ],
+      "value": "__module__",
+      "index": 159
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4129690,
+        4129704
+      ],
+      "value": "__qualname__",
+      "index": 160
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4129704,
+        4129709
+      ],
+      "value": "int",
+      "index": 161
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4129709,
+        4129714
+      ],
+      "value": "str",
+      "index": 162
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4129714,
+        4129764
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129716,
+              4129726
+            ],
+            "value": "severity"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129726,
+              4129736
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129736,
+              4129744
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129744,
+              4129749
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129749,
+              4129759
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129759,
+              4129764
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 163
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4129764,
+        4129942
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129766,
+              4129774
+            ],
+            "value": "dim_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129774,
+              4129784
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129784,
+              4129788
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129788,
+              4129800
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129800,
+              4129813
+            ],
+            "value": "fanfic_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129813,
+              4129828
+            ],
+            "value": "fanfic_config"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129828,
+              4129836
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129836,
+              4129841
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129841,
+              4129851
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129851,
+              4129865
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4129865,
+              4129888
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4129888,
+              4129907
+            ],
+            "value": "FanficMode | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4129907,
+              4129937
+            ],
+            "value": "FanficDimensionConfig | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129937,
+              4129942
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 164
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4129942,
+        4129958
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129944,
+              4129954
+            ],
+            "value": "language"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129954,
+              4129958
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 165
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4129958,
+        4130013
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129960,
+              4129970
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4129970,
+              4129978
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4129978,
+              4129988
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4129988,
+              4130013
+            ],
+            "value": "list[dict[str, object]]"
+          }
+        ]
+      },
+      "index": 166
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130013,
+        4130047
+      ],
+      "value": "build_settings_dimension_catalog",
+      "index": 167
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4130047,
+        4130050
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4130049,
+              4130050
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 168
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130050,
+        4130099
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130052,
+              4130062
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130062,
+              4130080
+            ],
+            "value": "has_parent_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130080,
+              4130093
+            ],
+            "value": "fanfic_mode"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130093,
+              4130097
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "F",
+            "fileRange": [
+              4130097,
+              4130098
+            ],
+            "value": false
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4130098,
+              4130099
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 169
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130099,
+        4130260
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130101,
+              4130105
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130105,
+              4130117
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130117,
+              4130127
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130127,
+              4130145
+            ],
+            "value": "has_parent_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130145,
+              4130158
+            ],
+            "value": "fanfic_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130158,
+              4130166
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130166,
+              4130180
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4130180,
+              4130203
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130203,
+              4130213
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130213,
+              4130219
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4130219,
+              4130238
+            ],
+            "value": "FanficMode | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4130238,
+              4130260
+            ],
+            "value": "list[AuditDimension]"
+          }
+        ]
+      },
+      "index": 170
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130260,
+        4130282
+      ],
+      "value": "build_dimension_list",
+      "index": 171
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130282,
+        4130351
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130284,
+              4130296
+            ],
+            "value": "dimensions"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130296,
+              4130306
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130306,
+              4130314
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4130314,
+              4130336
+            ],
+            "value": "list[AuditDimension]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130336,
+              4130346
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130346,
+              4130351
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 172
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130351,
+        4130374
+      ],
+      "value": "format_dimension_list",
+      "index": 173
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130374,
+        4130438
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130376,
+              4130389
+            ],
+            "value": "genre_label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130389,
+              4130408
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130408,
+              4130421
+            ],
+            "value": "search_note"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130421,
+              4130431
+            ],
+            "value": "language"
+          }
+        ],
+        "values": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4130431,
+              4130432
+            ],
+            "value": null
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4130432,
+              4130433
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4130433,
+              4130434
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  4130432,
+                  4130433
+                ],
+                "value": ""
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130434,
+              4130438
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 174
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130438,
+        4130569
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130440,
+              4130444
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130444,
+              4130454
+            ],
+            "value": "dim_list"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130454,
+              4130467
+            ],
+            "value": "genre_label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130467,
+              4130486
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130486,
+              4130499
+            ],
+            "value": "search_note"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130499,
+              4130509
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130509,
+              4130517
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130517,
+              4130531
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130531,
+              4130536
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4130536,
+              4130548
+            ],
+            "value": "str | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130548,
+              4130553
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4130553,
+              4130554
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4130548,
+                  4130553
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130554,
+              4130564
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130564,
+              4130569
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 175
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130569,
+        4130601
+      ],
+      "value": "build_continuity_system_prompt",
+      "index": 176
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130601,
+        4130648
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130603,
+              4130618
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130618,
+              4130632
+            ],
+            "value": "extra_blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130632,
+              4130642
+            ],
+            "value": "language"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4130642,
+              4130643
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4130643,
+              4130644
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  4130642,
+                  4130643
+                ],
+                "value": ""
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130644,
+              4130648
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 177
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130648,
+        4130757
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130650,
+              4130666
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130666,
+              4130683
+            ],
+            "value": "chapter_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130683,
+              4130698
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130698,
+              4130712
+            ],
+            "value": "extra_blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130712,
+              4130722
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130722,
+              4130730
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130730,
+              4130735
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130735,
+              4130740
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4130740,
+              4130741
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4130735,
+                  4130740
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4130741,
+              4130742
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4130740,
+                  4130741
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4130735,
+                      4130740
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130742,
+              4130752
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130752,
+              4130757
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 178
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130757,
+        4130787
+      ],
+      "value": "build_continuity_user_prompt",
+      "index": 179
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130787,
+        4130857
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130789,
+              4130801
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130801,
+              4130811
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130811,
+              4130819
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4130819,
+              4130842
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130842,
+              4130852
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130852,
+              4130857
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 180
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130857,
+        4130882
+      ],
+      "value": "build_protagonist_block",
+      "index": 181
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4130882,
+        4130935
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130884,
+              4130888
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130888,
+              4130898
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130898,
+              4130906
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4130906,
+              4130920
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130920,
+              4130930
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4130930,
+              4130935
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 182
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4130935,
+        4130954
+      ],
+      "value": "build_search_note",
+      "index": 183
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4130954,
+        4130998
+      ],
+      "value": "novels\\prompts\\inkos\\continuity_prompts.py",
+      "index": 184
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4130998,
+        4131006
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131000,
+              4131004
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4131004,
+              4131006
+            ],
+            "value": "x"
+          }
+        ]
+      },
+      "index": 185
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4131006,
+        4131056
+      ],
+      "value": "<module novels.prompts.inkos.continuity_prompts>",
+      "index": 186
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131056,
+        4131069
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131058,
+              4131069
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 187
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131069,
+        4131091
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131071,
+              4131081
+            ],
+            "value": "severity"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131081,
+              4131091
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 188
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131091,
+        4131169
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131093,
+              4131097
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131097,
+              4131107
+            ],
+            "value": "dim_list"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131107,
+              4131120
+            ],
+            "value": "genre_label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131120,
+              4131139
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131139,
+              4131152
+            ],
+            "value": "search_note"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131152,
+              4131162
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131162,
+              4131169
+            ],
+            "value": "label"
+          }
+        ]
+      },
+      "index": 189
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131169,
+        4131243
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131171,
+              4131187
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131187,
+              4131204
+            ],
+            "value": "chapter_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131204,
+              4131219
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131219,
+              4131233
+            ],
+            "value": "extra_blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131233,
+              4131243
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 190
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131243,
+        4131392
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131245,
+              4131249
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131249,
+              4131261
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131261,
+              4131271
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131271,
+              4131289
+            ],
+            "value": "has_parent_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131289,
+              4131302
+            ],
+            "value": "fanfic_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131302,
+              4131314
+            ],
+            "value": "active_ids"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131314,
+              4131329
+            ],
+            "value": "fanfic_config"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131329,
+              4131335
+            ],
+            "value": "dims"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131335,
+              4131347
+            ],
+            "value": "additional"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131347,
+              4131359
+            ],
+            "value": "name_to_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131359,
+              4131365
+            ],
+            "value": "item"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131365,
+              4131372
+            ],
+            "value": "exact"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131372,
+              4131378
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131378,
+              4131386
+            ],
+            "value": "dim_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131386,
+              4131392
+            ],
+            "value": "note"
+          }
+        ]
+      },
+      "index": 191
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131392,
+        4131555
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131394,
+              4131402
+            ],
+            "value": "dim_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131402,
+              4131412
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131412,
+              4131416
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131416,
+              4131428
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131428,
+              4131441
+            ],
+            "value": "fanfic_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131441,
+              4131456
+            ],
+            "value": "fanfic_config"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131456,
+              4131469
+            ],
+            "value": "notes_by_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131469,
+              4131484
+            ],
+            "value": "fatigue_words"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131484,
+              4131494
+            ],
+            "value": "override"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131494,
+              4131502
+            ],
+            "value": "joined"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131502,
+              4131522
+            ],
+            "value": "satisfaction_types"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131522,
+              4131528
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131528,
+              4131538
+            ],
+            "value": "severity"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131538,
+              4131550
+            ],
+            "value": "base_notes"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131550,
+              4131555
+            ],
+            "value": "dim"
+          }
+        ]
+      },
+      "index": 192
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131555,
+        4131618
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131557,
+              4131569
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131569,
+              4131579
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131579,
+              4131592
+            ],
+            "value": "protagonist"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131592,
+              4131598
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131598,
+              4131605
+            ],
+            "value": "locks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131605,
+              4131618
+            ],
+            "value": "constraints"
+          }
+        ]
+      },
+      "index": 193
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131618,
+        4131634
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131620,
+              4131624
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131624,
+              4131634
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 194
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131634,
+        4131676
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131636,
+              4131646
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131646,
+              4131655
+            ],
+            "value": "catalog"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131655,
+              4131663
+            ],
+            "value": "dim_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131663,
+              4131670
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131670,
+              4131676
+            ],
+            "value": "hint"
+          }
+        ]
+      },
+      "index": 195
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4131676,
+        4131720
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4131678,
+              4131690
+            ],
+            "value": "dimensions"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131690,
+              4131700
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131700,
+              4131707
+            ],
+            "value": "lines"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131707,
+              4131712
+            ],
+            "value": "dim"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4131712,
+              4131720
+            ],
+            "value": "suffix"
+          }
+        ]
+      },
+      "index": 196
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4131720,
+        4131730
+      ],
+      "value": "__name__",
+      "index": 197
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4131730,
+        4131740
+      ],
+      "value": "__spec__",
+      "index": 198
+    }
+  ]
+}

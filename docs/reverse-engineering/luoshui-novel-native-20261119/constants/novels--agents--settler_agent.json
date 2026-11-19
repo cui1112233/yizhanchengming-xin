@@ -1,0 +1,2368 @@
+{
+  "moduleName": "novels.agents.settler_agent",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3914305,
+  "payloadRange": [
+    3914337,
+    3917497
+  ],
+  "payloadSha256": "fd6d97396c147c3e027cb4099eee12338e13bdf02fdbb216dde05022cdf1e84e",
+  "declaredConstants": 126,
+  "parsedConstants": 126,
+  "stoppedAt": 3917496,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3914339,
+        3914344
+      ],
+      "value": "ctx",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914344,
+        3914365
+      ],
+      "value": "read_truth_snapshot",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914365,
+        3914388
+      ],
+      "value": "resolve_genre_profile",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914388,
+        3914395
+      ],
+      "value": "genre",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914395,
+        3914416
+      ],
+      "value": "book_to_writer_dict",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914416,
+        3914426
+      ],
+      "value": "language",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914426,
+        3914430
+      ],
+      "value": "zh",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914430,
+        3914434
+      ],
+      "value": "en",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914434,
+        3914441
+      ],
+      "value": "strip",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914441,
+        3914456
+      ],
+      "value": "_run_observer",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914456,
+        3914462
+      ],
+      "value": "emit",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914462,
+        3914476
+      ],
+      "value": "真相沉淀",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914476,
+        3914484
+      ],
+      "value": "active",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914484,
+        3914502
+      ],
+      "value": "正在沉淀第 ",
+      "index": 13
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3914502,
+        3914503
+      ],
+      "value": "",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914503,
+        3914524
+      ],
+      "value": " 章真相文件...",
+      "index": 15
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3914524,
+        3914541
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3914526,
+              3914541
+            ],
+            "value": "tool:progress"
+          }
+        ]
+      },
+      "index": 16
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3914541,
+        3914567
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3914543,
+              3914550
+            ],
+            "value": "stage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914550,
+              3914558
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914558,
+              3914567
+            ],
+            "value": "message"
+          }
+        ]
+      },
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914567,
+        3914592
+      ],
+      "value": "SettlerUserPromptParams",
+      "index": 18
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3914592,
+        3914598
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3914593,
+              3914594
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3914594,
+              3914597
+            ],
+            "value": 12000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3914597,
+              3914598
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914598,
+        3914613
+      ],
+      "value": "current_state",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914613,
+        3914624
+      ],
+      "value": "（空）",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914624,
+        3914640
+      ],
+      "value": "FileRepository",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914640,
+        3914651
+      ],
+      "value": "read_text",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914651,
+        3914671
+      ],
+      "value": "particle_ledger.md",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914671,
+        3914686
+      ],
+      "value": "pending_hooks",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914686,
+        3914705
+      ],
+      "value": "chapter_summaries",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914705,
+        3914727
+      ],
+      "value": "(文件尚未创建)",
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914727,
+        3914745
+      ],
+      "value": "subplot_board.md",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914745,
+        3914764
+      ],
+      "value": "emotional_arcs.md",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914764,
+        3914785
+      ],
+      "value": "character_matrix.md",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3914785,
+        3914800
+      ],
+      "value": "volume_map.md",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914800,
+        3914814
+      ],
+      "value": "observations",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3914814,
+        3914997
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3914816,
+              3914832
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914832,
+              3914839
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914839,
+              3914848
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914848,
+              3914863
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914863,
+              3914871
+            ],
+            "value": "ledger"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914871,
+              3914878
+            ],
+            "value": "hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914878,
+              3914897
+            ],
+            "value": "chapter_summaries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914897,
+              3914912
+            ],
+            "value": "subplot_board"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914912,
+              3914928
+            ],
+            "value": "emotional_arcs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914928,
+              3914946
+            ],
+            "value": "character_matrix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914946,
+              3914962
+            ],
+            "value": "volume_outline"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914962,
+              3914976
+            ],
+            "value": "observations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914976,
+              3914997
+            ],
+            "value": "validation_feedback"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914997,
+        3915003
+      ],
+      "value": "role",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915003,
+        3915011
+      ],
+      "value": "system",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915011,
+        3915020
+      ],
+      "value": "content",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915020,
+        3915049
+      ],
+      "value": "build_settler_system_prompt",
+      "index": 37
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3915049,
+        3915061
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915051,
+              3915061
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915061,
+        3915067
+      ],
+      "value": "user",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915067,
+        3915094
+      ],
+      "value": "build_settler_user_prompt",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915094,
+        3915100
+      ],
+      "value": "chat",
+      "index": 41
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3915100,
+        3915139
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915102,
+              3915114
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915114,
+              3915127
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3915127,
+              3915130
+            ],
+            "value": 6000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3915130,
+              3915139
+            ],
+            "value": 0.25
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915139,
+        3915161
+      ],
+      "value": "extract_tagged_block",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915161,
+        3915178
+      ],
+      "value": "POST_SETTLEMENT",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915178,
+        3915206
+      ],
+      "value": "parse_settler_delta_output",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915206,
+        3915221
+      ],
+      "value": "UPDATED_STATE",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915221,
+        3915236
+      ],
+      "value": "UPDATED_HOOKS",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915236,
+        3915253
+      ],
+      "value": "CHAPTER_SUMMARY",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915253,
+        3915270
+      ],
+      "value": "post_settlement",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915270,
+        3915297
+      ],
+      "value": "summary_events_from_delta",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915297,
+        3915318
+      ],
+      "value": "runtime_state_delta",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915318,
+        3915347
+      ],
+      "value": "apply_settler_runtime_delta",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915347,
+        3915355
+      ],
+      "value": "parent",
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915355,
+        3915379
+      ],
+      "value": "current_state_markdown",
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915379,
+        3915395
+      ],
+      "value": "hooks_markdown",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915395,
+        3915423
+      ],
+      "value": "chapter_summaries_markdown",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915423,
+        3915451
+      ],
+      "value": "append_chapter_summary_row",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915451,
+        3915477
+      ],
+      "value": "sync_from_settler_output",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915477,
+        3915494
+      ],
+      "value": "TruthSettlement",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915494,
+        3915510
+      ],
+      "value": "summary_events",
+      "index": 60
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3915510,
+        3915616
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915512,
+              3915527
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915527,
+              3915542
+            ],
+            "value": "pending_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915542,
+              3915566
+            ],
+            "value": "chapter_summary_events"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915566,
+              3915585
+            ],
+            "value": "chapter_summaries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915585,
+              3915602
+            ],
+            "value": "post_settlement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915602,
+              3915616
+            ],
+            "value": "observations"
+          }
+        ]
+      },
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915616,
+        3915646
+      ],
+      "value": "build_observer_system_prompt",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915646,
+        3915674
+      ],
+      "value": "build_observer_user_prompt",
+      "index": 63
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3915674,
+        3915713
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915676,
+              3915688
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915688,
+              3915701
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3915701,
+              3915704
+            ],
+            "value": 4096
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3915704,
+              3915713
+            ],
+            "value": 0.2
+          }
+        ]
+      },
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915713,
+        3915727
+      ],
+      "value": "OBSERVATIONS",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915727,
+        3915736
+      ],
+      "value": "__doc__",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915736,
+        3915746
+      ],
+      "value": "__file__",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915746,
+        3915754
+      ],
+      "value": "origin",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915754,
+        3915768
+      ],
+      "value": "has_location",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915768,
+        3915780
+      ],
+      "value": "__cached__",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915780,
+        3915793
+      ],
+      "value": "annotations",
+      "index": 71
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915793,
+        3915806
+      ],
+      "value": "dataclasses",
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3915806,
+        3915819
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915808,
+              3915819
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915819,
+        3915830
+      ],
+      "value": "dataclass",
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915830,
+        3915839
+      ],
+      "value": "pathlib",
+      "index": 75
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3915839,
+        3915847
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915841,
+              3915847
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915847,
+        3915853
+      ],
+      "value": "Path",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3915853,
+        3915869
+      ],
+      "value": "models.schemas",
+      "index": 78
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3915869,
+        3915883
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915871,
+              3915883
+            ],
+            "value": "BookConfig"
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3915883,
+        3915885
+      ],
+      "value": 2,
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3915885,
+        3915897
+      ],
+      "value": "BookConfig",
+      "index": 81
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3915897,
+        3915935
+      ],
+      "value": "prompts.inkos.genre_profile_resolver",
+      "index": 82
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3915935,
+        3915981
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3915937,
+              3915958
+            ],
+            "value": "book_to_writer_dict"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3915958,
+              3915981
+            ],
+            "value": "resolve_genre_profile"
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3915981,
+        3916013
+      ],
+      "value": "prompts.inkos.observer_prompts",
+      "index": 84
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916013,
+        3916073
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916015,
+              3916045
+            ],
+            "value": "build_observer_system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916045,
+              3916073
+            ],
+            "value": "build_observer_user_prompt"
+          }
+        ]
+      },
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916073,
+        3916104
+      ],
+      "value": "prompts.inkos.settler_prompts",
+      "index": 86
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916104,
+        3916187
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916106,
+              3916131
+            ],
+            "value": "SettlerUserPromptParams"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916131,
+              3916160
+            ],
+            "value": "build_settler_system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916160,
+              3916187
+            ],
+            "value": "build_settler_user_prompt"
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916187,
+        3916217
+      ],
+      "value": "services.runtime_state_store",
+      "index": 88
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916217,
+        3916248
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916219,
+              3916248
+            ],
+            "value": "apply_settler_runtime_delta"
+          }
+        ]
+      },
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916248,
+        3916279
+      ],
+      "value": "services.settler_delta_parser",
+      "index": 90
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916279,
+        3916336
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916281,
+              3916309
+            ],
+            "value": "parse_settler_delta_output"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916309,
+              3916336
+            ],
+            "value": "summary_events_from_delta"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916336,
+        3916363
+      ],
+      "value": "services.structured_state",
+      "index": 92
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916363,
+        3916391
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916365,
+              3916391
+            ],
+            "value": "sync_from_settler_output"
+          }
+        ]
+      },
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916391,
+        3916413
+      ],
+      "value": "services.truth_files",
+      "index": 94
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916413,
+        3916486
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916415,
+              3916443
+            ],
+            "value": "append_chapter_summary_row"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916443,
+              3916465
+            ],
+            "value": "extract_tagged_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916465,
+              3916486
+            ],
+            "value": "read_truth_snapshot"
+          }
+        ]
+      },
+      "index": 95
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916486,
+        3916511
+      ],
+      "value": "storage.file_repository",
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916511,
+        3916529
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916513,
+              3916529
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916529,
+        3916541
+      ],
+      "value": "base_agent",
+      "index": 98
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916541,
+        3916557
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916543,
+              3916557
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916557,
+        3916571
+      ],
+      "value": "AgentContext",
+      "index": 100
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916571,
+        3916574
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              3916573,
+              3916574
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3916574,
+        3916583
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916576,
+              3916583
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916583,
+        3916595
+      ],
+      "value": "__module__",
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916595,
+        3916609
+      ],
+      "value": "__qualname__",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916609,
+        3916626
+      ],
+      "value": "__annotations__",
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916626,
+        3916631
+      ],
+      "value": "str",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916631,
+        3916655
+      ],
+      "value": "chapter_summary_events",
+      "index": 107
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916655,
+        3916669
+      ],
+      "value": "SettlerAgent",
+      "index": 108
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3916669,
+        3916690
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916671,
+              3916676
+            ],
+            "value": "ctx"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916676,
+              3916690
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 109
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916690,
+        3916700
+      ],
+      "value": "__init__",
+      "index": 110
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916700,
+        3916723
+      ],
+      "value": "SettlerAgent.__init__",
+      "index": 111
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3916723,
+        3916762
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916725,
+              3916739
+            ],
+            "value": "observations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916739,
+              3916760
+            ],
+            "value": "validation_feedback"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              3916760,
+              3916761
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3916761,
+              3916762
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  3916760,
+                  3916761
+                ],
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "index": 112
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3916762,
+        3916904
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916764,
+              3916770
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916770,
+              3916781
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916781,
+              3916797
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916797,
+              3916804
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916804,
+              3916813
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916813,
+              3916827
+            ],
+            "value": "observations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916827,
+              3916848
+            ],
+            "value": "validation_feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916848,
+              3916856
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916856,
+              3916868
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916868,
+              3916874
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916874,
+              3916879
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916879,
+              3916884
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3916884,
+              3916885
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3916879,
+                  3916884
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3916885,
+              3916886
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3916884,
+                  3916885
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3916879,
+                      3916884
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3916886,
+              3916887
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3916885,
+                  3916886
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3916884,
+                      3916885
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          3916879,
+                          3916884
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916887,
+              3916904
+            ],
+            "value": "TruthSettlement"
+          }
+        ]
+      },
+      "index": 113
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3916904,
+        3916912
+      ],
+      "value": "settle",
+      "index": 114
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3916912,
+        3916933
+      ],
+      "value": "SettlerAgent.settle",
+      "index": 115
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3916933,
+        3917020
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916935,
+              3916941
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916941,
+              3916951
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916951,
+              3916967
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916967,
+              3916974
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916974,
+              3916983
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3916983,
+              3916991
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3916991,
+              3917003
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917003,
+              3917008
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917008,
+              3917013
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917013,
+              3917018
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3917018,
+              3917019
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3917013,
+                  3917018
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3917019,
+              3917020
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3917018,
+                  3917019
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3917013,
+                      3917018
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3917020,
+        3917048
+      ],
+      "value": "SettlerAgent._run_observer",
+      "index": 117
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3917048,
+        3917080
+      ],
+      "value": "novels\\agents\\settler_agent.py",
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3917080,
+        3917118
+      ],
+      "value": "<module novels.agents.settler_agent>",
+      "index": 119
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3917118,
+        3917131
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3917120,
+              3917131
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 120
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3917131,
+        3917144
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3917133,
+              3917139
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917139,
+              3917144
+            ],
+            "value": "ctx"
+          }
+        ]
+      },
+      "index": 121
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3917144,
+        3917219
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3917146,
+              3917152
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917152,
+              3917158
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917158,
+              3917162
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917162,
+              3917172
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917172,
+              3917188
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917188,
+              3917195
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917195,
+              3917204
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917204,
+              3917214
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917214,
+              3917219
+            ],
+            "value": "raw"
+          }
+        ]
+      },
+      "index": 122
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3917219,
+        3917476
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3917221,
+              3917227
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917227,
+              3917233
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917233,
+              3917244
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917244,
+              3917260
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917260,
+              3917267
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917267,
+              3917276
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917276,
+              3917290
+            ],
+            "value": "observations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917290,
+              3917311
+            ],
+            "value": "validation_feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917311,
+              3917321
+            ],
+            "value": "snapshot"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917321,
+              3917325
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917325,
+              3917336
+            ],
+            "value": "book_dict"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917336,
+              3917346
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917346,
+              3917354
+            ],
+            "value": "params"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917354,
+              3917364
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917364,
+              3917369
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917369,
+              3917386
+            ],
+            "value": "post_settlement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917386,
+              3917400
+            ],
+            "value": "delta_output"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917400,
+              3917415
+            ],
+            "value": "updated_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917415,
+              3917430
+            ],
+            "value": "updated_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917430,
+              3917446
+            ],
+            "value": "summary_events"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917446,
+              3917457
+            ],
+            "value": "artifacts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3917457,
+              3917476
+            ],
+            "value": "updated_summaries"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3917476,
+        3917486
+      ],
+      "value": "__name__",
+      "index": 124
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3917486,
+        3917496
+      ],
+      "value": "__spec__",
+      "index": 125
+    }
+  ]
+}

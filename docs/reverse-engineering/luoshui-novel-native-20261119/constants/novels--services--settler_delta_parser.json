@@ -1,0 +1,1168 @@
+{
+  "moduleName": "novels.services.settler_delta_parser",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4372442,
+  "payloadRange": [
+    4372483,
+    4373634
+  ],
+  "payloadSha256": "160dc27f95af2c6c03d1e2c67a2186f7355cc5bb588463644caac13b09fffd08",
+  "declaredConstants": 69,
+  "parsedConstants": 69,
+  "stoppedAt": 4373633,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4372485,
+        4372489
+      ],
+      "value": "re",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372489,
+        4372497
+      ],
+      "value": "search",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372497,
+        4372505
+      ],
+      "value": "===\\s*",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372505,
+        4372513
+      ],
+      "value": "escape",
+      "index": 3
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4372513,
+        4372514
+      ],
+      "value": "",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372514,
+        4372560
+      ],
+      "value": "\\s*===\\s*([\\s\\S]*?)(?====\\s*[A-Z_]+\\s*===|$)",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372560,
+        4372567
+      ],
+      "value": "group",
+      "index": 6
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372567,
+        4372571
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4372569,
+              4372571
+            ],
+            "value": 1
+          }
+        ]
+      },
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372571,
+        4372578
+      ],
+      "value": "strip",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372578,
+        4372585
+      ],
+      "value": "match",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372585,
+        4372620
+      ],
+      "value": "^```(?:json)?\\s*([\\s\\S]*?)\\s*```$",
+      "index": 10
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4372620,
+        4372622
+      ],
+      "value": "I",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372622,
+        4372627
+      ],
+      "value": "sub",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372627,
+        4372640
+      ],
+      "value": ",\\s*([}\\]])",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372640,
+        4372644
+      ],
+      "value": "\\1",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372644,
+        4372678
+      ],
+      "value": "[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372678,
+        4372692
+      ],
+      "value": "_extract_tag",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372692,
+        4372713
+      ],
+      "value": "RUNTIME_STATE_DELTA",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372713,
+        4372732
+      ],
+      "value": "_strip_code_fence",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372732,
+        4372738
+      ],
+      "value": "json",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372738,
+        4372745
+      ],
+      "value": "loads",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372745,
+        4372761
+      ],
+      "value": "_sanitize_json",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372761,
+        4372778
+      ],
+      "value": "JSONDecodeError",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372778,
+        4372791
+      ],
+      "value": "\\{[\\s\\S]*\\}",
+      "index": 23
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372791,
+        4372795
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4372793,
+              4372795
+            ],
+            "value": 0
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372795,
+        4372815
+      ],
+      "value": "SettlerDeltaOutput",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372815,
+        4372832
+      ],
+      "value": "POST_SETTLEMENT",
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372832,
+        4372872
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372834,
+              4372851
+            ],
+            "value": "post_settlement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372851,
+              4372872
+            ],
+            "value": "runtime_state_delta"
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372872,
+        4372877
+      ],
+      "value": "get",
+      "index": 28
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372877,
+        4372895
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372879,
+              4372895
+            ],
+            "value": "chapterSummary"
+          }
+        ]
+      },
+      "index": 29
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372895,
+        4372905
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372897,
+              4372905
+            ],
+            "value": "events"
+          }
+        ]
+      },
+      "index": 30
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372905,
+        4372921
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372907,
+              4372921
+            ],
+            "value": "stateChanges"
+          }
+        ]
+      },
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372921,
+        4372926
+      ],
+      "value": "；",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372926,
+        4372935
+      ],
+      "value": "__doc__",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372935,
+        4372945
+      ],
+      "value": "__file__",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372945,
+        4372953
+      ],
+      "value": "origin",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372953,
+        4372967
+      ],
+      "value": "has_location",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372967,
+        4372979
+      ],
+      "value": "__cached__",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372979,
+        4372992
+      ],
+      "value": "annotations",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372992,
+        4373005
+      ],
+      "value": "dataclasses",
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373005,
+        4373018
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373007,
+              4373018
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373018,
+        4373029
+      ],
+      "value": "dataclass",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373029,
+        4373034
+      ],
+      "value": "Any",
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373034,
+        4373037
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4373036,
+              4373037
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373037,
+        4373046
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373039,
+              4373046
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373046,
+        4373058
+      ],
+      "value": "__module__",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373058,
+        4373072
+      ],
+      "value": "__qualname__",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373072,
+        4373089
+      ],
+      "value": "__annotations__",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373089,
+        4373094
+      ],
+      "value": "str",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373094,
+        4373111
+      ],
+      "value": "post_settlement",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4373111,
+        4373127
+      ],
+      "value": "dict[str, Any]",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373127,
+        4373148
+      ],
+      "value": "runtime_state_delta",
+      "index": 51
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4373148,
+        4373179
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373150,
+              4373159
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373159,
+              4373164
+            ],
+            "value": "tag"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373164,
+              4373172
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373172,
+              4373177
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4373177,
+              4373178
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4373172,
+                  4373177
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4373178,
+              4373179
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4373177,
+                  4373178
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4373172,
+                      4373177
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 52
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4373179,
+        4373202
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373181,
+              4373188
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373188,
+              4373196
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373196,
+              4373201
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4373201,
+              4373202
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4373196,
+                  4373201
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4373202,
+        4373224
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373204,
+              4373210
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373210,
+              4373218
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373218,
+              4373223
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4373223,
+              4373224
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4373218,
+                  4373223
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4373224,
+        4373275
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373226,
+              4373235
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373235,
+              4373243
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373243,
+              4373248
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4373248,
+              4373275
+            ],
+            "value": "SettlerDeltaOutput | None"
+          }
+        ]
+      },
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373275,
+        4373303
+      ],
+      "value": "parse_settler_delta_output",
+      "index": 56
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4373303,
+        4373341
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373305,
+              4373312
+            ],
+            "value": "delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373312,
+              4373320
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4373320,
+              4373336
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373336,
+              4373341
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373341,
+        4373368
+      ],
+      "value": "summary_events_from_delta",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4373368,
+        4373409
+      ],
+      "value": "novels\\services\\settler_delta_parser.py",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4373409,
+        4373456
+      ],
+      "value": "<module novels.services.settler_delta_parser>",
+      "index": 60
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373456,
+        4373469
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373458,
+              4373469
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 61
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373469,
+        4373492
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373471,
+              4373480
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373480,
+              4373485
+            ],
+            "value": "tag"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373485,
+              4373492
+            ],
+            "value": "match"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373492,
+        4373500
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373494,
+              4373500
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 63
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373500,
+        4373526
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373502,
+              4373509
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373509,
+              4373518
+            ],
+            "value": "trimmed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373518,
+              4373526
+            ],
+            "value": "fenced"
+          }
+        ]
+      },
+      "index": 64
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373526,
+        4373572
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373528,
+              4373537
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373537,
+              4373548
+            ],
+            "value": "raw_delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373548,
+              4373557
+            ],
+            "value": "payload"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373557,
+              4373565
+            ],
+            "value": "parsed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373565,
+              4373572
+            ],
+            "value": "match"
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4373572,
+        4373613
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4373574,
+              4373581
+            ],
+            "value": "delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373581,
+              4373590
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373590,
+              4373598
+            ],
+            "value": "events"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4373598,
+              4373613
+            ],
+            "value": "state_changes"
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373613,
+        4373623
+      ],
+      "value": "__name__",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4373623,
+        4373633
+      ],
+      "value": "__spec__",
+      "index": 68
+    }
+  ]
+}

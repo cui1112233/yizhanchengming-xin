@@ -1,0 +1,2975 @@
+{
+  "moduleName": "novels.prompts.agent_tools",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4013056,
+  "payloadRange": [
+    4013087,
+    4016351
+  ],
+  "payloadSha256": "ab673b9fd8509643ab1f082625d9ce4aeb604aa21f3d12859257283487ee3a3f",
+  "declaredConstants": 41,
+  "parsedConstants": 41,
+  "stoppedAt": 4016350,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4013089,
+        4013095
+      ],
+      "value": "copy",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013095,
+        4013105
+      ],
+      "value": "deepcopy",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013105,
+        4013126
+      ],
+      "value": "PROPOSE_ACTION_TOOL",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013126,
+        4013134
+      ],
+      "value": "sorted",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013134,
+        4013159
+      ],
+      "value": "allowed_propose_actions",
+      "index": 4
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4013159,
+        4013171
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4013161,
+              4013171
+            ],
+            "value": "has_book"
+          }
+        ]
+      },
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013171,
+        4013181
+      ],
+      "value": "function",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013181,
+        4013193
+      ],
+      "value": "parameters",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013193,
+        4013205
+      ],
+      "value": "properties",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013205,
+        4013213
+      ],
+      "value": "action",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013213,
+        4013219
+      ],
+      "value": "enum",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013219,
+        4013235
+      ],
+      "value": "PLAY_STEP_TOOL",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013235,
+        4013251
+      ],
+      "value": "PLAY_EDIT_TOOL",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013251,
+        4013269
+      ],
+      "value": "PLAY_REVISE_TOOL",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013269,
+        4013278
+      ],
+      "value": "__doc__",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013278,
+        4013288
+      ],
+      "value": "__file__",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013288,
+        4013296
+      ],
+      "value": "origin",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013296,
+        4013310
+      ],
+      "value": "has_location",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013310,
+        4013322
+      ],
+      "value": "__cached__",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013322,
+        4013339
+      ],
+      "value": "__annotations__",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013339,
+        4013352
+      ],
+      "value": "annotations",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013352,
+        4013357
+      ],
+      "value": "Any",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4013357,
+        4013363
+      ],
+      "value": "Dict",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4013363,
+        4013385
+      ],
+      "value": "services.tool_policy",
+      "index": 23
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4013385,
+        4013412
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4013387,
+              4013412
+            ],
+            "value": "allowed_propose_actions"
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4013412,
+        4013414
+      ],
+      "value": 2,
+      "index": 25
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4013414,
+        4014582
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4013416,
+              4013422
+            ],
+            "value": "type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4013422,
+              4013432
+            ],
+            "value": "function"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4013432,
+              4013442
+            ],
+            "value": "function"
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4013442,
+              4014582
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4013444,
+                    4013450
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4013450,
+                    4013463
+                  ],
+                  "value": "description"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4013463,
+                    4013475
+                  ],
+                  "value": "parameters"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4013475,
+                    4013491
+                  ],
+                  "value": "propose_action"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4013491,
+                    4013629
+                  ],
+                  "value": "向用户提议一个需要确认的生产型或辅助入口动作。调用后由 UI 展示确认卡，用户点击继续后才执行。"
+                },
+                {
+                  "tag": "D",
+                  "fileRange": [
+                    4013629,
+                    4014582
+                  ],
+                  "value": {
+                    "type": "dict",
+                    "keys": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4013631,
+                          4013637
+                        ],
+                        "value": "type"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4013637,
+                          4013649
+                        ],
+                        "value": "properties"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4013649,
+                          4013659
+                        ],
+                        "value": "required"
+                      }
+                    ],
+                    "values": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4013659,
+                          4013667
+                        ],
+                        "value": "object"
+                      },
+                      {
+                        "tag": "D",
+                        "fileRange": [
+                          4013667,
+                          4014559
+                        ],
+                        "value": {
+                          "type": "dict",
+                          "keys": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013669,
+                                4013677
+                              ],
+                              "value": "action"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013677,
+                                4013690
+                              ],
+                              "value": "instruction"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013690,
+                                4013697
+                              ],
+                              "value": "title"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013697,
+                                4013706
+                              ],
+                              "value": "summary"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013706,
+                                4013713
+                              ],
+                              "value": "genre"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013713,
+                                4013723
+                              ],
+                              "value": "platform"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013723,
+                                4013739
+                              ],
+                              "value": "targetChapters"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013739,
+                                4013757
+                              ],
+                              "value": "chapterWordCount"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013757,
+                                4013772
+                              ],
+                              "value": "chapterNumber"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013772,
+                                4013779
+                              ],
+                              "value": "count"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013779,
+                                4013785
+                              ],
+                              "value": "mode"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013785,
+                                4013796
+                              ],
+                              "value": "direction"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013796,
+                                4013806
+                              ],
+                              "value": "chapters"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013806,
+                                4013823
+                              ],
+                              "value": "charsPerChapter"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4013823,
+                                4013841
+                              ],
+                              "value": "knowledgeBookIds"
+                            }
+                          ],
+                          "values": [
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4013841,
+                                4014040
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4013843,
+                                      4013849
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4013849,
+                                      4013855
+                                    ],
+                                    "value": "enum"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4013855,
+                                      4013863
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "L",
+                                    "fileRange": [
+                                      4013863,
+                                      4014040
+                                    ],
+                                    "value": {
+                                      "type": "list",
+                                      "items": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013865,
+                                            4013878
+                                          ],
+                                          "value": "create_book"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013878,
+                                            4013890
+                                          ],
+                                          "value": "write_next"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013890,
+                                            4013901
+                                          ],
+                                          "value": "short_run"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013901,
+                                            4013913
+                                          ],
+                                          "value": "play_start"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013913,
+                                            4013929
+                                          ],
+                                          "value": "generate_cover"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013929,
+                                            4013942
+                                          ],
+                                          "value": "fanfic_init"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013942,
+                                            4013963
+                                          ],
+                                          "value": "continuation_import"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013963,
+                                            4013979
+                                          ],
+                                          "value": "spinoff_create"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013979,
+                                            4013996
+                                          ],
+                                          "value": "style_imitation"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4013996,
+                                            4014011
+                                          ],
+                                          "value": "audit_chapter"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4014011,
+                                            4014027
+                                          ],
+                                          "value": "revise_chapter"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4014027,
+                                            4014040
+                                          ],
+                                          "value": "write_batch"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014040,
+                                4014095
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014042,
+                                      4014048
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014048,
+                                      4014061
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014061,
+                                      4014069
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014069,
+                                      4014095
+                                    ],
+                                    "value": "自包含的执行说明"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014095,
+                                4014111
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014097,
+                                      4014103
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014103,
+                                      4014111
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014111,
+                                4014157
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014113,
+                                      4014119
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014119,
+                                      4014132
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014132,
+                                      4014140
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014140,
+                                      4014157
+                                    ],
+                                    "value": "确认卡摘要"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014157,
+                                4014173
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014159,
+                                      4014165
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014165,
+                                      4014173
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014173,
+                                4014189
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014175,
+                                      4014181
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014181,
+                                      4014189
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014189,
+                                4014206
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014191,
+                                      4014197
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014197,
+                                      4014206
+                                    ],
+                                    "value": "integer"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014206,
+                                4014223
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014208,
+                                      4014214
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014214,
+                                      4014223
+                                    ],
+                                    "value": "integer"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014223,
+                                4014240
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014225,
+                                      4014231
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014231,
+                                      4014240
+                                    ],
+                                    "value": "integer"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014240,
+                                4014290
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014242,
+                                      4014248
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014248,
+                                      4014261
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014261,
+                                      4014270
+                                    ],
+                                    "value": "integer"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014270,
+                                      4014290
+                                    ],
+                                    "value": "批量写作章数"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014290,
+                                4014306
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014292,
+                                      4014298
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014298,
+                                      4014306
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014306,
+                                4014355
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014308,
+                                      4014314
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014314,
+                                      4014327
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014327,
+                                      4014335
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014335,
+                                      4014355
+                                    ],
+                                    "value": "短篇创作方向"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014355,
+                                4014408
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014357,
+                                      4014363
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014363,
+                                      4014376
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014376,
+                                      4014385
+                                    ],
+                                    "value": "integer"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014385,
+                                      4014408
+                                    ],
+                                    "value": "短篇章节数 12-18"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014408,
+                                4014467
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014410,
+                                      4014416
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014416,
+                                      4014429
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014429,
+                                      4014438
+                                    ],
+                                    "value": "integer"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014438,
+                                      4014467
+                                    ],
+                                    "value": "短篇每章字数 900-1200"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014467,
+                                4014559
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014469,
+                                      4014475
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014475,
+                                      4014482
+                                    ],
+                                    "value": "items"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014482,
+                                      4014495
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014495,
+                                      4014502
+                                    ],
+                                    "value": "array"
+                                  },
+                                  {
+                                    "tag": "D",
+                                    "fileRange": [
+                                      4014502,
+                                      4014518
+                                    ],
+                                    "value": {
+                                      "type": "dict",
+                                      "keys": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4014504,
+                                            4014510
+                                          ],
+                                          "value": "type"
+                                        }
+                                      ],
+                                      "values": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4014510,
+                                            4014518
+                                          ],
+                                          "value": "string"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014518,
+                                      4014559
+                                    ],
+                                    "value": "知识库书籍 ID，用作文风参考"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "tag": "L",
+                        "fileRange": [
+                          4014559,
+                          4014582
+                        ],
+                        "value": {
+                          "type": "list",
+                          "items": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4014561,
+                                4014569
+                              ],
+                              "value": "action"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4014569,
+                                4014582
+                              ],
+                              "value": "instruction"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4014582,
+        4014598
+      ],
+      "value": "Dict[str, Any]",
+      "index": 27
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4014598,
+        4014611
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4014600,
+              4014610
+            ],
+            "value": "has_book"
+          }
+        ],
+        "values": [
+          {
+            "tag": "F",
+            "fileRange": [
+              4014610,
+              4014611
+            ],
+            "value": false
+          }
+        ]
+      },
+      "index": 28
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4014611,
+        4014672
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4014613,
+              4014627
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4014627,
+              4014637
+            ],
+            "value": "has_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4014637,
+              4014645
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4014645,
+              4014650
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4014650,
+              4014656
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4014656,
+              4014672
+            ],
+            "value": "Dict[str, Any]"
+          }
+        ]
+      },
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4014672,
+        4014702
+      ],
+      "value": "propose_action_tool_for_kind",
+      "index": 30
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4014702,
+        4014986
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4014704,
+              4014710
+            ],
+            "value": "type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4014710,
+              4014720
+            ],
+            "value": "function"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4014720,
+              4014730
+            ],
+            "value": "function"
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4014730,
+              4014986
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4014732,
+                    4014738
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4014738,
+                    4014751
+                  ],
+                  "value": "description"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4014751,
+                    4014763
+                  ],
+                  "value": "parameters"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4014763,
+                    4014774
+                  ],
+                  "value": "play_step"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4014774,
+                    4014878
+                  ],
+                  "value": "推进当前互动世界一回合。用户输入动作、台词、观察、移动或选择时调用。"
+                },
+                {
+                  "tag": "D",
+                  "fileRange": [
+                    4014878,
+                    4014986
+                  ],
+                  "value": {
+                    "type": "dict",
+                    "keys": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4014880,
+                          4014886
+                        ],
+                        "value": "type"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4014886,
+                          4014898
+                        ],
+                        "value": "properties"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4014898,
+                          4014908
+                        ],
+                        "value": "required"
+                      }
+                    ],
+                    "values": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4014908,
+                          4014916
+                        ],
+                        "value": "object"
+                      },
+                      {
+                        "tag": "D",
+                        "fileRange": [
+                          4014916,
+                          4014977
+                        ],
+                        "value": {
+                          "type": "dict",
+                          "keys": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4014918,
+                                4014925
+                              ],
+                              "value": "input"
+                            }
+                          ],
+                          "values": [
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4014925,
+                                4014977
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014927,
+                                      4014933
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014933,
+                                      4014946
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4014946,
+                                      4014954
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4014954,
+                                      4014977
+                                    ],
+                                    "value": "玩家本回合输入"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "tag": "L",
+                        "fileRange": [
+                          4014977,
+                          4014986
+                        ],
+                        "value": {
+                          "type": "list",
+                          "items": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4014979,
+                                4014986
+                              ],
+                              "value": "input"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 31
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4014986,
+        4015734
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4014988,
+              4014994
+            ],
+            "value": "type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4014994,
+              4015004
+            ],
+            "value": "function"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4015004,
+              4015014
+            ],
+            "value": "function"
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4015014,
+              4015734
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015016,
+                    4015022
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015022,
+                    4015035
+                  ],
+                  "value": "description"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015035,
+                    4015047
+                  ],
+                  "value": "parameters"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015047,
+                    4015058
+                  ],
+                  "value": "play_edit"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4015058,
+                    4015192
+                  ],
+                  "value": "持久编辑当前互动世界的世界契约、视觉契约、玩家 persona 或实体卡；不推进时间、不生成新场景。"
+                },
+                {
+                  "tag": "D",
+                  "fileRange": [
+                    4015192,
+                    4015734
+                  ],
+                  "value": {
+                    "type": "dict",
+                    "keys": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015194,
+                          4015200
+                        ],
+                        "value": "type"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015200,
+                          4015212
+                        ],
+                        "value": "properties"
+                      }
+                    ],
+                    "values": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015212,
+                          4015220
+                        ],
+                        "value": "object"
+                      },
+                      {
+                        "tag": "D",
+                        "fileRange": [
+                          4015220,
+                          4015734
+                        ],
+                        "value": {
+                          "type": "dict",
+                          "keys": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015222,
+                                4015237
+                              ],
+                              "value": "worldContract"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015237,
+                                4015258
+                              ],
+                              "value": "worldContractAppend"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015258,
+                                4015285
+                              ],
+                              "value": "worldContractReplacements"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015285,
+                                4015301
+                              ],
+                              "value": "visualContract"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015301,
+                                4015323
+                              ],
+                              "value": "visualContractAppend"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015323,
+                                4015351
+                              ],
+                              "value": "visualContractReplacements"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015351,
+                                4015360
+                              ],
+                              "value": "premise"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015360,
+                                4015375
+                              ],
+                              "value": "playerPersona"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015375,
+                                4015390
+                              ],
+                              "value": "entityUpdates"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015390,
+                                4015396
+                              ],
+                              "value": "note"
+                            }
+                          ],
+                          "values": [
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015396,
+                                4015412
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015398,
+                                      4015404
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015404,
+                                      4015412
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015412,
+                                4015428
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015414,
+                                      4015420
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015420,
+                                      4015428
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015428,
+                                4015522
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015430,
+                                      4015436
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015436,
+                                      4015443
+                                    ],
+                                    "value": "items"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015443,
+                                      4015450
+                                    ],
+                                    "value": "array"
+                                  },
+                                  {
+                                    "tag": "D",
+                                    "fileRange": [
+                                      4015450,
+                                      4015522
+                                    ],
+                                    "value": {
+                                      "type": "dict",
+                                      "keys": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015452,
+                                            4015458
+                                          ],
+                                          "value": "type"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015458,
+                                            4015470
+                                          ],
+                                          "value": "properties"
+                                        }
+                                      ],
+                                      "values": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015470,
+                                            4015478
+                                          ],
+                                          "value": "object"
+                                        },
+                                        {
+                                          "tag": "D",
+                                          "fileRange": [
+                                            4015478,
+                                            4015522
+                                          ],
+                                          "value": {
+                                            "type": "dict",
+                                            "keys": [
+                                              {
+                                                "tag": "a",
+                                                "fileRange": [
+                                                  4015480,
+                                                  4015486
+                                                ],
+                                                "value": "from"
+                                              },
+                                              {
+                                                "tag": "a",
+                                                "fileRange": [
+                                                  4015486,
+                                                  4015490
+                                                ],
+                                                "value": "to"
+                                              }
+                                            ],
+                                            "values": [
+                                              {
+                                                "tag": "D",
+                                                "fileRange": [
+                                                  4015490,
+                                                  4015506
+                                                ],
+                                                "value": {
+                                                  "type": "dict",
+                                                  "keys": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015492,
+                                                        4015498
+                                                      ],
+                                                      "value": "type"
+                                                    }
+                                                  ],
+                                                  "values": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015498,
+                                                        4015506
+                                                      ],
+                                                      "value": "string"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              {
+                                                "tag": "D",
+                                                "fileRange": [
+                                                  4015506,
+                                                  4015522
+                                                ],
+                                                "value": {
+                                                  "type": "dict",
+                                                  "keys": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015508,
+                                                        4015514
+                                                      ],
+                                                      "value": "type"
+                                                    }
+                                                  ],
+                                                  "values": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015514,
+                                                        4015522
+                                                      ],
+                                                      "value": "string"
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015522,
+                                4015538
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015524,
+                                      4015530
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015530,
+                                      4015538
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015538,
+                                4015554
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015540,
+                                      4015546
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015546,
+                                      4015554
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015554,
+                                4015648
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015556,
+                                      4015562
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015562,
+                                      4015569
+                                    ],
+                                    "value": "items"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015569,
+                                      4015576
+                                    ],
+                                    "value": "array"
+                                  },
+                                  {
+                                    "tag": "D",
+                                    "fileRange": [
+                                      4015576,
+                                      4015648
+                                    ],
+                                    "value": {
+                                      "type": "dict",
+                                      "keys": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015578,
+                                            4015584
+                                          ],
+                                          "value": "type"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015584,
+                                            4015596
+                                          ],
+                                          "value": "properties"
+                                        }
+                                      ],
+                                      "values": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015596,
+                                            4015604
+                                          ],
+                                          "value": "object"
+                                        },
+                                        {
+                                          "tag": "D",
+                                          "fileRange": [
+                                            4015604,
+                                            4015648
+                                          ],
+                                          "value": {
+                                            "type": "dict",
+                                            "keys": [
+                                              {
+                                                "tag": "a",
+                                                "fileRange": [
+                                                  4015606,
+                                                  4015612
+                                                ],
+                                                "value": "from"
+                                              },
+                                              {
+                                                "tag": "a",
+                                                "fileRange": [
+                                                  4015612,
+                                                  4015616
+                                                ],
+                                                "value": "to"
+                                              }
+                                            ],
+                                            "values": [
+                                              {
+                                                "tag": "D",
+                                                "fileRange": [
+                                                  4015616,
+                                                  4015632
+                                                ],
+                                                "value": {
+                                                  "type": "dict",
+                                                  "keys": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015618,
+                                                        4015624
+                                                      ],
+                                                      "value": "type"
+                                                    }
+                                                  ],
+                                                  "values": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015624,
+                                                        4015632
+                                                      ],
+                                                      "value": "string"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              {
+                                                "tag": "D",
+                                                "fileRange": [
+                                                  4015632,
+                                                  4015648
+                                                ],
+                                                "value": {
+                                                  "type": "dict",
+                                                  "keys": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015634,
+                                                        4015640
+                                                      ],
+                                                      "value": "type"
+                                                    }
+                                                  ],
+                                                  "values": [
+                                                    {
+                                                      "tag": "a",
+                                                      "fileRange": [
+                                                        4015640,
+                                                        4015648
+                                                      ],
+                                                      "value": "string"
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015648,
+                                4015664
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015650,
+                                      4015656
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015656,
+                                      4015664
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015664,
+                                4015680
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015666,
+                                      4015672
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015672,
+                                      4015680
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015680,
+                                4015718
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015682,
+                                      4015688
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015688,
+                                      4015695
+                                    ],
+                                    "value": "items"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015695,
+                                      4015702
+                                    ],
+                                    "value": "array"
+                                  },
+                                  {
+                                    "tag": "D",
+                                    "fileRange": [
+                                      4015702,
+                                      4015718
+                                    ],
+                                    "value": {
+                                      "type": "dict",
+                                      "keys": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015704,
+                                            4015710
+                                          ],
+                                          "value": "type"
+                                        }
+                                      ],
+                                      "values": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4015710,
+                                            4015718
+                                          ],
+                                          "value": "object"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015718,
+                                4015734
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015720,
+                                      4015726
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015726,
+                                      4015734
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 32
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4015734,
+        4016169
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4015736,
+              4015742
+            ],
+            "value": "type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4015742,
+              4015752
+            ],
+            "value": "function"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4015752,
+              4015762
+            ],
+            "value": "function"
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4015762,
+              4016169
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015764,
+                    4015770
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015770,
+                    4015783
+                  ],
+                  "value": "description"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015783,
+                    4015795
+                  ],
+                  "value": "parameters"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4015795,
+                    4015808
+                  ],
+                  "value": "play_revise"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4015808,
+                    4015906
+                  ],
+                  "value": "重做上一回合、换一版、编辑上一条玩家输入，或恢复已保存回合版本。"
+                },
+                {
+                  "tag": "D",
+                  "fileRange": [
+                    4015906,
+                    4016169
+                  ],
+                  "value": {
+                    "type": "dict",
+                    "keys": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015908,
+                          4015914
+                        ],
+                        "value": "type"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015914,
+                          4015926
+                        ],
+                        "value": "properties"
+                      },
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015926,
+                          4015936
+                        ],
+                        "value": "required"
+                      }
+                    ],
+                    "values": [
+                      {
+                        "tag": "a",
+                        "fileRange": [
+                          4015936,
+                          4015944
+                        ],
+                        "value": "object"
+                      },
+                      {
+                        "tag": "D",
+                        "fileRange": [
+                          4015944,
+                          4016159
+                        ],
+                        "value": {
+                          "type": "dict",
+                          "keys": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015946,
+                                4015954
+                              ],
+                              "value": "action"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015954,
+                                4015961
+                              ],
+                              "value": "input"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015961,
+                                4015967
+                              ],
+                              "value": "turn"
+                            },
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4015967,
+                                4015978
+                              ],
+                              "value": "variantId"
+                            }
+                          ],
+                          "values": [
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4015978,
+                                4016058
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015980,
+                                      4015986
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015986,
+                                      4015992
+                                    ],
+                                    "value": "enum"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4015992,
+                                      4016000
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "L",
+                                    "fileRange": [
+                                      4016000,
+                                      4016058
+                                    ],
+                                    "value": {
+                                      "type": "list",
+                                      "items": [
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4016002,
+                                            4016024
+                                          ],
+                                          "value": "regenerate_last_turn"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4016024,
+                                            4016041
+                                          ],
+                                          "value": "edit_last_input"
+                                        },
+                                        {
+                                          "tag": "a",
+                                          "fileRange": [
+                                            4016041,
+                                            4016058
+                                          ],
+                                          "value": "restore_variant"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4016058,
+                                4016126
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016060,
+                                      4016066
+                                    ],
+                                    "value": "type"
+                                  },
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016066,
+                                      4016079
+                                    ],
+                                    "value": "description"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016079,
+                                      4016087
+                                    ],
+                                    "value": "string"
+                                  },
+                                  {
+                                    "tag": "u",
+                                    "fileRange": [
+                                      4016087,
+                                      4016126
+                                    ],
+                                    "value": "edit_last_input 时的新玩家输入"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4016126,
+                                4016143
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016128,
+                                      4016134
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016134,
+                                      4016143
+                                    ],
+                                    "value": "integer"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "tag": "D",
+                              "fileRange": [
+                                4016143,
+                                4016159
+                              ],
+                              "value": {
+                                "type": "dict",
+                                "keys": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016145,
+                                      4016151
+                                    ],
+                                    "value": "type"
+                                  }
+                                ],
+                                "values": [
+                                  {
+                                    "tag": "a",
+                                    "fileRange": [
+                                      4016151,
+                                      4016159
+                                    ],
+                                    "value": "string"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "tag": "L",
+                        "fileRange": [
+                          4016159,
+                          4016169
+                        ],
+                        "value": {
+                          "type": "list",
+                          "items": [
+                            {
+                              "tag": "a",
+                              "fileRange": [
+                                4016161,
+                                4016169
+                              ],
+                              "value": "action"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4016169,
+        4016201
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4016171,
+              4016179
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4016179,
+              4016201
+            ],
+            "value": "list[Dict[str, Any]]"
+          }
+        ]
+      },
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4016201,
+        4016230
+      ],
+      "value": "play_tools_for_active_world",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4016230,
+        4016261
+      ],
+      "value": "novels\\prompts\\agent_tools.py",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4016261,
+        4016298
+      ],
+      "value": "<module novels.prompts.agent_tools>",
+      "index": 37
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4016298,
+        4016339
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4016300,
+              4016314
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4016314,
+              4016324
+            ],
+            "value": "has_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4016324,
+              4016330
+            ],
+            "value": "tool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4016330,
+              4016339
+            ],
+            "value": "allowed"
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4016339,
+        4016340
+      ],
+      "value": "",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4016340,
+        4016350
+      ],
+      "value": "__spec__",
+      "index": 40
+    }
+  ]
+}

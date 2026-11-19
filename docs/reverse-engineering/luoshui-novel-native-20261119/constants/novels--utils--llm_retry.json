@@ -1,0 +1,1195 @@
+{
+  "moduleName": "novels.utils.llm_retry",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4426957,
+  "payloadRange": [
+    4426984,
+    4428792
+  ],
+  "payloadSha256": "136e2051b2d4eb8c60f9ded80ee14b15a10e618c4f071cb39e7d64eec142d133",
+  "declaredConstants": 49,
+  "parsedConstants": 49,
+  "stoppedAt": 4428791,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4426986,
+        4426993
+      ],
+      "value": "lower",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4426993,
+        4427014
+      ],
+      "value": "_TRANSIENT_PATTERNS",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427014,
+        4427019
+      ],
+      "value": "msg",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4427019,
+        4427030
+      ],
+      "value": "<genexpr>",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4427030,
+        4427073
+      ],
+      "value": "is_transient_llm_error.<locals>.<genexpr>",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427073,
+        4427096
+      ],
+      "value": "_USER_FRIENDLY_ERRORS",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427096,
+        4427103
+      ],
+      "value": "items",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4427103,
+        4427123
+      ],
+      "value": "AI 调用失败：",
+      "index": 7
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4427123,
+        4427124
+      ],
+      "value": "",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427124,
+        4427128
+      ],
+      "value": "fn",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427128,
+        4427142
+      ],
+      "value": "max_attempts",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427142,
+        4427166
+      ],
+      "value": "is_transient_llm_error",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427166,
+        4427178
+      ],
+      "value": "base_delay",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427178,
+        4427186
+      ],
+      "value": "logger",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427186,
+        4427195
+      ],
+      "value": "warning",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4427195,
+        4427260
+      ],
+      "value": "[%s] transient LLM error (attempt %s/%s), retrying in %.1fs: %s",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427260,
+        4427267
+      ],
+      "value": "label",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427267,
+        4427273
+      ],
+      "value": "time",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427273,
+        4427280
+      ],
+      "value": "sleep",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427280,
+        4427292
+      ],
+      "value": "last_error",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427292,
+        4427301
+      ],
+      "value": "__doc__",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427301,
+        4427311
+      ],
+      "value": "__file__",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427311,
+        4427319
+      ],
+      "value": "origin",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427319,
+        4427333
+      ],
+      "value": "has_location",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427333,
+        4427345
+      ],
+      "value": "__cached__",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427345,
+        4427358
+      ],
+      "value": "annotations",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427358,
+        4427367
+      ],
+      "value": "logging",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427367,
+        4427377
+      ],
+      "value": "Callable",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427377,
+        4427387
+      ],
+      "value": "Optional",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427387,
+        4427396
+      ],
+      "value": "TypeVar",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4427396,
+        4427407
+      ],
+      "value": "getLogger",
+      "index": 30
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4427407,
+        4427411
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4427409,
+              4427411
+            ],
+            "value": "T"
+          }
+        ]
+      },
+      "index": 31
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4427411,
+        4427413
+      ],
+      "value": "T",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4427413,
+        4427777
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4427415,
+              4427431
+            ],
+            "value": "unexpected eof"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427431,
+              4427443
+            ],
+            "value": "econnreset"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427443,
+              4427459
+            ],
+            "value": "socket hang up"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427459,
+              4427471
+            ],
+            "value": "terminated"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427471,
+              4427485
+            ],
+            "value": "fetch failed"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427485,
+              4427503
+            ],
+            "value": "connection reset"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427503,
+              4427514
+            ],
+            "value": "timed out"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427514,
+              4427523
+            ],
+            "value": "timeout"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427523,
+              4427548
+            ],
+            "value": "incomplete chunked read"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427548,
+              4427572
+            ],
+            "value": "peer closed connection"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427572,
+              4427595
+            ],
+            "value": "complete message body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427595,
+              4427616
+            ],
+            "value": "remoteprotocolerror"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427616,
+              4427636
+            ],
+            "value": "connection aborted"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427636,
+              4427649
+            ],
+            "value": "broken pipe"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427649,
+              4427664
+            ],
+            "value": "reset by peer"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427664,
+              4427685
+            ],
+            "value": "server disconnected"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427685,
+              4427712
+            ],
+            "value": "httpx.remoteprotocolerror"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427712,
+              4427738
+            ],
+            "value": "read operation timed out"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427738,
+              4427743
+            ],
+            "value": "503"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427743,
+              4427748
+            ],
+            "value": "502"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427748,
+              4427753
+            ],
+            "value": "429"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427753,
+              4427765
+            ],
+            "value": "rate limit"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427765,
+              4427777
+            ],
+            "value": "overloaded"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4427777,
+        4428327
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4427779,
+              4427803
+            ],
+            "value": "peer closed connection"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427803,
+              4427828
+            ],
+            "value": "incomplete chunked read"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427828,
+              4427846
+            ],
+            "value": "connection reset"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427846,
+              4427857
+            ],
+            "value": "timed out"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427857,
+              4427866
+            ],
+            "value": "timeout"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427866,
+              4427878
+            ],
+            "value": "rate limit"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4427878,
+              4427890
+            ],
+            "value": "overloaded"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427890,
+              4427895
+            ],
+            "value": "429"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427895,
+              4427900
+            ],
+            "value": "502"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427900,
+              4427905
+            ],
+            "value": "503"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4427905,
+              4427940
+            ],
+            "value": "AI 服务连接中断，请重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427940,
+              4427978
+            ],
+            "value": "AI 响应传输不完整，请重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4427978,
+              4428028
+            ],
+            "value": "网络连接被重置，请检查网络后重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428028,
+              4428057
+            ],
+            "value": "AI 响应超时，请重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428057,
+              4428086
+            ],
+            "value": "AI 响应超时，请重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428086,
+              4428133
+            ],
+            "value": "AI 服务请求频率过高，请稍后重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428133,
+              4428174
+            ],
+            "value": "AI 服务当前繁忙，请稍后重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428174,
+              4428221
+            ],
+            "value": "AI 服务请求频率过高，请稍后重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428221,
+              4428274
+            ],
+            "value": "AI 服务暂时不可用（502），请稍后重试"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4428274,
+              4428327
+            ],
+            "value": "AI 服务暂时不可用（503），请稍后重试"
+          }
+        ]
+      },
+      "index": 34
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4428327,
+        4428365
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428329,
+              4428336
+            ],
+            "value": "error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428336,
+              4428344
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428344,
+              4428359
+            ],
+            "value": "BaseException"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428359,
+              4428365
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 35
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4428365,
+        4428402
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428367,
+              4428374
+            ],
+            "value": "error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428374,
+              4428382
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428382,
+              4428397
+            ],
+            "value": "BaseException"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428397,
+              4428402
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4428402,
+        4428422
+      ],
+      "value": "friendly_llm_error",
+      "index": 37
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4428422,
+        4428473
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428424,
+              4428431
+            ],
+            "value": "label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428431,
+              4428445
+            ],
+            "value": "max_attempts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428445,
+              4428457
+            ],
+            "value": "base_delay"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428457,
+              4428462
+            ],
+            "value": "llm"
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4428462,
+              4428464
+            ],
+            "value": 3
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              4428464,
+              4428473
+            ],
+            "value": 2.0
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4428473,
+        4428556
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428475,
+              4428479
+            ],
+            "value": "fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428479,
+              4428486
+            ],
+            "value": "label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428486,
+              4428500
+            ],
+            "value": "max_attempts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428500,
+              4428512
+            ],
+            "value": "base_delay"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428512,
+              4428520
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4428520,
+              4428537
+            ],
+            "value": "Callable[[], T]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428537,
+              4428542
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428542,
+              4428547
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428547,
+              4428554
+            ],
+            "value": "float"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4428554,
+              4428556
+            ],
+            "value": "T"
+          }
+        ]
+      },
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4428556,
+        4428572
+      ],
+      "value": "retry_llm_call",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4428572,
+        4428599
+      ],
+      "value": "novels\\utils\\llm_retry.py",
+      "index": 41
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4428599,
+        4428619
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428601,
+              4428605
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428605,
+              4428614
+            ],
+            "value": "pattern"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428614,
+              4428619
+            ],
+            "value": "msg"
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4428619,
+        4428652
+      ],
+      "value": "<module novels.utils.llm_retry>",
+      "index": 43
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4428652,
+        4428685
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428654,
+              4428661
+            ],
+            "value": "error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428661,
+              4428666
+            ],
+            "value": "msg"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428666,
+              4428675
+            ],
+            "value": "pattern"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428675,
+              4428685
+            ],
+            "value": "friendly"
+          }
+        ]
+      },
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4428685,
+        4428699
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428687,
+              4428694
+            ],
+            "value": "error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428694,
+              4428699
+            ],
+            "value": "msg"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4428699,
+        4428771
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4428701,
+              4428705
+            ],
+            "value": "fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428705,
+              4428712
+            ],
+            "value": "label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428712,
+              4428726
+            ],
+            "value": "max_attempts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428726,
+              4428738
+            ],
+            "value": "base_delay"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428738,
+              4428750
+            ],
+            "value": "last_error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428750,
+              4428759
+            ],
+            "value": "attempt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428759,
+              4428764
+            ],
+            "value": "exc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4428764,
+              4428771
+            ],
+            "value": "delay"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4428771,
+        4428781
+      ],
+      "value": "__name__",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4428781,
+        4428791
+      ],
+      "value": "__spec__",
+      "index": 48
+    }
+  ]
+}

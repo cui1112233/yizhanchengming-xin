@@ -1,0 +1,5070 @@
+{
+  "moduleName": "novels.prompts.inkos.writer_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4245812,
+  "payloadRange": [
+    4245852,
+    4304507
+  ],
+  "payloadSha256": "9620774a656e2e131174b05cd72630881316372f18989dc9b8998d6ce236cd6e",
+  "declaredConstants": 300,
+  "parsedConstants": 300,
+  "stoppedAt": 4304506,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4245854,
+        4245864
+      ],
+      "value": "language",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245864,
+        4245868
+      ],
+      "value": "en",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245868,
+        4245878
+      ],
+      "value": "governed",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245878,
+        4245897
+      ],
+      "value": "build_length_spec",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245897,
+        4245915
+      ],
+      "value": "chapterWordCount",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245915,
+        4245919
+      ],
+      "value": "zh",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245919,
+        4245929
+      ],
+      "value": "creative",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245929,
+        4245967
+      ],
+      "value": "build_english_creative_output_format",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245967,
+        4245996
+      ],
+      "value": "build_english_output_format",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245996,
+        4246026
+      ],
+      "value": "build_creative_output_format",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246026,
+        4246047
+      ],
+      "value": "build_output_format",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246047,
+        4246074
+      ],
+      "value": "build_english_genre_intro",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246074,
+        4246080
+      ],
+      "value": "book",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246080,
+        4246095
+      ],
+      "value": "genre_profile",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246095,
+        4246121
+      ],
+      "value": "build_english_core_rules",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246121,
+        4246152
+      ],
+      "value": "build_governed_input_contract",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246152,
+        4246181
+      ],
+      "value": "build_chapter_memo_contract",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246181,
+        4246204
+      ],
+      "value": "build_length_guidance",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246204,
+        4246226
+      ],
+      "value": "resolved_length_spec",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246226,
+        4246252
+      ],
+      "value": "build_writing_craft_card",
+      "index": 19
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4246252,
+        4246258
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4246254,
+              4246258
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246258,
+        4246287
+      ],
+      "value": "build_prose_execution_rules",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246287,
+        4246316
+      ],
+      "value": "build_creative_constitution",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246316,
+        4246341
+      ],
+      "value": "build_immersion_pillars",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246341,
+        4246374
+      ],
+      "value": "build_golden_opening_discipline",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246374,
+        4246393
+      ],
+      "value": "build_genre_rules",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246393,
+        4246418
+      ],
+      "value": "build_protagonist_rules",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246418,
+        4246447
+      ],
+      "value": "build_narrative_person_rule",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246447,
+        4246470
+      ],
+      "value": "build_book_rules_body",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246470,
+        4246489
+      ],
+      "value": "build_style_guide",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246489,
+        4246514
+      ],
+      "value": "build_style_fingerprint",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246514,
+        4246542
+      ],
+      "value": "build_fanfic_canon_section",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246542,
+        4246555
+      ],
+      "value": "fanficCanon",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246555,
+        4246567
+      ],
+      "value": "fanficMode",
+      "index": 33
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4246567,
+        4246568
+      ],
+      "value": "",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246568,
+        4246600
+      ],
+      "value": "build_character_voice_profiles",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246600,
+        4246632
+      ],
+      "value": "build_fanfic_mode_instructions",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246632,
+        4246651
+      ],
+      "value": "allowedDeviations",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246651,
+        4246670
+      ],
+      "value": "build_genre_intro",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246670,
+        4246688
+      ],
+      "value": "build_core_rules",
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4246688,
+        4246694
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4246690,
+              4246694
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246694,
+        4246723
+      ],
+      "value": "build_golden_chapters_rules",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246723,
+        4246728
+      ],
+      "value": "get",
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4246728,
+        4246754
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4246730,
+              4246754
+            ],
+            "value": "enableFullCastTracking"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246754,
+        4246780
+      ],
+      "value": "build_full_cast_tracking",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246780,
+        4246784
+      ],
+      "value": "\n\n",
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246784,
+        4246795
+      ],
+      "value": "<genexpr>",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246795,
+        4246842
+      ],
+      "value": "build_writer_system_prompt.<locals>.<genexpr>",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246842,
+        4246865
+      ],
+      "value": "你是一位专业的",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246865,
+        4246871
+      ],
+      "value": "name",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246871,
+        4246900
+      ],
+      "value": "网络小说作家。你为",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4246900,
+        4246910
+      ],
+      "value": "platform",
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246910,
+        4246927
+      ],
+      "value": "平台写作。",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4246927,
+        4248180
+      ],
+      "value": "## Input Governance Contract\n\n- Chapter-specific steering comes from the provided chapter intent and composed context package.\n- The outline is the default plan, not unconditional global supremacy.\n- When the runtime rule stack records an active L4 -> L3 override, follow the current task over local planning.\n- Keep hard guardrails compact: canon, continuity facts, and explicit prohibitions still win.\n- If an English Variance Brief is provided, obey it: avoid the listed phrase/opening/ending patterns and satisfy the scene obligation.\n- If Hook Debt Briefs are provided, they contain the ORIGINAL SEED TEXT from the chapter where each hook was planted. Use this text to write a continuation or payoff that feels connected to what the reader already saw — not a vague mention, but a scene that builds on the specific promise.\n- When the explicit hook agenda names an eligible resolve target, land a concrete payoff beat that answers the reader's original question from the seed chapter.\n- When stale debt is present, do not open sibling hooks casually; clear pressure from old promises before minting fresh debt.\n- In multi-character scenes, include at least one resistance-bearing exchange instead of reducing the beat to summary or explanation.",
+      "index": 53
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4248180,
+        4249358
+      ],
+      "value": "## 输入治理契约\n\n- 本章具体写什么，以提供给你的 chapter intent 和 composed context package 为准。\n- 卷纲是默认规划，不是全局最高规则。\n- 当 runtime rule stack 明确记录了 L4 -> L3 的 active override 时，优先执行当前任务意图，再局部调整规划层。\n- 真正不能突破的只有硬护栏：世界设定、连续性事实、显式禁令。\n- 如果提供了 English Variance Brief，必须主动避开其中列出的高频短语、重复开头和重复结尾模式，并完成 scene obligation。\n- 如果提供了 Hook Debt 简报，里面包含每个伏笔种下时的**原始文本片段**。用这些原文来写延续或兑现场景——不是模糊地提一嘴，而是接着读者已经看到的具体承诺来写。\n- 如果显式 hook agenda 里出现了可回收目标，本章必须写出具体兑现片段，回答种子章节中读者的原始疑问。\n- 如果存在 stale debt，先消化旧承诺的压力，再决定是否开新坑；同类 sibling hook 不得随手再开。\n- 多角色场景里，至少给出一轮带阻力的直接交锋，不要把人物关系写成纯解释或纯总结。",
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4249358,
+        4251469
+      ],
+      "value": "## Chapter Memo Alignment\n\nYou will receive a chapter_memo composed of 7 markdown sections:\n\n- ## 当前任务 → the concrete action this chapter must complete; stay aligned with it throughout\n- ## 读者此刻在等什么 → controls how emotional gaps are created / delayed / paid off\n- ## 该兑现的 / 暂不掀的 → payoffs that must land this chapter + cards you must NOT reveal\n- ## 日常/过渡承担什么任务 → function map for non-conflict passages ([passage location] → [function])\n- ## 关键抉择过三连问 → three-question check every key character choice must pass\n- ## 章尾必须发生的改变 → 1-3 concrete changes the ending must deliver (info / relation / physical / power)\n- ## 本章 hook 账 → **hard correspondence rule**: each hook_id listed under advance/resolve MUST have a **concretely locatable payoff scene** in the prose — explicit characters acting on or talking about a specific object/event/piece of information, with observable actions. No \"sideways hints\" or \"deferred to next chapter\". Example: if the memo says 'advance: H007 Huzi's IOU → planted → pressured', the prose must contain a scene where Lin Qiu actually touches / sees / picks up that specific IOU and does something. An inner mention like \"he remembered the IOU was still in the drawer\" does NOT count. Each advance/resolve payoff scene must be at least 60 chars. Entries under defer need no prose. Entries under open only need a natural new-hook seed near the chapter end\n- ## 不要做 → hard prohibitions for this chapter\n\nAddress each section in order when drafting the chapter. Every section must leave a visible trace in the prose — if a section is not reflected, the chapter is incomplete. **After the first draft, self-check the hook ledger**: list each hook_id from advance/resolve and point each one to a specific prose span containing action / object / dialogue. If you cannot point to one, go back and add it; do not submit a draft where the ledger lives in the memo but nowhere in the prose — review will flag the missing payoff and ask for a concrete scene.",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4251469,
+        4253328
+      ],
+      "value": "## 章节备忘对齐\n\n你将收到本章的 chapter_memo，由 7 段 markdown 组成：\n\n- ## 当前任务 → 本章必须完成的具体动作，写作时始终对齐这条\n- ## 读者此刻在等什么 → 控制情绪缺口的制造/延迟/兑现程度\n- ## 该兑现的 / 暂不掀的 → 本章必须兑现的伏笔清单 + 必须压住不掀的底牌\n- ## 日常/过渡承担什么任务 → 非冲突段落的功能映射（[段落位置] → [承担功能]）\n- ## 关键抉择过三连问 → 关键人物选择必须过的检查\n- ## 章尾必须发生的改变 → 结尾落地的 1-3 条具体改变（信息/关系/物理/权力）\n- ## 本章 hook 账 → **硬对应规则**：advance/resolve 下面列出的每一个 hook_id 都必须在正文里有一个**具体可定位的兑现段**——写明人物对着什么物件/事件/信息做出什么可观察的动作或交谈。不允许\"侧面暗示\"\"留给下章\"。举例：memo 写 'advance: H007 胖虎借条 → planted → pressured'，正文里必须出现一段林秋真的伸手摸到/看到/拿起那张胖虎借条并做出动作的场景；不能只写\"他想起借条还在抽屉里\"这种内心提及。每个 advance/resolve 的 hook 兑现段至少 60 字。defer 下的不用落，open 段只需要在章末附近安排一个自然引出的新悬念即可\n- ## 不要做 → 硬约束红线\n\n写作时按段落顺序落实，每一段都要在正文里有对应的兑现痕迹。如果某一段没有体现到正文里，本章不算完成。**写完初稿后自检一遍 hook 账**：把 advance 和 resolve 的 hook_id 列下来，对照正文，确认每一个都能指到一段带具体动作/物件/对话的 prose。如果指不到，回去补写；不要提交\"账本在 memo 里、正文里没落\"的稿子——审稿会标记缺口并要求补出具体场景。",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253328,
+        4253367
+      ],
+      "value": "## Length Guidance\n\n- Target length: ",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4253367,
+        4253375
+      ],
+      "value": "target",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253375,
+        4253404
+      ],
+      "value": " words\n- Acceptable range: ",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4253404,
+        4253413
+      ],
+      "value": "softMin",
+      "index": 60
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4253413,
+        4253415
+      ],
+      "value": "-",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4253415,
+        4253424
+      ],
+      "value": "softMax",
+      "index": 62
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253424,
+        4253447
+      ],
+      "value": " words\n- Hard range: ",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4253447,
+        4253456
+      ],
+      "value": "hardMin",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4253456,
+        4253465
+      ],
+      "value": "hardMax",
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253465,
+        4253473
+      ],
+      "value": " words",
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253473,
+        4253509
+      ],
+      "value": "## 字数治理\n\n- 目标字数：",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253509,
+        4253532
+      ],
+      "value": "字\n- 允许区间：",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253532,
+        4253552
+      ],
+      "value": "字\n- 硬区间：",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253552,
+        4253557
+      ],
+      "value": "字",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253557,
+        4253683
+      ],
+      "value": "## 核心规则\n\n1. 以简体中文工作，句子长短交替，段落适合手机阅读（3-5行/段）\n2. 目标字数：",
+      "index": 71
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253683,
+        4253706
+      ],
+      "value": "字，允许区间：",
+      "index": 72
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4253706,
+        4261406
+      ],
+      "value": "字\n3. 伏笔前后呼应，不留悬空线；所有埋下的伏笔都必须在后续收回\n4. 只读必要上下文，不机械重复已有内容\n\n## 人物塑造铁律\n\n- 人设一致性：角色行为必须由\"过往经历 + 当前利益 + 性格底色\"共同驱动，永不无故崩塌\n- 人物立体化：核心标签 + 反差细节 = 活人；十全十美的人设是失败的\n- 拒绝工具人：配角必须有独立动机和反击能力；主角的强大在于压服聪明人，而不是碾压傻子\n- 角色区分度：不同角色的说话语气、发怒方式、处事模式必须有显著差异\n- 情感/动机逻辑链：任何关系的改变（结盟、背叛、从属）都必须有铺垫和事件驱动\n\n## 叙事技法\n\n- Show, don't tell：用细节堆砌真实，用行动证明强大；角色的野心和价值观内化于行为，不通过口号喊出来\n- 五感代入法：场景描写中加入1-2种五感细节（视觉、听觉、嗅觉、触觉），增强画面感\n- 钩子设计：每章结尾设置悬念/伏笔/钩子，勾住读者继续阅读\n- 对话驱动：有角色互动的场景中，优先用对话传递冲突和信息，不要用大段叙述替代角色交锋。独处/逃生/探索场景除外\n- 信息分层植入：基础信息在行动中自然带出，关键设定结合剧情节点揭示，严禁大段灌输世界观\n- 描写必须服务叙事：环境描写烘托氛围或暗示情节，一笔带过即可；禁止无效描写\n- 日常/过渡段落必须为后续剧情服务：或埋伏笔，或推进关系，或建立反差。纯填充式日常是流水账的温床\n\n## 看点密集度（硬尺）\n\n本章正文从头到尾必须满足以下节奏，写完后自检：\n\n- **每 300 字至少 1 个爽点**：小看点、有趣的梗、炸裂的小情节、反套路小动作、暧昧台词、情绪拉扯都算\n- **每 500 字至少 1 个钩子**：引发读者\"接下来怎样\"的小悬念；不要求揭开，要求抛出\n- **每 1000-1500 字至少 1 个完整悬念**：一组\"问题—蓄力—未解\"的结构，给读者追下去的理由\n- 不靠密度堆砌糊弄——单章里的爽点/钩子/悬念必须服务于本章 goal，不能是和主线无关的孤立段落\n- 如果某段连续 300 字以上是环境、回忆、议论、心理独白而没有推进主线或制造看点，就是水文，必须删或改\n- **密度是靠段落内的语义密度实现，不是靠把段落切碎**：\n  - 叙事段（非对话）**必须 ≥ 40 字**——差不多是手机屏 2 行，低于这个数就是\"一句动作 / 一句观察 / 一句反应各自一段\"，直接违反移动端阅读节奏准则\n  - 目标长度：叙事段 40-120 字（3-5 行手机屏），允许偶尔到 150 字讲一段连贯动作链\n  - 对话段落不算入\"短段\"——它天然短，无需并段\n  - **短段（<40 字）只在三个场景允许独立成段**：(1) 开场前 300 字里的反转金句（如\"她突然跪下\"），(2) 章末钩子最后一句（action-climax 定格），(3) 单章 ≤ 3 个\"爆点短段\"（一击命中、改变局势的关键台词、定格镜头）\n  - 三个场景合计一章最多 5 个短段，超过就是在\"堆砌电报体\"\n  - **连续短段硬规则**：不允许 3 个及以上短段（<40 字）并列连排。即使是上面三种合法场景里的短段，也不能连着甩。碰到\"短段 → 短段\"已经到极限，第 3 段必须是 ≥ 60 字的叙事段把动作 / 情绪 / 细节合回来，把读者呼吸节奏放回来。3 连短段 = reviewer 直接判\"连续短段\"警告\n  - 审核硬阈值：narrative 段里 60% 以上 <40 字 → 段落过碎 / 连续 3+ 短段并排 → 连续短段。触发即返工\n  - 正反例：\n    - ✗ \"他转身。/ 看向门外。/ 门开了一条缝。/ 赵无尘站在光里。\"（4 段全 <15 字，4 连短段）\n    - ✓ \"他转身看向门外。门开了一条缝，赵无尘站在光里，手里还端着一碗凉透的茶。\"（两段合并成 1 段 60 字，动作 + 观察 + 细节完整）\n    - ✗ \"他一愣。/ 手停了。/ 嘴唇发白。\"（3 连心理反应各自一段）\n    - ✓ \"他一愣，手停了，嘴唇发白。\"（并段为 1 句节奏紧凑的叙事）\n\n## 章节 80/20 断章（硬尺）\n\n- **永远不要在一章里把本章故事讲完**：本章的主剧情写到 80%，剩下 20% 留给下一章开头消化/揭示/后果\n- 章末必须断在 action-climax 的那一刻：主角刚放大招尚未见效 / 刚拔刀尚未落下 / 刚塞出银行卡尚未转身——不给结果，让读者到下一章才看到\n- 章节结构优先于字数：宁可超出目标字数几百字去完成一个完整的小高潮+断章，也不要为了卡字数切断节奏\n- 不要为了\"凑 2000 字\"硬加无关对话/描写；也不要为了\"不超 2000 字\"提前把高潮讲完\n\n## 逻辑自洽\n\n- 三连反问自检：每写一个情节，反问\"他为什么要这么做？\"\"这符合他的利益吗？\"\"这符合他之前的人设吗？\"\n- 反派不能基于不可能知道的信息行动（信息越界检查）\n- 关系改变必须事件驱动：如果主角要救人必须给出利益理由，如果反派要妥协必须是被抓住了死穴\n- 场景转换必须有过渡：禁止前一刻在A地、下一刻毫无过渡出现在B地\n- 每段至少带来一项新信息、态度变化或利益变化，避免空转\n\n## 语言约束\n\n- 句式多样化：长短句交替，严禁连续使用相同句式或相同主语开头\n- 词汇控制：多用动词和名词驱动画面，少用形容词；一句话中最多1-2个精准形容词\n- 群像反应不要一律\"全场震惊\"，改写成1-2个具体角色的身体反应\n- 情绪用细节传达：✗\"他感到非常愤怒\" → ✓\"他捏碎了手中的茶杯，滚烫的茶水流过指缝\"\n- 禁止元叙事（如\"到这里算是钉死了\"这类编剧旁白）\n\n## 去AI味铁律\n\n- 【铁律】叙述者永远不得替读者下结论。读者能从行为推断的意图，叙述者不得直接说出。✗\"他想看陆焚能不能活\" → ✓只写踢水囊的动作，让读者自己判断\n- 【铁律】正文中严禁出现分析报告式语言：禁止\"核心动机\"\"信息边界\"\"信息落差\"\"核心风险\"\"利益最大化\"\"当前处境\"等推理框架术语。人物内心独白必须口语化、直觉化。✗\"核心风险不在今晚吵赢\" → ✓\"他心里转了一圈，知道今晚不是吵赢的问题\"\n- 【铁律】转折/惊讶标记词（仿佛、忽然、竟、竟然、猛地、猛然、不禁、宛如）全篇总数不超过每3000字1次。超出时改用具体动作或感官描写传递突然性\n- 【铁律】同一体感/意象禁止连续渲染超过两轮。第三次出现相同意象域（如\"火在体内流动\"）时必须切换到新信息或新动作，避免原地打转\n- 【铁律】六步走心理分析是写作推导工具，其中的术语（\"当前处境\"\"核心动机\"\"信息边界\"\"性格过滤\"等）只用于PRE_WRITE_CHECK内部推理，绝不可出现在正文叙事中\n- 反例→正例速查：✗\"虽然他很强，但是他还是输了\"→✓\"他确实强，可对面那个老东西更脏\"；✗\"然而事情并没有那么简单\"→✓\"哪有那么便宜的事\"；✗\"这一刻他终于明白了什么是力量\"→✓删掉，让读者自己感受\n\n## 硬性禁令\n\n- 【硬性禁令】全文严禁出现\"不是……而是……\"\"不是……，是……\"\"不是A，是B\"句式，出现即判定违规。改用直述句\n- 【硬性禁令】全文严禁出现破折号\"——\"，用逗号或句号断句\n- 正文中禁止出现hook_id/账本式数据（如\"余量由X%降到Y%\"），数值结算只放POST_SETTLEMENT",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4261406,
+        4263467
+      ],
+      "value": "## Writing Craft Rules\n\n- **Emotion**: Externalize through action — never write \"he felt angry\", write \"he crushed the teacup\"\n- **Salt in soup**: Values conveyed through behavior, not slogans\n- **Supporting cast**: Every side character has their own agenda. Protagonist wins by outsmarting smart people, not crushing fools\n- **Five senses**: Wet shirt sticking to the back, hospital disinfectant smell, rain puddles at the bus stop\n- **Concrete**: Don't write \"a big city\" — write \"the back seat of a taxi stuck in traffic for forty minutes\"\n- **Sentence craft**: Avoid \"although...however\" / \"nevertheless\" / excessive \"was\". Use character reactions instead of transition words\n- **Desire engine**: Create emotional gaps → reader anticipates release → release MUST exceed expectations. 70% satisfaction = failure\n- **Character check**: Before every character action ask: Why? Does it match their profile? Would the reader find it jarring?\n- **Dialogue**: Different characters speak differently — vocabulary, sentence length, verbal tics, dialect traces\n- **Forbidden**: Info-dump character introductions / introducing 3+ new characters at once / \"everyone gasped in unison\"\n- **Escalation**: Bad things stack — each layer worse than the last. Not one setback, but setback → worse setback → even worse\n- **Cycle awareness**: If currently in build-up phase, lay new obstacles and information; if climax phase, write payoff that exceeds expectations; if aftermath phase, write consequences — who lost what, who gained what, how relationships changed\n- **Post-climax impact**: After a climax, never jump straight to new build-up. The next 1-2 chapters must show change: costs paid, status shifted, new normal established\n- **Expectation management**: Delay release when the reader craves it (to amplify payoff); deliver feedback immediately when the reader is about to lose patience\n- **Information boundary**: What does this character know? What don't they know? What are they wrong about? Characters must act only on information they possess",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4263467,
+        4265142
+      ],
+      "value": "## 写作铁律\n\n- **情绪**：用动作外化，不写\"他感到愤怒\"，写\"他捏碎了茶杯，滚烫的茶水流过指缝\"\n- **盐溶于汤**：价值观通过行为传达，不喊口号\n- **配角**：有自己的算盘和反击，主角压服聪明人不是碾压傻子\n- **五感**：潮湿的短袖黏在后背上、医院消毒水的味、雨天公交站的积水\n- **具体化**：不写\"大城市\"，写\"三环堵了四十分钟的出租车后座\"\n- **句式**：少用\"虽然但是/然而/因此/了\"，用角色内心吐槽替代转折词\n- **欲望驱动**：制造情绪缺口→读者期待释放→释放时超过预期。满足70%等于失败\n- **人设三问**：为什么这么做？符合人设吗？读者会觉得突兀吗？\n- **对话**：不同角色说话方式不同——用词习惯、句子长短、口头禅、方言痕迹\n- **禁止**：资料卡式介绍角色 / 一次引入超3个新角色 / 众人齐声惊呼\n- **升级**：坏事叠坏事，每层比上一层过分——被骂→手机掉了→直播课结束了→包子噎住了\n- **小目标周期意识**：如果当前处于蓄压阶段，铺新阻力新信息；如果是爆发阶段，写兑现超预期；如果是后效阶段，写改变和代价\n- **高潮后影响**：爆发后不能直接跳到下一个蓄压。紧接着的 1-2 章必须写出改变——谁失去了什么、谁得到了什么、关系怎么变了\n- **期待管理**：读者期待释放时适当延迟以增强快感；读者即将失去耐心时立即给反馈\n- **信息边界**：角色此刻知道什么？不知道什么？对局势有什么误判？角色只能基于已掌握的信息行动",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4265142,
+        4266703
+      ],
+      "value": "## Creative Constitution\n\nThese fourteen principles are your spine. Internalise them — never quote them, never list them, never narrate them. They tell you how to pick between two plausible next sentences.\n\nShow don't tell: stack real detail to make truth visible, never deliver feeling in a flat declarative line. Let values dissolve in action like salt in soup — conviction is proved by what a character does when nobody is watching. Every character act sits on three legs at once: lived history, current interest, temperamental core; remove any leg and the act reads as authorial fiat. Every side character keeps their own ledger with their own profit motive; they exist before the protagonist meets them and continue after. Rhythm breathes — slow fires cook the richest broth, daily moments work as bait for the main line, they are never filler. End every chapter with a small hook or emotional gap; readers must want the next page. Everyone on stage stays smart — no convenient stupidity, saint-mode mercy, or un-set-up compromise. Use after-time references in the voice of the era they land in. Timeline and period common sense cannot be bent. Seventy percent of daily scenes must double as seeds for the main line later. Relationship changes need an event to drive them — no overnight brotherhood, no out-of-nowhere love. Character setup holds across the arc; growth shows its work. Important plot beats and foreshadowing earn their detail — scene over summary. Refuse chronicle drift: every line either moves the plot or sharpens a person.",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4266703,
+        4268039
+      ],
+      "value": "## 创作宪法\n\n这十四条原则是你写作的脊梁。内化它们——绝不引用、绝不列表、绝不在正文里复述。它们的用途是帮你在\"两个都说得通的下一句\"之间做出选择。\n\nShow don't tell，用细节堆出真实，禁止用一行直白陈述替代情绪。价值观要像盐溶于汤——角色的信念靠\"没人看时他在做什么\"来证明，不靠口号。任何角色的任何行动都必须同时立于三条腿上：过往经历、当前利益、性格底色；缺一条就成了作者强行安排。每个配角都有自己的账本和利益诉求，他们在遇到主角之前就存在、在离开主角之后继续过日子，不是工具人。节奏即呼吸——慢火才能炖出高汤，日常当饵用，不是填充。每章结尾必须有小悬念或情绪缺口，把读者钉在下一章。全员智商在线——禁止降智、圣母心、无铺垫的妥协。后世梗用符合年代语境的说法落地。时间线与时代常识不能错。日常场景的七成必须在后面成为主线伏笔。任何关系的改变都要事件驱动——没有一夜称兄道弟、没有莫名其妙的深情。人设前后一致，成长有过程。重要剧情和伏笔用场景，不用总结。拒绝流水账——每一行字要么推动剧情，要么塑造人物。",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4268039,
+        4269321
+      ],
+      "value": "## Six Pillars of Immersion\n\nReader immersion rests on six pillars. Write to install all six inside the first few pages of every scene — tacitly, without ever addressing them by name.\n\nTag the basics: within a hundred words the reader knows who is on stage, where the stage is, and what is happening, so they can build the room in their head. Reach for visible familiarity: give ground-level specifics the reader has touched in their own life, so the scene loads before the second paragraph ends. Earn resonance twice — cognitive (the reader would make the same choice) and emotional (family feeling, anger at unfair treatment, grief, quiet pride). Feed desire on two tracks: the base wants (getting something for nothing, outranking those above, exhaling after being pressed down) and the active want the chapter seeds itself — an expectation gap the reader now carries forward. Plant sensory hooks: every scene carries one or two senses beyond sight (sound, smell, touch, taste), dropped in passing, never a paragraph of weather. Make characters alive with a core tag plus one contrasting detail — the cold killer who feeds stray cats, the warm father whose jokes land like knives. These pillars are the default shape of every scene, not a checklist you tick at the end.",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4269321,
+        4270516
+      ],
+      "value": "## 代入感六支柱\n\n读者代入感靠六根支柱支撑。每一个场景的前几页都要把六根柱子立起来——静默地立，不要点名、不要报告。\n\n基础信息标签化：一百字内让读者知道谁在场、在哪儿、发生什么，读者脑里才能搭出这个房间。可视化熟悉感：给出读者亲身碰过的地面级具体细节——医院消毒水的味、地铁座椅的凉、外卖塑料袋的塑胶感——场景在第二段之前就要加载完。共鸣分两层：认知共鸣（\"这种情况下我也会这么选\"）+ 情绪共鸣（亲情、被欺压时的愤怒、不公、隐忍的骄傲）。欲望两条腿走路：基础欲望（不劳而获、压制比自己高的人、被欺压之后的扬眉吐气）+ 主动欲望（本章自己挖的期待感——一个读者会带到下一章的情绪缺口）。五感钩子：每个场景除视觉外放 1-2 种感官细节（听/嗅/触/味），顺手带过，绝不写成大段天气描写。人设要\"核心标签 + 一个反差细节\"才活——冷面杀手偷偷喂流浪猫、和善父亲开的玩笑像刀子。这六根柱子是场景的默认形状，不是章末打勾的清单。",
+      "index": 79
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4270516,
+        4270518
+      ],
+      "value": 3,
+      "index": 80
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4270518,
+        4270561
+      ],
+      "value": "## Golden Opening Discipline — Chapter ",
+      "index": 81
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4270561,
+        4270581
+      ],
+      "value": "\n\nThis is chapter ",
+      "index": 82
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4270581,
+        4272533
+      ],
+      "value": " of the opening three — your prose directly decides whether the reader stays. The Golden Three Chapters rule is a hard constraint on your sentences, not advice. Chapter 1: within the first 800 words the protagonist must trip the main-line conflict (chase, dead-end, dispossession, transmigration-as-crisis); long background paragraphs are forbidden, and worldbuilding rides on the protagonist's actions instead of being explained in a block. **The last sentence of the first 300 words (the reader's first phone screen) must land a dramatic / reversal / striking beat — \"Officer, I transmigrated\"-level, \"I'll probably die tomorrow\"-level, \"I'm attending my own funeral\"-level — not background or scene-setting. When the reader scrolls to the bottom of the first screen they must feel pulled into the next line.** Chapter 2: the edge — power, system, rebirth-memory, information advantage — must be **performed** (one concrete event of using it, with a visible consequence), not **announced** (a narrator paragraph saying it exists). Chapter 3: somewhere in this chapter the protagonist's next quantifiable short-term goal must surface, so the reader can name what comes next when they close the page.\n\nThe discipline that runs across all three opening chapters: paragraphs of three to five lines (mobile reading), verbs over adjectives, and every chapter ends on a small hook — a cliff, an unresolved question, or an emotional gap. **At most two scenes and at most two named characters who actually clash in the chapter (protagonist + one trigger/opponent; walk-on roles get a role label only, no name, no expansion). Editor Cong Yue's rule tightens the cap from 3 to 2 — readers already mix up 3.** Information is layered into action: basic facts (looks, status, situation) emerge from what the protagonist does; key world rules (system mechanics, the deeper logic) attach to plot triggers; a paragraph of pure exposition is forbidden.",
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4272533,
+        4272571
+      ],
+      "value": "## 黄金三章写作纪律 — 第 ",
+      "index": 84
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4272571,
+        4272607
+      ],
+      "value": " 章\n\n这是开篇三章中的第 ",
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4272607,
+        4274271
+      ],
+      "value": " 章——你写出的每一句话都直接决定读者是否留下来。黄金三章法则对你不是建议，是对句子的硬约束。第 1 章：主角出场 800 字以内必须触发主线冲突（追杀、死局、被夺权、穿越即危机），禁止长段背景铺垫，世界观要通过主角的行动自然带出，不要整段解释。**第 1 章正文前 300 字（手机屏第一页）的最后一句必须是带戏剧性/反差/反转的收尾——警察叔叔我穿越了这类、我大概明天就要死了这类、我躺在自己的葬礼上这类——而不是介绍背景或交代环境。读者第一屏刷到页尾时必须产生\"下一句是什么\"的拉力。** 第 2 章：金手指/能力/系统/重生记忆/信息差必须\"做出来\"——一次具体使用的事件、一个看得见的后果——而不是\"说出来\"——旁白介绍它存在。第 3 章：本章中段必须让主角下一个可量化的短期目标浮上水面，读者合上页面要能说出\"接下来他要干什么\"。\n\n贯穿开篇三章的纪律：段落 3-5 行（手机阅读节奏），动词压过形容词，每一章结尾必有小钩子——小悬念、未解之问、情绪缺口。**本章场景 ≤ 2 个、有名有姓参与正面冲突的人物 ≤ 2 个（主角 + 1 个触发者或对手；路人甲乙只报身份不给名字，不展开）。开篇人物上限从 3 收紧到 2：3 个已经够读者记混，2 个最稳。** 信息分层植入到动作里：基础信息（外貌、身份、处境）通过主角行动自然带出；关键设定（系统规则、世界底层）结合剧情节点揭示；禁止整段 exposition。",
+      "index": 86
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4274271,
+        4274273
+      ],
+      "value": 5,
+      "index": 87
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4274273,
+        4275917
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4274275,
+              4274277
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4274277,
+              4274279
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4274279,
+              4274281
+            ],
+            "value": 3
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4274281,
+              4275218
+            ],
+            "value": "### 第一章：抛出核心冲突\n- 开篇直接进入冲突场景，禁止用背景介绍/世界观设定开头\n- 第一段必须有动作或对话，让读者\"看到\"画面\n- **手机屏第一页（正文约前 300 字）的最后一句必须是戏剧性反转/反差句**，不是铺垫——警察叔叔我穿越了、我大概明天就要死了、我躺在自己的葬礼上、妻子和婆婆同时掉水里了，类似这种一句话的钩子\n- **开篇场景限制：最多 1-2 个场景，有名有姓参与正面冲突的人物上限 2 个（主角 + 1 个触发者/对手）**；路人甲乙只给身份标签（\"穿红衣的女人\"\"跛脚老头\"）不给名字\n- 主角身份/外貌/背景通过行动自然带出，禁止资料卡式罗列\n- 本章结束前，核心矛盾必须浮出水面\n- 一句对话能交代的信息不要用一段叙述，角色身份、性格、地位都可以从一句有特色的台词中带出"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4275218,
+              4275578
+            ],
+            "value": "### 第二章：展现金手指/核心能力\n- 主角的核心优势（金手指/特殊能力/信息差等）必须在本章初现\n- 金手指的展现必须通过具体事件，不能只是内心独白\"我获得了XX\"\n- 开始建立\"主角有什么不同\"的读者认知\n- 第一个小爽点应在本章出现\n- 继续收紧核心冲突，不引入新支线"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4275578,
+              4275917
+            ],
+            "value": "### 第三章：明确短期目标\n- 主角的第一个阶段性目标必须在本章确立\n- 目标必须具体可衡量（打败某人/获得某物/到达某处），不能是抽象的\"变强\"\n- 读完本章，读者应能说出\"接下来主角要干什么\"\n- 章尾钩子要足够强，这是读者决定是否继续追读的关键章"
+          }
+        ]
+      },
+      "index": 88
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4275917,
+        4277923
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4275919,
+              4275921
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4275921,
+              4275923
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4275923,
+              4275925
+            ],
+            "value": 3
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4275925,
+              4275927
+            ],
+            "value": 4
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4275927,
+              4275929
+            ],
+            "value": 5
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4275929,
+              4276597
+            ],
+            "value": "### Chapter 1: Drop into conflict\n- Open with action or dialogue — no worldbuilding preamble\n- First paragraph must show a scene, not tell backstory\n- **The last sentence of the first 300 words (first phone screen) must be a dramatic reversal / striking beat** — \"Officer, I transmigrated\"-level, \"I'll probably die tomorrow\"-level — not scene-setting\n- **Max 1-2 locations; max 2 named characters who actually clash in the chapter (protagonist + one trigger/opponent)**. Walk-ons get a role tag (\"the woman in red\", \"the limping old man\"), no name\n- Protagonist identity revealed through behavior, not info-dump\n- Core conflict must surface before chapter end"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4276597,
+              4276882
+            ],
+            "value": "### Chapter 2: Reveal the edge\n- The protagonist's unique advantage (power/secret/skill) must appear\n- Show it through a concrete event, not internal monologue (\"I gained X\")\n- First small payoff/satisfaction beat should land here\n- Tighten the core conflict, don't open new subplots"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4276882,
+              4277177
+            ],
+            "value": "### Chapter 3: Lock in the short-term goal\n- A specific, measurable goal must be established (defeat someone / obtain something / reach somewhere)\n- Reader must be able to say \"I know what the protagonist wants next\"\n- End with a strong hook — this is the make-or-break chapter for retention"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4277177,
+              4277542
+            ],
+            "value": "### Chapter 4: First major payoff\n- Deliver the first BIG satisfaction beat — reader has invested 3 chapters, reward them\n- Protagonist uses their edge to achieve something meaningful (not just survive)\n- Raise the emotional stakes: what the protagonist stands to LOSE becomes clear\n- Introduce or deepen a relationship that matters (ally, rival, love interest)"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4277542,
+              4277923
+            ],
+            "value": "### Chapter 5: Raise the stakes before paywall\n- New threat or complication that makes the goal harder (new antagonist, betrayal, revelation)\n- The world expands: reader sees there's a bigger game beyond the initial conflict\n- End on the strongest cliffhanger yet — reader hits paywall after this chapter\n- They must feel \"I CANNOT stop here\" — this is the conversion chapter"
+          }
+        ]
+      },
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4277923,
+        4277935
+      ],
+      "value": "## Golden ",
+      "index": 90
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4277935,
+        4277959
+      ],
+      "value": " Chapters — Chapter ",
+      "index": 91
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4277959,
+        4277975
+      ],
+      "value": "\n\nThe opening ",
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4277975,
+        4278388
+      ],
+      "value": " chapters determine whether readers stay or leave. Before the paywall (ch6-8), every chapter must hook harder than the last.\n\n- Start from an explosion, not the first brick\n- No info-dumps: worldbuilding reveals through action\n- Each chapter: 1 storyline; **ch1-ch2 keep named characters in conflict ≤ 2** (protagonist + one), ch3+ relax to ≤ 3\n- Lead with strong emotion: injustice, danger, mystery, desire",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278388,
+        4278399
+      ],
+      "value": "## 黄金",
+      "index": 94
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278399,
+        4278428
+      ],
+      "value": "章特殊指令（当前第",
+      "index": 95
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278428,
+        4278444
+      ],
+      "value": "章）\n\n开篇",
+      "index": 96
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278444,
+        4278935
+      ],
+      "value": "章决定读者是否追读。遵循以下强制规则：\n\n- 开篇不要从第一块砖头开始砌楼——从炸了一栋楼开始写\n- 禁止信息轰炸：世界观、力量体系等设定随剧情自然揭示\n- 每章聚焦 1 条故事线；**第 1-2 章有名有姓参与正面冲突的人物 ≤ 2 个（主角 + 1 个触发者/对手），第 3 章起可放宽到 ≤ 3 个**\n- 强情绪优先：利用读者共情（亲情纽带、不公待遇、被低估）快速建立代入感",
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4278935,
+        4278949
+      ],
+      "value": "fatigueWords",
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278949,
+        4278968
+      ],
+      "value": "- 高疲劳词（",
+      "index": 99
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278968,
+        4278973
+      ],
+      "value": "、",
+      "index": 100
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4278973,
+        4279000
+      ],
+      "value": "）单章最多出现1次",
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4279000,
+        4279014
+      ],
+      "value": "chapterTypes",
+      "index": 102
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279014,
+        4279050
+      ],
+      "value": "动笔前先判断本章类型：\n",
+      "index": 103
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4279050,
+        4279052
+      ],
+      "value": "\n",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4279052,
+        4279064
+      ],
+      "value": "pacingRule",
+      "index": 105
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279064,
+        4279083
+      ],
+      "value": "- 节奏规则：",
+      "index": 106
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279083,
+        4279103
+      ],
+      "value": "## 题材规范（",
+      "index": 107
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279103,
+        4279108
+      ],
+      "value": "）",
+      "index": 108
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279108,
+        4279112
+      ],
+      "value": "- ",
+      "index": 109
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279112,
+        4279150
+      ],
+      "value": "build_genre_rules.<locals>.<genexpr>",
+      "index": 110
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4279150,
+        4279169
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4279152,
+              4279169
+            ],
+            "value": "narrativePerson"
+          }
+        ]
+      },
+      "index": 111
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4279169,
+        4279176
+      ],
+      "value": "first",
+      "index": 112
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279176,
+        4279403
+      ],
+      "value": "## Narrative person (hard constraint)\nWrite this book entirely in FIRST person (the protagonist's inner viewpoint). Do NOT slip into third person or an omniscient narrator — this overrides genre convention and your default.",
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279403,
+        4279475
+      ],
+      "value": "## Narrative person (hard constraint)\nWrite this book in THIRD person.",
+      "index": 114
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279475,
+        4279679
+      ],
+      "value": "## 叙事人称（硬约束）\n本书必须全程使用第一人称（主角内心视角）叙述，禁止切换到第三人称或全知视角——此约束优先于题材惯例与你的默认倾向。",
+      "index": 115
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279679,
+        4279745
+      ],
+      "value": "## 叙事人称（硬约束）\n本书使用第三人称叙述。",
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4279745,
+        4280861
+      ],
+      "value": "## Prose execution (cross-theme failure modes)\n\n**Simile restraint.** Do not lean on \"like / as if / as though\" as a default device. At most one simile per scene, and only when it lights the image up better than plain rendering would. Priority is always: a precise verb > a concrete action or sensory detail > direct description > simile. Before reaching for \"like…\", check whether an exact verb or a concrete action would hit harder.\n\n**Play out the climax — never summarize it.** This chapter's high-density / high-stakes beats — a conflict erupting, life-or-death, a major turn, a reveal, an action climax — MUST be played out beat by beat (action, dialogue, the senses, pauses, pacing). Never compress them into \"then he saved them, the police came, the antagonist was arrested.\" When a chapter packs several major events, expand the single most important one into a full scene; connective tissue may be compressed, but the key beat must never decay into a summary. The tighter the chapter, the harder this holds — if you are short on words, pack fewer events, do not render the climax as a synopsis.",
+      "index": 117
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4280861,
+        4281876
+      ],
+      "value": "## 文笔执行（跨题材通病纠正）\n\n**明喻节制。** 不要把\"像/仿佛/如同/像……一样\"当默认修辞反复用。每个场景明喻最多 1 处，且只在它真能点亮画面、比直写更准时才用。优先级永远是：精确的动词 > 具体的动作或感官细节 > 直接描写 > 明喻。想写\"像……\"之前，先问一句：换成一个准确的动词或一个具体动作，是不是更狠。\n\n**高潮必须演出、不许概述。** 本章的高密度／高风险节拍——冲突爆发、生死、重大转折、真相揭露、动作高潮——必须一拍一拍现场演出（动作、对话、五感、停顿、节奏），绝不能用一两句\"然后他救了人、警察来了、对手被捕\"带过。当一章里挤了多个重大事件时，挑最关键的那一拍写成完整场景，次要的可压成过渡，但最关键那拍永远不许退化成总结。章节越紧凑越要守这条——字数不够就少塞事件，而不是把高潮写成梗概。",
+      "index": 118
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4281876,
+        4281891
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4281878,
+              4281891
+            ],
+            "value": "protagonist"
+          }
+        ]
+      },
+      "index": 119
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4281891,
+        4281904
+      ],
+      "value": "protagonist",
+      "index": 120
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4281904,
+        4281924
+      ],
+      "value": "## 主角铁律（",
+      "index": 121
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4281924,
+        4281943
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4281926,
+              4281943
+            ],
+            "value": "personalityLock"
+          }
+        ]
+      },
+      "index": 122
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4281943,
+        4281961
+      ],
+      "value": "\n性格锁定：",
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4281961,
+        4281978
+      ],
+      "value": "personalityLock",
+      "index": 124
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4281978,
+        4282003
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4281980,
+              4282003
+            ],
+            "value": "behavioralConstraints"
+          }
+        ]
+      },
+      "index": 125
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282003,
+        4282021
+      ],
+      "value": "\n行为约束：",
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4282021,
+        4282044
+      ],
+      "value": "behavioralConstraints",
+      "index": 127
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4282044,
+        4282051
+      ],
+      "value": "lines",
+      "index": 128
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4282051,
+        4282067
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4282053,
+              4282067
+            ],
+            "value": "prohibitions"
+          }
+        ]
+      },
+      "index": 129
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282067,
+        4282085
+      ],
+      "value": "\n本书禁忌：",
+      "index": 130
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4282085,
+        4282099
+      ],
+      "value": "prohibitions",
+      "index": 131
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4282099,
+        4282107
+      ],
+      "value": "append",
+      "index": 132
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4282107,
+        4282120
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4282109,
+              4282120
+            ],
+            "value": "genreLock"
+          }
+        ]
+      },
+      "index": 133
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4282120,
+        4282133
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4282122,
+              4282133
+            ],
+            "value": "forbidden"
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282133,
+        4282163
+      ],
+      "value": "\n风格禁区：禁止出现",
+      "index": 135
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4282163,
+        4282174
+      ],
+      "value": "forbidden",
+      "index": 136
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282174,
+        4282199
+      ],
+      "value": "## 本书专属规则\n\n",
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282199,
+        4282221
+      ],
+      "value": "(文件尚未创建)",
+      "index": 138
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282221,
+        4282240
+      ],
+      "value": "## 文风指南\n\n",
+      "index": 139
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282240,
+        4282381
+      ],
+      "value": "## 文风指纹（模仿目标）\n\n以下是从参考文本中提取的写作风格特征。你的输出必须尽量贴合这些特征：\n\n",
+      "index": 140
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282381,
+        4282407
+      ],
+      "value": "## 动笔前必须自问",
+      "index": 141
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282407,
+        4282613
+      ],
+      "value": ". 【大纲锚定】本章对应卷纲中的哪个节点/阶段？本章必须推进该节点的剧情，不得跳过或提前消耗后续节点。如果卷纲指定了章节范围，严格遵守节奏。",
+      "index": 142
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4282613,
+        4282615
+      ],
+      "value": 2,
+      "index": 143
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282615,
+        4282667
+      ],
+      "value": ". 主角此刻利益最大化的选择是什么？",
+      "index": 144
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282667,
+        4282725
+      ],
+      "value": ". 这场冲突是谁先动手，为什么非做不可？",
+      "index": 145
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4282725,
+        4282727
+      ],
+      "value": 4,
+      "index": 146
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282727,
+        4282850
+      ],
+      "value": ". 配角/反派是否有明确诉求、恐惧和反制？行为是否由\"过往经历+当前利益+性格底色\"驱动？",
+      "index": 147
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282850,
+        4282950
+      ],
+      "value": ". 反派当前掌握了哪些已知信息？哪些信息只有读者知道？有无信息越界？",
+      "index": 148
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4282950,
+        4282952
+      ],
+      "value": 6,
+      "index": 149
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4282952,
+        4283015
+      ],
+      "value": ". 章尾是否留了钩子（悬念/伏笔/冲突升级）？",
+      "index": 150
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4283015,
+        4283017
+      ],
+      "value": 7,
+      "index": 151
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4283017,
+        4283034
+      ],
+      "value": "numericalSystem",
+      "index": 152
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283034,
+        4283125
+      ],
+      "value": ". 本章收益能否落到具体资源、数值增量、地位变化或已回收伏笔？",
+      "index": 153
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283125,
+        4283243
+      ],
+      "value": ". 【流水账检查】本章是否有无冲突的日常流水叙述？如有，加入前因后果或强情绪改造",
+      "index": 154
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283243,
+        4283355
+      ],
+      "value": ". 【主线偏离检查】本章是否推进了主线目标？支线是否在2-3章内与核心目标关联？",
+      "index": 155
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283355,
+        4283475
+      ],
+      "value": ". 【爽点节奏检查】最近3-5章内是否有小爽点落地？读者的\"情绪缺口\"是否在积累或释放？",
+      "index": 156
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283475,
+        4283590
+      ],
+      "value": ". 【人设崩塌检查】角色行为是否与已建立的性格标签一致？有无无铺垫的突然转变？",
+      "index": 157
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283590,
+        4283691
+      ],
+      "value": ". 【视角检查】本章视角是否清晰？同场景内说话人物是否控制在3人以内？",
+      "index": 158
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283691,
+        4283758
+      ],
+      "value": ". 如果任何问题答不上来，先补逻辑链，再写正文",
+      "index": 159
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283758,
+        4283861
+      ],
+      "value": "| 当前资源总量 | X | 与账本一致 |\n| 本章预计增量 | +X（来源） | 无增量写+0 |",
+      "index": 160
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4283861,
+        4284837
+      ],
+      "value": "=== PRE_WRITE_CHECK ===\n（必须输出Markdown表格，全部检查项对齐 chapter_memo 七段，而不是卷纲）\n| 检查项 | 本章记录 | 备注 |\n|--------|----------|------|\n| 当前任务 | 复述 chapter_memo 的「当前任务」并写出本章执行动作 | 必须具体，不能抽象 |\n| 读者在等什么 | 本章如何处理「读者此刻在等什么」—制造/延迟/兑现 | 与 memo 一致 |\n| 该兑现的 / 暂不掀的 | 本章确认要兑现的伏笔 + 必须压住不掀的底牌 | 引用 memo 原文 |\n| 日常/过渡承担任务 | 若有日常/过渡段落，说明各自承担的功能 | 对齐 memo 映射表 |\n| 章尾必须发生的改变 | 列出 memo「章尾必须发生的改变」中 1-3 条具体改变 | 必须落地 |\n| 不要做 | 复述 memo「不要做」清单 | 正文不得触碰 |\n| 上下文范围 | 第X章至第Y章 / 状态卡 / 设定文件 | |\n| 当前锚点 | 地点 / 对手 / 收益目标 | 锚点必须具体 |\n",
+      "index": 161
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4284837,
+        4284981
+      ],
+      "value": "| 待回收伏笔 | 用真实 hook_id 填写（无则写 none） | 与伏笔池一致 |\n| 本章冲突 | 一句话概括 | |\n| 章节类型 | ",
+      "index": 162
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4284981,
+        4284983
+      ],
+      "value": "/",
+      "index": 163
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4284983,
+        4285036
+      ],
+      "value": " | |\n| 风险扫描 | OOC/信息越界/设定冲突",
+      "index": 164
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4285036,
+        4285050
+      ],
+      "value": "powerScaling",
+      "index": 165
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285050,
+        4285065
+      ],
+      "value": "/战力崩坏",
+      "index": 166
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285065,
+        4285091
+      ],
+      "value": "/节奏/词汇疲劳 | |",
+      "index": 167
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285091,
+        4285128
+      ],
+      "value": "## 输出格式（严格遵守）\n\n",
+      "index": 168
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285128,
+        4285424
+      ],
+      "value": "\n\n=== CHAPTER_TITLE ===\n(章节标题，不含\"第X章\"。标题必须与已有章节标题不同，不要重复使用相同或相似的标题；若提供了 recent title history 或高频标题词，必须主动避开重复词根和高频意象)\n\n=== CHAPTER_CONTENT ===\n(正文内容，目标",
+      "index": 169
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285424,
+        4285444
+      ],
+      "value": "字，允许区间",
+      "index": 170
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285444,
+        4285652
+      ],
+      "value": "字)\n\n【重要】本次只需输出以上三个区块（PRE_WRITE_CHECK、CHAPTER_TITLE、CHAPTER_CONTENT）。\n状态卡、伏笔池、摘要等追踪文件将由后续结算阶段处理，请勿输出。",
+      "index": 171
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285652,
+        4285999
+      ],
+      "value": "=== POST_SETTLEMENT ===\n（如有数值变动，必须输出Markdown表格）\n| 结算项 | 本章记录 | 备注 |\n|--------|----------|------|\n| 资源账本 | 期初X / 增量+Y / 期末Z | 无增量写+0 |\n| 重要资源 | 资源名 -> 贡献+Y（依据） | 无写\"无\" |\n| 伏笔变动 | 新增/回收/延后 Hook | 同步更新伏笔池 |",
+      "index": 172
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4285999,
+        4286200
+      ],
+      "value": "=== POST_SETTLEMENT ===\n（如有伏笔变动，必须输出）\n| 结算项 | 本章记录 | 备注 |\n|--------|----------|------|\n| 伏笔变动 | 新增/回收/延后 Hook | 同步更新伏笔池 |",
+      "index": 173
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4286200,
+        4286281
+      ],
+      "value": "\n=== UPDATED_LEDGER ===\n(更新后的完整资源账本，Markdown表格格式)",
+      "index": 174
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4286281,
+        4286310
+      ],
+      "value": "过渡/冲突/高潮/收束",
+      "index": 175
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4286310,
+        4286318
+      ],
+      "value": "字)\n\n",
+      "index": 176
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4286318,
+        4286397
+      ],
+      "value": "\n\n=== UPDATED_STATE ===\n(更新后的完整状态卡，Markdown表格格式)\n",
+      "index": 177
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4286397,
+        4286863
+      ],
+      "value": "\n=== UPDATED_HOOKS ===\n(更新后的完整伏笔池，Markdown表格格式)\n\n=== CHAPTER_SUMMARY ===\n(本章摘要，Markdown表格格式，必须包含以下列)\n| 章节 | 标题 | 出场人物 | 关键事件 | 状态变化 | 伏笔动态 | 情绪基调 | 章节类型 |\n|------|------|----------|----------|----------|----------|----------|----------|\n| N | 本章标题 | 角色1,角色2 | 一句话概括 | 关键变化 | H01埋设/H02推进 | 情绪基调 | ",
+      "index": 178
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4286863,
+        4287918
+      ],
+      "value": " |\n\n=== UPDATED_SUBPLOTS ===\n(更新后的完整支线进度板，Markdown表格格式)\n| 支线ID | 支线名 | 相关角色 | 起始章 | 最近活跃章 | 距今章数 | 状态 | 进度概述 | 回收ETA |\n|--------|--------|----------|--------|------------|----------|------|----------|---------|\n\n=== UPDATED_EMOTIONAL_ARCS ===\n(更新后的完整情感弧线，Markdown表格格式)\n| 角色 | 章节 | 情绪状态 | 触发事件 | 强度(1-10) | 弧线方向 |\n|------|------|----------|----------|------------|----------|\n\n=== UPDATED_CHARACTER_MATRIX ===\n(更新后的角色矩阵，每个角色一个 ## 块)\n\n## 角色名\n- **定位**: 主角 / 反派 / 盟友 / 配角 / 提及\n- **标签**: 核心身份标签\n- **反差**: 打破刻板印象的独特细节\n- **说话**: 说话风格概述\n- **性格**: 性格底色\n- **动机**: 根本驱动力\n- **当前**: 本章即时目标\n- **关系**: 某角色(关系性质/Ch#) | ...\n- **已知**: 该角色已知的信息（仅限亲历或被告知）\n- **未知**: 该角色不知道的信息",
+      "index": 179
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4287918,
+        4288027
+      ],
+      "value": "| Current resource total | X | match the ledger |\n| This chapter's gain | +X (source) | write +0 if none |\n",
+      "index": 180
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4288027,
+        4289029
+      ],
+      "value": "=== PRE_WRITE_CHECK ===\n(Output a Markdown table. Every row aligns with the seven chapter_memo sections, not the volume outline.)\n| Check | This chapter | Note |\n|-------|--------------|------|\n| Current task | Restate the chapter_memo \"Current task\" and the concrete action this chapter takes | Be specific, not abstract |\n| What the reader is waiting for | How this chapter handles it: create / delay / pay off | Match the memo |\n| Pay off / keep hidden | Foreshadowing to pay off + cards that must stay down | Quote the memo |\n| Routine / transition duty | If any routine or transition passage exists, state each one's function | Match the memo mapping |\n| Required end-of-chapter change | 1-3 concrete changes from the memo's end-of-chapter change | Must land on the page |\n| Do not | Restate the memo \"Do not\" list | The prose must not touch these |\n| Context range | Ch X to Ch Y / state card / setting files | |\n| Current anchor | Location / opponent / payoff goal | Anchor must be concrete |\n",
+      "index": 181
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289029,
+        4289170
+      ],
+      "value": "| Hooks to resolve | Real hook_id (write none if absent) | Match the hook pool |\n| This chapter's conflict | One line | |\n| Chapter type | ",
+      "index": 182
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289170,
+        4289175
+      ],
+      "value": " / ",
+      "index": 183
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289175,
+        4289228
+      ],
+      "value": " | |\n| Risk scan | OOC / info leak / canon conflict",
+      "index": 184
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289228,
+        4289252
+      ],
+      "value": " / power-scaling break",
+      "index": 185
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289252,
+        4289282
+      ],
+      "value": " / pacing / word fatigue | |",
+      "index": 186
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289282,
+        4289581
+      ],
+      "value": "=== CHAPTER_TITLE ===\n(Chapter title, without \"Chapter X\". It must differ from existing titles; do not reuse the same or similar titles. If recent title history or high-frequency title words are provided, avoid repeated roots and overused imagery.)\n\n=== CHAPTER_CONTENT ===\n(Chapter prose. Target ",
+      "index": 187
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289581,
+        4289608
+      ],
+      "value": " words, acceptable range ",
+      "index": 188
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289608,
+        4289618
+      ],
+      "value": " words.)",
+      "index": 189
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289618,
+        4289656
+      ],
+      "value": "## Output Format (follow strictly)\n\n",
+      "index": 190
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4289656,
+        4289687
+      ],
+      "value": "build_english_pre_write_table",
+      "index": 191
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4289687,
+        4289717
+      ],
+      "value": "build_english_content_blocks",
+      "index": 192
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289717,
+        4289919
+      ],
+      "value": "\n\n[Important] Output only the three blocks above (PRE_WRITE_CHECK, CHAPTER_TITLE, CHAPTER_CONTENT). State cards, hook pool, and summaries are handled by the later settlement stage; do not output them.",
+      "index": 193
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4289919,
+        4290281
+      ],
+      "value": "=== POST_SETTLEMENT ===\n(If any numerical change occurred, output a Markdown table.)\n| Item | This chapter | Note |\n|------|--------------|------|\n| Resource ledger | open X / gain +Y / close Z | write +0 if none |\n| Key resources | name -> contribution +Y (basis) | write \"none\" if none |\n| Hook changes | new / resolved / deferred hook | sync the hook pool |",
+      "index": 194
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4290281,
+        4290475
+      ],
+      "value": "=== POST_SETTLEMENT ===\n(If any hook changed, output this.)\n| Item | This chapter | Note |\n|------|--------------|------|\n| Hook changes | new / resolved / deferred hook | sync the hook pool |",
+      "index": 195
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4290475,
+        4290552
+      ],
+      "value": "\n=== UPDATED_LEDGER ===\n(The full updated resource ledger, Markdown table.)",
+      "index": 196
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4290552,
+        4290597
+      ],
+      "value": "transition / conflict / climax / resolution",
+      "index": 197
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4290597,
+        4290670
+      ],
+      "value": "\n\n=== UPDATED_STATE ===\n(The full updated state card, Markdown table.)\n",
+      "index": 198
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4290670,
+        4291163
+      ],
+      "value": "\n=== UPDATED_HOOKS ===\n(The full updated hook pool, Markdown table.)\n\n=== CHAPTER_SUMMARY ===\n(Chapter summary as a Markdown table with these columns.)\n| Chapter | Title | Characters | Key events | State change | Hook dynamics | Emotional tone | Chapter type |\n|---------|-------|------------|------------|--------------|---------------|----------------|--------------|\n| N | this chapter's title | Char1, Char2 | one-line summary | key change | H01 planted / H02 advanced | emotional arc | ",
+      "index": 199
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4291163,
+        4292339
+      ],
+      "value": " |\n\n=== UPDATED_SUBPLOTS ===\n(The full updated subplot board, Markdown table.)\n| Subplot ID | Name | Characters | Start ch | Last active ch | Chapters since | Status | Progress | Resolve ETA |\n|------------|------|------------|----------|----------------|----------------|--------|----------|-------------|\n\n=== UPDATED_EMOTIONAL_ARCS ===\n(The full updated emotional arcs, Markdown table.)\n| Character | Chapter | Emotional state | Trigger | Intensity (1-10) | Arc direction |\n|-----------|---------|-----------------|---------|------------------|---------------|\n\n=== UPDATED_CHARACTER_MATRIX ===\n(The updated character matrix, one ## block per character.)\n\n## Character Name\n- **Role**: protagonist / antagonist / ally / supporting / mentioned\n- **Tags**: core identity tags\n- **Contrast**: a distinctive detail that breaks the stereotype\n- **Voice**: how they speak\n- **Personality**: underlying temperament\n- **Motivation**: core driving force\n- **Current**: this chapter's immediate goal\n- **Relations**: Character (relationship / Ch#) | ...\n- **Knows**: what this character knows (only what they witnessed or were told)\n- **Unknown**: what this character does not know",
+      "index": 200
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292339,
+        4292348
+      ],
+      "value": "__doc__",
+      "index": 201
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292348,
+        4292358
+      ],
+      "value": "__file__",
+      "index": 202
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292358,
+        4292366
+      ],
+      "value": "origin",
+      "index": 203
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292366,
+        4292380
+      ],
+      "value": "has_location",
+      "index": 204
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292380,
+        4292392
+      ],
+      "value": "__cached__",
+      "index": 205
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292392,
+        4292405
+      ],
+      "value": "annotations",
+      "index": 206
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292405,
+        4292410
+      ],
+      "value": "Any",
+      "index": 207
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292410,
+        4292419
+      ],
+      "value": "Literal",
+      "index": 208
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292419,
+        4292430
+      ],
+      "value": "TypedDict",
+      "index": 209
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292430,
+        4292450
+      ],
+      "value": "en_prompt_sections",
+      "index": 210
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292450,
+        4292505
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292452,
+              4292478
+            ],
+            "value": "build_english_core_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292478,
+              4292505
+            ],
+            "value": "build_english_genre_intro"
+          }
+        ]
+      },
+      "index": 211
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292505,
+        4292529
+      ],
+      "value": "fanfic_prompt_sections",
+      "index": 212
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292529,
+        4292635
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292531,
+              4292543
+            ],
+            "value": "FanficMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292543,
+              4292575
+            ],
+            "value": "build_character_voice_profiles"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292575,
+              4292603
+            ],
+            "value": "build_fanfic_canon_section"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292603,
+              4292635
+            ],
+            "value": "build_fanfic_mode_instructions"
+          }
+        ]
+      },
+      "index": 213
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292635,
+        4292647
+      ],
+      "value": "FanficMode",
+      "index": 214
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292647,
+        4292671
+      ],
+      "value": "genre_profile_defaults",
+      "index": 215
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292671,
+        4292687
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292673,
+              4292687
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 216
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292687,
+        4292701
+      ],
+      "value": "GenreProfile",
+      "index": 217
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292701,
+        4292720
+      ],
+      "value": "length_governance",
+      "index": 218
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292720,
+        4292753
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292722,
+              4292734
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292734,
+              4292753
+            ],
+            "value": "build_length_spec"
+          }
+        ]
+      },
+      "index": 219
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292753,
+        4292765
+      ],
+      "value": "LengthSpec",
+      "index": 220
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292765,
+        4292785
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292767,
+              4292775
+            ],
+            "value": "legacy"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292775,
+              4292785
+            ],
+            "value": "governed"
+          }
+        ]
+      },
+      "index": 221
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292785,
+        4292799
+      ],
+      "value": "InputProfile",
+      "index": 222
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292799,
+        4292817
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292801,
+              4292807
+            ],
+            "value": "full"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292807,
+              4292817
+            ],
+            "value": "creative"
+          }
+        ]
+      },
+      "index": 223
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292817,
+        4292829
+      ],
+      "value": "WriterMode",
+      "index": 224
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4292829,
+        4292839
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4292831,
+              4292835
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4292835,
+              4292839
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 225
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292839,
+        4292849
+      ],
+      "value": "Language",
+      "index": 226
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292849,
+        4292862
+      ],
+      "value": "__prepare__",
+      "index": 227
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292862,
+        4292877
+      ],
+      "value": "FanficContext",
+      "index": 228
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292877,
+        4292890
+      ],
+      "value": "__getitem__",
+      "index": 229
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4292890,
+        4292938
+      ],
+      "value": "%s.__prepare__() must return a mapping, not %s",
+      "index": 230
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292938,
+        4292948
+      ],
+      "value": "__name__",
+      "index": 231
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4292948,
+        4292961
+      ],
+      "value": "<metaclass>",
+      "index": 232
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292961,
+        4292973
+      ],
+      "value": "__module__",
+      "index": 233
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292973,
+        4292987
+      ],
+      "value": "__qualname__",
+      "index": 234
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4292987,
+        4293004
+      ],
+      "value": "__annotations__",
+      "index": 235
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4293004,
+        4293009
+      ],
+      "value": "str",
+      "index": 236
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4293009,
+        4293020
+      ],
+      "value": "list[str]",
+      "index": 237
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4293020,
+        4293036
+      ],
+      "value": "__orig_bases__",
+      "index": 238
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4293036,
+        4293057
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4293038,
+              4293039
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4293039,
+              4293040
+            ],
+            "value": null
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293040,
+              4293046
+            ],
+            "value": "full"
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4293046,
+              4293047
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4293047,
+              4293048
+            ],
+            "value": null
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293048,
+              4293056
+            ],
+            "value": "legacy"
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4293056,
+              4293057
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 239
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4293057,
+        4293419
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293059,
+              4293065
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293065,
+              4293080
+            ],
+            "value": "genre_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293080,
+              4293092
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293092,
+              4293109
+            ],
+            "value": "book_rules_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293109,
+              4293121
+            ],
+            "value": "genre_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293121,
+              4293134
+            ],
+            "value": "style_guide"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293134,
+              4293153
+            ],
+            "value": "style_fingerprint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293153,
+              4293169
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293169,
+              4293175
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293175,
+              4293191
+            ],
+            "value": "fanfic_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293191,
+              4293210
+            ],
+            "value": "language_override"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293210,
+              4293225
+            ],
+            "value": "input_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293225,
+              4293238
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293238,
+              4293246
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4293246,
+              4293262
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293262,
+              4293276
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4293276,
+              4293299
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293299,
+              4293304
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4293304,
+              4293305
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4293299,
+                  4293304
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4293305,
+              4293306
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4293304,
+                  4293305
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4293299,
+                      4293304
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4293306,
+              4293318
+            ],
+            "value": "str | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4293318,
+              4293330
+            ],
+            "value": "int | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293330,
+              4293342
+            ],
+            "value": "WriterMode"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4293342,
+              4293364
+            ],
+            "value": "FanficContext | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4293364,
+              4293381
+            ],
+            "value": "Language | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293381,
+              4293395
+            ],
+            "value": "InputProfile"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4293395,
+              4293414
+            ],
+            "value": "LengthSpec | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293414,
+              4293419
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 240
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4293419,
+        4293447
+      ],
+      "value": "build_writer_system_prompt",
+      "index": 241
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4293447,
+        4293502
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293449,
+              4293455
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293455,
+              4293459
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293459,
+              4293467
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4293467,
+              4293483
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293483,
+              4293497
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293497,
+              4293502
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 242
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4293502,
+        4293553
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293504,
+              4293514
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293514,
+              4293524
+            ],
+            "value": "governed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293524,
+              4293532
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293532,
+              4293542
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293542,
+              4293548
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293548,
+              4293553
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 243
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4293553,
+        4293613
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293555,
+              4293568
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293568,
+              4293578
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293578,
+              4293586
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293586,
+              4293598
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293598,
+              4293608
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293608,
+              4293613
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 244
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4293613,
+        4293653
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293615,
+              4293628
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293628,
+              4293636
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293636,
+              4293648
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4293648,
+              4293653
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 245
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4293653,
+        4293668
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293655,
+              4293663
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4293663,
+              4293668
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 246
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4293668,
+        4296253
+      ],
+      "value": "## 去AI味：反例→正例对照\n\n以下对照表展示AI常犯的\"味道\"问题和修正方法。正文必须贴近正例风格。\n\n### 情绪描写\n| 反例（AI味） | 正例（人味） | 要点 |\n|---|---|---|\n| 他感到非常愤怒。 | 他捏碎了手中的茶杯，滚烫的茶水流过指缝，但他像没感觉一样。 | 用动作外化情绪 |\n| 她心里很悲伤，眼泪流了下来。 | 她攥紧手机，指节发白，屏幕上的聊天记录模糊成一片。 | 用身体细节替代直白标签 |\n| 他感到一阵恐惧。 | 他后背的汗毛竖了起来，脚底像踩在了冰上。 | 五感传递恐惧 |\n\n### 转折与衔接\n| 反例（AI味） | 正例（人味） | 要点 |\n|---|---|---|\n| 虽然他很强，但是他还是输了。 | 他确实强，可对面那个老东西更脏。 | 口语化转折，少用\"虽然...但是\" |\n| 然而，事情并没有那么简单。 | 哪有那么便宜的事。 | \"然而\"换成角色内心吐槽 |\n| 因此，他决定采取行动。 | 他站起来，把凳子踢到一边。 | 删掉因果连词，直接写动作 |\n\n### \"了\"字与助词控制\n| 反例（AI味） | 正例（人味） | 要点 |\n|---|---|---|\n| 他走了过去，拿了杯子，喝了一口水。 | 他走过去，端起杯子，灌了一口。 | 连续\"了\"字削弱节奏，保留最有力的一个 |\n| 他看了看四周，发现了一个洞口。 | 他扫了一眼四周，墙根裂开一道缝。 | 两个\"了\"减为一个，\"发现\"换成具体画面 |\n\n### 词汇与句式\n| 反例（AI味） | 正例（人味） | 要点 |\n|---|---|---|\n| 那双眼睛充满了智慧和深邃。 | 那双眼睛像饿狼见了肉。 | 用具体比喻替代空洞形容词 |\n| 他的内心充满了矛盾和挣扎。 | 他攥着拳头站了半天，最后骂了句脏话，转身走了。 | 内心活动外化为行动 |\n| 全场为之震惊。 | 老陈的烟掉在了裤子上，烫得他跳起来。 | 群像反应具体到个人 |\n| 不禁感叹道…… | （直接写感叹内容，删掉\"不禁感叹\"） | 删除无意义的情绪中介词 |\n\n### 叙述者姿态\n| 反例（AI味） | 正例（人味） | 要点 |\n|---|---|---|\n| 这一刻，他终于明白了什么是真正的力量。 | （删掉这句——让读者自己从前文感受） | 不替读者下结论 |\n| 显然，对方低估了他的实力。 | （只写对方的表情变化，让读者自己判断） | \"显然\"是作者在说教 |\n| 他知道，这将是改变命运的一战。 | 他把刀从鞘里拔了一寸，又推回去。 | 用犹豫的动作暗示重要性 |",
+      "index": 247
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4296253,
+        4296277
+      ],
+      "value": "build_anti_ai_examples",
+      "index": 248
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4296277,
+        4297635
+      ],
+      "value": "## 六步走人物心理分析\n\n每个重要角色在关键场景中的行为，必须经过以下六步推导：\n\n1. **当前处境**：角色此刻面临什么局面？手上有什么牌？\n2. **核心动机**：角色最想要什么？最害怕什么？\n3. **信息边界**：角色知道什么？不知道什么？对局势有什么误判？\n4. **性格过滤**：同样的局面，这个角色的性格会怎么反应？（冲动/谨慎/阴险/果断）\n5. **行为选择**：基于以上四点，角色会做出什么选择？\n6. **情绪外化**：这个选择伴随什么情绪？用什么身体语言、表情、语气表达？\n\n禁止跳过步骤直接写行为。如果推导不出合理行为，说明前置铺垫不足，先补铺垫。\n\n### 人设防崩三问（每次写角色行为前）\n1. \"他为什么要这么做？\"——必须有利益或情感驱动\n2. \"这符合他之前的人设吗？\"——行为由\"过往经历+当前利益+性格底色\"共同驱动\n3. \"如果把这段给一个只看过前面章节的读者，他会觉得突兀吗？\"——人设一致性检验\n\n### \"盐溶于汤\"原则\n主角的野心和价值观不能通过口号喊出来，必须内化于行为。\n- 反例：主角说\"我要成为最强的人！\" → 空洞口号\n- 正例：主角在别人放弃时默默多练了两个小时 → 用行动传达野心",
+      "index": 249
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4297635,
+        4297670
+      ],
+      "value": "build_character_psychology_method",
+      "index": 250
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4297670,
+        4298779
+      ],
+      "value": "## 配角设计方法论\n\n### 配角B面原则\n配角必须有反击，有自己的算盘。主角的强大在于压服聪明人，而不是碾压傻子。\n\n### 构建方法\n1. **动机绑定主线**：每个配角的行为动机必须与主线产生关联\n   - 反派对抗主角不是因为\"反派脸谱\"，而是有自己的诉求（如保护家人、争夺生存资源）\n   - 盟友帮助主角是因为有共同敌人或欠了人情，而非无条件忠诚\n2. **核心标签 + 反差细节**：让配角\"活\"过来\n   - 表面冷硬的角色有不为人知的温柔一面（如偷偷照顾流浪动物）\n   - 看似粗犷的角色有出人意料的细腻爱好\n   - 反派头子对老母亲言听计从\n3. **通过事件立人设**：禁止通过外貌描写和形容词堆砌来立人设，用角色在事件中的反应、选择、语气来展现性格\n4. **语言区分度**：不同角色的说话方式必须有辨识度——用词习惯、句子长短、口头禅、方言痕迹都是工具\n5. **拒绝集体反应**：群戏中不写\"众人齐声惊呼\"，而是挑1-2个角色写具体反应",
+      "index": 251
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4298779,
+        4298814
+      ],
+      "value": "build_supporting_character_method",
+      "index": 252
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4298814,
+        4299755
+      ],
+      "value": "## 读者心理学框架\n\n写作时同步考虑读者的心理状态：\n\n- **期待管理**：在读者期待释放时，适当延迟以增强快感；在读者即将失去耐心时，立即给反馈\n- **信息落差**：让读者比角色多知道一点（制造紧张），或比角色少知道一点（制造好奇）\n- **情绪节拍**：压制→释放→更大的压制→更大的释放。释放时要超过读者心理预期。递进式升级——不是一次到位，而是层层加码（被骂→手机掉下水道→被噎住→有人敲门），每次比上一次更过分\n- **锚定效应**：先给读者一个参照（对手有多强/困难有多大），再展示主角的表现\n- **沉没成本**：读者已经投入的阅读时间是留存的关键，每章都要给出\"继续读下去的理由\"\n- **代入感维护**：主角的困境必须让读者能共情，主角的选择必须让读者觉得\"我也会这么做\" ",
+      "index": 253
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4299755,
+        4299787
+      ],
+      "value": "build_reader_psychology_method",
+      "index": 254
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4299787,
+        4301102
+      ],
+      "value": "## 情感节点设计\n\n关系发展（友情、爱情、从属）必须经过事件驱动的节点递进：\n\n1. **设计3-5个关键事件**：共同御敌、秘密分享、利益冲突、信任考验、牺牲/妥协\n2. **递进升温**：每个事件推进关系一个层级，禁止跨越式发展（初见即死忠、一面之缘即深情）\n3. **情绪用场景传达**：环境烘托（暴雨中独坐）+ 微动作（攥拳指尖发白）替代直白抒情\n4. **情感与题材匹配**：末世侧重\"共患难的信任\"、悬疑侧重\"试探与默契\"、玄幻侧重\"利益捆绑到真正认可\"\n5. **禁止标签化互动**：不可突然称兄道弟、莫名深情告白，每次称呼变化都需要事件支撑\n\n### 强情绪升级法（避免流水账的核武器）\n流水账的修法不是删掉日常，而是给日常加\"料\"：\n1. **加入前因后果**：下班回家→加上\"催债电话刚打来\"的前因→日常立刻有了紧迫感\n2. **情绪递进**：不是一个坏事，而是坏事接着坏事——被骂→赶不上公交→手机掉了→直播课结束了→包子把自己噎住了。每层比上一层更过分\n3. **日常必须为主线服务**：万物皆为\"饵\"。日常段落要么埋伏笔，要么推关系，要么建立反差。纯填充的日常是流水账的温床",
+      "index": 255
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4301102,
+        4301133
+      ],
+      "value": "build_emotional_pacing_method",
+      "index": 256
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4301133,
+        4302482
+      ],
+      "value": "## 代入感技法\n\n- **自然信息交代**：角色身份/外貌/背景通过行动和对话带出，禁止\"资料卡式\"直接罗列\n- **画面代入法**：开场先给画面（动作、环境、声音），再给信息，让读者\"看到\"而非\"被告知\"\n- **共鸣锚点**：主角的困境必须有普遍性（被欺压、不公待遇、被低估），让读者觉得\"这也是我\"\n- **欲望钩子**：每章至少让读者产生一个\"接下来会怎样\"的好奇心\n- **信息落差应用**：让读者比角色多知道一点（紧张感）或少知道一点（好奇心），动态切换\n- **具体化/可视化**：描写时具体到读者脑海能浮现的东西——不写\"一个大城市\"，写\"三环堵了四十分钟的出租车后座\"\n- **熟悉感**：接地气的场景自带代入感——医院走廊的消毒水味、深夜便利店的暖光、雨天公交站的积水\n\n### 欲望驱动（网文核心）\n网文本质是满足读者的欲望。两种欲望必须交替使用：\n- **基础欲望**（被动）：不劳而获、高人一等、权势地位、扬眉吐气——读者天然渴望的东西\n- **主动欲望**（期待感）：作者刻意制造的\"情绪缺口\"——压制→读者期待释放→释放时超过预期\n- 关键：释放点必须超过读者的心理预期，只满足70%的期待等于失败",
+      "index": 257
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4302482,
+        4302510
+      ],
+      "value": "build_immersion_techniques",
+      "index": 258
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4302510,
+        4302545
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302512,
+              4302522
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302522,
+              4302530
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302530,
+              4302540
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302540,
+              4302545
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 259
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4302545,
+        4302608
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302547,
+              4302563
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302563,
+              4302573
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302573,
+              4302581
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4302581,
+              4302593
+            ],
+            "value": "int | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302593,
+              4302603
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302603,
+              4302608
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 260
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4302608,
+        4302611
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4302610,
+              4302611
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 261
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4302611,
+        4302676
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302613,
+              4302629
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302629,
+              4302639
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302639,
+              4302647
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4302647,
+              4302659
+            ],
+            "value": "int | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4302659,
+              4302671
+            ],
+            "value": "str | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302671,
+              4302676
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 262
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4302676,
+        4302942
+      ],
+      "value": "## 全员追踪\n\n本书启用全员追踪模式。每章结束时，POST_SETTLEMENT 必须额外包含：\n- 本章出场角色清单（名字 + 一句话状态变化）\n- 角色间关系变动（如有）\n- 未出场但被提及的角色（名字 + 提及原因）",
+      "index": 263
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4302942,
+        4302988
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302944,
+              4302948
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302948,
+              4302960
+            ],
+            "value": "genre_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302960,
+              4302968
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302968,
+              4302982
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4302982,
+              4302987
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4302987,
+              4302988
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4302982,
+                  4302987
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 264
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4302988,
+        4303058
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4302990,
+              4303002
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303002,
+              4303012
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303012,
+              4303020
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4303020,
+              4303043
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303043,
+              4303053
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303053,
+              4303058
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 265
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303058,
+        4303108
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303060,
+              4303072
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303072,
+              4303080
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4303080,
+              4303103
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303103,
+              4303108
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 266
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303108,
+        4303130
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303110,
+              4303116
+            ],
+            "value": "body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303116,
+              4303124
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303124,
+              4303129
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4303129,
+              4303130
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4303124,
+                  4303129
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 267
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303130,
+        4303159
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303132,
+              4303145
+            ],
+            "value": "style_guide"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303145,
+              4303153
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303153,
+              4303158
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4303158,
+              4303159
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4303153,
+                  4303158
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 268
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303159,
+        4303199
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303161,
+              4303174
+            ],
+            "value": "fingerprint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303174,
+              4303182
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4303182,
+              4303194
+            ],
+            "value": "str | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303194,
+              4303199
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 269
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4303199,
+        4303226
+      ],
+      "value": "build_pre_write_checklist",
+      "index": 270
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303226,
+        4303306
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303228,
+              4303234
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303234,
+              4303238
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303238,
+              4303251
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303251,
+              4303259
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4303259,
+              4303275
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303275,
+              4303289
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303289,
+              4303301
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303301,
+              4303306
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 271
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303306,
+        4303339
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303308,
+              4303312
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303312,
+              4303320
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303320,
+              4303334
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303334,
+              4303339
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 272
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4303339,
+        4303420
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303341,
+              4303348
+            ],
+            "value": "_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303348,
+              4303352
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303352,
+              4303365
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303365,
+              4303373
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4303373,
+              4303389
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303389,
+              4303403
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303403,
+              4303415
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303415,
+              4303420
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 273
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4303420,
+        4303460
+      ],
+      "value": "novels\\prompts\\inkos\\writer_prompts.py",
+      "index": 274
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303460,
+        4303468
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303462,
+              4303466
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4303466,
+              4303468
+            ],
+            "value": "s"
+          }
+        ]
+      },
+      "index": 275
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303468,
+        4303476
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303470,
+              4303474
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4303474,
+              4303476
+            ],
+            "value": "t"
+          }
+        ]
+      },
+      "index": 276
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4303476,
+        4303522
+      ],
+      "value": "<module novels.prompts.inkos.writer_prompts>",
+      "index": 277
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303522,
+        4303535
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303524,
+              4303535
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 278
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303535,
+        4303543
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303537,
+              4303543
+            ],
+            "value": "body"
+          }
+        ]
+      },
+      "index": 279
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303543,
+        4303565
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303545,
+              4303555
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303555,
+              4303565
+            ],
+            "value": "governed"
+          }
+        ]
+      },
+      "index": 280
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303565,
+        4303580
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303567,
+              4303580
+            ],
+            "value": "length_spec"
+          }
+        ]
+      },
+      "index": 281
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303580,
+        4303592
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303582,
+              4303592
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 282
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303592,
+        4303648
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303594,
+              4303600
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303600,
+              4303604
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303604,
+              4303617
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303617,
+              4303631
+            ],
+            "value": "resource_row"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303631,
+              4303648
+            ],
+            "value": "pre_write_table"
+          }
+        ]
+      },
+      "index": 283
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303648,
+        4303674
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303650,
+              4303657
+            ],
+            "value": "_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303657,
+              4303661
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303661,
+              4303674
+            ],
+            "value": "length_spec"
+          }
+        ]
+      },
+      "index": 284
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303674,
+        4303757
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303676,
+              4303683
+            ],
+            "value": "_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303683,
+              4303687
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303687,
+              4303700
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303700,
+              4303717
+            ],
+            "value": "post_settlement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303717,
+              4303733
+            ],
+            "value": "updated_ledger"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303733,
+              4303757
+            ],
+            "value": "chapter_types_fallback"
+          }
+        ]
+      },
+      "index": 285
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303757,
+        4303777
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303759,
+              4303763
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303763,
+              4303777
+            ],
+            "value": "resource_row"
+          }
+        ]
+      },
+      "index": 286
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303777,
+        4303789
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303779,
+              4303785
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303785,
+              4303789
+            ],
+            "value": "gp"
+          }
+        ]
+      },
+      "index": 287
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303789,
+        4303854
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303791,
+              4303795
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303795,
+              4303807
+            ],
+            "value": "genre_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303807,
+              4303821
+            ],
+            "value": "fatigue_line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303821,
+              4303841
+            ],
+            "value": "chapter_types_line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303841,
+              4303854
+            ],
+            "value": "pacing_line"
+          }
+        ]
+      },
+      "index": 288
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303854,
+        4303943
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303856,
+              4303872
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303872,
+              4303882
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303882,
+              4303892
+            ],
+            "value": "zh_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303892,
+              4303902
+            ],
+            "value": "en_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303902,
+              4303914
+            ],
+            "value": "is_english"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303914,
+              4303928
+            ],
+            "value": "golden_limit"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303928,
+              4303935
+            ],
+            "value": "rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303935,
+              4303943
+            ],
+            "value": "header"
+          }
+        ]
+      },
+      "index": 289
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303943,
+        4303971
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303945,
+              4303961
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303961,
+              4303971
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 290
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303971,
+        4303996
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303973,
+              4303986
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4303986,
+              4303996
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 291
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4303996,
+        4304028
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4303998,
+              4304010
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304010,
+              4304020
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304020,
+              4304028
+            ],
+            "value": "person"
+          }
+        ]
+      },
+      "index": 292
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4304028,
+        4304141
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4304030,
+              4304036
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304036,
+              4304040
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304040,
+              4304053
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304053,
+              4304067
+            ],
+            "value": "resource_row"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304067,
+              4304084
+            ],
+            "value": "pre_write_table"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304084,
+              4304101
+            ],
+            "value": "post_settlement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304101,
+              4304117
+            ],
+            "value": "updated_ledger"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304117,
+              4304141
+            ],
+            "value": "chapter_types_fallback"
+          }
+        ]
+      },
+      "index": 293
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4304141,
+        4304165
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4304143,
+              4304149
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304149,
+              4304153
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304153,
+              4304158
+            ],
+            "value": "idx"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304158,
+              4304165
+            ],
+            "value": "lines"
+          }
+        ]
+      },
+      "index": 294
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4304165,
+        4304215
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4304167,
+              4304179
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4304179,
+              4304181
+            ],
+            "value": "p"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304181,
+              4304188
+            ],
+            "value": "lines"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4304188,
+              4304190
+            ],
+            "value": "c"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304190,
+              4304203
+            ],
+            "value": "prohibition"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304203,
+              4304215
+            ],
+            "value": "genre_lock"
+          }
+        ]
+      },
+      "index": 295
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4304215,
+        4304230
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4304217,
+              4304230
+            ],
+            "value": "fingerprint"
+          }
+        ]
+      },
+      "index": 296
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4304230,
+        4304245
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4304232,
+              4304245
+            ],
+            "value": "style_guide"
+          }
+        ]
+      },
+      "index": 297
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4304245,
+        4304496
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4304247,
+              4304253
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304253,
+              4304268
+            ],
+            "value": "genre_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304268,
+              4304280
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304280,
+              4304297
+            ],
+            "value": "book_rules_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304297,
+              4304309
+            ],
+            "value": "genre_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304309,
+              4304322
+            ],
+            "value": "style_guide"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304322,
+              4304341
+            ],
+            "value": "style_fingerprint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304341,
+              4304357
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304357,
+              4304363
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304363,
+              4304379
+            ],
+            "value": "fanfic_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304379,
+              4304398
+            ],
+            "value": "language_override"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304398,
+              4304413
+            ],
+            "value": "input_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304413,
+              4304426
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304426,
+              4304438
+            ],
+            "value": "is_english"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304438,
+              4304448
+            ],
+            "value": "governed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304448,
+              4304470
+            ],
+            "value": "resolved_length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304470,
+              4304486
+            ],
+            "value": "output_section"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4304486,
+              4304496
+            ],
+            "value": "sections"
+          }
+        ]
+      },
+      "index": 298
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4304496,
+        4304506
+      ],
+      "value": "__spec__",
+      "index": 299
+    }
+  ]
+}

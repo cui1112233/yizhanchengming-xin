@@ -1,0 +1,838 @@
+{
+  "moduleName": "novels.services.chapter_status",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4331698,
+  "payloadRange": [
+    4331733,
+    4332740
+  ],
+  "payloadSha256": "0895fd49e84846c4e3981d30736f141aede098d57eafad6cfcb0ccea5a1e4ae3",
+  "declaredConstants": 50,
+  "parsedConstants": 50,
+  "stoppedAt": 4332739,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4331735,
+        4331740
+      ],
+      "value": "get",
+      "index": 0
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4331740,
+        4331750
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4331742,
+              4331750
+            ],
+            "value": "passed"
+          }
+        ]
+      },
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331750,
+        4331768
+      ],
+      "value": "ready-for-review",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331768,
+        4331782
+      ],
+      "value": "audit-failed",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331782,
+        4331798
+      ],
+      "value": "state-degraded",
+      "index": 4
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4331798,
+        4331815
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4331800,
+              4331815
+            ],
+            "value": "chapterNumber"
+          }
+        ]
+      },
+      "index": 5
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4331815,
+        4331816
+      ],
+      "value": "",
+      "index": 6
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4331816,
+        4331825
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4331818,
+              4331825
+            ],
+            "value": "title"
+          }
+        ]
+      },
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4331825,
+        4331832
+      ],
+      "value": "strip",
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4331832,
+        4331845
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4331834,
+              4331845
+            ],
+            "value": "wordCount"
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4331845,
+        4331855
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4331847,
+              4331855
+            ],
+            "value": "status"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331855,
+        4331860
+      ],
+      "value": "《",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331860,
+        4331865
+      ],
+      "value": "》",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331865,
+        4331873
+      ],
+      "value": "本书",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4331873,
+        4331895
+      ],
+      "value": "chapter_needs_review",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331895,
+        4331904
+      ],
+      "value": "已为 ",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331904,
+        4331917
+      ],
+      "value": " 写出第 ",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331917,
+        4331923
+      ],
+      "value": " 章",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331923,
+        4331935
+      ],
+      "value": "，字数 ",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331935,
+        4331968
+      ],
+      "value": "，但审稿未通过，状态 ",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4331968,
+        4332000
+      ],
+      "value": "，需要复核后再继续。",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332000,
+        4332013
+      ],
+      "value": " 完成第 ",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332013,
+        4332025
+      ],
+      "value": "，状态 ",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332025,
+        4332030
+      ],
+      "value": "。",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332030,
+        4332047
+      ],
+      "value": "审稿通过。",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332047,
+        4332091
+      ],
+      "value": "审稿未通过，请查看问题列表。",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332091,
+        4332097
+      ],
+      "value": "第 ",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332097,
+        4332118
+      ],
+      "value": " 章审稿通过。",
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332118,
+        4332169
+      ],
+      "value": " 章审稿未通过，需要复核后再继续。",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332169,
+        4332178
+      ],
+      "value": "__doc__",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332178,
+        4332188
+      ],
+      "value": "__file__",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332188,
+        4332196
+      ],
+      "value": "origin",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332196,
+        4332210
+      ],
+      "value": "has_location",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332210,
+        4332222
+      ],
+      "value": "__cached__",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332222,
+        4332235
+      ],
+      "value": "annotations",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332235,
+        4332240
+      ],
+      "value": "Any",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332240,
+        4332246
+      ],
+      "value": "Dict",
+      "index": 36
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4332246,
+        4332309
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332248,
+              4332255
+            ],
+            "value": "audit"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332255,
+              4332274
+            ],
+            "value": "validation_passed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332274,
+              4332282
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4332282,
+              4332298
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332298,
+              4332304
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332304,
+              4332309
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332309,
+        4332339
+      ],
+      "value": "resolve_write_chapter_status",
+      "index": 38
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4332339,
+        4332368
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332341,
+              4332349
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332349,
+              4332357
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332357,
+              4332362
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332362,
+              4332368
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 39
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4332368,
+        4332424
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332370,
+              4332382
+            ],
+            "value": "book_title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332382,
+              4332390
+            ],
+            "value": "result"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332390,
+              4332398
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332398,
+              4332403
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4332403,
+              4332419
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332419,
+              4332424
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332424,
+        4332453
+      ],
+      "value": "build_chapter_write_summary",
+      "index": 41
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4332453,
+        4332503
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332455,
+              4332471
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332471,
+              4332479
+            ],
+            "value": "passed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332479,
+              4332487
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332487,
+              4332492
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332492,
+              4332498
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332498,
+              4332503
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332503,
+        4332524
+      ],
+      "value": "build_audit_summary",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332524,
+        4332559
+      ],
+      "value": "novels\\services\\chapter_status.py",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4332559,
+        4332600
+      ],
+      "value": "<module novels.services.chapter_status>",
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4332600,
+        4332626
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332602,
+              4332618
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332618,
+              4332626
+            ],
+            "value": "passed"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4332626,
+        4332701
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332628,
+              4332640
+            ],
+            "value": "book_title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332640,
+              4332648
+            ],
+            "value": "result"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332648,
+              4332656
+            ],
+            "value": "number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332656,
+              4332663
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332663,
+              4332675
+            ],
+            "value": "word_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332675,
+              4332683
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332683,
+              4332695
+            ],
+            "value": "title_part"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332695,
+              4332701
+            ],
+            "value": "book"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4332701,
+        4332729
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4332703,
+              4332710
+            ],
+            "value": "audit"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4332710,
+              4332729
+            ],
+            "value": "validation_passed"
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4332729,
+        4332739
+      ],
+      "value": "__spec__",
+      "index": 49
+    }
+  ]
+}

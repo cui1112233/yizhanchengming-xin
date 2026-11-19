@@ -1,0 +1,2800 @@
+{
+  "moduleName": "novels.agents.reviser_agent",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3910245,
+  "payloadRange": [
+    3910277,
+    3914305
+  ],
+  "payloadSha256": "531912e6cc94e258f3d7374d42b9b3406899b94cebae4044e76160bbf849ac07",
+  "declaredConstants": 149,
+  "parsedConstants": 149,
+  "stoppedAt": 3914304,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3910279,
+        3910284
+      ],
+      "value": "ctx",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910284,
+        3910290
+      ],
+      "value": "auto",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910290,
+        3910297
+      ],
+      "value": "strip",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910297,
+        3910304
+      ],
+      "value": "lower",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910304,
+        3910310
+      ],
+      "value": "emit",
+      "index": 4
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3910310,
+        3910381
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3910312,
+              3910327
+            ],
+            "value": "tool:progress"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3910327,
+              3910341
+            ],
+            "value": "修订章节"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910341,
+              3910349
+            ],
+            "value": "active"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3910349,
+              3910381
+            ],
+            "value": "修订者正在处理章节..."
+          }
+        ]
+      },
+      "index": 5
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3910381,
+        3910407
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3910383,
+              3910390
+            ],
+            "value": "stage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910390,
+              3910398
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910398,
+              3910407
+            ],
+            "value": "message"
+          }
+        ]
+      },
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910407,
+        3910430
+      ],
+      "value": "resolve_genre_profile",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910430,
+        3910437
+      ],
+      "value": "genre",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910437,
+        3910444
+      ],
+      "value": "other",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910444,
+        3910454
+      ],
+      "value": "language",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910454,
+        3910458
+      ],
+      "value": "zh",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910458,
+        3910462
+      ],
+      "value": "en",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910462,
+        3910485
+      ],
+      "value": "_issues_from_feedback",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910485,
+        3910511
+      ],
+      "value": "resolve_auto_output_mode",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3910511,
+        3910523
+      ],
+      "value": "allow-full",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910523,
+        3910548
+      ],
+      "value": "build_tiered_issue_list",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910548,
+        3910574
+      ],
+      "value": "build_auto_system_prompt",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910574,
+        3910599
+      ],
+      "value": "build_protagonist_block",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910599,
+        3910616
+      ],
+      "value": "numericalSystem",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3910616,
+        3910667
+      ],
+      "value": "\n3. 数值错误必须精确修正，前后对账",
+      "index": 20
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3910667,
+        3910668
+      ],
+      "value": "",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910668,
+        3910687
+      ],
+      "value": "build_length_spec",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910687,
+        3910705
+      ],
+      "value": "chapterWordCount",
+      "index": 23
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3910705,
+        3910783
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3910707,
+              3910726
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910726,
+              3910742
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910742,
+              3910752
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910752,
+              3910765
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910765,
+              3910783
+            ],
+            "value": "auto_output_mode"
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3910783,
+        3910891
+      ],
+      "value": "\n8. 保持章节字数在目标区间内；只有在修复关键问题确实需要时才允许轻微偏离",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910891,
+        3910919
+      ],
+      "value": "build_legacy_system_prompt",
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3910919,
+        3910984
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3910921,
+              3910940
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910940,
+              3910956
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910956,
+              3910974
+            ],
+            "value": "length_guardrail"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3910974,
+              3910984
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3910984,
+        3911000
+      ],
+      "value": "FileRepository",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911000,
+        3911011
+      ],
+      "value": "read_text",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911011,
+        3911029
+      ],
+      "value": "current_state.md",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911029,
+        3911048
+      ],
+      "value": "(文件不存在)",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911048,
+        3911066
+      ],
+      "value": "pending_hooks.md",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911066,
+        3911082
+      ],
+      "value": "\n## 伏笔池\n",
+      "index": 33
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        3911082,
+        3911084
+      ],
+      "value": "\n",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911084,
+        3911099
+      ],
+      "value": "volume_map.md",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911099,
+        3911112
+      ],
+      "value": "\n## 卷纲\n",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911112,
+        3911128
+      ],
+      "value": "story_frame.md",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911128,
+        3911150
+      ],
+      "value": "\n## 世界观设定\n",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911150,
+        3911171
+      ],
+      "value": "character_matrix.md",
+      "index": 39
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911171,
+        3911196
+      ],
+      "value": "\n## 角色交互矩阵\n",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911196,
+        3911218
+      ],
+      "value": "chapter_summaries.md",
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911218,
+        3911237
+      ],
+      "value": "\n## 章节摘要\n",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911237,
+        3911254
+      ],
+      "value": "parent_canon.md",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911254,
+        3911379
+      ],
+      "value": "\n## 正传正典参照（修稿专用）\n本书为番外作品。修改时参照正典约束，不可改变正典事实。\n",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911379,
+        3911396
+      ],
+      "value": "fanfic_canon.md",
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911396,
+        3911581
+      ],
+      "value": "\n## 同人正典参照（修稿专用）\n本书为同人作品。修改时参照正典角色档案和世界规则，不可违反正典事实。角色对话必须保留原作语癖。\n",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911581,
+        3911597
+      ],
+      "value": "style_guide.md",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911597,
+        3911616
+      ],
+      "value": "\n## 文风指南\n",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911616,
+        3911636
+      ],
+      "value": "particle_ledger.md",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911636,
+        3911640
+      ],
+      "value": "gp",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3911640,
+        3911659
+      ],
+      "value": "\n## 资源账本\n",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911659,
+        3911686
+      ],
+      "value": "build_reviser_user_prompt",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911686,
+        3911711
+      ],
+      "value": "ReviserUserPromptParams",
+      "index": 53
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3911711,
+        3911911
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3911713,
+              3911729
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911729,
+              3911741
+            ],
+            "value": "issue_list"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911741,
+              3911756
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911756,
+              3911773
+            ],
+            "value": "chapter_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911773,
+              3911787
+            ],
+            "value": "ledger_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911787,
+              3911800
+            ],
+            "value": "hooks_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911800,
+              3911815
+            ],
+            "value": "outline_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911815,
+              3911828
+            ],
+            "value": "bible_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911828,
+              3911842
+            ],
+            "value": "matrix_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911842,
+              3911859
+            ],
+            "value": "summaries_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911859,
+              3911872
+            ],
+            "value": "canon_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911872,
+              3911892
+            ],
+            "value": "fanfic_canon_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911892,
+              3911911
+            ],
+            "value": "style_guide_block"
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911911,
+        3911917
+      ],
+      "value": "chat",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911917,
+        3911923
+      ],
+      "value": "role",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911923,
+        3911931
+      ],
+      "value": "system",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911931,
+        3911940
+      ],
+      "value": "content",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911940,
+        3911946
+      ],
+      "value": "user",
+      "index": 59
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3911946,
+        3911949
+      ],
+      "value": 8192,
+      "index": 60
+    },
+    {
+      "tag": "f",
+      "fileRange": [
+        3911949,
+        3911958
+      ],
+      "value": 0.3,
+      "index": 61
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3911958,
+        3911985
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3911960,
+              3911972
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3911972,
+              3911985
+            ],
+            "value": "temperature"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3911985,
+        3912011
+      ],
+      "value": "_extract_revised_content",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912011,
+        3912023
+      ],
+      "value": "splitlines",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912023,
+        3912035
+      ],
+      "value": "startswith",
+      "index": 65
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912035,
+        3912039
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              3912037,
+              3912039
+            ],
+            "value": "-"
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912039,
+        3912048
+      ],
+      "value": "warning",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912048,
+        3912060
+      ],
+      "value": "[critical]",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912060,
+        3912070
+      ],
+      "value": "Critical",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912070,
+        3912080
+      ],
+      "value": "critical",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912080,
+        3912088
+      ],
+      "value": "[high]",
+      "index": 71
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912088,
+        3912094
+      ],
+      "value": "High",
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912094,
+        3912102
+      ],
+      "value": "issues",
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912102,
+        3912112
+      ],
+      "value": "severity",
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912112,
+        3912122
+      ],
+      "value": "category",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912122,
+        3912136
+      ],
+      "value": "审稿意见",
+      "index": 76
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912136,
+        3912149
+      ],
+      "value": "description",
+      "index": 77
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912149,
+        3912157
+      ],
+      "value": "lstrip",
+      "index": 78
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912157,
+        3912163
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3912159,
+              3912163
+            ],
+            "value": "- "
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912163,
+        3912177
+      ],
+      "value": "repair_scope",
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912177,
+        3912189
+      ],
+      "value": "structural",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912189,
+        3912196
+      ],
+      "value": "local",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912196,
+        3912205
+      ],
+      "value": "unknown",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912205,
+        3912227
+      ],
+      "value": "extract_tagged_block",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912227,
+        3912244
+      ],
+      "value": "REVISED_CONTENT",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912244,
+        3912253
+      ],
+      "value": "PATCHES",
+      "index": 86
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912253,
+        3912263
+      ],
+      "value": "spot-fix",
+      "index": 87
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912263,
+        3912275
+      ],
+      "value": "patch-only",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912275,
+        3912299
+      ],
+      "value": "parse_spot_fix_patches",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912299,
+        3912323
+      ],
+      "value": "apply_spot_fix_patches",
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912323,
+        3912332
+      ],
+      "value": "applied",
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912332,
+        3912349
+      ],
+      "value": "revised_content",
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912349,
+        3912363
+      ],
+      "value": "rewrite-only",
+      "index": 93
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912363,
+        3912367
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              3912365,
+              3912367
+            ],
+            "value": "#"
+          }
+        ]
+      },
+      "index": 94
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912367,
+        3912376
+      ],
+      "value": "__doc__",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912376,
+        3912386
+      ],
+      "value": "__file__",
+      "index": 96
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912386,
+        3912394
+      ],
+      "value": "origin",
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912394,
+        3912408
+      ],
+      "value": "has_location",
+      "index": 98
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912408,
+        3912420
+      ],
+      "value": "__cached__",
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912420,
+        3912433
+      ],
+      "value": "annotations",
+      "index": 100
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912433,
+        3912437
+      ],
+      "value": "re",
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912437,
+        3912446
+      ],
+      "value": "pathlib",
+      "index": 102
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912446,
+        3912454
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912448,
+              3912454
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912454,
+        3912460
+      ],
+      "value": "Path",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912460,
+        3912465
+      ],
+      "value": "Any",
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912465,
+        3912475
+      ],
+      "value": "Optional",
+      "index": 106
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912475,
+        3912491
+      ],
+      "value": "models.schemas",
+      "index": 107
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912491,
+        3912505
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912493,
+              3912505
+            ],
+            "value": "BookConfig"
+          }
+        ]
+      },
+      "index": 108
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3912505,
+        3912507
+      ],
+      "value": 2,
+      "index": 109
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3912507,
+        3912519
+      ],
+      "value": "BookConfig",
+      "index": 110
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912519,
+        3912557
+      ],
+      "value": "prompts.inkos.genre_profile_resolver",
+      "index": 111
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912557,
+        3912582
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912559,
+              3912582
+            ],
+            "value": "resolve_genre_profile"
+          }
+        ]
+      },
+      "index": 112
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912582,
+        3912615
+      ],
+      "value": "prompts.inkos.length_governance",
+      "index": 113
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912615,
+        3912636
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912617,
+              3912636
+            ],
+            "value": "build_length_spec"
+          }
+        ]
+      },
+      "index": 114
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912636,
+        3912667
+      ],
+      "value": "prompts.inkos.reviser_prompts",
+      "index": 115
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912667,
+        3912851
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912669,
+              3912694
+            ],
+            "value": "ReviserUserPromptParams"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912694,
+              3912720
+            ],
+            "value": "build_auto_system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912720,
+              3912748
+            ],
+            "value": "build_legacy_system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912748,
+              3912773
+            ],
+            "value": "build_protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912773,
+              3912800
+            ],
+            "value": "build_reviser_user_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912800,
+              3912825
+            ],
+            "value": "build_tiered_issue_list"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912825,
+              3912851
+            ],
+            "value": "resolve_auto_output_mode"
+          }
+        ]
+      },
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912851,
+        3912878
+      ],
+      "value": "services.spot_fix_patches",
+      "index": 117
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912878,
+        3912928
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912880,
+              3912904
+            ],
+            "value": "apply_spot_fix_patches"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3912904,
+              3912928
+            ],
+            "value": "parse_spot_fix_patches"
+          }
+        ]
+      },
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912928,
+        3912950
+      ],
+      "value": "services.truth_files",
+      "index": 119
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912950,
+        3912974
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3912952,
+              3912974
+            ],
+            "value": "extract_tagged_block"
+          }
+        ]
+      },
+      "index": 120
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3912974,
+        3912999
+      ],
+      "value": "storage.file_repository",
+      "index": 121
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3912999,
+        3913017
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913001,
+              3913017
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 122
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913017,
+        3913029
+      ],
+      "value": "base_agent",
+      "index": 123
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3913029,
+        3913045
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913031,
+              3913045
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 124
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913045,
+        3913059
+      ],
+      "value": "AgentContext",
+      "index": 125
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913059,
+        3913071
+      ],
+      "value": "__module__",
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913071,
+        3913085
+      ],
+      "value": "ReviserAgent",
+      "index": 127
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913085,
+        3913099
+      ],
+      "value": "__qualname__",
+      "index": 128
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3913099,
+        3913120
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913101,
+              3913106
+            ],
+            "value": "ctx"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913106,
+              3913120
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 129
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913120,
+        3913130
+      ],
+      "value": "__init__",
+      "index": 130
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3913130,
+        3913153
+      ],
+      "value": "ReviserAgent.__init__",
+      "index": 131
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3913153,
+        3913161
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913155,
+              3913161
+            ],
+            "value": "auto"
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3913161,
+        3913223
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913163,
+              3913169
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913169,
+              3913180
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913180,
+              3913196
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913196,
+              3913204
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913204,
+              3913217
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3913217,
+              3913218
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3913218,
+              3913219
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3913219,
+              3913221
+            ],
+            "value": 1
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3913221,
+              3913222
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3913222,
+              3913223
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 133
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3913223,
+        3913424
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913225,
+              3913242
+            ],
+            "value": "chapter_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913242,
+              3913252
+            ],
+            "value": "feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913252,
+              3913258
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913258,
+              3913264
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913264,
+              3913275
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913275,
+              3913291
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913291,
+              3913299
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913299,
+              3913312
+            ],
+            "value": "temperature"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913312,
+              3913320
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913320,
+              3913325
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3913325,
+              3913326
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3913320,
+                  3913325
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3913326,
+              3913327
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3913325,
+                  3913326
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3913320,
+                      3913325
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3913327,
+              3913349
+            ],
+            "value": "Optional[BookConfig]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3913349,
+              3913365
+            ],
+            "value": "Optional[Path]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913365,
+              3913370
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3913370,
+              3913402
+            ],
+            "value": "Optional[list[dict[str, Any]]]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3913402,
+              3913419
+            ],
+            "value": "Optional[float]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913419,
+              3913424
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3913424,
+        3913432
+      ],
+      "value": "revise",
+      "index": 135
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3913432,
+        3913453
+      ],
+      "value": "ReviserAgent.revise",
+      "index": 136
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3913453,
+        3913500
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913455,
+              3913465
+            ],
+            "value": "feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913465,
+              3913473
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913473,
+              3913478
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3913478,
+              3913500
+            ],
+            "value": "list[dict[str, Any]]"
+          }
+        ]
+      },
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3913500,
+        3913536
+      ],
+      "value": "ReviserAgent._issues_from_feedback",
+      "index": 138
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3913536,
+        3913594
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913538,
+              3913543
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913543,
+              3913553
+            ],
+            "value": "original"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913553,
+              3913559
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913559,
+              3913577
+            ],
+            "value": "auto_output_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913577,
+              3913585
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913585,
+              3913590
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3913590,
+              3913591
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3913585,
+                  3913590
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3913591,
+              3913592
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3913590,
+                  3913591
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3913585,
+                      3913590
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3913592,
+              3913593
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3913591,
+                  3913592
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3913590,
+                      3913591
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          3913585,
+                          3913590
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3913593,
+              3913594
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3913592,
+                  3913593
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3913591,
+                      3913592
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "p",
+                        "fileRange": [
+                          3913590,
+                          3913591
+                        ],
+                        "value": {
+                          "previous": {
+                            "tag": "a",
+                            "fileRange": [
+                              3913585,
+                              3913590
+                            ],
+                            "value": "str"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3913594,
+        3913633
+      ],
+      "value": "ReviserAgent._extract_revised_content",
+      "index": 140
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3913633,
+        3913665
+      ],
+      "value": "novels\\agents\\reviser_agent.py",
+      "index": 141
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3913665,
+        3913703
+      ],
+      "value": "<module novels.agents.reviser_agent>",
+      "index": 142
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3913703,
+        3913716
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913705,
+              3913711
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913711,
+              3913716
+            ],
+            "value": "ctx"
+          }
+        ]
+      },
+      "index": 143
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3913716,
+        3913802
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913718,
+              3913723
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913723,
+              3913733
+            ],
+            "value": "original"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913733,
+              3913739
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913739,
+              3913757
+            ],
+            "value": "auto_output_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913757,
+              3913766
+            ],
+            "value": "revised"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913766,
+              3913779
+            ],
+            "value": "patches_raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913779,
+              3913788
+            ],
+            "value": "patches"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913788,
+              3913796
+            ],
+            "value": "result"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913796,
+              3913802
+            ],
+            "value": "body"
+          }
+        ]
+      },
+      "index": 144
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3913802,
+        3913844
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913804,
+              3913814
+            ],
+            "value": "feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913814,
+              3913822
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913822,
+              3913828
+            ],
+            "value": "line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913828,
+              3913834
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913834,
+              3913844
+            ],
+            "value": "severity"
+          }
+        ]
+      },
+      "index": 145
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3913844,
+        3914284
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3913846,
+              3913852
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913852,
+              3913869
+            ],
+            "value": "chapter_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913869,
+              3913879
+            ],
+            "value": "feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913879,
+              3913885
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913885,
+              3913891
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913891,
+              3913902
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913902,
+              3913918
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913918,
+              3913926
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913926,
+              3913939
+            ],
+            "value": "temperature"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913939,
+              3913949
+            ],
+            "value": "mode_key"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913949,
+              3913953
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913953,
+              3913963
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913963,
+              3913978
+            ],
+            "value": "parsed_issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913978,
+              3913996
+            ],
+            "value": "auto_output_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3913996,
+              3914008
+            ],
+            "value": "issue_list"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914008,
+              3914023
+            ],
+            "value": "system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914023,
+              3914041
+            ],
+            "value": "length_guardrail"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914041,
+              3914047
+            ],
+            "value": "spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914047,
+              3914062
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914062,
+              3914075
+            ],
+            "value": "hooks_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914075,
+              3914090
+            ],
+            "value": "outline_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914090,
+              3914103
+            ],
+            "value": "bible_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914103,
+              3914117
+            ],
+            "value": "matrix_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914117,
+              3914134
+            ],
+            "value": "summaries_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914134,
+              3914147
+            ],
+            "value": "canon_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914147,
+              3914161
+            ],
+            "value": "fanfic_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914161,
+              3914174
+            ],
+            "value": "style_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914174,
+              3914188
+            ],
+            "value": "ledger_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914188,
+              3914195
+            ],
+            "value": "hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914195,
+              3914203
+            ],
+            "value": "volume"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914203,
+              3914216
+            ],
+            "value": "story_frame"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914216,
+              3914224
+            ],
+            "value": "matrix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914224,
+              3914235
+            ],
+            "value": "summaries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914235,
+              3914243
+            ],
+            "value": "parent"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914243,
+              3914251
+            ],
+            "value": "fanfic"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914251,
+              3914258
+            ],
+            "value": "style"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914258,
+              3914266
+            ],
+            "value": "ledger"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914266,
+              3914279
+            ],
+            "value": "user_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3914279,
+              3914284
+            ],
+            "value": "raw"
+          }
+        ]
+      },
+      "index": 146
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914284,
+        3914294
+      ],
+      "value": "__name__",
+      "index": 147
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3914294,
+        3914304
+      ],
+      "value": "__spec__",
+      "index": 148
+    }
+  ]
+}

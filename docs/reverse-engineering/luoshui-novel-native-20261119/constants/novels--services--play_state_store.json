@@ -1,0 +1,3559 @@
+{
+  "moduleName": "novels.services.play_state_store",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4352003,
+  "payloadRange": [
+    4352040,
+    4354917
+  ],
+  "payloadSha256": "2f598a497a4af1673b48f28e314440bd56fa3da967e87758091f17b83cb2f58c",
+  "declaredConstants": 154,
+  "parsedConstants": 154,
+  "stoppedAt": 4354916,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4352042,
+        4352048
+      ],
+      "value": "turn",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352048,
+        4352058
+      ],
+      "value": "location",
+      "index": 1
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4352058,
+        4352059
+      ],
+      "value": "",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352059,
+        4352066
+      ],
+      "value": "clock",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352066,
+        4352076
+      ],
+      "value": "entities",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352076,
+        4352087
+      ],
+      "value": "relations",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352087,
+        4352094
+      ],
+      "value": "facts",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352094,
+        4352101
+      ],
+      "value": "goals",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352101,
+        4352112
+      ],
+      "value": "inventory",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352112,
+        4352119
+      ],
+      "value": "state",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352119,
+        4352135
+      ],
+      "value": "FileRepository",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352135,
+        4352147
+      ],
+      "value": "ensure_dir",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352147,
+        4352158
+      ],
+      "value": "state_dir",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352158,
+        4352176
+      ],
+      "value": "world_state.json",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352176,
+        4352187
+      ],
+      "value": "read_json",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352187,
+        4352205
+      ],
+      "value": "empty_play_state",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352205,
+        4352210
+      ],
+      "value": "get",
+      "index": 16
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352210,
+        4352218
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352212,
+              4352218
+            ],
+            "value": "turn"
+          }
+        ]
+      },
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352218,
+        4352226
+      ],
+      "value": "update",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352226,
+        4352238
+      ],
+      "value": "write_json",
+      "index": 19
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352238,
+        4352250
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352240,
+              4352250
+            ],
+            "value": "entities"
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352250,
+        4352263
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352252,
+              4352263
+            ],
+            "value": "relations"
+          }
+        ]
+      },
+      "index": 21
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352263,
+        4352272
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352265,
+              4352272
+            ],
+            "value": "facts"
+          }
+        ]
+      },
+      "index": 22
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352272,
+        4352281
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352274,
+              4352281
+            ],
+            "value": "goals"
+          }
+        ]
+      },
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352281,
+        4352292
+      ],
+      "value": "回合：",
+      "index": 24
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352292,
+        4352302
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352294,
+              4352300
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4352300,
+              4352302
+            ],
+            "value": 0
+          }
+        ]
+      },
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352302,
+        4352313
+      ],
+      "value": "地点：",
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352313,
+        4352325
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352315,
+              4352325
+            ],
+            "value": "location"
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352325,
+        4352333
+      ],
+      "value": "未知",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352333,
+        4352344
+      ],
+      "value": "时间：",
+      "index": 29
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352344,
+        4352353
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352346,
+              4352353
+            ],
+            "value": "clock"
+          }
+        ]
+      },
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352353,
+        4352364
+      ],
+      "value": "实体：",
+      "index": 31
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4352364,
+        4352369
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4352365,
+              4352366
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4352366,
+              4352368
+            ],
+            "value": 12
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352368,
+              4352369
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352369,
+        4352377
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352371,
+              4352377
+            ],
+            "value": "name"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352377,
+        4352383
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352379,
+              4352383
+            ],
+            "value": "id"
+          }
+        ]
+      },
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352383,
+        4352390
+      ],
+      "value": "strip",
+      "index": 35
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352390,
+        4352398
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352392,
+              4352398
+            ],
+            "value": "type"
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352398,
+        4352405
+      ],
+      "value": "other",
+      "index": 37
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352405,
+        4352414
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352407,
+              4352414
+            ],
+            "value": "attrs"
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352414,
+        4352418
+      ],
+      "value": ", ",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352418,
+        4352425
+      ],
+      "value": "items",
+      "index": 40
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4352425,
+        4352430
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4352426,
+              4352427
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4352427,
+              4352429
+            ],
+            "value": 4
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352429,
+              4352430
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352430,
+        4352437
+      ],
+      "value": "lines",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352437,
+        4352442
+      ],
+      "value": "- [",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352442,
+        4352446
+      ],
+      "value": "] ",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352446,
+        4352450
+      ],
+      "value": " (",
+      "index": 45
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4352450,
+        4352452
+      ],
+      "value": ")",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352452,
+        4352463
+      ],
+      "value": "关系：",
+      "index": 47
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4352463,
+        4352468
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4352464,
+              4352465
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4352465,
+              4352467
+            ],
+            "value": 10
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352467,
+              4352468
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352468,
+        4352476
+      ],
+      "value": "append",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352476,
+        4352480
+      ],
+      "value": "- ",
+      "index": 50
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352480,
+        4352488
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352482,
+              4352488
+            ],
+            "value": "from"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352488,
+        4352493
+      ],
+      "value": " --",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352493,
+        4352499
+      ],
+      "value": "--> ",
+      "index": 53
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352499,
+        4352505
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352501,
+              4352505
+            ],
+            "value": "to"
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352505,
+        4352518
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4352507,
+              4352518
+            ],
+            "value": "事实："
+          }
+        ]
+      },
+      "index": 55
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4352518,
+        4352523
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "q",
+            "fileRange": [
+              4352519,
+              4352521
+            ],
+            "value": -12
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352521,
+              4352522
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352522,
+              4352523
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 56
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352523,
+        4352534
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352525,
+              4352534
+            ],
+            "value": "subject"
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4352534,
+        4352536
+      ],
+      "value": " ",
+      "index": 58
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352536,
+        4352549
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352538,
+              4352549
+            ],
+            "value": "predicate"
+          }
+        ]
+      },
+      "index": 59
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352549,
+        4352559
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352551,
+              4352559
+            ],
+            "value": "object"
+          }
+        ]
+      },
+      "index": 60
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352559,
+        4352572
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4352561,
+              4352572
+            ],
+            "value": "目标："
+          }
+        ]
+      },
+      "index": 61
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4352572,
+        4352577
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4352573,
+              4352574
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4352574,
+              4352576
+            ],
+            "value": 6
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352576,
+              4352577
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4352577,
+        4352579
+      ],
+      "value": "\n",
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352579,
+        4352603
+      ],
+      "value": "\n（状态已截断）",
+      "index": 64
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4352603,
+        4352605
+      ],
+      "value": "=",
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352605,
+        4352616
+      ],
+      "value": "<genexpr>",
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352616,
+        4352658
+      ],
+      "value": "compact_state_summary.<locals>.<genexpr>",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352658,
+        4352664
+      ],
+      "value": "copy",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352664,
+        4352674
+      ],
+      "value": "deepcopy",
+      "index": 69
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352674,
+        4352693
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352676,
+              4352686
+            ],
+            "value": "location"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4352686,
+              4352693
+            ],
+            "value": "clock"
+          }
+        ]
+      },
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352693,
+        4352700
+      ],
+      "value": "delta",
+      "index": 71
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352700,
+        4352708
+      ],
+      "value": "merged",
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4352708,
+        4352812
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "T",
+            "fileRange": [
+              4352710,
+              4352732
+            ],
+            "value": {
+              "type": "tuple",
+              "items": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352712,
+                    4352722
+                  ],
+                  "value": "entities"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352722,
+                    4352732
+                  ],
+                  "value": "entities"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "T",
+            "fileRange": [
+              4352732,
+              4352756
+            ],
+            "value": {
+              "type": "tuple",
+              "items": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352734,
+                    4352745
+                  ],
+                  "value": "relations"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352745,
+                    4352756
+                  ],
+                  "value": "relations"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "T",
+            "fileRange": [
+              4352756,
+              4352772
+            ],
+            "value": {
+              "type": "tuple",
+              "items": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352758,
+                    4352765
+                  ],
+                  "value": "facts"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352765,
+                    4352772
+                  ],
+                  "value": "facts"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "T",
+            "fileRange": [
+              4352772,
+              4352788
+            ],
+            "value": {
+              "type": "tuple",
+              "items": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352774,
+                    4352781
+                  ],
+                  "value": "goals"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352781,
+                    4352788
+                  ],
+                  "value": "goals"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "T",
+            "fileRange": [
+              4352788,
+              4352812
+            ],
+            "value": {
+              "type": "tuple",
+              "items": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352790,
+                    4352801
+                  ],
+                  "value": "inventory"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4352801,
+                    4352812
+                  ],
+                  "value": "inventory"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352812,
+        4352819
+      ],
+      "value": "by_id",
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352819,
+        4352823
+      ],
+      "value": "id",
+      "index": 75
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352823,
+        4352831
+      ],
+      "value": "values",
+      "index": 76
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352831,
+        4352841
+      ],
+      "value": "existing",
+      "index": 77
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4352841,
+        4352846
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "q",
+            "fileRange": [
+              4352842,
+              4352844
+            ],
+            "value": -40
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352844,
+              4352845
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4352845,
+              4352846
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352846,
+        4352871
+      ],
+      "value": "_merge_unique_dict_rows",
+      "index": 79
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352871,
+        4352877
+      ],
+      "value": "json",
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352877,
+        4352884
+      ],
+      "value": "dumps",
+      "index": 81
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4352884,
+        4352913
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4352886,
+              4352900
+            ],
+            "value": "ensure_ascii"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4352900,
+              4352911
+            ],
+            "value": "sort_keys"
+          }
+        ],
+        "values": [
+          {
+            "tag": "F",
+            "fileRange": [
+              4352911,
+              4352912
+            ],
+            "value": false
+          },
+          {
+            "tag": "t",
+            "fileRange": [
+              4352912,
+              4352913
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352913,
+        4352919
+      ],
+      "value": "seen",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352919,
+        4352924
+      ],
+      "value": "add",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352924,
+        4352930
+      ],
+      "value": "rows",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352930,
+        4352943
+      ],
+      "value": "checkpoint_",
+      "index": 86
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352943,
+        4352948
+      ],
+      "value": "03d",
+      "index": 87
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4352948,
+        4352955
+      ],
+      "value": ".json",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352955,
+        4352965
+      ],
+      "value": "variants",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352965,
+        4352972
+      ],
+      "value": "turn_",
+      "index": 90
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4352972,
+        4352974
+      ],
+      "value": "_",
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352974,
+        4352980
+      ],
+      "value": "text",
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352980,
+        4352989
+      ],
+      "value": "replace",
+      "index": 93
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352989,
+        4352997
+      ],
+      "value": "delta_",
+      "index": 94
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4352997,
+        4353006
+      ],
+      "value": "__doc__",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353006,
+        4353016
+      ],
+      "value": "__file__",
+      "index": 96
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353016,
+        4353024
+      ],
+      "value": "origin",
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353024,
+        4353038
+      ],
+      "value": "has_location",
+      "index": 98
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353038,
+        4353050
+      ],
+      "value": "__cached__",
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353050,
+        4353063
+      ],
+      "value": "annotations",
+      "index": 100
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353063,
+        4353072
+      ],
+      "value": "pathlib",
+      "index": 101
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4353072,
+        4353080
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353074,
+              4353080
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353080,
+        4353086
+      ],
+      "value": "Path",
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353086,
+        4353091
+      ],
+      "value": "Any",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353091,
+        4353097
+      ],
+      "value": "Dict",
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353097,
+        4353103
+      ],
+      "value": "List",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353103,
+        4353113
+      ],
+      "value": "Optional",
+      "index": 107
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4353113,
+        4353138
+      ],
+      "value": "storage.file_repository",
+      "index": 108
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4353138,
+        4353156
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353140,
+              4353156
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 109
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4353156,
+        4353158
+      ],
+      "value": 2,
+      "index": 110
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353158,
+        4353168
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353160,
+              4353166
+            ],
+            "value": "turn"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4353166,
+              4353168
+            ],
+            "value": 0
+          }
+        ]
+      },
+      "index": 111
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353168,
+        4353205
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353170,
+              4353176
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353176,
+              4353184
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353184,
+              4353189
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353189,
+              4353205
+            ],
+            "value": "Dict[str, Any]"
+          }
+        ]
+      },
+      "index": 112
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353205,
+        4353234
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353207,
+              4353219
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353219,
+              4353227
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353227,
+              4353233
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4353233,
+              4353234
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4353227,
+                  4353233
+                ],
+                "value": "Path"
+              }
+            }
+          }
+        ]
+      },
+      "index": 113
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353234,
+        4353278
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353236,
+              4353248
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353248,
+              4353256
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353256,
+              4353262
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353262,
+              4353278
+            ],
+            "value": "Dict[str, Any]"
+          }
+        ]
+      },
+      "index": 114
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353278,
+        4353295
+      ],
+      "value": "load_play_state",
+      "index": 115
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353295,
+        4353352
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353297,
+              4353309
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353309,
+              4353316
+            ],
+            "value": "state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353316,
+              4353324
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353324,
+              4353330
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353330,
+              4353346
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353346,
+              4353352
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 116
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353352,
+        4353369
+      ],
+      "value": "save_play_state",
+      "index": 117
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353369,
+        4353385
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353371,
+              4353382
+            ],
+            "value": "max_chars"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4353382,
+              4353385
+            ],
+            "value": 2200
+          }
+        ]
+      },
+      "index": 118
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353385,
+        4353439
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353387,
+              4353394
+            ],
+            "value": "state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353394,
+              4353405
+            ],
+            "value": "max_chars"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353405,
+              4353413
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4353413,
+              4353429
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353429,
+              4353434
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353434,
+              4353439
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 119
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353439,
+        4353462
+      ],
+      "value": "compact_state_summary",
+      "index": 120
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353462,
+        4353545
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353464,
+              4353471
+            ],
+            "value": "state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353471,
+              4353478
+            ],
+            "value": "delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353478,
+              4353484
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353484,
+              4353492
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4353492,
+              4353508
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353508,
+              4353524
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353524,
+              4353529
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353529,
+              4353545
+            ],
+            "value": "Dict[str, Any]"
+          }
+        ]
+      },
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353545,
+        4353564
+      ],
+      "value": "merge_state_delta",
+      "index": 122
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353564,
+        4353627
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353566,
+              4353576
+            ],
+            "value": "existing"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353576,
+              4353586
+            ],
+            "value": "incoming"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353586,
+              4353594
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4353594,
+              4353605
+            ],
+            "value": "List[Any]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353605,
+              4353616
+            ],
+            "value": "List[Any]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353616,
+              4353627
+            ],
+            "value": "List[Any]"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353627,
+        4353695
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353629,
+              4353641
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353641,
+              4353647
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353647,
+              4353654
+            ],
+            "value": "state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353654,
+              4353662
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353662,
+              4353668
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353668,
+              4353673
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353673,
+              4353689
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353689,
+              4353695
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 124
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353695,
+        4353712
+      ],
+      "value": "save_checkpoint",
+      "index": 125
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353712,
+        4353777
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353714,
+              4353726
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353726,
+              4353732
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353732,
+              4353740
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353740,
+              4353746
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353746,
+              4353751
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353751,
+              4353777
+            ],
+            "value": "Optional[Dict[str, Any]]"
+          }
+        ]
+      },
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353777,
+        4353794
+      ],
+      "value": "load_checkpoint",
+      "index": 127
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353794,
+        4353881
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353796,
+              4353808
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353808,
+              4353814
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353814,
+              4353826
+            ],
+            "value": "variant_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353826,
+              4353835
+            ],
+            "value": "payload"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353835,
+              4353843
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353843,
+              4353849
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353849,
+              4353854
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353854,
+              4353859
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353859,
+              4353875
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353875,
+              4353881
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 128
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353881,
+        4353900
+      ],
+      "value": "save_turn_variant",
+      "index": 129
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4353900,
+        4353982
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353902,
+              4353914
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353914,
+              4353920
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353920,
+              4353932
+            ],
+            "value": "variant_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353932,
+              4353940
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4353940,
+              4353946
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353946,
+              4353951
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4353951,
+              4353956
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4353956,
+              4353982
+            ],
+            "value": "Optional[Dict[str, Any]]"
+          }
+        ]
+      },
+      "index": 130
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4353982,
+        4354001
+      ],
+      "value": "load_turn_variant",
+      "index": 131
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354001,
+        4354004
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4354003,
+              4354004
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4354004,
+        4354030
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354006,
+              4354020
+            ],
+            "value": "replacements"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354020,
+              4354028
+            ],
+            "value": "append"
+          }
+        ],
+        "values": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4354028,
+              4354029
+            ],
+            "value": null
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4354029,
+              4354030
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 133
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4354030,
+        4354128
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354032,
+              4354041
+            ],
+            "value": "current"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354041,
+              4354054
+            ],
+            "value": "replacement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354054,
+              4354068
+            ],
+            "value": "replacements"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354068,
+              4354076
+            ],
+            "value": "append"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354076,
+              4354084
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354084,
+              4354089
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4354089,
+              4354090
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4354084,
+                  4354089
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4354090,
+              4354122
+            ],
+            "value": "Optional[List[Dict[str, str]]]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354122,
+              4354127
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4354127,
+              4354128
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4354122,
+                  4354127
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4354128,
+        4354149
+      ],
+      "value": "merge_contract_text",
+      "index": 135
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4354149,
+        4354217
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354151,
+              4354163
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354163,
+              4354169
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354169,
+              4354176
+            ],
+            "value": "delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354176,
+              4354184
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354184,
+              4354190
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354190,
+              4354195
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4354195,
+              4354211
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354211,
+              4354217
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 136
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4354217,
+        4354234
+      ],
+      "value": "save_turn_delta",
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4354234,
+        4354271
+      ],
+      "value": "novels\\services\\play_state_store.py",
+      "index": 138
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354271,
+        4354281
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354273,
+              4354277
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4354277,
+              4354279
+            ],
+            "value": "k"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4354279,
+              4354281
+            ],
+            "value": "v"
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4354281,
+        4354324
+      ],
+      "value": "<module novels.services.play_state_store>",
+      "index": 140
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354324,
+        4354369
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354326,
+              4354336
+            ],
+            "value": "existing"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354336,
+              4354346
+            ],
+            "value": "incoming"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354346,
+              4354352
+            ],
+            "value": "rows"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354352,
+              4354358
+            ],
+            "value": "seen"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354358,
+              4354364
+            ],
+            "value": "item"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354364,
+              4354369
+            ],
+            "value": "key"
+          }
+        ]
+      },
+      "index": 141
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354369,
+        4354479
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354371,
+              4354378
+            ],
+            "value": "state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354378,
+              4354389
+            ],
+            "value": "max_chars"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354389,
+              4354399
+            ],
+            "value": "entities"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354399,
+              4354410
+            ],
+            "value": "relations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354410,
+              4354417
+            ],
+            "value": "facts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354417,
+              4354424
+            ],
+            "value": "goals"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354424,
+              4354431
+            ],
+            "value": "lines"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354431,
+              4354437
+            ],
+            "value": "item"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354437,
+              4354443
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354443,
+              4354449
+            ],
+            "value": "kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354449,
+              4354456
+            ],
+            "value": "attrs"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354456,
+              4354467
+            ],
+            "value": "attr_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354467,
+              4354473
+            ],
+            "value": "goal"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354473,
+              4354479
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 142
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354479,
+        4354505
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354481,
+              4354493
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354493,
+              4354499
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354499,
+              4354505
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 143
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354505,
+        4354539
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354507,
+              4354519
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354519,
+              4354525
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354525,
+              4354531
+            ],
+            "value": "data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354531,
+              4354539
+            ],
+            "value": "merged"
+          }
+        ]
+      },
+      "index": 144
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354539,
+        4354577
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354541,
+              4354553
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354553,
+              4354559
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354559,
+              4354571
+            ],
+            "value": "variant_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354571,
+              4354577
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 145
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354577,
+        4354645
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354579,
+              4354588
+            ],
+            "value": "current"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354588,
+              4354601
+            ],
+            "value": "replacement"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354601,
+              4354615
+            ],
+            "value": "replacements"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354615,
+              4354623
+            ],
+            "value": "append"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354623,
+              4354629
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354629,
+              4354635
+            ],
+            "value": "item"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354635,
+              4354640
+            ],
+            "value": "old"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354640,
+              4354645
+            ],
+            "value": "new"
+          }
+        ]
+      },
+      "index": 146
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354645,
+        4354756
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354647,
+              4354654
+            ],
+            "value": "state"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354654,
+              4354661
+            ],
+            "value": "delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354661,
+              4354667
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354667,
+              4354675
+            ],
+            "value": "merged"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354675,
+              4354680
+            ],
+            "value": "key"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354680,
+              4354687
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354687,
+              4354695
+            ],
+            "value": "bucket"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354695,
+              4354707
+            ],
+            "value": "target_key"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354707,
+              4354717
+            ],
+            "value": "incoming"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354717,
+              4354727
+            ],
+            "value": "existing"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354727,
+              4354734
+            ],
+            "value": "by_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354734,
+              4354740
+            ],
+            "value": "item"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354740,
+              4354751
+            ],
+            "value": "entity_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354751,
+              4354756
+            ],
+            "value": "row"
+          }
+        ]
+      },
+      "index": 147
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354756,
+        4354783
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354758,
+              4354770
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354770,
+              4354776
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354776,
+              4354783
+            ],
+            "value": "state"
+          }
+        ]
+      },
+      "index": 148
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354783,
+        4354804
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354785,
+              4354797
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354797,
+              4354804
+            ],
+            "value": "state"
+          }
+        ]
+      },
+      "index": 149
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354804,
+        4354831
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354806,
+              4354818
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354818,
+              4354824
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354824,
+              4354831
+            ],
+            "value": "delta"
+          }
+        ]
+      },
+      "index": 150
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354831,
+        4354886
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354833,
+              4354845
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354845,
+              4354851
+            ],
+            "value": "turn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354851,
+              4354863
+            ],
+            "value": "variant_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354863,
+              4354872
+            ],
+            "value": "payload"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354872,
+              4354886
+            ],
+            "value": "variants_dir"
+          }
+        ]
+      },
+      "index": 151
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4354886,
+        4354906
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4354888,
+              4354900
+            ],
+            "value": "world_base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4354900,
+              4354906
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 152
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4354906,
+        4354916
+      ],
+      "value": "__spec__",
+      "index": 153
+    }
+  ]
+}

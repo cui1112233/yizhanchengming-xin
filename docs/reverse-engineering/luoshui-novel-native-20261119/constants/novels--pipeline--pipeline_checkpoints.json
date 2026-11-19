@@ -1,0 +1,1284 @@
+{
+  "moduleName": "novels.pipeline.pipeline_checkpoints",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3962572,
+  "payloadRange": [
+    3962613,
+    3963801
+  ],
+  "payloadSha256": "0db709bc01f31bbfff2d69e889c59382af87604b9b8528c8bf55a095c11d0383",
+  "declaredConstants": 68,
+  "parsedConstants": 68,
+  "stoppedAt": 3963800,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3962615,
+        3962620
+      ],
+      "value": "get",
+      "index": 0
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3962620,
+        3962647
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3962622,
+              3962647
+            ],
+            "value": "requireSecondaryConfirm"
+          }
+        ]
+      },
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962647,
+        3962663
+      ],
+      "value": "CHECKPOINT_DIR",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962663,
+        3962679
+      ],
+      "value": "FileRepository",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962679,
+        3962691
+      ],
+      "value": "ensure_dir",
+      "index": 4
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3962691,
+        3962692
+      ],
+      "value": "",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962692,
+        3962699
+      ],
+      "value": "strip",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962699,
+        3962708
+      ],
+      "value": "replace",
+      "index": 7
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3962708,
+        3962715
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3962710,
+              3962714
+            ],
+            "value": ".."
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3962714,
+              3962715
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3962715,
+        3962720
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              3962717,
+              3962719
+            ],
+            "value": "/"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3962719,
+              3962720
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962720,
+        3962736
+      ],
+      "value": "checkpoint_dir",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3962736,
+        3962748
+      ],
+      "value": ".confirmed",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962748,
+        3962756
+      ],
+      "value": "exists",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3962756,
+        3962781
+      ],
+      "value": "checkpoint 名称无效",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962781,
+        3962793
+      ],
+      "value": "write_text",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962793,
+        3962805
+      ],
+      "value": "confirmed\n",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962805,
+        3962812
+      ],
+      "value": "items",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962812,
+        3962824
+      ],
+      "value": "startswith",
+      "index": 17
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3962824,
+        3962828
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              3962826,
+              3962828
+            ],
+            "value": "_"
+          }
+        ]
+      },
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962828,
+        3962840
+      ],
+      "value": "write_json",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962840,
+        3962858
+      ],
+      "value": "RUN_PAYLOAD_FILE",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962858,
+        3962869
+      ],
+      "value": "read_json",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3962869,
+        3962882
+      ],
+      "value": "status.json",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962882,
+        3962890
+      ],
+      "value": "status",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962890,
+        3962913
+      ],
+      "value": "awaiting_confirmation",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962913,
+        3962925
+      ],
+      "value": "checkpoint",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962925,
+        3962934
+      ],
+      "value": "storyId",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962934,
+        3962941
+      ],
+      "value": "title",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962941,
+        3962950
+      ],
+      "value": "__doc__",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962950,
+        3962960
+      ],
+      "value": "__file__",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962960,
+        3962968
+      ],
+      "value": "origin",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962968,
+        3962982
+      ],
+      "value": "has_location",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962982,
+        3962994
+      ],
+      "value": "__cached__",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3962994,
+        3963007
+      ],
+      "value": "annotations",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963007,
+        3963016
+      ],
+      "value": "pathlib",
+      "index": 34
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963016,
+        3963024
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963018,
+              3963024
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963024,
+        3963030
+      ],
+      "value": "Path",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963030,
+        3963035
+      ],
+      "value": "Any",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963035,
+        3963041
+      ],
+      "value": "Dict",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963041,
+        3963051
+      ],
+      "value": "Optional",
+      "index": 39
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3963051,
+        3963076
+      ],
+      "value": "storage.file_repository",
+      "index": 40
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963076,
+        3963094
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963078,
+              3963094
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 41
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3963094,
+        3963096
+      ],
+      "value": 2,
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963096,
+        3963109
+      ],
+      "value": "checkpoints",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3963109,
+        3963127
+      ],
+      "value": "run_payload.json",
+      "index": 44
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963127,
+        3963184
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963129,
+              3963144
+            ],
+            "value": "review_config"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963144,
+              3963152
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3963152,
+              3963178
+            ],
+            "value": "Optional[Dict[str, Any]]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963178,
+              3963184
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963184,
+        3963211
+      ],
+      "value": "require_secondary_confirm",
+      "index": 46
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963211,
+        3963234
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963213,
+              3963219
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963219,
+              3963227
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963227,
+              3963233
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3963233,
+              3963234
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3963227,
+                  3963233
+                ],
+                "value": "Path"
+              }
+            }
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963234,
+        3963273
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963236,
+              3963242
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963242,
+              3963248
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963248,
+              3963256
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963256,
+              3963262
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963262,
+              3963267
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963267,
+              3963273
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963273,
+        3963287
+      ],
+      "value": "is_confirmed",
+      "index": 49
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963287,
+        3963326
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963289,
+              3963295
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963295,
+              3963301
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963301,
+              3963309
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963309,
+              3963315
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963315,
+              3963320
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963320,
+              3963326
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963326,
+        3963342
+      ],
+      "value": "mark_confirmed",
+      "index": 51
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963342,
+        3963395
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963344,
+              3963350
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963350,
+              3963359
+            ],
+            "value": "payload"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963359,
+              3963367
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963367,
+              3963373
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3963373,
+              3963389
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963389,
+              3963395
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963395,
+        3963413
+      ],
+      "value": "save_run_payload",
+      "index": 53
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963413,
+        3963461
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963415,
+              3963421
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963421,
+              3963429
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963429,
+              3963435
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3963435,
+              3963461
+            ],
+            "value": "Optional[Dict[str, Any]]"
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963461,
+        3963479
+      ],
+      "value": "load_run_payload",
+      "index": 55
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963479,
+        3963489
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963481,
+              3963488
+            ],
+            "value": "title"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              3963488,
+              3963489
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 56
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3963489,
+        3963553
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963491,
+              3963497
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963497,
+              3963507
+            ],
+            "value": "story_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963507,
+              3963519
+            ],
+            "value": "checkpoint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963519,
+              3963526
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963526,
+              3963534
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963534,
+              3963540
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963540,
+              3963545
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3963545,
+              3963546
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3963540,
+                  3963545
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3963546,
+              3963547
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3963545,
+                  3963546
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3963540,
+                      3963545
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963547,
+              3963553
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963553,
+        3963576
+      ],
+      "value": "write_awaiting_status",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3963576,
+        3963617
+      ],
+      "value": "novels\\pipeline\\pipeline_checkpoints.py",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3963617,
+        3963664
+      ],
+      "value": "<module novels.pipeline.pipeline_checkpoints>",
+      "index": 60
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963664,
+        3963678
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963666,
+              3963672
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963672,
+              3963678
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 61
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963678,
+        3963698
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963680,
+              3963686
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963686,
+              3963692
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963692,
+              3963698
+            ],
+            "value": "safe"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963698,
+        3963712
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963700,
+              3963706
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963706,
+              3963712
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 63
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963712,
+        3963729
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963714,
+              3963729
+            ],
+            "value": "review_config"
+          }
+        ]
+      },
+      "index": 64
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963729,
+        3963753
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963731,
+              3963737
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963737,
+              3963746
+            ],
+            "value": "payload"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963746,
+              3963753
+            ],
+            "value": "clean"
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3963753,
+        3963790
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3963755,
+              3963761
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963761,
+              3963771
+            ],
+            "value": "story_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963771,
+              3963783
+            ],
+            "value": "checkpoint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3963783,
+              3963790
+            ],
+            "value": "title"
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3963790,
+        3963800
+      ],
+      "value": "__spec__",
+      "index": 67
+    }
+  ]
+}

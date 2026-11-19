@@ -1,0 +1,2491 @@
+{
+  "moduleName": "novels.prompts.inkos.play_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4184734,
+  "payloadRange": [
+    4184772,
+    4212879
+  ],
+  "payloadSha256": "821150977733a2ca914a2e511fccd7ba0515ac576936635f26092ac110020916",
+  "declaredConstants": 181,
+  "parsedConstants": 181,
+  "stoppedAt": 4212878,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4184774,
+        4184778
+      ],
+      "value": "en",
+      "index": 0
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4184778,
+        4184901
+      ],
+      "value": "That was not strict JSON. Output ONLY one JSON object {\"sceneText\": \"...\", \"suggestedActions\": [\"...\"]} and nothing else.",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4184901,
+        4185036
+      ],
+      "value": "上面不是严格 JSON。只输出一个 JSON 对象 {\"sceneText\": \"...\", \"suggestedActions\": [\"...\"]}，不要任何其他文字。",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4185036,
+        4185503
+      ],
+      "value": "You are an interactive-fiction action interpreter.\nYour job is to normalize one line of the player's natural language into one of five action kinds: look / say / move / do / wait.\nDo not add drama for the player, do not advance the plot, do not write scene prose.\nlook = observe/examine/recall a clue; say = speak/probe/confront; move = move to a location; do = perform an action/use an item/investigate; wait = wait/stall/watch.\nOutput strict JSON, no explanation.",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4185503,
+        4185912
+      ],
+      "value": "你是互动小说动作理解器。\n你的任务是把玩家一句自然语言，归一成五类动作之一：look / say / move / do / wait。\n不要替玩家加戏，不要直接推进剧情，不要写场景正文。\nlook=观察/检查/回忆线索；say=说话/试探/质问；move=移动到地点；do=执行动作/使用物品/调查；wait=等待/拖延/旁观。\n输出严格 JSON，不要解释。",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4185912,
+        4185922
+      ],
+      "value": "language",
+      "index": 5
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4185922,
+        4185924
+      ],
+      "value": "\n",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4185924,
+        4185940
+      ],
+      "value": "Current scene:",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4185940,
+        4185953
+      ],
+      "value": "scene_brief",
+      "index": 8
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4185953,
+        4185954
+      ],
+      "value": "",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4185954,
+        4185969
+      ],
+      "value": "Player input:",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4185969,
+        4185976
+      ],
+      "value": "input",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4185976,
+        4186097
+      ],
+      "value": "Output fields: actionKind, targetEntityLabel?, targetLocationLabel?, intent, manner, risk, ambiguity, secondaryActions.",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186097,
+        4186114
+      ],
+      "value": "当前场景：",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186114,
+        4186131
+      ],
+      "value": "玩家输入：",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186131,
+        4186254
+      ],
+      "value": "输出字段：actionKind, targetEntityLabel?, targetLocationLabel?, intent, manner, risk, ambiguity, secondaryActions。",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186254,
+        4186307
+      ],
+      "value": "You are an interactive-fiction world-state drafter.",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186307,
+        4186422
+      ],
+      "value": "Based only on the player's action and the current context, propose this turn's possible state changes as a draft.",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186422,
+        4186558
+      ],
+      "value": "Do not write final prose; do not commit to the store on the reducer's behalf; do not let key states jump to completion out of nowhere.",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186558,
+        4186817
+      ],
+      "value": "One player input advances one adjacent beat. If the player gives a chain of actions, apply only the literal chain up to the nearest new pressure point; do not skip through off-screen aftermath, rewards, or resolution beyond what the input directly attempts.",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4186817,
+        4187077
+      ],
+      "value": "Do not leap over the process. If the player runs toward, reaches for, uses, opens, or confronts something, account for the movement, resistance, interruption, or immediate pressure inside this same beat instead of jumping straight to an after-the-fact state.",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4187077,
+        4187301
+      ],
+      "value": "This engine is genre-neutral: romance, adventure, wuxia, mystery, slice-of-life all use the same structure. Entity types: actor/location/item/evidence/clue/claim/proof_chain/organization/rule/scene/event — use as needed.",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4187301,
+        4187471
+      ],
+      "value": "Give every new or important entity a one-line summary (who/what it is and why it matters), not just a status word — the player expands this summary in the side panel.",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4187471,
+        4187807
+      ],
+      "value": "Tangible things the player discovers or holds (a clue, a document, a weapon, a token, key evidence) MUST be their own entity (item/evidence/clue), never folded into a person's status — only then can they enter the player's holdings and be tracked. Observed phenomena, knowledge, impressions, or environmental signs are NOT holdings.",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4187807,
+        4188098
+      ],
+      "value": "Use entity.status to record state progress for any genre, with status words suited to this world's genre, advancing step by step without skipping (e.g. relationship: stranger -> curious -> attracted -> lover; injury: healthy -> bleeding -> critical; clue: found -> collected -> confirmed).",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4188098,
+        4188284
+      ],
+      "value": "The player entity id is fixed: always use id actor_player for the player character. Never rename this id; only replace its label, summary, and status with this world's player identity.",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4188284,
+        4188667
+      ],
+      "value": "Whenever a meaningful relationship forms or shifts between entities (ally / rival / kin / suspicion / debt / master-servant …), record it in edges.upsert as {\"fromId\":\"<entity>\",\"type\":\"<relation>\",\"toId\":\"<entity>\",\"value\":{\"role\":\"relation\"}} — this is the ONLY source for the relationship panel, so over-record rather than skip; add a fresh edge when a relationship changes.",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4188667,
+        4189034
+      ],
+      "value": "When the player physically holds/carries/keeps/takes a tangible thing, record an edge from actor_player to that entity and set value.role=\"holding\". If the held target is evidence/clue/claim/proof_chain rather than an item, also set value.physical=true. If the player only observes or learns something, use value.role=\"observed\" or a normal relation, never holding.",
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4189034,
+        4189287
+      ],
+      "value": "The current context may include an entity roster. Reuse those exact ids in entities, edges, evidence, and stateSlots. If you only know a name, use the exact roster label; never invent a new id for the same person/thing (or the panel shows duplicates).",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4189287,
+        4189573
+      ],
+      "value": "State tracking is optional and governed by the user's world contract. If the world contract rejects stats, numeric panels, levels, RPG framing, or quantified meters, do NOT output stateSlots; express progress as natural-language entity.status / summary / evidence transitions instead.",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4189573,
+        4189815
+      ],
+      "value": "When stateSlots are appropriate, prefer natural-language values unless the user explicitly asked for quantitative tracking or the fiction contains a concrete count/clock/deadline. Do not create numbers just because the schema supports them.",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4189815,
+        4190168
+      ],
+      "value": "Early on (the first few turns), seed only the state the premise already establishes: a concrete deadline may become a timer slot if the world permits quantified tracking; the central mystery/objective -> its first clue/evidence entity; already-named key characters -> actor entities with a one-line summary. Don't leave the opening world nearly empty.",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4190168,
+        4190309
+      ],
+      "value": "Restraint: only create entities and meters the story actually makes real — never invent gratuitous stats or items just to fill the panel.",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4190309,
+        4190448
+      ],
+      "value": "Only use evidence.transitions for the evidence lifecycle when this world is genuinely an investigation/mystery; otherwise leave it empty.",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4190448,
+        4190557
+      ],
+      "value": "If the player's action is invalid or information is insufficient, set blocked=true and write blockedReason.",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4190557,
+        4191144
+      ],
+      "value": "Time is a synchronization axis, not a fixed tick. For every non-opening turn, set timeAdvance with: elapsed = the natural-language duration spent by this action; anchor = the world time/phase after the action if the world has a clock, season, phase, day/night, retreat period, deadline, or other temporal anchor; rationale = why this duration is right; synchronized = what relevant NPCs/places/pressures changed during the same elapsed time. A glance may pass seconds, a trip half a day, cultivation three years — obey the user's world contract; never invent a universal turn length.",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4191144,
+        4191306
+      ],
+      "value": "Output strict JSON matching PlayMutation: eventId, turn, actionKind, summary, timeAdvance, entities, edges, stateSlots, evidence, blocked, blockedReason, notes.",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4191306,
+        4191515
+      ],
+      "value": "The following is only a JSON-shape example. Do not reuse its labels, names, or story facts in the actual world; the reserved player id actor_player is the only example id you must keep for the player entity:",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4191515,
+        4191540
+      ],
+      "value": "MUTATOR_JSON_EXAMPLE_EN",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4191540,
+        4191584
+      ],
+      "value": "你是互动小说世界状态草案员。",
+      "index": 39
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4191584,
+        4191682
+      ],
+      "value": "你只根据玩家动作和当前上下文，提出本回合可能发生的状态变化草案。",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4191682,
+        4191783
+      ],
+      "value": "不要写最终正文；不要越权替 reducer 落库；不要凭空让关键状态一步到位。",
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4191783,
+        4192013
+      ],
+      "value": "一个玩家输入只推进相邻一拍。玩家把多个动作写在一句里时，只处理原话直接包含的动作链，到最近的新压力点就停；不要跳过过程去写场外后果、完整回报或问题解决。",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4192013,
+        4192219
+      ],
+      "value": "不要替玩家越过过程。玩家奔向、伸手、使用、打开或对峙某物时，必须把移动、阻力、干扰、敌人压近或即时压力算进这一拍，不能直接跳到事后状态。",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4192219,
+        4192444
+      ],
+      "value": "这套引擎是品类中立的：恋情、冒险、武侠、悬疑、日常等都用同一套结构表达。实体类型用 actor/location/item/evidence/clue/claim/proof_chain/organization/rule/scene/event，按需选用。",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4192444,
+        4192630
+      ],
+      "value": "给每个新出现或重要的实体写一句 summary（他是谁/这是什么、为什么重要），不要只靠 status 一句话——玩家会在侧栏里展开看这条 summary。",
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4192630,
+        4192948
+      ],
+      "value": "玩家发现或获得的「实物」（线索、文件、凶器、信物、关键证据等）必须建成独立实体（item/evidence/clue），不要塞进某个人物的 status——这样它们才能进入玩家的「持有物」并被追踪。观察到的现象、知识、印象、环境征兆不是持有物。",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4192948,
+        4193202
+      ],
+      "value": "用 entity.status 记录任意品类的状态推进，状态词按这个世界的题材自定，循序渐进、不要跳级（例如关系：陌生→好奇→心动→恋人；伤势：健康→流血→重伤；线索：发现→收集→坐实）。",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4193202,
+        4193385
+      ],
+      "value": "玩家本人实体 id 是固定保留字：必须始终用 actor_player。绝不要把它改成本局名字或别的 id；只替换 label、summary、status 为本局玩家身份。",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4193385,
+        4193794
+      ],
+      "value": "人物之间（或人物与组织/地点之间）一旦形成或改变有意义的关系（盟友/敌对/亲属/怀疑/欠债/上下级/师徒等），就在 edges.upsert 里记一条 {\"fromId\":\"<实体>\",\"type\":\"<关系词>\",\"toId\":\"<实体>\",\"value\":{\"role\":\"relation\"}}——这是侧栏「关系网」的唯一来源，宁可多记勿漏；关系一旦变化（如怀疑→敌对）也补一条新边。",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4193794,
+        4194162
+      ],
+      "value": "玩家实际持有/携带/收进包里/拿走某个实物时，必须记一条 actor_player 指向该实体的 edge，并设置 value.role=\"holding\"。如果目标是 evidence/clue/claim/proof_chain 而不是 item，还必须设置 value.physical=true。玩家只是观察或知道某件事时，用 value.role=\"observed\" 或普通关系，绝不能写成 holding。",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4194162,
+        4194432
+      ],
+      "value": "当前上下文可能包含实体名册。entities、edges、evidence、stateSlots 都优先复用名册里的精确 id；如果只知道名字，就用名册里的精确 label。绝不要把同一个人/物换个新 id 重建（否则侧栏会出现重复节点）。",
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4194432,
+        4194674
+      ],
+      "value": "状态追踪是可选的，必须服从用户的世界契约。世界契约禁止数值、面板、等级、RPG 化或量化进度时，不要输出 stateSlots；改用 entity.status / summary / evidence transitions 写自然语言状态。",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4194674,
+        4194887
+      ],
+      "value": "确实需要 stateSlots 时，也优先用自然语言 value；只有用户明确要求量化追踪，或文本里存在具体倒计时/钟点/数量，才写数字。不要因为 schema 支持就硬造数值。",
+      "index": 53
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4194887,
+        4195177
+      ],
+      "value": "开局阶段（前几回合），只播种前提里已经确立的状态：明确期限在世界允许量化时才可成为 timer；核心谜题/目标物→第一条 clue/evidence 实体；已点名的关键人物→actor 实体并配一句 summary。不要让开场世界几乎空着。",
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4195177,
+        4195284
+      ],
+      "value": "克制：只建剧情真正落地的实体和数值，不要为了填满侧栏而硬造属性或物品。",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4195284,
+        4195420
+      ],
+      "value": "只有当这个世界确实是调查/推理题材时，才用 evidence.transitions 走证据生命周期；其他题材留空即可。",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4195420,
+        4195500
+      ],
+      "value": "如果玩家动作无效或信息不足，blocked=true 并写 blockedReason。",
+      "index": 57
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4195500,
+        4196055
+      ],
+      "value": "时间是世界同步轴，不是固定 tick。每个非开场回合都要写 timeAdvance：elapsed=本动作按语义经过了多久；anchor=动作结束后世界处在什么时间/阶段（若本局有钟点、昼夜、季节、闭关期、期限、潮汐、巡逻节奏等时间锚点）；rationale=为什么是这段时间；synchronized=同一段时间里相关人物/地点/压力发生了什么同步变化。看一眼可能几息，赶路可能半天，闭关可能三年——遵守用户的世界契约，绝不要发明统一回合长度。",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196055,
+        4196225
+      ],
+      "value": "输出严格 JSON，必须符合 PlayMutation：eventId, turn, actionKind, summary, timeAdvance, entities, edges, stateSlots, evidence, blocked, blockedReason, notes。",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196225,
+        4196376
+      ],
+      "value": "下面的范例只示结构，不得复用范例里的名称、人名或剧情事实；唯一必须保留的示例 id 是玩家本人 actor_player：",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4196376,
+        4196401
+      ],
+      "value": "MUTATOR_JSON_EXAMPLE_ZH",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4196401,
+        4196407
+      ],
+      "value": "json",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4196407,
+        4196414
+      ],
+      "value": "dumps",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4196414,
+        4196422
+      ],
+      "value": "action",
+      "index": 64
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4196422,
+        4196449
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4196424,
+              4196438
+            ],
+            "value": "ensure_ascii"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4196438,
+              4196446
+            ],
+            "value": "indent"
+          }
+        ],
+        "values": [
+          {
+            "tag": "F",
+            "fileRange": [
+              4196446,
+              4196447
+            ],
+            "value": false
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4196447,
+              4196449
+            ],
+            "value": 2
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196449,
+        4196457
+      ],
+      "value": "turn: ",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4196457,
+        4196463
+      ],
+      "value": "turn",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196463,
+        4196480
+      ],
+      "value": "Player's words:",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196480,
+        4196504
+      ],
+      "value": "Action interpretation:",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196504,
+        4196522
+      ],
+      "value": "Current context:",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4196522,
+        4196531
+      ],
+      "value": "context",
+      "index": 71
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196531,
+        4196562
+      ],
+      "value": "Requirement: use eventId evt-",
+      "index": 72
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196562,
+        4196636
+      ],
+      "value": "; every new or referenced entity id must be stable, readable, and short.",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196636,
+        4196653
+      ],
+      "value": "玩家原话：",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196653,
+        4196670
+      ],
+      "value": "动作理解：",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196670,
+        4196690
+      ],
+      "value": "当前上下文：",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196690,
+        4196720
+      ],
+      "value": "要求：eventId 使用 evt-",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4196720,
+        4196789
+      ],
+      "value": "；所有新增或引用的实体 id 要稳定、可读、短小。",
+      "index": 78
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4196789,
+        4201082
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4196791,
+              4196846
+            ],
+            "value": "You are an interactive-fiction scene-response author."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4196846,
+              4196942
+            ],
+            "value": "Write the response only from the already-applied state; do not overturn the reducer's results."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4196942,
+              4197267
+            ],
+            "value": "Concrete new objects, clues, evidence, locations, organizations, or named people can only appear if they are already present in Applied changes or Current state summary. If the prose needs a new concrete thing, it must have been created by the mutator first; otherwise describe mood, pressure, or an unnamed detail instead."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4197267,
+              4197446
+            ],
+            "value": "It should read like a playable novel — action, senses, pressure, breathing room — never a system log and never a menu-narration that herds the player into picking something."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4197446,
+              4197703
+            ],
+            "value": "Bridge from the player's action first. Even though the state is already applied, do not start as if everything is already over; write the follow-through, contact, resistance, interruption, and immediate consequence so the action connects to the new state."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4197703,
+              4197923
+            ],
+            "value": "Do not jump straight to the after-action result, and do not write epilogue-style summaries, morals, or closing-theme lines. End on an immediate sensory pressure, changed position, exposed detail, or nearby consequence."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4197923,
+              4198257
+            ],
+            "value": "Stay strictly inside the world the premise established — era, place, tech level, genre tone must stay consistent. Never introduce elements that don't belong: a modern-city story must not grow night-watchmen / oil lamps; a historical/wuxia story must not sprout phones / cars / computers. Every detail lands inside the given world."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4198257,
+              4198619
+            ],
+            "value": "The player is not always 'acting'. When they merely observe, linger, feel, idle-chat, or do nothing, give an immersive beat — one living detail, a smell, a bystander's small movement, a thought crossing their mind. NEVER say 'there's nothing more to see' / 'you already looked' / 'stop stalling', and never nag them to hurry up and act. Let the beat breathe."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4198619,
+              4199019
+            ],
+            "value": "The world is not inert. Time moves, the deadline closes in, side characters act on their own, something stirs in the distance, off-screen events happen. Even on a turn where the player did nothing, nudge the world forward a little — so the pull to move forward comes from the STORY (the trail goes cold / the deadline nears / someone moved first), not from the narration pestering them to choose."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4199019,
+              4199360
+            ],
+            "value": "If Current state summary includes a Time section, treat elapsed and anchor as canonical. Render the scene after exactly that elapsed interval, at that resulting world time/phase, and include the synchronized pressure/character movement naturally in prose. Do not invent another clock reading, another elapsed amount, or a fixed tick label."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4199360,
+              4199600
+            ],
+            "value": "Respect negative player intent as fact. If the player's words say they did NOT touch, open, take, leave, attack, or speak, do not narrate them doing it by implication; write the restraint itself and the world's response to that restraint."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4199600,
+              4200048
+            ],
+            "value": "Do not end with herding questions like 'What do you do?' / 'Which way?'. And do NOT route the same pressure through a companion who keeps listing options ('go to A, or B?') — a sidekick is not an options dispenser. Most beats should NOT end on a pending question at all: land on an image, a sound, a smell, or a hanging tension, and stop. Only when the player is genuinely at a fork that demands a decision may a question surface — sparingly."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4200048,
+              4200567
+            ],
+            "value": "sceneText is PURE narrative prose. Never put a choice list in the body — no 'Options:' / 'What do you do?' followed by A/B/C, no '- ' bulleted options — no matter how urgent or fork-like the moment is (a tense escape is NOT an excuse for a menu). Weave the available routes into the scene itself (the bamboo by the wall, the half-open skylight, the alley toward the river) and let the player decide by free input. Any springboard goes ONLY in the suggestedActions field, kept sparse — never a menu in the prose."
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4200567,
+              4201082
+            ],
+            "value": "Example (applies even at a life-or-death beat) — [WRONG, never write this] 'The zombie lunges, the axe is stuck. React now:\\n- yank the axe and swing\\n- squeeze sideways through\\n- roll back'; [RIGHT] 'Its claws are already spread, the sour reek of rot in your nose. Your axe is wedged in the twenty-centimeter gap of the door, and it won't come free. Its weight bears down—'. Take the danger to its peak, then stop, and hand the 'what now' entirely to the player's free input — never list options for them."
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4201082,
+        4201090
+      ],
+      "value": "guided",
+      "index": 80
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4201090,
+        4201313
+      ],
+      "value": "suggestedActions: give 0-3 as optional springboards ('you could…'), ONLY at a genuine decision point — not every turn. They are hints, not the only way forward; the player can type freely or just stay put at any time.",
+      "index": 81
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4201313,
+        4201445
+      ],
+      "value": "suggestedActions: 0-3 short hints, optional, never restricting the player's input; omit them when there is no real decision point.",
+      "index": 82
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4201445,
+        4201497
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4201447,
+              4201497
+            ],
+            "value": "Output strict JSON: sceneText, suggestedActions."
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4201497,
+        4205558
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4201499,
+              4201540
+            ],
+            "value": "你是互动小说场景回应作者。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4201540,
+              4201623
+            ],
+            "value": "你只能根据已经应用后的状态写回应，不要推翻 reducer 结果。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4201623,
+              4201907
+            ],
+            "value": "具体的新物件、线索、证据、地点、组织、具名人物，只能来自「已应用的本回合变化」或「当前状态摘要」。如果正文需要一个新的具体东西，它必须先由 mutator 建成实体；否则只写氛围、压力或不具名的细节。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4201907,
+              4202067
+            ],
+            "value": "回应要像可玩的小说：有动作、感官、压迫、留白；绝不是系统日志，也绝不是把玩家往'快做个选择'上赶的菜单旁白。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4202067,
+              4202267
+            ],
+            "value": "先承接玩家动作。即使状态已经应用，也不要直接跳到动作完成后；要写出动作的跟进、接触、阻力、打断和即时后果，让玩家原话自然接到新状态。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4202267,
+              4202431
+            ],
+            "value": "不要写总结性尾声、主题升华或收束感很强的结语。每回合停在眼前的感官压力、位置变化、暴露出的细节或近处后果上。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4202431,
+              4202740
+            ],
+            "value": "严格守住前提确立的那个世界——年代、地点、技术水平、题材基调都要一致。绝不要引入不属于它的元素：现代都市故事别冒出更夫/油灯/二更天，古代武侠故事别冒出手机/汽车/电脑。每一拍的细节都落在前提给定的那个世界里。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4202740,
+              4203101
+            ],
+            "value": "玩家不一定每回合都在'行动'。当他只是观察、停留、感受、闲聊、发呆，给一段有沉浸感的回应——一个活的细节、一缕气味、旁人的一个小动作、心里掠过的一个念头。绝不要说'这里没什么可看的了''你已经看过了''别磨蹭'，也绝不要催他快点行动。让这一拍能呼吸。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4203101,
+              4203438
+            ],
+            "value": "世界不是死的：时间在走、期限在逼近、配角会自己做事、远处会有动静、场外会发生事。哪怕玩家这一拍什么都没做，也让世界往前动一点点——让'前进的压力'来自故事本身（再不动线索就凉了／期限就到了／有人先动了），而不是来自旁白催他选。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4203438,
+              4203796
+            ],
+            "value": "如果当前状态摘要里有 Time/时间段，elapsed 和 anchor 是权威时间：正文必须按这段经过时长、这个动作后的世界时间/阶段来写，并把同步发生的压力、人物移动、远处变化自然溶进正文。不得另写一个钟点、另写一段经过时长，也不要写成固定 tick、回合标签或 UI 提示。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4203796,
+              4204044
+            ],
+            "value": "玩家原话里的否定动作就是事实。玩家说没有触碰、没有打开、没有拿走、没有离开、没有攻击、没有开口时，正文不能暗示他做了这些事；要写克制本身，以及世界对这份克制的反应。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4204044,
+              4204524
+            ],
+            "value": "不要用'你想怎么做？''你打算往哪走？'这类逼问句收尾；也不要把同样的催促塞进身边同伴的嘴里（'要去 A 还是 B？''去不去问他？'）——同伴不是'选项播报员'，别让他每段都给你列下一步。**多数 beat 根本不该以一个待决问题结束**：落在一个画面、一处声响、一缕气味或悬着的张力上，然后停住。只有当玩家真的走到了非选不可的岔口，才偶尔点出选择。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4204524,
+              4205047
+            ],
+            "value": "sceneText 必须是纯叙事散文。**正文里绝不允许出现'选项：''你想怎么做？'后跟 A/B/C 清单，也不允许用'- '列出可选动作**——无论局势多紧急、多像一个岔路口都不行（被围杀的逃命戏也不是甩菜单的借口）。可走的路要自然融进场景描写里（墙下的竹丛、半开的天窗、通向河边的巷尾），让玩家用自由输入自己决定。要给跳板只放进 suggestedActions 字段、少而精；正文里一个选项清单都不要。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4205047,
+              4205558
+            ],
+            "value": "对比一例（生死关头也照此办）——【错，绝不要这样写】「丧尸扑来，斧头卡住。你必须立刻做出反应：\\n- 拔斧劈砍\\n- 侧身挤过\\n- 后翻闪避」；【对】「它的爪子已经张开，腐臭的酸味灌进你的鼻腔。你的斧头死死卡在那道二十厘米宽的门缝里，一时拔不出来。它的重心压下来了——」。把险境写到极致，然后停住，把'怎么办'整个交给玩家的自由输入；一个选项都不要替他列。"
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4205558,
+        4205802
+      ],
+      "value": "suggestedActions：给 0-3 个，作为'你也许可以这样做'的跳板——只在真正出现抉择点时给，不必每回合都给；它们是参考、不是唯一前进方式，玩家随时可以自由输入、也可以只是待着。",
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4205802,
+        4205923
+      ],
+      "value": "suggestedActions：0-3 个短句，可选，只是参考、不限制玩家输入；没有明显抉择点时就不给。",
+      "index": 86
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4205923,
+        4205977
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4205925,
+              4205977
+            ],
+            "value": "输出严格 JSON：sceneText, suggestedActions。"
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4205977,
+        4205992
+      ],
+      "value": "world_premise",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4205992,
+        4205999
+      ],
+      "value": "strip",
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4205999,
+        4206029
+      ],
+      "value": "World setting (always obey):",
+      "index": 90
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206029,
+        4206038
+      ],
+      "value": "Action:",
+      "index": 91
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206038,
+        4206066
+      ],
+      "value": "Applied changes this turn:",
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4206066,
+        4206084
+      ],
+      "value": "mutation_summary",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206084,
+        4206108
+      ],
+      "value": "Current state summary:",
+      "index": 94
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4206108,
+        4206121
+      ],
+      "value": "state_brief",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4206121,
+        4206137
+      ],
+      "value": "replay_context",
+      "index": 96
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206137,
+        4206158
+      ],
+      "value": "Replay constraints:",
+      "index": 97
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206158,
+        4206193
+      ],
+      "value": "世界设定（始终遵守）：",
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206193,
+        4206204
+      ],
+      "value": "动作：",
+      "index": 99
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206204,
+        4206236
+      ],
+      "value": "已应用的本回合变化：",
+      "index": 100
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206236,
+        4206259
+      ],
+      "value": "当前状态摘要：",
+      "index": 101
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206259,
+        4206276
+      ],
+      "value": "重写约束：",
+      "index": 102
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4206276,
+        4207170
+      ],
+      "value": "You reconcile an interactive-fiction scene with the world graph.\nCompare the rendered prose against the already applied changes and current state summary.\nIf the prose introduced a concrete named object, clue, evidence, location, organization, or person that is not represented in the applied changes/current state, output ONLY supplemental PlayMutation entries for those missing graph facts.\nDo not rewrite prose. Do not invent facts that are not in the rendered scene. If nothing is missing, output an empty PlayMutation with empty arrays.\nUse the same eventId/turn/actionKind. For tangible things the player now physically holds, add a holding edge from actor_player with value.role=\"holding\"; if the target is evidence/clue/claim/proof_chain rather than an item, also set value.physical=true. Observed phenomena or learned facts are not holdings.\nOutput strict JSON matching PlayMutation.",
+      "index": 103
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4207170,
+        4207998
+      ],
+      "value": "你负责把互动小说正文和世界图谱对齐。\n对照已经应用的本回合变化、当前状态摘要和最终正文。\n如果正文里出现了具体且具名的新物件、线索、证据、地点、组织或人物，但它还没有体现在已应用变化/当前状态里，只输出这些缺失图谱事实的补充 PlayMutation。\n不要改正文，不要发明正文没有的事实。没有缺失就输出空的 PlayMutation，各数组留空。\n沿用同一个 eventId/turn/actionKind。玩家获得或拿在手里的实物，需要补一条 actor_player 指向该实体、value.role=\"holding\" 的 edge；如果目标是 evidence/clue/claim/proof_chain 而不是 item，还要设置 value.physical=true。观察到的现象或知道的信息不是持有物。\n输出严格 JSON，必须符合 PlayMutation。",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4207998,
+        4208003
+      ],
+      "value": "get",
+      "index": 105
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4208003,
+        4208017
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4208005,
+              4208017
+            ],
+            "value": "actionKind"
+          }
+        ]
+      },
+      "index": 106
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4208017,
+        4208027
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4208019,
+              4208027
+            ],
+            "value": "action"
+          }
+        ]
+      },
+      "index": 107
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208027,
+        4208031
+      ],
+      "value": "do",
+      "index": 108
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208031,
+        4208037
+      ],
+      "value": "evt-",
+      "index": 109
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208037,
+        4208047
+      ],
+      "value": "mutation",
+      "index": 110
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208047,
+        4208058
+      ],
+      "value": "eventId: ",
+      "index": 111
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208058,
+        4208072
+      ],
+      "value": "actionKind: ",
+      "index": 112
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208072,
+        4208088
+      ],
+      "value": "World setting:",
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208088,
+        4208123
+      ],
+      "value": "Current context before this turn:",
+      "index": 114
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208123,
+        4208142
+      ],
+      "value": "Applied mutation:",
+      "index": 115
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208142,
+        4208159
+      ],
+      "value": "Rendered scene:",
+      "index": 116
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208159,
+        4208171
+      ],
+      "value": "scene_text",
+      "index": 117
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208171,
+        4208188
+      ],
+      "value": "世界设定：",
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208188,
+        4208223
+      ],
+      "value": "本回合前的当前上下文：",
+      "index": 119
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208223,
+        4208246
+      ],
+      "value": "已应用 mutation：",
+      "index": 120
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208246,
+        4208263
+      ],
+      "value": "最终正文：",
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208263,
+        4208272
+      ],
+      "value": "__doc__",
+      "index": 122
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208272,
+        4208282
+      ],
+      "value": "__file__",
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208282,
+        4208290
+      ],
+      "value": "origin",
+      "index": 124
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208290,
+        4208304
+      ],
+      "value": "has_location",
+      "index": 125
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208304,
+        4208316
+      ],
+      "value": "__cached__",
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208316,
+        4208329
+      ],
+      "value": "annotations",
+      "index": 127
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208329,
+        4208342
+      ],
+      "value": "dataclasses",
+      "index": 128
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4208342,
+        4208355
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4208344,
+              4208355
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 129
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208355,
+        4208366
+      ],
+      "value": "dataclass",
+      "index": 130
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208366,
+        4208371
+      ],
+      "value": "Any",
+      "index": 131
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208371,
+        4208377
+      ],
+      "value": "Dict",
+      "index": 132
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208377,
+        4208386
+      ],
+      "value": "Literal",
+      "index": 133
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208386,
+        4208396
+      ],
+      "value": "Optional",
+      "index": 134
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4208396,
+        4208406
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4208398,
+              4208402
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4208402,
+              4208406
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 135
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4208406,
+        4208416
+      ],
+      "value": "Language",
+      "index": 136
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4208416,
+        4210090
+      ],
+      "value": "{\"eventId\":\"evt-1\",\"turn\":1,\"actionKind\":\"look\",\"summary\":\"The player-character finds a sample clue and a sample key.\",\"timeAdvance\":{\"elapsed\":\"a few breaths\",\"anchor\":\"still in the same rain-soaked minute\",\"rationale\":\"The player only examined the immediate scene.\",\"synchronized\":[\"The counterpart notices the pause but does not act openly yet.\"]},\"entities\":{\"upsert\":[{\"id\":\"actor_player\",\"type\":\"actor\",\"label\":\"player-character\",\"summary\":\"Reserved player entity id; replace label, summary, and status with the current world's player identity.\",\"status\":\"alert\",\"updatedEventId\":\"evt-1\"},{\"id\":\"actor_counterpart\",\"type\":\"actor\",\"label\":\"counterpart\",\"summary\":\"Placeholder for a relevant person in the current world; replace with the real roster id/label.\",\"status\":\"guarded\",\"updatedEventId\":\"evt-1\"},{\"id\":\"evidence_sample_clue\",\"type\":\"evidence\",\"label\":\"sample clue\",\"summary\":\"A tangible clue discovered this turn; replace with a real object from the scene.\",\"status\":\"seen\",\"updatedEventId\":\"evt-1\"},{\"id\":\"item_sample_key\",\"type\":\"item\",\"label\":\"sample key\",\"summary\":\"A tangible item collected this turn; replace with a real object from the scene.\",\"status\":\"collected\",\"updatedEventId\":\"evt-1\"}]},\"edges\":{\"upsert\":[{\"fromId\":\"actor_player\",\"type\":\"suspicious_of\",\"toId\":\"actor_counterpart\",\"value\":{\"role\":\"relation\"}},{\"fromId\":\"actor_player\",\"type\":\"holds\",\"toId\":\"item_sample_key\",\"value\":{\"role\":\"holding\"}},{\"fromId\":\"actor_player\",\"type\":\"holds\",\"toId\":\"evidence_sample_clue\",\"value\":{\"role\":\"holding\",\"physical\":true}}]},\"stateSlots\":{\"upsert\":[{\"id\":\"slot_sample_timer\",\"kind\":\"timer\",\"label\":\"sample timer\",\"value\":3,\"updatedEventId\":\"evt-1\"}]}}",
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4210090,
+        4211799
+      ],
+      "value": "{\"eventId\":\"evt-1\",\"turn\":1,\"actionKind\":\"look\",\"summary\":\"玩家角色发现了一个示例线索和一个示例道具。\",\"timeAdvance\":{\"elapsed\":\"几息\",\"anchor\":\"仍在同一个雨夜片刻里\",\"rationale\":\"玩家只是贴近观察眼前物件，没有离开现场。\",\"synchronized\":[\"相关人物注意到玩家停顿，但还没有公开阻拦。\"]},\"entities\":{\"upsert\":[{\"id\":\"actor_player\",\"type\":\"actor\",\"label\":\"玩家角色\",\"summary\":\"玩家本人固定实体 id；实际输出只替换 label、summary、status 为本局玩家身份。\",\"status\":\"警觉\",\"updatedEventId\":\"evt-1\"},{\"id\":\"actor_counterpart\",\"type\":\"actor\",\"label\":\"相关人物\",\"summary\":\"当前世界中相关人物的占位示例；实际输出必须替换为本局真实实体。\",\"status\":\"戒备\",\"updatedEventId\":\"evt-1\"},{\"id\":\"evidence_sample_clue\",\"type\":\"evidence\",\"label\":\"示例线索\",\"summary\":\"本回合发现的实物线索示例；实际输出必须替换为场景里的真实物件。\",\"status\":\"已发现\",\"updatedEventId\":\"evt-1\"},{\"id\":\"item_sample_key\",\"type\":\"item\",\"label\":\"示例钥匙\",\"summary\":\"本回合获得的实物道具示例；实际输出必须替换为场景里的真实物件。\",\"status\":\"已收集\",\"updatedEventId\":\"evt-1\"}]},\"edges\":{\"upsert\":[{\"fromId\":\"actor_player\",\"type\":\"怀疑\",\"toId\":\"actor_counterpart\",\"value\":{\"role\":\"relation\"}},{\"fromId\":\"actor_player\",\"type\":\"持有\",\"toId\":\"item_sample_key\",\"value\":{\"role\":\"holding\"}},{\"fromId\":\"actor_player\",\"type\":\"持有\",\"toId\":\"evidence_sample_clue\",\"value\":{\"role\":\"holding\",\"physical\":true}}]},\"stateSlots\":{\"upsert\":[{\"id\":\"slot_sample_timer\",\"kind\":\"timer\",\"label\":\"示例倒计时\",\"value\":3,\"updatedEventId\":\"evt-1\"}]}}",
+      "index": 138
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4211799,
+        4211805
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4211801,
+              4211805
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4211805,
+        4211840
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4211807,
+              4211817
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4211817,
+              4211825
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4211825,
+              4211835
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4211835,
+              4211840
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 140
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211840,
+        4211880
+      ],
+      "value": "build_scene_renderer_strict_json_retry",
+      "index": 141
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211880,
+        4211920
+      ],
+      "value": "build_action_interpreter_system_prompt",
+      "index": 142
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4211920,
+        4211923
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4211922,
+              4211923
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 143
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4211923,
+        4211932
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4211925,
+              4211932
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 144
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211932,
+        4211944
+      ],
+      "value": "__module__",
+      "index": 145
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211944,
+        4211968
+      ],
+      "value": "ActionInterpreterInput",
+      "index": 146
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211968,
+        4211982
+      ],
+      "value": "__qualname__",
+      "index": 147
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211982,
+        4211999
+      ],
+      "value": "__annotations__",
+      "index": 148
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4211999,
+        4212004
+      ],
+      "value": "str",
+      "index": 149
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212004,
+        4212008
+      ],
+      "value": "zh",
+      "index": 150
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4212008,
+        4212052
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212010,
+              4212015
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212015,
+              4212023
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212023,
+              4212047
+            ],
+            "value": "ActionInterpreterInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212047,
+              4212052
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 151
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212052,
+        4212090
+      ],
+      "value": "build_action_interpreter_user_prompt",
+      "index": 152
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212090,
+        4212125
+      ],
+      "value": "build_world_mutator_system_prompt",
+      "index": 153
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212125,
+        4212144
+      ],
+      "value": "WorldMutatorInput",
+      "index": 154
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212144,
+        4212149
+      ],
+      "value": "int",
+      "index": 155
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4212149,
+        4212165
+      ],
+      "value": "Dict[str, Any]",
+      "index": 156
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4212165,
+        4212204
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212167,
+              4212172
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212172,
+              4212180
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212180,
+              4212199
+            ],
+            "value": "WorldMutatorInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212199,
+              4212204
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 157
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212204,
+        4212237
+      ],
+      "value": "build_world_mutator_user_prompt",
+      "index": 158
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212237,
+        4212249
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212239,
+              4212245
+            ],
+            "value": "open"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212245,
+              4212249
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 159
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4212249,
+        4212317
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212251,
+              4212257
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212257,
+              4212267
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212267,
+              4212275
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4212275,
+              4212302
+            ],
+            "value": "Literal['open', 'guided']"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212302,
+              4212312
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212312,
+              4212317
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 160
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212317,
+        4212353
+      ],
+      "value": "build_scene_renderer_system_prompt",
+      "index": 161
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212353,
+        4212371
+      ],
+      "value": "SceneRenderInput",
+      "index": 162
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4212371,
+        4212409
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212373,
+              4212378
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212378,
+              4212386
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212386,
+              4212404
+            ],
+            "value": "SceneRenderInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212404,
+              4212409
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 163
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212409,
+        4212443
+      ],
+      "value": "build_scene_renderer_user_prompt",
+      "index": 164
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212443,
+        4212481
+      ],
+      "value": "build_scene_reconciler_system_prompt",
+      "index": 165
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212481,
+        4212502
+      ],
+      "value": "SceneReconcileInput",
+      "index": 166
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4212502,
+        4212543
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212504,
+              4212509
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212509,
+              4212517
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212517,
+              4212538
+            ],
+            "value": "SceneReconcileInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212538,
+              4212543
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 167
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212543,
+        4212579
+      ],
+      "value": "build_scene_reconciler_user_prompt",
+      "index": 168
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4212579,
+        4212617
+      ],
+      "value": "novels\\prompts\\inkos\\play_prompts.py",
+      "index": 169
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4212617,
+        4212661
+      ],
+      "value": "<module novels.prompts.inkos.play_prompts>",
+      "index": 170
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212661,
+        4212674
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212663,
+              4212674
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 171
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212674,
+        4212686
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212676,
+              4212686
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 172
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212686,
+        4212693
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212688,
+              4212693
+            ],
+            "value": "inp"
+          }
+        ]
+      },
+      "index": 173
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212693,
+        4212745
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212695,
+              4212700
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212700,
+              4212713
+            ],
+            "value": "action_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212713,
+              4212723
+            ],
+            "value": "event_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212723,
+              4212738
+            ],
+            "value": "mutation_json"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212738,
+              4212745
+            ],
+            "value": "parts"
+          }
+        ]
+      },
+      "index": 174
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212745,
+        4212783
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212747,
+              4212753
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212753,
+              4212763
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212763,
+              4212769
+            ],
+            "value": "base"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212769,
+              4212783
+            ],
+            "value": "actions_rule"
+          }
+        ]
+      },
+      "index": 175
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212783,
+        4212819
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212785,
+              4212790
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212790,
+              4212799
+            ],
+            "value": "premise"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212799,
+              4212812
+            ],
+            "value": "action_json"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212812,
+              4212819
+            ],
+            "value": "parts"
+          }
+        ]
+      },
+      "index": 176
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212819,
+        4212838
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212821,
+              4212831
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212831,
+              4212838
+            ],
+            "value": "lines"
+          }
+        ]
+      },
+      "index": 177
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212838,
+        4212858
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212840,
+              4212845
+            ],
+            "value": "inp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4212845,
+              4212858
+            ],
+            "value": "action_json"
+          }
+        ]
+      },
+      "index": 178
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212858,
+        4212868
+      ],
+      "value": "__name__",
+      "index": 179
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212868,
+        4212878
+      ],
+      "value": "__spec__",
+      "index": 180
+    }
+  ]
+}

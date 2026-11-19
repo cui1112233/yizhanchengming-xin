@@ -1,0 +1,1153 @@
+{
+  "source": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\luoshui-novel-native-20261119\\novels-b5b22086.pyd",
+  "sha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleCount": 95,
+  "complete": 95,
+  "modules": [
+    {
+      "module": "novels.agents.architect_agent",
+      "path": "constants/novels--agents--architect_agent.json",
+      "complete": true,
+      "declared": 187,
+      "parsed": 187,
+      "payloadRange": [
+        3880406,
+        3887402
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.auditor_agent",
+      "path": "constants/novels--agents--auditor_agent.json",
+      "complete": true,
+      "declared": 176,
+      "parsed": 176,
+      "payloadRange": [
+        3887434,
+        3891078
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.base_agent",
+      "path": "constants/novels--agents--base_agent.json",
+      "complete": true,
+      "declared": 101,
+      "parsed": 101,
+      "payloadRange": [
+        3891107,
+        3892967
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.composer_agent",
+      "path": "constants/novels--agents--composer_agent.json",
+      "complete": true,
+      "declared": 130,
+      "parsed": 130,
+      "payloadRange": [
+        3893000,
+        3896402
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.consolidator_agent",
+      "path": "constants/novels--agents--consolidator_agent.json",
+      "complete": true,
+      "declared": 93,
+      "parsed": 93,
+      "payloadRange": [
+        3896439,
+        3898195
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents",
+      "path": "constants/novels--agents.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        3898213,
+        3898499
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.foundation_reviewer_agent",
+      "path": "constants/novels--agents--foundation_reviewer_agent.json",
+      "complete": true,
+      "declared": 98,
+      "parsed": 98,
+      "payloadRange": [
+        3898543,
+        3900942
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.observer_agent",
+      "path": "constants/novels--agents--observer_agent.json",
+      "complete": true,
+      "declared": 61,
+      "parsed": 61,
+      "payloadRange": [
+        3900975,
+        3902098
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.planner_agent",
+      "path": "constants/novels--agents--planner_agent.json",
+      "complete": true,
+      "declared": 128,
+      "parsed": 128,
+      "payloadRange": [
+        3902130,
+        3904918
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.play_agents",
+      "path": "constants/novels--agents--play_agents.json",
+      "complete": true,
+      "declared": 235,
+      "parsed": 235,
+      "payloadRange": [
+        3904948,
+        3910245
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.reviser_agent",
+      "path": "constants/novels--agents--reviser_agent.json",
+      "complete": true,
+      "declared": 149,
+      "parsed": 149,
+      "payloadRange": [
+        3910277,
+        3914305
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.settler_agent",
+      "path": "constants/novels--agents--settler_agent.json",
+      "complete": true,
+      "declared": 126,
+      "parsed": 126,
+      "payloadRange": [
+        3914337,
+        3917497
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.state_validator_agent",
+      "path": "constants/novels--agents--state_validator_agent.json",
+      "complete": true,
+      "declared": 83,
+      "parsed": 83,
+      "payloadRange": [
+        3917537,
+        3919295
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.agents.writer_agent",
+      "path": "constants/novels--agents--writer_agent.json",
+      "complete": true,
+      "declared": 176,
+      "parsed": 176,
+      "payloadRange": [
+        3919326,
+        3924123
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.api",
+      "path": "constants/novels--api.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        3924138,
+        3924412
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.api.novels_api",
+      "path": "constants/novels--api--novels_api.json",
+      "complete": true,
+      "declared": 522,
+      "parsed": 522,
+      "payloadRange": [
+        3924438,
+        3938086
+      ],
+      "error": null
+    },
+    {
+      "module": "novels",
+      "path": "constants/novels.json",
+      "complete": true,
+      "declared": 29,
+      "parsed": 29,
+      "payloadRange": [
+        3938097,
+        3938569
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.models.book_rules",
+      "path": "constants/novels--models--book_rules.json",
+      "complete": true,
+      "declared": 157,
+      "parsed": 157,
+      "payloadRange": [
+        3938598,
+        3941753
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.models",
+      "path": "constants/novels--models.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        3941771,
+        3942057
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.models.schemas",
+      "path": "constants/novels--models--schemas.json",
+      "complete": true,
+      "declared": 143,
+      "parsed": 143,
+      "payloadRange": [
+        3942083,
+        3944530
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.models.write_input",
+      "path": "constants/novels--models--write_input.json",
+      "complete": true,
+      "declared": 27,
+      "parsed": 27,
+      "payloadRange": [
+        3944560,
+        3944911
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.chapter_review_cycle",
+      "path": "constants/novels--pipeline--chapter_review_cycle.json",
+      "complete": true,
+      "declared": 195,
+      "parsed": 195,
+      "payloadRange": [
+        3944952,
+        3949694
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline",
+      "path": "constants/novels--pipeline.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        3949714,
+        3950008
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.cover_runner",
+      "path": "constants/novels--pipeline--cover_runner.json",
+      "complete": true,
+      "declared": 98,
+      "parsed": 98,
+      "payloadRange": [
+        3950041,
+        3952419
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.imitation_short_runner",
+      "path": "constants/novels--pipeline--imitation_short_runner.json",
+      "complete": true,
+      "declared": 350,
+      "parsed": 350,
+      "payloadRange": [
+        3952462,
+        3962572
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.pipeline_checkpoints",
+      "path": "constants/novels--pipeline--pipeline_checkpoints.json",
+      "complete": true,
+      "declared": 68,
+      "parsed": 68,
+      "payloadRange": [
+        3962613,
+        3963801
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.pipeline_runner",
+      "path": "constants/novels--pipeline--pipeline_runner.json",
+      "complete": true,
+      "declared": 1003,
+      "parsed": 1003,
+      "payloadRange": [
+        3963837,
+        3992044
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.play_runner",
+      "path": "constants/novels--pipeline--play_runner.json",
+      "complete": true,
+      "declared": 321,
+      "parsed": 321,
+      "payloadRange": [
+        3992076,
+        3998720
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.short_fiction_parsers",
+      "path": "constants/novels--pipeline--short_fiction_parsers.json",
+      "complete": true,
+      "declared": 210,
+      "parsed": 210,
+      "payloadRange": [
+        3998762,
+        4003230
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.pipeline.short_fiction_runner",
+      "path": "constants/novels--pipeline--short_fiction_runner.json",
+      "complete": true,
+      "declared": 319,
+      "parsed": 319,
+      "payloadRange": [
+        4003271,
+        4013056
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.agent_tools",
+      "path": "constants/novels--prompts--agent_tools.json",
+      "complete": true,
+      "declared": 41,
+      "parsed": 41,
+      "payloadRange": [
+        4013087,
+        4016351
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts",
+      "path": "constants/novels--prompts.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        4016370,
+        4016660
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.imitation_short",
+      "path": "constants/novels--prompts--imitation_short.json",
+      "complete": true,
+      "declared": 113,
+      "parsed": 113,
+      "payloadRange": [
+        4016695,
+        4024175
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.imitation_short.references",
+      "path": "constants/novels--prompts--imitation_short--references.json",
+      "complete": true,
+      "declared": 24,
+      "parsed": 24,
+      "payloadRange": [
+        4024221,
+        4049229
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.agent_system_prompt",
+      "path": "constants/novels--prompts--inkos--agent_system_prompt.json",
+      "complete": true,
+      "declared": 97,
+      "parsed": 97,
+      "payloadRange": [
+        4049274,
+        4085943
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.architect_prompts",
+      "path": "constants/novels--prompts--inkos--architect_prompts.json",
+      "complete": true,
+      "declared": 103,
+      "parsed": 103,
+      "payloadRange": [
+        4085986,
+        4104649
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.composer_prompts",
+      "path": "constants/novels--prompts--inkos--composer_prompts.json",
+      "complete": true,
+      "declared": 77,
+      "parsed": 77,
+      "payloadRange": [
+        4104691,
+        4107903
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos",
+      "path": "constants/novels--prompts--inkos.json",
+      "complete": true,
+      "declared": 22,
+      "parsed": 22,
+      "payloadRange": [
+        4107928,
+        4108384
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.continuity_prompts",
+      "path": "constants/novels--prompts--inkos--continuity_prompts.json",
+      "complete": true,
+      "declared": 199,
+      "parsed": 199,
+      "payloadRange": [
+        4108428,
+        4131741
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.en_prompt_sections",
+      "path": "constants/novels--prompts--inkos--en_prompt_sections.json",
+      "complete": true,
+      "declared": 55,
+      "parsed": 55,
+      "payloadRange": [
+        4131785,
+        4140892
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.fanfic_dimensions",
+      "path": "constants/novels--prompts--inkos--fanfic_dimensions.json",
+      "complete": true,
+      "declared": 56,
+      "parsed": 56,
+      "payloadRange": [
+        4140935,
+        4142977
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.fanfic_prompt_sections",
+      "path": "constants/novels--prompts--inkos--fanfic_prompt_sections.json",
+      "complete": true,
+      "declared": 61,
+      "parsed": 61,
+      "payloadRange": [
+        4143025,
+        4146220
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+      "path": "constants/novels--prompts--inkos--foundation_reviewer_prompts.json",
+      "complete": true,
+      "declared": 104,
+      "parsed": 104,
+      "payloadRange": [
+        4146273,
+        4150882
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.genre_profile_defaults",
+      "path": "constants/novels--prompts--inkos--genre_profile_defaults.json",
+      "complete": true,
+      "declared": 195,
+      "parsed": 195,
+      "payloadRange": [
+        4150930,
+        4156066
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.genre_profile_resolver",
+      "path": "constants/novels--prompts--inkos--genre_profile_resolver.json",
+      "complete": true,
+      "declared": 62,
+      "parsed": 62,
+      "payloadRange": [
+        4156114,
+        4158060
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.length_governance",
+      "path": "constants/novels--prompts--inkos--length_governance.json",
+      "complete": true,
+      "declared": 105,
+      "parsed": 105,
+      "payloadRange": [
+        4158103,
+        4160083
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.observer_prompts",
+      "path": "constants/novels--prompts--inkos--observer_prompts.json",
+      "complete": true,
+      "declared": 48,
+      "parsed": 48,
+      "payloadRange": [
+        4160125,
+        4164295
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.planner_prompts",
+      "path": "constants/novels--prompts--inkos--planner_prompts.json",
+      "complete": true,
+      "declared": 104,
+      "parsed": 104,
+      "payloadRange": [
+        4164336,
+        4184734
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.play_prompts",
+      "path": "constants/novels--prompts--inkos--play_prompts.json",
+      "complete": true,
+      "declared": 181,
+      "parsed": 181,
+      "payloadRange": [
+        4184772,
+        4212879
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.reviser_prompts",
+      "path": "constants/novels--prompts--inkos--reviser_prompts.json",
+      "complete": true,
+      "declared": 208,
+      "parsed": 208,
+      "payloadRange": [
+        4212920,
+        4226909
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.settler_prompts",
+      "path": "constants/novels--prompts--inkos--settler_prompts.json",
+      "complete": true,
+      "declared": 101,
+      "parsed": 101,
+      "payloadRange": [
+        4226950,
+        4235534
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.short_fiction_prompts",
+      "path": "constants/novels--prompts--inkos--short_fiction_prompts.json",
+      "complete": true,
+      "declared": 163,
+      "parsed": 163,
+      "payloadRange": [
+        4235581,
+        4245812
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.inkos.writer_prompts",
+      "path": "constants/novels--prompts--inkos--writer_prompts.json",
+      "complete": true,
+      "declared": 300,
+      "parsed": 300,
+      "payloadRange": [
+        4245852,
+        4304507
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.prompts.system_prompts",
+      "path": "constants/novels--prompts--system_prompts.json",
+      "complete": true,
+      "declared": 61,
+      "parsed": 61,
+      "payloadRange": [
+        4304541,
+        4306894
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.agent_session",
+      "path": "constants/novels--services--agent_session.json",
+      "complete": true,
+      "declared": 451,
+      "parsed": 451,
+      "payloadRange": [
+        4306928,
+        4317743
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.agent_settings",
+      "path": "constants/novels--services--agent_settings.json",
+      "complete": true,
+      "declared": 192,
+      "parsed": 192,
+      "payloadRange": [
+        4317778,
+        4324846
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.ai_tells_detector",
+      "path": "constants/novels--services--ai_tells_detector.json",
+      "complete": true,
+      "declared": 173,
+      "parsed": 173,
+      "payloadRange": [
+        4324884,
+        4328568
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.audit_dimensions",
+      "path": "constants/novels--services--audit_dimensions.json",
+      "complete": true,
+      "declared": 79,
+      "parsed": 79,
+      "payloadRange": [
+        4328605,
+        4331698
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.chapter_status",
+      "path": "constants/novels--services--chapter_status.json",
+      "complete": true,
+      "declared": 50,
+      "parsed": 50,
+      "payloadRange": [
+        4331733,
+        4332740
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services",
+      "path": "constants/novels--services.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        4332760,
+        4333054
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.foundation_review",
+      "path": "constants/novels--services--foundation_review.json",
+      "complete": true,
+      "declared": 82,
+      "parsed": 82,
+      "payloadRange": [
+        4333092,
+        4334922
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.hook_manager",
+      "path": "constants/novels--services--hook_manager.json",
+      "complete": true,
+      "declared": 135,
+      "parsed": 135,
+      "payloadRange": [
+        4334955,
+        4337287
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.length_normalizer",
+      "path": "constants/novels--services--length_normalizer.json",
+      "complete": true,
+      "declared": 122,
+      "parsed": 122,
+      "payloadRange": [
+        4337325,
+        4340761
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.memory_index",
+      "path": "constants/novels--services--memory_index.json",
+      "complete": true,
+      "declared": 78,
+      "parsed": 78,
+      "payloadRange": [
+        4340794,
+        4342161
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.memory_store",
+      "path": "constants/novels--services--memory_store.json",
+      "complete": true,
+      "declared": 141,
+      "parsed": 141,
+      "payloadRange": [
+        4342194,
+        4346268
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.mode_write_context",
+      "path": "constants/novels--services--mode_write_context.json",
+      "complete": true,
+      "declared": 108,
+      "parsed": 108,
+      "payloadRange": [
+        4346307,
+        4349769
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.narrative_control",
+      "path": "constants/novels--services--narrative_control.json",
+      "complete": true,
+      "declared": 92,
+      "parsed": 92,
+      "payloadRange": [
+        4349807,
+        4352003
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.play_state_store",
+      "path": "constants/novels--services--play_state_store.json",
+      "complete": true,
+      "declared": 154,
+      "parsed": 154,
+      "payloadRange": [
+        4352040,
+        4354917
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.post_write_validator",
+      "path": "constants/novels--services--post_write_validator.json",
+      "complete": true,
+      "declared": 258,
+      "parsed": 258,
+      "payloadRange": [
+        4354958,
+        4361403
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.runtime_state",
+      "path": "constants/novels--services--runtime_state.json",
+      "complete": true,
+      "declared": 49,
+      "parsed": 49,
+      "payloadRange": [
+        4361437,
+        4362388
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.runtime_state_store",
+      "path": "constants/novels--services--runtime_state_store.json",
+      "complete": true,
+      "declared": 206,
+      "parsed": 206,
+      "payloadRange": [
+        4362428,
+        4366820
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.scheduler",
+      "path": "constants/novels--services--scheduler.json",
+      "complete": true,
+      "declared": 177,
+      "parsed": 177,
+      "payloadRange": [
+        4366850,
+        4369861
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.sensitive_detector",
+      "path": "constants/novels--services--sensitive_detector.json",
+      "complete": true,
+      "declared": 93,
+      "parsed": 93,
+      "payloadRange": [
+        4369900,
+        4372442
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.settler_delta_parser",
+      "path": "constants/novels--services--settler_delta_parser.json",
+      "complete": true,
+      "declared": 69,
+      "parsed": 69,
+      "payloadRange": [
+        4372483,
+        4373634
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.short_story_store",
+      "path": "constants/novels--services--short_story_store.json",
+      "complete": true,
+      "declared": 132,
+      "parsed": 132,
+      "payloadRange": [
+        4373672,
+        4376311
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.spot_fix_patches",
+      "path": "constants/novels--services--spot_fix_patches.json",
+      "complete": true,
+      "declared": 90,
+      "parsed": 90,
+      "payloadRange": [
+        4376348,
+        4378337
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.state_projections",
+      "path": "constants/novels--services--state_projections.json",
+      "complete": true,
+      "declared": 115,
+      "parsed": 115,
+      "payloadRange": [
+        4378375,
+        4381878
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.state_reducer",
+      "path": "constants/novels--services--state_reducer.json",
+      "complete": true,
+      "declared": 158,
+      "parsed": 158,
+      "payloadRange": [
+        4381912,
+        4386085
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.structured_state",
+      "path": "constants/novels--services--structured_state.json",
+      "complete": true,
+      "declared": 110,
+      "parsed": 110,
+      "payloadRange": [
+        4386122,
+        4387920
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.style_fingerprint",
+      "path": "constants/novels--services--style_fingerprint.json",
+      "complete": true,
+      "declared": 66,
+      "parsed": 66,
+      "payloadRange": [
+        4387958,
+        4389641
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.style_library",
+      "path": "constants/novels--services--style_library.json",
+      "complete": true,
+      "declared": 169,
+      "parsed": 169,
+      "payloadRange": [
+        4389675,
+        4392914
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.temporal_memory",
+      "path": "constants/novels--services--temporal_memory.json",
+      "complete": true,
+      "declared": 227,
+      "parsed": 227,
+      "payloadRange": [
+        4392950,
+        4401916
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.tool_policy",
+      "path": "constants/novels--services--tool_policy.json",
+      "complete": true,
+      "declared": 53,
+      "parsed": 53,
+      "payloadRange": [
+        4401948,
+        4403245
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.truth_files",
+      "path": "constants/novels--services--truth_files.json",
+      "complete": true,
+      "declared": 103,
+      "parsed": 103,
+      "payloadRange": [
+        4403277,
+        4405146
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.volume_utils",
+      "path": "constants/novels--services--volume_utils.json",
+      "complete": true,
+      "declared": 54,
+      "parsed": 54,
+      "payloadRange": [
+        4405179,
+        4406142
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.services.write_context",
+      "path": "constants/novels--services--write_context.json",
+      "complete": true,
+      "declared": 88,
+      "parsed": 88,
+      "payloadRange": [
+        4406176,
+        4408352
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.storage",
+      "path": "constants/novels--storage.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        4408371,
+        4408661
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.storage.file_repository",
+      "path": "constants/novels--storage--file_repository.json",
+      "complete": true,
+      "declared": 105,
+      "parsed": 105,
+      "payloadRange": [
+        4408696,
+        4410331
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.storage.state_manager",
+      "path": "constants/novels--storage--state_manager.json",
+      "complete": true,
+      "declared": 178,
+      "parsed": 178,
+      "payloadRange": [
+        4410364,
+        4413796
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.utils.ai_client",
+      "path": "constants/novels--utils--ai_client.json",
+      "complete": true,
+      "declared": 208,
+      "parsed": 208,
+      "payloadRange": [
+        4413823,
+        4421380
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.utils.cancellation",
+      "path": "constants/novels--utils--cancellation.json",
+      "complete": true,
+      "declared": 20,
+      "parsed": 20,
+      "payloadRange": [
+        4421410,
+        4421736
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.utils",
+      "path": "constants/novels--utils.json",
+      "complete": true,
+      "declared": 19,
+      "parsed": 19,
+      "payloadRange": [
+        4421753,
+        4422035
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.utils.context_budget",
+      "path": "constants/novels--utils--context_budget.json",
+      "complete": true,
+      "declared": 151,
+      "parsed": 151,
+      "payloadRange": [
+        4422067,
+        4425829
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.utils.knowledge_bridge",
+      "path": "constants/novels--utils--knowledge_bridge.json",
+      "complete": true,
+      "declared": 60,
+      "parsed": 60,
+      "payloadRange": [
+        4425863,
+        4426957
+      ],
+      "error": null
+    },
+    {
+      "module": "novels.utils.llm_retry",
+      "path": "constants/novels--utils--llm_retry.json",
+      "complete": true,
+      "declared": 49,
+      "parsed": 49,
+      "payloadRange": [
+        4426984,
+        4428792
+      ],
+      "error": null
+    }
+  ],
+  "limitations": [
+    "Constant recovery is not source decompilation.",
+    "Function binding, branch order and assembled prompt must be proved separately.",
+    "No target import/execution, model requests or app writes."
+  ]
+}

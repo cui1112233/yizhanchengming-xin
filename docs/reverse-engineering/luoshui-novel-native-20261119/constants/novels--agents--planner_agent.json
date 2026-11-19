@@ -1,0 +1,2383 @@
+{
+  "moduleName": "novels.agents.planner_agent",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3902098,
+  "payloadRange": [
+    3902130,
+    3904918
+  ],
+  "payloadSha256": "484d58faffcf54277c70a448e20201f07dd5c533f6f552576f9ed52c9d1a5160",
+  "declaredConstants": 128,
+  "parsedConstants": 128,
+  "stoppedAt": 3904917,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3902132,
+        3902137
+      ],
+      "value": "ctx",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902137,
+        3902144
+      ],
+      "value": "state",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902144,
+        3902148
+      ],
+      "value": "id",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902148,
+        3902155
+      ],
+      "value": "story",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902155,
+        3902174
+      ],
+      "value": "read_story_blocks",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902174,
+        3902204
+      ],
+      "value": "read_recent_chapter_excerpts",
+      "index": 5
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3902204,
+        3902215
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3902206,
+              3902213
+            ],
+            "value": "limit"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3902213,
+              3902215
+            ],
+            "value": 3
+          }
+        ]
+      },
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902215,
+        3902221
+      ],
+      "value": "emit",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902221,
+        3902235
+      ],
+      "value": "章节规划",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902235,
+        3902243
+      ],
+      "value": "active",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902243,
+        3902261
+      ],
+      "value": "正在规划第 ",
+      "index": 10
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3902261,
+        3902262
+      ],
+      "value": "",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902262,
+        3902283
+      ],
+      "value": " 章写作意图...",
+      "index": 12
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902283,
+        3902300
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3902285,
+              3902300
+            ],
+            "value": "tool:progress"
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902300,
+        3902326
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3902302,
+              3902309
+            ],
+            "value": "stage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902309,
+              3902317
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902317,
+              3902326
+            ],
+            "value": "message"
+          }
+        ]
+      },
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902326,
+        3902336
+      ],
+      "value": "language",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902336,
+        3902340
+      ],
+      "value": "zh",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902340,
+        3902344
+      ],
+      "value": "en",
+      "index": 17
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3902344,
+        3902350
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "q",
+            "fileRange": [
+              3902345,
+              3902348
+            ],
+            "value": -800
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902348,
+              3902349
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902349,
+              3902350
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902350,
+        3902355
+      ],
+      "value": "get",
+      "index": 19
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902355,
+        3902372
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3902357,
+              3902371
+            ],
+            "value": "章节摘要"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3902371,
+              3902372
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3902372,
+        3902378
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3902373,
+              3902374
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3902374,
+              3902377
+            ],
+            "value": 4000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902377,
+              3902378
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902378,
+        3902392
+      ],
+      "value": "（暂无）",
+      "index": 22
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902392,
+        3902409
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3902394,
+              3902408
+            ],
+            "value": "卷纲规划"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3902408,
+              3902409
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 23
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3902409,
+        3902415
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3902410,
+              3902411
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3902411,
+              3902414
+            ],
+            "value": 3000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902414,
+              3902415
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902415,
+        3902435
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3902417,
+              3902434
+            ],
+            "value": "待回收伏笔"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3902434,
+              3902435
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 25
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3902435,
+        3902441
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3902436,
+              3902437
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3902437,
+              3902440
+            ],
+            "value": 2500
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902440,
+              3902441
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902441,
+        3902458
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3902443,
+              3902457
+            ],
+            "value": "创作规则"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3902457,
+              3902458
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3902458,
+        3902464
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3902459,
+              3902460
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3902460,
+              3902463
+            ],
+            "value": 1500
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902463,
+              3902464
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902464,
+        3902480
+      ],
+      "value": "FileRepository",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902480,
+        3902491
+      ],
+      "value": "read_text",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902491,
+        3902501
+      ],
+      "value": "brief.md",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902501,
+        3902508
+      ],
+      "value": "strip",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902508,
+        3902531
+      ],
+      "value": "services.hook_manager",
+      "index": 33
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902531,
+        3902576
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3902533,
+              3902549
+            ],
+            "value": "analyze_health"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902549,
+              3902576
+            ],
+            "value": "format_health_for_planner"
+          }
+        ]
+      },
+      "index": 34
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3902576,
+        3902578
+      ],
+      "value": 2,
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902578,
+        3902594
+      ],
+      "value": "analyze_health",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902594,
+        3902621
+      ],
+      "value": "format_health_for_planner",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3902621,
+        3902646
+      ],
+      "value": "PlannerUserMessageInput",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902646,
+        3902675
+      ],
+      "value": "（首章或无上一章）",
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902675,
+        3902692
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3902677,
+              3902691
+            ],
+            "value": "当前状态"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3902691,
+              3902692
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3902692,
+        3902698
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3902693,
+              3902694
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3902694,
+              3902697
+            ],
+            "value": 1200
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3902697,
+              3902698
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902698,
+        3902751
+      ],
+      "value": "（从卷纲与当前状态推断主要阻力方）",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902751,
+        3902804
+      ],
+      "value": "（从卷纲与角色关系推断主要协作者）",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3902804,
+        3902892
+      ],
+      "value": "（从 pending_hooks 中筛选 pressured/near_payoff 且 ≥5 章未推进的钩子）",
+      "index": 44
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3902892,
+        3902894
+      ],
+      "value": 3,
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3902894,
+        3903150
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3902896,
+              3902912
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902912,
+              3902945
+            ],
+            "value": "previous_chapter_ending_excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902945,
+              3902963
+            ],
+            "value": "recent_summaries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902963,
+              3902982
+            ],
+            "value": "current_arc_prose"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3902982,
+              3903006
+            ],
+            "value": "protagonist_matrix_row"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903006,
+              3903021
+            ],
+            "value": "opponent_rows"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903021,
+              3903040
+            ],
+            "value": "collaborator_rows"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903040,
+              3903058
+            ],
+            "value": "relevant_threads"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903058,
+              3903076
+            ],
+            "value": "recyclable_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903076,
+              3903095
+            ],
+            "value": "is_golden_opening"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903095,
+              3903116
+            ],
+            "value": "book_rules_relevant"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903116,
+              3903123
+            ],
+            "value": "brief"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903123,
+              3903140
+            ],
+            "value": "chapter_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903140,
+              3903150
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903150,
+        3903156
+      ],
+      "value": "role",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903156,
+        3903164
+      ],
+      "value": "system",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903164,
+        3903173
+      ],
+      "value": "content",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903173,
+        3903205
+      ],
+      "value": "get_planner_memo_system_prompt",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903205,
+        3903211
+      ],
+      "value": "user",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903211,
+        3903239
+      ],
+      "value": "build_planner_user_message",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903239,
+        3903245
+      ],
+      "value": "chat",
+      "index": 53
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3903245,
+        3903284
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903247,
+              3903259
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903259,
+              3903272
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3903272,
+              3903275
+            ],
+            "value": 4096
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3903275,
+              3903284
+            ],
+            "value": 0.55
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903284,
+        3903309
+      ],
+      "value": "_collect_style_emphasis",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903309,
+        3903328
+      ],
+      "value": "## Style Emphasis",
+      "index": 56
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        3903328,
+        3903330
+      ],
+      "value": "\n",
+      "index": 57
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903330,
+        3903352
+      ],
+      "value": "\n\n## Style Emphasis\n",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903352,
+        3903367
+      ],
+      "value": "write_intents",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903367,
+        3903374
+      ],
+      "value": "mkdir",
+      "index": 60
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903374,
+        3903378
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              3903376,
+              3903377
+            ],
+            "value": true
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3903377,
+              3903378
+            ],
+            "value": {
+              "previous": {
+                "tag": "t",
+                "fileRange": [
+                  3903376,
+                  3903377
+                ],
+                "value": true
+              }
+            }
+          }
+        ]
+      },
+      "index": 61
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903378,
+        3903399
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903380,
+              3903389
+            ],
+            "value": "parents"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903389,
+              3903399
+            ],
+            "value": "exist_ok"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903399,
+        3903411
+      ],
+      "value": "write_text",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903411,
+        3903421
+      ],
+      "value": "chapter_",
+      "index": 64
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903421,
+        3903426
+      ],
+      "value": "04d",
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903426,
+        3903438
+      ],
+      "value": "_intent.md",
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903438,
+        3903442
+      ],
+      "value": "- ",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903442,
+        3903453
+      ],
+      "value": "<genexpr>",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903453,
+        3903499
+      ],
+      "value": "PlannerAgent.plan_chapter.<locals>.<genexpr>",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903499,
+        3903511
+      ],
+      "value": "splitlines",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903511,
+        3903519
+      ],
+      "value": "lstrip",
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903519,
+        3903525
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3903521,
+              3903525
+            ],
+            "value": "- "
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903525,
+        3903532
+      ],
+      "value": "items",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903532,
+        3903550
+      ],
+      "value": "current_state.md",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903550,
+        3903558
+      ],
+      "value": "风格",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903558,
+        3903566
+      ],
+      "value": "氛围",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903566,
+        3903574
+      ],
+      "value": "节奏",
+      "index": 77
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903574,
+        3903579
+      ],
+      "value": "POV",
+      "index": 78
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903579,
+        3903586
+      ],
+      "value": "upper",
+      "index": 79
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3903586,
+        3903591
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3903587,
+              3903588
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3903588,
+              3903590
+            ],
+            "value": 50
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3903590,
+              3903591
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903591,
+        3903597
+      ],
+      "value": "seen",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903597,
+        3903602
+      ],
+      "value": "add",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903602,
+        3903610
+      ],
+      "value": "unique",
+      "index": 83
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3903610,
+        3903615
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3903611,
+              3903612
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3903612,
+              3903614
+            ],
+            "value": 4
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3903614,
+              3903615
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903615,
+        3903624
+      ],
+      "value": "__doc__",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903624,
+        3903634
+      ],
+      "value": "__file__",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903634,
+        3903642
+      ],
+      "value": "origin",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903642,
+        3903656
+      ],
+      "value": "has_location",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903656,
+        3903668
+      ],
+      "value": "__cached__",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903668,
+        3903681
+      ],
+      "value": "annotations",
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903681,
+        3903690
+      ],
+      "value": "pathlib",
+      "index": 91
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903690,
+        3903698
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903692,
+              3903698
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903698,
+        3903704
+      ],
+      "value": "Path",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903704,
+        3903720
+      ],
+      "value": "models.schemas",
+      "index": 94
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903720,
+        3903734
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903722,
+              3903734
+            ],
+            "value": "BookConfig"
+          }
+        ]
+      },
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3903734,
+        3903746
+      ],
+      "value": "BookConfig",
+      "index": 96
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903746,
+        3903777
+      ],
+      "value": "prompts.inkos.planner_prompts",
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903777,
+        3903864
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903779,
+              3903804
+            ],
+            "value": "PlannerUserMessageInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903804,
+              3903832
+            ],
+            "value": "build_planner_user_message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903832,
+              3903864
+            ],
+            "value": "get_planner_memo_system_prompt"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903864,
+        3903888
+      ],
+      "value": "services.write_context",
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903888,
+        3903939
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903890,
+              3903920
+            ],
+            "value": "read_recent_chapter_excerpts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3903920,
+              3903939
+            ],
+            "value": "read_story_blocks"
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903939,
+        3903964
+      ],
+      "value": "storage.file_repository",
+      "index": 101
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3903964,
+        3903982
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3903966,
+              3903982
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 102
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3903982,
+        3904005
+      ],
+      "value": "storage.state_manager",
+      "index": 103
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3904005,
+        3904027
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904007,
+              3904027
+            ],
+            "value": "NovelsStateManager"
+          }
+        ]
+      },
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904027,
+        3904047
+      ],
+      "value": "NovelsStateManager",
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904047,
+        3904059
+      ],
+      "value": "base_agent",
+      "index": 106
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3904059,
+        3904075
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904061,
+              3904075
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 107
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904075,
+        3904089
+      ],
+      "value": "AgentContext",
+      "index": 108
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904089,
+        3904101
+      ],
+      "value": "__module__",
+      "index": 109
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904101,
+        3904115
+      ],
+      "value": "PlannerAgent",
+      "index": 110
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904115,
+        3904129
+      ],
+      "value": "__qualname__",
+      "index": 111
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3904129,
+        3904177
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904131,
+              3904136
+            ],
+            "value": "ctx"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904136,
+              3904143
+            ],
+            "value": "state"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904143,
+              3904157
+            ],
+            "value": "AgentContext"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904157,
+              3904177
+            ],
+            "value": "NovelsStateManager"
+          }
+        ]
+      },
+      "index": 112
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904177,
+        3904187
+      ],
+      "value": "__init__",
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3904187,
+        3904210
+      ],
+      "value": "PlannerAgent.__init__",
+      "index": 114
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3904210,
+        3904280
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904212,
+              3904218
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904218,
+              3904228
+            ],
+            "value": "book_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904228,
+              3904244
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904244,
+              3904252
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904252,
+              3904264
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904264,
+              3904270
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904270,
+              3904275
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904275,
+              3904280
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 115
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904280,
+        3904294
+      ],
+      "value": "plan_chapter",
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3904294,
+        3904321
+      ],
+      "value": "PlannerAgent.plan_chapter",
+      "index": 117
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3904321,
+        3904359
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904323,
+              3904334
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904334,
+              3904342
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904342,
+              3904348
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3904348,
+              3904359
+            ],
+            "value": "list[str]"
+          }
+        ]
+      },
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3904359,
+        3904397
+      ],
+      "value": "PlannerAgent._collect_style_emphasis",
+      "index": 119
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3904397,
+        3904429
+      ],
+      "value": "novels\\agents\\planner_agent.py",
+      "index": 120
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3904429,
+        3904437
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904431,
+              3904435
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              3904435,
+              3904437
+            ],
+            "value": "s"
+          }
+        ]
+      },
+      "index": 121
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3904437,
+        3904475
+      ],
+      "value": "<module novels.agents.planner_agent>",
+      "index": 122
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3904475,
+        3904495
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904477,
+              3904483
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904483,
+              3904488
+            ],
+            "value": "ctx"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904488,
+              3904495
+            ],
+            "value": "state"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3904495,
+        3904580
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904497,
+              3904508
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904508,
+              3904515
+            ],
+            "value": "items"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904515,
+              3904521
+            ],
+            "value": "seen"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904521,
+              3904529
+            ],
+            "value": "unique"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904529,
+              3904544
+            ],
+            "value": "author_intent"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904544,
+              3904550
+            ],
+            "value": "line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904550,
+              3904559
+            ],
+            "value": "cleaned"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904559,
+              3904574
+            ],
+            "value": "current_focus"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904574,
+              3904580
+            ],
+            "value": "item"
+          }
+        ]
+      },
+      "index": 124
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3904580,
+        3904897
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3904582,
+              3904588
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904588,
+              3904594
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904594,
+              3904604
+            ],
+            "value": "book_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904604,
+              3904620
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904620,
+              3904629
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904629,
+              3904640
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904640,
+              3904654
+            ],
+            "value": "story_blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904654,
+              3904662
+            ],
+            "value": "recent"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904662,
+              3904672
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904672,
+              3904689
+            ],
+            "value": "previous_ending"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904689,
+              3904695
+            ],
+            "value": "last"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904695,
+              3904713
+            ],
+            "value": "recent_summaries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904713,
+              3904726
+            ],
+            "value": "current_arc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904726,
+              3904741
+            ],
+            "value": "pending_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904741,
+              3904753
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904753,
+              3904760
+            ],
+            "value": "brief"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904760,
+              3904778
+            ],
+            "value": "hook_health_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904778,
+              3904794
+            ],
+            "value": "analyze_health"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904794,
+              3904821
+            ],
+            "value": "format_health_for_planner"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904821,
+              3904829
+            ],
+            "value": "report"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904829,
+              3904844
+            ],
+            "value": "planner_input"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904844,
+              3904854
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904854,
+              3904862
+            ],
+            "value": "intent"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904862,
+              3904878
+            ],
+            "value": "style_emphasis"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904878,
+              3904885
+            ],
+            "value": "items"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3904885,
+              3904897
+            ],
+            "value": "drafts_dir"
+          }
+        ]
+      },
+      "index": 125
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904897,
+        3904907
+      ],
+      "value": "__name__",
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3904907,
+        3904917
+      ],
+      "value": "__spec__",
+      "index": 127
+    }
+  ]
+}

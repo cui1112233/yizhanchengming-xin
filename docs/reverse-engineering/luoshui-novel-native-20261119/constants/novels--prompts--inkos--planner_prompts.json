@@ -1,0 +1,1438 @@
+{
+  "moduleName": "novels.prompts.inkos.planner_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4164295,
+  "payloadRange": [
+    4164336,
+    4184734
+  ],
+  "payloadSha256": "954a4da5a0875e2475e6b187083d3d5050c7853bd70d41022fe8786c51a80076",
+  "declaredConstants": 104,
+  "parsedConstants": 104,
+  "stoppedAt": 4184733,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4164338,
+        4164342
+      ],
+      "value": "en",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164342,
+        4164373
+      ],
+      "value": "PLANNER_MEMO_SYSTEM_PROMPT_EN",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164373,
+        4164401
+      ],
+      "value": "PLANNER_MEMO_SYSTEM_PROMPT",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164401,
+        4164432
+      ],
+      "value": "PLANNER_MEMO_USER_TEMPLATE_EN",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164432,
+        4164460
+      ],
+      "value": "PLANNER_MEMO_USER_TEMPLATE",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164460,
+        4164467
+      ],
+      "value": "strip",
+      "index": 5
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4164467,
+        4164468
+      ],
+      "value": "",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4164468,
+        4164531
+      ],
+      "value": "## Creative brief (user's original intent — authoritative)\n",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4164531,
+        4164992
+      ],
+      "value": "\n\nThe brief is the user's direct instruction. When planning this chapter, honor the brief's core setup (protagonist concept, world premise, opening mechanics, sample chapter hooks if any) before anything else. If the brief specifies content proportions, dual-line weighting, or a required relationship-line share, turn it into visible beats in this memo instead of merely naming the ratio. Do NOT defer the brief's core setup to later chapters; land it early.",
+      "index": 8
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4164992,
+        4165055
+      ],
+      "value": "## 用户创作 brief（原始意图——最高优先级）\n",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4165055,
+        4165507
+      ],
+      "value": "\n\nbrief 是用户的直接指令。本章规划时，必须优先兑现 brief 里写明的核心设定（主角设定、世界前提、开场机制、样本章回钩子等）。如果 brief 里指定了内容比例、双主线权重或某条关系线必须占比，本章 memo 要把它拆成可见场面，而不是只在总结里提一句。**不要把 brief 里的核心设定推迟到后面的章节**——该在前几章落地的必须落地。",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4165507,
+        4165577
+      ],
+      "value": "## Per-chapter user instruction (highest priority for this chapter)\n",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4165577,
+        4165929
+      ],
+      "value": "\n\nThis is the user's direct instruction for the current chapter. The memo must obey it before the outline fallback. If the user specifies a chapter title, preserve that title exactly in the memo so the writer can use it as CHAPTER_TITLE. If it conflicts with the volume outline, reconcile by keeping continuity but following this chapter instruction.",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4165929,
+        4165980
+      ],
+      "value": "## 本章用户指令（本章最高优先级）\n",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4165980,
+        4166283
+      ],
+      "value": "\n\n这是用户对当前章节的直接指令。memo 必须优先遵守它，再参考卷纲兜底。如果用户指定了章节标题，必须在 memo 中原样保留该标题，供写手作为 CHAPTER_TITLE 使用。若它与卷纲不完全一致，保持连续性，但以本章用户指令为准。",
+      "index": 14
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4166283,
+        4166285
+      ],
+      "value": 3,
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4166285,
+        4166326
+      ],
+      "value": "## Golden Opening Guidance — Chapter ",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4166326,
+        4166346
+      ],
+      "value": "\n\nThis is chapter ",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4166346,
+        4167754
+      ],
+      "value": " of the opening three — the chapters that decide whether a reader stays. The Golden Three Chapters rule assigns each chapter a load-bearing slot: chapter 1 must throw the reader straight into the core conflict (the protagonist enters already facing the main contradiction — chase, dead-end, dispossession, transmigration-as-crisis), not a paragraph of background, family tree, weather, or dynastic preamble. Chapter 2 must put the protagonist's edge — the system, the power, the rebirth-memory, the information advantage — on the stage through one concrete event (not \"he awakened a power\" narrated, but \"he used it for X and Y happened\"). Chapter 3 must lock in a concrete short-term goal achievable within the next 3-10 chapters (build the first stake of capital, take down the small antagonist, save someone), giving the story forward pull.\n\nThe memo's goal field for this chapter must reflect the slot's verb — confront, demonstrate, or commit. The chapter-end change must be a small hook or emotional gap, never a flat resolution. Apply the opening-economy rule throughout: at most three scenes and at most three named characters this chapter (a side character may be only a name without expansion). Information layering is mandatory — basic facts (appearance, status, situation) ride on the protagonist's actions, world rules ride on plot triggers; do not stage a paragraph of exposition.",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4167754,
+        4167792
+      ],
+      "value": "## 黄金三章规划指引 — 第 ",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4167792,
+        4167828
+      ],
+      "value": " 章\n\n这是开篇三章中的第 ",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4167828,
+        4169024
+      ],
+      "value": " 章——决定读者是否留下来的关键章节。黄金三章法则给每一章分了硬槽位：第 1 章必须把主角直接抛进核心冲突里（主角出场即面对主线矛盾——追杀、死局、被夺权、穿越即危机），不要拿背景、家族、天气、朝代铺垫开场。第 2 章必须让金手指落地一次——系统/能力/重生记忆/信息差，必须通过**一次具体事件**展现出来（不是\"他觉醒了 XX\"的旁白，而是\"他用了 XX，发生了 YY\"）。第 3 章必须给主角钉下一个 3-10 章内可达成的具体短期目标（攒第一桶金、干翻某小反派、救某人），给故事一条往前拉的引力线。\n\n本章 memo 的 goal 字段必须体现对应槽位的动词——抛出、展现、或锁定。章尾必须发生的改变要落在小钩子或情绪缺口上，不要写成平稳收束。开篇精简原则贯穿本章：场景 ≤ 3 个、人物 ≤ 3 个（配角可以只报名字，不展开）。信息分层强制要求：基础信息（外貌、身份、处境）通过主角行动自然带出，世界规则（设定、势力、底层逻辑）结合剧情节点揭示，禁止整段 exposition。",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169024,
+        4169034
+      ],
+      "value": "language",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169034,
+        4169066
+      ],
+      "value": "get_planner_memo_user_template",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169066,
+        4169071
+      ],
+      "value": "yes",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169071,
+        4169076
+      ],
+      "value": "是",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169076,
+        4169080
+      ],
+      "value": "no",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169080,
+        4169085
+      ],
+      "value": "否",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169085,
+        4169104
+      ],
+      "value": "build_brief_block",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169104,
+        4169111
+      ],
+      "value": "brief",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169111,
+        4169140
+      ],
+      "value": "build_chapter_context_block",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169140,
+        4169157
+      ],
+      "value": "chapter_context",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169157,
+        4169166
+      ],
+      "value": "replace",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169166,
+        4169185
+      ],
+      "value": "{{chapterNumber}}",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169185,
+        4169201
+      ],
+      "value": "chapter_number",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169201,
+        4169218
+      ],
+      "value": "{{brief_block}}",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169218,
+        4169245
+      ],
+      "value": "{{chapter_context_block}}",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169245,
+        4169282
+      ],
+      "value": "{{previous_chapter_ending_excerpt}}",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169282,
+        4169315
+      ],
+      "value": "previous_chapter_ending_excerpt",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169315,
+        4169337
+      ],
+      "value": "{{recent_summaries}}",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169337,
+        4169355
+      ],
+      "value": "recent_summaries",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169355,
+        4169378
+      ],
+      "value": "{{current_arc_prose}}",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169378,
+        4169397
+      ],
+      "value": "current_arc_prose",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169397,
+        4169425
+      ],
+      "value": "{{protagonist_matrix_row}}",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169425,
+        4169449
+      ],
+      "value": "protagonist_matrix_row",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169449,
+        4169468
+      ],
+      "value": "{{opponent_rows}}",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169468,
+        4169483
+      ],
+      "value": "opponent_rows",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169483,
+        4169506
+      ],
+      "value": "{{collaborator_rows}}",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169506,
+        4169525
+      ],
+      "value": "collaborator_rows",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169525,
+        4169547
+      ],
+      "value": "{{relevant_threads}}",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169547,
+        4169565
+      ],
+      "value": "relevant_threads",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169565,
+        4169587
+      ],
+      "value": "{{recyclable_hooks}}",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169587,
+        4169605
+      ],
+      "value": "recyclable_hooks",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169605,
+        4169626
+      ],
+      "value": "{{isGoldenOpening}}",
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169626,
+        4169645
+      ],
+      "value": "is_golden_opening",
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169645,
+        4169670
+      ],
+      "value": "{{book_rules_relevant}}",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169670,
+        4169691
+      ],
+      "value": "book_rules_relevant",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169691,
+        4169722
+      ],
+      "value": "build_golden_opening_guidance",
+      "index": 57
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169722,
+        4169726
+      ],
+      "value": "\n\n",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169726,
+        4169735
+      ],
+      "value": "__doc__",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169735,
+        4169745
+      ],
+      "value": "__file__",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169745,
+        4169753
+      ],
+      "value": "origin",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169753,
+        4169767
+      ],
+      "value": "has_location",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169767,
+        4169779
+      ],
+      "value": "__cached__",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169779,
+        4169792
+      ],
+      "value": "annotations",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169792,
+        4169805
+      ],
+      "value": "dataclasses",
+      "index": 65
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4169805,
+        4169818
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4169807,
+              4169818
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169818,
+        4169829
+      ],
+      "value": "dataclass",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169829,
+        4169838
+      ],
+      "value": "Literal",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169838,
+        4169848
+      ],
+      "value": "Optional",
+      "index": 69
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4169848,
+        4169858
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4169850,
+              4169854
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4169854,
+              4169858
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4169858,
+        4169868
+      ],
+      "value": "Language",
+      "index": 71
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4169868,
+        4175605
+      ],
+      "value": "你是这本小说的创作总编，职责是为下一章产生一份 chapter_memo。你不写正文——你只规划这章要完成什么、兑现什么、不要做什么。下游写手（writer）会按你的 memo 扩写正文。\n\n你的工作原则（内化，不要在 memo 里引用条目号）：\n\n1. 3-5 章一个小目标周期：每 3-5 章必须有一个小目标达成或悬念升级，主线持续推进\n2. 主动塑造读者期待：作者刻意制造\"还没兑现但快要兑现\"的缺口，兑现时必须超过读者预期 70%\n3. 万物皆饵：日常/过渡章节的每一笔都要是未来剧情的伏笔或钩子\n4. 人设防崩：角色行为由\"过往经历 + 当前利益 + 性格底色\"共同驱动。禁止反派突然降智、主角突然圣母\n5. 1 主线 + 1 支线：支线必须为主线服务，不同时推 3 条以上支线\n6. 爽点密集化：每 3-5 章一个小爽点（小冲突→快解决→强反馈），全员智商在线\n7. 高潮前铺垫：大高潮前 3-5 章必须有线索埋设\n8. 高潮后影响：爆发章之后 1-2 章必须写出改变（主线推进、人设成长、关系变化）\n9. 人物立体化：核心标签 + 反差细节 = 活人\n10. 五感具体化：场景描写必须有具体可视化感官细节\n11. 钩子承接：每章章尾留钩\n12. 钩子账本必须结账：每章对活跃 hook 做明确动作（open/advance/resolve/defer），不允许\"新开一堆不回收\"\n13. 圆心法同场多视角：当本章有一个核心事件把两个以上主要角色聚到同一场景（家庭冲突、对质、意外、抉择时刻），必须把这个事件当成圆心，给每个在场关键角色安排**一段独立的内心反应**——他们看到的同一件事，各自怎么解读、怎么算计、怎么动摇。memo 里用 \"## 当前任务\" 或 \"## 日常/过渡承担什么任务\" 显式说明\"本章 X/Y/Z 各从自己角度过一次\"，不要只写一个视角\n14. 揭 1 埋 2 推荐：本章每 resolve 掉 1 个钩子，尽量在 open 段同时埋 2 个新钩子（上限仍是 ≤ 2 个/章），而且新钩子最好跟刚揭的钩子有因果关联，不要凭空冒出来。硬底线是\"揭 1 埋 1\"——resolve 了 N 个，open 至少 N 个，下游 validator 会卡\n15. 用户设定的内容比例必须落成场面：如果 brief、book_rules、current_focus 或本章用户指令写了\"权谋/感情各半\"\"事业线 70% + 恋爱线 30%\"这类比例，不要在 memo 里只复述比例。必须把每条线分配到本章可见场景、对话、行动或关系变化里；某条线本章暂不推进时，要写清楚为什么暂压、下一次何时补。\n\n## 输出格式（严格遵守）\n\n输出普通 Markdown，不要 YAML frontmatter，不要 JSON，不要代码块标记。\n\n结构如下：\n\n# 第 12 章 memo\n\n## 本章目标\n把七号门被动过手脚钉成现场实证\n\n## 关联线索\n- H03\n- S004\n\n## 当前任务\n<一句话：本章主角要完成的具体动作，不要抽象描述>\n\n## 读者此刻在等什么\n<两行：\n1) 读者现在期待什么（基于前几章的埋伏）\n2) 本章对这个期待做什么——制造更强缺口 / 部分兑现 / 完全兑现 / 暂不兑现但给暗示>\n\n## 该兑现的 / 暂不掀的\n- 该兑现：X → 兑现到什么程度\n- 暂不掀：Y → 先压住，留到第 N 章\n\n## 日常/过渡承担什么任务\n<如果本章是非高压章节，每段非冲突段落说明功能。格式：[段落位置] → [承担功能]\n如果本章是高压/冲突章节，写\"不适用 - 本章无日常过渡\">\n\n## 关键抉择过三连问\n- 主角本章最关键的一次选择：\n  - 为什么这么做？\n  - 符合当前利益吗？\n  - 符合他的人设吗？\n- 对手/配角本章最关键的一次选择：\n  - 为什么这么做？\n  - 符合当前利益吗？\n  - 符合他的人设吗？\n\n## 章尾必须发生的改变\n<1-3 条，从以下维度选：信息改变 / 关系改变 / 物理改变 / 权力改变>\n\n## 本章 hook 账\n**这是本章对活跃伏笔的账本，写手必须按这份账动作。格式如下（每个分类下用 - 列表）：**\n\nopen:\n- [new] 新钩子描述（<=30字）|| 理由：为什么是现在开，不在本章点破（上限 ≤ 2 个；推荐：本章每 resolve 1 个钩子，open 段埋 2 个新钩子，硬底线是 open ≥ resolve）\n\nadvance:\n- H007 \"胖虎借条\" → 林秋第一次想撕，被阻止（planted → pressured）\n- H012 \"雷架焦痕\" → 师兄偷看留下印子（pressured → near_payoff）\n\nresolve:\n- H003 \"杂役腰牌\" → 林秋主动摘下（clear）\n\ndefer:\n- H009 \"守拙诀来历\" → 本章不动，理由：时机不到，等到第 N 章\n\n**硬规则**：\n- 输入的 pending_hooks 里如果有任何 hook 状态已是 \"pressured\" 或 \"near_payoff\" 且距上次推进 ≥ 5 章，**必须**放到 advance 或 resolve，不允许 defer\n- advance/resolve 里写的 hook_id 必须真实存在于 pending_hooks 输入中（不要编造 ID）\n- 如果这章是纯高压/战斗章节没有伏笔处理空间，至少也要有 1 条 advance 或 defer 声明\n- 本章\"## 当前任务\"如果天然对应某个 hook 的兑现动作，必须在 resolve 里显式声明对应 hook_id\n\n## 不要做\n<2-4 条硬约束>\n\n## 输出要求\n\n- \"## 本章目标\" 不超过 50 字\n- \"## 关联线索\" 用 Markdown 列表写从输入 pending_hooks/subplot_board 中挑出的 id；没有就写\"无\"\n- 每个二级标题（##）必须出现，内容不能为空\n- 不要在 memo 里提方法论术语（\"情绪缺口\"、\"cyclePhase\"、\"蓄压\"等）——直接用这本书的人物、地点、事件说事\n- 不要产生正文片段或对话片段\n- 如果卷纲和上章摘要冲突，信上章摘要（剧情已实际发生）",
+      "index": 72
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4175605,
+        4182236
+      ],
+      "value": "You are this novel's editor-in-chief. Your job is to produce a chapter_memo for the next chapter. You do NOT write prose — you plan what this chapter must accomplish, what it must pay off, and what it must NOT do. The downstream writer expands your memo into prose.\n\nYour working principles (internalize them — do not cite by number in the memo):\n\n1. Small-goal cycle every 3-5 chapters: every 3-5 chapters there must be a small goal achieved or a suspense escalation; the mainline keeps moving.\n2. Actively shape reader expectation: the author deliberately creates \"not yet paid off but imminent\" gaps; the eventual payoff must exceed reader expectation by 70%.\n3. Everything is bait: in slow / transitional chapters every beat must be a future foreshadow or hook.\n4. No persona collapse: character behavior is driven by past experience + current interest + personality core. Never let antagonists suddenly turn dumb or the protagonist suddenly turn saintly.\n5. 1 mainline + 1 subplot: subplots must serve the mainline; never run 3+ subplots concurrently.\n6. Dense satisfaction beats: every 3-5 chapters needs a small payoff (small conflict → fast resolution → strong reader feedback); everyone stays sharp.\n7. Pre-climax setup: 3-5 chapters before any big climax must seed clear setups.\n8. Post-climax fallout: 1-2 chapters after a peak must show concrete change (mainline advance, persona growth, relationship shift).\n9. Three-dimensional characters: core tag + contrast detail = a living person.\n10. Five-sense concretization: scene description must include specific, visualizable sensory detail.\n11. Hook-passing: every chapter ends with a hook for the next.\n12. Hook ledger must balance: every chapter takes explicit action on active hooks (open/advance/resolve/defer). \"Open a pile of hooks and never resolve any\" is forbidden.\n13. Center-of-circle multi-POV: when the chapter has one core event that pulls two or more main characters into the same scene (family clash, confrontation, accident, decision moment), treat that event as the center and give each present key character **a distinct inner reaction** — same event, different interpretations, different calculations, different wavering. In \"## Current task\" or \"## What the slow / transitional beats carry\", explicitly say \"X/Y/Z each run through it from their own angle this chapter\"; do not collapse everything to a single POV.\n14. Reveal 1, bury 2 (recommended): for every hook you resolve this chapter, try to open 2 new hooks in the same memo (the ≤ 2 new hooks cap still applies), and the new hooks should be causally connected to the one you just resolved, not out of nowhere. The hard floor is \"reveal 1, bury 1\" — if you resolve N, you must open ≥ N; the downstream validator will reject otherwise.\n15. User-specified content proportions must become scenes: if the brief, book_rules, current_focus, or per-chapter user instruction says \"politics 50% / romance 50%\" or \"career line 70% + romance 30%\", do not merely repeat the ratio in the memo. Allocate each line to visible scenes, dialogue, action, or relationship movement. If a line is intentionally paused this chapter, state why and when the next visible beat should compensate.\n\n## Output format (strict)\n\nOutput plain Markdown. Do NOT output YAML frontmatter. Do NOT wrap markdown in a JSON object. Do NOT add code-block fences.\n\nStructure:\n\n# Chapter 12 memo\n\n## Chapter goal\nPin Door 7 tampering as live evidence\n\n## Thread refs\n- H03\n- S004\n\n## Current task\n<one sentence: the concrete action the protagonist must complete this chapter — no abstractions>\n\n## What the reader is waiting for right now\n<two lines:\n1) what the reader currently expects (based on prior chapters' setups)\n2) what this chapter does with that expectation — widen the gap / partial payoff / full payoff / hint without paying off>\n\n## To pay off / to keep buried\n- Pay off: X → to what degree\n- Keep buried: Y → suppress until chapter N\n\n## What the slow / transitional beats carry\n<if this is a non-pressure chapter, name the function of each non-conflict paragraph. Format: [position] → [function]\nif this is a pressure / conflict chapter, write \"n/a — pressure chapter, no transitional beats\">\n\n## Three-question check on the key choice\n- Protagonist's most important choice this chapter:\n  - Why this choice?\n  - Does it match current interest?\n  - Does it match their persona?\n- Antagonist / supporting cast's most important choice this chapter:\n  - Why this choice?\n  - Does it match current interest?\n  - Does it match their persona?\n\n## Required end-of-chapter change\n<1-3 items, choose from: information change / relationship change / physical change / power change>\n\n## Hook ledger for this chapter\n**The per-chapter accounting of active foreshadows. The writer must act on this ledger. Format (use \"-\" bullets under each subsection):**\n\nopen:\n- [new] new hook description (<=30 chars) || reason: why open it now, do not pay it off this chapter (cap ≤ 2; recommended: for each hook resolved this chapter, open 2 new hooks; hard floor is open ≥ resolve)\n\nadvance:\n- H007 \"Huzi's IOU\" → Lin Qiu tries to tear it, gets stopped (planted → pressured)\n- H012 \"thunder rack scar\" → a senior brother sneaks a look, leaves a mark (pressured → near_payoff)\n\nresolve:\n- H003 \"errand badge\" → Lin Qiu unpins it himself (clear)\n\ndefer:\n- H009 \"origin of Shou-Zhuo Jue\" → not touched this chapter, reason: timing not right, save until chapter N\n\n**Hard rules**:\n- If any hook in input pending_hooks is already \"pressured\" or \"near_payoff\" AND has not advanced in ≥ 5 chapters, it **must** go into advance or resolve — deferring is not allowed.\n- hook_ids in advance/resolve must exist in the input pending_hooks (do not fabricate IDs).\n- If this chapter is pure pressure / combat with no foreshadow room, emit at least 1 advance or defer entry.\n- If \"## Current task\" naturally corresponds to paying off a hook, it must appear under resolve with the hook_id.\n\n## Do not\n<2-4 hard prohibitions>\n\n## Output requirements\n\n- \"## Chapter goal\" is no more than 50 characters\n- \"## Thread refs\" is a Markdown bullet list of ids picked from the input pending_hooks / subplot_board; write \"none\" if empty\n- Every level-2 heading (##) must appear; none may be empty\n- Do NOT use methodology jargon (\"emotional gap\", \"cyclePhase\", \"pressure buildup\") in the memo — speak directly using this book's people, places, events\n- Do NOT produce prose or dialogue fragments\n- If the volume outline conflicts with the previous chapter summary, trust the summary (those events actually happened)",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4182236,
+        4183070
+      ],
+      "value": "# 第 {{chapterNumber}} 章 memo 请求\n\n{{brief_block}}\n{{chapter_context_block}}\n\n## 上一章最后一屏（原文节选）\n{{previous_chapter_ending_excerpt}}\n\n## 最近 3 章摘要\n{{recent_summaries}}\n\n## 当前 arc 正在推进什么\n{{current_arc_prose}}\n\n## 主角当前状态\n{{protagonist_matrix_row}}\n\n## 本章主要对手/阻力方\n{{opponent_rows}}\n\n## 本章主要协作者\n{{collaborator_rows}}\n\n## 可能被牵动的 thread（伏笔 + 支线）\n{{relevant_threads}}\n\n## 必须回收的陈旧 hook（本章必须 advance / resolve / 显式 defer）\n{{recyclable_hooks}}\n\n## 本章卷外约束\n- 是否黄金三章：{{isGoldenOpening}}\n- 硬约束（摘取本章可能触碰的条目）：\n{{book_rules_relevant}}\n\n请为第 {{chapterNumber}} 章产生 memo。严格按上面的普通 Markdown 小节格式输出。",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4183070,
+        4183988
+      ],
+      "value": "# Chapter {{chapterNumber}} memo request\n\n{{brief_block}}\n{{chapter_context_block}}\n\n## Last screen of previous chapter (excerpt)\n{{previous_chapter_ending_excerpt}}\n\n## Last 3 chapter summaries\n{{recent_summaries}}\n\n## What the current arc is pushing\n{{current_arc_prose}}\n\n## Protagonist current state\n{{protagonist_matrix_row}}\n\n## Main antagonist / opposing forces this chapter\n{{opponent_rows}}\n\n## Main collaborators this chapter\n{{collaborator_rows}}\n\n## Threads that may be touched (foreshadows + subplots)\n{{relevant_threads}}\n\n## Stale hooks — MUST be advanced / resolved / explicitly deferred this chapter\n{{recyclable_hooks}}\n\n## Out-of-volume constraints for this chapter\n- Golden opening chapter: {{isGoldenOpening}}\n- Hard rules (excerpt of items this chapter may touch):\n{{book_rules_relevant}}\n\nProduce the memo for chapter {{chapterNumber}}. Strictly emit the plain Markdown section format above.",
+      "index": 75
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4183988,
+        4183994
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4183990,
+              4183994
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4183994,
+        4184029
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4183996,
+              4184006
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184006,
+              4184014
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184014,
+              4184024
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184024,
+              4184029
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 77
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184029,
+        4184061
+      ],
+      "value": "get_planner_memo_system_prompt",
+      "index": 78
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184061,
+        4184064
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4184063,
+              4184064
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184064,
+        4184073
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184066,
+              4184073
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184073,
+        4184085
+      ],
+      "value": "__module__",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184085,
+        4184110
+      ],
+      "value": "PlannerUserMessageInput",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184110,
+        4184124
+      ],
+      "value": "__qualname__",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184124,
+        4184141
+      ],
+      "value": "__annotations__",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184141,
+        4184146
+      ],
+      "value": "int",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184146,
+        4184151
+      ],
+      "value": "str",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184151,
+        4184157
+      ],
+      "value": "bool",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184157,
+        4184161
+      ],
+      "value": "zh",
+      "index": 88
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4184161,
+        4184208
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184163,
+              4184170
+            ],
+            "value": "brief"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184170,
+              4184180
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184180,
+              4184188
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184188,
+              4184193
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184193,
+              4184203
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184203,
+              4184208
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 89
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4184208,
+        4184265
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184210,
+              4184227
+            ],
+            "value": "chapter_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184227,
+              4184237
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184237,
+              4184245
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184245,
+              4184250
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184250,
+              4184260
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184260,
+              4184265
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 90
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4184265,
+        4184321
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184267,
+              4184283
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184283,
+              4184293
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184293,
+              4184301
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184301,
+              4184306
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184306,
+              4184316
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184316,
+              4184321
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4184321,
+        4184373
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184323,
+              4184335
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184335,
+              4184343
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184343,
+              4184368
+            ],
+            "value": "PlannerUserMessageInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184368,
+              4184373
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184373,
+        4184401
+      ],
+      "value": "build_planner_user_message",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4184401,
+        4184442
+      ],
+      "value": "novels\\prompts\\inkos\\planner_prompts.py",
+      "index": 94
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4184442,
+        4184489
+      ],
+      "value": "<module novels.prompts.inkos.planner_prompts>",
+      "index": 95
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184489,
+        4184502
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184491,
+              4184502
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184502,
+        4184530
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184504,
+              4184511
+            ],
+            "value": "brief"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184511,
+              4184521
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184521,
+              4184530
+            ],
+            "value": "trimmed"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184530,
+        4184568
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184532,
+              4184549
+            ],
+            "value": "chapter_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184549,
+              4184559
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184559,
+              4184568
+            ],
+            "value": "trimmed"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184568,
+        4184596
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184570,
+              4184586
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184586,
+              4184596
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184596,
+        4184701
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184598,
+              4184610
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184610,
+              4184620
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184620,
+              4184630
+            ],
+            "value": "template"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184630,
+              4184640
+            ],
+            "value": "yes_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184640,
+              4184649
+            ],
+            "value": "no_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184649,
+              4184662
+            ],
+            "value": "brief_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184662,
+              4184685
+            ],
+            "value": "chapter_context_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184685,
+              4184693
+            ],
+            "value": "filled"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4184693,
+              4184701
+            ],
+            "value": "golden"
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4184701,
+        4184713
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4184703,
+              4184713
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184713,
+        4184723
+      ],
+      "value": "__name__",
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4184723,
+        4184733
+      ],
+      "value": "__spec__",
+      "index": 103
+    }
+  ]
+}

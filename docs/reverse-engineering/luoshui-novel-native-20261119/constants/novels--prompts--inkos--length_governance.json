@@ -1,0 +1,1891 @@
+{
+  "moduleName": "novels.prompts.inkos.length_governance",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4158060,
+  "payloadRange": [
+    4158103,
+    4160083
+  ],
+  "payloadSha256": "dcf64afd00adb79acdb876fa08b0477888b97f84ec8d7058a18dfca4b93bf2f8",
+  "declaredConstants": 105,
+  "parsedConstants": 105,
+  "stoppedAt": 4160082,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4158105,
+        4158109
+      ],
+      "value": "en",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158109,
+        4158136
+      ],
+      "value": "DEFAULT_CHAPTER_LENGTH_EN",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158136,
+        4158163
+      ],
+      "value": "DEFAULT_CHAPTER_LENGTH_ZH",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158163,
+        4158173
+      ],
+      "value": "en_words",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158173,
+        4158183
+      ],
+      "value": "zh_chars",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158183,
+        4158188
+      ],
+      "value": "max",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158188,
+        4158206
+      ],
+      "value": "REFERENCE_TARGET",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158206,
+        4158226
+      ],
+      "value": "_scale_range_delta",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158226,
+        4158244
+      ],
+      "value": "SOFT_RANGE_DELTA",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158244,
+        4158262
+      ],
+      "value": "HARD_RANGE_DELTA",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158262,
+        4158274
+      ],
+      "value": "LengthSpec",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158274,
+        4158304
+      ],
+      "value": "resolve_length_counting_mode",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158304,
+        4158310
+      ],
+      "value": "none",
+      "index": 12
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158310,
+        4158385
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4158312,
+              4158320
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158320,
+              4158329
+            ],
+            "value": "softMin"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158329,
+              4158338
+            ],
+            "value": "softMax"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158338,
+              4158347
+            ],
+            "value": "hardMin"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158347,
+              4158356
+            ],
+            "value": "hardMax"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158356,
+              4158370
+            ],
+            "value": "countingMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158370,
+              4158385
+            ],
+            "value": "normalizeMode"
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4158385,
+        4158386
+      ],
+      "value": "",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158386,
+        4158394
+      ],
+      "value": " words",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158394,
+        4158399
+      ],
+      "value": "字",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158399,
+        4158408
+      ],
+      "value": "softMin",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158408,
+        4158417
+      ],
+      "value": "softMax",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158417,
+        4158426
+      ],
+      "value": "hardMin",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158426,
+        4158435
+      ],
+      "value": "hardMax",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158435,
+        4158443
+      ],
+      "value": "expand",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158443,
+        4158453
+      ],
+      "value": "compress",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158453,
+        4158462
+      ],
+      "value": "replace",
+      "index": 23
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158462,
+        4158470
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4158464,
+              4158468
+            ],
+            "value": "\r\n"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4158468,
+              4158470
+            ],
+            "value": "\n"
+          }
+        ]
+      },
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158470,
+        4158478
+      ],
+      "value": "lstrip",
+      "index": 25
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158478,
+        4158485
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4158480,
+              4158485
+            ],
+            "value": "﻿"
+          }
+        ]
+      },
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158485,
+        4158492
+      ],
+      "value": "split",
+      "index": 27
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158492,
+        4158496
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4158494,
+              4158496
+            ],
+            "value": "\n"
+          }
+        ]
+      },
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158496,
+        4158503
+      ],
+      "value": "strip",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158503,
+        4158508
+      ],
+      "value": "---",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158508,
+        4158515
+      ],
+      "value": "index",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158515,
+        4158519
+      ],
+      "value": "re",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158519,
+        4158526
+      ],
+      "value": "match",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158526,
+        4158538
+      ],
+      "value": "^(```|~~~)",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158538,
+        4158548
+      ],
+      "value": "in_fence",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158548,
+        4158560
+      ],
+      "value": "^#{1,6}\\s+",
+      "index": 36
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158560,
+        4158572
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4158562,
+              4158567
+            ],
+            "value": "---"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4158567,
+              4158572
+            ],
+            "value": "..."
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158572,
+        4158585
+      ],
+      "value": "prose_lines",
+      "index": 38
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4158585,
+        4158587
+      ],
+      "value": "\n",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158587,
+        4158613
+      ],
+      "value": "_strip_markdown_metadata",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158613,
+        4158622
+      ],
+      "value": "findall",
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158622,
+        4158654
+      ],
+      "value": "[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?",
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158654,
+        4158659
+      ],
+      "value": "sub",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158659,
+        4158664
+      ],
+      "value": "\\s+",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158664,
+        4158673
+      ],
+      "value": "__doc__",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158673,
+        4158683
+      ],
+      "value": "__file__",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158683,
+        4158691
+      ],
+      "value": "origin",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158691,
+        4158705
+      ],
+      "value": "has_location",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158705,
+        4158717
+      ],
+      "value": "__cached__",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158717,
+        4158730
+      ],
+      "value": "annotations",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158730,
+        4158739
+      ],
+      "value": "Literal",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158739,
+        4158750
+      ],
+      "value": "TypedDict",
+      "index": 52
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158750,
+        4158772
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4158752,
+              4158762
+            ],
+            "value": "zh_chars"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158762,
+              4158772
+            ],
+            "value": "en_words"
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158772,
+        4158792
+      ],
+      "value": "LengthCountingMode",
+      "index": 54
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158792,
+        4158818
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4158794,
+              4158802
+            ],
+            "value": "expand"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158802,
+              4158812
+            ],
+            "value": "compress"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158812,
+              4158818
+            ],
+            "value": "none"
+          }
+        ]
+      },
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158818,
+        4158839
+      ],
+      "value": "LengthNormalizeMode",
+      "index": 56
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158839,
+        4158849
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4158841,
+              4158845
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158845,
+              4158849
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158849,
+        4158865
+      ],
+      "value": "LengthLanguage",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158865,
+        4158878
+      ],
+      "value": "__prepare__",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158878,
+        4158891
+      ],
+      "value": "__getitem__",
+      "index": 60
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158891,
+        4158939
+      ],
+      "value": "%s.__prepare__() must return a mapping, not %s",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158939,
+        4158949
+      ],
+      "value": "__name__",
+      "index": 62
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4158949,
+        4158962
+      ],
+      "value": "<metaclass>",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158962,
+        4158974
+      ],
+      "value": "__module__",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158974,
+        4158988
+      ],
+      "value": "__qualname__",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158988,
+        4159005
+      ],
+      "value": "__annotations__",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159005,
+        4159010
+      ],
+      "value": "int",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159010,
+        4159018
+      ],
+      "value": "target",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159018,
+        4159032
+      ],
+      "value": "countingMode",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159032,
+        4159047
+      ],
+      "value": "normalizeMode",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159047,
+        4159063
+      ],
+      "value": "__orig_bases__",
+      "index": 71
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4159063,
+        4159066
+      ],
+      "value": 2200,
+      "index": 72
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4159066,
+        4159069
+      ],
+      "value": 300,
+      "index": 73
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4159069,
+        4159072
+      ],
+      "value": 600,
+      "index": 74
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4159072,
+        4159075
+      ],
+      "value": 3000,
+      "index": 75
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4159075,
+        4159078
+      ],
+      "value": 2000,
+      "index": 76
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159078,
+        4159084
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159080,
+              4159084
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 77
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159084,
+        4159125
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159086,
+              4159096
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159096,
+              4159104
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159104,
+              4159120
+            ],
+            "value": "LengthLanguage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159120,
+              4159125
+            ],
+            "value": "int"
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159125,
+        4159149
+      ],
+      "value": "default_chapter_length",
+      "index": 79
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159149,
+        4159205
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159151,
+              4159161
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159161,
+              4159169
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159169,
+              4159185
+            ],
+            "value": "LengthLanguage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159185,
+              4159205
+            ],
+            "value": "LengthCountingMode"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159205,
+        4159247
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159207,
+              4159215
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159215,
+              4159232
+            ],
+            "value": "reference_delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159232,
+              4159240
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159240,
+              4159245
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4159245,
+              4159246
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4159240,
+                  4159245
+                ],
+                "value": "int"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4159246,
+              4159247
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4159245,
+                  4159246
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4159240,
+                      4159245
+                    ],
+                    "value": "int"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159247,
+        4159308
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159249,
+              4159257
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159257,
+              4159267
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159267,
+              4159275
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159275,
+              4159280
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159280,
+              4159296
+            ],
+            "value": "LengthLanguage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159296,
+              4159308
+            ],
+            "value": "LengthSpec"
+          }
+        ]
+      },
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159308,
+        4159327
+      ],
+      "value": "build_length_spec",
+      "index": 83
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159327,
+        4159389
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159329,
+              4159336
+            ],
+            "value": "count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159336,
+              4159351
+            ],
+            "value": "counting_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159351,
+              4159359
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159359,
+              4159364
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159364,
+              4159384
+            ],
+            "value": "LengthCountingMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159384,
+              4159389
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159389,
+        4159410
+      ],
+      "value": "format_length_count",
+      "index": 85
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159410,
+        4159456
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159412,
+              4159419
+            ],
+            "value": "count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159419,
+              4159425
+            ],
+            "value": "spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159425,
+              4159433
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159433,
+              4159438
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159438,
+              4159450
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159450,
+              4159456
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159456,
+        4159479
+      ],
+      "value": "is_outside_soft_range",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159479,
+        4159502
+      ],
+      "value": "is_outside_hard_range",
+      "index": 88
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159502,
+        4159563
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159504,
+              4159511
+            ],
+            "value": "count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159511,
+              4159517
+            ],
+            "value": "spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159517,
+              4159525
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159525,
+              4159530
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159530,
+              4159542
+            ],
+            "value": "LengthSpec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159542,
+              4159563
+            ],
+            "value": "LengthNormalizeMode"
+          }
+        ]
+      },
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159563,
+        4159586
+      ],
+      "value": "choose_normalize_mode",
+      "index": 90
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159586,
+        4159611
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159588,
+              4159597
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159597,
+              4159605
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159605,
+              4159610
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4159610,
+              4159611
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4159605,
+                  4159610
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4159611,
+        4159675
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159613,
+              4159622
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159622,
+              4159637
+            ],
+            "value": "counting_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159637,
+              4159645
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159645,
+              4159650
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159650,
+              4159670
+            ],
+            "value": "LengthCountingMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159670,
+              4159675
+            ],
+            "value": "int"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4159675,
+        4159697
+      ],
+      "value": "count_chapter_length",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4159697,
+        4159740
+      ],
+      "value": "novels\\prompts\\inkos\\length_governance.py",
+      "index": 94
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4159740,
+        4159789
+      ],
+      "value": "<module novels.prompts.inkos.length_governance>",
+      "index": 95
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159789,
+        4159802
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159791,
+              4159802
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159802,
+        4159829
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159804,
+              4159812
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159812,
+              4159829
+            ],
+            "value": "reference_delta"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159829,
+        4159892
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159831,
+              4159840
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159840,
+              4159853
+            ],
+            "value": "prose_lines"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159853,
+              4159860
+            ],
+            "value": "lines"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159860,
+              4159867
+            ],
+            "value": "index"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159867,
+              4159877
+            ],
+            "value": "in_fence"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159877,
+              4159883
+            ],
+            "value": "line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159883,
+              4159892
+            ],
+            "value": "trimmed"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159892,
+        4159976
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159894,
+              4159902
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159902,
+              4159912
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159912,
+              4159924
+            ],
+            "value": "soft_delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159924,
+              4159936
+            ],
+            "value": "hard_delta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159936,
+              4159946
+            ],
+            "value": "soft_min"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159946,
+              4159956
+            ],
+            "value": "soft_max"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159956,
+              4159966
+            ],
+            "value": "hard_min"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159966,
+              4159976
+            ],
+            "value": "hard_max"
+          }
+        ]
+      },
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159976,
+        4159991
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159978,
+              4159985
+            ],
+            "value": "count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4159985,
+              4159991
+            ],
+            "value": "spec"
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4159991,
+        4160036
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4159993,
+              4160002
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4160002,
+              4160017
+            ],
+            "value": "counting_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4160017,
+              4160029
+            ],
+            "value": "normalized"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4160029,
+              4160036
+            ],
+            "value": "words"
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4160036,
+        4160048
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4160038,
+              4160048
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 102
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4160048,
+        4160072
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4160050,
+              4160057
+            ],
+            "value": "count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4160057,
+              4160072
+            ],
+            "value": "counting_mode"
+          }
+        ]
+      },
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4160072,
+        4160082
+      ],
+      "value": "__spec__",
+      "index": 104
+    }
+  ]
+}

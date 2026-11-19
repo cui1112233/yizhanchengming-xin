@@ -1,0 +1,1471 @@
+{
+  "moduleName": "novels.prompts.inkos.settler_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4226909,
+  "payloadRange": [
+    4226950,
+    4235534
+  ],
+  "payloadSha256": "c8d8363c284a513573d8a9595144fb15db108dcc21758fa1323fddfe82a96c17",
+  "declaredConstants": 101,
+  "parsedConstants": 101,
+  "stoppedAt": 4235533,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4226952,
+        4226957
+      ],
+      "value": "get",
+      "index": 0
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226957,
+        4226973
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226959,
+              4226973
+            ],
+            "value": "chapterTypes"
+          }
+        ]
+      },
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226973,
+        4226987
+      ],
+      "value": "chapterTypes",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4226987,
+        4227001
+      ],
+      "value": "主线推进",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4227001,
+        4228519
+      ],
+      "value": "=== POST_SETTLEMENT ===\n（简要说明本章有哪些状态变动、伏笔推进、结算注意事项；允许 Markdown 表格或要点）\n\n=== RUNTIME_STATE_DELTA ===\n（必须输出 JSON，不要输出 Markdown，不要加解释）\n```json\n{\n  \"chapter\": 12,\n  \"currentStatePatch\": {\n    \"currentLocation\": \"可选\",\n    \"protagonistState\": \"可选\",\n    \"currentGoal\": \"可选\",\n    \"currentConstraint\": \"可选\",\n    \"currentAlliances\": \"可选\",\n    \"currentConflict\": \"可选\"\n  },\n  \"hookOps\": {\n    \"upsert\": [\n      {\n        \"hookId\": \"mentor-oath\",\n        \"startChapter\": 8,\n        \"type\": \"relationship\",\n        \"status\": \"progressing\",\n        \"lastAdvancedChapter\": 12,\n        \"expectedPayoff\": \"揭开师债真相\",\n        \"payoffTiming\": \"slow-burn\",\n        \"notes\": \"本章为何推进/延后/回收\"\n      }\n    ],\n    \"mention\": [\"本章只是被提到、没有真实推进的 hookId\"],\n    \"resolve\": [\"已回收的 hookId\"],\n    \"defer\": [\"需要标记延后的 hookId\"]\n  },\n  \"newHookCandidates\": [\n    {\n      \"type\": \"mystery\",\n      \"expectedPayoff\": \"新伏笔未来要回收到哪里\",\n      \"payoffTiming\": \"near-term\",\n      \"notes\": \"本章为什么会形成新的未解问题\"\n    }\n  ],\n  \"chapterSummary\": {\n    \"chapter\": 12,\n    \"title\": \"本章标题\",\n    \"characters\": \"角色1,角色2\",\n    \"events\": \"一句话概括关键事件\",\n    \"stateChanges\": \"一句话概括状态变化\",\n    \"hookActivity\": \"mentor-oath advanced\",\n    \"mood\": \"紧绷\",\n    \"chapterType\": \"",
+      "index": 4
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4228519,
+        4228520
+      ],
+      "value": "",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4228520,
+        4229267
+      ],
+      "value": "\"\n  },\n  \"subplotOps\": [],\n  \"emotionalArcOps\": [],\n  \"characterMatrixOps\": [],\n  \"notes\": []\n}\n```\n\n规则：\n1. 只输出增量，不要重写完整 truth files\n2. 所有章节号字段都必须是整数，不能写自然语言\n3. hookOps.upsert 里只能写“当前伏笔池里已经存在”的 hookId，不允许发明新的 hookId\n4. brand-new unresolved thread 一律写进 newHookCandidates，不要自造 hookId\n5. 如果旧 hook 只是被提到、没有真实状态变化，把它放进 mention，不要更新 lastAdvancedChapter\n6. 如果本章推进了旧 hook，lastAdvancedChapter 必须等于当前章号\n7. 如果回收或延后 hook，必须放在 resolve / defer 数组里\n8. chapterSummary.chapter 必须等于当前章节号",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4229267,
+        4229277
+      ],
+      "value": "language",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4229277,
+        4229281
+      ],
+      "value": "en",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4229281,
+        4229298
+      ],
+      "value": "numericalSystem",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4229298,
+        4229482
+      ],
+      "value": "\n- 本题材有数值/资源体系，你必须在 UPDATED_LEDGER 中追踪正文中出现的所有资源变动\n- 数值验算铁律：期初 + 增量 = 期末，三项必须可验算",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4229482,
+        4229535
+      ],
+      "value": "\n- 本题材无数值系统，UPDATED_LEDGER 留空",
+      "index": 11
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4229535,
+        4229561
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4229537,
+              4229561
+            ],
+            "value": "enableFullCastTracking"
+          }
+        ]
+      },
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4229561,
+        4229701
+      ],
+      "value": "\n## 全员追踪\nPOST_SETTLEMENT 必须额外包含：本章出场角色清单、角色间关系变动、未出场但被提及的角色。",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4229701,
+        4229875
+      ],
+      "value": "【LANGUAGE OVERRIDE】ALL output (state card, hooks, summaries, subplots, emotional arcs, character matrix) MUST be in English. The === TAG === markers remain unchanged.\n\n",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4229875,
+        4230526
+      ],
+      "value": "你是状态追踪分析师。给定新章节正文和当前 truth 文件，你的任务是产出更新后的 truth 文件。\n\n## 工作模式\n\n你不是在写作。你的任务是：\n1. 仔细阅读正文，提取所有状态变化\n2. 基于\"当前追踪文件\"做增量更新\n3. 严格按照 === TAG === 格式输出\n\n## 分析维度\n\n从正文中提取以下信息：\n- 角色出场、退场、状态变化（受伤/突破/死亡等）\n- 位置移动、场景转换\n- 物品/资源的获得与消耗\n- 伏笔的埋设、推进、回收\n- 情感弧线变化\n- 支线进展\n- 角色间关系变化、新的信息边界\n\n## 书籍信息\n\n- 标题：",
+      "index": 15
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4230526,
+        4230536
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4230528,
+              4230535
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4230535,
+              4230536
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4230536,
+        4230550
+      ],
+      "value": "\n- 题材：",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4230550,
+        4230556
+      ],
+      "value": "name",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4230556,
+        4230561
+      ],
+      "value": "（",
+      "index": 19
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4230561,
+        4230577
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4230563,
+              4230570
+            ],
+            "value": "genre"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4230570,
+              4230577
+            ],
+            "value": "other"
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4230577,
+        4230594
+      ],
+      "value": "）\n- 平台：",
+      "index": 21
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4230594,
+        4230613
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4230596,
+              4230606
+            ],
+            "value": "platform"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4230606,
+              4230613
+            ],
+            "value": "other"
+          }
+        ]
+      },
+      "index": 22
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4230613,
+        4230615
+      ],
+      "value": "\n",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4230615,
+        4232056
+      ],
+      "value": "\n\n## 伏笔追踪规则（严格执行）\n\n- 新伏笔：只有当正文中出现一个会延续到后续章节、且有具体回收方向的未解问题时，才新增 hook_id。不要为旧 hook 的换说法、重述、抽象总结再开新 hook\n- 提及伏笔：已有伏笔在本章被提到，但没有新增信息、没有改变读者或角色对该问题的理解 → 放入 mention 数组，不要更新最近推进\n- 推进伏笔：已有伏笔在本章出现了新的事实、证据、关系变化、风险升级或范围收缩 → **必须**更新\"最近推进\"列为当前章节号，更新状态和备注\n- 回收伏笔：伏笔在本章被明确揭示、解决、或不再成立 → 状态改为\"已回收\"，备注回收方式\n- 延后伏笔：只有当正文明确显示该线被主动搁置、转入后台、或被剧情压后时，才标注\"延后\"；不要因为“已经过了几章”就机械延后\n- brand-new unresolved thread：不要直接发明新的 hookId。把候选放进 newHookCandidates，由系统决定它是映射到旧 hook、变成真正新 hook，还是被拒绝为重述\n- payoffTiming 使用语义节奏，不用硬写章节号：只允许 immediate / near-term / mid-arc / slow-burn / endgame\n- **铁律**：不要把“再次提到”“换个说法重述”“抽象复盘”当成推进。只有状态真的变了，才更新最近推进。只是出现过的旧 hook，放进 mention 数组。",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4232056,
+        4232101
+      ],
+      "value": "\n\n## 输出格式（必须严格遵循）\n\n",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4232101,
+        4232130
+      ],
+      "value": "build_settler_output_format",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4232130,
+        4233519
+      ],
+      "value": "\n\n## 关键规则\n\n1. 状态卡和伏笔池必须基于\"当前追踪文件\"做增量更新，不是从零开始\n2. 正文中的每一个事实性变化都必须反映在对应的追踪文件中\n3. 不要遗漏细节：数值变化、位置变化、关系变化、信息变化都要记录\n4. 角色交互矩阵中的\"信息边界\"要准确——角色只知道他在场时发生的事\n\n## 铁律：只记录正文中实际发生的事（严格执行）\n\n- **只提取正文中明确描写的事件和状态变化**。不要推断、预测、或补充正文没有写到的内容\n- 如果正文只写到角色走到门口还没进去，状态卡就不能写\"角色已进入房间\"\n- 如果正文只暗示了某种可能性但没有确认，不要把它当作已发生的事实记录\n- 不要从卷纲或大纲中补充正文尚未到达的剧情到状态卡\n- 不要删除或修改已有 hooks 中与本章无关的内容——只更新本章正文涉及的 hooks\n- 第 1 章尤其注意：初始追踪文件可能包含从大纲预生成的内容，只保留正文实际支持的部分，不要保留正文未涉及的预设\n- **伏笔例外**：正文中出现的未解疑问、悬念、伏笔线索必须在 hooks 中记录。这不是\"推断\"，而是\"提取正文中的叙事承诺\"。如果正文暗示了一个谜题/冲突/秘密但没有解答，那就是一个 hook，必须记录",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233519,
+        4233527
+      ],
+      "value": "ledger",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233527,
+        4233552
+      ],
+      "value": "\n## 当前资源账本\n",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233552,
+        4233571
+      ],
+      "value": "chapter_summaries",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233571,
+        4233593
+      ],
+      "value": "(文件尚未创建)",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233593,
+        4233618
+      ],
+      "value": "\n## 已有章节摘要\n",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233618,
+        4233633
+      ],
+      "value": "subplot_board",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233633,
+        4233661
+      ],
+      "value": "\n## 当前支线进度板\n",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233661,
+        4233677
+      ],
+      "value": "emotional_arcs",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233677,
+        4233702
+      ],
+      "value": "\n## 当前情感弧线\n",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233702,
+        4233720
+      ],
+      "value": "character_matrix",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233720,
+        4233751
+      ],
+      "value": "\n## 当前角色交互矩阵\n",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233751,
+        4233765
+      ],
+      "value": "observations",
+      "index": 39
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233765,
+        4233842
+      ],
+      "value": "\n## 观察日志（由 Observer 提取，包含本章所有事实变化）\n",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4233842,
+        4233982
+      ],
+      "value": "\n\n基于以上观察日志和正文，更新所有追踪文件。确保观察日志中的每一项变化都反映在对应的文件中。\n",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4233982,
+        4234007
+      ],
+      "value": "selected_evidence_block",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234007,
+        4234032
+      ],
+      "value": "\n## 已选长程证据\n",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234032,
+        4234056
+      ],
+      "value": "governed_control_block",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234056,
+        4234072
+      ],
+      "value": "volume_outline",
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234072,
+        4234085
+      ],
+      "value": "\n## 卷纲\n",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234085,
+        4234106
+      ],
+      "value": "validation_feedback",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234106,
+        4234131
+      ],
+      "value": "\n## 状态校验反馈\n",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234131,
+        4234256
+      ],
+      "value": "\n\n请严格纠正这些矛盾，只修正 truth files，不要改写正文，不要引入正文中不存在的新事实。\n",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234256,
+        4234270
+      ],
+      "value": "请分析第",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234270,
+        4234286
+      ],
+      "value": "chapter_number",
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234286,
+        4234294
+      ],
+      "value": "章「",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234294,
+        4234301
+      ],
+      "value": "title",
+      "index": 53
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234301,
+        4234346
+      ],
+      "value": "」的正文，更新所有追踪文件。\n",
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234346,
+        4234366
+      ],
+      "value": "\n## 本章正文\n\n",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234366,
+        4234375
+      ],
+      "value": "content",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234375,
+        4234398
+      ],
+      "value": "\n\n## 当前状态卡\n",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234398,
+        4234413
+      ],
+      "value": "current_state",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234413,
+        4234435
+      ],
+      "value": "\n## 当前伏笔池\n",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234435,
+        4234442
+      ],
+      "value": "hooks",
+      "index": 60
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4234442,
+        4234501
+      ],
+      "value": "\n\n请严格按照 === TAG === 格式输出结算结果。",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234501,
+        4234510
+      ],
+      "value": "__doc__",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234510,
+        4234520
+      ],
+      "value": "__file__",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234520,
+        4234528
+      ],
+      "value": "origin",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234528,
+        4234542
+      ],
+      "value": "has_location",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234542,
+        4234554
+      ],
+      "value": "__cached__",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234554,
+        4234567
+      ],
+      "value": "annotations",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234567,
+        4234580
+      ],
+      "value": "dataclasses",
+      "index": 68
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4234580,
+        4234593
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234582,
+              4234593
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234593,
+        4234604
+      ],
+      "value": "dataclass",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234604,
+        4234609
+      ],
+      "value": "Any",
+      "index": 71
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234609,
+        4234618
+      ],
+      "value": "Literal",
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234618,
+        4234628
+      ],
+      "value": "Optional",
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234628,
+        4234652
+      ],
+      "value": "genre_profile_defaults",
+      "index": 74
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4234652,
+        4234668
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234654,
+              4234668
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234668,
+        4234682
+      ],
+      "value": "GenreProfile",
+      "index": 76
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4234682,
+        4234692
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234684,
+              4234688
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234688,
+              4234692
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 77
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234692,
+        4234702
+      ],
+      "value": "Language",
+      "index": 78
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4234702,
+        4234735
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234704,
+              4234708
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234708,
+              4234716
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234716,
+              4234730
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234730,
+              4234735
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4234735,
+        4234739
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4234737,
+              4234738
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4234738,
+              4234739
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4234739,
+        4234870
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234741,
+              4234747
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234747,
+              4234762
+            ],
+            "value": "genre_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234762,
+              4234774
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234774,
+              4234784
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234784,
+              4234792
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4234792,
+              4234808
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234808,
+              4234822
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4234822,
+              4234845
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4234845,
+              4234865
+            ],
+            "value": "Optional[Language]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234865,
+              4234870
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234870,
+        4234899
+      ],
+      "value": "build_settler_system_prompt",
+      "index": 82
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4234899,
+        4234902
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4234901,
+              4234902
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4234902,
+        4234911
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234904,
+              4234911
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234911,
+        4234923
+      ],
+      "value": "__module__",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234923,
+        4234948
+      ],
+      "value": "SettlerUserPromptParams",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234948,
+        4234962
+      ],
+      "value": "__qualname__",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234962,
+        4234979
+      ],
+      "value": "__annotations__",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234979,
+        4234984
+      ],
+      "value": "int",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4234984,
+        4234989
+      ],
+      "value": "str",
+      "index": 90
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4234989,
+        4235037
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4234991,
+              4234999
+            ],
+            "value": "params"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4234999,
+              4235007
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4235007,
+              4235032
+            ],
+            "value": "SettlerUserPromptParams"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235032,
+              4235037
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235037,
+        4235064
+      ],
+      "value": "build_settler_user_prompt",
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235064,
+        4235105
+      ],
+      "value": "novels\\prompts\\inkos\\settler_prompts.py",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235105,
+        4235152
+      ],
+      "value": "<module novels.prompts.inkos.settler_prompts>",
+      "index": 94
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4235152,
+        4235165
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4235154,
+              4235165
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 95
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4235165,
+        4235193
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4235167,
+              4235171
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235171,
+              4235193
+            ],
+            "value": "chapter_type_example"
+          }
+        ]
+      },
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4235193,
+        4235324
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4235195,
+              4235201
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235201,
+              4235216
+            ],
+            "value": "genre_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235216,
+              4235228
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235228,
+              4235238
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235238,
+              4235253
+            ],
+            "value": "resolved_lang"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235253,
+              4235265
+            ],
+            "value": "is_english"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235265,
+              4235282
+            ],
+            "value": "numerical_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235282,
+              4235294
+            ],
+            "value": "hook_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235294,
+              4235311
+            ],
+            "value": "full_cast_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235311,
+              4235324
+            ],
+            "value": "lang_prefix"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4235324,
+        4235513
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4235326,
+              4235334
+            ],
+            "value": "params"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235334,
+              4235348
+            ],
+            "value": "ledger_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235348,
+              4235365
+            ],
+            "value": "summaries_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235365,
+              4235380
+            ],
+            "value": "subplot_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235380,
+              4235397
+            ],
+            "value": "emotional_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235397,
+              4235411
+            ],
+            "value": "matrix_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235411,
+              4235431
+            ],
+            "value": "observations_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235431,
+              4235456
+            ],
+            "value": "selected_evidence_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235456,
+              4235471
+            ],
+            "value": "control_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235471,
+              4235486
+            ],
+            "value": "outline_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4235486,
+              4235513
+            ],
+            "value": "validation_feedback_block"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235513,
+        4235523
+      ],
+      "value": "__name__",
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235523,
+        4235533
+      ],
+      "value": "__spec__",
+      "index": 100
+    }
+  ]
+}

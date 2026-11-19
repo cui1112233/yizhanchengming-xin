@@ -1,0 +1,1787 @@
+{
+  "moduleName": "novels.services.spot_fix_patches",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4376311,
+  "payloadRange": [
+    4376348,
+    4378337
+  ],
+  "payloadSha256": "fcfffd5cfd7d65a7698c42ad5b29f2ab1d78dd16bbd332e57f89070921215fd9",
+  "declaredConstants": 90,
+  "parsedConstants": 90,
+  "stoppedAt": 4378336,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4376350,
+        4376367
+      ],
+      "value": "=== PATCHES ===",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376367,
+        4376374
+      ],
+      "value": "index",
+      "index": 1
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4376374,
+        4376393
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4376376,
+              4376393
+            ],
+            "value": "=== PATCHES ==="
+          }
+        ]
+      },
+      "index": 2
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4376393,
+        4376395
+      ],
+      "value": 15,
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376395,
+        4376399
+      ],
+      "value": "re",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376399,
+        4376408
+      ],
+      "value": "compile",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4376408,
+        4376515
+      ],
+      "value": "--- PATCH(?:\\s+\\d+)? ---\\s*TARGET_TEXT:\\s*([\\s\\S]*?)\\s*REPLACEMENT_TEXT:\\s*([\\s\\S]*?)\\s*--- END PATCH ---",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376515,
+        4376526
+      ],
+      "value": "MULTILINE",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376526,
+        4376536
+      ],
+      "value": "finditer",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376536,
+        4376549
+      ],
+      "value": "_trim_field",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376549,
+        4376556
+      ],
+      "value": "group",
+      "index": 10
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4376556,
+        4376560
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4376558,
+              4376560
+            ],
+            "value": 1
+          }
+        ]
+      },
+      "index": 11
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4376560,
+        4376561
+      ],
+      "value": "",
+      "index": 12
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4376561,
+        4376565
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4376563,
+              4376565
+            ],
+            "value": 2
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376565,
+        4376574
+      ],
+      "value": "patches",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376574,
+        4376588
+      ],
+      "value": "SpotFixPatch",
+      "index": 15
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4376588,
+        4376621
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4376590,
+              4376603
+            ],
+            "value": "target_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376603,
+              4376621
+            ],
+            "value": "replacement_text"
+          }
+        ]
+      },
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376621,
+        4376646
+      ],
+      "value": "SpotFixPatchApplyResult",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4376646,
+        4376674
+      ],
+      "value": "No valid patches returned.",
+      "index": 18
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4376674,
+        4376719
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4376676,
+              4376685
+            ],
+            "value": "applied"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376685,
+              4376702
+            ],
+            "value": "revised_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376702,
+              4376719
+            ],
+            "value": "rejected_reason"
+          }
+        ]
+      },
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376719,
+        4376737
+      ],
+      "value": "_try_apply_patch",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376737,
+        4376746
+      ],
+      "value": "current",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376746,
+        4376761
+      ],
+      "value": "applied_count",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376761,
+        4376776
+      ],
+      "value": "touched_chars",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376776,
+        4376789
+      ],
+      "value": "target_text",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376789,
+        4376804
+      ],
+      "value": "skipped_count",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4376804,
+        4376857
+      ],
+      "value": "No patches could be matched to the chapter content.",
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4376857,
+        4376959
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4376859,
+              4376868
+            ],
+            "value": "applied"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376868,
+              4376885
+            ],
+            "value": "revised_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376885,
+              4376906
+            ],
+            "value": "applied_patch_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376906,
+              4376927
+            ],
+            "value": "skipped_patch_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376927,
+              4376942
+            ],
+            "value": "touched_chars"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4376942,
+              4376959
+            ],
+            "value": "rejected_reason"
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376959,
+        4376977
+      ],
+      "value": "_try_exact_match",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376977,
+        4376995
+      ],
+      "value": "replacement_text",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4376995,
+        4377013
+      ],
+      "value": "_try_fuzzy_match",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377013,
+        4377019
+      ],
+      "value": "find",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377019,
+        4377042
+      ],
+      "value": "_normalize_whitespace",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377042,
+        4377071
+      ],
+      "value": "_map_normalized_to_original",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377071,
+        4377076
+      ],
+      "value": "sub",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4377076,
+        4377081
+      ],
+      "value": "\\s+",
+      "index": 35
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4377081,
+        4377083
+      ],
+      "value": " ",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377083,
+        4377090
+      ],
+      "value": "strip",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377090,
+        4377094
+      ],
+      "value": "oi",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377094,
+        4377103
+      ],
+      "value": "isspace",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377103,
+        4377107
+      ],
+      "value": "ni",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377107,
+        4377122
+      ],
+      "value": "in_whitespace",
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4377122,
+        4377130
+      ],
+      "value": "^\\s*\\n",
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377130,
+        4377138
+      ],
+      "value": "rstrip",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377138,
+        4377147
+      ],
+      "value": "__doc__",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377147,
+        4377157
+      ],
+      "value": "__file__",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377157,
+        4377165
+      ],
+      "value": "origin",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377165,
+        4377179
+      ],
+      "value": "has_location",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377179,
+        4377191
+      ],
+      "value": "__cached__",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377191,
+        4377204
+      ],
+      "value": "annotations",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377204,
+        4377217
+      ],
+      "value": "dataclasses",
+      "index": 50
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377217,
+        4377230
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377219,
+              4377230
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377230,
+        4377241
+      ],
+      "value": "dataclass",
+      "index": 52
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377241,
+        4377244
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4377243,
+              4377244
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377244,
+        4377253
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377246,
+              4377253
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377253,
+        4377265
+      ],
+      "value": "__module__",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377265,
+        4377279
+      ],
+      "value": "__qualname__",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377279,
+        4377296
+      ],
+      "value": "__annotations__",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377296,
+        4377301
+      ],
+      "value": "str",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377301,
+        4377307
+      ],
+      "value": "bool",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377307,
+        4377316
+      ],
+      "value": "applied",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377316,
+        4377333
+      ],
+      "value": "revised_content",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377333,
+        4377350
+      ],
+      "value": "rejected_reason",
+      "index": 62
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4377350,
+        4377362
+      ],
+      "value": "str | None",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377362,
+        4377383
+      ],
+      "value": "applied_patch_count",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377383,
+        4377388
+      ],
+      "value": "int",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377388,
+        4377409
+      ],
+      "value": "skipped_patch_count",
+      "index": 66
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377409,
+        4377449
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377411,
+              4377416
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377416,
+              4377424
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377424,
+              4377429
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4377429,
+              4377449
+            ],
+            "value": "list[SpotFixPatch]"
+          }
+        ]
+      },
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377449,
+        4377473
+      ],
+      "value": "parse_spot_fix_patches",
+      "index": 68
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377473,
+        4377552
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377475,
+              4377485
+            ],
+            "value": "original"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377485,
+              4377494
+            ],
+            "value": "patches"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377494,
+              4377502
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377502,
+              4377507
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4377507,
+              4377527
+            ],
+            "value": "list[SpotFixPatch]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377527,
+              4377552
+            ],
+            "value": "SpotFixPatchApplyResult"
+          }
+        ]
+      },
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4377552,
+        4377576
+      ],
+      "value": "apply_spot_fix_patches",
+      "index": 70
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377576,
+        4377633
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377578,
+              4377587
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377587,
+              4377594
+            ],
+            "value": "patch"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377594,
+              4377602
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377602,
+              4377607
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377607,
+              4377621
+            ],
+            "value": "SpotFixPatch"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4377621,
+              4377633
+            ],
+            "value": "str | None"
+          }
+        ]
+      },
+      "index": 71
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377633,
+        4377678
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377635,
+              4377644
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377644,
+              4377652
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377652,
+              4377660
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377660,
+              4377665
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4377665,
+              4377666
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4377660,
+                  4377665
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4377666,
+              4377678
+            ],
+            "value": "int | None"
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377678,
+        4377735
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377680,
+              4377689
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377689,
+              4377697
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377697,
+              4377705
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377705,
+              4377710
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4377710,
+              4377711
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4377705,
+                  4377710
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4377711,
+              4377735
+            ],
+            "value": "tuple[int, int] | None"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377735,
+        4377757
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377737,
+              4377743
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377743,
+              4377751
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377751,
+              4377756
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4377756,
+              4377757
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4377751,
+                  4377756
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 74
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377757,
+        4377804
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377759,
+              4377769
+            ],
+            "value": "original"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377769,
+              4377785
+            ],
+            "value": "normalized_pos"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377785,
+              4377793
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377793,
+              4377798
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377798,
+              4377803
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4377803,
+              4377804
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4377798,
+                  4377803
+                ],
+                "value": "int"
+              }
+            }
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4377804,
+        4377827
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377806,
+              4377813
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377813,
+              4377821
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377821,
+              4377826
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4377826,
+              4377827
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4377821,
+                  4377826
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4377827,
+        4377864
+      ],
+      "value": "novels\\services\\spot_fix_patches.py",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4377864,
+        4377907
+      ],
+      "value": "<module novels.services.spot_fix_patches>",
+      "index": 78
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377907,
+        4377920
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377909,
+              4377920
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377920,
+        4377975
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377922,
+              4377932
+            ],
+            "value": "original"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377932,
+              4377948
+            ],
+            "value": "normalized_pos"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377948,
+              4377952
+            ],
+            "value": "ni"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377952,
+              4377967
+            ],
+            "value": "in_whitespace"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377967,
+              4377971
+            ],
+            "value": "oi"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4377971,
+              4377975
+            ],
+            "value": "ch"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377975,
+        4377983
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377977,
+              4377983
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377983,
+        4377992
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377985,
+              4377992
+            ],
+            "value": "value"
+          }
+        ]
+      },
+      "index": 82
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4377992,
+        4378036
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4377994,
+              4378003
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378003,
+              4378010
+            ],
+            "value": "patch"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378010,
+              4378017
+            ],
+            "value": "exact"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378017,
+              4378024
+            ],
+            "value": "start"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378024,
+              4378031
+            ],
+            "value": "fuzzy"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378031,
+              4378036
+            ],
+            "value": "end"
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4378036,
+        4378062
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4378038,
+              4378047
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378047,
+              4378055
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378055,
+              4378062
+            ],
+            "value": "start"
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4378062,
+        4378163
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4378064,
+              4378073
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378073,
+              4378081
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378081,
+              4378100
+            ],
+            "value": "normalized_target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378100,
+              4378120
+            ],
+            "value": "normalized_content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378120,
+              4378133
+            ],
+            "value": "match_start"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378133,
+              4378149
+            ],
+            "value": "original_start"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378149,
+              4378163
+            ],
+            "value": "original_end"
+          }
+        ]
+      },
+      "index": 85
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4378163,
+        4378253
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4378165,
+              4378175
+            ],
+            "value": "original"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378175,
+              4378184
+            ],
+            "value": "patches"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378184,
+              4378193
+            ],
+            "value": "current"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378193,
+              4378208
+            ],
+            "value": "applied_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378208,
+              4378223
+            ],
+            "value": "skipped_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378223,
+              4378238
+            ],
+            "value": "touched_chars"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378238,
+              4378245
+            ],
+            "value": "patch"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378245,
+              4378253
+            ],
+            "value": "result"
+          }
+        ]
+      },
+      "index": 86
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4378253,
+        4378316
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4378255,
+              4378260
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378260,
+              4378269
+            ],
+            "value": "patches"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378269,
+              4378281
+            ],
+            "value": "normalized"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378281,
+              4378288
+            ],
+            "value": "regex"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378288,
+              4378295
+            ],
+            "value": "match"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378295,
+              4378303
+            ],
+            "value": "target"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4378303,
+              4378316
+            ],
+            "value": "replacement"
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4378316,
+        4378326
+      ],
+      "value": "__name__",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4378326,
+        4378336
+      ],
+      "value": "__spec__",
+      "index": 89
+    }
+  ]
+}

@@ -1,0 +1,3583 @@
+{
+  "moduleName": "novels.prompts.inkos.reviser_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4212879,
+  "payloadRange": [
+    4212920,
+    4226909
+  ],
+  "payloadSha256": "820cf7b686df3f13e1a0877002c46c5ad9d7bf2533397ad38315f160b13a2907",
+  "declaredConstants": 208,
+  "parsedConstants": 208,
+  "stoppedAt": 4226908,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4212922,
+        4212926
+      ],
+      "value": "- ",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212926,
+        4212931
+      ],
+      "value": "get",
+      "index": 1
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212931,
+        4212944
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212933,
+              4212943
+            ],
+            "value": "category"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4212943,
+              4212944
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 2
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4212944,
+        4212945
+      ],
+      "value": "",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4212945,
+        4212949
+      ],
+      "value": ": ",
+      "index": 4
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212949,
+        4212965
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212951,
+              4212964
+            ],
+            "value": "description"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4212964,
+              4212965
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 5
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212965,
+        4212978
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212967,
+              4212977
+            ],
+            "value": "severity"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4212977,
+              4212978
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212978,
+        4212985
+      ],
+      "value": "lower",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4212985,
+        4212995
+      ],
+      "value": "critical",
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4212995,
+        4213012
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4212997,
+              4213006
+            ],
+            "value": "warning"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4213006,
+              4213012
+            ],
+            "value": "high"
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213012,
+        4213018
+      ],
+      "value": "high",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213018,
+        4213026
+      ],
+      "value": "medium",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213026,
+        4213053
+      ],
+      "value": "## Critical — Must Fix\n",
+      "index": 12
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4213053,
+        4213055
+      ],
+      "value": "\n",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213055,
+        4213087
+      ],
+      "value": "## Critical（必须解决）\n",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213087,
+        4213116
+      ],
+      "value": "## High — Should Improve\n",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213116,
+        4213144
+      ],
+      "value": "## High（应当改善）\n",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213144,
+        4213170
+      ],
+      "value": "## Medium — Reference\n",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213170,
+        4213200
+      ],
+      "value": "## Medium（参考建议）\n",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213200,
+        4213204
+      ],
+      "value": "\n\n",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213204,
+        4213216
+      ],
+      "value": "allow-full",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213216,
+        4213222
+      ],
+      "value": "info",
+      "index": 21
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4213222,
+        4213237
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213224,
+              4213237
+            ],
+            "value": "repairScope"
+          }
+        ]
+      },
+      "index": 22
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4213237,
+        4213253
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213239,
+              4213253
+            ],
+            "value": "repair_scope"
+          }
+        ]
+      },
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213253,
+        4213267
+      ],
+      "value": "rewrite-only",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213267,
+        4213279
+      ],
+      "value": "patch-only",
+      "index": 25
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4213279,
+        4213318
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213281,
+              4213288
+            ],
+            "value": "issue"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4213288,
+              4213296
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4213296,
+              4213312
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4213312,
+              4213318
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213318,
+        4213333
+      ],
+      "value": "is_structural",
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213333,
+        4213382
+      ],
+      "value": "resolve_auto_output_mode.<locals>.is_structural",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213382,
+        4213392
+      ],
+      "value": "is_local",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213392,
+        4213436
+      ],
+      "value": "resolve_auto_output_mode.<locals>.is_local",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213436,
+        4213448
+      ],
+      "value": "structural",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213448,
+        4213459
+      ],
+      "value": "<genexpr>",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213459,
+        4213504
+      ],
+      "value": "resolve_auto_output_mode.<locals>.<genexpr>",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213504,
+        4213511
+      ],
+      "value": "local",
+      "index": 34
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4213511,
+        4213513
+      ],
+      "value": " ",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213513,
+        4213534
+      ],
+      "value": "STRUCTURAL_PATTERNS",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213534,
+        4213542
+      ],
+      "value": "search",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213542,
+        4213548
+      ],
+      "value": "text",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213548,
+        4213616
+      ],
+      "value": "resolve_auto_output_mode.<locals>.is_structural.<locals>.<genexpr>",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213616,
+        4213637
+      ],
+      "value": "LOCAL_ONLY_PATTERNS",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213637,
+        4213700
+      ],
+      "value": "resolve_auto_output_mode.<locals>.is_local.<locals>.<genexpr>",
+      "index": 41
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4213700,
+        4213715
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213702,
+              4213715
+            ],
+            "value": "protagonist"
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4213715,
+        4213724
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213717,
+              4213723
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4213723,
+              4213724
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4213724,
+        4213743
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213726,
+              4213743
+            ],
+            "value": "personalityLock"
+          }
+        ]
+      },
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4213743,
+        4213768
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4213745,
+              4213768
+            ],
+            "value": "behavioralConstraints"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4213768,
+        4213772
+      ],
+      "value": "en",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213772,
+        4213794
+      ],
+      "value": "\n\nProtagonist lock: ",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213794,
+        4213801
+      ],
+      "value": " — ",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213801,
+        4213805
+      ],
+      "value": ", ",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213805,
+        4213860
+      ],
+      "value": ". Revisions must not violate the protagonist profile.",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213860,
+        4213885
+      ],
+      "value": "\n\n主角人设锁定：",
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213885,
+        4213890
+      ],
+      "value": "，",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213890,
+        4213895
+      ],
+      "value": "、",
+      "index": 53
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213895,
+        4213927
+      ],
+      "value": "。修改不得违反人设。",
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213927,
+        4213971
+      ],
+      "value": "build_protagonist_block.<locals>.<genexpr>",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4213971,
+        4214099
+      ],
+      "value": "【LANGUAGE OVERRIDE】ALL output (FIXED_ISSUES, PATCHES, REVISED_CONTENT, UPDATED_STATE, UPDATED_HOOKS) MUST be in English.\n\n",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4214099,
+        4214116
+      ],
+      "value": "numericalSystem",
+      "index": 57
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214116,
+        4214174
+      ],
+      "value": "\n=== UPDATED_LEDGER ===\n(更新后的完整资源账本)",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4214174,
+        4214178
+      ],
+      "value": "zh",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214178,
+        4214232
+      ],
+      "value": "\n  硬性约束：重写后的章节必须控制在 ",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4214232,
+        4214241
+      ],
+      "value": "softMin",
+      "index": 61
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4214241,
+        4214243
+      ],
+      "value": "-",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4214243,
+        4214252
+      ],
+      "value": "softMax",
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214252,
+        4214274
+      ],
+      "value": " 字以内（目标 ",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4214274,
+        4214282
+      ],
+      "value": "target",
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214282,
+        4214332
+      ],
+      "value": " 字，±25%）。这是不可突破的底线。",
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214332,
+        4214391
+      ],
+      "value": "\n  HARD CONSTRAINT: The revised chapter must stay within ",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214391,
+        4214414
+      ],
+      "value": " characters (target: ",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214414,
+        4214478
+      ],
+      "value": ", ±25%). This is non-negotiable — do not exceed this range.",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214478,
+        4214830
+      ],
+      "value": "\n\nROUTING: The reviewer's blocking issues are structural / semantic (character collapse, mainline drift, missing payoff, timeline break, unpaid hook, memo drift, etc.). You MUST output REVISED_CONTENT — do not emit PATCHES, they cannot fix this class of problem. If you cannot safely rewrite, say so in FIXED_ISSUES and leave REVISED_CONTENT empty.",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4214830,
+        4215085
+      ],
+      "value": "\n\nROUTING: The reviewer's blocking issues are local (wording, paragraph shape, fatigue word, information boundary, knowledge pollution). You MUST output PATCHES only — do not rewrite the whole chapter. If patches are not possible, leave PATCHES empty.",
+      "index": 71
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4215085,
+        4215110
+      ],
+      "value": "You are a professional ",
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4215110,
+        4215116
+      ],
+      "value": "name",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4215116,
+        4215194
+      ],
+      "value": " web-fiction revision editor. Fix the chapter according to the review notes.",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4215194,
+        4215859
+      ],
+      "value": "\n\nPATCHES and REVISED_CONTENT serve different problems — choose by problem type, not preference:\n\nPATCHES — for local text issues (wording, dialogue, AI-tell phrases, small continuity errors).\n  Each PATCH quotes the passage to change (a sentence, a paragraph, or multiple paragraphs) and provides a replacement. Untouched text stays exactly as-is.\n\nREVISED_CONTENT — for whole-chapter issues (length compression, structural rewrite, pacing restructure, major plot realignment).\n  Outputs the full revised chapter. When Critical issues include length or structural problems, you must use REVISED_CONTENT — patches cannot compress or restructure a chapter.",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4215859,
+        4216064
+      ],
+      "value": "\n\nIf Critical issues include both local and whole-chapter problems, use REVISED_CONTENT (it addresses everything in one pass).\n\nRevision principles:\n1. Fix root causes — do not apply superficial polish",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4216064,
+        4217735
+      ],
+      "value": "\n2. Hook status must stay in sync with the hooks board. If hook debt briefs are provided, preserve hook payoff scenes\n3. Do not alter the plot direction or core conflicts\n4. Preserve the original language style, rhythm, and pacing — do not compress transitional scenes or remove breathing room\n5. Emotion through action (never \"he felt angry\" — show it). Values through behavior, not slogans\n6. Different characters speak differently. No \"everyone gasped in unison\"\n7. Escalate: bad things stack, each worse than the last\n\nCycle-aware revision:\n- If this chapter should be \"aftermath\" but is still escalating tension, rewrite the densest conflict passage into a change-showing passage — who lost what, whose attitude shifted, what the new normal is\n- If this chapter should be \"climax\" but has no clear payoff, find the closest scene to a reward and amplify it — make the promised release exceed reader expectations\n- Daily passages that don't serve the main line: rewrite as \"bait\" — add a detail pointing to the future, a hint, a character reaction that seeds curiosity\n\nOutput format:\n\n=== FIXED_ISSUES ===\n(List each fix on its own line; if a safe local fix is not possible, explain here)\n\n=== PATCHES ===\n(Output local patches if applicable. Omit this section entirely if using REVISED_CONTENT)\n--- PATCH 1 ---\nTARGET_TEXT:\n(Exact quote from the original that identifies the passage to change)\nREPLACEMENT_TEXT:\n(Replacement text for this passage)\n--- END PATCH ---\n\n=== REVISED_CONTENT ===\n(Full revised chapter content — only when PATCHES cannot solve the problem. Omit this section if using PATCHES)\n\n=== UPDATED_STATE ===\n(Full updated state card)\n",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4217735,
+        4217786
+      ],
+      "value": "\n=== UPDATED_HOOKS ===\n(Full updated hooks board)",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4217786,
+        4218123
+      ],
+      "value": "\n\n分流指令：reviewer 报告的阻塞问题属于结构/语义错（人设崩、主线偏、爽点缺、时间线错、伏笔未收、memo 偏离等）。你必须输出 REVISED_CONTENT——禁止输出 PATCHES，这类问题不能靠补丁修复。如果无法安全重写，在 FIXED_ISSUES 里说明并留空 REVISED_CONTENT。",
+      "index": 79
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4218123,
+        4218353
+      ],
+      "value": "\n\n分流指令：reviewer 报告的阻塞问题属于局部错（措辞、段落形状、疲劳词、信息越界、知识污染）。你必须只输出 PATCHES——不要整章改写。如果做不出补丁，留空 PATCHES。",
+      "index": 80
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4218353,
+        4218376
+      ],
+      "value": "你是一位专业的",
+      "index": 81
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4218376,
+        4218462
+      ],
+      "value": "网络小说修稿编辑。你的任务是根据审稿意见对章节进行修正。",
+      "index": 82
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4218462,
+        4219091
+      ],
+      "value": "\n\nPATCHES 和 REVISED_CONTENT 分别处理不同类型的问题——按问题类型选择，不是按偏好：\n\nPATCHES——处理局部文字问题（措辞、对话、AI痕迹、小的连续性错误）。\n  每个 PATCH 引用要修改的原文段落（一句、一段或多段皆可），给出替换文本。未涉及的内容保持原样。\n\nREVISED_CONTENT——处理全章级问题（字数压缩、结构重组、节奏重排、重大剧情偏离）。\n  输出修正后的完整正文。当 Critical 问题包含字数或结构性问题时，必须使用 REVISED_CONTENT——PATCHES 无法压缩或重构整章。",
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4219091,
+        4219262
+      ],
+      "value": "\n\n如果 Critical 同时包含局部问题和全章问题，使用 REVISED_CONTENT（一次性解决所有问题）。\n\n修稿原则：\n1. 修根因，不做表面润色",
+      "index": 84
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4219262,
+        4220704
+      ],
+      "value": "\n2. 伏笔状态必须与伏笔池同步。如果提供了 Hook Debt 简报，必须保留伏笔兑现段落\n3. 不改变剧情走向和核心冲突\n4. 保持原文的语言风格、节奏和呼吸——不要压缩过渡段、不要删掉减速段\n5. 情绪用动作外化（不写\"他感到愤怒\"，写动作）。价值观通过行为传达\n6. 不同角色说话方式必须不同。禁止\"众人齐声惊呼\"\n7. 坏事叠坏事，每层比上一层过分\n\n小目标周期修稿指引：\n- 如果本章应该是\"后效\"阶段但仍在加压，把最密集的冲突段落改写为展示改变的段落——谁失去了什么、谁的态度变了、新的常态是什么\n- 如果本章应该是\"爆发\"阶段但没有明确兑现，找到最接近回报的场景并放大它——让承诺的释放超过读者预期\n- 日常段落如果不服务主线，改写为\"饵\"：加入一个指向未来的细节、一句暗示、一个角色反应\n\n输出格式：\n\n=== FIXED_ISSUES ===\n(逐条说明修正了什么)\n\n=== PATCHES ===\n(局部补丁——仅用于局部文字问题。有全章级问题时省略此区块)\n--- PATCH 1 ---\nTARGET_TEXT:\n(从原文中精确引用要修改的段落)\nREPLACEMENT_TEXT:\n(替换后的文本)\n--- END PATCH ---\n\n=== REVISED_CONTENT ===\n(修正后的完整正文——用于字数/结构/节奏等全章级问题。仅局部问题时省略此区块)\n\n=== UPDATED_STATE ===\n(更新后的完整状态卡)\n",
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4220704,
+        4220758
+      ],
+      "value": "\n=== UPDATED_HOOKS ===\n(更新后的完整伏笔池)",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4220758,
+        4220777
+      ],
+      "value": "MODE_DESCRIPTIONS",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4220777,
+        4220785
+      ],
+      "value": "polish",
+      "index": 88
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4220785,
+        4220795
+      ],
+      "value": "spot-fix",
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4220795,
+        4221151
+      ],
+      "value": "=== FIXED_ISSUES ===\n(逐条说明修正了什么，一行一条；如果无法安全定点修复，也在这里说明)\n\n=== PATCHES ===\n--- PATCH 1 ---\nTARGET_TEXT:\n(必须从原文中精确复制、且能唯一命中的原句或原段)\nREPLACEMENT_TEXT:\n(替换后的局部文本)\n--- END PATCH ---\n\n=== UPDATED_STATE ===\n(更新后的完整状态卡)\n",
+      "index": 90
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221151,
+        4221324
+      ],
+      "value": "=== FIXED_ISSUES ===\n(逐条说明修正了什么，一行一条)\n\n=== REVISED_CONTENT ===\n(修正后的完整正文)\n\n=== UPDATED_STATE ===\n(更新后的完整状态卡)\n",
+      "index": 91
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221324,
+        4221524
+      ],
+      "value": "\n9. spot-fix 只能输出局部补丁，禁止输出整章改写；TARGET_TEXT 必须能在原文中唯一命中\n10. 如果需要大面积改写，说明无法安全 spot-fix，并让 PATCHES 留空",
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221524,
+        4221543
+      ],
+      "value": "\n\n修稿模式：",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221543,
+        4221627
+      ],
+      "value": "\n\n修稿原则：\n1. 按模式控制修改幅度\n2. 修根因，不做表面润色",
+      "index": 94
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221627,
+        4221783
+      ],
+      "value": "\n4. 伏笔状态必须与伏笔池同步\n5. 不改变剧情走向和核心冲突\n6. 保持原文的语言风格和节奏\n7. 修改后同步更新状态卡",
+      "index": 95
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221783,
+        4221794
+      ],
+      "value": "、账本",
+      "index": 96
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221794,
+        4221809
+      ],
+      "value": "、伏笔池\n",
+      "index": 97
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221809,
+        4221830
+      ],
+      "value": "\n\n输出格式：\n\n",
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221830,
+        4221844
+      ],
+      "value": "请修正第",
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221844,
+        4221860
+      ],
+      "value": "chapter_number",
+      "index": 100
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221860,
+        4221886
+      ],
+      "value": "章。\n\n## 审稿问题\n",
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221886,
+        4221898
+      ],
+      "value": "issue_list",
+      "index": 102
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4221898,
+        4221921
+      ],
+      "value": "\n\n## 当前状态卡\n",
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221921,
+        4221936
+      ],
+      "value": "current_state",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221936,
+        4221950
+      ],
+      "value": "ledger_block",
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221950,
+        4221963
+      ],
+      "value": "hooks_block",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221963,
+        4221978
+      ],
+      "value": "outline_block",
+      "index": 107
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221978,
+        4221991
+      ],
+      "value": "bible_block",
+      "index": 108
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4221991,
+        4222005
+      ],
+      "value": "matrix_block",
+      "index": 109
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222005,
+        4222022
+      ],
+      "value": "summaries_block",
+      "index": 110
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222022,
+        4222035
+      ],
+      "value": "canon_block",
+      "index": 111
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222035,
+        4222055
+      ],
+      "value": "fanfic_canon_block",
+      "index": 112
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222055,
+        4222074
+      ],
+      "value": "style_guide_block",
+      "index": 113
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222074,
+        4222097
+      ],
+      "value": "length_guidance_block",
+      "index": 114
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4222097,
+        4222120
+      ],
+      "value": "\n\n## 待修正章节\n",
+      "index": 115
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222120,
+        4222137
+      ],
+      "value": "chapter_content",
+      "index": 116
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222137,
+        4222146
+      ],
+      "value": "__doc__",
+      "index": 117
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222146,
+        4222156
+      ],
+      "value": "__file__",
+      "index": 118
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222156,
+        4222164
+      ],
+      "value": "origin",
+      "index": 119
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222164,
+        4222178
+      ],
+      "value": "has_location",
+      "index": 120
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222178,
+        4222190
+      ],
+      "value": "__cached__",
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222190,
+        4222207
+      ],
+      "value": "__annotations__",
+      "index": 122
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222207,
+        4222220
+      ],
+      "value": "annotations",
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222220,
+        4222224
+      ],
+      "value": "re",
+      "index": 124
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222224,
+        4222237
+      ],
+      "value": "dataclasses",
+      "index": 125
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4222237,
+        4222250
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4222239,
+              4222250
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222250,
+        4222261
+      ],
+      "value": "dataclass",
+      "index": 127
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222261,
+        4222266
+      ],
+      "value": "Any",
+      "index": 128
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222266,
+        4222275
+      ],
+      "value": "Literal",
+      "index": 129
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222275,
+        4222285
+      ],
+      "value": "Optional",
+      "index": 130
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222285,
+        4222309
+      ],
+      "value": "genre_profile_defaults",
+      "index": 131
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4222309,
+        4222325
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4222311,
+              4222325
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222325,
+        4222339
+      ],
+      "value": "GenreProfile",
+      "index": 133
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222339,
+        4222358
+      ],
+      "value": "length_governance",
+      "index": 134
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4222358,
+        4222372
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4222360,
+              4222372
+            ],
+            "value": "LengthSpec"
+          }
+        ]
+      },
+      "index": 135
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222372,
+        4222384
+      ],
+      "value": "LengthSpec",
+      "index": 136
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4222384,
+        4222440
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4222386,
+              4222392
+            ],
+            "value": "auto"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222392,
+              4222400
+            ],
+            "value": "polish"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222400,
+              4222409
+            ],
+            "value": "rewrite"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222409,
+              4222417
+            ],
+            "value": "rework"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222417,
+              4222430
+            ],
+            "value": "anti-detect"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222430,
+              4222440
+            ],
+            "value": "spot-fix"
+          }
+        ]
+      },
+      "index": 137
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222440,
+        4222452
+      ],
+      "value": "ReviseMode",
+      "index": 138
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4222452,
+        4222492
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4222454,
+              4222466
+            ],
+            "value": "patch-only"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222466,
+              4222480
+            ],
+            "value": "rewrite-only"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222480,
+              4222492
+            ],
+            "value": "allow-full"
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222492,
+        4222508
+      ],
+      "value": "AutoOutputMode",
+      "index": 140
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4222508,
+        4222518
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4222510,
+              4222514
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222514,
+              4222518
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 141
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4222518,
+        4222528
+      ],
+      "value": "Language",
+      "index": 142
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4222528,
+        4224342
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4222530,
+              4222536
+            ],
+            "value": "auto"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222536,
+              4222544
+            ],
+            "value": "polish"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222544,
+              4222553
+            ],
+            "value": "rewrite"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4222553,
+              4222561
+            ],
+            "value": "rework"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222561,
+              4222574
+            ],
+            "value": "anti-detect"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222574,
+              4222584
+            ],
+            "value": "spot-fix"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4222584,
+              4222585
+            ],
+            "value": ""
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222585,
+              4222832
+            ],
+            "value": "润色：只改表达、节奏、段落呼吸，不改事实与剧情结论。禁止：增删段落、改变人名/地名/物品名、增加新情节或新对话、改变因果关系。只允许：替换用词、调整句序、修改标点节奏"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4222832,
+              4223098
+            ],
+            "value": "改写：允许重组问题段落、调整画面和叙述力度，但优先保留原文的绝大部分句段。除非问题跨越整章，否则禁止整章推倒重写；只能围绕问题段落及其直接上下文改写，同时保留核心事实与人物动机"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4223098,
+              4223184
+            ],
+            "value": "重写：可重构场景推进和冲突组织，但不改主设定和大事件结果"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4223184,
+              4224145
+            ],
+            "value": "反检测改写：在保持剧情不变的前提下，降低AI生成可检测性。\n\n改写手法（附正例）：\n1. 打破句式规律：连续短句 → 长短交替，句式不可预测\n2. 口语化替代：✗\"然而事情并没有那么简单\" → ✓\"哪有那么便宜的事\"\n3. 减少\"了\"字密度：✗\"他走了过去，拿了杯子\" → ✓\"他走过去，端起杯子\"\n4. 转折词降频：✗\"虽然…但是…\" → ✓ 用角色内心吐槽或直接动作切换\n5. 情绪外化：✗\"他感到愤怒\" → ✓\"他捏碎了茶杯，滚烫的茶水流过指缝\"\n6. 删掉叙述者结论：✗\"这一刻他终于明白了力量\" → ✓ 只写行动，让读者自己感受\n7. 群像反应具体化：✗\"全场震惊\" → ✓\"老陈的烟掉在裤子上，烫得他跳起来\"\n8. 段落长度差异化：不再等长段落，有的段只有一句话，有的段七八行\n9. 消灭\"不禁\"\"仿佛\"\"宛如\"等AI标记词：换成具体感官描写"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4224145,
+              4224342
+            ],
+            "value": "定点修复：只修改审稿意见指出的具体句子或段落，其余所有内容必须原封不动保留。修改范围限定在问题句子及其前后各一句。禁止改动无关段落"
+          }
+        ]
+      },
+      "index": 143
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224342,
+        4224358
+      ],
+      "value": "dict[str, str]",
+      "index": 144
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4224358,
+        4224367
+      ],
+      "value": "compile",
+      "index": 145
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224367,
+        4224402
+      ],
+      "value": "Paragraph uniformity|段落等长",
+      "index": 146
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4224402,
+        4224404
+      ],
+      "value": "I",
+      "index": 147
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224404,
+        4224432
+      ],
+      "value": "Hedge density|套话密度",
+      "index": 148
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224432,
+        4224471
+      ],
+      "value": "Formulaic transitions|公式化转折",
+      "index": 149
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224471,
+        4224508
+      ],
+      "value": "List-like structure|列表式结构",
+      "index": 150
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224508,
+        4224547
+      ],
+      "value": "Cross-chapter repetition|跨章重复",
+      "index": 151
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224547,
+        4224569
+      ],
+      "value": "AI-tell word density",
+      "index": 152
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224569,
+        4224596
+      ],
+      "value": "Fatigue word|高疲劳词",
+      "index": 153
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224596,
+        4224637
+      ],
+      "value": "Information Boundary Check|信息越界",
+      "index": 154
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224637,
+        4224679
+      ],
+      "value": "Knowledge Base Pollution|知识库污染",
+      "index": 155
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224679,
+        4224750
+      ],
+      "value": "OOC|人设|Character Fidelity|Character Matrix|Character.*Consistency",
+      "index": 156
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224750,
+        4224845
+      ],
+      "value": "Mainline.*Drift|主线偏离|Outline Drift|大纲偏离|Chapter Memo Drift|章节备忘偏离",
+      "index": 157
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224845,
+        4224897
+      ],
+      "value": "Conflict|冲突乏力|Payoff Dilution|爽点虚化",
+      "index": 158
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224897,
+        4224917
+      ],
+      "value": "Timeline|时间线",
+      "index": 159
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224917,
+        4224975
+      ],
+      "value": "Hook Check|伏笔检查|Hook.*Debt|伏笔.*债|未兑现",
+      "index": 160
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4224975,
+        4225013
+      ],
+      "value": "Power Scaling|战力崩坏|金手指",
+      "index": 161
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4225013,
+        4225028
+      ],
+      "value": "Pacing|节奏",
+      "index": 162
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4225028,
+        4225052
+      ],
+      "value": "POV Consistency|视角",
+      "index": 163
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4225052,
+        4225111
+      ],
+      "value": "Subplot Stagnation|支线停滞|Arc Flatline|弧线平坦",
+      "index": 164
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4225111,
+        4225160
+      ],
+      "value": "Relationship Dynamics|关系动态|情感表达",
+      "index": 165
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4225160,
+        4225187
+      ],
+      "value": "Incentive Chain|利益链",
+      "index": 166
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4225187,
+        4225222
+      ],
+      "value": "Canon Event|正典|Mainline Canon",
+      "index": 167
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4225222,
+        4225225
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "F",
+            "fileRange": [
+              4225224,
+              4225225
+            ],
+            "value": false
+          }
+        ]
+      },
+      "index": 168
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225225,
+        4225288
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225227,
+              4225235
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225235,
+              4225247
+            ],
+            "value": "is_english"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225247,
+              4225255
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4225255,
+              4225277
+            ],
+            "value": "list[dict[str, Any]]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225277,
+              4225283
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225283,
+              4225288
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 169
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4225288,
+        4225313
+      ],
+      "value": "build_tiered_issue_list",
+      "index": 170
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225313,
+        4225369
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225315,
+              4225323
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225323,
+              4225331
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4225331,
+              4225353
+            ],
+            "value": "list[dict[str, Any]]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225353,
+              4225369
+            ],
+            "value": "AutoOutputMode"
+          }
+        ]
+      },
+      "index": 171
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4225369,
+        4225395
+      ],
+      "value": "resolve_auto_output_mode",
+      "index": 172
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4225395,
+        4225401
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225397,
+              4225401
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 173
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225401,
+        4225471
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225403,
+              4225415
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225415,
+              4225425
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225425,
+              4225433
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4225433,
+              4225456
+            ],
+            "value": "dict[str, Any] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225456,
+              4225466
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225466,
+              4225471
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 174
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4225471,
+        4225496
+      ],
+      "value": "build_protagonist_block",
+      "index": 175
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225496,
+        4225593
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225498,
+              4225517
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225517,
+              4225533
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225533,
+              4225543
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225543,
+              4225556
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225556,
+              4225574
+            ],
+            "value": "auto_output_mode"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4225574,
+              4225575
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225575,
+              4225576
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  4225574,
+                  4225575
+                ],
+                "value": ""
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225576,
+              4225580
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4225580,
+              4225581
+            ],
+            "value": null
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4225581,
+              4225593
+            ],
+            "value": "allow-full"
+          }
+        ]
+      },
+      "index": 176
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225593,
+        4225753
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225595,
+              4225599
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225599,
+              4225618
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225618,
+              4225634
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225634,
+              4225644
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225644,
+              4225657
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225657,
+              4225675
+            ],
+            "value": "auto_output_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225675,
+              4225683
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225683,
+              4225697
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225697,
+              4225702
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225702,
+              4225703
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4225697,
+                  4225702
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225703,
+              4225713
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4225713,
+              4225732
+            ],
+            "value": "LengthSpec | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225732,
+              4225748
+            ],
+            "value": "AutoOutputMode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225748,
+              4225753
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 177
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4225753,
+        4225779
+      ],
+      "value": "build_auto_system_prompt",
+      "index": 178
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225779,
+        4225851
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225781,
+              4225800
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225800,
+              4225816
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225816,
+              4225834
+            ],
+            "value": "length_guardrail"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225834,
+              4225844
+            ],
+            "value": "language"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4225844,
+              4225845
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225845,
+              4225846
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  4225844,
+                  4225845
+                ],
+                "value": ""
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225846,
+              4225847
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4225845,
+                  4225846
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "s",
+                    "fileRange": [
+                      4225844,
+                      4225845
+                    ],
+                    "value": ""
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225847,
+              4225851
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 179
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4225851,
+        4225971
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225853,
+              4225857
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225857,
+              4225863
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225863,
+              4225882
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225882,
+              4225898
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225898,
+              4225916
+            ],
+            "value": "length_guardrail"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225916,
+              4225926
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225926,
+              4225934
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4225934,
+              4225948
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225948,
+              4225953
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225953,
+              4225954
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4225948,
+                  4225953
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225954,
+              4225955
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4225953,
+                  4225954
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4225948,
+                      4225953
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4225955,
+              4225956
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4225954,
+                  4225955
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      4225953,
+                      4225954
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          4225948,
+                          4225953
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225956,
+              4225966
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4225966,
+              4225971
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 180
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4225971,
+        4225999
+      ],
+      "value": "build_legacy_system_prompt",
+      "index": 181
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4225999,
+        4226002
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4226001,
+              4226002
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 182
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226002,
+        4226011
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226004,
+              4226011
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 183
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226011,
+        4226023
+      ],
+      "value": "__module__",
+      "index": 184
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226023,
+        4226048
+      ],
+      "value": "ReviserUserPromptParams",
+      "index": 185
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226048,
+        4226062
+      ],
+      "value": "__qualname__",
+      "index": 186
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226062,
+        4226067
+      ],
+      "value": "int",
+      "index": 187
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226067,
+        4226072
+      ],
+      "value": "str",
+      "index": 188
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4226072,
+        4226120
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226074,
+              4226082
+            ],
+            "value": "params"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226082,
+              4226090
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226090,
+              4226115
+            ],
+            "value": "ReviserUserPromptParams"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226115,
+              4226120
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 189
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226120,
+        4226147
+      ],
+      "value": "build_reviser_user_prompt",
+      "index": 190
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4226147,
+        4226188
+      ],
+      "value": "novels\\prompts\\inkos\\reviser_prompts.py",
+      "index": 191
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226188,
+        4226196
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226190,
+              4226194
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4226194,
+              4226196
+            ],
+            "value": "x"
+          }
+        ]
+      },
+      "index": 192
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226196,
+        4226209
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226198,
+              4226202
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226202,
+              4226209
+            ],
+            "value": "issue"
+          }
+        ]
+      },
+      "index": 193
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226209,
+        4226232
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226211,
+              4226215
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226215,
+              4226222
+            ],
+            "value": "issue"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226222,
+              4226232
+            ],
+            "value": "is_local"
+          }
+        ]
+      },
+      "index": 194
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226232,
+        4226260
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226234,
+              4226238
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226238,
+              4226245
+            ],
+            "value": "issue"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226245,
+              4226260
+            ],
+            "value": "is_structural"
+          }
+        ]
+      },
+      "index": 195
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226260,
+        4226281
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226262,
+              4226266
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226266,
+              4226275
+            ],
+            "value": "pattern"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226275,
+              4226281
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 196
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4226281,
+        4226328
+      ],
+      "value": "<module novels.prompts.inkos.reviser_prompts>",
+      "index": 197
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226328,
+        4226341
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226330,
+              4226341
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 198
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226341,
+        4226500
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226343,
+              4226347
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226347,
+              4226366
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226366,
+              4226382
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226382,
+              4226392
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226392,
+              4226405
+            ],
+            "value": "length_spec"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226405,
+              4226423
+            ],
+            "value": "auto_output_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226423,
+              4226436
+            ],
+            "value": "lang_prefix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226436,
+              4226452
+            ],
+            "value": "ledger_section"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226452,
+              4226479
+            ],
+            "value": "rewrite_length_constraint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226479,
+              4226488
+            ],
+            "value": "routing"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226488,
+              4226500
+            ],
+            "value": "routing_zh"
+          }
+        ]
+      },
+      "index": 199
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226500,
+        4226643
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226502,
+              4226506
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226506,
+              4226512
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226512,
+              4226531
+            ],
+            "value": "protagonist_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226531,
+              4226547
+            ],
+            "value": "numerical_rule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226547,
+              4226565
+            ],
+            "value": "length_guardrail"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226565,
+              4226575
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226575,
+              4226588
+            ],
+            "value": "lang_prefix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226588,
+              4226599
+            ],
+            "value": "mode_desc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226599,
+              4226612
+            ],
+            "value": "ledger_line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226612,
+              4226627
+            ],
+            "value": "output_format"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226627,
+              4226643
+            ],
+            "value": "spot_fix_rules"
+          }
+        ]
+      },
+      "index": 200
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226643,
+        4226706
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226645,
+              4226657
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226657,
+              4226667
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226667,
+              4226680
+            ],
+            "value": "protagonist"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226680,
+              4226686
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226686,
+              4226693
+            ],
+            "value": "locks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226693,
+              4226706
+            ],
+            "value": "constraints"
+          }
+        ]
+      },
+      "index": 201
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226706,
+        4226716
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226708,
+              4226716
+            ],
+            "value": "params"
+          }
+        ]
+      },
+      "index": 202
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226716,
+        4226792
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226718,
+              4226726
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226726,
+              4226738
+            ],
+            "value": "is_english"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226738,
+              4226748
+            ],
+            "value": "critical"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226748,
+              4226754
+            ],
+            "value": "high"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226754,
+              4226762
+            ],
+            "value": "medium"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226762,
+              4226769
+            ],
+            "value": "parts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226769,
+              4226776
+            ],
+            "value": "issue"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226776,
+              4226782
+            ],
+            "value": "line"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226782,
+              4226792
+            ],
+            "value": "severity"
+          }
+        ]
+      },
+      "index": 203
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226792,
+        4226807
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226794,
+              4226801
+            ],
+            "value": "issue"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226801,
+              4226807
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 204
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4226807,
+        4226888
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4226809,
+              4226817
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226817,
+              4226834
+            ],
+            "value": "scoped_blocking"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226834,
+              4226853
+            ],
+            "value": "blocking_non_info"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226853,
+              4226868
+            ],
+            "value": "is_structural"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226868,
+              4226878
+            ],
+            "value": "is_local"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4226878,
+              4226888
+            ],
+            "value": "blocking"
+          }
+        ]
+      },
+      "index": 205
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226888,
+        4226898
+      ],
+      "value": "__name__",
+      "index": 206
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4226898,
+        4226908
+      ],
+      "value": "__spec__",
+      "index": 207
+    }
+  ]
+}

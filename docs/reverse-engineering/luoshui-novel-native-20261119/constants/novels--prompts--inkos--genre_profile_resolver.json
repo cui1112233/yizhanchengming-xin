@@ -1,0 +1,1207 @@
+{
+  "moduleName": "novels.prompts.inkos.genre_profile_resolver",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4156066,
+  "payloadRange": [
+    4156114,
+    4158060
+  ],
+  "payloadSha256": "66219b9d6b00fe3b8e369f1d614af1ef674d16685b11657caeb81d423828f5a8",
+  "declaredConstants": 62,
+  "parsedConstants": 62,
+  "stoppedAt": 4158059,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4156116,
+        4156123
+      ],
+      "value": "other",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156123,
+        4156130
+      ],
+      "value": "strip",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156130,
+        4156137
+      ],
+      "value": "lower",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156137,
+        4156160
+      ],
+      "value": "DEFAULT_GENRE_PROFILE",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156160,
+        4156164
+      ],
+      "value": "id",
+      "index": 4
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4156164,
+        4156296
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156166,
+              4156176
+            ],
+            "value": "xuanhuan"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156176,
+              4156185
+            ],
+            "value": "xianxia"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156185,
+              4156192
+            ],
+            "value": "urban"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156192,
+              4156201
+            ],
+            "value": "romance"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156201,
+              4156210
+            ],
+            "value": "mystery"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156210,
+              4156219
+            ],
+            "value": "history"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156219,
+              4156226
+            ],
+            "value": "scifi"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156226,
+              4156232
+            ],
+            "value": "game"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4156232,
+              4156240
+            ],
+            "value": "玄幻"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156240,
+              4156248
+            ],
+            "value": "仙侠"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156248,
+              4156256
+            ],
+            "value": "都市"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156256,
+              4156264
+            ],
+            "value": "言情"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156264,
+              4156272
+            ],
+            "value": "悬疑"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156272,
+              4156280
+            ],
+            "value": "历史"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156280,
+              4156288
+            ],
+            "value": "科幻"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156288,
+              4156296
+            ],
+            "value": "游戏"
+          }
+        ]
+      },
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156296,
+        4156304
+      ],
+      "value": "通用",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156304,
+        4156310
+      ],
+      "value": "name",
+      "index": 7
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4156310,
+        4156321
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156312,
+              4156321
+            ],
+            "value": "history"
+          }
+        ]
+      },
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156321,
+        4156334
+      ],
+      "value": "eraResearch",
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4156334,
+        4156361
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156336,
+              4156346
+            ],
+            "value": "xuanhuan"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156346,
+              4156355
+            ],
+            "value": "xianxia"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156355,
+              4156361
+            ],
+            "value": "game"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156361,
+        4156378
+      ],
+      "value": "numericalSystem",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156378,
+        4156392
+      ],
+      "value": "powerScaling",
+      "index": 12
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4156392,
+        4156413
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156394,
+              4156404
+            ],
+            "value": "xuanhuan"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156404,
+              4156413
+            ],
+            "value": "xianxia"
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4156413,
+        4156453
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4156415,
+              4156423
+            ],
+            "value": "升级"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156423,
+              4156431
+            ],
+            "value": "打脸"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156431,
+              4156439
+            ],
+            "value": "收获"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4156439,
+              4156453
+            ],
+            "value": "身份揭露"
+          }
+        ]
+      },
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156453,
+        4156472
+      ],
+      "value": "satisfactionTypes",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156472,
+        4156481
+      ],
+      "value": "romance",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156481,
+        4156495
+      ],
+      "value": "情感推进",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156495,
+        4156509
+      ],
+      "value": "误会解除",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156509,
+        4156523
+      ],
+      "value": "关系突破",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156523,
+        4156532
+      ],
+      "value": "mystery",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156532,
+        4156546
+      ],
+      "value": "线索落地",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156546,
+        4156554
+      ],
+      "value": "反转",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4156554,
+        4156568
+      ],
+      "value": "真相揭露",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156568,
+        4156582
+      ],
+      "value": "GENRE_BODIES",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156582,
+        4156587
+      ],
+      "value": "get",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156587,
+        4156594
+      ],
+      "value": "title",
+      "index": 26
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4156594,
+        4156595
+      ],
+      "value": "",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156595,
+        4156602
+      ],
+      "value": "genre",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156602,
+        4156612
+      ],
+      "value": "platform",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156612,
+        4156628
+      ],
+      "value": "targetChapters",
+      "index": 30
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4156628,
+        4156631
+      ],
+      "value": 200,
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156631,
+        4156649
+      ],
+      "value": "chapterWordCount",
+      "index": 32
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4156649,
+        4156652
+      ],
+      "value": 3000,
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156652,
+        4156662
+      ],
+      "value": "language",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156662,
+        4156666
+      ],
+      "value": "zh",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156666,
+        4156675
+      ],
+      "value": "__doc__",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156675,
+        4156685
+      ],
+      "value": "__file__",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156685,
+        4156693
+      ],
+      "value": "origin",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156693,
+        4156707
+      ],
+      "value": "has_location",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156707,
+        4156719
+      ],
+      "value": "__cached__",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156719,
+        4156736
+      ],
+      "value": "__annotations__",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156736,
+        4156749
+      ],
+      "value": "annotations",
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156749,
+        4156754
+      ],
+      "value": "Any",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156754,
+        4156778
+      ],
+      "value": "genre_profile_defaults",
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4156778,
+        4156817
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156780,
+              4156803
+            ],
+            "value": "DEFAULT_GENRE_PROFILE"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156803,
+              4156817
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156817,
+        4156831
+      ],
+      "value": "GenreProfile",
+      "index": 46
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4156831,
+        4157639
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156833,
+              4156843
+            ],
+            "value": "xuanhuan"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156843,
+              4156852
+            ],
+            "value": "xianxia"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156852,
+              4156859
+            ],
+            "value": "urban"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156859,
+              4156868
+            ],
+            "value": "romance"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156868,
+              4156877
+            ],
+            "value": "mystery"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156877,
+              4156886
+            ],
+            "value": "history"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156886,
+              4156893
+            ],
+            "value": "scifi"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156893,
+              4156899
+            ],
+            "value": "game"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156899,
+              4156906
+            ],
+            "value": "other"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4156906,
+              4157007
+            ],
+            "value": "玄幻升级流：力量体系清晰、节奏明快、爽点密集，主角成长线贯穿全书。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157007,
+              4157099
+            ],
+            "value": "仙侠修真：境界体系、宗门势力、天地规则，注重修炼逻辑与因果。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157099,
+              4157191
+            ],
+            "value": "都市现实：贴近当代生活，冲突来自社会关系、职场、家庭与阶层。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157191,
+              4157271
+            ],
+            "value": "言情：情感推进为核心，关系张力与情绪回报是主发动机。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157271,
+              4157348
+            ],
+            "value": "悬疑推理：信息释放节奏、证据链、反转与读者参与感。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157348,
+              4157437
+            ],
+            "value": "历史：时代锚、政策与社会环境不可违背，人物命运与时代绑定。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157437,
+              4157497
+            ],
+            "value": "科幻：技术/设定自洽，世界观规则可推演。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157497,
+              4157556
+            ],
+            "value": "游戏异界：系统、数值、副本与升级反馈。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157556,
+              4157639
+            ],
+            "value": "通用网文：人物驱动、冲突明确、章末留钩、节奏张弛有度。"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4157639,
+        4157655
+      ],
+      "value": "dict[str, str]",
+      "index": 48
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4157655,
+        4157694
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157657,
+              4157667
+            ],
+            "value": "genre_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4157667,
+              4157675
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157675,
+              4157680
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4157680,
+              4157694
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4157694,
+        4157717
+      ],
+      "value": "resolve_genre_profile",
+      "index": 50
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4157717,
+        4157743
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157719,
+              4157729
+            ],
+            "value": "genre_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4157729,
+              4157737
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157737,
+              4157742
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4157742,
+              4157743
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4157737,
+                  4157742
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4157743,
+        4157763
+      ],
+      "value": "resolve_genre_body",
+      "index": 52
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4157763,
+        4157786
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157765,
+              4157785
+            ],
+            "value": "chapter_word_count"
+          }
+        ],
+        "values": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4157785,
+              4157786
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4157786,
+        4157855
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157788,
+              4157794
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4157794,
+              4157814
+            ],
+            "value": "chapter_word_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4157814,
+              4157822
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157822,
+              4157827
+            ],
+            "value": "Any"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157827,
+              4157839
+            ],
+            "value": "int | None"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4157839,
+              4157855
+            ],
+            "value": "dict[str, Any]"
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4157855,
+        4157876
+      ],
+      "value": "book_to_writer_dict",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4157876,
+        4157924
+      ],
+      "value": "novels\\prompts\\inkos\\genre_profile_resolver.py",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4157924,
+        4157978
+      ],
+      "value": "<module novels.prompts.inkos.genre_profile_resolver>",
+      "index": 57
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4157978,
+        4158006
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4157980,
+              4157986
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4157986,
+              4158006
+            ],
+            "value": "chapter_word_count"
+          }
+        ]
+      },
+      "index": 58
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158006,
+        4158023
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4158008,
+              4158018
+            ],
+            "value": "genre_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158018,
+              4158023
+            ],
+            "value": "key"
+          }
+        ]
+      },
+      "index": 59
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4158023,
+        4158049
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4158025,
+              4158035
+            ],
+            "value": "genre_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158035,
+              4158044
+            ],
+            "value": "profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4158044,
+              4158049
+            ],
+            "value": "key"
+          }
+        ]
+      },
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4158049,
+        4158059
+      ],
+      "value": "__spec__",
+      "index": 61
+    }
+  ]
+}

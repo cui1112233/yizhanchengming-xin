@@ -1,0 +1,4726 @@
+{
+  "moduleName": "novels.agents.architect_agent",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3880372,
+  "payloadRange": [
+    3880406,
+    3887402
+  ],
+  "payloadSha256": "693ae19b85526cdf7a9a3e858ad25ce29145dd8b5843b6a715fff01a15769de7",
+  "declaredConstants": 187,
+  "parsedConstants": 187,
+  "stoppedAt": 3887401,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3880408,
+        3880413
+      ],
+      "value": "ctx",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880413,
+        3880419
+      ],
+      "value": "emit",
+      "index": 1
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3880419,
+        3880502
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3880421,
+              3880436
+            ],
+            "value": "tool:progress"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3880436,
+              3880456
+            ],
+            "value": "生成基础设定"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880456,
+              3880464
+            ],
+            "value": "active"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3880464,
+              3880502
+            ],
+            "value": "建筑师正在生成故事框架..."
+          }
+        ]
+      },
+      "index": 2
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3880502,
+        3880528
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3880504,
+              3880511
+            ],
+            "value": "stage"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880511,
+              3880519
+            ],
+            "value": "status"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880519,
+              3880528
+            ],
+            "value": "message"
+          }
+        ]
+      },
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880528,
+        3880551
+      ],
+      "value": "resolve_genre_profile",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880551,
+        3880558
+      ],
+      "value": "genre",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880558,
+        3880578
+      ],
+      "value": "resolve_genre_body",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880578,
+        3880599
+      ],
+      "value": "book_to_writer_dict",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880599,
+        3880620
+      ],
+      "value": "build_context_block",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880620,
+        3880649
+      ],
+      "value": "build_review_feedback_block",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880649,
+        3880659
+      ],
+      "value": "language",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880659,
+        3880663
+      ],
+      "value": "zh",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880663,
+        3880688
+      ],
+      "value": "build_constraint_blocks",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880688,
+        3880721
+      ],
+      "value": "build_chinese_foundation_prompt",
+      "index": 13
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3880721,
+        3880802
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3880723,
+              3880738
+            ],
+            "value": "context_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880738,
+              3880761
+            ],
+            "value": "review_feedback_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880761,
+              3880778
+            ],
+            "value": "numerical_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880778,
+              3880791
+            ],
+            "value": "power_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880791,
+              3880802
+            ],
+            "value": "era_block"
+          }
+        ]
+      },
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880802,
+        3880833
+      ],
+      "value": "build_foundation_user_message",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880833,
+        3880839
+      ],
+      "value": "role",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880839,
+        3880847
+      ],
+      "value": "system",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880847,
+        3880856
+      ],
+      "value": "content",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880856,
+        3880862
+      ],
+      "value": "user",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880862,
+        3880868
+      ],
+      "value": "chat",
+      "index": 20
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3880868,
+        3880907
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3880870,
+              3880882
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3880882,
+              3880895
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3880895,
+              3880898
+            ],
+            "value": 12000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3880898,
+              3880907
+            ],
+            "value": 0.8
+          }
+        ]
+      },
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880907,
+        3880933
+      ],
+      "value": "parse_architect_sections",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880933,
+        3880960
+      ],
+      "value": "foundation_to_story_files",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880960,
+        3880967
+      ],
+      "value": "story",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880967,
+        3880983
+      ],
+      "value": "FileRepository",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3880983,
+        3880995
+      ],
+      "value": "ensure_dir",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3880995,
+        3881011
+      ],
+      "value": "story_frame.md",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3881011,
+        3881016
+      ],
+      "value": "get",
+      "index": 28
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3881016,
+        3881032
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881018,
+              3881031
+            ],
+            "value": "story_frame"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3881031,
+              3881032
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881032,
+        3881047
+      ],
+      "value": "volume_map.md",
+      "index": 30
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3881047,
+        3881062
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881049,
+              3881061
+            ],
+            "value": "volume_map"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3881061,
+              3881062
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881062,
+        3881077
+      ],
+      "value": "book_rules.md",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3881077,
+        3881092
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881079,
+              3881091
+            ],
+            "value": "book_rules"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3881091,
+              3881092
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881092,
+        3881110
+      ],
+      "value": "current_state.md",
+      "index": 34
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3881110,
+        3881128
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881112,
+              3881127
+            ],
+            "value": "current_state"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3881127,
+              3881128
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881128,
+        3881146
+      ],
+      "value": "pending_hooks.md",
+      "index": 36
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3881146,
+        3881164
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881148,
+              3881163
+            ],
+            "value": "pending_hooks"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3881163,
+              3881164
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881164,
+        3881186
+      ],
+      "value": "chapter_summaries.md",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881186,
+        3881266
+      ],
+      "value": "# 章节摘要\n\n| 章节 | 标题 | 关键事件 |\n|------|------|----------|\n",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3881266,
+        3881278
+      ],
+      "value": "write_text",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3881278,
+        3881289
+      ],
+      "value": "story_dir",
+      "index": 41
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3881289,
+        3881290
+      ],
+      "value": "",
+      "index": 42
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3881290,
+        3881538
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881292,
+              3881299
+            ],
+            "value": "canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3881299,
+              3881303
+            ],
+            "value": "au"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3881303,
+              3881308
+            ],
+            "value": "ooc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3881308,
+              3881312
+            ],
+            "value": "cp"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3881312,
+              3881350
+            ],
+            "value": "严格尊重原作设定与事件。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881350,
+              3881412
+            ],
+            "value": "允许架空世界规则，但保留角色核心辨识度。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881412,
+              3881470
+            ],
+            "value": "允许性格偏离，需标注可接受的 OOC 边界。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881470,
+              3881538
+            ],
+            "value": "重点整理角色关系、CP 互动模式与情感张力来源。"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        3881538,
+        3881540
+      ],
+      "value": "\n",
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3881540,
+        3881687
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3881542,
+              3881556
+            ],
+            "value": "世界规则"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881556,
+              3881570
+            ],
+            "value": "角色档案"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881570,
+              3881596
+            ],
+            "value": "角色语癖与口头禅"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881596,
+              3881610
+            ],
+            "value": "行为模式"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881610,
+              3881627
+            ],
+            "value": "关键时间线"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881627,
+              3881641
+            ],
+            "value": "力量体系"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881641,
+              3881655
+            ],
+            "value": "关系动态"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3881655,
+              3881687
+            ],
+            "value": "信息边界（不可违背）"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881687,
+        3881807
+      ],
+      "value": "你是同人正典整理师（FanficCanonImporter）。把原作材料整理为结构化正典文档。模式说明：",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3881807,
+        3881814
+      ],
+      "value": "canon",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881814,
+        3881851
+      ],
+      "value": "\n必须包含以下二级标题：\n",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881851,
+        3881911
+      ],
+      "value": "\n使用中文 Markdown，具体可引用，不要空话。",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881911,
+        3881922
+      ],
+      "value": "来源：",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881922,
+        3881934
+      ],
+      "value": "\n模式：",
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881934,
+        3881948
+      ],
+      "value": "\n\n原文：\n",
+      "index": 52
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3881948,
+        3881955
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3881949,
+              3881950
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3881950,
+              3881954
+            ],
+            "value": 24000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3881954,
+              3881955
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3881955,
+        3881994
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3881957,
+              3881969
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3881969,
+              3881982
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3881982,
+              3881985
+            ],
+            "value": 8000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3881985,
+              3881994
+            ],
+            "value": 0.4
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881994,
+        3881999
+      ],
+      "value": "## ",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3881999,
+        3882010
+      ],
+      "value": "<genexpr>",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882010,
+        3882061
+      ],
+      "value": "ArchitectAgent.summarize_canon.<locals>.<genexpr>",
+      "index": 57
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3882061,
+        3882200
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              3882063,
+              3882077
+            ],
+            "value": "世界规则"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882077,
+              3882106
+            ],
+            "value": "不可违反的正典约束"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882106,
+              3882126
+            ],
+            "value": "角色当前快照"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882126,
+              3882149
+            ],
+            "value": "关键事件时间线"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882149,
+              3882163
+            ],
+            "value": "信息边界"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882163,
+              3882180
+            ],
+            "value": "伏笔池摘要"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882180,
+              3882200
+            ],
+            "value": "番外写作禁区"
+          }
+        ]
+      },
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882200,
+        3882317
+      ],
+      "value": "你是正传母本压缩器。将正传材料压成番外必须遵守的边界文件 parent_canon。番外类型：",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882317,
+        3882328
+      ],
+      "value": "未指定",
+      "index": 60
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882328,
+        3882347
+      ],
+      "value": "\n必须包含：\n",
+      "index": 61
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882347,
+        3882422
+      ],
+      "value": "\n使用 Markdown，突出「不可违反」与「不可提前泄露」。",
+      "index": 62
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882422,
+        3882439
+      ],
+      "value": "正传书名：",
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882439,
+        3882453
+      ],
+      "value": "\n\n材料：\n",
+      "index": 64
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3882453,
+        3882460
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3882454,
+              3882455
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3882455,
+              3882459
+            ],
+            "value": 30000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3882459,
+              3882460
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3882460,
+        3882499
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3882462,
+              3882474
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3882474,
+              3882487
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3882487,
+              3882490
+            ],
+            "value": 9000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3882490,
+              3882499
+            ],
+            "value": 0.35
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882499,
+        3882556
+      ],
+      "value": "ArchitectAgent.generate_parent_canon.<locals>.<genexpr>",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3882556,
+        3882578
+      ],
+      "value": "STYLE_GUIDE_SECTIONS",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882578,
+        3882753
+      ],
+      "value": "你是文风分析师。从参考文本提取可执行的 style guide，对齐 InkOS style import 结构。必须包含以下二级标题，每节附 1-2 条原文例句：\n",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882753,
+        3882757
+      ],
+      "value": "\n\n",
+      "index": 70
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3882757,
+        3882764
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3882758,
+              3882759
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3882759,
+              3882763
+            ],
+            "value": 20000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3882763,
+              3882764
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 71
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3882764,
+        3882803
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3882766,
+              3882778
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3882778,
+              3882791
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3882791,
+              3882794
+            ],
+            "value": 6000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3882794,
+              3882803
+            ],
+            "value": 0.35
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882803,
+        3882858
+      ],
+      "value": "\n（分析要点 + 1-2 条原文例句作为依据）",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3882858,
+        3882914
+      ],
+      "value": "ArchitectAgent.generate_style_guide.<locals>.<genexpr>",
+      "index": 74
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3882914,
+        3883130
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3882916,
+              3882922
+            ],
+            "value": "role"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3882922,
+              3882931
+            ],
+            "value": "content"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3882931,
+              3882939
+            ],
+            "value": "system"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3882939,
+              3883130
+            ],
+            "value": "你是拆书分析师。输出六维拆书报告 Markdown，包含：情绪曲线、人设、金句、结构、核心价值观、底层逻辑。不要抄袭原文大段，用分析语言。"
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3883130,
+        3883137
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3883131,
+              3883132
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3883132,
+              3883136
+            ],
+            "value": 22000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3883136,
+              3883137
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883137,
+        3883176
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883139,
+              3883151
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883151,
+              3883164
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3883164,
+              3883167
+            ],
+            "value": 7000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3883167,
+              3883176
+            ],
+            "value": 0.4
+          }
+        ]
+      },
+      "index": 77
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883176,
+        3883415
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883178,
+              3883184
+            ],
+            "value": "role"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883184,
+              3883193
+            ],
+            "value": "content"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883193,
+              3883201
+            ],
+            "value": "system"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3883201,
+              3883415
+            ],
+            "value": "你是仿写选题策划。根据参考文本给出 3 个不同的仿写方向（结构须与原作不同）。输出 Markdown：## 方向一/二/三，各含标题、核心冲突、人物微调、结构差异。"
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3883415,
+        3883432
+      ],
+      "value": "用户意向：",
+      "index": 79
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3883432,
+        3883446
+      ],
+      "value": "\n\n参考：\n",
+      "index": 80
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3883446,
+        3883452
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3883447,
+              3883448
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3883448,
+              3883451
+            ],
+            "value": 16000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3883451,
+              3883452
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883452,
+        3883491
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883454,
+              3883466
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883466,
+              3883479
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3883479,
+              3883482
+            ],
+            "value": 4000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3883482,
+              3883491
+            ],
+            "value": 0.65
+          }
+        ]
+      },
+      "index": 82
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883491,
+        3883677
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883493,
+              3883499
+            ],
+            "value": "role"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883499,
+              3883508
+            ],
+            "value": "content"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883508,
+              3883516
+            ],
+            "value": "system"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3883516,
+              3883677
+            ],
+            "value": "你是仿写蓝图设计师。输出 imitation_blueprint：主线、人物微调、结构差异表、每卷/每阶段节奏。强调结构不同、不抄句。"
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3883677,
+        3883688
+      ],
+      "value": "方向：",
+      "index": 84
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3883688,
+        3883700
+      ],
+      "value": "\n意向：",
+      "index": 85
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3883700,
+        3883706
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3883701,
+              3883702
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3883702,
+              3883705
+            ],
+            "value": 14000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3883705,
+              3883706
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 86
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883706,
+        3883745
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883708,
+              3883720
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883720,
+              3883733
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3883733,
+              3883736
+            ],
+            "value": 5000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3883736,
+              3883745
+            ],
+            "value": 0.5
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883745,
+        3883937
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883747,
+              3883753
+            ],
+            "value": "role"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883753,
+              3883762
+            ],
+            "value": "content"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883762,
+              3883770
+            ],
+            "value": "system"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3883770,
+              3883937
+            ],
+            "value": "输出 anti_plagiarism_map Markdown 表格：原作元素 | 新作替换 | 说明。覆盖人名、地名、标志性情节、金句，确保不连续相同字句。"
+          }
+        ]
+      },
+      "index": 88
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3883937,
+        3883949
+      ],
+      "value": "蓝图：\n",
+      "index": 89
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3883949,
+        3883955
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3883950,
+              3883951
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3883951,
+              3883954
+            ],
+            "value": 6000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3883954,
+              3883955
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 90
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3883955,
+        3883961
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3883956,
+              3883957
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3883957,
+              3883960
+            ],
+            "value": 12000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3883960,
+              3883961
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3883961,
+        3884000
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3883963,
+              3883975
+            ],
+            "value": "max_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3883975,
+              3883988
+            ],
+            "value": "temperature"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3883988,
+              3883991
+            ],
+            "value": 4000
+          },
+          {
+            "tag": "f",
+            "fileRange": [
+              3883991,
+              3884000
+            ],
+            "value": 0.35
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884000,
+        3884017
+      ],
+      "value": "同人模式：",
+      "index": 93
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884017,
+        3884029
+      ],
+      "value": "\n方向：",
+      "index": 94
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884029,
+        3884049
+      ],
+      "value": "\n\n## 原作正典\n",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884049,
+        3884070
+      ],
+      "value": "generate_foundation",
+      "index": 96
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884070,
+        3884161
+      ],
+      "value": "这是正传番外/侧故事，不得推进或破坏正传主线终局。\n番外方向：",
+      "index": 97
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884161,
+        3884187
+      ],
+      "value": "\n\n## 正传正典参照\n",
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884187,
+        3884268
+      ],
+      "value": "以下是从已写章节反推的素材，请生成可续写的 foundation：\n\n",
+      "index": 99
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        3884268,
+        3884275
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              3884269,
+              3884270
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              3884270,
+              3884274
+            ],
+            "value": 28000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              3884274,
+              3884275
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884275,
+        3884284
+      ],
+      "value": "__doc__",
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884284,
+        3884294
+      ],
+      "value": "__file__",
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884294,
+        3884302
+      ],
+      "value": "origin",
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884302,
+        3884316
+      ],
+      "value": "has_location",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884316,
+        3884328
+      ],
+      "value": "__cached__",
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884328,
+        3884341
+      ],
+      "value": "annotations",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884341,
+        3884350
+      ],
+      "value": "pathlib",
+      "index": 107
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884350,
+        3884358
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884352,
+              3884358
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 108
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884358,
+        3884364
+      ],
+      "value": "Path",
+      "index": 109
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884364,
+        3884380
+      ],
+      "value": "models.schemas",
+      "index": 110
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884380,
+        3884394
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884382,
+              3884394
+            ],
+            "value": "BookConfig"
+          }
+        ]
+      },
+      "index": 111
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        3884394,
+        3884396
+      ],
+      "value": 2,
+      "index": 112
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884396,
+        3884408
+      ],
+      "value": "BookConfig",
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884408,
+        3884441
+      ],
+      "value": "prompts.inkos.architect_prompts",
+      "index": 114
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884441,
+        3884635
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884443,
+              3884476
+            ],
+            "value": "build_chinese_foundation_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884476,
+              3884501
+            ],
+            "value": "build_constraint_blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884501,
+              3884522
+            ],
+            "value": "build_context_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884522,
+              3884553
+            ],
+            "value": "build_foundation_user_message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884553,
+              3884582
+            ],
+            "value": "build_review_feedback_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884582,
+              3884609
+            ],
+            "value": "foundation_to_story_files"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884609,
+              3884635
+            ],
+            "value": "parse_architect_sections"
+          }
+        ]
+      },
+      "index": 115
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884635,
+        3884673
+      ],
+      "value": "prompts.inkos.genre_profile_resolver",
+      "index": 116
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884673,
+        3884739
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884675,
+              3884696
+            ],
+            "value": "book_to_writer_dict"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884696,
+              3884716
+            ],
+            "value": "resolve_genre_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884716,
+              3884739
+            ],
+            "value": "resolve_genre_profile"
+          }
+        ]
+      },
+      "index": 117
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884739,
+        3884764
+      ],
+      "value": "storage.file_repository",
+      "index": 118
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884764,
+        3884782
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884766,
+              3884782
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 119
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884782,
+        3884810
+      ],
+      "value": "services.style_fingerprint",
+      "index": 120
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884810,
+        3884834
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884812,
+              3884834
+            ],
+            "value": "STYLE_GUIDE_SECTIONS"
+          }
+        ]
+      },
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884834,
+        3884846
+      ],
+      "value": "base_agent",
+      "index": 122
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884846,
+        3884862
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884848,
+              3884862
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884862,
+        3884876
+      ],
+      "value": "AgentContext",
+      "index": 124
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884876,
+        3884888
+      ],
+      "value": "__module__",
+      "index": 125
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884888,
+        3884904
+      ],
+      "value": "ArchitectAgent",
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884904,
+        3884918
+      ],
+      "value": "__qualname__",
+      "index": 127
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3884918,
+        3884939
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884920,
+              3884925
+            ],
+            "value": "ctx"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884925,
+              3884939
+            ],
+            "value": "AgentContext"
+          }
+        ]
+      },
+      "index": 128
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3884939,
+        3884949
+      ],
+      "value": "__init__",
+      "index": 129
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3884949,
+        3884974
+      ],
+      "value": "ArchitectAgent.__init__",
+      "index": 130
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3884974,
+        3884978
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "s",
+            "fileRange": [
+              3884976,
+              3884977
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3884977,
+              3884978
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  3884976,
+                  3884977
+                ],
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "index": 131
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3884978,
+        3885063
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3884980,
+              3884986
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3884986,
+              3885004
+            ],
+            "value": "external_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885004,
+              3885021
+            ],
+            "value": "review_feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885021,
+              3885029
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885029,
+              3885041
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885041,
+              3885046
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885046,
+              3885047
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885041,
+                  3885046
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3885047,
+              3885063
+            ],
+            "value": "dict[str, str]"
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885063,
+        3885099
+      ],
+      "value": "ArchitectAgent.generate_foundation",
+      "index": 133
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885099,
+        3885159
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885101,
+              3885111
+            ],
+            "value": "book_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885111,
+              3885123
+            ],
+            "value": "foundation"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885123,
+              3885131
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885131,
+              3885137
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3885137,
+              3885153
+            ],
+            "value": "dict[str, str]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885153,
+              3885159
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885159,
+        3885183
+      ],
+      "value": "write_foundation_files",
+      "index": 135
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885183,
+        3885222
+      ],
+      "value": "ArchitectAgent.write_foundation_files",
+      "index": 136
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3885222,
+        3885231
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885224,
+              3885231
+            ],
+            "value": "canon"
+          }
+        ]
+      },
+      "index": 137
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885231,
+        3885281
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885233,
+              3885246
+            ],
+            "value": "source_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885246,
+              3885259
+            ],
+            "value": "source_name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885259,
+              3885265
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885265,
+              3885273
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885273,
+              3885278
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885278,
+              3885279
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885273,
+                  3885278
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885279,
+              3885280
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885278,
+                  3885279
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3885273,
+                      3885278
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885280,
+              3885281
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885279,
+                  3885280
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3885278,
+                      3885279
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          3885273,
+                          3885278
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 138
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885281,
+        3885298
+      ],
+      "value": "summarize_canon",
+      "index": 139
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885298,
+        3885330
+      ],
+      "value": "ArchitectAgent.summarize_canon",
+      "index": 140
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3885330,
+        3885333
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "s",
+            "fileRange": [
+              3885332,
+              3885333
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 141
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885333,
+        3885394
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885335,
+              3885349
+            ],
+            "value": "parent_title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885349,
+              3885364
+            ],
+            "value": "source_bundle"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885364,
+              3885378
+            ],
+            "value": "spinoff_type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885378,
+              3885386
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885386,
+              3885391
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885391,
+              3885392
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885386,
+                  3885391
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885392,
+              3885393
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885391,
+                  3885392
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3885386,
+                      3885391
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885393,
+              3885394
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885392,
+                  3885393
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3885391,
+                      3885392
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          3885386,
+                          3885391
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 142
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885394,
+        3885417
+      ],
+      "value": "generate_parent_canon",
+      "index": 143
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885417,
+        3885455
+      ],
+      "value": "ArchitectAgent.generate_parent_canon",
+      "index": 144
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3885455,
+        3885468
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885457,
+              3885468
+            ],
+            "value": "reference"
+          }
+        ]
+      },
+      "index": 145
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885468,
+        3885514
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885470,
+              3885486
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885486,
+              3885499
+            ],
+            "value": "source_name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885499,
+              3885507
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885507,
+              3885512
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885512,
+              3885513
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885507,
+                  3885512
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885513,
+              3885514
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885512,
+                  3885513
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3885507,
+                      3885512
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 146
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885514,
+        3885536
+      ],
+      "value": "generate_style_guide",
+      "index": 147
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885536,
+        3885573
+      ],
+      "value": "ArchitectAgent.generate_style_guide",
+      "index": 148
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885573,
+        3885605
+      ],
+      "value": "generate_deconstruction_report",
+      "index": 149
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885605,
+        3885652
+      ],
+      "value": "ArchitectAgent.generate_deconstruction_report",
+      "index": 150
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885652,
+        3885697
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885654,
+              3885670
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885670,
+              3885682
+            ],
+            "value": "story_idea"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885682,
+              3885690
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885690,
+              3885695
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885695,
+              3885696
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885690,
+                  3885695
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885696,
+              3885697
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885695,
+                  3885696
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3885690,
+                      3885695
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 151
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885697,
+        3885728
+      ],
+      "value": "generate_imitation_directions",
+      "index": 152
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885728,
+        3885774
+      ],
+      "value": "ArchitectAgent.generate_imitation_directions",
+      "index": 153
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885774,
+        3885831
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885776,
+              3885792
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885792,
+              3885803
+            ],
+            "value": "direction"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885803,
+              3885815
+            ],
+            "value": "story_idea"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885815,
+              3885823
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885823,
+              3885828
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885828,
+              3885829
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885823,
+                  3885828
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885829,
+              3885830
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885828,
+                  3885829
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3885823,
+                      3885828
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885830,
+              3885831
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885829,
+                  3885830
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      3885828,
+                      3885829
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          3885823,
+                          3885828
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 154
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885831,
+        3885861
+      ],
+      "value": "generate_imitation_blueprint",
+      "index": 155
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885861,
+        3885906
+      ],
+      "value": "ArchitectAgent.generate_imitation_blueprint",
+      "index": 156
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3885906,
+        3885950
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885908,
+              3885924
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885924,
+              3885935
+            ],
+            "value": "blueprint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3885935,
+              3885943
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3885943,
+              3885948
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885948,
+              3885949
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3885943,
+                  3885948
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3885949,
+              3885950
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3885948,
+                  3885949
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3885943,
+                      3885948
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 157
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3885950,
+        3885980
+      ],
+      "value": "generate_anti_plagiarism_map",
+      "index": 158
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3885980,
+        3886025
+      ],
+      "value": "ArchitectAgent.generate_anti_plagiarism_map",
+      "index": 159
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3886025,
+        3886112
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886027,
+              3886033
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886033,
+              3886045
+            ],
+            "value": "canon_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886045,
+              3886058
+            ],
+            "value": "fanfic_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886058,
+              3886069
+            ],
+            "value": "direction"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886069,
+              3886077
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886077,
+              3886089
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886089,
+              3886094
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3886094,
+              3886095
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3886089,
+                  3886094
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3886095,
+              3886096
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  3886094,
+                  3886095
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      3886089,
+                      3886094
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3886096,
+              3886112
+            ],
+            "value": "dict[str, str]"
+          }
+        ]
+      },
+      "index": 160
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3886112,
+        3886140
+      ],
+      "value": "generate_fanfic_foundation",
+      "index": 161
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3886140,
+        3886183
+      ],
+      "value": "ArchitectAgent.generate_fanfic_foundation",
+      "index": 162
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3886183,
+        3886258
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886185,
+              3886191
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886191,
+              3886205
+            ],
+            "value": "parent_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886205,
+              3886216
+            ],
+            "value": "direction"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886216,
+              3886224
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886224,
+              3886236
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886236,
+              3886241
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              3886241,
+              3886242
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  3886236,
+                  3886241
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3886242,
+              3886258
+            ],
+            "value": "dict[str, str]"
+          }
+        ]
+      },
+      "index": 163
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3886258,
+        3886287
+      ],
+      "value": "generate_spinoff_foundation",
+      "index": 164
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3886287,
+        3886331
+      ],
+      "value": "ArchitectAgent.generate_spinoff_foundation",
+      "index": 165
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        3886331,
+        3886395
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886333,
+              3886339
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886339,
+              3886354
+            ],
+            "value": "chapters_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886354,
+              3886362
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886362,
+              3886374
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886374,
+              3886379
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3886379,
+              3886395
+            ],
+            "value": "dict[str, str]"
+          }
+        ]
+      },
+      "index": 166
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3886395,
+        3886428
+      ],
+      "value": "generate_foundation_from_import",
+      "index": 167
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3886428,
+        3886476
+      ],
+      "value": "ArchitectAgent.generate_foundation_from_import",
+      "index": 168
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3886476,
+        3886510
+      ],
+      "value": "novels\\agents\\architect_agent.py",
+      "index": 169
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886510,
+        3886523
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886512,
+              3886516
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886516,
+              3886523
+            ],
+            "value": "title"
+          }
+        ]
+      },
+      "index": 170
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3886523,
+        3886563
+      ],
+      "value": "<module novels.agents.architect_agent>",
+      "index": 171
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886563,
+        3886576
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886565,
+              3886571
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886571,
+              3886576
+            ],
+            "value": "ctx"
+          }
+        ]
+      },
+      "index": 172
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886576,
+        3886621
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886578,
+              3886584
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886584,
+              3886600
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886600,
+              3886611
+            ],
+            "value": "blueprint"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886611,
+              3886621
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 173
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886621,
+        3886668
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886623,
+              3886629
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886629,
+              3886645
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886645,
+              3886658
+            ],
+            "value": "source_name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886658,
+              3886668
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 174
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886668,
+        3886727
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886670,
+              3886676
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886676,
+              3886682
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886682,
+              3886694
+            ],
+            "value": "canon_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886694,
+              3886707
+            ],
+            "value": "fanfic_mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886707,
+              3886718
+            ],
+            "value": "direction"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886718,
+              3886727
+            ],
+            "value": "context"
+          }
+        ]
+      },
+      "index": 175
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886727,
+        3886927
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886729,
+              3886735
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886735,
+              3886741
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886741,
+              3886759
+            ],
+            "value": "external_context"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886759,
+              3886776
+            ],
+            "value": "review_feedback"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886776,
+              3886780
+            ],
+            "value": "gp"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886780,
+              3886792
+            ],
+            "value": "genre_body"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886792,
+              3886803
+            ],
+            "value": "book_dict"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886803,
+              3886818
+            ],
+            "value": "context_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886818,
+              3886832
+            ],
+            "value": "review_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886832,
+              3886849
+            ],
+            "value": "numerical_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886849,
+              3886862
+            ],
+            "value": "power_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886862,
+              3886873
+            ],
+            "value": "era_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886873,
+              3886888
+            ],
+            "value": "system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886888,
+              3886902
+            ],
+            "value": "user_message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886902,
+              3886912
+            ],
+            "value": "messages"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886912,
+              3886917
+            ],
+            "value": "raw"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886917,
+              3886927
+            ],
+            "value": "sections"
+          }
+        ]
+      },
+      "index": 176
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886927,
+        3886965
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886929,
+              3886935
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886935,
+              3886941
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886941,
+              3886956
+            ],
+            "value": "chapters_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886956,
+              3886965
+            ],
+            "value": "context"
+          }
+        ]
+      },
+      "index": 177
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3886965,
+        3887022
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3886967,
+              3886973
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886973,
+              3886989
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3886989,
+              3887000
+            ],
+            "value": "direction"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887000,
+              3887012
+            ],
+            "value": "story_idea"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887012,
+              3887022
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 178
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3887022,
+        3887068
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3887024,
+              3887030
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887030,
+              3887046
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887046,
+              3887058
+            ],
+            "value": "story_idea"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887058,
+              3887068
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 179
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3887068,
+        3887139
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3887070,
+              3887076
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887076,
+              3887090
+            ],
+            "value": "parent_title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887090,
+              3887105
+            ],
+            "value": "source_bundle"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887105,
+              3887119
+            ],
+            "value": "spinoff_type"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887119,
+              3887129
+            ],
+            "value": "sections"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887129,
+              3887139
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 180
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3887139,
+        3887187
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3887141,
+              3887147
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887147,
+              3887153
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887153,
+              3887167
+            ],
+            "value": "parent_canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887167,
+              3887178
+            ],
+            "value": "direction"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887178,
+              3887187
+            ],
+            "value": "context"
+          }
+        ]
+      },
+      "index": 181
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3887187,
+        3887244
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3887189,
+              3887195
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887195,
+              3887211
+            ],
+            "value": "reference_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887211,
+              3887224
+            ],
+            "value": "source_name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887224,
+              3887234
+            ],
+            "value": "sections"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887234,
+              3887244
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 182
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3887244,
+        3887316
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3887246,
+              3887252
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887252,
+              3887265
+            ],
+            "value": "source_text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887265,
+              3887278
+            ],
+            "value": "source_name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887278,
+              3887284
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887284,
+              3887296
+            ],
+            "value": "mode_notes"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887296,
+              3887306
+            ],
+            "value": "sections"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887306,
+              3887316
+            ],
+            "value": "messages"
+          }
+        ]
+      },
+      "index": 183
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3887316,
+        3887381
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3887318,
+              3887324
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887324,
+              3887334
+            ],
+            "value": "book_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887334,
+              3887346
+            ],
+            "value": "foundation"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887346,
+              3887357
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887357,
+              3887366
+            ],
+            "value": "mapping"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887366,
+              3887372
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3887372,
+              3887381
+            ],
+            "value": "content"
+          }
+        ]
+      },
+      "index": 184
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3887381,
+        3887391
+      ],
+      "value": "__name__",
+      "index": 185
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3887391,
+        3887401
+      ],
+      "value": "__spec__",
+      "index": 186
+    }
+  ]
+}

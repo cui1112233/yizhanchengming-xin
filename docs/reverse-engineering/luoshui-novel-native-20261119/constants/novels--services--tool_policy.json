@@ -1,0 +1,1053 @@
+{
+  "moduleName": "novels.services.tool_policy",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4401916,
+  "payloadRange": [
+    4401948,
+    4403245
+  ],
+  "payloadSha256": "9ad33175e9747c429dcc7d3c79750be13ce9b3bc0f8e946950a8a4b47dabfd9f",
+  "declaredConstants": 53,
+  "parsedConstants": 53,
+  "stoppedAt": 4403244,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4401950,
+        4401956
+      ],
+      "value": "chat",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4401956,
+        4401970
+      ],
+      "value": "CHAT_ACTIONS",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4401970,
+        4401983
+      ],
+      "value": "book-create",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4401983,
+        4402004
+      ],
+      "value": "BOOK_CREATE_ACTIONS",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402004,
+        4402011
+      ],
+      "value": "short",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402011,
+        4402026
+      ],
+      "value": "SHORT_ACTIONS",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402026,
+        4402032
+      ],
+      "value": "play",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402032,
+        4402046
+      ],
+      "value": "PLAY_ACTIONS",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402046,
+        4402052
+      ],
+      "value": "book",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402052,
+        4402066
+      ],
+      "value": "BOOK_ACTIONS",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402066,
+        4402071
+      ],
+      "value": "get",
+      "index": 10
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4402071,
+        4402082
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402073,
+              4402081
+            ],
+            "value": "action"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4402081,
+              4402082
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402082,
+        4402089
+      ],
+      "value": "strip",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4402089,
+        4402104
+      ],
+      "value": "缺少 action",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402104,
+        4402129
+      ],
+      "value": "allowed_propose_actions",
+      "index": 14
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4402129,
+        4402141
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402131,
+              4402141
+            ],
+            "value": "has_book"
+          }
+        ]
+      },
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4402141,
+        4402162
+      ],
+      "value": "当前会话类型 ",
+      "index": 16
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4402162,
+        4402163
+      ],
+      "value": "",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4402163,
+        4402182
+      ],
+      "value": " 不允许动作 ",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4402182,
+        4402251
+      ],
+      "value": "Return mode label used by agent_session when picking tool exposure.",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402251,
+        4402260
+      ],
+      "value": "__doc__",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402260,
+        4402270
+      ],
+      "value": "__file__",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402270,
+        4402278
+      ],
+      "value": "origin",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402278,
+        4402292
+      ],
+      "value": "has_location",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402292,
+        4402304
+      ],
+      "value": "__cached__",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402304,
+        4402321
+      ],
+      "value": "__annotations__",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402321,
+        4402334
+      ],
+      "value": "annotations",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402334,
+        4402339
+      ],
+      "value": "Any",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402339,
+        4402345
+      ],
+      "value": "Dict",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402345,
+        4402351
+      ],
+      "value": "List",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402351,
+        4402361
+      ],
+      "value": "Optional",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402361,
+        4402366
+      ],
+      "value": "Set",
+      "index": 31
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402366,
+        4402487
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402368,
+              4402381
+            ],
+            "value": "create_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402381,
+              4402392
+            ],
+            "value": "short_run"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402392,
+              4402404
+            ],
+            "value": "play_start"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402404,
+              4402421
+            ],
+            "value": "style_imitation"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402421,
+              4402442
+            ],
+            "value": "continuation_import"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402442,
+              4402458
+            ],
+            "value": "generate_cover"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402458,
+              4402474
+            ],
+            "value": "spinoff_create"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402474,
+              4402487
+            ],
+            "value": "fanfic_init"
+          }
+        ]
+      },
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4402487,
+        4402497
+      ],
+      "value": "Set[str]",
+      "index": 33
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402497,
+        4402512
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402499,
+              4402512
+            ],
+            "value": "create_book"
+          }
+        ]
+      },
+      "index": 34
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402512,
+        4402541
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402514,
+              4402525
+            ],
+            "value": "short_run"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402525,
+              4402541
+            ],
+            "value": "generate_cover"
+          }
+        ]
+      },
+      "index": 35
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402541,
+        4402615
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402543,
+              4402555
+            ],
+            "value": "write_next"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402555,
+              4402571
+            ],
+            "value": "generate_cover"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402571,
+              4402587
+            ],
+            "value": "revise_chapter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402587,
+              4402600
+            ],
+            "value": "write_batch"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402600,
+              4402615
+            ],
+            "value": "audit_chapter"
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402615,
+        4402628
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402617,
+              4402628
+            ],
+            "value": "play_step"
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402628,
+        4402697
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402630,
+              4402643
+            ],
+            "value": "fanfic_init"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402643,
+              4402660
+            ],
+            "value": "style_imitation"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402660,
+              4402681
+            ],
+            "value": "continuation_import"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402681,
+              4402697
+            ],
+            "value": "spinoff_create"
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402697,
+        4402715
+      ],
+      "value": "ASSISTED_ACTIONS",
+      "index": 39
+    },
+    {
+      "tag": "S",
+      "fileRange": [
+        4402715,
+        4402825
+      ],
+      "value": {
+        "type": "set",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402717,
+              4402730
+            ],
+            "value": "create_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402730,
+              4402741
+            ],
+            "value": "short_run"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402741,
+              4402753
+            ],
+            "value": "play_start"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402753,
+              4402765
+            ],
+            "value": "write_next"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402765,
+              4402781
+            ],
+            "value": "generate_cover"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402781,
+              4402797
+            ],
+            "value": "revise_chapter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402797,
+              4402810
+            ],
+            "value": "write_batch"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402810,
+              4402825
+            ],
+            "value": "audit_chapter"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402825,
+        4402845
+      ],
+      "value": "PRODUCTION_ACTIONS",
+      "index": 41
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4402845,
+        4402858
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402847,
+              4402857
+            ],
+            "value": "has_book"
+          }
+        ],
+        "values": [
+          {
+            "tag": "F",
+            "fileRange": [
+              4402857,
+              4402858
+            ],
+            "value": false
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4402858,
+        4402913
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402860,
+              4402874
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402874,
+              4402884
+            ],
+            "value": "has_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402884,
+              4402892
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402892,
+              4402897
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402897,
+              4402903
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4402903,
+              4402913
+            ],
+            "value": "Set[str]"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4402913,
+        4402997
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402915,
+              4402929
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402929,
+              4402937
+            ],
+            "value": "action"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402937,
+              4402947
+            ],
+            "value": "has_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402947,
+              4402955
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4402955,
+              4402960
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4402960,
+              4402976
+            ],
+            "value": "Dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4402976,
+              4402982
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4402982,
+              4402997
+            ],
+            "value": "Optional[str]"
+          }
+        ]
+      },
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4402997,
+        4403023
+      ],
+      "value": "validate_proposed_action",
+      "index": 45
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4403023,
+        4403073
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4403025,
+              4403039
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403039,
+              4403049
+            ],
+            "value": "has_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403049,
+              4403057
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4403057,
+              4403062
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403062,
+              4403068
+            ],
+            "value": "bool"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403068,
+              4403073
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4403073,
+        4403089
+      ],
+      "value": "tools_for_send",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4403089,
+        4403121
+      ],
+      "value": "novels\\services\\tool_policy.py",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4403121,
+        4403159
+      ],
+      "value": "<module novels.services.tool_policy>",
+      "index": 49
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4403159,
+        4403185
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4403161,
+              4403175
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403175,
+              4403185
+            ],
+            "value": "has_book"
+          }
+        ]
+      },
+      "index": 50
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4403185,
+        4403234
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4403187,
+              4403201
+            ],
+            "value": "session_kind"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403201,
+              4403209
+            ],
+            "value": "action"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403209,
+              4403219
+            ],
+            "value": "has_book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403219,
+              4403225
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4403225,
+              4403234
+            ],
+            "value": "allowed"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4403234,
+        4403244
+      ],
+      "value": "__spec__",
+      "index": 52
+    }
+  ]
+}

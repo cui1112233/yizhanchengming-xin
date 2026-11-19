@@ -1,0 +1,742 @@
+{
+  "functions": [
+    {
+      "address": "0x1801cb080",
+      "evidenceId": "ev_121d5878896af8131d1f77a05fcd573773157be9653a5e956a49b6e6b652b5ef",
+      "source": "native/0x1801cb080.c",
+      "annotated": "native/0x1801cb080.annotated.c",
+      "lines": 8,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801cb0cd",
+            "start": "0x1801cb080"
+          }
+        ],
+        "span_bytes": 78,
+        "total_bytes": 78
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801dfdd0",
+      "evidenceId": "ev_3bdfb90ae4fa90bfa017ecabdb88e0b1655a8f50489ba5dc4b9dd19e35958102",
+      "source": "native/0x1801dfdd0.c",
+      "annotated": "native/0x1801dfdd0.annotated.c",
+      "lines": 1816,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801e289c",
+            "start": "0x1801dfdd0"
+          }
+        ],
+        "span_bytes": 10957,
+        "total_bytes": 10957
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1800c10e0",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea",
+      "source": "native/0x1800c10e0.c",
+      "annotated": "native/0x1800c10e0.annotated.c",
+      "lines": 1287,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": true,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1800c132b",
+            "start": "0x1800c10e0"
+          },
+          {
+            "end": "0x1800c34a7",
+            "start": "0x1800c132d"
+          }
+        ],
+        "span_bytes": 9160,
+        "total_bytes": 9159
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Ghidra Listing reports a terminal call at 0x1800c1326 to EXTERNAL:0xfd API-MS-WIN-CRT-RUNTIME-L1-1-0.DLL::abort (external=true, thunk=false, hasNoReturn=true); fallthrough is excluded by Ghidra's flow model. This records Ghidra's FunctionManager flag, not an independent verification that the callee cannot return.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1800b9330",
+      "evidenceId": "ev_684a0100194ec31e6b8494e8e69aaaa339cea0a178c463f433a1c4aa3d4aedbd",
+      "source": "native/0x1800b9330.c",
+      "annotated": "native/0x1800b9330.annotated.c",
+      "lines": 4395,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1800bed52",
+            "start": "0x1800b9330"
+          }
+        ],
+        "span_bytes": 23075,
+        "total_bytes": 23075
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801cb030",
+      "evidenceId": "ev_689399892c00deb3b52afd7b00dbf500a9c52ef91ec76cac0094e29c353031fc",
+      "source": "native/0x1801cb030.c",
+      "annotated": "native/0x1801cb030.annotated.c",
+      "lines": 8,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801cb07d",
+            "start": "0x1801cb030"
+          }
+        ],
+        "span_bytes": 78,
+        "total_bytes": 78
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801c0cf0",
+      "evidenceId": "ev_779279c5817eeb88a2d67e3f57474443d8120234a8bf6a6d26c678be05d3e56d",
+      "source": "native/0x1801c0cf0.c",
+      "annotated": "native/0x1801c0cf0.annotated.c",
+      "lines": 18,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801c0d38",
+            "start": "0x1801c0cf0"
+          }
+        ],
+        "span_bytes": 73,
+        "total_bytes": 73
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801cb170",
+      "evidenceId": "ev_8f01f737747c21eb787e8a6d5d72c834193a396ff5c4d94b9dc2f07dbdce75ba",
+      "source": "native/0x1801cb170.c",
+      "annotated": "native/0x1801cb170.annotated.c",
+      "lines": 2150,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": true,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801cb340",
+            "start": "0x1801cb170"
+          },
+          {
+            "end": "0x1801ce3c3",
+            "start": "0x1801cb342"
+          }
+        ],
+        "span_bytes": 12884,
+        "total_bytes": 12883
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Ghidra Listing reports a terminal call at 0x1801cb33b to EXTERNAL:0xfd API-MS-WIN-CRT-RUNTIME-L1-1-0.DLL::abort (external=true, thunk=false, hasNoReturn=true); fallthrough is excluded by Ghidra's flow model. This records Ghidra's FunctionManager flag, not an independent verification that the callee cannot return.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801cb120",
+      "evidenceId": "ev_b4d8161a1168996cf4f69b8fb9579dde5a6106746cf665333b4e005ee0aeb81b",
+      "source": "native/0x1801cb120.c",
+      "annotated": "native/0x1801cb120.annotated.c",
+      "lines": 8,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801cb16d",
+            "start": "0x1801cb120"
+          }
+        ],
+        "span_bytes": 78,
+        "total_bytes": 78
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801cb0d0",
+      "evidenceId": "ev_f92b97ae5a10ba8fa97039c26ccdfd8958bd06227d53f4e8c8565b152de8f684",
+      "source": "native/0x1801cb0d0.c",
+      "annotated": "native/0x1801cb0d0.annotated.c",
+      "lines": 8,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801cb11d",
+            "start": "0x1801cb0d0"
+          }
+        ],
+        "span_bytes": 78,
+        "total_bytes": 78
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801edcc0",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2",
+      "source": "native/0x1801edcc0.c",
+      "annotated": "native/0x1801edcc0.annotated.c",
+      "lines": 1215,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": true,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801edf0b",
+            "start": "0x1801edcc0"
+          },
+          {
+            "end": "0x1801f040f",
+            "start": "0x1801edf0d"
+          }
+        ],
+        "span_bytes": 10064,
+        "total_bytes": 10063
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Ghidra Listing reports a terminal call at 0x1801edf06 to EXTERNAL:0xfd API-MS-WIN-CRT-RUNTIME-L1-1-0.DLL::abort (external=true, thunk=false, hasNoReturn=true); fallthrough is excluded by Ghidra's flow model. This records Ghidra's FunctionManager flag, not an independent verification that the callee cannot return.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1801caf90",
+      "evidenceId": "ev_fbaf399fb62d36644f4b3c9efef68c4aed169bedda4d240eae3fd86a8933971e",
+      "source": "native/0x1801caf90.c",
+      "annotated": "native/0x1801caf90.annotated.c",
+      "lines": 8,
+      "body": {
+        "available": true,
+        "contains_entry": true,
+        "non_contiguous": false,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "end": "0x1801cafdd",
+            "start": "0x1801caf90"
+          }
+        ],
+        "span_bytes": 78,
+        "total_bytes": 78
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1800b5cc0",
+      "evidenceId": "ev_f2f56a573b43e899f37d7b7def89a74cbd69a7be8f8600753795161c831287d2",
+      "source": "native/0x1800b5cc0.c",
+      "annotated": "native/0x1800b5cc0.annotated.c",
+      "lines": 219,
+      "body": {
+        "available": true,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "start": "0x1800b5cc0",
+            "end": "0x1800b61e1"
+          }
+        ],
+        "total_bytes": 1314,
+        "span_bytes": 1314,
+        "non_contiguous": false,
+        "contains_entry": true
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    },
+    {
+      "address": "0x1800b67e0",
+      "evidenceId": "ev_b87223f0a2d39548850cd974b4950b71951e5b7c4b1daafde9435ec7aae105c4",
+      "source": "native/0x1800b67e0.c",
+      "annotated": "native/0x1800b67e0.annotated.c",
+      "lines": 198,
+      "body": {
+        "available": true,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "start": "0x1800b67e0",
+            "end": "0x1800b6c61"
+          }
+        ],
+        "total_bytes": 1154,
+        "span_bytes": 1154,
+        "non_contiguous": false,
+        "contains_entry": true
+      },
+      "limitations": [
+        "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+        "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+        "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+        "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+        "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+        "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+        "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+        "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+        "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+        "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+        "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+        "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+      ]
+    }
+  ],
+  "constructorBindings": [
+    {
+      "nativeEntry": "0x1801c8710",
+      "module": "novels.prompts.inkos.reviser_prompts",
+      "constantIndex": 178,
+      "name": "build_auto_system_prompt",
+      "evidenceId": "ev_121d5878896af8131d1f77a05fcd573773157be9653a5e956a49b6e6b652b5ef"
+    },
+    {
+      "nativeEntry": "0x1800b5770",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 111,
+      "name": "_count_chars",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea"
+    },
+    {
+      "nativeEntry": "0x1800b5cc0",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 113,
+      "name": "_length_in_range",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea"
+    },
+    {
+      "nativeEntry": "0x1800b61f0",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 112,
+      "name": "_audit_score",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea"
+    },
+    {
+      "nativeEntry": "0x1800b67e0",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 57,
+      "name": "_is_passed",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea"
+    },
+    {
+      "nativeEntry": "0x1800b6c70",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 75,
+      "name": "_format_issues_feedback",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea"
+    },
+    {
+      "nativeEntry": "0x1800b9330",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 177,
+      "name": "run_chapter_review_cycle",
+      "evidenceId": "ev_5fe8338cce2bdf7b802886a5d2edfee1e468e4a518b4b78da8e0945359c9f6ea"
+    },
+    {
+      "nativeEntry": "0x1800bed60",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 41,
+      "name": "log",
+      "evidenceId": "ev_684a0100194ec31e6b8494e8e69aaaa339cea0a178c463f433a1c4aa3d4aedbd"
+    },
+    {
+      "nativeEntry": "0x1800bf180",
+      "module": "novels.pipeline.chapter_review_cycle",
+      "constantIndex": 46,
+      "name": "assess",
+      "evidenceId": "ev_684a0100194ec31e6b8494e8e69aaaa339cea0a178c463f433a1c4aa3d4aedbd"
+    },
+    {
+      "nativeEntry": "0x1801c72e0",
+      "module": "novels.prompts.inkos.reviser_prompts",
+      "constantIndex": 175,
+      "name": "build_protagonist_block",
+      "evidenceId": "ev_689399892c00deb3b52afd7b00dbf500a9c52ef91ec76cac0094e29c353031fc"
+    },
+    {
+      "nativeEntry": "0x1801ca680",
+      "module": "novels.prompts.inkos.reviser_prompts",
+      "constantIndex": 190,
+      "name": "build_reviser_user_prompt",
+      "evidenceId": "ev_b4d8161a1168996cf4f69b8fb9579dde5a6106746cf665333b4e005ee0aeb81b"
+    },
+    {
+      "nativeEntry": "0x1801c98e0",
+      "module": "novels.prompts.inkos.reviser_prompts",
+      "constantIndex": 181,
+      "name": "build_legacy_system_prompt",
+      "evidenceId": "ev_f92b97ae5a10ba8fa97039c26ccdfd8958bd06227d53f4e8c8565b152de8f684"
+    },
+    {
+      "nativeEntry": "0x1801dfdd0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 241,
+      "name": "build_writer_system_prompt",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e2da0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 38,
+      "name": "build_genre_intro",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e31a0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 15,
+      "name": "build_governed_input_contract",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e3500",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 16,
+      "name": "build_chapter_memo_contract",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e3860",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 17,
+      "name": "build_length_guidance",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e4130",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 39,
+      "name": "build_core_rules",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e4550",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 19,
+      "name": "build_writing_craft_card",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e47a0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 22,
+      "name": "build_creative_constitution",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e49f0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 23,
+      "name": "build_immersion_pillars",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e4c40",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 24,
+      "name": "build_golden_opening_discipline",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e5240",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 41,
+      "name": "build_golden_chapters_rules",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e5d00",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 25,
+      "name": "build_genre_rules",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e7520",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 27,
+      "name": "build_narrative_person_rule",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e7950",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 21,
+      "name": "build_prose_execution_rules",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e7ba0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 26,
+      "name": "build_protagonist_rules",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e9380",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 28,
+      "name": "build_book_rules_body",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e9720",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 29,
+      "name": "build_style_guide",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e9ae0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 30,
+      "name": "build_style_fingerprint",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801e9e80",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 270,
+      "name": "build_pre_write_checklist",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801eb0b0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 9,
+      "name": "build_creative_output_format",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801eb930",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 10,
+      "name": "build_output_format",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801ec5a0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 191,
+      "name": "build_english_pre_write_table",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801ecac0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 192,
+      "name": "build_english_content_blocks",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801ecee0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 7,
+      "name": "build_english_creative_output_format",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801ed3b0",
+      "module": "novels.prompts.inkos.writer_prompts",
+      "constantIndex": 8,
+      "name": "build_english_output_format",
+      "evidenceId": "ev_fad984d2e37e65f7f3b0d97197106a716dce83d13967f8a01b1a37f70a79eba2"
+    },
+    {
+      "nativeEntry": "0x1801c1350",
+      "module": "novels.prompts.inkos.reviser_prompts",
+      "constantIndex": 170,
+      "name": "build_tiered_issue_list",
+      "evidenceId": "ev_fbaf399fb62d36644f4b3c9efef68c4aed169bedda4d240eae3fd86a8933971e"
+    }
+  ]
+}

@@ -1,0 +1,4844 @@
+{
+  "moduleName": "novels.prompts.inkos.genre_profile_defaults",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4150882,
+  "payloadRange": [
+    4150930,
+    4156066
+  ],
+  "payloadSha256": "4daf8c3a94b59a6fd90cfdd30811ea5959e72fcc3e1f7541dc5e5859dd805a5b",
+  "declaredConstants": 195,
+  "parsedConstants": 195,
+  "stoppedAt": 4156065,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4150932,
+        4150946
+      ],
+      "value": "_PROFILE_MAP",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4150946,
+        4150951
+      ],
+      "value": "get",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4150951,
+        4150974
+      ],
+      "value": "DEFAULT_GENRE_PROFILE",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4150974,
+        4150983
+      ],
+      "value": "__doc__",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4150983,
+        4150993
+      ],
+      "value": "__file__",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4150993,
+        4151001
+      ],
+      "value": "origin",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151001,
+        4151015
+      ],
+      "value": "has_location",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151015,
+        4151027
+      ],
+      "value": "__cached__",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151027,
+        4151044
+      ],
+      "value": "__annotations__",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151044,
+        4151057
+      ],
+      "value": "annotations",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151057,
+        4151066
+      ],
+      "value": "Literal",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151066,
+        4151077
+      ],
+      "value": "TypedDict",
+      "index": 11
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151077,
+        4151087
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4151079,
+              4151083
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151083,
+              4151087
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151087,
+        4151097
+      ],
+      "value": "Language",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151097,
+        4151110
+      ],
+      "value": "__prepare__",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151110,
+        4151124
+      ],
+      "value": "GenreProfile",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151124,
+        4151137
+      ],
+      "value": "__getitem__",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4151137,
+        4151185
+      ],
+      "value": "%s.__prepare__() must return a mapping, not %s",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151185,
+        4151195
+      ],
+      "value": "__name__",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4151195,
+        4151208
+      ],
+      "value": "<metaclass>",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151208,
+        4151220
+      ],
+      "value": "__module__",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151220,
+        4151234
+      ],
+      "value": "__qualname__",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151234,
+        4151239
+      ],
+      "value": "str",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151239,
+        4151245
+      ],
+      "value": "name",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151245,
+        4151249
+      ],
+      "value": "id",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151249,
+        4151259
+      ],
+      "value": "language",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4151259,
+        4151270
+      ],
+      "value": "list[str]",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151270,
+        4151284
+      ],
+      "value": "chapterTypes",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151284,
+        4151298
+      ],
+      "value": "fatigueWords",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151298,
+        4151304
+      ],
+      "value": "bool",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151304,
+        4151321
+      ],
+      "value": "numericalSystem",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151321,
+        4151335
+      ],
+      "value": "powerScaling",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151335,
+        4151348
+      ],
+      "value": "eraResearch",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151348,
+        4151360
+      ],
+      "value": "pacingRule",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151360,
+        4151379
+      ],
+      "value": "satisfactionTypes",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4151379,
+        4151390
+      ],
+      "value": "list[int]",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151390,
+        4151407
+      ],
+      "value": "auditDimensions",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151407,
+        4151423
+      ],
+      "value": "__orig_bases__",
+      "index": 37
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4151423,
+        4151651
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4151425,
+              4151431
+            ],
+            "value": "name"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151431,
+              4151435
+            ],
+            "value": "id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151435,
+              4151445
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151445,
+              4151459
+            ],
+            "value": "chapterTypes"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151459,
+              4151473
+            ],
+            "value": "fatigueWords"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151473,
+              4151490
+            ],
+            "value": "numericalSystem"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151490,
+              4151504
+            ],
+            "value": "powerScaling"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151504,
+              4151517
+            ],
+            "value": "eraResearch"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151517,
+              4151529
+            ],
+            "value": "pacingRule"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151529,
+              4151548
+            ],
+            "value": "satisfactionTypes"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151548,
+              4151565
+            ],
+            "value": "auditDimensions"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151565,
+              4151573
+            ],
+            "value": "通用"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151573,
+              4151582
+            ],
+            "value": "default"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4151582,
+              4151586
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "L",
+            "fileRange": [
+              4151586,
+              4151588
+            ],
+            "value": {
+              "type": "list",
+              "items": []
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4151588,
+              4151589
+            ],
+            "value": {
+              "previous": {
+                "tag": "L",
+                "fileRange": [
+                  4151586,
+                  4151588
+                ],
+                "value": {
+                  "type": "list",
+                  "items": []
+                }
+              }
+            }
+          },
+          {
+            "tag": "F",
+            "fileRange": [
+              4151589,
+              4151590
+            ],
+            "value": false
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4151590,
+              4151591
+            ],
+            "value": {
+              "previous": {
+                "tag": "F",
+                "fileRange": [
+                  4151589,
+                  4151590
+                ],
+                "value": false
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4151591,
+              4151592
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4151590,
+                  4151591
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "F",
+                    "fileRange": [
+                      4151589,
+                      4151590
+                    ],
+                    "value": false
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4151592,
+              4151593
+            ],
+            "value": ""
+          },
+          {
+            "tag": "L",
+            "fileRange": [
+              4151593,
+              4151595
+            ],
+            "value": {
+              "type": "list",
+              "items": []
+            }
+          },
+          {
+            "tag": "L",
+            "fileRange": [
+              4151595,
+              4151651
+            ],
+            "value": {
+              "type": "list",
+              "items": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151597,
+                    4151599
+                  ],
+                  "value": 1
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151599,
+                    4151601
+                  ],
+                  "value": 2
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151601,
+                    4151603
+                  ],
+                  "value": 3
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151603,
+                    4151605
+                  ],
+                  "value": 4
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151605,
+                    4151607
+                  ],
+                  "value": 5
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151607,
+                    4151609
+                  ],
+                  "value": 6
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151609,
+                    4151611
+                  ],
+                  "value": 7
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151611,
+                    4151613
+                  ],
+                  "value": 8
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151613,
+                    4151615
+                  ],
+                  "value": 9
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151615,
+                    4151617
+                  ],
+                  "value": 10
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151617,
+                    4151619
+                  ],
+                  "value": 11
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151619,
+                    4151621
+                  ],
+                  "value": 12
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151621,
+                    4151623
+                  ],
+                  "value": 13
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151623,
+                    4151625
+                  ],
+                  "value": 14
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151625,
+                    4151627
+                  ],
+                  "value": 15
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151627,
+                    4151629
+                  ],
+                  "value": 16
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151629,
+                    4151631
+                  ],
+                  "value": 17
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151631,
+                    4151633
+                  ],
+                  "value": 18
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151633,
+                    4151635
+                  ],
+                  "value": 19
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151635,
+                    4151637
+                  ],
+                  "value": 20
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151637,
+                    4151639
+                  ],
+                  "value": 21
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151639,
+                    4151641
+                  ],
+                  "value": 22
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151641,
+                    4151643
+                  ],
+                  "value": 23
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151643,
+                    4151645
+                  ],
+                  "value": 24
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151645,
+                    4151647
+                  ],
+                  "value": 25
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151647,
+                    4151649
+                  ],
+                  "value": 26
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4151649,
+                    4151651
+                  ],
+                  "value": 27
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4151651,
+        4151724
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151653,
+              4151664
+            ],
+            "value": "忍不住"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151664,
+              4151675
+            ],
+            "value": "不由得"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151675,
+              4151689
+            ],
+            "value": "情不自禁"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151689,
+              4151700
+            ],
+            "value": "下意识"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151700,
+              4151708
+            ],
+            "value": "缓缓"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151708,
+              4151716
+            ],
+            "value": "微微"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151716,
+              4151724
+            ],
+            "value": "淡淡"
+          }
+        ]
+      },
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151724,
+        4151741
+      ],
+      "value": "_COMMON_FATIGUE",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4151741,
+        4151749
+      ],
+      "value": "玄幻",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151749,
+        4151759
+      ],
+      "value": "xuanhuan",
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4151759,
+        4151763
+      ],
+      "value": "zh",
+      "index": 43
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4151763,
+        4151851
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151765,
+              4151779
+            ],
+            "value": "修炼突破"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151779,
+              4151787
+            ],
+            "value": "战斗"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151787,
+              4151801
+            ],
+            "value": "探索秘境"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151801,
+              4151815
+            ],
+            "value": "拍卖竞价"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151815,
+              4151829
+            ],
+            "value": "宗门日常"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151829,
+              4151843
+            ],
+            "value": "势力冲突"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151843,
+              4151851
+            ],
+            "value": "寻宝"
+          }
+        ]
+      },
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151851,
+        4151861
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151853,
+              4151861
+            ],
+            "value": "气势"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151861,
+        4151871
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151863,
+              4151871
+            ],
+            "value": "威压"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151871,
+        4151881
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151873,
+              4151881
+            ],
+            "value": "灵气"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151881,
+        4151891
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151883,
+              4151891
+            ],
+            "value": "丹田"
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151891,
+        4151901
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151893,
+              4151901
+            ],
+            "value": "经脉"
+          }
+        ]
+      },
+      "index": 49
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151901,
+        4151911
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151903,
+              4151911
+            ],
+            "value": "吞噬"
+          }
+        ]
+      },
+      "index": 50
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4151911,
+        4151921
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151913,
+              4151921
+            ],
+            "value": "领悟"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4151921,
+        4151981
+      ],
+      "value": "每3章至少一次战斗或突破，避免连续修炼章",
+      "index": 52
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4151981,
+        4152053
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4151983,
+              4151997
+            ],
+            "value": "境界突破"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4151997,
+              4152011
+            ],
+            "value": "以弱胜强"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152011,
+              4152025
+            ],
+            "value": "获得神器"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152025,
+              4152039
+            ],
+            "value": "领悟奥义"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152039,
+              4152053
+            ],
+            "value": "碾压打脸"
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152053,
+        4152109
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4152055,
+              4152057
+            ],
+            "value": 1
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152057,
+              4152059
+            ],
+            "value": 2
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152059,
+              4152061
+            ],
+            "value": 3
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152061,
+              4152063
+            ],
+            "value": 4
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152063,
+              4152065
+            ],
+            "value": 5
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152065,
+              4152067
+            ],
+            "value": 6
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152067,
+              4152069
+            ],
+            "value": 7
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152069,
+              4152071
+            ],
+            "value": 8
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152071,
+              4152073
+            ],
+            "value": 9
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152073,
+              4152075
+            ],
+            "value": 10
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152075,
+              4152077
+            ],
+            "value": 11
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152077,
+              4152079
+            ],
+            "value": 12
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152079,
+              4152081
+            ],
+            "value": 13
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152081,
+              4152083
+            ],
+            "value": 14
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152083,
+              4152085
+            ],
+            "value": 15
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152085,
+              4152087
+            ],
+            "value": 16
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152087,
+              4152089
+            ],
+            "value": 17
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152089,
+              4152091
+            ],
+            "value": 18
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152091,
+              4152093
+            ],
+            "value": 19
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152093,
+              4152095
+            ],
+            "value": 20
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152095,
+              4152097
+            ],
+            "value": 21
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152097,
+              4152099
+            ],
+            "value": 22
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152099,
+              4152101
+            ],
+            "value": 23
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152101,
+              4152103
+            ],
+            "value": 24
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152103,
+              4152105
+            ],
+            "value": 25
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152105,
+              4152107
+            ],
+            "value": 26
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4152107,
+              4152109
+            ],
+            "value": 27
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152109,
+        4152117
+      ],
+      "value": "仙侠",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4152117,
+        4152126
+      ],
+      "value": "xianxia",
+      "index": 56
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152126,
+        4152208
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152128,
+              4152136
+            ],
+            "value": "论道"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152136,
+              4152144
+            ],
+            "value": "渡劫"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152144,
+              4152152
+            ],
+            "value": "炼丹"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152152,
+              4152166
+            ],
+            "value": "御剑飞行"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152166,
+              4152180
+            ],
+            "value": "洞天修炼"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152180,
+              4152194
+            ],
+            "value": "宗门大比"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152194,
+              4152208
+            ],
+            "value": "仙魔大战"
+          }
+        ]
+      },
+      "index": 57
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152208,
+        4152218
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152210,
+              4152218
+            ],
+            "value": "道韵"
+          }
+        ]
+      },
+      "index": 58
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152218,
+        4152228
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152220,
+              4152228
+            ],
+            "value": "天劫"
+          }
+        ]
+      },
+      "index": 59
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152228,
+        4152238
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152230,
+              4152238
+            ],
+            "value": "灵根"
+          }
+        ]
+      },
+      "index": 60
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152238,
+        4152248
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152240,
+              4152248
+            ],
+            "value": "仙气"
+          }
+        ]
+      },
+      "index": 61
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152248,
+        4152258
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152250,
+              4152258
+            ],
+            "value": "剑意"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152258,
+        4152268
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152260,
+              4152268
+            ],
+            "value": "心境"
+          }
+        ]
+      },
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152268,
+        4152355
+      ],
+      "value": "修仙节奏慢于玄幻，每5章允许一次修炼沉淀章，但需有内心成长",
+      "index": 64
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152355,
+        4152413
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152357,
+              4152371
+            ],
+            "value": "渡劫成功"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152371,
+              4152379
+            ],
+            "value": "悟道"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152379,
+              4152399
+            ],
+            "value": "炼出极品丹药"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152399,
+              4152413
+            ],
+            "value": "剑破苍穹"
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152413,
+        4152421
+      ],
+      "value": "都市",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4152421,
+        4152428
+      ],
+      "value": "urban",
+      "index": 67
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152428,
+        4152498
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152430,
+              4152438
+            ],
+            "value": "商战"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152438,
+              4152446
+            ],
+            "value": "社交"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152446,
+              4152460
+            ],
+            "value": "家庭冲突"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152460,
+              4152468
+            ],
+            "value": "职场"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152468,
+              4152476
+            ],
+            "value": "恋爱"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152476,
+              4152484
+            ],
+            "value": "日常"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152484,
+              4152498
+            ],
+            "value": "意外事件"
+          }
+        ]
+      },
+      "index": 68
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152498,
+        4152508
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152500,
+              4152508
+            ],
+            "value": "眼眸"
+          }
+        ]
+      },
+      "index": 69
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152508,
+        4152518
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152510,
+              4152518
+            ],
+            "value": "薄唇"
+          }
+        ]
+      },
+      "index": 70
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152518,
+        4152528
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152520,
+              4152528
+            ],
+            "value": "磁性"
+          }
+        ]
+      },
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152528,
+        4152538
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152530,
+              4152538
+            ],
+            "value": "霸道"
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152538,
+        4152548
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152540,
+              4152548
+            ],
+            "value": "冷冽"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152548,
+        4152613
+      ],
+      "value": "对话驱动，每章至少40%对话，避免大段心理独白",
+      "index": 74
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152613,
+        4152671
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152615,
+              4152629
+            ],
+            "value": "商业逆转"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152629,
+              4152643
+            ],
+            "value": "打脸装逼"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152643,
+              4152657
+            ],
+            "value": "真相揭露"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152657,
+              4152671
+            ],
+            "value": "关系升温"
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152671,
+        4152679
+      ],
+      "value": "言情",
+      "index": 76
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4152679,
+        4152688
+      ],
+      "value": "romance",
+      "index": 77
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152688,
+        4152760
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152690,
+              4152698
+            ],
+            "value": "初遇"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152698,
+              4152706
+            ],
+            "value": "误会"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152706,
+              4152714
+            ],
+            "value": "暧昧"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152714,
+              4152722
+            ],
+            "value": "告白"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152722,
+              4152730
+            ],
+            "value": "分离"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152730,
+              4152738
+            ],
+            "value": "重逢"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152738,
+              4152752
+            ],
+            "value": "甜蜜日常"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152752,
+              4152760
+            ],
+            "value": "虐心"
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152760,
+        4152776
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152762,
+              4152776
+            ],
+            "value": "心跳加速"
+          }
+        ]
+      },
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152776,
+        4152792
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152778,
+              4152792
+            ],
+            "value": "脸颊绯红"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152792,
+        4152808
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152794,
+              4152808
+            ],
+            "value": "小鹿乱撞"
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152808,
+        4152818
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152810,
+              4152818
+            ],
+            "value": "温柔"
+          }
+        ]
+      },
+      "index": 82
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4152818,
+        4152828
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152820,
+              4152828
+            ],
+            "value": "宠溺"
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152828,
+        4152907
+      ],
+      "value": "甜虐交替，连续3章甜后需设置矛盾，连续2章虐后需给希望",
+      "index": 84
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152907,
+        4152961
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152909,
+              4152914
+            ],
+            "value": "糖"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152914,
+              4152925
+            ],
+            "value": "虐后甜"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152925,
+              4152933
+            ],
+            "value": "吃醋"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152933,
+              4152947
+            ],
+            "value": "双向暗恋"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152947,
+              4152961
+            ],
+            "value": "英雄救美"
+          }
+        ]
+      },
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4152961,
+        4152969
+      ],
+      "value": "悬疑",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4152969,
+        4152979
+      ],
+      "value": "suspense",
+      "index": 87
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4152979,
+        4153043
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4152981,
+              4152989
+            ],
+            "value": "案发"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152989,
+              4152997
+            ],
+            "value": "调查"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4152997,
+              4153005
+            ],
+            "value": "推理"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153005,
+              4153013
+            ],
+            "value": "误导"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153013,
+              4153027
+            ],
+            "value": "真相揭露"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153027,
+              4153035
+            ],
+            "value": "追逐"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153035,
+              4153043
+            ],
+            "value": "审讯"
+          }
+        ]
+      },
+      "index": 88
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153043,
+        4153059
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153045,
+              4153059
+            ],
+            "value": "蛛丝马迹"
+          }
+        ]
+      },
+      "index": 89
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153059,
+        4153075
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153061,
+              4153075
+            ],
+            "value": "真相大白"
+          }
+        ]
+      },
+      "index": 90
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153075,
+        4153091
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153077,
+              4153091
+            ],
+            "value": "恍然大悟"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153091,
+        4153107
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153093,
+              4153107
+            ],
+            "value": "细思极恐"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153107,
+        4153176
+      ],
+      "value": "每3章至少一个新线索或反转，结尾必须有悬念钩子",
+      "index": 93
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153176,
+        4153228
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153178,
+              4153192
+            ],
+            "value": "线索串联"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153192,
+              4153200
+            ],
+            "value": "反转"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153200,
+              4153214
+            ],
+            "value": "真相揭露"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153214,
+              4153228
+            ],
+            "value": "伏笔回收"
+          }
+        ]
+      },
+      "index": 94
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153228,
+        4153236
+      ],
+      "value": "历史",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4153236,
+        4153245
+      ],
+      "value": "history",
+      "index": 96
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153245,
+        4153303
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153247,
+              4153255
+            ],
+            "value": "朝堂"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153255,
+              4153263
+            ],
+            "value": "战争"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153263,
+              4153271
+            ],
+            "value": "阴谋"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153271,
+              4153279
+            ],
+            "value": "民间"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153279,
+              4153287
+            ],
+            "value": "科举"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153287,
+              4153295
+            ],
+            "value": "宫廷"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153295,
+              4153303
+            ],
+            "value": "外交"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153303,
+        4153313
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153305,
+              4153313
+            ],
+            "value": "拱手"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153313,
+        4153323
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153315,
+              4153323
+            ],
+            "value": "微臣"
+          }
+        ]
+      },
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153323,
+        4153333
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153325,
+              4153333
+            ],
+            "value": "圣上"
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153333,
+        4153343
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153335,
+              4153343
+            ],
+            "value": "社稷"
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153343,
+        4153412
+      ],
+      "value": "大事件间穿插日常生活细节，每5章需推动历史进程",
+      "index": 102
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153412,
+        4153470
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153414,
+              4153428
+            ],
+            "value": "权谋成功"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153428,
+              4153442
+            ],
+            "value": "历史改变"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153442,
+              4153456
+            ],
+            "value": "英雄崛起"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153456,
+              4153470
+            ],
+            "value": "正义伸张"
+          }
+        ]
+      },
+      "index": 103
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153470,
+        4153478
+      ],
+      "value": "科幻",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4153478,
+        4153485
+      ],
+      "value": "scifi",
+      "index": 105
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153485,
+        4153565
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153487,
+              4153495
+            ],
+            "value": "探索"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153495,
+              4153509
+            ],
+            "value": "科技展示"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153509,
+              4153523
+            ],
+            "value": "太空航行"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153523,
+              4153537
+            ],
+            "value": "外星接触"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153537,
+              4153551
+            ],
+            "value": "科技危机"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153551,
+              4153565
+            ],
+            "value": "虚拟世界"
+          }
+        ]
+      },
+      "index": 106
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153565,
+        4153575
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153567,
+              4153575
+            ],
+            "value": "量子"
+          }
+        ]
+      },
+      "index": 107
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153575,
+        4153585
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153577,
+              4153585
+            ],
+            "value": "维度"
+          }
+        ]
+      },
+      "index": 108
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153585,
+        4153595
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153587,
+              4153595
+            ],
+            "value": "矩阵"
+          }
+        ]
+      },
+      "index": 109
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153595,
+        4153605
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153597,
+              4153605
+            ],
+            "value": "纳米"
+          }
+        ]
+      },
+      "index": 110
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153605,
+        4153615
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153607,
+              4153615
+            ],
+            "value": "全息"
+          }
+        ]
+      },
+      "index": 111
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153615,
+        4153689
+      ],
+      "value": "硬科幻每章限一个核心设定展示，软科幻侧重人物驱动",
+      "index": 112
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153689,
+        4153756
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153691,
+              4153705
+            ],
+            "value": "科技突破"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153705,
+              4153719
+            ],
+            "value": "谜题解开"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153719,
+              4153733
+            ],
+            "value": "文明接触"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153733,
+              4153756
+            ],
+            "value": "逻辑自洽的反转"
+          }
+        ]
+      },
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153756,
+        4153764
+      ],
+      "value": "游戏",
+      "index": 114
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4153764,
+        4153770
+      ],
+      "value": "game",
+      "index": 115
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153770,
+        4153837
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153772,
+              4153780
+            ],
+            "value": "副本"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4153780,
+              4153785
+            ],
+            "value": "PVP"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153785,
+              4153793
+            ],
+            "value": "升级"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153793,
+              4153801
+            ],
+            "value": "锻造"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153801,
+              4153812
+            ],
+            "value": "公会战"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153812,
+              4153826
+            ],
+            "value": "隐藏任务"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153826,
+              4153837
+            ],
+            "value": "剧情NPC"
+          }
+        ]
+      },
+      "index": 116
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153837,
+        4153850
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153839,
+              4153850
+            ],
+            "value": "经验值"
+          }
+        ]
+      },
+      "index": 117
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153850,
+        4153860
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153852,
+              4153860
+            ],
+            "value": "暴击"
+          }
+        ]
+      },
+      "index": 118
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153860,
+        4153870
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153862,
+              4153870
+            ],
+            "value": "闪避"
+          }
+        ]
+      },
+      "index": 119
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4153870,
+        4153886
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153872,
+              4153886
+            ],
+            "value": "系统提示"
+          }
+        ]
+      },
+      "index": 120
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4153886,
+        4153952
+      ],
+      "value": "每2章至少一次战斗或副本，数值系统要前后一致",
+      "index": 121
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4153952,
+        4154010
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4153954,
+              4153968
+            ],
+            "value": "装备爆出"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153968,
+              4153982
+            ],
+            "value": "等级碾压"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153982,
+              4153996
+            ],
+            "value": "隐藏成就"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4153996,
+              4154010
+            ],
+            "value": "以弱胜强"
+          }
+        ]
+      },
+      "index": 122
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154010,
+        4154018
+      ],
+      "value": "恐怖",
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4154018,
+        4154026
+      ],
+      "value": "horror",
+      "index": 124
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154026,
+        4154088
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154028,
+              4154036
+            ],
+            "value": "探索"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154036,
+              4154044
+            ],
+            "value": "遭遇"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154044,
+              4154052
+            ],
+            "value": "逃亡"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154052,
+              4154066
+            ],
+            "value": "调查真相"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154066,
+              4154080
+            ],
+            "value": "心理恐惧"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154080,
+              4154088
+            ],
+            "value": "生存"
+          }
+        ]
+      },
+      "index": 125
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154088,
+        4154104
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154090,
+              4154104
+            ],
+            "value": "毛骨悚然"
+          }
+        ]
+      },
+      "index": 126
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154104,
+        4154120
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154106,
+              4154120
+            ],
+            "value": "后背发凉"
+          }
+        ]
+      },
+      "index": 127
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154120,
+        4154136
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154122,
+              4154136
+            ],
+            "value": "头皮发麻"
+          }
+        ]
+      },
+      "index": 128
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154136,
+        4154152
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154138,
+              4154152
+            ],
+            "value": "不寒而栗"
+          }
+        ]
+      },
+      "index": 129
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154152,
+        4154232
+      ],
+      "value": "恐惧递进，不要一开始就用最恐怖的元素，每章结尾留悬念",
+      "index": 130
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154232,
+        4154284
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154234,
+              4154248
+            ],
+            "value": "真相揭露"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154248,
+              4154262
+            ],
+            "value": "成功逃脱"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154262,
+              4154276
+            ],
+            "value": "恐惧升级"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154276,
+              4154284
+            ],
+            "value": "反杀"
+          }
+        ]
+      },
+      "index": 131
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154284,
+        4154292
+      ],
+      "value": "军事",
+      "index": 132
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4154292,
+        4154302
+      ],
+      "value": "military",
+      "index": 133
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154302,
+        4154364
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154304,
+              4154318
+            ],
+            "value": "战术部署"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154318,
+              4154326
+            ],
+            "value": "战斗"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154326,
+              4154334
+            ],
+            "value": "情报"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154334,
+              4154342
+            ],
+            "value": "训练"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154342,
+              4154350
+            ],
+            "value": "战后"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154350,
+              4154364
+            ],
+            "value": "政治博弈"
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154364,
+        4154374
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154366,
+              4154374
+            ],
+            "value": "战术"
+          }
+        ]
+      },
+      "index": 135
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154374,
+        4154384
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154376,
+              4154384
+            ],
+            "value": "编制"
+          }
+        ]
+      },
+      "index": 136
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154384,
+        4154400
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154386,
+              4154400
+            ],
+            "value": "火力覆盖"
+          }
+        ]
+      },
+      "index": 137
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154400,
+        4154410
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154402,
+              4154410
+            ],
+            "value": "阵地"
+          }
+        ]
+      },
+      "index": 138
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154410,
+        4154467
+      ],
+      "value": "战斗章与部署章交替，避免连续3章纯战斗",
+      "index": 139
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154467,
+        4154522
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154469,
+              4154483
+            ],
+            "value": "战术成功"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154483,
+              4154497
+            ],
+            "value": "以少胜多"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154497,
+              4154511
+            ],
+            "value": "英雄时刻"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154511,
+              4154522
+            ],
+            "value": "战友情"
+          }
+        ]
+      },
+      "index": 140
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154522,
+        4154530
+      ],
+      "value": "古言",
+      "index": 141
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4154530,
+        4154537
+      ],
+      "value": "guyan",
+      "index": 142
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154537,
+        4154595
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154539,
+              4154547
+            ],
+            "value": "宅斗"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154547,
+              4154555
+            ],
+            "value": "宫斗"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154555,
+              4154563
+            ],
+            "value": "相遇"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154563,
+              4154571
+            ],
+            "value": "误会"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154571,
+              4154579
+            ],
+            "value": "阴谋"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154579,
+              4154587
+            ],
+            "value": "团圆"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154587,
+              4154595
+            ],
+            "value": "甜蜜"
+          }
+        ]
+      },
+      "index": 143
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154595,
+        4154605
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154597,
+              4154605
+            ],
+            "value": "凤眸"
+          }
+        ]
+      },
+      "index": 144
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154605,
+        4154621
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154607,
+              4154621
+            ],
+            "value": "薄唇轻启"
+          }
+        ]
+      },
+      "index": 145
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154621,
+        4154637
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154623,
+              4154637
+            ],
+            "value": "锦衣华服"
+          }
+        ]
+      },
+      "index": 146
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154637,
+        4154653
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154639,
+              4154653
+            ],
+            "value": "施了一礼"
+          }
+        ]
+      },
+      "index": 147
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154653,
+        4154714
+      ],
+      "value": "宅斗/宫斗每3章一个小高潮，感情线穿插其中",
+      "index": 148
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154714,
+        4154766
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154716,
+              4154730
+            ],
+            "value": "计谋成功"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154730,
+              4154738
+            ],
+            "value": "打脸"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154738,
+              4154752
+            ],
+            "value": "真心相待"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154752,
+              4154766
+            ],
+            "value": "身份揭露"
+          }
+        ]
+      },
+      "index": 149
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154766,
+        4154774
+      ],
+      "value": "重生",
+      "index": 150
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4154774,
+        4154783
+      ],
+      "value": "rebirth",
+      "index": 151
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154783,
+        4154869
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154785,
+              4154799
+            ],
+            "value": "重生觉醒"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154799,
+              4154813
+            ],
+            "value": "蝴蝶效应"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154813,
+              4154827
+            ],
+            "value": "预知布局"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154827,
+              4154841
+            ],
+            "value": "弥补遗憾"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154841,
+              4154855
+            ],
+            "value": "命运改变"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4154855,
+              4154869
+            ],
+            "value": "前世回忆"
+          }
+        ]
+      },
+      "index": 152
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154869,
+        4154879
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154871,
+              4154879
+            ],
+            "value": "前世"
+          }
+        ]
+      },
+      "index": 153
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154879,
+        4154892
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154881,
+              4154892
+            ],
+            "value": "上辈子"
+          }
+        ]
+      },
+      "index": 154
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154892,
+        4154905
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154894,
+              4154905
+            ],
+            "value": "这一世"
+          }
+        ]
+      },
+      "index": 155
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4154905,
+        4154918
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154907,
+              4154918
+            ],
+            "value": "记忆中"
+          }
+        ]
+      },
+      "index": 156
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4154918,
+        4154992
+      ],
+      "value": "前世记忆要用闪回而非大段回忆，预知信息要逐步释放",
+      "index": 157
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4154992,
+        4155050
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4154994,
+              4155008
+            ],
+            "value": "改变命运"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155008,
+              4155022
+            ],
+            "value": "复仇成功"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155022,
+              4155036
+            ],
+            "value": "弥补遗憾"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155036,
+              4155050
+            ],
+            "value": "超越前世"
+          }
+        ]
+      },
+      "index": 158
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155050,
+        4155061
+      ],
+      "value": "系统流",
+      "index": 159
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4155061,
+        4155069
+      ],
+      "value": "system",
+      "index": 160
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4155069,
+        4155137
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155071,
+              4155085
+            ],
+            "value": "系统激活"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155085,
+              4155093
+            ],
+            "value": "任务"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155093,
+              4155101
+            ],
+            "value": "奖励"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155101,
+              4155109
+            ],
+            "value": "升级"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155109,
+              4155123
+            ],
+            "value": "隐藏功能"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155123,
+              4155137
+            ],
+            "value": "系统危机"
+          }
+        ]
+      },
+      "index": 161
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155137,
+        4155144
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155139,
+              4155144
+            ],
+            "value": "叮"
+          }
+        ]
+      },
+      "index": 162
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155144,
+        4155160
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155146,
+              4155160
+            ],
+            "value": "任务完成"
+          }
+        ]
+      },
+      "index": 163
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155160,
+        4155176
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155162,
+              4155176
+            ],
+            "value": "奖励发放"
+          }
+        ]
+      },
+      "index": 164
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155176,
+        4155260
+      ],
+      "value": "系统面板展示每章最多2次，任务驱动但不能只靠任务推动情节",
+      "index": 165
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4155260,
+        4155315
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155262,
+              4155276
+            ],
+            "value": "任务完成"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155276,
+              4155290
+            ],
+            "value": "隐藏奖励"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155290,
+              4155304
+            ],
+            "value": "系统升级"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155304,
+              4155315
+            ],
+            "value": "BUG利用"
+          }
+        ]
+      },
+      "index": 166
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155315,
+        4155323
+      ],
+      "value": "耽美",
+      "index": 167
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4155323,
+        4155331
+      ],
+      "value": "danmei",
+      "index": 168
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4155331,
+        4155389
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155333,
+              4155341
+            ],
+            "value": "初遇"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155341,
+              4155349
+            ],
+            "value": "暧昧"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155349,
+              4155357
+            ],
+            "value": "误会"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155357,
+              4155365
+            ],
+            "value": "表白"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155365,
+              4155373
+            ],
+            "value": "甜蜜"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155373,
+              4155381
+            ],
+            "value": "虐心"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155381,
+              4155389
+            ],
+            "value": "和好"
+          }
+        ]
+      },
+      "index": 169
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155389,
+        4155399
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155391,
+              4155399
+            ],
+            "value": "喉结"
+          }
+        ]
+      },
+      "index": 170
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155399,
+        4155415
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155401,
+              4155415
+            ],
+            "value": "指节分明"
+          }
+        ]
+      },
+      "index": 171
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155415,
+        4155425
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155417,
+              4155425
+            ],
+            "value": "低哑"
+          }
+        ]
+      },
+      "index": 172
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155425,
+        4155499
+      ],
+      "value": "感情线为主线，社会压力作为外部矛盾，甜虐比建议7:3",
+      "index": 173
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4155499,
+        4155540
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155501,
+              4155506
+            ],
+            "value": "糖"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155506,
+              4155520
+            ],
+            "value": "双向奔赴"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155520,
+              4155528
+            ],
+            "value": "吃醋"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155528,
+              4155536
+            ],
+            "value": "保护"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4155536,
+              4155540
+            ],
+            "value": "HE"
+          }
+        ]
+      },
+      "index": 174
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155540,
+        4155548
+      ],
+      "value": "赘婿",
+      "index": 175
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4155548,
+        4155556
+      ],
+      "value": "zhuixu",
+      "index": 176
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4155556,
+        4155624
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155558,
+              4155566
+            ],
+            "value": "受辱"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155566,
+              4155574
+            ],
+            "value": "反击"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155574,
+              4155588
+            ],
+            "value": "身份暴露"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155588,
+              4155596
+            ],
+            "value": "打脸"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155596,
+              4155610
+            ],
+            "value": "家族冲突"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155610,
+              4155624
+            ],
+            "value": "商业逆袭"
+          }
+        ]
+      },
+      "index": 177
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155624,
+        4155634
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155626,
+              4155634
+            ],
+            "value": "废物"
+          }
+        ]
+      },
+      "index": 178
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155634,
+        4155644
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155636,
+              4155644
+            ],
+            "value": "窝囊"
+          }
+        ]
+      },
+      "index": 179
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155644,
+        4155660
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155646,
+              4155660
+            ],
+            "value": "不过如此"
+          }
+        ]
+      },
+      "index": 180
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155660,
+        4155670
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155662,
+              4155670
+            ],
+            "value": "蝼蚁"
+          }
+        ]
+      },
+      "index": 181
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155670,
+        4155749
+      ],
+      "value": "打脸节奏2-3章一个小打脸，10章一个大打脸，反派不能太蠢",
+      "index": 182
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4155749,
+        4155797
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4155751,
+              4155759
+            ],
+            "value": "打脸"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155759,
+              4155773
+            ],
+            "value": "身份暴露"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155773,
+              4155781
+            ],
+            "value": "逆袭"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155781,
+              4155789
+            ],
+            "value": "护妻"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4155789,
+              4155797
+            ],
+            "value": "碾压"
+          }
+        ]
+      },
+      "index": 183
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4155797,
+        4155813
+      ],
+      "value": "GENRE_PROFILES",
+      "index": 184
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155813,
+        4155833
+      ],
+      "value": "list[GenreProfile]",
+      "index": 185
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4155833,
+        4155839
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4155835,
+              4155839
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 186
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4155839,
+        4155898
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4155841,
+              4155851
+            ],
+            "value": "genre_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4155851,
+              4155861
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4155861,
+              4155869
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4155869,
+              4155874
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4155874,
+              4155884
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4155884,
+              4155898
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 187
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4155898,
+        4155917
+      ],
+      "value": "get_genre_profile",
+      "index": 188
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155917,
+        4155965
+      ],
+      "value": "novels\\prompts\\inkos\\genre_profile_defaults.py",
+      "index": 189
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4155965,
+        4156019
+      ],
+      "value": "<module novels.prompts.inkos.genre_profile_defaults>",
+      "index": 190
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4156019,
+        4156032
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156021,
+              4156032
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 191
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4156032,
+        4156054
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4156034,
+              4156044
+            ],
+            "value": "genre_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4156044,
+              4156054
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 192
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4156054,
+        4156055
+      ],
+      "value": "",
+      "index": 193
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4156055,
+        4156065
+      ],
+      "value": "__spec__",
+      "index": 194
+    }
+  ]
+}

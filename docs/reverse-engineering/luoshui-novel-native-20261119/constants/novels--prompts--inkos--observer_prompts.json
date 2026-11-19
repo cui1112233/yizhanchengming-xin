@@ -1,0 +1,793 @@
+{
+  "moduleName": "novels.prompts.inkos.observer_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4160083,
+  "payloadRange": [
+    4160125,
+    4164295
+  ],
+  "payloadSha256": "64f2aafa716435eb41ac28834ccc8bc761bd9d5f948bda24884d955dab6c5bb3",
+  "declaredConstants": 48,
+  "parsedConstants": 48,
+  "stoppedAt": 4164294,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4160127,
+        4160137
+      ],
+      "value": "language",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4160137,
+        4160141
+      ],
+      "value": "en",
+      "index": 1
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4160141,
+        4160198
+      ],
+      "value": "【LANGUAGE OVERRIDE】ALL output MUST be in English.\n\n",
+      "index": 2
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4160198,
+        4160199
+      ],
+      "value": "",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4160199,
+        4160237
+      ],
+      "value": "You are a fact extraction specialist",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4160237,
+        4160302
+      ],
+      "value": "Read the chapter text and extract EVERY observable fact change.",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4160302,
+        4160949
+      ],
+      "value": "## Extraction Categories\n\n1. **Character actions**: Who did what, to whom, why\n2. **Location changes**: Who moved where, from where\n3. **Resource changes**: Items gained, lost, consumed, quantities\n4. **Relationship changes**: New encounters, trust/distrust shifts, alliances, betrayals\n5. **Emotional shifts**: Character mood before → after, trigger event\n6. **Information flow**: Who learned what, who is still unaware\n7. **Plot threads**: New mysteries planted, existing threads advanced, threads resolved\n8. **Time progression**: How much time passed, time markers mentioned\n9. **Physical state**: Injuries, healing, fatigue, power changes",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4160949,
+        4161256
+      ],
+      "value": "## Rules\n\n- Extract from the TEXT ONLY — do not infer what might happen\n- Over-extract: if unsure whether something is significant, include it\n- Be specific: \"Lin Chen's left arm fractured\" not \"Lin Chen got hurt\"\n- Include chapter-internal time markers\n- Note which characters are present in each scene",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4161256,
+        4161909
+      ],
+      "value": "=== OBSERVATIONS ===\n\n[CHARACTERS]\n- <name>: <action/state change> (scene: <location>)\n\n[LOCATIONS]\n- <character> moved from <A> to <B>\n\n[RESOURCES]\n- <character> gained/lost <item> (quantity: <n>)\n\n[RELATIONSHIPS]\n- <charA> → <charB>: <change description>\n\n[EMOTIONS]\n- <character>: <before> → <after> (trigger: <event>)\n\n[INFORMATION]\n- <character> learned: <fact> (source: <how>)\n- <character> still unaware of: <fact>\n\n[PLOT_THREADS]\n- NEW: <description>\n- ADVANCED: <existing thread> — <progress>\n- RESOLVED: <thread> — <resolution>\n\n[TIME]\n- <time markers, duration>\n\n[PHYSICAL_STATE]\n- <character>: <injury/healing/fatigue/power change>",
+      "index": 8
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4161909,
+        4161941
+      ],
+      "value": "你是一个事实提取专家",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4161941,
+        4162009
+      ],
+      "value": "阅读章节正文，提取每一个可观察到的事实变化。",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4162009,
+        4162633
+      ],
+      "value": "## 提取类别\n\n1. **角色行为**：谁做了什么，对谁，为什么\n2. **位置变化**：谁去了哪里，从哪里来\n3. **资源变化**：获得、失去、消耗了什么，具体数量\n4. **关系变化**：新相遇、信任/不信任转变、结盟、背叛\n5. **情绪变化**：角色情绪从X到Y，触发事件是什么\n6. **信息流动**：谁知道了什么新信息，谁仍然不知情\n7. **剧情线索**：新埋下的悬念、已有线索的推进、线索的解答\n8. **时间推进**：过了多少时间，提到的时间标记\n9. **身体状态**：受伤、恢复、疲劳、战力变化",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4162633,
+        4162897
+      ],
+      "value": "## 规则\n\n- 只从正文提取——不推测可能发生的事\n- 宁多勿少：不确定是否重要时也要记录\n- 具体化：\"陆承烬左肩旧伤开裂\" 而非 \"陆承烬受伤了\"\n- 记录章节内的时间标记\n- 标注每个场景中在场的角色",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4162897,
+        4163524
+      ],
+      "value": "=== OBSERVATIONS ===\n\n[角色行为]\n- <角色名>: <行为/状态变化> (场景: <地点>)\n\n[位置变化]\n- <角色> 从 <A> 到 <B>\n\n[资源变化]\n- <角色> 获得/失去 <物品> (数量: <n>)\n\n[关系变化]\n- <角色A> → <角色B>: <变化描述>\n\n[情绪变化]\n- <角色>: <之前> → <之后> (触发: <事件>)\n\n[信息流动]\n- <角色> 得知: <事实> (来源: <途径>)\n- <角色> 仍不知: <事实>\n\n[剧情线索]\n- 新埋: <描述>\n- 推进: <已有线索> — <进展>\n- 回收: <线索> — <解答>\n\n[时间]\n- <时间标记、时长>\n\n[身体状态]\n- <角色>: <受伤/恢复/疲劳/战力变化>",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163524,
+        4163529
+      ],
+      "value": "。",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163529,
+        4163533
+      ],
+      "value": "\n\n",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163533,
+        4163554
+      ],
+      "value": "\n\n## 输出格式\n\n",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163554,
+        4163587
+      ],
+      "value": "Extract all facts from Chapter ",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163587,
+        4163591
+      ],
+      "value": " \"",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163591,
+        4163597
+      ],
+      "value": "\":\n\n",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163597,
+        4163611
+      ],
+      "value": "请提取第",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163611,
+        4163619
+      ],
+      "value": "章「",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4163619,
+        4163647
+      ],
+      "value": "」中的所有事实：\n\n",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163647,
+        4163656
+      ],
+      "value": "__doc__",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163656,
+        4163666
+      ],
+      "value": "__file__",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163666,
+        4163674
+      ],
+      "value": "origin",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163674,
+        4163688
+      ],
+      "value": "has_location",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163688,
+        4163700
+      ],
+      "value": "__cached__",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163700,
+        4163713
+      ],
+      "value": "annotations",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163713,
+        4163718
+      ],
+      "value": "Any",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163718,
+        4163727
+      ],
+      "value": "Literal",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163727,
+        4163737
+      ],
+      "value": "Optional",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163737,
+        4163761
+      ],
+      "value": "genre_profile_defaults",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4163761,
+        4163777
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4163763,
+              4163777
+            ],
+            "value": "GenreProfile"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163777,
+        4163791
+      ],
+      "value": "GenreProfile",
+      "index": 34
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4163791,
+        4163801
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4163793,
+              4163797
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163797,
+              4163801
+            ],
+            "value": "en"
+          }
+        ]
+      },
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163801,
+        4163811
+      ],
+      "value": "Language",
+      "index": 36
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4163811,
+        4163814
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4163813,
+              4163814
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4163814,
+        4163910
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4163816,
+              4163822
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163822,
+              4163837
+            ],
+            "value": "genre_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163837,
+              4163847
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163847,
+              4163855
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4163855,
+              4163871
+            ],
+            "value": "dict[str, Any]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163871,
+              4163885
+            ],
+            "value": "GenreProfile"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4163885,
+              4163905
+            ],
+            "value": "Optional[Language]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163905,
+              4163910
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4163910,
+        4163940
+      ],
+      "value": "build_observer_system_prompt",
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4163940,
+        4163946
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4163942,
+              4163946
+            ],
+            "value": "zh"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4163946,
+        4164024
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4163948,
+              4163964
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163964,
+              4163971
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163971,
+              4163980
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163980,
+              4163990
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4163990,
+              4163998
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4163998,
+              4164003
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164003,
+              4164008
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4164008,
+              4164009
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4164003,
+                  4164008
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164009,
+              4164019
+            ],
+            "value": "Language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164019,
+              4164024
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164024,
+        4164052
+      ],
+      "value": "build_observer_user_prompt",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4164052,
+        4164094
+      ],
+      "value": "novels\\prompts\\inkos\\observer_prompts.py",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4164094,
+        4164142
+      ],
+      "value": "<module novels.prompts.inkos.observer_prompts>",
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4164142,
+        4164240
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4164144,
+              4164150
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164150,
+              4164165
+            ],
+            "value": "genre_profile"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164165,
+              4164175
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164175,
+              4164187
+            ],
+            "value": "is_english"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164187,
+              4164200
+            ],
+            "value": "lang_prefix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164200,
+              4164206
+            ],
+            "value": "role"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164206,
+              4164213
+            ],
+            "value": "intro"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164213,
+              4164225
+            ],
+            "value": "categories"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164225,
+              4164232
+            ],
+            "value": "rules"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164232,
+              4164240
+            ],
+            "value": "output"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4164240,
+        4164284
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4164242,
+              4164258
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164258,
+              4164265
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164265,
+              4164274
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4164274,
+              4164284
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4164284,
+        4164294
+      ],
+      "value": "__spec__",
+      "index": 47
+    }
+  ]
+}

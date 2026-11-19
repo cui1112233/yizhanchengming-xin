@@ -1,0 +1,979 @@
+{
+  "moduleName": "novels.services.runtime_state",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4361403,
+  "payloadRange": [
+    4361437,
+    4362388
+  ],
+  "payloadSha256": "6133d797c5b1a2bcfe6657783fef5dcb67c96bcdc6be38145ac534cc9912081e",
+  "declaredConstants": 49,
+  "parsedConstants": 49,
+  "stoppedAt": 4362387,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4361439,
+        4361446
+      ],
+      "value": "state",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361446,
+        4361462
+      ],
+      "value": "FileRepository",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361462,
+        4361474
+      ],
+      "value": "ensure_dir",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361474,
+        4361493
+      ],
+      "value": "runtime_state_dir",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361493,
+        4361502
+      ],
+      "value": "chapter",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361502,
+        4361509
+      ],
+      "value": "title",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361509,
+        4361518
+      ],
+      "value": "summary",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361518,
+        4361539
+      ],
+      "value": "currentStateExcerpt",
+      "index": 7
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4361539,
+        4361540
+      ],
+      "value": "",
+      "index": 8
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4361540,
+        4361546
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4361541,
+              4361542
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4361542,
+              4361545
+            ],
+            "value": 2000
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4361545,
+              4361546
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361546,
+        4361560
+      ],
+      "value": "hooksExcerpt",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361560,
+        4361571
+      ],
+      "value": "updatedAt",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361571,
+        4361584
+      ],
+      "value": "utc_now_iso",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361584,
+        4361596
+      ],
+      "value": "write_json",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361596,
+        4361606
+      ],
+      "value": "chapter_",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4361606,
+        4361611
+      ],
+      "value": "04d",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4361611,
+        4361618
+      ],
+      "value": ".json",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4361618,
+        4361631
+      ],
+      "value": "latest.json",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361631,
+        4361642
+      ],
+      "value": "read_json",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361642,
+        4361651
+      ],
+      "value": "__doc__",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361651,
+        4361661
+      ],
+      "value": "__file__",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361661,
+        4361669
+      ],
+      "value": "origin",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361669,
+        4361683
+      ],
+      "value": "has_location",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361683,
+        4361695
+      ],
+      "value": "__cached__",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361695,
+        4361708
+      ],
+      "value": "annotations",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361708,
+        4361714
+      ],
+      "value": "json",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361714,
+        4361723
+      ],
+      "value": "pathlib",
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4361723,
+        4361731
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361725,
+              4361731
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361731,
+        4361737
+      ],
+      "value": "Path",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361737,
+        4361742
+      ],
+      "value": "Any",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361742,
+        4361748
+      ],
+      "value": "Dict",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4361748,
+        4361758
+      ],
+      "value": "Optional",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4361758,
+        4361774
+      ],
+      "value": "models.schemas",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4361774,
+        4361789
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361776,
+              4361789
+            ],
+            "value": "utc_now_iso"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4361789,
+        4361791
+      ],
+      "value": 2,
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4361791,
+        4361816
+      ],
+      "value": "storage.file_repository",
+      "index": 35
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4361816,
+        4361834
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361818,
+              4361834
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4361834,
+        4361862
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361836,
+              4361847
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361847,
+              4361855
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361855,
+              4361861
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4361861,
+              4361862
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4361855,
+                  4361861
+                ],
+                "value": "Path"
+              }
+            }
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4361862,
+        4361914
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361864,
+              4361873
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361873,
+              4361896
+            ],
+            "value": "current_state_excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361896,
+              4361911
+            ],
+            "value": "hooks_excerpt"
+          }
+        ],
+        "values": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4361911,
+              4361912
+            ],
+            "value": ""
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4361912,
+              4361913
+            ],
+            "value": {
+              "previous": {
+                "tag": "s",
+                "fileRange": [
+                  4361911,
+                  4361912
+                ],
+                "value": ""
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4361913,
+              4361914
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4361912,
+                  4361913
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "s",
+                    "fileRange": [
+                      4361911,
+                      4361912
+                    ],
+                    "value": ""
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4361914,
+        4362040
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4361916,
+              4361927
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361927,
+              4361943
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361943,
+              4361950
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361950,
+              4361959
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361959,
+              4361982
+            ],
+            "value": "current_state_excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361982,
+              4361997
+            ],
+            "value": "hooks_excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4361997,
+              4362005
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4362005,
+              4362011
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362011,
+              4362016
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362016,
+              4362021
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4362021,
+              4362022
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4362016,
+                  4362021
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4362022,
+              4362023
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4362021,
+                  4362022
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4362016,
+                      4362021
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4362023,
+              4362024
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4362022,
+                  4362023
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "p",
+                    "fileRange": [
+                      4362021,
+                      4362022
+                    ],
+                    "value": {
+                      "previous": {
+                        "tag": "a",
+                        "fileRange": [
+                          4362016,
+                          4362021
+                        ],
+                        "value": "str"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4362024,
+              4362040
+            ],
+            "value": "Dict[str, Any]"
+          }
+        ]
+      },
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4362040,
+        4362069
+      ],
+      "value": "write_chapter_runtime_state",
+      "index": 40
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4362069,
+        4362122
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4362071,
+              4362082
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362082,
+              4362090
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4362090,
+              4362096
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4362096,
+              4362122
+            ],
+            "value": "Optional[Dict[str, Any]]"
+          }
+        ]
+      },
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4362122,
+        4362149
+      ],
+      "value": "read_latest_runtime_state",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4362149,
+        4362183
+      ],
+      "value": "novels\\services\\runtime_state.py",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4362183,
+        4362223
+      ],
+      "value": "<module novels.services.runtime_state>",
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4362223,
+        4362242
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4362225,
+              4362236
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362236,
+              4362242
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4362242,
+        4362261
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4362244,
+              4362255
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362255,
+              4362261
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 46
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4362261,
+        4362377
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4362263,
+              4362274
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362274,
+              4362290
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362290,
+              4362297
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362297,
+              4362306
+            ],
+            "value": "summary"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362306,
+              4362329
+            ],
+            "value": "current_state_excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362329,
+              4362344
+            ],
+            "value": "hooks_excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362344,
+              4362355
+            ],
+            "value": "state_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362355,
+              4362364
+            ],
+            "value": "payload"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4362364,
+              4362377
+            ],
+            "value": "latest_path"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4362377,
+        4362387
+      ],
+      "value": "__spec__",
+      "index": 48
+    }
+  ]
+}

@@ -1,0 +1,3030 @@
+{
+  "moduleName": "novels.storage.state_manager",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4410331,
+  "payloadRange": [
+    4410364,
+    4413796
+  ],
+  "payloadSha256": "99ebe856f1dc5b515cbc3fe7f74f896697a14c15978f23b658069616961993cf",
+  "declaredConstants": 178,
+  "parsedConstants": 178,
+  "stoppedAt": 4413795,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4410366,
+        4410372
+      ],
+      "value": "Path",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410372,
+        4410378
+      ],
+      "value": "root",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410378,
+        4410394
+      ],
+      "value": "FileRepository",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410394,
+        4410406
+      ],
+      "value": "ensure_dir",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410406,
+        4410420
+      ],
+      "value": "sessions_dir",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410420,
+        4410431
+      ],
+      "value": "books_dir",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410431,
+        4410441
+      ],
+      "value": "sessions",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410441,
+        4410448
+      ],
+      "value": "books",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410448,
+        4410458
+      ],
+      "value": "book_dir",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410458,
+        4410465
+      ],
+      "value": "story",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410465,
+        4410475
+      ],
+      "value": "chapters",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410475,
+        4410483
+      ],
+      "value": "shorts",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410483,
+        4410490
+      ],
+      "value": "plays",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410490,
+        4410501
+      ],
+      "value": "story_dir",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410501,
+        4410515
+      ],
+      "value": "chapters_dir",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410515,
+        4410524
+      ],
+      "value": "slugify",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410524,
+        4410530
+      ],
+      "value": "self",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410530,
+        4410541
+      ],
+      "value": "candidate",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410541,
+        4410549
+      ],
+      "value": "exists",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410549,
+        4410556
+      ],
+      "value": "index",
+      "index": 19
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4410556,
+        4410557
+      ],
+      "value": "",
+      "index": 20
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4410557,
+        4410559
+      ],
+      "value": "-",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410559,
+        4410577
+      ],
+      "value": "ensure_book_dirs",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410577,
+        4410581
+      ],
+      "value": "id",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410581,
+        4410594
+      ],
+      "value": "utc_now_iso",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410594,
+        4410605
+      ],
+      "value": "updatedAt",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410605,
+        4410617
+      ],
+      "value": "write_json",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410617,
+        4410628
+      ],
+      "value": "book.json",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410628,
+        4410637
+      ],
+      "value": "to_dict",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410637,
+        4410648
+      ],
+      "value": "read_json",
+      "index": 29
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410648,
+        4410667
+      ],
+      "value": "书籍不存在: ",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410667,
+        4410679
+      ],
+      "value": "BookConfig",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410679,
+        4410690
+      ],
+      "value": "from_dict",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410690,
+        4410698
+      ],
+      "value": "sorted",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410698,
+        4410707
+      ],
+      "value": "iterdir",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410707,
+        4410717
+      ],
+      "value": "<lambda>",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410717,
+        4410766
+      ],
+      "value": "NovelsStateManager.list_books.<locals>.<lambda>",
+      "index": 36
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410766,
+        4410773
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410768,
+              4410773
+            ],
+            "value": "key"
+          }
+        ]
+      },
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410773,
+        4410781
+      ],
+      "value": "is_dir",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410781,
+        4410787
+      ],
+      "value": "sort",
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410787,
+        4410803
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410789,
+              4410794
+            ],
+            "value": "key"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410794,
+              4410803
+            ],
+            "value": "reverse"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410803,
+        4410809
+      ],
+      "value": "name",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410809,
+        4410816
+      ],
+      "value": "strip",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410816,
+        4410837
+      ],
+      "value": "bookId 不能为空",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410837,
+        4410852
+      ],
+      "value": "list_sessions",
+      "index": 44
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410852,
+        4410863
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410854,
+              4410863
+            ],
+            "value": "book_id"
+          }
+        ]
+      },
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410863,
+        4410879
+      ],
+      "value": "delete_session",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410879,
+        4410887
+      ],
+      "value": "shutil",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410887,
+        4410895
+      ],
+      "value": "rmtree",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410895,
+        4410915
+      ],
+      "value": "chapter_index.json",
+      "index": 49
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4410915,
+        4410928
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410917,
+              4410926
+            ],
+            "value": "default"
+          }
+        ],
+        "values": [
+          {
+            "tag": "L",
+            "fileRange": [
+              4410926,
+              4410928
+            ],
+            "value": {
+              "type": "list",
+              "items": []
+            }
+          }
+        ]
+      },
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410928,
+        4410941
+      ],
+      "value": "ChapterMeta",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410941,
+        4410961
+      ],
+      "value": "load_chapter_index",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410961,
+        4410966
+      ],
+      "value": "max",
+      "index": 53
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4410966,
+        4410979
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410968,
+              4410977
+            ],
+            "value": "default"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4410977,
+              4410979
+            ],
+            "value": 0
+          }
+        ]
+      },
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410979,
+        4410987
+      ],
+      "value": "number",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410987,
+        4410998
+      ],
+      "value": "<genexpr>",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410998,
+        4411061
+      ],
+      "value": "NovelsStateManager.get_next_chapter_number.<locals>.<genexpr>",
+      "index": 57
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411061,
+        4411068
+      ],
+      "value": ".json",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411068,
+        4411087
+      ],
+      "value": "会话不存在: ",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411087,
+        4411102
+      ],
+      "value": "SessionRecord",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411102,
+        4411110
+      ],
+      "value": "unlink",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411110,
+        4411120
+      ],
+      "value": "workflow",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411120,
+        4411126
+      ],
+      "value": "kind",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411126,
+        4411133
+      ],
+      "value": "short",
+      "index": 64
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4411133,
+        4411154
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4411135,
+              4411148
+            ],
+            "value": "book-create"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4411148,
+              4411154
+            ],
+            "value": "chat"
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411154,
+        4411167
+      ],
+      "value": "book-create",
+      "index": 66
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411167,
+        4411177
+      ],
+      "value": "messages",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411177,
+        4411194
+      ],
+      "value": "imitation-short",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411194,
+        4411208
+      ],
+      "value": "仿写短篇",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411208,
+        4411215
+      ],
+      "value": "title",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411215,
+        4411220
+      ],
+      "value": "get",
+      "index": 71
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4411220,
+        4411232
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411222,
+              4411232
+            ],
+            "value": "toolName"
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411232,
+        4411253
+      ],
+      "value": "imitation_short_run",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411253,
+        4411318
+      ],
+      "value": "NovelsStateManager._resolve_session_workflow.<locals>.<genexpr>",
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411318,
+        4411324
+      ],
+      "value": "glob",
+      "index": 75
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4411324,
+        4411334
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4411326,
+              4411334
+            ],
+            "value": "*.json"
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411334,
+        4411386
+      ],
+      "value": "NovelsStateManager.list_sessions.<locals>.<lambda>",
+      "index": 77
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411386,
+        4411394
+      ],
+      "value": "bookId",
+      "index": 78
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411394,
+        4411421
+      ],
+      "value": "_resolve_session_workflow",
+      "index": 79
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411421,
+        4411429
+      ],
+      "value": "record",
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411429,
+        4411435
+      ],
+      "value": "stat",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411435,
+        4411445
+      ],
+      "value": "st_mtime",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411445,
+        4411454
+      ],
+      "value": "__doc__",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411454,
+        4411464
+      ],
+      "value": "__file__",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411464,
+        4411472
+      ],
+      "value": "origin",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411472,
+        4411486
+      ],
+      "value": "has_location",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411486,
+        4411498
+      ],
+      "value": "__cached__",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411498,
+        4411511
+      ],
+      "value": "annotations",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411511,
+        4411520
+      ],
+      "value": "pathlib",
+      "index": 89
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4411520,
+        4411528
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411522,
+              4411528
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411528,
+        4411534
+      ],
+      "value": "List",
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411534,
+        4411544
+      ],
+      "value": "Optional",
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411544,
+        4411560
+      ],
+      "value": "models.schemas",
+      "index": 93
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4411560,
+        4411615
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411562,
+              4411574
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4411574,
+              4411587
+            ],
+            "value": "ChapterMeta"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4411587,
+              4411602
+            ],
+            "value": "SessionRecord"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4411602,
+              4411615
+            ],
+            "value": "utc_now_iso"
+          }
+        ]
+      },
+      "index": 94
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4411615,
+        4411617
+      ],
+      "value": 2,
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411617,
+        4411634
+      ],
+      "value": "file_repository",
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4411634,
+        4411652
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411636,
+              4411652
+            ],
+            "value": "FileRepository"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411652,
+        4411664
+      ],
+      "value": "__module__",
+      "index": 98
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411664,
+        4411684
+      ],
+      "value": "NovelsStateManager",
+      "index": 99
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411684,
+        4411698
+      ],
+      "value": "__qualname__",
+      "index": 100
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4411698,
+        4411718
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411700,
+              4411706
+            ],
+            "value": "root"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4411706,
+              4411718
+            ],
+            "value": "str | Path"
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411718,
+        4411728
+      ],
+      "value": "__init__",
+      "index": 102
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411728,
+        4411757
+      ],
+      "value": "NovelsStateManager.__init__",
+      "index": 103
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4411757,
+        4411773
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411759,
+              4411767
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411767,
+              4411773
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 104
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411773,
+        4411806
+      ],
+      "value": "NovelsStateManager.sessions_dir",
+      "index": 105
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411806,
+        4411836
+      ],
+      "value": "NovelsStateManager.books_dir",
+      "index": 106
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4411836,
+        4411866
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411838,
+              4411847
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4411847,
+              4411855
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4411855,
+              4411860
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4411860,
+              4411866
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 107
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411866,
+        4411895
+      ],
+      "value": "NovelsStateManager.book_dir",
+      "index": 108
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411895,
+        4411925
+      ],
+      "value": "NovelsStateManager.story_dir",
+      "index": 109
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411925,
+        4411958
+      ],
+      "value": "NovelsStateManager.chapters_dir",
+      "index": 110
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4411958,
+        4411970
+      ],
+      "value": "shorts_dir",
+      "index": 111
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4411970,
+        4412001
+      ],
+      "value": "NovelsStateManager.shorts_dir",
+      "index": 112
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412001,
+        4412012
+      ],
+      "value": "plays_dir",
+      "index": 113
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412012,
+        4412042
+      ],
+      "value": "NovelsStateManager.plays_dir",
+      "index": 114
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412042,
+        4412072
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412044,
+              4412053
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412053,
+              4412061
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412061,
+              4412066
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412066,
+              4412072
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 115
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412072,
+        4412109
+      ],
+      "value": "NovelsStateManager.ensure_book_dirs",
+      "index": 116
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412109,
+        4412132
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412111,
+              4412118
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412118,
+              4412126
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412126,
+              4412131
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4412131,
+              4412132
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4412126,
+                  4412131
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 117
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412132,
+        4412148
+      ],
+      "value": "create_book_id",
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412148,
+        4412183
+      ],
+      "value": "NovelsStateManager.create_book_id",
+      "index": 119
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412183,
+        4412217
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412185,
+              4412191
+            ],
+            "value": "book"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412191,
+              4412199
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412199,
+              4412211
+            ],
+            "value": "BookConfig"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412211,
+              4412217
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 120
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412217,
+        4412228
+      ],
+      "value": "save_book",
+      "index": 121
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412228,
+        4412258
+      ],
+      "value": "NovelsStateManager.save_book",
+      "index": 122
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412258,
+        4412294
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412260,
+              4412269
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412269,
+              4412277
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412277,
+              4412282
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412282,
+              4412294
+            ],
+            "value": "BookConfig"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412294,
+        4412305
+      ],
+      "value": "load_book",
+      "index": 124
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412305,
+        4412335
+      ],
+      "value": "NovelsStateManager.load_book",
+      "index": 125
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412335,
+        4412363
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412337,
+              4412345
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4412345,
+              4412363
+            ],
+            "value": "List[BookConfig]"
+          }
+        ]
+      },
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412363,
+        4412375
+      ],
+      "value": "list_books",
+      "index": 127
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412375,
+        4412406
+      ],
+      "value": "NovelsStateManager.list_books",
+      "index": 128
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412406,
+        4412419
+      ],
+      "value": "delete_book",
+      "index": 129
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412419,
+        4412451
+      ],
+      "value": "NovelsStateManager.delete_book",
+      "index": 130
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412451,
+        4412510
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412453,
+              4412462
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412462,
+              4412472
+            ],
+            "value": "chapters"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412472,
+              4412480
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412480,
+              4412485
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4412485,
+              4412504
+            ],
+            "value": "List[ChapterMeta]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412504,
+              4412510
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 131
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412510,
+        4412530
+      ],
+      "value": "save_chapter_index",
+      "index": 132
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412530,
+        4412569
+      ],
+      "value": "NovelsStateManager.save_chapter_index",
+      "index": 133
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412569,
+        4412612
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412571,
+              4412580
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412580,
+              4412588
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412588,
+              4412593
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4412593,
+              4412612
+            ],
+            "value": "List[ChapterMeta]"
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412612,
+        4412651
+      ],
+      "value": "NovelsStateManager.load_chapter_index",
+      "index": 135
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412651,
+        4412680
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412653,
+              4412662
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412662,
+              4412670
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412670,
+              4412675
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412675,
+              4412680
+            ],
+            "value": "int"
+          }
+        ]
+      },
+      "index": 136
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412680,
+        4412705
+      ],
+      "value": "get_next_chapter_number",
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412705,
+        4412749
+      ],
+      "value": "NovelsStateManager.get_next_chapter_number",
+      "index": 138
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412749,
+        4412789
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412751,
+              4412760
+            ],
+            "value": "session"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412760,
+              4412768
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412768,
+              4412783
+            ],
+            "value": "SessionRecord"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412783,
+              4412789
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412789,
+        4412803
+      ],
+      "value": "save_session",
+      "index": 140
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412803,
+        4412836
+      ],
+      "value": "NovelsStateManager.save_session",
+      "index": 141
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412836,
+        4412878
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412838,
+              4412850
+            ],
+            "value": "session_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412850,
+              4412858
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412858,
+              4412863
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412863,
+              4412878
+            ],
+            "value": "SessionRecord"
+          }
+        ]
+      },
+      "index": 142
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4412878,
+        4412892
+      ],
+      "value": "load_session",
+      "index": 143
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412892,
+        4412925
+      ],
+      "value": "NovelsStateManager.load_session",
+      "index": 144
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412925,
+        4412958
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412927,
+              4412939
+            ],
+            "value": "session_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412939,
+              4412947
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412947,
+              4412952
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4412952,
+              4412958
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 145
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4412958,
+        4412993
+      ],
+      "value": "NovelsStateManager.delete_session",
+      "index": 146
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4412993,
+        4413031
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4412995,
+              4413003
+            ],
+            "value": "record"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413003,
+              4413011
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413011,
+              4413026
+            ],
+            "value": "SessionRecord"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413026,
+              4413031
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 147
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4413031,
+        4413077
+      ],
+      "value": "NovelsStateManager._resolve_session_workflow",
+      "index": 148
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413077,
+        4413081
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4413079,
+              4413080
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4413080,
+              4413081
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 149
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4413081,
+        4413161
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413083,
+              4413092
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413092,
+              4413102
+            ],
+            "value": "workflow"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413102,
+              4413110
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4413110,
+              4413125
+            ],
+            "value": "Optional[str]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4413125,
+              4413140
+            ],
+            "value": "Optional[str]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4413140,
+              4413161
+            ],
+            "value": "List[SessionRecord]"
+          }
+        ]
+      },
+      "index": 150
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4413161,
+        4413195
+      ],
+      "value": "NovelsStateManager.list_sessions",
+      "index": 151
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4413195,
+        4413228
+      ],
+      "value": "novels\\storage\\state_manager.py",
+      "index": 152
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413228,
+        4413236
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413230,
+              4413234
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4413234,
+              4413236
+            ],
+            "value": "m"
+          }
+        ]
+      },
+      "index": 153
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413236,
+        4413248
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413238,
+              4413242
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413242,
+              4413248
+            ],
+            "value": "item"
+          }
+        ]
+      },
+      "index": 154
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413248,
+        4413252
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4413250,
+              4413252
+            ],
+            "value": "b"
+          }
+        ]
+      },
+      "index": 155
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413252,
+        4413256
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4413254,
+              4413256
+            ],
+            "value": "p"
+          }
+        ]
+      },
+      "index": 156
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4413256,
+        4413295
+      ],
+      "value": "<module novels.storage.state_manager>",
+      "index": 157
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413295,
+        4413309
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413297,
+              4413303
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413303,
+              4413309
+            ],
+            "value": "root"
+          }
+        ]
+      },
+      "index": 158
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413309,
+        4413348
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413311,
+              4413317
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413317,
+              4413325
+            ],
+            "value": "record"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413325,
+              4413342
+            ],
+            "value": "record_workflow"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413342,
+              4413348
+            ],
+            "value": "msgs"
+          }
+        ]
+      },
+      "index": 159
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413348,
+        4413365
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413350,
+              4413356
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413356,
+              4413365
+            ],
+            "value": "book_id"
+          }
+        ]
+      },
+      "index": 160
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413365,
+        4413373
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413367,
+              4413373
+            ],
+            "value": "self"
+          }
+        ]
+      },
+      "index": 161
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413373,
+        4413412
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413375,
+              4413381
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413381,
+              4413388
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413388,
+              4413394
+            ],
+            "value": "slug"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413394,
+              4413405
+            ],
+            "value": "candidate"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413405,
+              4413412
+            ],
+            "value": "index"
+          }
+        ]
+      },
+      "index": 162
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413412,
+        4413457
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413414,
+              4413420
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413420,
+              4413429
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413429,
+              4413438
+            ],
+            "value": "safe_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413438,
+              4413448
+            ],
+            "value": "book_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413448,
+              4413457
+            ],
+            "value": "session"
+          }
+        ]
+      },
+      "index": 163
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413457,
+        4413483
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413459,
+              4413465
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413465,
+              4413477
+            ],
+            "value": "session_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413477,
+              4413483
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 164
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413483,
+        4413506
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413485,
+              4413491
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413491,
+              4413500
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413500,
+              4413506
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 165
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413506,
+        4413530
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413508,
+              4413514
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413514,
+              4413523
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413523,
+              4413530
+            ],
+            "value": "index"
+          }
+        ]
+      },
+      "index": 166
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413530,
+        4413564
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413532,
+              4413538
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413538,
+              4413545
+            ],
+            "value": "books"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413545,
+              4413551
+            ],
+            "value": "item"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413551,
+              4413564
+            ],
+            "value": "config_path"
+          }
+        ]
+      },
+      "index": 167
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413564,
+        4413632
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413566,
+              4413572
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413572,
+              4413581
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413581,
+              4413591
+            ],
+            "value": "workflow"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413591,
+              4413601
+            ],
+            "value": "sessions"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413601,
+              4413607
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413607,
+              4413615
+            ],
+            "value": "record"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413615,
+              4413632
+            ],
+            "value": "record_workflow"
+          }
+        ]
+      },
+      "index": 168
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413632,
+        4413655
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413634,
+              4413640
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413640,
+              4413649
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413649,
+              4413655
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 169
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413655,
+        4413677
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413657,
+              4413663
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413663,
+              4413672
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413672,
+              4413677
+            ],
+            "value": "raw"
+          }
+        ]
+      },
+      "index": 170
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413677,
+        4413703
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413679,
+              4413685
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413685,
+              4413697
+            ],
+            "value": "session_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413697,
+              4413703
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 171
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413703,
+        4413717
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413705,
+              4413711
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413711,
+              4413717
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 172
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413717,
+        4413731
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413719,
+              4413725
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413725,
+              4413731
+            ],
+            "value": "book"
+          }
+        ]
+      },
+      "index": 173
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413731,
+        4413758
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413733,
+              4413739
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413739,
+              4413748
+            ],
+            "value": "book_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413748,
+              4413758
+            ],
+            "value": "chapters"
+          }
+        ]
+      },
+      "index": 174
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4413758,
+        4413775
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4413760,
+              4413766
+            ],
+            "value": "self"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4413766,
+              4413775
+            ],
+            "value": "session"
+          }
+        ]
+      },
+      "index": 175
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4413775,
+        4413785
+      ],
+      "value": "__name__",
+      "index": 176
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4413785,
+        4413795
+      ],
+      "value": "__spec__",
+      "index": 177
+    }
+  ]
+}

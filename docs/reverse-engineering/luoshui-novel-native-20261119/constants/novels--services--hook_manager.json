@@ -1,0 +1,2040 @@
+{
+  "moduleName": "novels.services.hook_manager",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4334922,
+  "payloadRange": [
+    4334955,
+    4337287
+  ],
+  "payloadSha256": "6c8845b785d56aa3148da989364cd7fcde8756827ac5f8d95c2240a8b1468574",
+  "declaredConstants": 135,
+  "parsedConstants": 135,
+  "stoppedAt": 4337286,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4334957,
+        4334972
+      ],
+      "value": "get_all_hooks",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4334972,
+        4334980
+      ],
+      "value": "status",
+      "index": 1
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4334980,
+        4335002
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4334982,
+              4334991
+            ],
+            "value": "planted"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4334991,
+              4335002
+            ],
+            "value": "advancing"
+          }
+        ]
+      },
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335002,
+        4335012
+      ],
+      "value": "resolved",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335012,
+        4335029
+      ],
+      "value": "get_stale_hooks",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335029,
+        4335047
+      ],
+      "value": "_STALE_THRESHOLD",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335047,
+        4335065
+      ],
+      "value": "HookHealthReport",
+      "index": 6
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4335065,
+        4335137
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4335067,
+              4335081
+            ],
+            "value": "active_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335081,
+              4335094
+            ],
+            "value": "stale_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335094,
+              4335110
+            ],
+            "value": "resolved_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335110,
+              4335123
+            ],
+            "value": "stale_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335123,
+              4335137
+            ],
+            "value": "active_hooks"
+          }
+        ]
+      },
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335137,
+        4335156
+      ],
+      "value": "_MAX_ACTIVE_HOOKS",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335156,
+        4335164
+      ],
+      "value": "alerts",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335164,
+        4335172
+      ],
+      "value": "append",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335172,
+        4335183
+      ],
+      "value": "HookAlert",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335183,
+        4335192
+      ],
+      "value": "warning",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335192,
+        4335210
+      ],
+      "value": "活跃伏笔数 ",
+      "index": 13
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4335210,
+        4335211
+      ],
+      "value": "",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335211,
+        4335227
+      ],
+      "value": " 超过上限 ",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335227,
+        4335256
+      ],
+      "value": "，读者可能难以追踪",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335256,
+        4335265
+      ],
+      "value": "hook_id",
+      "index": 17
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4335265,
+        4335293
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4335267,
+              4335274
+            ],
+            "value": "level"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335274,
+              4335283
+            ],
+            "value": "message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335283,
+              4335293
+            ],
+            "value": "hook_ids"
+          }
+        ]
+      },
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335293,
+        4335315
+      ],
+      "value": " 个伏笔已沉寂 ",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335315,
+        4335331
+      ],
+      "value": "+ 章未推进",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335331,
+        4335336
+      ],
+      "value": "max",
+      "index": 21
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4335336,
+        4335349
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4335338,
+              4335347
+            ],
+            "value": "default"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4335347,
+              4335349
+            ],
+            "value": 0
+          }
+        ]
+      },
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335349,
+        4335369
+      ],
+      "value": "_DROUGHT_THRESHOLD",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335369,
+        4335376
+      ],
+      "value": "error",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335376,
+        4335382
+      ],
+      "value": "已 ",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335382,
+        4335425
+      ],
+      "value": " 章未推进任何伏笔（旱灾阈值 ",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335425,
+        4335430
+      ],
+      "value": "）",
+      "index": 27
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4335430,
+        4335448
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4335432,
+              4335439
+            ],
+            "value": "level"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335439,
+              4335448
+            ],
+            "value": "message"
+          }
+        ]
+      },
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335448,
+        4335463
+      ],
+      "value": "start_chapter",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335463,
+        4335480
+      ],
+      "value": "current_chapter",
+      "index": 30
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4335480,
+        4335482
+      ],
+      "value": 2,
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335482,
+        4335491
+      ],
+      "value": "planted",
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335491,
+        4335509
+      ],
+      "value": "_BURST_THRESHOLD",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335509,
+        4335532
+      ],
+      "value": "last_advanced_chapter",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335532,
+        4335550
+      ],
+      "value": "近 2 章新开 ",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335550,
+        4335598
+      ],
+      "value": " 个伏笔但未解决任何（爆发警告）",
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335598,
+        4335613
+      ],
+      "value": "compute_decay",
+      "index": 37
+    },
+    {
+      "tag": "f",
+      "fileRange": [
+        4335613,
+        4335622
+      ],
+      "value": 0.3,
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335622,
+        4335630
+      ],
+      "value": "report",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335630,
+        4335636
+      ],
+      "value": "info",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335636,
+        4335647
+      ],
+      "value": "伏笔「",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335647,
+        4335654
+      ],
+      "value": "title",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335654,
+        4335669
+      ],
+      "value": "」衰减度 ",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335669,
+        4335674
+      ],
+      "value": ".0%",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335674,
+        4335691
+      ],
+      "value": "，即将过期",
+      "index": 45
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335691,
+        4335702
+      ],
+      "value": "<genexpr>",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335702,
+        4335737
+      ],
+      "value": "analyze_health.<locals>.<genexpr>",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335737,
+        4335757
+      ],
+      "value": "half_life_chapters",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335757,
+        4335773
+      ],
+      "value": "_HALF_LIFE_MAP",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335773,
+        4335778
+      ],
+      "value": "get",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335778,
+        4335793
+      ],
+      "value": "payoff_timing",
+      "index": 51
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4335793,
+        4335795
+      ],
+      "value": 30,
+      "index": 52
+    },
+    {
+      "tag": "f",
+      "fileRange": [
+        4335795,
+        4335804
+      ],
+      "value": 1.0,
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335804,
+        4335810
+      ],
+      "value": "math",
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335810,
+        4335815
+      ],
+      "value": "exp",
+      "index": 55
+    },
+    {
+      "tag": "f",
+      "fileRange": [
+        4335815,
+        4335824
+      ],
+      "value": -0.693,
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335824,
+        4335834
+      ],
+      "value": "promoted",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335834,
+        4335845
+      ],
+      "value": "core_hook",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335845,
+        4335861
+      ],
+      "value": "advanced_count",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335861,
+        4335873
+      ],
+      "value": "depends_on",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335873,
+        4335887
+      ],
+      "value": "active_hooks",
+      "index": 61
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335887,
+        4335913
+      ],
+      "value": "## Hook Health (active: ",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335913,
+        4335927
+      ],
+      "value": "active_count",
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4335927,
+        4335938
+      ],
+      "value": ", stale: ",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335938,
+        4335951
+      ],
+      "value": "stale_count",
+      "index": 65
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4335951,
+        4335953
+      ],
+      "value": ")",
+      "index": 66
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4335953,
+        4335988
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4335955,
+              4335962
+            ],
+            "value": "error"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335962,
+              4335971
+            ],
+            "value": "warning"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4335971,
+              4335977
+            ],
+            "value": "info"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4335977,
+              4335982
+            ],
+            "value": "!!!"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4335982,
+              4335986
+            ],
+            "value": "!!"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4335986,
+              4335988
+            ],
+            "value": "i"
+          }
+        ]
+      },
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335988,
+        4335995
+      ],
+      "value": "level",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4335995,
+        4336002
+      ],
+      "value": "lines",
+      "index": 69
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4336002,
+        4336004
+      ],
+      "value": "[",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336004,
+        4336008
+      ],
+      "value": "] ",
+      "index": 71
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336008,
+        4336017
+      ],
+      "value": "message",
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336017,
+        4336030
+      ],
+      "value": "stale_hooks",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336030,
+        4336065
+      ],
+      "value": "\nStale hooks that need attention:",
+      "index": 74
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4336065,
+        4336070
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4336066,
+              4336067
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4336067,
+              4336069
+            ],
+            "value": 5
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4336069,
+              4336070
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336070,
+        4336076
+      ],
+      "value": "  - ",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336076,
+        4336090
+      ],
+      "value": " (planted ch",
+      "index": 77
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4336090,
+        4336092
+      ],
+      "value": "\n",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336092,
+        4336250
+      ],
+      "value": "Hook (foreshadowing) lifecycle health analysis.\n\nPorted from InkOS hook-health.ts + hook-promotion.ts.\nProvides health reports for the planner and auditor.\n",
+      "index": 79
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336250,
+        4336259
+      ],
+      "value": "__doc__",
+      "index": 80
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336259,
+        4336269
+      ],
+      "value": "__file__",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336269,
+        4336277
+      ],
+      "value": "origin",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336277,
+        4336291
+      ],
+      "value": "has_location",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336291,
+        4336303
+      ],
+      "value": "__cached__",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336303,
+        4336316
+      ],
+      "value": "annotations",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336316,
+        4336329
+      ],
+      "value": "dataclasses",
+      "index": 86
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336329,
+        4336349
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336331,
+              4336342
+            ],
+            "value": "dataclass"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336342,
+              4336349
+            ],
+            "value": "field"
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336349,
+        4336360
+      ],
+      "value": "dataclass",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336360,
+        4336367
+      ],
+      "value": "field",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336367,
+        4336376
+      ],
+      "value": "pathlib",
+      "index": 90
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336376,
+        4336384
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336378,
+              4336384
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336384,
+        4336390
+      ],
+      "value": "Path",
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336390,
+        4336396
+      ],
+      "value": "List",
+      "index": 93
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336396,
+        4336406
+      ],
+      "value": "Optional",
+      "index": 94
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336406,
+        4336423
+      ],
+      "value": "temporal_memory",
+      "index": 95
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336423,
+        4336481
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336425,
+              4336431
+            ],
+            "value": "Hook"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336431,
+              4336449
+            ],
+            "value": "get_active_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336449,
+              4336466
+            ],
+            "value": "get_stale_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336466,
+              4336481
+            ],
+            "value": "get_all_hooks"
+          }
+        ]
+      },
+      "index": 96
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336481,
+        4336487
+      ],
+      "value": "Hook",
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336487,
+        4336505
+      ],
+      "value": "get_active_hooks",
+      "index": 98
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4336505,
+        4336507
+      ],
+      "value": 15,
+      "index": 99
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4336507,
+        4336509
+      ],
+      "value": 8,
+      "index": 100
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4336509,
+        4336511
+      ],
+      "value": 12,
+      "index": 101
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4336511,
+        4336513
+      ],
+      "value": 3,
+      "index": 102
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4336513,
+        4336552
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336515,
+              4336526
+            ],
+            "value": "immediate"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4336526,
+              4336535
+            ],
+            "value": "mid-arc"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4336535,
+              4336546
+            ],
+            "value": "slow-burn"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4336546,
+              4336548
+            ],
+            "value": 10
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4336548,
+              4336550
+            ],
+            "value": 30
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4336550,
+              4336552
+            ],
+            "value": 80
+          }
+        ]
+      },
+      "index": 103
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336552,
+        4336555
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4336554,
+              4336555
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 104
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336555,
+        4336564
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336557,
+              4336564
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336564,
+        4336576
+      ],
+      "value": "__module__",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336576,
+        4336590
+      ],
+      "value": "__qualname__",
+      "index": 107
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336590,
+        4336607
+      ],
+      "value": "__annotations__",
+      "index": 108
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336607,
+        4336612
+      ],
+      "value": "str",
+      "index": 109
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336612,
+        4336620
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "O",
+            "fileRange": [
+              4336614,
+              4336620
+            ],
+            "value": {
+              "builtinTag": "O",
+              "name": "list"
+            }
+          }
+        ]
+      },
+      "index": 110
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336620,
+        4336639
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336622,
+              4336639
+            ],
+            "value": "default_factory"
+          }
+        ]
+      },
+      "index": 111
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336639,
+        4336649
+      ],
+      "value": "hook_ids",
+      "index": 112
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336649,
+        4336660
+      ],
+      "value": "List[str]",
+      "index": 113
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336660,
+        4336665
+      ],
+      "value": "int",
+      "index": 114
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336665,
+        4336681
+      ],
+      "value": "resolved_count",
+      "index": 115
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336681,
+        4336698
+      ],
+      "value": "List[HookAlert]",
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336698,
+        4336710
+      ],
+      "value": "List[Hook]",
+      "index": 117
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4336710,
+        4336777
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336712,
+              4336723
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336723,
+              4336740
+            ],
+            "value": "current_chapter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336740,
+              4336748
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336748,
+              4336754
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336754,
+              4336759
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336759,
+              4336777
+            ],
+            "value": "HookHealthReport"
+          }
+        ]
+      },
+      "index": 118
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336777,
+        4336793
+      ],
+      "value": "analyze_health",
+      "index": 119
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4336793,
+        4336844
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336795,
+              4336801
+            ],
+            "value": "hook"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336801,
+              4336818
+            ],
+            "value": "current_chapter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336818,
+              4336826
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336826,
+              4336832
+            ],
+            "value": "Hook"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336832,
+              4336837
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336837,
+              4336844
+            ],
+            "value": "float"
+          }
+        ]
+      },
+      "index": 120
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4336844,
+        4336872
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336846,
+              4336852
+            ],
+            "value": "hook"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336852,
+              4336860
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336860,
+              4336866
+            ],
+            "value": "Hook"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336866,
+              4336872
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336872,
+        4336889
+      ],
+      "value": "check_promotion",
+      "index": 122
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4336889,
+        4336930
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336891,
+              4336899
+            ],
+            "value": "report"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336899,
+              4336907
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336907,
+              4336925
+            ],
+            "value": "HookHealthReport"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4336925,
+              4336930
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4336930,
+        4336957
+      ],
+      "value": "format_health_for_planner",
+      "index": 124
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336957,
+        4336990
+      ],
+      "value": "novels\\services\\hook_manager.py",
+      "index": 125
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4336990,
+        4336998
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4336992,
+              4336996
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4336996,
+              4336998
+            ],
+            "value": "h"
+          }
+        ]
+      },
+      "index": 126
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4336998,
+        4337037
+      ],
+      "value": "<module novels.services.hook_manager>",
+      "index": 127
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4337037,
+        4337050
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4337039,
+              4337050
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 128
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4337050,
+        4337177
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4337052,
+              4337063
+            ],
+            "value": "story_dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337063,
+              4337080
+            ],
+            "value": "current_chapter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337080,
+              4337091
+            ],
+            "value": "all_hooks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337091,
+              4337099
+            ],
+            "value": "active"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337099,
+              4337109
+            ],
+            "value": "resolved"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337109,
+              4337116
+            ],
+            "value": "stale"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337116,
+              4337124
+            ],
+            "value": "report"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337124,
+              4337139
+            ],
+            "value": "last_advanced"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337139,
+              4337151
+            ],
+            "value": "recent_new"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337151,
+              4337168
+            ],
+            "value": "recent_resolved"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4337168,
+              4337170
+            ],
+            "value": "h"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337170,
+              4337177
+            ],
+            "value": "decay"
+          }
+        ]
+      },
+      "index": 129
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4337177,
+        4337185
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4337179,
+              4337185
+            ],
+            "value": "hook"
+          }
+        ]
+      },
+      "index": 130
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4337185,
+        4337232
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4337187,
+              4337193
+            ],
+            "value": "hook"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337193,
+              4337210
+            ],
+            "value": "current_chapter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337210,
+              4337221
+            ],
+            "value": "half_life"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337221,
+              4337226
+            ],
+            "value": "age"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337226,
+              4337232
+            ],
+            "value": "math"
+          }
+        ]
+      },
+      "index": 131
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4337232,
+        4337266
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4337234,
+              4337242
+            ],
+            "value": "report"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337242,
+              4337249
+            ],
+            "value": "lines"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337249,
+              4337256
+            ],
+            "value": "alert"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4337256,
+              4337264
+            ],
+            "value": "prefix"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4337264,
+              4337266
+            ],
+            "value": "h"
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4337266,
+        4337276
+      ],
+      "value": "__name__",
+      "index": 133
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4337276,
+        4337286
+      ],
+      "value": "__spec__",
+      "index": 134
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "moduleName": "novels.agents",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3898195,
+  "payloadRange": [
+    3898213,
+    3898499
+  ],
+  "payloadSha256": "4755aee0b01ee2b04d3fb265cd68f3100e5152ea555a3c783e8fcb8c991f39c7",
+  "declaredConstants": 19,
+  "parsedConstants": 19,
+  "stoppedAt": 3898498,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3898215,
+        3898224
+      ],
+      "value": "__doc__",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898224,
+        3898234
+      ],
+      "value": "__file__",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898234,
+        3898240
+      ],
+      "value": "path",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898240,
+        3898249
+      ],
+      "value": "dirname",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898249,
+        3898255
+      ],
+      "value": "join",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898255,
+        3898264
+      ],
+      "value": "environ",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898264,
+        3898269
+      ],
+      "value": "get",
+      "index": 6
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3898269,
+        3898309
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3898271,
+              3898294
+            ],
+            "value": "NUITKA_PACKAGE_novels"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3898294,
+              3898309
+            ],
+            "value": "\\not_existing"
+          }
+        ]
+      },
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898309,
+        3898317
+      ],
+      "value": "agents",
+      "index": 8
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3898317,
+        3898364
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3898319,
+              3898349
+            ],
+            "value": "NUITKA_PACKAGE_novels_agents"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3898349,
+              3898364
+            ],
+            "value": "\\not_existing"
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898364,
+        3898374
+      ],
+      "value": "__path__",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898374,
+        3898382
+      ],
+      "value": "origin",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898382,
+        3898396
+      ],
+      "value": "has_location",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898396,
+        3898424
+      ],
+      "value": "submodule_search_locations",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898424,
+        3898436
+      ],
+      "value": "__cached__",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3898436,
+        3898463
+      ],
+      "value": "novels\\agents\\__init__.py",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3898463,
+        3898487
+      ],
+      "value": "<module novels.agents>",
+      "index": 16
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3898487,
+        3898488
+      ],
+      "value": "",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3898488,
+        3898498
+      ],
+      "value": "__spec__",
+      "index": 18
+    }
+  ]
+}

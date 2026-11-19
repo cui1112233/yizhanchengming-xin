@@ -1,0 +1,1378 @@
+{
+  "moduleName": "novels.services.sensitive_detector",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4369861,
+  "payloadRange": [
+    4369900,
+    4372442
+  ],
+  "payloadSha256": "14957b82f868bd9dc56dd3e438b07255a331d4f08128274b09fc9e4461ec55e1",
+  "declaredConstants": 93,
+  "parsedConstants": 93,
+  "stoppedAt": 4372441,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4369902,
+        4369923
+      ],
+      "value": "_POLITICAL_PATTERNS",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4369923,
+        4369931
+      ],
+      "value": "search",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4369931,
+        4369940
+      ],
+      "value": "content",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4369940,
+        4369948
+      ],
+      "value": "issues",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4369948,
+        4369964
+      ],
+      "value": "SensitiveIssue",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4369964,
+        4369971
+      ],
+      "value": "block",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4369971,
+        4369985
+      ],
+      "value": "政治敏感",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4369985,
+        4370044
+      ],
+      "value": "检测到政治敏感内容，平台审核必定不通过",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370044,
+        4370051
+      ],
+      "value": "group",
+      "index": 8
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4370051,
+        4370056
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4370052,
+              4370053
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4370053,
+              4370055
+            ],
+            "value": 20
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4370055,
+              4370056
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 9
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4370056,
+        4370096
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4370058,
+              4370068
+            ],
+            "value": "severity"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4370068,
+              4370078
+            ],
+            "value": "category"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4370078,
+              4370087
+            ],
+            "value": "message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4370087,
+              4370096
+            ],
+            "value": "matched"
+          }
+        ]
+      },
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370096,
+        4370115
+      ],
+      "value": "_VIOLENCE_EXTREME",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370115,
+        4370129
+      ],
+      "value": "极端暴力",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370129,
+        4370177
+      ],
+      "value": "检测到极端暴力/危险行为描写指导",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370177,
+        4370196
+      ],
+      "value": "_MINOR_PROTECTION",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370196,
+        4370213
+      ],
+      "value": "未成年保护",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370213,
+        4370254
+      ],
+      "value": "检测到涉及未成年人不当内容",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370254,
+        4370277
+      ],
+      "value": "_SUPERSTITION_EXTREME",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370277,
+        4370298
+      ],
+      "value": "封建迷信/邪教",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370298,
+        4370334
+      ],
+      "value": "检测到邪教/传销宣扬内容",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370334,
+        4370342
+      ],
+      "value": "tomato",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370342,
+        4370360
+      ],
+      "value": "_PLATFORM_TOMATO",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370360,
+        4370369
+      ],
+      "value": "warning",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370369,
+        4370383
+      ],
+      "value": "平台违规",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370383,
+        4370433
+      ],
+      "value": "番茄平台禁止在正文中包含引流信息",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370433,
+        4370451
+      ],
+      "value": "_GENERIC_CAUTION",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370451,
+        4370459
+      ],
+      "value": "append",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370459,
+        4370470
+      ],
+      "value": "检测到",
+      "index": 27
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4370470,
+        4370471
+      ],
+      "value": "",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370471,
+        4370521
+      ],
+      "value": "倾向内容，建议修改以通过平台审核",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370521,
+        4370543
+      ],
+      "value": "SensitiveCheckResult",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370543,
+        4370556
+      ],
+      "value": "block_count",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370556,
+        4370571
+      ],
+      "value": "warning_count",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4370571,
+        4370596
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4370573,
+              4370581
+            ],
+            "value": "passed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4370581,
+              4370589
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4370589,
+              4370596
+            ],
+            "value": "stats"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370596,
+        4370904
+      ],
+      "value": "Check content against sensitive word/pattern rules.\n\n    Args:\n        content: Chapter text to check.\n        platform: Target platform (tomato, feilu, qidian, other).\n        genre: Book genre for context-sensitive rules.\n\n    Returns:\n        SensitiveCheckResult with pass/fail and matched issues.\n    ",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4370904,
+        4370914
+      ],
+      "value": "severity",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370914,
+        4370925
+      ],
+      "value": "<genexpr>",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370925,
+        4370969
+      ],
+      "value": "check_sensitive_content.<locals>.<genexpr>",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4370969,
+        4371144
+      ],
+      "value": "Sensitive content detection for platform compliance.\n\nRule-based pattern matching for content that may violate\nplatform publishing guidelines (e.g., Tomato, Feilu, Qidian).\n",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371144,
+        4371153
+      ],
+      "value": "__doc__",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371153,
+        4371163
+      ],
+      "value": "__file__",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371163,
+        4371171
+      ],
+      "value": "origin",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371171,
+        4371185
+      ],
+      "value": "has_location",
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371185,
+        4371197
+      ],
+      "value": "__cached__",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371197,
+        4371210
+      ],
+      "value": "annotations",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371210,
+        4371214
+      ],
+      "value": "re",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371214,
+        4371227
+      ],
+      "value": "dataclasses",
+      "index": 46
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371227,
+        4371247
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4371229,
+              4371240
+            ],
+            "value": "dataclass"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4371240,
+              4371247
+            ],
+            "value": "field"
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371247,
+        4371258
+      ],
+      "value": "dataclass",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371258,
+        4371265
+      ],
+      "value": "field",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371265,
+        4371270
+      ],
+      "value": "Any",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371270,
+        4371276
+      ],
+      "value": "Dict",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371276,
+        4371282
+      ],
+      "value": "List",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371282,
+        4371291
+      ],
+      "value": "Literal",
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371291,
+        4371301
+      ],
+      "value": "Sequence",
+      "index": 54
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371301,
+        4371304
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4371303,
+              4371304
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 55
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371304,
+        4371313
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4371306,
+              4371313
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371313,
+        4371325
+      ],
+      "value": "__module__",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371325,
+        4371339
+      ],
+      "value": "__qualname__",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371339,
+        4371356
+      ],
+      "value": "__annotations__",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4371356,
+        4371393
+      ],
+      "value": "Literal['block', 'warning', 'info']",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371393,
+        4371398
+      ],
+      "value": "str",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371398,
+        4371408
+      ],
+      "value": "category",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371408,
+        4371417
+      ],
+      "value": "message",
+      "index": 63
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371417,
+        4371426
+      ],
+      "value": "matched",
+      "index": 64
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371426,
+        4371432
+      ],
+      "value": "bool",
+      "index": 65
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371432,
+        4371440
+      ],
+      "value": "passed",
+      "index": 66
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371440,
+        4371448
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "O",
+            "fileRange": [
+              4371442,
+              4371448
+            ],
+            "value": {
+              "builtinTag": "O",
+              "name": "list"
+            }
+          }
+        ]
+      },
+      "index": 67
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371448,
+        4371467
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4371450,
+              4371467
+            ],
+            "value": "default_factory"
+          }
+        ]
+      },
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4371467,
+        4371489
+      ],
+      "value": "List[SensitiveIssue]",
+      "index": 69
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371489,
+        4371497
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "O",
+            "fileRange": [
+              4371491,
+              4371497
+            ],
+            "value": {
+              "builtinTag": "O",
+              "name": "dict"
+            }
+          }
+        ]
+      },
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371497,
+        4371504
+      ],
+      "value": "stats",
+      "index": 71
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4371504,
+        4371520
+      ],
+      "value": "Dict[str, Any]",
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371520,
+        4371622
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4371522,
+              4371550
+            ],
+            "value": "颠覆[^，。]{0,4}政权"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4371550,
+              4371578
+            ],
+            "value": "分裂[^，。]{0,4}国家"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4371578,
+              4371622
+            ],
+            "value": "煽动[^，。]{0,4}(暴乱|革命|颠覆)"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4371622,
+        4371631
+      ],
+      "value": "compile",
+      "index": 74
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371631,
+        4371751
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4371633,
+              4371687
+            ],
+            "value": "详细描(写|述)[^。]{0,20}(肢解|分尸|虐杀)"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4371687,
+              4371751
+            ],
+            "value": "(教程|方法|步骤)[^。]{0,10}(制毒|制造炸弹|自杀)"
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371751,
+        4371838
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4371753,
+              4371838
+            ],
+            "value": "(未成年|幼女|幼童|小学生|中学生)[^。]{0,15}(性|色情|猥亵|侵犯)"
+          }
+        ]
+      },
+      "index": 76
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371838,
+        4371898
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4371840,
+              4371898
+            ],
+            "value": "(邪教|传销)[^。]{0,10}(宣扬|推广|招募|洗脑)"
+          }
+        ]
+      },
+      "index": 77
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371898,
+        4371962
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4371900,
+              4371962
+            ],
+            "value": "(微信|QQ群|加群|公众号|淘宝|京东)\\s*[:：]?\\s*\\d"
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4371962,
+        4371976
+      ],
+      "value": "涉毒描写",
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4371976,
+        4372052
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4371978,
+              4372052
+            ],
+            "value": "(吸毒|注射海洛因|冰毒|大麻)[^。]{0,20}(快感|飘飘|舒服)"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372052,
+        4372066
+      ],
+      "value": "赌博美化",
+      "index": 81
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372066,
+        4372132
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4372068,
+              4372132
+            ],
+            "value": "(赌博|赌场|下注)[^。]{0,15}(发财|暴富|人生赢家)"
+          }
+        ]
+      },
+      "index": 82
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4372132,
+        4372165
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372134,
+              4372144
+            ],
+            "value": "platform"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372144,
+              4372151
+            ],
+            "value": "genre"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372151,
+              4372158
+            ],
+            "value": "other"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372158,
+              4372165
+            ],
+            "value": "other"
+          }
+        ]
+      },
+      "index": 83
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4372165,
+        4372230
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372167,
+              4372176
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372176,
+              4372186
+            ],
+            "value": "platform"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372186,
+              4372193
+            ],
+            "value": "genre"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372193,
+              4372201
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372201,
+              4372206
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4372206,
+              4372207
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4372201,
+                  4372206
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4372207,
+              4372208
+            ],
+            "value": {
+              "previous": {
+                "tag": "p",
+                "fileRange": [
+                  4372206,
+                  4372207
+                ],
+                "value": {
+                  "previous": {
+                    "tag": "a",
+                    "fileRange": [
+                      4372201,
+                      4372206
+                    ],
+                    "value": "str"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372208,
+              4372230
+            ],
+            "value": "SensitiveCheckResult"
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372230,
+        4372255
+      ],
+      "value": "check_sensitive_content",
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372255,
+        4372294
+      ],
+      "value": "novels\\services\\sensitive_detector.py",
+      "index": 86
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372294,
+        4372302
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372296,
+              4372300
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4372300,
+              4372302
+            ],
+            "value": "i"
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4372302,
+        4372347
+      ],
+      "value": "<module novels.services.sensitive_detector>",
+      "index": 88
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372347,
+        4372360
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372349,
+              4372360
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 89
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4372360,
+        4372421
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4372362,
+              4372371
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372371,
+              4372381
+            ],
+            "value": "platform"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372381,
+              4372388
+            ],
+            "value": "genre"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372388,
+              4372396
+            ],
+            "value": "issues"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372396,
+              4372401
+            ],
+            "value": "pat"
+          },
+          {
+            "tag": "w",
+            "fileRange": [
+              4372401,
+              4372403
+            ],
+            "value": "m"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372403,
+              4372410
+            ],
+            "value": "label"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4372410,
+              4372421
+            ],
+            "value": "has_block"
+          }
+        ]
+      },
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372421,
+        4372431
+      ],
+      "value": "__name__",
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4372431,
+        4372441
+      ],
+      "value": "__spec__",
+      "index": 92
+    }
+  ]
+}

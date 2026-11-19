@@ -1,0 +1,301 @@
+{
+  "moduleName": "novels",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 3938086,
+  "payloadRange": [
+    3938097,
+    3938569
+  ],
+  "payloadSha256": "07eae47f668b7935623ba251e5774c414c56884f5fa45bce40f4ca8ac75a459e",
+  "declaredConstants": 29,
+  "parsedConstants": 29,
+  "stoppedAt": 3938568,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        3938099,
+        3938116
+      ],
+      "value": "__mro_entries__",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938116,
+        3938123
+      ],
+      "value": "bases",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938123,
+        3938129
+      ],
+      "value": "keys",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938129,
+        3938177
+      ],
+      "value": "%s argument after ** must be a mapping, not %s",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938177,
+        3938187
+      ],
+      "value": "__name__",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938187,
+        3938237
+      ],
+      "value": "%s got multiple values for keyword argument '%s'",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938237,
+        3938245
+      ],
+      "value": "called",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938245,
+        3938260
+      ],
+      "value": "star_arg_dict",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938260,
+        3938290
+      ],
+      "value": "'%s' object is not a mapping",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938290,
+        3938294
+      ],
+      "value": "kw",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938294,
+        3938300
+      ],
+      "value": "args",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938300,
+        3938326
+      ],
+      "value": "keywords must be strings",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938326,
+        3938360
+      ],
+      "value": "InkOS-style novel studio module.",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938360,
+        3938369
+      ],
+      "value": "__doc__",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938369,
+        3938379
+      ],
+      "value": "__file__",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938379,
+        3938385
+      ],
+      "value": "path",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938385,
+        3938394
+      ],
+      "value": "dirname",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938394,
+        3938403
+      ],
+      "value": "environ",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938403,
+        3938408
+      ],
+      "value": "get",
+      "index": 18
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3938408,
+        3938448
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3938410,
+              3938433
+            ],
+            "value": "NUITKA_PACKAGE_novels"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3938433,
+              3938448
+            ],
+            "value": "\\not_existing"
+          }
+        ]
+      },
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938448,
+        3938458
+      ],
+      "value": "__path__",
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938458,
+        3938466
+      ],
+      "value": "origin",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938466,
+        3938480
+      ],
+      "value": "has_location",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938480,
+        3938508
+      ],
+      "value": "submodule_search_locations",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938508,
+        3938520
+      ],
+      "value": "__cached__",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938520,
+        3938540
+      ],
+      "value": "novels\\__init__.py",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        3938540,
+        3938557
+      ],
+      "value": "<module novels>",
+      "index": 26
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        3938557,
+        3938558
+      ],
+      "value": "",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        3938558,
+        3938568
+      ],
+      "value": "__spec__",
+      "index": 28
+    }
+  ]
+}

@@ -1,0 +1,2107 @@
+{
+  "moduleName": "novels.prompts.inkos.short_fiction_prompts",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4235534,
+  "payloadRange": [
+    4235581,
+    4245812
+  ],
+  "payloadSha256": "10d07580be33d9d40b83fc07b3ec86a4db02327831a844adfe7c10d3c76a03bb",
+  "declaredConstants": 163,
+  "parsedConstants": 163,
+  "stoppedAt": 4245811,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4235583,
+        4235600
+      ],
+      "value": "## 创作方向",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235600,
+        4235611
+      ],
+      "value": "direction",
+      "index": 1
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4235611,
+        4235612
+      ],
+      "value": "",
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235612,
+        4235629
+      ],
+      "value": "## 目标规格",
+      "index": 3
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235629,
+        4235644
+      ],
+      "value": "完整短篇 ",
+      "index": 4
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235644,
+        4235659
+      ],
+      "value": "chapter_count",
+      "index": 5
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235659,
+        4235678
+      ],
+      "value": " 章，每章约 ",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235678,
+        4235697
+      ],
+      "value": "chars_per_chapter",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235697,
+        4235706
+      ],
+      "value": " 字。",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235706,
+        4235717
+      ],
+      "value": "reference",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235717,
+        4235723
+      ],
+      "value": "text",
+      "index": 10
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4235723,
+        4235746
+      ],
+      "value": "## 可选参考文本",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4235746,
+        4235753
+      ],
+      "value": "strip",
+      "index": 12
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4235753,
+        4236572
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4235755,
+              4235772
+            ],
+            "value": "## 产出要求"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4235772,
+              4236017
+            ],
+            "value": "先给一个平台感标题，再给完整故事方案。大纲要讲清楚主角为什么被压住、读者想看什么回报、主角靠什么翻盘、证据/关系/身份/规则如何递进、反派为什么会反扑、结尾如何落地。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236017,
+              4236169
+            ],
+            "value": "章节方案必须逐章写清：章节标题方向、当章发生的关键场面、角色动作、压力升级或回报、章尾继续读的理由。"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236169,
+              4236264
+            ],
+            "value": "可以给标签，但不要穷举标签表；标签服务选题和写作，不替代故事。"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              4236264,
+              4236265
+            ],
+            "value": ""
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236265,
+              4236282
+            ],
+            "value": "## 输出格式"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236282,
+              4236316
+            ],
+            "value": "=== SHORT_FICTION_PLAN_TITLE ==="
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236316,
+              4236345
+            ],
+            "value": "只写一行平台感标题"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236345,
+              4236373
+            ],
+            "value": "=== SHORT_FICTION_PLAN ==="
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4236373,
+              4236572
+            ],
+            "value": "用 Markdown 写完整故事方案，包含：题材/受众、标题方向、开篇小钩子、人物与关系、核心压力、主角赢法、升级链、反转链、结尾回报、逐章方案。"
+          }
+        ]
+      },
+      "index": 13
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4236572,
+        4236574
+      ],
+      "value": "\n",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236574,
+        4236597
+      ],
+      "value": "## 待审故事方案",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4236597,
+        4236618
+      ],
+      "value": "outline_raw_content",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236618,
+        4236635
+      ],
+      "value": "## 审查重点",
+      "index": 17
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236635,
+        4236702
+      ],
+      "value": "- 这是不是完整短篇故事，而不是局部试写方案。",
+      "index": 18
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236702,
+        4236766
+      ],
+      "value": "- 标题、开篇、前三章是否有点击和追读理由。",
+      "index": 19
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236766,
+        4236830
+      ],
+      "value": "- 大纲是否足够密，写手是否会在后半段泄气。",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236830,
+        4236912
+      ],
+      "value": "- 关键场面有没有人物行动、反扑和回报，不是纯结果摘要。",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4236912,
+        4237015
+      ],
+      "value": "- 读者会不会因为时间线、人物关系、证据权限、身体状态、常识问题出戏。",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237015,
+        4237089
+      ],
+      "value": "根据上面的审纲意见，继续给出第二版完整故事方案。",
+      "index": 23
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237089,
+        4237175
+      ],
+      "value": "这是同一次创作的第二轮，不要另起炉灶，不要只写修改说明。",
+      "index": 24
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237175,
+        4237187
+      ],
+      "value": "仍然按 ",
+      "index": 25
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237187,
+        4237206
+      ],
+      "value": " 章、每章约 ",
+      "index": 26
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237206,
+        4237224
+      ],
+      "value": " 字来组织。",
+      "index": 27
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237224,
+        4237316
+      ],
+      "value": "保留能打的题材发动机和人物关系，修掉会导致成稿不好看的硬伤。",
+      "index": 28
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237316,
+        4237333
+      ],
+      "value": "## 审纲意见",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4237333,
+        4237341
+      ],
+      "value": "review",
+      "index": 30
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237341,
+        4237358
+      ],
+      "value": "## 输出格式",
+      "index": 31
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237358,
+        4237392
+      ],
+      "value": "=== SHORT_FICTION_PLAN_TITLE ===",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237392,
+        4237421
+      ],
+      "value": "只写一行平台感标题",
+      "index": 33
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237421,
+        4237449
+      ],
+      "value": "=== SHORT_FICTION_PLAN ===",
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237449,
+        4237497
+      ],
+      "value": "用 Markdown 写完整第二版故事方案。",
+      "index": 35
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4237497,
+        4237505
+      ],
+      "value": "blocks",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237505,
+        4237519
+      ],
+      "value": "=== CHAPTER ",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237519,
+        4237531
+      ],
+      "value": " TITLE ===",
+      "index": 38
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237531,
+        4237598
+      ],
+      "value": "章节标题，只写纯文本，不要 #，不要第几章前缀",
+      "index": 39
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237598,
+        4237612
+      ],
+      "value": " CONTENT ===",
+      "index": 40
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237612,
+        4237617
+      ],
+      "value": "第",
+      "index": 41
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237617,
+        4237682
+      ],
+      "value": "章正文，写完整场面，不要梗概，不要作者备注",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237682,
+        4237693
+      ],
+      "value": "## 任务",
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237693,
+        4237711
+      ],
+      "value": "一次写完整 ",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237711,
+        4237866
+      ],
+      "value": "先读完整故事方案，再写正文。正文要承接大纲的压力链、证据链、反转链和情绪回报，不要临时改成另一种故事。",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4237866,
+        4237901
+      ],
+      "value": "_build_short_fiction_craft_prompt",
+      "index": 46
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237901,
+        4237918
+      ],
+      "value": "## 故事方案",
+      "index": 47
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4237918,
+        4237936
+      ],
+      "value": "outline_markdown",
+      "index": 48
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237936,
+        4237965
+      ],
+      "value": "=== SHORT_FICTION_TITLE ===",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4237965,
+        4238009
+      ],
+      "value": "短篇标题，只写纯文本平台标题",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238009,
+        4238045
+      ],
+      "value": "=== SHORT_FICTION_OPENING_HOOK ===",
+      "index": 51
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238045,
+        4238163
+      ],
+      "value": "可选正文前小钩子，约 200 字；如果不需要独立引子，也要写第 1 章第一屏的入局小场面",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4238163,
+        4238187
+      ],
+      "value": "_chapter_output_blocks",
+      "index": 53
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238187,
+        4238191
+      ],
+      "value": ", ",
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4238191,
+        4238209
+      ],
+      "value": "missing_chapters",
+      "index": 55
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238209,
+        4238277
+      ],
+      "value": "上一次正文被截断或漏章。现在只补写缺失章节：",
+      "index": 56
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238277,
+        4238282
+      ],
+      "value": "。",
+      "index": 57
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238282,
+        4238306
+      ],
+      "value": "仍然按完整短篇 ",
+      "index": 58
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238306,
+        4238321
+      ],
+      "value": " 字校准。",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238321,
+        4238419
+      ],
+      "value": "不要重写已完成章节，不要写总结说明，不要道歉，不要输出审稿意见。",
+      "index": 60
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238419,
+        4238472
+      ],
+      "value": "## 已有正文（只用于承接，不要重写）",
+      "index": 61
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4238472,
+        4238497
+      ],
+      "value": "existing_draft_markdown",
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4238497,
+        4238504
+      ],
+      "value": "parts",
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238504,
+        4238515
+      ],
+      "value": "<genexpr>",
+      "index": 64
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238515,
+        4238586
+      ],
+      "value": "build_short_fiction_draft_continuation_user_prompt.<locals>.<genexpr>",
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238586,
+        4238606
+      ],
+      "value": "## 原故事方案",
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238606,
+        4238623
+      ],
+      "value": "## 待审正文",
+      "index": 67
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4238623,
+        4238639
+      ],
+      "value": "draft_markdown",
+      "index": 68
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238639,
+        4238656
+      ],
+      "value": "## 审稿要求",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238656,
+        4238805
+      ],
+      "value": "直接说人话：这本读起来哪里有欲望、哪里出戏、哪里像梗概、哪里后半段泄气、哪里标题或章节标题不想点。",
+      "index": 70
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238805,
+        4238903
+      ],
+      "value": "不要因为某章略短或略长就判死；先判断内容是否完整、有戏、有回报。",
+      "index": 71
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238903,
+        4238959
+      ],
+      "value": "根据审稿意见，继续写第二版完整正文。",
+      "index": 72
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238959,
+        4239078
+      ],
+      "value": "这是同一篇的第二轮写作：保留上一版能打的地方，修掉会让读者出戏或不想读的问题。",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239078,
+        4239155
+      ],
+      "value": "不要只列修改建议，不要只改几章片段，输出完整正文。",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239155,
+        4239172
+      ],
+      "value": "## 审稿意见",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239172,
+        4239192
+      ],
+      "value": "## 第二轮重点",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239192,
+        4239295
+      ],
+      "value": "- 修时间线、逻辑、人物关系、证据权限、身体状态等会让读者出戏的问题。",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239295,
+        4239356
+      ],
+      "value": "- 补后半段有效场面，不要用结果摘要收尾。",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239356,
+        4239486
+      ],
+      "value": "- 保持标题、开篇、章节标题和正文主标题一致，但标题可以基于正文重新压得更有平台点击感。",
+      "index": 79
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239486,
+        4239568
+      ],
+      "value": "- 字数只做校准：偏短补有效场面，偏长删解释和重复反应。",
+      "index": 80
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239568,
+        4239585
+      ],
+      "value": "## 最终正文",
+      "index": 81
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239585,
+        4239622
+      ],
+      "value": "=== SHORT_FICTION_PACKAGE_TITLE ===",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4239622,
+        4239635
+      ],
+      "value": "draft_title",
+      "index": 83
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239635,
+        4239664
+      ],
+      "value": "=== SHORT_FICTION_INTRO ===",
+      "index": 84
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239664,
+        4239754
+      ],
+      "value": "100-180字平台简介，直接抓冲突、压迫和回报，不要剧透成流水账。",
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239754,
+        4239792
+      ],
+      "value": "=== SHORT_FICTION_SELLING_POINTS ===",
+      "index": 86
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239792,
+        4239825
+      ],
+      "value": "- 3到6条卖点，每条一行",
+      "index": 87
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239825,
+        4239861
+      ],
+      "value": "=== SHORT_FICTION_COVER_PROMPT ===",
+      "index": 88
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239861,
+        4239983
+      ],
+      "value": "中文封面生成提示词：3:4竖图，主标题区，人物情绪，道具，配色，字体风格，避免事项。",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4239983,
+        4239992
+      ],
+      "value": "__doc__",
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4239992,
+        4240002
+      ],
+      "value": "__file__",
+      "index": 91
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240002,
+        4240010
+      ],
+      "value": "origin",
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240010,
+        4240024
+      ],
+      "value": "has_location",
+      "index": 93
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240024,
+        4240036
+      ],
+      "value": "__cached__",
+      "index": 94
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240036,
+        4240049
+      ],
+      "value": "annotations",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240049,
+        4240062
+      ],
+      "value": "dataclasses",
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4240062,
+        4240075
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4240064,
+              4240075
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240075,
+        4240086
+      ],
+      "value": "dataclass",
+      "index": 98
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240086,
+        4240096
+      ],
+      "value": "Optional",
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4240096,
+        4240099
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4240098,
+              4240099
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4240099,
+        4240108
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4240101,
+              4240108
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240108,
+        4240120
+      ],
+      "value": "__module__",
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240120,
+        4240154
+      ],
+      "value": "ShortFictionReferencePromptInput",
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240154,
+        4240168
+      ],
+      "value": "__qualname__",
+      "index": 104
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240168,
+        4240185
+      ],
+      "value": "__annotations__",
+      "index": 105
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4240185,
+        4240200
+      ],
+      "value": "Optional[str]",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240200,
+        4240232
+      ],
+      "value": "ShortFictionOutlinePromptInput",
+      "index": 107
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240232,
+        4240237
+      ],
+      "value": "str",
+      "index": 108
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240237,
+        4240242
+      ],
+      "value": "int",
+      "index": 109
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4240242,
+        4240286
+      ],
+      "value": "Optional[ShortFictionReferencePromptInput]",
+      "index": 110
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240286,
+        4240324
+      ],
+      "value": "ShortFictionOutlineReviewPromptInput",
+      "index": 111
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240324,
+        4240364
+      ],
+      "value": "ShortFictionOutlineRevisionPromptInput",
+      "index": 112
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240364,
+        4240394
+      ],
+      "value": "ShortFictionDraftPromptInput",
+      "index": 113
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240394,
+        4240407
+      ],
+      "value": "__prepare__",
+      "index": 114
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240407,
+        4240449
+      ],
+      "value": "ShortFictionDraftContinuationPromptInput",
+      "index": 115
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240449,
+        4240462
+      ],
+      "value": "__getitem__",
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4240462,
+        4240510
+      ],
+      "value": "%s.__prepare__() must return a mapping, not %s",
+      "index": 117
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240510,
+        4240520
+      ],
+      "value": "__name__",
+      "index": 118
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4240520,
+        4240533
+      ],
+      "value": "<metaclass>",
+      "index": 119
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4240533,
+        4240544
+      ],
+      "value": "list[int]",
+      "index": 120
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240544,
+        4240560
+      ],
+      "value": "__orig_bases__",
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240560,
+        4240596
+      ],
+      "value": "ShortFictionDraftReviewPromptInput",
+      "index": 122
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240596,
+        4240634
+      ],
+      "value": "ShortFictionDraftRevisionPromptInput",
+      "index": 123
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4240634,
+        4240666
+      ],
+      "value": "ShortFictionPackagePromptInput",
+      "index": 124
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4240666,
+        4240681
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4240668,
+              4240676
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4240676,
+              4240681
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 125
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4240681,
+        4241316
+      ],
+      "value": "你是短篇小说总编，负责把一个创作方向做成完整短篇故事方案。\n只基于本次创作方向和用户提供的参考文本创作；没有提供的资料，不要声称读过、引用过或继承过。\n目标是内容优先：标题、开篇、人物压力、证据/关系/身份杠杆、升级链、反转链和回报落点必须能支撑一次写完整篇。\n不要过度结构化，不要输出 JSON/YAML。用人能读的 Markdown，但章节方案必须足够密，写手拿到后能直接一次写完。\n短篇默认 12-18 章，每章约 900-1200 字。故事要完整，不是长篇前 5 章启动包。",
+      "index": 126
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4241316,
+        4241359
+      ],
+      "value": "build_short_fiction_outline_system_prompt",
+      "index": 127
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4241359,
+        4241418
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4241361,
+              4241373
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4241373,
+              4241381
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4241381,
+              4241413
+            ],
+            "value": "ShortFictionOutlinePromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4241413,
+              4241418
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 128
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4241418,
+        4241459
+      ],
+      "value": "build_short_fiction_outline_user_prompt",
+      "index": 129
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4241459,
+        4241890
+      ],
+      "value": "你是短篇审纲编辑。你不负责打分，也不负责判抄。\n你的任务是判断这个故事方案能不能支撑一次写完整篇：题材发动机是否清楚、人物动机是否成立、压力链是否递进、反派反扑是否可信、结尾回报是否够。\n审稿要像真实读者和编辑，不要只列工程检查项。\n输出 Markdown，直接指出会导致成稿不好看的硬伤和可保留优点。",
+      "index": 130
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4241890,
+        4241940
+      ],
+      "value": "build_short_fiction_outline_review_system_prompt",
+      "index": 131
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4241940,
+        4242005
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4241942,
+              4241954
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4241954,
+              4241962
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4241962,
+              4242000
+            ],
+            "value": "ShortFictionOutlineReviewPromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4242000,
+              4242005
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4242005,
+        4242053
+      ],
+      "value": "build_short_fiction_outline_review_user_prompt",
+      "index": 133
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4242053,
+        4242120
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4242055,
+              4242067
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4242067,
+              4242075
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4242075,
+              4242115
+            ],
+            "value": "ShortFictionOutlineRevisionPromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4242115,
+              4242120
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 134
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4242120,
+        4242167
+      ],
+      "value": "build_short_fiction_outline_revision_followup",
+      "index": 135
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4242167,
+        4242932
+      ],
+      "value": "你是中文短篇 BatchWriter。你要根据故事方案一次 API 写完整短篇正文。\n这不是长篇连载续写，也不是章节梗概。每章都要有当场发生的戏：人物行动、对话或反应、局面变化、章尾继续读的理由。\n网文戏剧性要足：现实压力可以放大到读者愿意信的程度，但不能荒诞到失去代入。\n标题和章节标题要像平台内容，不要文艺化总结。正文保持移动端节奏，段落短但不要写成电报体。\n字数是校准，不是平均数学题。大场面可略长，过渡章可略短；明显偏短通常说明写成了梗概，必须补有效场面。\n输出必须严格使用指定 block，不要写作者说明、字数说明、审稿意见或格式解释。",
+      "index": 136
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4242932,
+        4242974
+      ],
+      "value": "build_short_fiction_writer_system_prompt",
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4242974,
+        4244094
+      ],
+      "value": "## 写法提醒\n- 盐溶于汤：人物价值观和野心靠行动表现，不靠口号。\n- Show don't tell：用行为、证据、细节和场景让读者自己感到人物状态。\n- 明喻节制：别把「像/仿佛/如同」当默认修辞反复用，每个场景最多 1 处；优先用准确的动词和具体动作，而不是比喻。\n- 反注水：每个场景都推动冲突、因果、情绪、证据、压迫、回报或关系。\n- 高潮即场景，不是概述：冲突爆发、反转、生死、揭露这些关键拍必须当场一拍一拍演出（动作、对话、五感）。本章信息量越大越要把最关键那拍写成完整场面，绝不能用「然后他救了人、对手落网」这种一句话带过。\n- 回报要有铺垫：反转、打脸、和解、复仇、身份揭露都要有证据链和因果链。\n- 配角要有动机：压迫者也有利益、误判或恐惧，不要写成无脑工具人。\n- 日常细节要变成饵：细节承担证据、情绪、人物差异或后续反转功能。\n- 移动端优先：段落短，信息密，少写空泛抒情和装饰性废话。",
+      "index": 138
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4244094,
+        4244135
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244096,
+              4244111
+            ],
+            "value": "chapter_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244111,
+              4244119
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244119,
+              4244124
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4244124,
+              4244135
+            ],
+            "value": "list[str]"
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4244135,
+        4244192
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244137,
+              4244149
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244149,
+              4244157
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244157,
+              4244187
+            ],
+            "value": "ShortFictionDraftPromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244187,
+              4244192
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 140
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4244192,
+        4244232
+      ],
+      "value": "build_short_fiction_writer_user_prompt",
+      "index": 141
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4244232,
+        4244301
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244234,
+              4244246
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244246,
+              4244254
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244254,
+              4244296
+            ],
+            "value": "ShortFictionDraftContinuationPromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244296,
+              4244301
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 142
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4244301,
+        4244353
+      ],
+      "value": "build_short_fiction_draft_continuation_user_prompt",
+      "index": 143
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4244353,
+        4244788
+      ],
+      "value": "你是短篇成稿审稿编辑。\n你只看内容是否能卖、是否顺、是否有继续读的欲望；不要把审稿变成确定性打分。\n重点看标题、章节标题、开篇、人物动机、时间线、人物关系、证据/权限、压力递进、反派反扑、后半段是否泄气、结尾回报是否落地。\n输出 Markdown，写清哪些问题会明显影响读者读下去，哪些只是可接受的小瑕疵。",
+      "index": 144
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4244788,
+        4244836
+      ],
+      "value": "build_short_fiction_draft_review_system_prompt",
+      "index": 145
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4244836,
+        4244899
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244838,
+              4244850
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244850,
+              4244858
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244858,
+              4244894
+            ],
+            "value": "ShortFictionDraftReviewPromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244894,
+              4244899
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 146
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4244899,
+        4244945
+      ],
+      "value": "build_short_fiction_draft_review_user_prompt",
+      "index": 147
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4244945,
+        4245010
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244947,
+              4244959
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4244959,
+              4244967
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4244967,
+              4245005
+            ],
+            "value": "ShortFictionDraftRevisionPromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245005,
+              4245010
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 148
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245010,
+        4245055
+      ],
+      "value": "build_short_fiction_draft_revision_followup",
+      "index": 149
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4245055,
+        4245420
+      ],
+      "value": "你是短篇小说包装编辑，负责根据最终正文生成简介、卖点和封面提示词。\n不要另起一个和正文不同的主标题。包装必须围绕正文实际标题和剧情。\n封面提示词按手机端竖版书封思考：3:4 竖图、大标题区、强人物情绪、少量一眼可识别道具、高对比色彩，不要影视海报感。",
+      "index": 150
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245420,
+        4245463
+      ],
+      "value": "build_short_fiction_package_system_prompt",
+      "index": 151
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4245463,
+        4245522
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245465,
+              4245477
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245477,
+              4245485
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245485,
+              4245517
+            ],
+            "value": "ShortFictionPackagePromptInput"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245517,
+              4245522
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 152
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245522,
+        4245563
+      ],
+      "value": "build_short_fiction_package_user_prompt",
+      "index": 153
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4245563,
+        4245610
+      ],
+      "value": "novels\\prompts\\inkos\\short_fiction_prompts.py",
+      "index": 154
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4245610,
+        4245620
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245612,
+              4245616
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245616,
+              4245620
+            ],
+            "value": "ch"
+          }
+        ]
+      },
+      "index": 155
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4245620,
+        4245673
+      ],
+      "value": "<module novels.prompts.inkos.short_fiction_prompts>",
+      "index": 156
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4245673,
+        4245686
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245675,
+              4245686
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 157
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4245686,
+        4245727
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245688,
+              4245703
+            ],
+            "value": "chapter_count"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245703,
+              4245711
+            ],
+            "value": "blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245711,
+              4245718
+            ],
+            "value": "index"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245718,
+              4245727
+            ],
+            "value": "chapter"
+          }
+        ]
+      },
+      "index": 158
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4245727,
+        4245766
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245729,
+              4245741
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245741,
+              4245750
+            ],
+            "value": "missing"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245750,
+              4245757
+            ],
+            "value": "parts"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245757,
+              4245766
+            ],
+            "value": "chapter"
+          }
+        ]
+      },
+      "index": 159
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4245766,
+        4245780
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245768,
+              4245780
+            ],
+            "value": "input_data"
+          }
+        ]
+      },
+      "index": 160
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4245780,
+        4245801
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4245782,
+              4245794
+            ],
+            "value": "input_data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4245794,
+              4245801
+            ],
+            "value": "parts"
+          }
+        ]
+      },
+      "index": 161
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4245801,
+        4245811
+      ],
+      "value": "__spec__",
+      "index": 162
+    }
+  ]
+}

@@ -1,0 +1,1424 @@
+{
+  "moduleName": "novels.prompts.inkos.fanfic_dimensions",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4140892,
+  "payloadRange": [
+    4140935,
+    4142977
+  ],
+  "payloadSha256": "9c69a7dc1d8c40d651b8bf22cedf2170c1e2b61d85e5a8cd9589e96ee8c61157",
+  "declaredConstants": 56,
+  "parsedConstants": 56,
+  "stoppedAt": 4142976,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4140937,
+        4140951
+      ],
+      "value": "SEVERITY_MAP",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140951,
+        4140970
+      ],
+      "value": "FANFIC_DIMENSIONS",
+      "index": 1
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140970,
+        4140974
+      ],
+      "value": "id",
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140974,
+        4140994
+      ],
+      "value": "severity_overrides",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4140994,
+        4141004
+      ],
+      "value": "critical",
+      "index": 4
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4141004,
+        4141024
+      ],
+      "value": "（严格检查）",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141024,
+        4141030
+      ],
+      "value": "info",
+      "index": 6
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4141030,
+        4141065
+      ],
+      "value": "（仅记录，不判定失败）",
+      "index": 7
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4141065,
+        4141085
+      ],
+      "value": "（警告级别）",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141085,
+        4141095
+      ],
+      "value": "baseNote",
+      "index": 9
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4141095,
+        4141096
+      ],
+      "value": "",
+      "index": 10
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4141096,
+        4141098
+      ],
+      "value": " ",
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141098,
+        4141105
+      ],
+      "value": "notes",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141105,
+        4141110
+      ],
+      "value": "ooc",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141110,
+        4141119
+      ],
+      "value": "OOC_DIM",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4141119,
+        4141255
+      ],
+      "value": "OOC模式下角色可偏离性格底色，此维度仅记录不判定失败。参照 fanfic_canon.md 角色档案评估偏离程度。",
+      "index": 15
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141255,
+        4141262
+      ],
+      "value": "canon",
+      "index": 16
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4141262,
+        4141392
+      ],
+      "value": "原作向同人：角色必须严格遵守性格底色。参照 fanfic_canon.md 角色档案中的性格底色和行为模式。",
+      "index": 17
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141392,
+        4141415
+      ],
+      "value": "FanficDimensionConfig",
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141415,
+        4141429
+      ],
+      "value": "SPINOFF_DIMS",
+      "index": 19
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4141429,
+        4141487
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4141431,
+              4141443
+            ],
+            "value": "active_ids"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4141443,
+              4141463
+            ],
+            "value": "severity_overrides"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4141463,
+              4141480
+            ],
+            "value": "deactivated_ids"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4141480,
+              4141487
+            ],
+            "value": "notes"
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141487,
+        4141496
+      ],
+      "value": "__doc__",
+      "index": 21
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141496,
+        4141506
+      ],
+      "value": "__file__",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141506,
+        4141514
+      ],
+      "value": "origin",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141514,
+        4141528
+      ],
+      "value": "has_location",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141528,
+        4141540
+      ],
+      "value": "__cached__",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141540,
+        4141557
+      ],
+      "value": "__annotations__",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141557,
+        4141570
+      ],
+      "value": "annotations",
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141570,
+        4141583
+      ],
+      "value": "dataclasses",
+      "index": 28
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4141583,
+        4141596
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4141585,
+              4141596
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141596,
+        4141607
+      ],
+      "value": "dataclass",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141607,
+        4141616
+      ],
+      "value": "Literal",
+      "index": 31
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4141616,
+        4141638
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4141618,
+              4141625
+            ],
+            "value": "canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4141625,
+              4141629
+            ],
+            "value": "au"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4141629,
+              4141634
+            ],
+            "value": "ooc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4141634,
+              4141638
+            ],
+            "value": "cp"
+          }
+        ]
+      },
+      "index": 32
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4141638,
+        4141650
+      ],
+      "value": "FanficMode",
+      "index": 33
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4141650,
+        4142261
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "D",
+            "fileRange": [
+              4141652,
+              4141823
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141654,
+                    4141658
+                  ],
+                  "value": "id"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141658,
+                    4141664
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141664,
+                    4141674
+                  ],
+                  "value": "baseNote"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4141674,
+                    4141676
+                  ],
+                  "value": 34
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4141676,
+                    4141693
+                  ],
+                  "value": "角色还原度"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4141693,
+                    4141823
+                  ],
+                  "value": "检查角色的语癖、说话风格、行为模式是否与 fanfic_canon.md 角色档案一致。偏离必须有情境驱动。"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4141823,
+              4141979
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141825,
+                    4141829
+                  ],
+                  "value": "id"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141829,
+                    4141835
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141835,
+                    4141845
+                  ],
+                  "value": "baseNote"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4141845,
+                    4141847
+                  ],
+                  "value": 35
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4141847,
+                    4141867
+                  ],
+                  "value": "世界规则遵守"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4141867,
+                    4141979
+                  ],
+                  "value": "检查章节内容是否违反 fanfic_canon.md 中的世界规则（地理、力量体系、阵营关系）。"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4141979,
+              4142144
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141981,
+                    4141985
+                  ],
+                  "value": "id"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141985,
+                    4141991
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4141991,
+                    4142001
+                  ],
+                  "value": "baseNote"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142001,
+                    4142003
+                  ],
+                  "value": 36
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4142003,
+                    4142017
+                  ],
+                  "value": "关系动态"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4142017,
+                    4142144
+                  ],
+                  "value": "检查角色之间的关系互动是否合理，是否与 fanfic_canon.md 中标注的关键关系一致或有合理发展。"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4142144,
+              4142261
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142146,
+                    4142150
+                  ],
+                  "value": "id"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142150,
+                    4142156
+                  ],
+                  "value": "name"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142156,
+                    4142166
+                  ],
+                  "value": "baseNote"
+                }
+              ],
+              "values": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142166,
+                    4142168
+                  ],
+                  "value": 37
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4142168,
+                    4142191
+                  ],
+                  "value": "正典事件一致性"
+                },
+                {
+                  "tag": "u",
+                  "fileRange": [
+                    4142191,
+                    4142261
+                  ],
+                  "value": "检查章节是否与 fanfic_canon.md 关键事件时间线矛盾。"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 34
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4142261,
+        4142286
+      ],
+      "value": "list[dict[str, object]]",
+      "index": 35
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4142286,
+        4142482
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4142288,
+              4142295
+            ],
+            "value": "canon"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142295,
+              4142299
+            ],
+            "value": "au"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142299,
+              4142304
+            ],
+            "value": "ooc"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142304,
+              4142308
+            ],
+            "value": "cp"
+          }
+        ],
+        "values": [
+          {
+            "tag": "D",
+            "fileRange": [
+              4142308,
+              4142357
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142310,
+                    4142312
+                  ],
+                  "value": 34
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142312,
+                    4142314
+                  ],
+                  "value": 35
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142314,
+                    4142316
+                  ],
+                  "value": 36
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142316,
+                    4142318
+                  ],
+                  "value": 37
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142318,
+                    4142328
+                  ],
+                  "value": "critical"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142328,
+                    4142338
+                  ],
+                  "value": "critical"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142338,
+                    4142347
+                  ],
+                  "value": "warning"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142347,
+                    4142357
+                  ],
+                  "value": "critical"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4142357,
+              4142398
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142359,
+                    4142361
+                  ],
+                  "value": 34
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142361,
+                    4142363
+                  ],
+                  "value": 35
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142363,
+                    4142365
+                  ],
+                  "value": 36
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142365,
+                    4142367
+                  ],
+                  "value": 37
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142367,
+                    4142377
+                  ],
+                  "value": "critical"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142377,
+                    4142383
+                  ],
+                  "value": "info"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142383,
+                    4142392
+                  ],
+                  "value": "warning"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142392,
+                    4142398
+                  ],
+                  "value": "info"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4142398,
+              4142438
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142400,
+                    4142402
+                  ],
+                  "value": 34
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142402,
+                    4142404
+                  ],
+                  "value": 35
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142404,
+                    4142406
+                  ],
+                  "value": 36
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142406,
+                    4142408
+                  ],
+                  "value": 37
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142408,
+                    4142414
+                  ],
+                  "value": "info"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142414,
+                    4142423
+                  ],
+                  "value": "warning"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142423,
+                    4142432
+                  ],
+                  "value": "warning"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142432,
+                    4142438
+                  ],
+                  "value": "info"
+                }
+              ]
+            }
+          },
+          {
+            "tag": "D",
+            "fileRange": [
+              4142438,
+              4142482
+            ],
+            "value": {
+              "type": "dict",
+              "keys": [
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142440,
+                    4142442
+                  ],
+                  "value": 34
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142442,
+                    4142444
+                  ],
+                  "value": 35
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142444,
+                    4142446
+                  ],
+                  "value": 36
+                },
+                {
+                  "tag": "l",
+                  "fileRange": [
+                    4142446,
+                    4142448
+                  ],
+                  "value": 37
+                }
+              ],
+              "values": [
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142448,
+                    4142457
+                  ],
+                  "value": "warning"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142457,
+                    4142466
+                  ],
+                  "value": "warning"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142466,
+                    4142476
+                  ],
+                  "value": "critical"
+                },
+                {
+                  "tag": "a",
+                  "fileRange": [
+                    4142476,
+                    4142482
+                  ],
+                  "value": "info"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4142482,
+        4142516
+      ],
+      "value": "dict[FanficMode, dict[int, str]]",
+      "index": 37
+    },
+    {
+      "tag": "L",
+      "fileRange": [
+        4142516,
+        4142526
+      ],
+      "value": {
+        "type": "list",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4142518,
+              4142520
+            ],
+            "value": 28
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4142520,
+              4142522
+            ],
+            "value": 29
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4142522,
+              4142524
+            ],
+            "value": 30
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4142524,
+              4142526
+            ],
+            "value": 31
+          }
+        ]
+      },
+      "index": 38
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4142526,
+        4142529
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4142528,
+              4142529
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 39
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4142529,
+        4142538
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4142531,
+              4142538
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142538,
+        4142550
+      ],
+      "value": "__module__",
+      "index": 41
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142550,
+        4142564
+      ],
+      "value": "__qualname__",
+      "index": 42
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4142564,
+        4142575
+      ],
+      "value": "list[int]",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142575,
+        4142587
+      ],
+      "value": "active_ids",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4142587,
+        4142603
+      ],
+      "value": "dict[int, str]",
+      "index": 45
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142603,
+        4142620
+      ],
+      "value": "deactivated_ids",
+      "index": 46
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4142620,
+        4142623
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4142622,
+              4142623
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 47
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4142623,
+        4142713
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4142625,
+              4142631
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142631,
+              4142652
+            ],
+            "value": "_allowed_deviations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142652,
+              4142660
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4142660,
+              4142672
+            ],
+            "value": "FanficMode"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4142672,
+              4142690
+            ],
+            "value": "list[str] | None"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142690,
+              4142713
+            ],
+            "value": "FanficDimensionConfig"
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142713,
+        4142742
+      ],
+      "value": "get_fanfic_dimension_config",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4142742,
+        4142785
+      ],
+      "value": "novels\\prompts\\inkos\\fanfic_dimensions.py",
+      "index": 50
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4142785,
+        4142834
+      ],
+      "value": "<module novels.prompts.inkos.fanfic_dimensions>",
+      "index": 51
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4142834,
+        4142847
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4142836,
+              4142847
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 52
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4142847,
+        4142956
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4142849,
+              4142855
+            ],
+            "value": "mode"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142855,
+              4142876
+            ],
+            "value": "_allowed_deviations"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142876,
+              4142896
+            ],
+            "value": "severity_overrides"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142896,
+              4142903
+            ],
+            "value": "notes"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142903,
+              4142917
+            ],
+            "value": "severity_map"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142917,
+              4142922
+            ],
+            "value": "dim"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142922,
+              4142930
+            ],
+            "value": "dim_id"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142930,
+              4142940
+            ],
+            "value": "severity"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4142940,
+              4142956
+            ],
+            "value": "severity_label"
+          }
+        ]
+      },
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142956,
+        4142966
+      ],
+      "value": "__name__",
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4142966,
+        4142976
+      ],
+      "value": "__spec__",
+      "index": 55
+    }
+  ]
+}

@@ -69,8 +69,9 @@ type RunContext struct {
 	Notes              []ProjectNote
 	KnowledgeMaterials []KnowledgeMaterial
 	// MaxRevisionRounds overrides the default audit-revision loop bound.
-	MaxRevisionRounds int
-	Agent             *AgentSettings
+	MaxRevisionRounds  int
+	Agent              *AgentSettings
+	ReviewCycleVersion int
 }
 
 type Pipeline struct {
@@ -131,6 +132,7 @@ type chapterAuditOutput struct {
 }
 
 type auditIssue struct {
+	Source      string          `json:"source,omitempty"`
 	ID          string          `json:"id"`
 	Severity    string          `json:"severity"`
 	Description string          `json:"description"`
@@ -547,6 +549,9 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 		temperature: 0.2, maxTokens: 4500,
 		validate: func() error { return validateAudit(audit, p.threshold(input)) },
 	}, &audit)
+	if err == nil {
+		audit, raw, err = mergePostWriteIntoAudit(input, plan, content, audit, raw)
+	}
 	return audit, raw, err
 }
 

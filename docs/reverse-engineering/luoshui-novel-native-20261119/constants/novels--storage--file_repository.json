@@ -1,0 +1,1978 @@
+{
+  "moduleName": "novels.storage.file_repository",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4408661,
+  "payloadRange": [
+    4408696,
+    4410331
+  ],
+  "payloadSha256": "73f33df3e45a63fafd2c3654216856d0f54a5fb425a8df5c9d9f14af02f65655",
+  "declaredConstants": 105,
+  "parsedConstants": 105,
+  "stoppedAt": 4410330,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4408698,
+        4408705
+      ],
+      "value": "mkdir",
+      "index": 0
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408705,
+        4408709
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4408707,
+              4408708
+            ],
+            "value": true
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4408708,
+              4408709
+            ],
+            "value": {
+              "previous": {
+                "tag": "t",
+                "fileRange": [
+                  4408707,
+                  4408708
+                ],
+                "value": true
+              }
+            }
+          }
+        ]
+      },
+      "index": 1
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408709,
+        4408730
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4408711,
+              4408720
+            ],
+            "value": "parents"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4408720,
+              4408730
+            ],
+            "value": "exist_ok"
+          }
+        ]
+      },
+      "index": 2
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408730,
+        4408738
+      ],
+      "value": "exists",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408738,
+        4408749
+      ],
+      "value": "read_text",
+      "index": 4
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408749,
+        4408758
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4408751,
+              4408758
+            ],
+            "value": "utf-8"
+          }
+        ]
+      },
+      "index": 5
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408758,
+        4408770
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4408760,
+              4408770
+            ],
+            "value": "encoding"
+          }
+        ]
+      },
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408770,
+        4408778
+      ],
+      "value": "parent",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408778,
+        4408794
+      ],
+      "value": "FileRepository",
+      "index": 8
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408794,
+        4408809
+      ],
+      "value": "_atomic_write",
+      "index": 9
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408809,
+        4408815
+      ],
+      "value": "open",
+      "index": 10
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408815,
+        4408826
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4408817,
+              4408819
+            ],
+            "value": "r"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4408819,
+              4408826
+            ],
+            "value": "utf-8"
+          }
+        ]
+      },
+      "index": 11
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408826,
+        4408837
+      ],
+      "value": "__enter__",
+      "index": 12
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408837,
+        4408847
+      ],
+      "value": "__exit__",
+      "index": 13
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408847,
+        4408853
+      ],
+      "value": "json",
+      "index": 14
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408853,
+        4408859
+      ],
+      "value": "load",
+      "index": 15
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408859,
+        4408864
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4408861,
+              4408862
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4408862,
+              4408863
+            ],
+            "value": null
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4408863,
+              4408864
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408864,
+        4408871
+      ],
+      "value": "dumps",
+      "index": 17
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4408871,
+        4408898
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4408873,
+              4408887
+            ],
+            "value": "ensure_ascii"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4408887,
+              4408895
+            ],
+            "value": "indent"
+          }
+        ],
+        "values": [
+          {
+            "tag": "F",
+            "fileRange": [
+              4408895,
+              4408896
+            ],
+            "value": false
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4408896,
+              4408898
+            ],
+            "value": 2
+          }
+        ]
+      },
+      "index": 18
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408898,
+        4408908
+      ],
+      "value": "tempfile",
+      "index": 19
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408908,
+        4408928
+      ],
+      "value": "NamedTemporaryFile",
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4408928,
+        4408935
+      ],
+      "value": "utf-8",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4408935,
+        4408942
+      ],
+      "value": ".tmp_",
+      "index": 22
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408942,
+        4408948
+      ],
+      "value": "name",
+      "index": 23
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4408948,
+        4408949
+      ],
+      "value": "",
+      "index": 24
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4408949,
+        4408951
+      ],
+      "value": "_",
+      "index": 25
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408951,
+        4408955
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4408953,
+              4408955
+            ],
+            "value": "w"
+          }
+        ]
+      },
+      "index": 26
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4408955,
+        4408988
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4408957,
+              4408967
+            ],
+            "value": "encoding"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4408967,
+              4408972
+            ],
+            "value": "dir"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4408972,
+              4408980
+            ],
+            "value": "prefix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4408980,
+              4408988
+            ],
+            "value": "delete"
+          }
+        ]
+      },
+      "index": 27
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408988,
+        4408994
+      ],
+      "value": "Path",
+      "index": 28
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4408994,
+        4409001
+      ],
+      "value": "write",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409001,
+        4409010
+      ],
+      "value": "replace",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409010,
+        4409020
+      ],
+      "value": "tmp_path",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409020,
+        4409028
+      ],
+      "value": "unlink",
+      "index": 32
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409028,
+        4409114
+      ],
+      "value": "先写临时文件再替换：并发读的一方不会读到写了一半的内容。",
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409114,
+        4409121
+      ],
+      "value": "strip",
+      "index": 34
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409121,
+        4409131
+      ],
+      "value": "untitled",
+      "index": 35
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409131,
+        4409142
+      ],
+      "value": "\\/:*?\"<>|",
+      "index": 36
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409142,
+        4409153
+      ],
+      "value": "<genexpr>",
+      "index": 37
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409153,
+        4409202
+      ],
+      "value": "FileRepository.safe_filename.<locals>.<genexpr>",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409202,
+        4409208
+      ],
+      "value": "uuid",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409208,
+        4409215
+      ],
+      "value": "uuid4",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409215,
+        4409220
+      ],
+      "value": "hex",
+      "index": 41
+    },
+    {
+      "tag": ":",
+      "fileRange": [
+        4409220,
+        4409225
+      ],
+      "value": {
+        "type": ":",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4409221,
+              4409222
+            ],
+            "value": null
+          },
+          {
+            "tag": "l",
+            "fileRange": [
+              4409222,
+              4409224
+            ],
+            "value": 12
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4409224,
+              4409225
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 42
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409225,
+        4409229
+      ],
+      "value": "re",
+      "index": 43
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409229,
+        4409234
+      ],
+      "value": "sub",
+      "index": 44
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409234,
+        4409256
+      ],
+      "value": "[^\\w\\u4e00-\\u9fff-]+",
+      "index": 45
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4409256,
+        4409258
+      ],
+      "value": "-",
+      "index": 46
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409258,
+        4409265
+      ],
+      "value": "lower",
+      "index": 47
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4409265,
+        4409269
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "w",
+            "fileRange": [
+              4409267,
+              4409269
+            ],
+            "value": "-"
+          }
+        ]
+      },
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409269,
+        4409275
+      ],
+      "value": "book",
+      "index": 49
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409275,
+        4409284
+      ],
+      "value": "__doc__",
+      "index": 50
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409284,
+        4409294
+      ],
+      "value": "__file__",
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409294,
+        4409302
+      ],
+      "value": "origin",
+      "index": 52
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409302,
+        4409316
+      ],
+      "value": "has_location",
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409316,
+        4409328
+      ],
+      "value": "__cached__",
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409328,
+        4409341
+      ],
+      "value": "annotations",
+      "index": 55
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409341,
+        4409345
+      ],
+      "value": "os",
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409345,
+        4409354
+      ],
+      "value": "pathlib",
+      "index": 57
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4409354,
+        4409362
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409356,
+              4409362
+            ],
+            "value": "Path"
+          }
+        ]
+      },
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409362,
+        4409367
+      ],
+      "value": "Any",
+      "index": 59
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409367,
+        4409379
+      ],
+      "value": "__module__",
+      "index": 60
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409379,
+        4409393
+      ],
+      "value": "__qualname__",
+      "index": 61
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409393,
+        4409421
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409395,
+              4409401
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409401,
+              4409409
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409409,
+              4409415
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409415,
+              4409421
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 62
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409421,
+        4409433
+      ],
+      "value": "ensure_dir",
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409433,
+        4409460
+      ],
+      "value": "FileRepository.ensure_dir",
+      "index": 64
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4409460,
+        4409463
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "s",
+            "fileRange": [
+              4409462,
+              4409463
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 65
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409463,
+        4409500
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409465,
+              4409471
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409471,
+              4409480
+            ],
+            "value": "default"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409480,
+              4409488
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409488,
+              4409494
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409494,
+              4409499
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4409499,
+              4409500
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4409494,
+                  4409499
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409500,
+        4409526
+      ],
+      "value": "FileRepository.read_text",
+      "index": 67
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409526,
+        4409568
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409528,
+              4409534
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409534,
+              4409543
+            ],
+            "value": "content"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409543,
+              4409551
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409551,
+              4409557
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409557,
+              4409562
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409562,
+              4409568
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409568,
+        4409580
+      ],
+      "value": "write_text",
+      "index": 69
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409580,
+        4409607
+      ],
+      "value": "FileRepository.write_text",
+      "index": 70
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4409607,
+        4409610
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4409609,
+              4409610
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 71
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409610,
+        4409647
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409612,
+              4409618
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409618,
+              4409627
+            ],
+            "value": "default"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409627,
+              4409635
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409635,
+              4409641
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409641,
+              4409646
+            ],
+            "value": "Any"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4409646,
+              4409647
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4409641,
+                  4409646
+                ],
+                "value": "Any"
+              }
+            }
+          }
+        ]
+      },
+      "index": 72
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409647,
+        4409658
+      ],
+      "value": "read_json",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409658,
+        4409684
+      ],
+      "value": "FileRepository.read_json",
+      "index": 74
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409684,
+        4409723
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409686,
+              4409692
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409692,
+              4409698
+            ],
+            "value": "data"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409698,
+              4409706
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409706,
+              4409712
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409712,
+              4409717
+            ],
+            "value": "Any"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409717,
+              4409723
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 75
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409723,
+        4409735
+      ],
+      "value": "write_json",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409735,
+        4409762
+      ],
+      "value": "FileRepository.write_json",
+      "index": 77
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409762,
+        4409801
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409764,
+              4409770
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409770,
+              4409776
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409776,
+              4409784
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409784,
+              4409790
+            ],
+            "value": "Path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409790,
+              4409795
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409795,
+              4409801
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409801,
+        4409831
+      ],
+      "value": "FileRepository._atomic_write",
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4409831,
+        4409835
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4409833,
+              4409835
+            ],
+            "value": 64
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409835,
+        4409879
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409837,
+              4409844
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409844,
+              4409856
+            ],
+            "value": "max_length"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409856,
+              4409864
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409864,
+              4409869
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409869,
+              4409874
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409874,
+              4409879
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409879,
+        4409894
+      ],
+      "value": "safe_filename",
+      "index": 82
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409894,
+        4409924
+      ],
+      "value": "FileRepository.safe_filename",
+      "index": 83
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409924,
+        4409948
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409926,
+              4409934
+            ],
+            "value": "prefix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409934,
+              4409942
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409942,
+              4409947
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4409947,
+              4409948
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4409942,
+                  4409947
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4409948,
+        4409956
+      ],
+      "value": "new_id",
+      "index": 85
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4409956,
+        4409979
+      ],
+      "value": "FileRepository.new_id",
+      "index": 86
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4409979,
+        4410002
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409981,
+              4409988
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4409988,
+              4409996
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4409996,
+              4410001
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4410001,
+              4410002
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4409996,
+                  4410001
+                ],
+                "value": "str"
+              }
+            }
+          }
+        ]
+      },
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410002,
+        4410011
+      ],
+      "value": "slugify",
+      "index": 88
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410011,
+        4410035
+      ],
+      "value": "FileRepository.slugify",
+      "index": 89
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410035,
+        4410070
+      ],
+      "value": "novels\\storage\\file_repository.py",
+      "index": 90
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410070,
+        4410080
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410072,
+              4410076
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410076,
+              4410080
+            ],
+            "value": "ch"
+          }
+        ]
+      },
+      "index": 91
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410080,
+        4410092
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410082,
+              4410086
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410086,
+              4410092
+            ],
+            "value": "part"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4410092,
+        4410133
+      ],
+      "value": "<module novels.storage.file_repository>",
+      "index": 93
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410133,
+        4410165
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410135,
+              4410141
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410141,
+              4410147
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410147,
+              4410157
+            ],
+            "value": "tmp_path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410157,
+              4410165
+            ],
+            "value": "handle"
+          }
+        ]
+      },
+      "index": 94
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410165,
+        4410173
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410167,
+              4410173
+            ],
+            "value": "path"
+          }
+        ]
+      },
+      "index": 95
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410173,
+        4410190
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410175,
+              4410183
+            ],
+            "value": "prefix"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410183,
+              4410190
+            ],
+            "value": "token"
+          }
+        ]
+      },
+      "index": 96
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410190,
+        4410215
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410192,
+              4410198
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410198,
+              4410207
+            ],
+            "value": "default"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410207,
+              4410215
+            ],
+            "value": "handle"
+          }
+        ]
+      },
+      "index": 97
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410215,
+        4410232
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410217,
+              4410223
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410223,
+              4410232
+            ],
+            "value": "default"
+          }
+        ]
+      },
+      "index": 98
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410232,
+        4410264
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410234,
+              4410241
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410241,
+              4410253
+            ],
+            "value": "max_length"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410253,
+              4410264
+            ],
+            "value": "sanitized"
+          }
+        ]
+      },
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410264,
+        4410279
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410266,
+              4410273
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410273,
+              4410279
+            ],
+            "value": "text"
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410279,
+        4410293
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410281,
+              4410287
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410287,
+              4410293
+            ],
+            "value": "data"
+          }
+        ]
+      },
+      "index": 101
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4410293,
+        4410310
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4410295,
+              4410301
+            ],
+            "value": "path"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4410301,
+              4410310
+            ],
+            "value": "content"
+          }
+        ]
+      },
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410310,
+        4410320
+      ],
+      "value": "__name__",
+      "index": 103
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4410320,
+        4410330
+      ],
+      "value": "__spec__",
+      "index": 104
+    }
+  ]
+}

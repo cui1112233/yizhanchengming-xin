@@ -1,0 +1,2674 @@
+{
+  "moduleName": "novels.utils.context_budget",
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "moduleNameOffset": 4422035,
+  "payloadRange": [
+    4422067,
+    4425829
+  ],
+  "payloadSha256": "80b792d9dbca5ffc0ab074914692beafab8e5ab307223d74a32cd907b76dd945",
+  "declaredConstants": 151,
+  "parsedConstants": 151,
+  "stoppedAt": 4425828,
+  "trailingHex": "2e",
+  "complete": true,
+  "error": null,
+  "formatReference": "https://github.com/Nuitka/Nuitka/blob/2.7.12/nuitka/build/static_src/HelpersConstantsBlob.c",
+  "pythonVersionEvidence": "python312.dll literal in target; code metadata optional fields decoded for Python 3.12",
+  "entries": [
+    {
+      "tag": "a",
+      "fileRange": [
+        4422069,
+        4422078
+      ],
+      "value": "_CJK_RE",
+      "index": 0
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422078,
+        4422087
+      ],
+      "value": "findall",
+      "index": 1
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4422087,
+        4422089
+      ],
+      "value": 4,
+      "index": 2
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422089,
+        4422129
+      ],
+      "value": "InkOS-compatible rough token estimate.",
+      "index": 3
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422129,
+        4422151
+      ],
+      "value": "estimate_text_tokens",
+      "index": 4
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4422151,
+        4422153
+      ],
+      "value": "\n",
+      "index": 5
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422153,
+        4422161
+      ],
+      "value": "source",
+      "index": 6
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422161,
+        4422169
+      ],
+      "value": "reason",
+      "index": 7
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422169,
+        4422178
+      ],
+      "value": "excerpt",
+      "index": 8
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422178,
+        4422189
+      ],
+      "value": "<genexpr>",
+      "index": 9
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422189,
+        4422231
+      ],
+      "value": "estimate_entry_tokens.<locals>.<genexpr>",
+      "index": 10
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422231,
+        4422254
+      ],
+      "value": "estimate_entry_tokens",
+      "index": 11
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422254,
+        4422291
+      ],
+      "value": "sum_entry_tokens.<locals>.<genexpr>",
+      "index": 12
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422291,
+        4422315
+      ],
+      "value": "runtime/chapter_intent",
+      "index": 13
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422315,
+        4422339
+      ],
+      "value": "story/author_intent.md",
+      "index": 14
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422339,
+        4422363
+      ],
+      "value": "story/current_focus.md",
+      "index": 15
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422363,
+        4422385
+      ],
+      "value": "story/audit_drift.md",
+      "index": 16
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422385,
+        4422397
+      ],
+      "value": "startswith",
+      "index": 17
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422397,
+        4422423
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4422399,
+              4422423
+            ],
+            "value": "story/current_state.md"
+          }
+        ]
+      },
+      "index": 18
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422423,
+        4422455
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4422425,
+              4422455
+            ],
+            "value": "story/outline/story_frame.md"
+          }
+        ]
+      },
+      "index": 19
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422455,
+        4422486
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4422457,
+              4422486
+            ],
+            "value": "story/outline/volume_map.md"
+          }
+        ]
+      },
+      "index": 20
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422486,
+        4422509
+      ],
+      "value": "story/parent_canon.md",
+      "index": 21
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422509,
+        4422532
+      ],
+      "value": "story/fanfic_canon.md",
+      "index": 22
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422532,
+        4422589
+      ],
+      "value": "Mirror InkOS protected sources for Luoshui story paths.",
+      "index": 23
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422589,
+        4422600
+      ],
+      "value": "_settings",
+      "index": 24
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422600,
+        4422615
+      ],
+      "value": "resolve_model",
+      "index": 25
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422615,
+        4422620
+      ],
+      "value": "get",
+      "index": 26
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422620,
+        4422631
+      ],
+      "value": "apiModels",
+      "index": 27
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422631,
+        4422640
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4422633,
+              4422640
+            ],
+            "value": "value"
+          }
+        ]
+      },
+      "index": 28
+    },
+    {
+      "tag": "s",
+      "fileRange": [
+        4422640,
+        4422641
+      ],
+      "value": "",
+      "index": 29
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422641,
+        4422648
+      ],
+      "value": "strip",
+      "index": 30
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422648,
+        4422655
+      ],
+      "value": "lower",
+      "index": 31
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422655,
+        4422665
+      ],
+      "value": "resolved",
+      "index": 32
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422665,
+        4422736
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4422667,
+              4422683
+            ],
+            "value": "context_window"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422683,
+              4422698
+            ],
+            "value": "contextWindow"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422698,
+              4422718
+            ],
+            "value": "max_context_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422718,
+              4422736
+            ],
+            "value": "maxContextTokens"
+          }
+        ]
+      },
+      "index": 33
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422736,
+        4422743
+      ],
+      "value": "entry",
+      "index": 34
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422743,
+        4422768
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "E",
+            "fileRange": [
+              4422745,
+              4422756
+            ],
+            "value": {
+              "builtinTag": "E",
+              "name": "TypeError"
+            }
+          },
+          {
+            "tag": "E",
+            "fileRange": [
+              4422756,
+              4422768
+            ],
+            "value": {
+              "builtinTag": "E",
+              "name": "ValueError"
+            }
+          }
+        ]
+      },
+      "index": 35
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422768,
+        4422821
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4422770,
+              4422790
+            ],
+            "value": "novelContextWindow"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422790,
+              4422805
+            ],
+            "value": "contextWindow"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422805,
+              4422821
+            ],
+            "value": "context_window"
+          }
+        ]
+      },
+      "index": 36
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422821,
+        4422831
+      ],
+      "value": "settings",
+      "index": 37
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422831,
+        4422847
+      ],
+      "value": "context_window",
+      "index": 38
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422847,
+        4422878
+      ],
+      "value": "DEFAULT_CONTEXT_WINDOW_TOKENS",
+      "index": 39
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422878,
+        4422893
+      ],
+      "value": "ContextBudget",
+      "index": 40
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422893,
+        4422898
+      ],
+      "value": "max",
+      "index": 41
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4422898,
+        4422901
+      ],
+      "value": 512,
+      "index": 42
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4422901,
+        4422950
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4422903,
+              4422926
+            ],
+            "value": "context_window_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422926,
+              4422950
+            ],
+            "value": "reserved_output_tokens"
+          }
+        ]
+      },
+      "index": 43
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422950,
+        4422955
+      ],
+      "value": "## ",
+      "index": 44
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422955,
+        4422962
+      ],
+      "value": "title",
+      "index": 45
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4422962,
+        4422964
+      ],
+      "value": "[",
+      "index": 46
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4422964,
+        4422966
+      ],
+      "value": "]",
+      "index": 47
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422966,
+        4422970
+      ],
+      "value": "> ",
+      "index": 48
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4422970,
+        4422978
+      ],
+      "value": "blocks",
+      "index": 49
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4422978,
+        4422982
+      ],
+      "value": "\n\n",
+      "index": 50
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4422982,
+        4423012
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4422984,
+              4422993
+            ],
+            "value": "message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4422993,
+              4423001
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4423001,
+              4423006
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423006,
+              4423012
+            ],
+            "value": "None"
+          }
+        ]
+      },
+      "index": 51
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423012,
+        4423017
+      ],
+      "value": "log",
+      "index": 52
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423017,
+        4423062
+      ],
+      "value": "apply_context_budget_if_needed.<locals>.log",
+      "index": 53
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423062,
+        4423085
+      ],
+      "value": "context_window_tokens",
+      "index": 54
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423085,
+        4423106
+      ],
+      "value": "ContextBudgetResult",
+      "index": 55
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4423106,
+        4423136
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4423108,
+              4423117
+            ],
+            "value": "entries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423117,
+              4423129
+            ],
+            "value": "compressed"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423129,
+              4423136
+            ],
+            "value": "notes"
+          }
+        ]
+      },
+      "index": 56
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423136,
+        4423160
+      ],
+      "value": "reserved_output_tokens",
+      "index": 57
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423160,
+        4423178
+      ],
+      "value": "sum_entry_tokens",
+      "index": 58
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423178,
+        4423207
+      ],
+      "value": "is_protected_context_source",
+      "index": 59
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423207,
+        4423254
+      ],
+      "value": "受保护上下文超出可用输入预算（",
+      "index": 60
+    },
+    {
+      "tag": "w",
+      "fileRange": [
+        4423254,
+        4423256
+      ],
+      "value": "/",
+      "index": 61
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423256,
+        4423358
+      ],
+      "value": " tokens）。洛水不会压缩作者意图、当前状态、故事框架或卷纲等绑定参照。",
+      "index": 62
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4423358,
+        4423416
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4423360,
+              4423416
+            ],
+            "value": "上下文超预算但无可压缩条目，保留原样"
+          }
+        ]
+      },
+      "index": 63
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423416,
+        4423461
+      ],
+      "value": "context-over-budget-no-compressible-entries",
+      "index": 64
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423461,
+        4423484
+      ],
+      "value": "上下文超预算（",
+      "index": 65
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423484,
+        4423529
+      ],
+      "value": " tokens），正在编译可压缩部分（",
+      "index": 66
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423529,
+        4423539
+      ],
+      "value": " → ≤",
+      "index": 67
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423539,
+        4423551
+      ],
+      "value": " tokens）",
+      "index": 68
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423551,
+        4423555
+      ],
+      "value": "en",
+      "index": 69
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423555,
+        4423559
+      ],
+      "value": "zh",
+      "index": 70
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423559,
+        4423594
+      ],
+      "value": "CompressibleContextCompileRequest",
+      "index": 71
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423594,
+        4423618
+      ],
+      "value": "render_context_entries",
+      "index": 72
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4423618,
+        4423707
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4423620,
+              4423636
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423636,
+              4423642
+            ],
+            "value": "goal"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423642,
+              4423660
+            ],
+            "value": "max_input_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423660,
+              4423677
+            ],
+            "value": "protected_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423677,
+              4423697
+            ],
+            "value": "compressible_block"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423697,
+              4423707
+            ],
+            "value": "language"
+          }
+        ]
+      },
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423707,
+        4423751
+      ],
+      "value": "可压缩上下文编译器返回空结果",
+      "index": 74
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423751,
+        4423765
+      ],
+      "value": "ContextEntry",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423765,
+        4423804
+      ],
+      "value": "runtime/compiled-compressible-context",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423804,
+        4423833
+      ],
+      "value": "相关背景（已编译）",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423833,
+        4423854
+      ],
+      "value": "Compiled Background",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423854,
+        4423923
+      ],
+      "value": "Semantic compile of compressible context to fit model input budget.",
+      "index": 79
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4423923,
+        4423957
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4423925,
+              4423933
+            ],
+            "value": "source"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423933,
+              4423940
+            ],
+            "value": "title"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423940,
+              4423949
+            ],
+            "value": "excerpt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4423949,
+              4423957
+            ],
+            "value": "reason"
+          }
+        ]
+      },
+      "index": 80
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4423957,
+        4423988
+      ],
+      "value": "compiled-compressible-context",
+      "index": 81
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423988,
+        4423998
+      ],
+      "value": "callable",
+      "index": 82
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4423998,
+        4424006
+      ],
+      "value": "log_fn",
+      "index": 83
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424006,
+        4424015
+      ],
+      "value": "__doc__",
+      "index": 84
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424015,
+        4424025
+      ],
+      "value": "__file__",
+      "index": 85
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424025,
+        4424033
+      ],
+      "value": "origin",
+      "index": 86
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424033,
+        4424047
+      ],
+      "value": "has_location",
+      "index": 87
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424047,
+        4424059
+      ],
+      "value": "__cached__",
+      "index": 88
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424059,
+        4424072
+      ],
+      "value": "annotations",
+      "index": 89
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424072,
+        4424076
+      ],
+      "value": "re",
+      "index": 90
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424076,
+        4424089
+      ],
+      "value": "dataclasses",
+      "index": 91
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424089,
+        4424102
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424091,
+              4424102
+            ],
+            "value": "dataclass"
+          }
+        ]
+      },
+      "index": 92
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424102,
+        4424113
+      ],
+      "value": "dataclass",
+      "index": 93
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424113,
+        4424123
+      ],
+      "value": "Callable",
+      "index": 94
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424123,
+        4424129
+      ],
+      "value": "List",
+      "index": 95
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424129,
+        4424139
+      ],
+      "value": "Optional",
+      "index": 96
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424139,
+        4424149
+      ],
+      "value": "Sequence",
+      "index": 97
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424149,
+        4424156
+      ],
+      "value": "Tuple",
+      "index": 98
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4424156,
+        4424188
+      ],
+      "value": "prompts.inkos.composer_prompts",
+      "index": 99
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424188,
+        4424325
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424190,
+              4424225
+            ],
+            "value": "CompressibleContextCompileRequest"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424225,
+              4424276
+            ],
+            "value": "build_compressible_context_compiler_system_prompt"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424276,
+              4424325
+            ],
+            "value": "build_compressible_context_compiler_user_prompt"
+          }
+        ]
+      },
+      "index": 100
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4424325,
+        4424327
+      ],
+      "value": 2,
+      "index": 101
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424327,
+        4424378
+      ],
+      "value": "build_compressible_context_compiler_system_prompt",
+      "index": 102
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424378,
+        4424427
+      ],
+      "value": "build_compressible_context_compiler_user_prompt",
+      "index": 103
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4424427,
+        4424444
+      ],
+      "value": "utils.ai_client",
+      "index": 104
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424444,
+        4424462
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424446,
+              4424462
+            ],
+            "value": "NovelsAIClient"
+          }
+        ]
+      },
+      "index": 105
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424462,
+        4424478
+      ],
+      "value": "NovelsAIClient",
+      "index": 106
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424478,
+        4424487
+      ],
+      "value": "compile",
+      "index": 107
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424487,
+        4424506
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4424489,
+              4424506
+            ],
+            "value": "[\\u3400-\\u9fff]"
+          }
+        ]
+      },
+      "index": 108
+    },
+    {
+      "tag": "l",
+      "fileRange": [
+        4424506,
+        4424510
+      ],
+      "value": 400000,
+      "index": 109
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424510,
+        4424513
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "t",
+            "fileRange": [
+              4424512,
+              4424513
+            ],
+            "value": true
+          }
+        ]
+      },
+      "index": 110
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424513,
+        4424522
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424515,
+              4424522
+            ],
+            "value": "slots"
+          }
+        ]
+      },
+      "index": 111
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424522,
+        4424534
+      ],
+      "value": "__module__",
+      "index": 112
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424534,
+        4424548
+      ],
+      "value": "__qualname__",
+      "index": 113
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424548,
+        4424565
+      ],
+      "value": "__annotations__",
+      "index": 114
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424565,
+        4424570
+      ],
+      "value": "str",
+      "index": 115
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424570,
+        4424575
+      ],
+      "value": "int",
+      "index": 116
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4424575,
+        4424595
+      ],
+      "value": "List[ContextEntry]",
+      "index": 117
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424595,
+        4424604
+      ],
+      "value": "entries",
+      "index": 118
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424604,
+        4424610
+      ],
+      "value": "bool",
+      "index": 119
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424610,
+        4424622
+      ],
+      "value": "compressed",
+      "index": 120
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4424622,
+        4424633
+      ],
+      "value": "List[str]",
+      "index": 121
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424633,
+        4424640
+      ],
+      "value": "notes",
+      "index": 122
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424640,
+        4424666
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424642,
+              4424648
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424648,
+              4424656
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424656,
+              4424661
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424661,
+              4424666
+            ],
+            "value": "int"
+          }
+        ]
+      },
+      "index": 123
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424666,
+        4424702
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424668,
+              4424675
+            ],
+            "value": "entry"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424675,
+              4424683
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424683,
+              4424697
+            ],
+            "value": "ContextEntry"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424697,
+              4424702
+            ],
+            "value": "int"
+          }
+        ]
+      },
+      "index": 124
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424702,
+        4424750
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424704,
+              4424713
+            ],
+            "value": "entries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424713,
+              4424721
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4424721,
+              4424745
+            ],
+            "value": "Sequence[ContextEntry]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424745,
+              4424750
+            ],
+            "value": "int"
+          }
+        ]
+      },
+      "index": 125
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424750,
+        4424779
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424752,
+              4424760
+            ],
+            "value": "source"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424760,
+              4424768
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424768,
+              4424773
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424773,
+              4424779
+            ],
+            "value": "bool"
+          }
+        ]
+      },
+      "index": 126
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4424779,
+        4424782
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "n",
+            "fileRange": [
+              4424781,
+              4424782
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 127
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424782,
+        4424811
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424784,
+              4424808
+            ],
+            "value": "reserved_output_tokens"
+          }
+        ],
+        "values": [
+          {
+            "tag": "l",
+            "fileRange": [
+              4424808,
+              4424811
+            ],
+            "value": 8192
+          }
+        ]
+      },
+      "index": 128
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424811,
+        4424921
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424813,
+              4424821
+            ],
+            "value": "client"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424821,
+              4424828
+            ],
+            "value": "model"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424828,
+              4424852
+            ],
+            "value": "reserved_output_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424852,
+              4424860
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424860,
+              4424876
+            ],
+            "value": "NovelsAIClient"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4424876,
+              4424891
+            ],
+            "value": "Optional[str]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424891,
+              4424896
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4424896,
+              4424921
+            ],
+            "value": "Optional[ContextBudget]"
+          }
+        ]
+      },
+      "index": 129
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4424921,
+        4424949
+      ],
+      "value": "context_budget_from_client",
+      "index": 130
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424949,
+        4424997
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424951,
+              4424960
+            ],
+            "value": "entries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424960,
+              4424968
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4424968,
+              4424992
+            ],
+            "value": "Sequence[ContextEntry]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4424992,
+              4424997
+            ],
+            "value": "str"
+          }
+        ]
+      },
+      "index": 131
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4424997,
+        4425022
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4424999,
+              4425009
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425009,
+              4425017
+            ],
+            "value": "log_fn"
+          }
+        ],
+        "values": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425017,
+              4425021
+            ],
+            "value": "zh"
+          },
+          {
+            "tag": "n",
+            "fileRange": [
+              4425021,
+              4425022
+            ],
+            "value": null
+          }
+        ]
+      },
+      "index": 132
+    },
+    {
+      "tag": "D",
+      "fileRange": [
+        4425022,
+        4425263
+      ],
+      "value": {
+        "type": "dict",
+        "keys": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425024,
+              4425033
+            ],
+            "value": "entries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425033,
+              4425049
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425049,
+              4425055
+            ],
+            "value": "goal"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425055,
+              4425065
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425065,
+              4425073
+            ],
+            "value": "budget"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425073,
+              4425085
+            ],
+            "value": "compile_fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425085,
+              4425093
+            ],
+            "value": "log_fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425093,
+              4425101
+            ],
+            "value": "return"
+          }
+        ],
+        "values": [
+          {
+            "tag": "u",
+            "fileRange": [
+              4425101,
+              4425121
+            ],
+            "value": "List[ContextEntry]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425121,
+              4425126
+            ],
+            "value": "int"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425126,
+              4425131
+            ],
+            "value": "str"
+          },
+          {
+            "tag": "p",
+            "fileRange": [
+              4425131,
+              4425132
+            ],
+            "value": {
+              "previous": {
+                "tag": "a",
+                "fileRange": [
+                  4425126,
+                  4425131
+                ],
+                "value": "str"
+              }
+            }
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4425132,
+              4425157
+            ],
+            "value": "Optional[ContextBudget]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4425157,
+              4425209
+            ],
+            "value": "Callable[[CompressibleContextCompileRequest], str]"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              4425209,
+              4425242
+            ],
+            "value": "Optional[Callable[[str], None]]"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425242,
+              4425263
+            ],
+            "value": "ContextBudgetResult"
+          }
+        ]
+      },
+      "index": 133
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4425263,
+        4425295
+      ],
+      "value": "apply_context_budget_if_needed",
+      "index": 134
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4425295,
+        4425327
+      ],
+      "value": "novels\\utils\\context_budget.py",
+      "index": 135
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425327,
+        4425339
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425329,
+              4425333
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425333,
+              4425339
+            ],
+            "value": "part"
+          }
+        ]
+      },
+      "index": 136
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425339,
+        4425352
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425341,
+              4425345
+            ],
+            "value": ".0"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425345,
+              4425352
+            ],
+            "value": "entry"
+          }
+        ]
+      },
+      "index": 137
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4425352,
+        4425390
+      ],
+      "value": "<module novels.utils.context_budget>",
+      "index": 138
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425390,
+        4425403
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425392,
+              4425403
+            ],
+            "value": "__class__"
+          }
+        ]
+      },
+      "index": 139
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425403,
+        4425593
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425405,
+              4425414
+            ],
+            "value": "entries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425414,
+              4425430
+            ],
+            "value": "chapter_number"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425430,
+              4425436
+            ],
+            "value": "goal"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425436,
+              4425446
+            ],
+            "value": "language"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425446,
+              4425454
+            ],
+            "value": "budget"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425454,
+              4425466
+            ],
+            "value": "compile_fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425466,
+              4425474
+            ],
+            "value": "log_fn"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425474,
+              4425480
+            ],
+            "value": "lang"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425480,
+              4425485
+            ],
+            "value": "log"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425485,
+              4425502
+            ],
+            "value": "available_input"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425502,
+              4425516
+            ],
+            "value": "total_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425516,
+              4425527
+            ],
+            "value": "protected"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425527,
+              4425541
+            ],
+            "value": "compressible"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425541,
+              4425559
+            ],
+            "value": "protected_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425559,
+              4425575
+            ],
+            "value": "compile_budget"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425575,
+              4425585
+            ],
+            "value": "compiled"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425585,
+              4425593
+            ],
+            "value": "merged"
+          }
+        ]
+      },
+      "index": 140
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425593,
+        4425694
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425595,
+              4425603
+            ],
+            "value": "client"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425603,
+              4425610
+            ],
+            "value": "model"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425610,
+              4425634
+            ],
+            "value": "reserved_output_tokens"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425634,
+              4425644
+            ],
+            "value": "settings"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425644,
+              4425654
+            ],
+            "value": "resolved"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425654,
+              4425670
+            ],
+            "value": "context_window"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425670,
+              4425677
+            ],
+            "value": "entry"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425677,
+              4425684
+            ],
+            "value": "value"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425684,
+              4425689
+            ],
+            "value": "key"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425689,
+              4425694
+            ],
+            "value": "raw"
+          }
+        ]
+      },
+      "index": 141
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425694,
+        4425703
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425696,
+              4425703
+            ],
+            "value": "entry"
+          }
+        ]
+      },
+      "index": 142
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425703,
+        4425725
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425705,
+              4425711
+            ],
+            "value": "text"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425711,
+              4425716
+            ],
+            "value": "cjk"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425716,
+              4425725
+            ],
+            "value": "non_cjk"
+          }
+        ]
+      },
+      "index": 143
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425725,
+        4425735
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425727,
+              4425735
+            ],
+            "value": "source"
+          }
+        ]
+      },
+      "index": 144
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425735,
+        4425754
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425737,
+              4425746
+            ],
+            "value": "message"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425746,
+              4425754
+            ],
+            "value": "log_fn"
+          }
+        ]
+      },
+      "index": 145
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425754,
+        4425764
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425756,
+              4425764
+            ],
+            "value": "log_fn"
+          }
+        ]
+      },
+      "index": 146
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425764,
+        4425797
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425766,
+              4425775
+            ],
+            "value": "entries"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425775,
+              4425783
+            ],
+            "value": "blocks"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425783,
+              4425790
+            ],
+            "value": "entry"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              4425790,
+              4425797
+            ],
+            "value": "lines"
+          }
+        ]
+      },
+      "index": 147
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        4425797,
+        4425808
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              4425799,
+              4425808
+            ],
+            "value": "entries"
+          }
+        ]
+      },
+      "index": 148
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4425808,
+        4425818
+      ],
+      "value": "__name__",
+      "index": 149
+    },
+    {
+      "tag": "a",
+      "fileRange": [
+        4425818,
+        4425828
+      ],
+      "value": "__spec__",
+      "index": 150
+    }
+  ]
+}
