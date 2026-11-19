@@ -37,6 +37,6 @@
 - [x] 正常补丁、整章重写、空值、重复目标、删除、短目标模糊拒绝、空白重复、部分冲突、无效响应、取消已测；失败不自动增加模型调用。
 - [x] 小说后端/prompt整包及小说相关HTTP定向测试通过。恢复旧任务测试曾暴露测试夹具未移除版本字段，已修正旧快照夹具并重跑通过。
 - [x] 隔离MySQL8.4：TestNativePatchRevisionRealMySQL通过（52.02秒），8次模拟请求，补丁正文/修订原始响应/成功次数持久化，重复完成任务不再生成；同时TestNativePostWriteReviewRealMySQL通过（68.88秒）。合计0次付费调用。
-- [ ] 本地4001新二进制与版本核验，见DELIVERY后续登记。
+- [x] 4001已运行49b727f6，PID40664，前端入口user-BY0bmwQG.js，health正常、小说页200。只重建Go，沿用当前嵌入前端。验证记录见PATCH-RUNTIME-VERIFICATION.json及PATCH-MYSQL-VERIFICATION.log。
 
 未完成：原版完整强制分流计算、全部动态提示词组装、状态/伏笔/记忆写回、篇幅择优及全部六入口/UI逐项对比。原版真实模型与CM同输入质量对照未执行。本步通过不代表这些条目完成。

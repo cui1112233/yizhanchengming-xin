@@ -36,3 +36,5 @@
 已接入新建长篇任务的PATCHES/REVISED_CONTENT分段修订。后端文件：native_revision.go；后端prompt文件：prompt/novelcreation/native_revision.go。提示词原始片段83、85来自固定目标常量，适配说明与剩余差异见PATCH-SPEC.md。
 测试：小说整包、prompt整包、小说HTTP定向通过；实际隔离MySQL验证补丁→复审→正文及原始修订保存→完成任务重复运行不再请求模型。未消耗真实模型额度。
 剩余事项中的“原版输出区块/PATCHES”现在仅局部及整章正文分段这一部分已接入；完整强制路由、原版状态回写、撤销路径和其它修订协议仍不能标记全部一致。
+
+本地4001运行版本49b727f6，PID40664（核验时），入口`/assets/user-BY0bmwQG.js`，health正常、小说页200。二进制为archive/qiantie-native-patches.exe，清单runtime-patches-manifest.json；未推送或发布公网。

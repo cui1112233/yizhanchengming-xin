@@ -1,0 +1,12 @@
+=== RUN   TestNativePostWriteReviewRealMySQL
+    native_review_merge_test.go:74: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=1
+    native_review_merge_test.go:74: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=2
+    native_review_merge_test.go:114: native-derived hard checks blocked LLM pass, entered revision/review, and saved corrected chapter with durable merged audit;0 paid calls
+--- PASS: TestNativePostWriteReviewRealMySQL (68.88s)
+=== RUN   TestNativePatchRevisionRealMySQL
+    native_revision_test.go:12: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=1
+    native_revision_test.go:12: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=2
+    native_revision_test.go:56: 8 fake-provider calls: original PATCHES -> re-audit -> durable MySQL chapter/revision -> repeat did not regenerate; 0 paid calls
+--- PASS: TestNativePatchRevisionRealMySQL (52.02s)
+PASS
+ok  	qiantie/backend/internal/novelcreation	121.045s
