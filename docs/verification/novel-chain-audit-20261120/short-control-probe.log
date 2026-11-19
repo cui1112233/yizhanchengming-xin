@@ -1,0 +1,14 @@
+=== RUN   TestAudit20261120ShortControls
+=== RUN   TestAudit20261120ShortControls/revision_budget_zero
+    audit20261120_control_probe_test.go:33: control ignored: revision_budget_zero, emitted short-body-revision, total_calls=4 status=completed
+=== RUN   TestAudit20261120ShortControls/length_switch_off
+    audit20261120_control_probe_test.go:33: control ignored: length_switch_off, emitted short-body-revision, total_calls=4 status=completed
+=== RUN   TestAudit20261120ShortControls/low_score_without_issues
+    audit20261120_control_probe_test.go:34: score=1 below passScore=80 still completed, calls=3
+--- FAIL: TestAudit20261120ShortControls (0.00s)
+    --- FAIL: TestAudit20261120ShortControls/revision_budget_zero (0.00s)
+    --- FAIL: TestAudit20261120ShortControls/length_switch_off (0.00s)
+    --- FAIL: TestAudit20261120ShortControls/low_score_without_issues (0.00s)
+FAIL
+FAIL	qiantie/backend/internal/novelcreation	0.103s
+FAIL

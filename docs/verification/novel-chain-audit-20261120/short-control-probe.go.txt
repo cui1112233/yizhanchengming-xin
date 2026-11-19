@@ -1,0 +1,37 @@
+package novelcreation
+
+import (
+ "context"
+ "encoding/json"
+ "strings"
+ "testing"
+ prompt "qiantie/backend/internal/prompt/novelcreation"
+)
+
+// Audit probes: expected controls, intentionally red if current short flow ignores them.
+func TestAudit20261120ShortControls(t *testing.T) {
+ for _, kind := range []string{"revision_budget_zero", "length_switch_off", "low_score_without_issues"} {
+  t.Run(kind,func(t *testing.T){
+   body := strings.Repeat("完整正文。",200)
+   first:=body
+   review:=`{"score":95,"issues":[]}`
+   if kind=="revision_budget_zero" { review=`{"score":50,"issues":["主线逻辑不成立"]}` }
+   if kind=="length_switch_off" {first="短正文。"}
+   if kind=="low_score_without_issues" {review=`{"score":1,"issues":[]}`}
+   encode:=func(v string)string{r,_:=json.Marshal(shortText{Content:v});return string(r)}
+   replies:=[]string{encode(first),review,encode(body),encode("推荐文案")}
+   if kind=="low_score_without_issues" {replies=[]string{encode(body),review,encode("推荐文案")}}
+   provider:=&queuedPipelineProvider{responses:replies}
+   in:=fixturePipelineRunContext(NewMemoryRuntime())
+   in.Session.Mode="short_original"
+   a:=NormalizeAgentSettings(AgentSettings{Version:1,MaxRevisionRounds:0,PassScore:80},2000)
+   a.EnableLengthNorm=false
+   in.Agent=&a
+   story:=ShortStory{Input:ShortStoryInput{Mode:"short_original",TargetWordCount:1000,TargetChapters:1},Outline:&ShortOutline{Title:"验收",Summary:"真相揭晓",Chapters:[]ShortOutlineChapter{{Number:1,Title:"起点",Summary:"完成冲突"}}}}
+   out,e:=pipelineWithProvider(provider).buildShortStory(context.Background(),in,&recordingEventSink{},story,true)
+   if e!=nil {t.Fatal(e)}
+   for _,r:=range provider.requests {if strings.Contains(r.SystemPrompt,prompt.ShortBodyRevision.SystemPrompt) {t.Fatalf("control ignored: %s, emitted short-body-revision, total_calls=%d status=%s",kind,len(provider.requests),out.Status)}}
+   if kind=="low_score_without_issues" && out.Status=="completed" {t.Fatalf("score=1 below passScore=80 still completed, calls=%d",len(provider.requests))}
+  })
+ }
+}
