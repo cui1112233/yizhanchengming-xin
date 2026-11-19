@@ -17,4 +17,14 @@
 - [x] 默认目录和后台展示：24条实际调用提示词，6个分区；只补缺失项，不覆盖已配置版本。
 - [x] 发布版本冻结和实际调用：长短篇、原生修订、增量结算、仿写、维护及创作对话共用发布目录。
 - [x] 权限、发布回滚、旧任务与保存验证：后台API权限及发布、草稿/归档/回滚、实际模型请求A/B（模拟模型）、MySQL8.4.11重启快照均通过。
-- [ ] 本地4001可见验收
+- [x] 本地4001可见验收：已登录浏览器打开后台“系统预设词→小说创作”，显示六分区及原生修订分流条目；打开章节审稿草稿编辑器可读实际正文，取消后未保存改动。
+
+本轮交付记录：
+
+- 实现提交：`a0a43bb8`（v88本地提交，未推送）。
+- 本地运行：`_local-archive-20261028/novel-admin-presets-20261119/qiantie-admin-presets.exe`，PID 56724；`/health`返回ok，`/api/runtime-build-info`确认a0a43bb8及`/assets/user-BVnCvltX.js`。
+- 页面入口：`http://127.0.0.1:4001/admin/presets`。选择“小说创作”，展开对应分区，点击“新建草稿”，修改并另存，再发布才影响新任务。
+- 页面证据：`_local-archive-20261028/novel-admin-presets-20261119/admin-review-prompt.png`；清单同目录`runtime-manifest.json`。
+- 验证：`go test ./internal/novelcreation ./internal/prompt/... ./internal/app -count=1`通过；HTTP后台权限/发布专项通过，HTTP整包JSON复跑退出0；前端预设页面18项通过，Vite构建通过。
+- 实际MySQL：`TestSystemPresetRealMySQLSnapshotSurvivesRestart`在隔离库`novelparity20261117ac92519bf9fa`通过（MySQL8.4.11），没有使用生产书籍或收费模型。
+- 本轮只完成小说系统预设管理与实际调用衔接；不等于已经完成洛水所有页面和功能对齐。结构校验/格式修复协议仍由后端固定；37项审稿勾选和自定义要求仍动态注入，不变成37个可编辑系统词。
