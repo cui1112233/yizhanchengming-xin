@@ -43,7 +43,7 @@ func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchf
 				Gender: stringValue(meta["gender"]), Source: novelfetchworkshop.GenderSource(stringValue(meta["genderSource"])), Reason: stringValue(meta["genderReason"]),
 			}
 			style := firstMetadataString(meta, "style", "styleName", "style_name")
-			updated, updateErr := store.UpdateBookMetadata(req.Context(), identity.Username, batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: meta, ExpectedRevision: book.Revision})
+			updated, updateErr := classifyBookMetadataWithRetry(req.Context(), store, identity.Username, batchID, book.ID, meta)
 			status := "classified"
 			if updateErr != nil || stringValue(meta["classifyStatus"]) != "classified" {
 				status = "failed"

@@ -660,13 +660,78 @@ func registerV12PublishClassificationRoute(mux *http.ServeMux, store batchfactor
 			Labels:   firstMetadataString(book.SourceMetadata, "labels", "tags"),
 		}
 		metadata := finalizeFetchedBatchClassification(classifyFetchedBatchBook(r.Context(), owner, info, book.SourceText, book.SourceMetadata, classification))
-		updated, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision})
+		updated, err := classifyBookMetadataWithRetry(r.Context(), store, owner, batch.ID, book.ID, metadata)
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"book": updated, "reused": false})
 	})
+}
+
+// classificationMetadataKeys 列出分类链路写入书档的键。AI 判断耗时期间，
+// 自动化执行、正文回填与前端轮询会持续推进书档 revision，handler 起点读到
+// 的快照几乎必然过期；而 UpdateBookMetadata 是整体替换 SourceMetadata，用
+// 旧快照重试会覆盖期间写入的字段。冲突重试时只把这些键合并进最新书档。
+var classificationMetadataKeys = []string{
+	"gender", "gender_name", "genderSource", "genderReason", "genderConfidence",
+	"style", "styleName", "style_name", "styleSource", "styleReason", "styleConfidence", "styleStatus",
+	"classifyStatus", "classifyError", "classifyRetryable", "classifyNeedsReview", "classifyReason", "classifyNote",
+	"themes", "theme", "labels", "tags",
+}
+
+func mergeClassificationMetadata(latest map[string]any, classified map[string]any) map[string]any {
+	meta := copyAnyMap(latest)
+	for _, key := range classificationMetadataKeys {
+		if value, ok := classified[key]; ok {
+			meta[key] = value
+		}
+	}
+	return meta
+}
+
+func findBatchBookByID(batch batchfactoryv11.Batch, bookID string) (batchfactoryv11.Book, bool) {
+	bookID = strings.TrimSpace(bookID)
+	for index := range batch.Books {
+		if batch.Books[index].ID == bookID {
+			return batch.Books[index], true
+		}
+	}
+	return batchfactoryv11.Book{}, false
+}
+
+// classifyBookMetadataWithRetry 把分类结果写回书档：每次尝试都重新读取最新
+// 书档，只合并分类结果键后写回；revision 冲突时刷新重试。这与自动化链路的
+// updateAutomationBookMetadata 语义一致，但额外避免旧快照覆盖并发写入。
+func classifyBookMetadataWithRetry(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID string, classified map[string]any) (batchfactoryv11.Book, error) {
+	if store == nil {
+		return batchfactoryv11.Book{}, fmt.Errorf("正文存储未配置")
+	}
+	var latest batchfactoryv11.Book
+	var lastErr error
+	for attempt := 0; attempt < automationBookWriteAttempts; attempt++ {
+		batch, err := store.GetBatch(ctx, owner, batchID)
+		if err != nil {
+			return batchfactoryv11.Book{}, err
+		}
+		book, ok := findBatchBookByID(batch, bookID)
+		if !ok {
+			return batchfactoryv11.Book{}, batchfactoryv11.ErrNotFound
+		}
+		latest = book
+		updated, err := store.UpdateBookMetadata(ctx, owner, batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{
+			Metadata:         mergeClassificationMetadata(book.SourceMetadata, classified),
+			ExpectedRevision: book.Revision,
+		})
+		if err == nil {
+			return updated, nil
+		}
+		if !errors.Is(err, batchfactoryv11.ErrConflict) {
+			return book, err
+		}
+		lastErr = err
+	}
+	return latest, fmt.Errorf("书档正被其他操作更新，保存分类失败：%w", lastErr)
 }
 
 func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store, workshopStore novelfetchworkshop.Store, fetcher *novelfetchworkshop.UpstreamFetcher, giantResolver GiantMaterialResolver, classification batchFetchClassification) {
