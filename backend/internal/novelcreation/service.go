@@ -152,7 +152,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	if err != nil {
 		return Run{}, err
 	}
-	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	settings.Agent = withDefaultReviewDimensions(NormalizeAgentSettings(settings.Agent, project.TargetChapterWords))
 	checkpoint := len(confirmedFoundation) == 0 && blueprintPauseRequired(settings.Agent, session.Mode)
 	if imitation != nil {
 		settings.Agent.TargetChapterWords = imitation.Input.TargetWordCount
@@ -709,7 +709,7 @@ func (s *Service) GetProjectSettings(ctx context.Context, owner, projectID strin
 	if err != nil {
 		return ProjectSettings{}, err
 	}
-	settings.Agent = NormalizeAgentSettings(settings.Agent, project.TargetChapterWords)
+	settings.Agent = withDefaultReviewDimensions(NormalizeAgentSettings(settings.Agent, project.TargetChapterWords))
 	creation, e := loadLongImitation(ctx, s.store, owner, projectID)
 	if e != nil {
 		return ProjectSettings{}, e
@@ -733,6 +733,14 @@ func (s *Service) updateProjectSettings(ctx context.Context, owner, projectID st
 		return ProjectSettings{}, err
 	}
 	agent := NormalizeAgentSettings(input.Agent, project.TargetChapterWords)
+	if agent.ReviewDimensionIDs == nil {
+		previous, e := s.store.GetProjectSettings(ctx, owner, projectID)
+		if e != nil {
+			return ProjectSettings{}, e
+		}
+		agent.ReviewDimensionIDs = NormalizeAgentSettings(previous.Agent, project.TargetChapterWords).ReviewDimensionIDs
+	}
+	agent = withDefaultReviewDimensions(agent)
 	creation, e := loadLongImitation(ctx, s.store, owner, projectID)
 	if e != nil {
 		return ProjectSettings{}, e

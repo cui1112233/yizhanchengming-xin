@@ -1,0 +1,224 @@
+[
+  {
+    "id": 1,
+    "title": "OOC检查",
+    "content": "角色言行是否偏离已建立的性格底色与行为模式。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 2,
+    "title": "时间线检查",
+    "content": "事件顺序、时间跨度与前后章节是否矛盾。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 3,
+    "title": "设定冲突",
+    "content": "世界观、规则、设定是否与前文或设定文档冲突。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 4,
+    "title": "战力崩坏",
+    "content": "战力、能力层级是否无理由暴涨或崩坏。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 5,
+    "title": "数值检查",
+    "content": "数值、等级、资源等量化设定是否前后一致。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 6,
+    "title": "伏笔检查",
+    "content": "伏笔是否按节奏回收，是否存在长期悬空或逻辑硬伤。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 7,
+    "title": "节奏检查",
+    "content": "本章是否有推进、冲突、钩子与情绪起伏，避免空转注水。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 8,
+    "title": "文风检查",
+    "content": "叙述口吻、修辞密度是否与全书文风指南一致。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 9,
+    "title": "信息越界",
+    "content": "角色是否获知超出其信息边界的知识。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 10,
+    "title": "词汇疲劳",
+    "content": "高疲劳词与 AI 标记词是否过密重复。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 11,
+    "title": "利益链断裂",
+    "content": "角色动机与利益链是否断裂或不合理。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 12,
+    "title": "年代考据",
+    "content": "时代背景、器物、称谓是否符合考据约束。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 13,
+    "title": "配角降智",
+    "content": "配角是否无故降智以衬托主角。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 14,
+    "title": "配角工具人化",
+    "content": "配角是否沦为只为主角服务的工具人。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 15,
+    "title": "爽点虚化",
+    "content": "爽点是否虚化，情绪缺口与兑现是否到位。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 16,
+    "title": "台词失真",
+    "content": "台词是否符合人物身份、语境与口语习惯。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 17,
+    "title": "流水账",
+    "content": "是否陷入只记事件、缺少戏剧张力的流水账。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 18,
+    "title": "知识库污染",
+    "content": "是否混入与本书无关的知识库或外部设定污染。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 19,
+    "title": "视角一致性",
+    "content": "视角切换是否有过渡，是否与设定视角一致。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 20,
+    "title": "段落等长",
+    "content": "段落长度是否过于均匀，缺乏节奏变化。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 21,
+    "title": "套话密度",
+    "content": "陈词滥调、模板化表达是否过密。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 22,
+    "title": "公式化转折",
+    "content": "转折是否公式化、可预测。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 23,
+    "title": "列表式结构",
+    "content": "正文是否呈现列表式、条目化结构。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 24,
+    "title": "支线停滞",
+    "content": "支线是否长期停滞或只被重复提及无推进。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 25,
+    "title": "弧线平坦",
+    "content": "主要角色情绪弧线是否长期平坦无变化。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 26,
+    "title": "节奏单调",
+    "content": "近期章节类型是否单调，高潮与释放是否缺席。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 27,
+    "title": "敏感词检查",
+    "content": "是否触及需规避的敏感内容。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 28,
+    "title": "正传事件冲突",
+    "content": "番外事件是否与正传正典约束矛盾。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 29,
+    "title": "未来信息泄露",
+    "content": "是否泄露分歧点之后才应揭示的未来信息。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 30,
+    "title": "世界规则跨书一致性",
+    "content": "番外是否违反正传世界规则（力量、地理、阵营）。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 31,
+    "title": "番外伏笔隔离",
+    "content": "番外是否越权回收正传伏笔。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 32,
+    "title": "读者期待管理",
+    "content": "章尾是否重燃好奇，读者期待是否在累积或被满足。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 33,
+    "title": "章节备忘偏离",
+    "content": "成稿是否兑现本章 memo 中的目标与段落要求。",
+    "defaultEnabled": true
+  },
+  {
+    "id": 34,
+    "title": "角色还原度",
+    "content": "角色语癖、行为是否与同人正典档案一致。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 35,
+    "title": "世界规则遵守",
+    "content": "是否违反同人正典中的世界规则。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 36,
+    "title": "关系动态",
+    "content": "角色关系互动是否合理、符合档案或发展逻辑。",
+    "defaultEnabled": false
+  },
+  {
+    "id": 37,
+    "title": "正典事件一致性",
+    "content": "是否与同人正典关键事件时间线矛盾。",
+    "defaultEnabled": false
+  }
+]

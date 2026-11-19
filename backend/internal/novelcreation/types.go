@@ -145,6 +145,8 @@ type AgentPrompt struct {
 }
 
 type AgentSettings struct {
+	// Nil means legacy/unset; explicit [] means all optional dimensions off.
+	ReviewDimensionIDs      *[]int            `json:"reviewDimensionIds,omitempty"`
 	ReviewPrompts           []AgentPrompt     `json:"reviewPrompts"`
 	CustomWritePrompts      []AgentPrompt     `json:"customWritePrompts"`
 	Version                 int               `json:"version"`

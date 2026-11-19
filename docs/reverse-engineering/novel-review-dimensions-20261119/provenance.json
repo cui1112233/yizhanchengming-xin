@@ -1,0 +1,228 @@
+{
+  "source": "F:\\软件\\洛水2026\\洛水2026\\modules\\novels.pyd",
+  "sha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "titleTableOffset": 4123045,
+  "descriptionTableOffset": 4125036,
+  "defaultSetOffset": 4129596,
+  "defaultSetHex": "531d6c016c026c036c046c056c066c076c086c096c0a6c0b6c0c6c0d6c0e6c0f6c106c116c126c136c146c156c166c176c186c196c1a6c1b6c206c21",
+  "defaultIDs": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    32,
+    33
+  ],
+  "count": 37,
+  "entries": [
+    {
+      "id": 1,
+      "titleOffset": 4123046,
+      "descriptionOffset": 4125037
+    },
+    {
+      "id": 2,
+      "titleOffset": 4123078,
+      "descriptionOffset": 4125180
+    },
+    {
+      "id": 3,
+      "titleOffset": 4123121,
+      "descriptionOffset": 4125312
+    },
+    {
+      "id": 4,
+      "titleOffset": 4123166,
+      "descriptionOffset": 4125446
+    },
+    {
+      "id": 5,
+      "titleOffset": 4123211,
+      "descriptionOffset": 4125572
+    },
+    {
+      "id": 6,
+      "titleOffset": 4123264,
+      "descriptionOffset": 4125700
+    },
+    {
+      "id": 7,
+      "titleOffset": 4123300,
+      "descriptionOffset": 4125846
+    },
+    {
+      "id": 8,
+      "titleOffset": 4123338,
+      "descriptionOffset": 4126002
+    },
+    {
+      "id": 9,
+      "titleOffset": 4123375,
+      "descriptionOffset": 4126131
+    },
+    {
+      "id": 10,
+      "titleOffset": 4123427,
+      "descriptionOffset": 4126254
+    },
+    {
+      "id": 11,
+      "titleOffset": 4123474,
+      "descriptionOffset": 4126376
+    },
+    {
+      "id": 12,
+      "titleOffset": 4123524,
+      "descriptionOffset": 4126492
+    },
+    {
+      "id": 13,
+      "titleOffset": 4123568,
+      "descriptionOffset": 4126619
+    },
+    {
+      "id": 14,
+      "titleOffset": 4123625,
+      "descriptionOffset": 4126735
+    },
+    {
+      "id": 15,
+      "titleOffset": 4123697,
+      "descriptionOffset": 4126851
+    },
+    {
+      "id": 16,
+      "titleOffset": 4123744,
+      "descriptionOffset": 4126970
+    },
+    {
+      "id": 17,
+      "titleOffset": 4123797,
+      "descriptionOffset": 4127091
+    },
+    {
+      "id": 18,
+      "titleOffset": 4123841,
+      "descriptionOffset": 4127224
+    },
+    {
+      "id": 19,
+      "titleOffset": 4123900,
+      "descriptionOffset": 4127359
+    },
+    {
+      "id": 20,
+      "titleOffset": 4123950,
+      "descriptionOffset": 4127481
+    },
+    {
+      "id": 21,
+      "titleOffset": 4124002,
+      "descriptionOffset": 4127599
+    },
+    {
+      "id": 22,
+      "titleOffset": 4124048,
+      "descriptionOffset": 4127718
+    },
+    {
+      "id": 23,
+      "titleOffset": 4124098,
+      "descriptionOffset": 4127814
+    },
+    {
+      "id": 24,
+      "titleOffset": 4124152,
+      "descriptionOffset": 4127925
+    },
+    {
+      "id": 25,
+      "titleOffset": 4124202,
+      "descriptionOffset": 4128049
+    },
+    {
+      "id": 26,
+      "titleOffset": 4124246,
+      "descriptionOffset": 4128165
+    },
+    {
+      "id": 27,
+      "titleOffset": 4124293,
+      "descriptionOffset": 4128293
+    },
+    {
+      "id": 28,
+      "titleOffset": 4124345,
+      "descriptionOffset": 4128395
+    },
+    {
+      "id": 29,
+      "titleOffset": 4124406,
+      "descriptionOffset": 4128506
+    },
+    {
+      "id": 30,
+      "titleOffset": 4124465,
+      "descriptionOffset": 4128636
+    },
+    {
+      "id": 31,
+      "titleOffset": 4124533,
+      "descriptionOffset": 4128763
+    },
+    {
+      "id": 32,
+      "titleOffset": 4124593,
+      "descriptionOffset": 4128867
+    },
+    {
+      "id": 33,
+      "titleOffset": 4124649,
+      "descriptionOffset": 4129006
+    },
+    {
+      "id": 34,
+      "titleOffset": 4124705,
+      "descriptionOffset": 4129130
+    },
+    {
+      "id": 35,
+      "titleOffset": 4124758,
+      "descriptionOffset": 4129255
+    },
+    {
+      "id": 36,
+      "titleOffset": 4124817,
+      "descriptionOffset": 4129365
+    },
+    {
+      "id": 37,
+      "titleOffset": 4124870,
+      "descriptionOffset": 4129494
+    }
+  ],
+  "limitation": "Static constant-table recovery, not proof of native prompt assembly or paid output quality."
+}

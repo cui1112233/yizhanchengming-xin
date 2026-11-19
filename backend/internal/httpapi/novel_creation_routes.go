@@ -11,6 +11,7 @@ import (
 
 	"qiantie/backend/internal/novelcreation"
 	"qiantie/backend/internal/projectretention"
+	novelprompt "qiantie/backend/internal/prompt/novelcreation"
 )
 
 const novelCreationJSONLimit = 4 << 20
@@ -215,7 +216,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 			writeNovelCreationError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+		writeJSON(w, http.StatusOK, map[string]any{"settings": settings, "reviewDimensionCatalog": novelprompt.ReviewDimensionCatalog()})
 	})
 	handle("PUT /api/novel-creation/projects/{projectID}/settings", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var input struct {
@@ -233,7 +234,7 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 			writeNovelCreationError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+		writeJSON(w, http.StatusOK, map[string]any{"settings": settings, "reviewDimensionCatalog": novelprompt.ReviewDimensionCatalog()})
 	})
 	handle("GET /api/novel-creation/projects/{projectID}/materials", func(w http.ResponseWriter, req *http.Request, owner string) {
 		materials, err := service.ListMaterials(req.Context(), owner, req.PathValue("projectID"))

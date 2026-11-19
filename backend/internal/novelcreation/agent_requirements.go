@@ -9,6 +9,15 @@ import (
 )
 
 func validateAgentRequirements(a AgentSettings) error {
+	if a.ReviewDimensionIDs != nil {
+		seen := map[int]bool{}
+		for _, id := range *a.ReviewDimensionIDs {
+			if id < 1 || id > 37 || seen[id] {
+				return &DomainError{Code: ErrInputRequired, Message: "审稿维度必须是1至37之间不重复的编号"}
+			}
+			seen[id] = true
+		}
+	}
 	total := 0
 	for _, group := range []struct {
 		name    string
@@ -76,5 +85,13 @@ func agentRequirementsSystemPrompt(input RunContext, definition promptcatalog.De
 			writing = append(writing, novelprompt.UserRequirement{Title: p.Title, Content: p.Content})
 		}
 	}
-	return novelprompt.WithUserRequirements(definition, review, writing)
+	return novelprompt.WithReviewDimensions(definition, novelprompt.WithUserRequirements(definition, review, writing), input.Agent.ReviewDimensionIDs)
+}
+
+func withDefaultReviewDimensions(a AgentSettings) AgentSettings {
+	if a.ReviewDimensionIDs == nil {
+		ids := novelprompt.DefaultReviewDimensionIDs()
+		a.ReviewDimensionIDs = &ids
+	}
+	return a
 }

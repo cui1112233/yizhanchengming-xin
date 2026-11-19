@@ -201,6 +201,7 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 		if e != nil {
 			return e
 		}
+		settings.Agent = withDefaultReviewDimensions(NormalizeAgentSettings(settings.Agent, p.TargetChapterWords))
 		// Content checkpoints are distinct from approval of individual paid requests.
 		raw, _ := json.Marshal(map[string]any{"short_story": story, "project_settings": settings, "agent_contract_version": 1, "mode": in.Mode})
 		run, e := tx.CreateRun(ctx, owner, Run{ProjectID: p.ID, SessionID: session.ID, ModelID: in.ModelID, ThinkingLevel: in.ThinkingLevel, IdempotencyKey: "short:" + fingerprint([]string{owner, in.IdempotencyKey}), Status: RunQueued, PromptSnapshot: raw})

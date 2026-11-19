@@ -2,17 +2,22 @@ import { Button, Form, InputNumber, Select, Switch, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { novelProjectRequest } from '../../../shared/api/novelCreation.js';
 import AgentRequirements from './AgentRequirements.jsx';
+import ReviewDimensions from './ReviewDimensions.jsx';
 import './AgentPanel.css';
 import useWorkspaceScope from './useWorkspaceScope.js';
 import { PHASES, THINKING, availableModel, modelOptions } from './contracts.js';
 
 export default function AgentPanel({ projectId, models, mode }) {
   const [form] = Form.useForm(); const [settings, setSettings] = useState(null); const [busy, setBusy] = useState(false);
+  const [dimensionCatalog, setDimensionCatalog] = useState([]);
   const saving = useRef(false), pauseTouched = useRef(false);
   const scope = useWorkspaceScope(projectId);
   useEffect(() => {
     scope.call(novelProjectRequest(projectId, '/settings', undefined, { signal: scope.signal }), r => {
       pauseTouched.current = false; setSettings(r.settings || {}); const a = r.settings?.agent || {};
+      const catalog = Array.isArray(r.reviewDimensionCatalog) ? r.reviewDimensionCatalog : [];
+      setDimensionCatalog(catalog);
+      form.setFieldValue('reviewDimensionIds', a.reviewDimensionIds ?? catalog.filter(d => d.defaultEnabled).map(d => d.id));
       form.setFieldsValue({ ...a, reviewPrompts: a.reviewPrompts || [], customWritePrompts: a.customWritePrompts || [], targetChapterWords: a.targetChapterWords ?? 2000, maxRevisionRounds: a.maxRevisionRounds ?? 3,
         passScore: a.passScore ?? 80, baseTemperature: a.baseTemperature ?? 0.65, temperatureStep: a.temperatureStep ?? 0.15,
         thinkingLevel: a.thinkingLevel ?? 'standard', enableLengthNorm: a.enableLengthNorm ?? true,
@@ -24,6 +29,7 @@ export default function AgentPanel({ projectId, models, mode }) {
     saving.current = true;
     try {
       const agent = await form.validateFields();
+      if (!dimensionCatalog.length) delete agent.reviewDimensionIds;
       if (settings?.agent?.pauseAfterBlueprint == null && !pauseTouched.current) delete agent.pauseAfterBlueprint;
       if (Object.values(agent.modelRoutes || {}).some(id => id && !availableModel(models, id))) { message.warning('分步骤原模型已不可用，请重新选择或清空'); return; }
       setBusy(true);
@@ -50,6 +56,7 @@ export default function AgentPanel({ projectId, models, mode }) {
     </section>
     <p>大纲、蓝图或基础设定生成后暂停，可修改已保存内容后继续。旧作品未明确设置时保留原有暂停规则。</p>
     <section className="novel-agent-section"><h3>模型调用确认</h3><Form.Item name="requireSecondaryConfirm" label="每次后续模型调用前确认" valuePropName="checked"><Switch aria-label="每次后续模型调用前确认" /></Form.Item><p>此项保留旧设置的逐次调用保护，与上面的内容暂停分别生效。</p></section>
+    <Form.Item name="reviewDimensionIds" noStyle><ReviewDimensions catalog={dimensionCatalog} disabled={busy || !settings} /></Form.Item>
     <AgentRequirements />
     <AgentRequirements writing />
     <section className="novel-agent-section"><h3>当前作品设置</h3><div className="novel-form-grid">
