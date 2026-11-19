@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/prompt/luoshui"
 )
 
 // 剧本医生 / 分镜医生（洛水 luoshui_doctors_v1 + luoshui_doctor_shared 取证，2026-06~09 更新日志）：
@@ -67,24 +69,16 @@ type doctorReviewDraft struct {
 }
 
 // ScreenplayDoctorSystemPrompt 剧本医生系统提示词：只审稿不改稿，输出严格 JSON。
+// 内置词注册在 luoshui 语料目录（v88_doctor_screenplay），管理后台发布覆盖版本后
+// 运行时自动改用覆盖正文。
 func ScreenplayDoctorSystemPrompt() string {
-	return "你是资深短剧剧本医生。你的任务不是夸稿子，而是找出剧本不够爆、不成立的地方，并给出可落地的修改方案；" +
-		"判断标准是观众会不会在这一句、这一场划走。检查维度：剧情逻辑（因果断裂、设定前后矛盾）、" +
-		"人物动机（行为缺乏理由、人设崩塌）、资产引用（人物/场景/道具与已建立设定不一致）、" +
-		"节奏推进（开篇是否即冲突、钩子与反转密度）、镜头缺失（该给画面的关键节点没有写出）、台词违和（出戏、不合身份、念白过长）。" +
-		"只做审核，不改写剧本。输出严格的 JSON 对象，不要任何解释或代码块以外内容：" +
-		`{"issues":[{"id":"唯一问题id","severity":"blocker|major|minor","episode":1,"location":"第几场或第几镜或资产名","dimension":"分类标签","problem":"问题描述","suggestion":"可落地修改建议","evidence":"可选引用原文片段"}],"suggested_actions":["rewrite_episode_1","rewrite_all","discuss_with_user"],"summary":"一句话结论"}` +
-		"。severity 约定：blocker=必须修（缺集、名称对不上、凭空新增人物等）；major=强烈建议修（爽点弱、格式不规范）；minor=优化项。"
+	return luoshui.V88RuntimeBody(luoshui.V88DoctorScreenplayID)
 }
 
 // StoryboardDoctorSystemPrompt 分镜词医生系统提示词：只审核一致性，不改分镜。
+// 内置词注册在 luoshui 语料目录（v88_doctor_storyboard），后台覆盖后运行时生效。
 func StoryboardDoctorSystemPrompt() string {
-	return "你是分镜词医生。对照剧本审核分镜提示词，找出一致性问题并给出可落地修改建议。检查维度：" +
-		"人物错位（分镜中出现该场不该出场的人物，或漏掉该出场的人物）、场景不连贯（前后分镜场景跳变且无交代）、" +
-		"资产引用错误（引用了剧本里不存在的人物/场景/道具名）、video_desc 结构缺失（视频提示词为空或没有可执行的画面动作）。" +
-		"只做审核，不改写分镜。输出严格的 JSON 对象，不要任何解释或代码块以外内容：" +
-		`{"issues":[{"id":"唯一问题id","severity":"blocker|major|minor","episode":1,"location":"分镜序号或资产名","dimension":"分类标签","problem":"问题描述","suggestion":"可落地修改建议","evidence":"可选引用片段"}],"suggested_actions":["rewrite_storyboard_episode_1","patch_shot_field","regenerate_storyboard_episode_1"],"summary":"一句话结论"}` +
-		"。severity 约定：blocker=必须修（凭空新增角色、名称对不上等）；major=强烈建议修；minor=优化项。"
+	return luoshui.V88RuntimeBody(luoshui.V88DoctorStoryboardID)
 }
 
 // normalizeDoctorReview 解析模型输出并按洛水规则计算 pass：severity 由服务端裁决，不信任模型自报。

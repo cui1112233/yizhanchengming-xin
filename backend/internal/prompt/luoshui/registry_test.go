@@ -15,10 +15,17 @@ func TestRegistryMatchesSpecCorpus(t *testing.T) {
 		t.Fatalf("加载语料失败: %v", err)
 	}
 	entries := reg.List()
-	if len(entries) != 53 {
-		t.Fatalf("提示词条数 = %d, want 53", len(entries))
+	// 53 条取证语料 + 3 条 V88 内置运行词（v88_doctor_screenplay / v88_doctor_storyboard / v88_synopsis，
+	// 见 v88_native.go，Section=v88，不参与取证 SHA 校验）。
+	if len(entries) != 56 {
+		t.Fatalf("提示词条数 = %d, want 56", len(entries))
 	}
+	v88Count := 0
 	for _, entry := range entries {
+		if entry.Section == "v88" {
+			v88Count++
+			continue
+		}
 		raw := reg.entries[entry.ID].body
 		if raw == "" {
 			t.Fatalf("缺少提示词 %s", entry.ID)
@@ -33,6 +40,9 @@ func TestRegistryMatchesSpecCorpus(t *testing.T) {
 		if entry.Length > 0 && len([]rune(raw)) != entry.Length {
 			t.Fatalf("%s 长度 = %d, want %d", entry.ID, len([]rune(raw)), entry.Length)
 		}
+	}
+	if v88Count != 3 {
+		t.Fatalf("V88 内置运行词条数 = %d, want 3", v88Count)
 	}
 }
 

@@ -116,6 +116,16 @@ func load() (*Registry, error) {
 		reg.entries[entry.ID] = entry
 		reg.order = append(reg.order, entry.ID)
 	}
+	// V88 内置运行词（剧本医生/分镜医生/故事概要）与取证语料同目录管理：
+	// 管理后台「漫剧创作」分区可查看与发布覆盖，运行时经 RuntimeBody 生效。
+	for _, entry := range v88NativeEntries() {
+		if _, exists := reg.entries[entry.ID]; exists {
+			return nil, fmt.Errorf("提示词 ID 重复: %s", entry.ID)
+		}
+		entry.Verified = true
+		reg.entries[entry.ID] = entry
+		reg.order = append(reg.order, entry.ID)
+	}
 	return reg, nil
 }
 

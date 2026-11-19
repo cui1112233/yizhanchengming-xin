@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"qiantie/backend/internal/prompt/luoshui"
 )
 
 // SynopsisResult 是「故事摘要 Agent」的结构化产物，对应洛水 synopsis_result.json：
@@ -23,37 +25,7 @@ type SynopsisResult struct {
 // 洛水 screenplay.pyd 的 SYNOPSIS_AGENT_PROMPT（提取原文规格，中文原样保留要点）：
 // 摘要 300-500 字，涵盖起因→发展→高潮→结局，保留核心人物姓名与关键事件；
 // 标题 2-10 字；audience 男频/女频二选一；genre 枚举；tags 3-6 个、每个 2-4 字。
-const synopsisSystemPrompt = `你是一个专业的故事摘要与项目信息提取助手。你的任务是分析小说文本，提炼故事核心脉络，生成精炼的故事摘要，并识别作品的受众类型、题材分类和关键标签，以 JSON 格式返回。
-
-【核心原则】
-摘要必须做到"精炼传神、脉络清晰"——用最少的文字传递最完整的故事信息，让读者一读便知故事全貌。
-
-【摘要要求】
-- 字数控制在 300-500字，不得少于300字，不得超过500字
-- 必须涵盖故事的完整脉络：起因→发展→高潮→结局（或当前进展）
-- 必须保留核心人物的姓名和关键事件的具体描述
-- 必须体现故事的核心冲突和情感主线
-- 语言流畅自然，具有文学性，能让读者快速了解故事全貌
-- 不要逐句复述原文，而是提炼概括，抓住关键转折点
-- 保持客观叙述视角，不加入个人评价或推荐语
-- 如果原文有明确的世界观设定（仙侠/玄幻/都市/历史等），摘要开头应简要交代背景
-
-【标题要求】
-- 根据故事内容提炼一个简洁有力的标题
-- 标题应能概括故事主题或核心冲突
-- 控制在 2-10个字 以内
-- 标题风格应贴合故事类型（仙侠→古韵诗意；悬疑→紧张悬念；言情→情感共鸣）
-
-【受众与分类标签要求】
-你必须从文本内容中精准识别以下信息：
-1. audience（受众频道）— 必须二选一："男频" 或 "女频"
-2. genre（题材分类）— 选择最匹配的一个：现代言情、古代言情、仙侠玄幻、都市异能、悬疑推理、科幻未来、历史军事、游戏竞技、恐怖灵异、二次元、古代宫廷、末日生存、武侠江湖、其他
-3. tags（关键词标签）— 3-6个，每个2-4字，从题材设定/情感基调/核心元素/风格氛围维度提取，避免过于笼统
-
-【输出格式要求】
-只返回合法 JSON，不得输出任何解释性文字。
-{"title":"故事标题（2-10字）","synopsis":"300-500字的故事摘要，涵盖起因、发展、高潮、结局","audience":"男频 或 女频","genre":"题材分类","tags":["标签1","标签2","标签3"]}`
-
+// 正文注册在 luoshui 语料目录（v88_synopsis），管理后台发布覆盖版本后运行时自动生效。
 var synopsisGenres = map[string]bool{
 	"现代言情": true, "古代言情": true, "仙侠玄幻": true, "都市异能": true, "悬疑推理": true,
 	"科幻未来": true, "历史军事": true, "游戏竞技": true, "恐怖灵异": true, "二次元": true,
@@ -130,7 +102,7 @@ func GenerateSynopsis(ctx context.Context, sourceText string, callModel func(ctx
 	if utf8.RuneCountInString(source) > maxRunes {
 		source = string([]rune(source)[:maxRunes])
 	}
-	raw, err := callModel(ctx, synopsisSystemPrompt, "请分析以下小说文本，生成故事摘要并严格按 JSON 格式返回：\n\n"+source)
+	raw, err := callModel(ctx, luoshui.V88RuntimeBody(luoshui.V88SynopsisID), "请分析以下小说文本，生成故事摘要并严格按 JSON 格式返回：\n\n"+source)
 	if err != nil {
 		return SynopsisResult{}, err
 	}

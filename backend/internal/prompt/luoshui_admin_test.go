@@ -50,7 +50,7 @@ func TestLuoshuiAdminPresetsGroupedByFunction(t *testing.T) {
 		"plugin.viral-opening":     2,
 		"plugin.character-edit":    1,
 		"plugin.cover-generation":  1,
-		"plugin.comic-screenplay":  16,
+		"plugin.comic-screenplay":  19,
 		"plugin.unassigned":        23,
 	}
 	for slot, want := range wantCounts {

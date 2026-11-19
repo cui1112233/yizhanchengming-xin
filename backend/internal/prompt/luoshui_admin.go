@@ -18,8 +18,9 @@ type LuoshuiAdminGroup struct {
 	Runtime bool
 }
 
-// 漫剧创作链路实际读取的提示词，按「剧本 → 资产 → 分镜」顺序排列。
-// 审校类（doctor_*）当前没有运行时代码读取，仍留在未归属分区。
+// 漫剧创作链路实际读取的提示词，按「剧本 → 资产 → 分镜 → 审核/概要」顺序排列。
+// v88_* 三条是 V88 内置运行词（剧本医生/分镜医生/故事概要），运行时经
+// luoshui.V88RuntimeBody 读取，后台发布覆盖后生效。
 var comicScreenplayPromptIDs = []string{
 	CreativeScript144, CreativeStoryboard307, CreativeCharacter213, CreativeScene289,
 	"a1_novel_to_screenplay",
@@ -34,6 +35,9 @@ var comicScreenplayPromptIDs = []string{
 	"asset_prop_v3",
 	"storyboard_xiaoluo_v7_15s",
 	"storyboard_xiaoyunque_v3",
+	"v88_doctor_screenplay",
+	"v88_doctor_storyboard",
+	"v88_synopsis",
 }
 
 // 分组顺序固定：先按 5 个插件功能，再是漫剧创作链路，最后是未归属。每个
@@ -166,6 +170,15 @@ func luoshuiAdminItem(entry luoshui.Entry, group LuoshuiAdminGroup, index int, u
 }
 
 func luoshuiAdminDescription(entry luoshui.Entry, group LuoshuiAdminGroup, unassigned bool) string {
+	// V88 内置运行词：正文是 V88 自研功能的内置词（非 CM v2.9.0 取证原文），
+	// 运行时读取已发布覆盖版本，后台编辑发布后真实生效。
+	if entry.Section == "v88" {
+		parts := []string{"V88 内置运行词（非洛水取证原文）"}
+		if group.Label != "" {
+			parts = append(parts, group.Label+"链路在用，编辑发布后生效")
+		}
+		return strings.Join(parts, " · ")
+	}
 	parts := []string{"CM v2.9.0 内嵌原文"}
 	if entry.Section != "" {
 		parts = append(parts, "§"+entry.Section)
