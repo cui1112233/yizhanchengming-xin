@@ -254,6 +254,71 @@ func TestScreenplayRoutesStoryboardShotCreateUpdateSplitMergeDelete(t *testing.T
 	}
 }
 
+func TestScreenplayRoutesBatchMergeShotsByDuration(t *testing.T) {
+	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	store := screenplay.NewMemoryStore()
+	if _, err := store.CreateProject(context.Background(), screenplay.Project{ID: "merge-project", OwnerUsername: "alice", Title: "分镜合并"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveStoryboard(context.Background(), screenplay.Storyboard{
+		ProjectID: "merge-project", OwnerUsername: "alice", EpisodeNo: 1, Engine: screenplay.EngineXiaoluoV7,
+		Shots: []screenplay.StoryboardShot{
+			{ID: "sb-1", Seq: 1, Duration: 15, Scene: "操场", VideoDesc: "第一镜", Characters: "暖暖"},
+			{ID: "sb-2", Seq: 2, Duration: 5, Scene: "看台", VideoDesc: "第二镜", Characters: "白衬衣少年"},
+			{ID: "sb-3", Seq: 3, Duration: 9, Scene: "走廊", VideoDesc: "第三镜", Characters: "暖暖"},
+			{ID: "sb-4", Seq: 4, Duration: 15, Scene: "教室", VideoDesc: "第四镜", Characters: "卷发少女"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterScreenplayRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, store, nil, func() time.Time { return now })
+	base := "/api/comic-screenplays/projects/merge-project/storyboards/xiaoluo_v7_15s/1/shots/merge"
+
+	preview := signedJSONRequest(t, mux, now, "alice", http.MethodPost, base, map[string]any{"max_seconds": 30, "dry_run": true})
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview=%d %s", preview.Code, preview.Body.String())
+	}
+	var previewPayload struct {
+		Plan screenplay.StoryboardMergePlan `json:"plan"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &previewPayload); err != nil {
+		t.Fatal(err)
+	}
+	if previewPayload.Plan.BeforeCount != 4 || previewPayload.Plan.AfterCount != 2 || previewPayload.Plan.PendingGroups != 1 {
+		t.Fatalf("preview plan = %+v", previewPayload.Plan)
+	}
+	if containsText(preview.Body.String(), `"storyboard"`) {
+		t.Fatalf("dry run must not write storyboard: %s", preview.Body.String())
+	}
+	if stored, err := store.GetStoryboard(context.Background(), "alice", "merge-project", 1, screenplay.EngineXiaoluoV7); err != nil || len(stored.Shots) != 4 {
+		t.Fatalf("dry run changed data: %d %v", len(stored.Shots), err)
+	}
+
+	merged := signedJSONRequest(t, mux, now, "alice", http.MethodPost, base, map[string]any{"max_seconds": 30})
+	if merged.Code != http.StatusOK || !containsText(merged.Body.String(), `"shot_count":2`) {
+		t.Fatalf("merge=%d %s", merged.Code, merged.Body.String())
+	}
+	if !containsText(merged.Body.String(), `"removed_count":2`) {
+		t.Fatalf("merge plan missing removed_count: %s", merged.Body.String())
+	}
+	stored, err := store.GetStoryboard(context.Background(), "alice", "merge-project", 1, screenplay.EngineXiaoluoV7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored.Shots) != 2 || stored.Shots[0].Duration != 29 {
+		t.Fatalf("stored shots = %+v", stored.Shots)
+	}
+	if stored.Shots[0].Characters != "暖暖；白衬衣少年" {
+		t.Fatalf("merged characters = %q", stored.Shots[0].Characters)
+	}
+
+	again := signedJSONRequest(t, mux, now, "alice", http.MethodPost, base, map[string]any{"max_seconds": 30})
+	if again.Code == http.StatusOK {
+		t.Fatalf("repeat merge should not report success: %s", again.Body.String())
+	}
+}
+
 func TestScreenplayRoutesAssetCreateUpdateDelete(t *testing.T) {
 	now := time.Date(2026, 11, 11, 11, 0, 0, 0, time.UTC)
 	store := screenplay.NewMemoryStore()

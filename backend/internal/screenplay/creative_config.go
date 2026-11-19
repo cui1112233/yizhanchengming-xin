@@ -40,6 +40,7 @@ type CreativeConfig struct {
 	ImageModelID                string                            `json:"image_model_id"`
 	ImageEditModelID            string                            `json:"image_edit_model_id"`
 	Style                       *CreativeStyleSnapshot            `json:"style,omitempty"`
+	SynopsisResult              *SynopsisResult                   `json:"synopsis_result,omitempty"`
 	PromptSnapshots             map[string]CreativePromptSnapshot `json:"-"`
 }
 

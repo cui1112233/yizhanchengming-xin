@@ -6,8 +6,8 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {build} from 'esbuild';
 const here=path.dirname(fileURLToPath(import.meta.url));
-const browser=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
-test('批量真实DOM：取消零请求、重复启动合并、停止后续集、只补遗漏资产、失败记录与重试入口', {skip:!browser},async()=>{
+const browser=[process.env.CHROME_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(p=>p&&existsSync(p));
+test('批量真实DOM：取消零请求、重复启动合并、停止后续集、失败记录与重试入口', {skip:!browser},async()=>{
  const bundle=await build({stdin:{resolveDir:here,loader:'jsx',contents:`
  import React from 'react';import{createRoot}from'react-dom/client';import{ComicEpisodeBatchDialog,ComicStoryboardFailures}from'./ComicScreenplayBatchTools.jsx';
  const root=createRoot(document.getElementById('root')),tick=()=>new Promise(r=>setTimeout(r,150)),assert=(v,m)=>{if(!v)throw Error(m)};
@@ -20,7 +20,7 @@ test('批量真实DOM：取消零请求、重复启动合并、停止后续集�
  (async()=>{
  render('first');await tick();await tick();assert(button('开始分镜').disabled,'empty selection enabled');chooseAll();await clickSelect('批量规划方式','不使用规划');button('开始分镜').click();await tick();button('取消').click();await tick();await tick();await tick();assert(!calls.length&&!writes.length,'cancel submitted');
  button('开始分镜').click();await tick();button('确认开始').click();button('确认开始')?.click();await tick();assert(calls.length===1,'duplicate first request '+calls.length);assert(calls[0].options.usePlanning===false,'none mode ignored');button('完成当前集后停止').click();release();await tick();await tick();assert(calls.length===1,'stopped batch started next');assert(document.body.textContent.includes('未开始'),'missing stopped result');button('关闭').click();await tick();
- render('assets',{checkOnly:true});await tick();await tick();chooseAll();await tick();hold=true;button('开始检查').click();await tick();button('确认开始').click();await tick();button('完成当前集后停止').click();release();await tick();await tick();await tick();assert(writes.length===3,'asset batch did not stop after current episode');assert(writes.every(w=>w.body.missingOnly===true&&w.body.content.includes('第1集')),'asset check overwrites or checks unselected episode');assert(document.body.textContent.includes('新增 3 项资产'),'no result summary');button('关闭').click();await tick();
+ // 资产检查迁至 comic-screenplay-asset-check.browser.test.js，覆盖后台任务与确认入库合同。
  render('plan');await tick();await tick();chooseAll();await clickSelect('批量任务','只生成规划');button('开始规划').click();await tick();button('确认开始').click();await tick();await tick();await tick();assert(writes.filter(w=>w.url.includes('storyboard-plan')).length===2,'planning not called per selected chapter');assert(calls.length===1,'plan-only called storyboard generation');button('关闭').click();await tick();
  root.render(<ComicStoryboardFailures projectId="p" engine="e" episodes={ep} onRetry={value=>calls.push(value)} onClose={()=>{}}/>);await tick();await tick();assert(document.body.textContent.includes('接口错误'),'failure reason absent');button('刷新记录').click();await tick();button('核对与重试').click();assert(calls.at(-1).no===1,'retry target wrong');document.body.dataset.result='passed';
  })().catch(e=>{document.body.dataset.result='failed';document.body.dataset.error=e.stack});

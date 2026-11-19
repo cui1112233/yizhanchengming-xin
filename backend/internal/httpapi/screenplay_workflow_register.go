@@ -42,7 +42,10 @@ func registerScreenplayWorkflow(root *http.ServeMux, auth BridgeAuth, options Ro
 			}
 			return scriptVideoModelConfig(ctx, options.Store, owner, config, modelKey)
 		}
-		runner = &screenplayVideoRunner{service: &scriptVideoService{resolver: videoResolver, localExecutor: options.LocalExecutors}, configs: options.UserConfigStore, repo: productionRepo, References: media.References, ReferenceIDs: media.ReferenceIDs, Subjects: media.VideoSubjects}
+		videoService := &scriptVideoService{resolver: videoResolver, localExecutor: options.LocalExecutors}
+		media.Video = videoService
+		media.Configs = options.UserConfigStore
+		runner = &screenplayVideoRunner{service: videoService, configs: options.UserConfigStore, repo: productionRepo, References: media.References, ReferenceIDs: media.ReferenceIDs, Subjects: media.VideoSubjects}
 	}
 	runtime := &screenplay.ProductionRuntime{Store: options.Screenplay, Repository: productionRepo, Executor: func(owner string) screenplay.BatchExecutor {
 		return screenplay.BatchExecutor{Store: options.Screenplay, Generator: screenplayTextGenerator{owner: owner, resolver: resolver}, Media: runner, Finalizer: media}

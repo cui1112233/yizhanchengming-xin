@@ -26,7 +26,7 @@ window.fetch=async(input,options={})=>{const url=new URL(String(input),'http://l
  }
  return response({});
 };
-function mount(project='p1'){root.render(<Prep projectId={project} episode={{no:1,title:project==='p1'?'本集一':'本集二',chapterId:'c'}} modelId="own-model" canGenerate readOnly={false} defaultDensity="standard" onSaveDensity={async()=>true} onGenerate={async()=>true} onChanged={async()=>{}} onClose={()=>{}} engine="xiaoluo_v7_15s"/>);}
+function mount(project='p1',extra={}){root.render(<Prep projectId={project} episode={{no:1,title:project==='p1'?'本集一':'本集二',chapterId:'c'}} modelId="own-model" canGenerate readOnly={false} defaultDensity="standard" onSaveDensity={async()=>true} onGenerate={async()=>true} onChanged={async()=>{}} onClose={()=>{}} engine="xiaoluo_v7_15s" {...extra}/>);}
 function pass(){document.body.dataset.result='passed';document.body.dataset.posts=String(posts);document.body.dataset.reads=String(reads);}
 function fail(e){document.body.dataset.result='failed';document.body.dataset.error=e.message+" posts="+posts+" reads="+reads;}
 `;
@@ -45,5 +45,24 @@ test('切换作品后丢弃迟到规划进度，不启动另一本作品生成',
 `);});
 test('重开运行中的规划仅读取进度，完成后恢复正式结果',{skip:!browser},async()=>{await run('restore-running',String.raw`
 (async()=>{Object.assign(rows.p1.chapters[0],{planning_request_key:'persisted',planning_status:'running'});mount();await wait(()=>text().includes('第2/8轮'));assert(posts===0&&button('开始分镜').disabled,'reopen re-posted planner');Object.assign(rows.p1.chapters[0],{planning_status:'partial',planning_text:'已完成部分稿',planning_coverage:{ok:false,chars:35,rows:0,missing:['二'],wrong:[]}});await wait(()=>text().includes('规划可能仍不完整，草稿已保存'));assert(posts===0,'finish re-posted planner');pass();})().catch(fail);
+`);});
+test('弹窗原版字段：规划小节开关、分镜前缀与额外内容进入生成参数',{skip:!browser},async()=>{await run('prep-original-fields',String.raw`
+(async()=>{mount('p1',{prefix:'账号前缀',onGenerate:async(no,options)=>{window.generated=options;return true;}});await wait(()=>document.querySelector('textarea[aria-label="分镜前缀"]')?.value==='账号前缀');
+const sw=document.querySelector('.comic-e2-prep-plan-section .ant-switch');assert(sw&&sw.getAttribute('aria-checked')==='false','plan-section default mismatch');
+sw.click();await tick();assert(sw.getAttribute('aria-checked')==='true'&&text().includes('只生成规划保存本章规划，不自动生成分镜JSON'),'plan-section did not select planning');
+sw.click();await tick();const box=document.querySelector('textarea[aria-label="额外内容"]');assert(box,'extra content box missing');
+const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(box,'补充台词更克制');box.dispatchEvent(new Event('input',{bubbles:true}));await tick();
+[...document.querySelectorAll('.comic-e2-plan-modes button')].find(el=>el.querySelector('strong')?.textContent==='不带规划直接分镜').click();await tick();click(button('开始分镜'));await wait(()=>window.generated);
+assert(window.generated.prefix==='账号前缀'&&window.generated.extraContent==='补充台词更克制','prefix/extra not forwarded: '+JSON.stringify(window.generated));pass();})().catch(fail);
+`);});
+test('顶部配置行只读展示模型与分镜词，上下文开关走真回调',{skip:!browser},async()=>{await run('config-row',String.raw`
+(async()=>{let toggle=null;mount('p1',{modelName:'豆包文本模型',promptName:'专业剧本分镜词',contextEnabled:true,onToggleContext:v=>{toggle=v;}});
+await wait(()=>text().includes('豆包文本模型'));
+const t=text();assert(t.includes('推理模型')&&t.includes('专业剧本分镜词')&&t.includes('分镜上下文'),'config row labels missing');
+const sw=document.querySelector('.comic-e2-prep-config-switch .ant-switch');assert(sw&&sw.getAttribute('aria-checked')==='true','context not reflecting prop');
+sw.click();await tick();assert(toggle===false,'context toggle did not call back with false');
+mount('p1',{modelName:'豆包文本模型',promptName:'专业剧本分镜词',readOnly:true,contextEnabled:true,onToggleContext:v=>{toggle=v;}});
+await wait(()=>{const s=document.querySelector('.comic-e2-prep-config-switch .ant-switch');return s&&s.getAttribute('aria-disabled')==='true'||s?.classList.contains('ant-switch-disabled');});
+pass();})().catch(fail);
 `);});
 

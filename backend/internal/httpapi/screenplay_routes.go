@@ -289,6 +289,23 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"document": document})
 	})
+	// 版本择优：读取单个版本的完整正文用于横排对照。
+	handle("GET /api/comic-screenplays/projects/{id}/documents/{documentID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		document, err := store.GetDocument(req.Context(), owner, req.PathValue("id"), req.PathValue("documentID"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"document": document})
+	})
+	// 版本择优：删除一个历史版本（含其场次/人物/场景）；当前活动版本被领域层拒绝。
+	handle("DELETE /api/comic-screenplays/projects/{id}/documents/{documentID}", func(w http.ResponseWriter, req *http.Request, owner string) {
+		if err := screenplay.DeleteDocument(req.Context(), store, owner, req.PathValue("id"), req.PathValue("documentID")); err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	handle("DELETE /api/comic-screenplays/projects/{id}", func(w http.ResponseWriter, req *http.Request, owner string) {
 		if err := store.DeleteProject(req.Context(), owner, req.PathValue("id")); err != nil {
 			writeScreenplayError(w, err)
@@ -303,6 +320,10 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			return
 		}
 		payload := map[string]any{"project": project, "documents": []screenplay.Document{}, "shots": []screenplay.Shot{}, "characters": []screenplay.Character{}, "scenes": []screenplay.Scene{}, "assets": []screenplay.Asset{}, "storyboards": []screenplay.Storyboard{}}
+		// 故事摘要 Agent 的结构化结果（洛水 workspace.synopsis_result）。未生成时为空。
+		if project.CreativeConfig != nil && project.CreativeConfig.SynopsisResult != nil {
+			payload["synopsis_result"] = project.CreativeConfig.SynopsisResult
+		}
 		documents, err := store.ListDocuments(req.Context(), owner, project.ID)
 		if err != nil {
 			writeScreenplayError(w, err)
@@ -629,12 +650,14 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			Synopsis                   string                      `json:"synopsis"`
 			Model                      string                      `json:"model"`
 			Confirmed                  bool                        `json:"confirmed"`
+			Prefix                     *string                     `json:"prefix,omitempty"`
+			ExtraContent               string                      `json:"extraContent,omitempty"`
 		}
 		if !decode(w, req, &input) {
 			return
 		}
 		service := screenplay.StoryboardService{Store: store, Authoring: authors, Generator: screenplayTextGenerator{owner: owner, resolver: resolver}}
-		result, err := service.Generate(req.Context(), screenplay.StoryboardRequest{IdempotencyKey: input.IdempotencyKey, RetryOf: input.RetryOf, ConfirmedRetry: input.ConfirmedRetry, Owner: owner, ProjectID: req.PathValue("id"), ChapterID: input.ChapterID, PlanningChapterID: input.PlanningChapterID, UsePlanning: input.UsePlanning, UseOriginalContentDirectly: input.UseOriginalContentDirectly, Engine: input.Engine, EpisodeNo: input.EpisodeNo, Content: input.Content, Episodes: input.Episodes, Style: input.Style, Synopsis: input.Synopsis, Model: input.Model, Confirmed: input.Confirmed})
+		result, err := service.Generate(req.Context(), screenplay.StoryboardRequest{IdempotencyKey: input.IdempotencyKey, RetryOf: input.RetryOf, ConfirmedRetry: input.ConfirmedRetry, Owner: owner, ProjectID: req.PathValue("id"), ChapterID: input.ChapterID, PlanningChapterID: input.PlanningChapterID, UsePlanning: input.UsePlanning, UseOriginalContentDirectly: input.UseOriginalContentDirectly, Engine: input.Engine, EpisodeNo: input.EpisodeNo, Content: input.Content, Episodes: input.Episodes, Style: input.Style, Synopsis: input.Synopsis, Model: input.Model, Confirmed: input.Confirmed, Prefix: input.Prefix, ExtraContent: input.ExtraContent})
 		if err != nil {
 			// 部分剧集失败：已生成的剧集已经落库，返回 partial_failure 和
 			// failed_episodes，让前端能明确提示「第 N 集失败」。
@@ -780,6 +803,302 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/shots/merge", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input struct {
+			MaxSeconds float64 `json:"max_seconds"`
+			DryRun     bool    `json:"dry_run"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		if input.MaxSeconds <= 0 {
+			input.MaxSeconds = screenplay.StoryboardMergeDefaultMaxSeconds
+		}
+		if input.DryRun {
+			storyboard, err := store.GetStoryboard(req.Context(), owner, projectID, episode, engine)
+			if err != nil {
+				writeScreenplayError(w, err)
+				return
+			}
+			plan, err := screenplay.PlanStoryboardMerge(storyboard.Shots, input.MaxSeconds)
+			if err != nil {
+				writeScreenplayError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
+			return
+		}
+		storyboard, plan, err := screenplay.MergeStoryboardShotsByDuration(req.Context(), store, owner, projectID, episode, engine, input.MaxSeconds)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard, "plan": plan})
+	})
+	handle("GET /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/costume/options", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		storyboard, err := store.GetStoryboard(req.Context(), owner, projectID, episode, engine)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		assets, err := store.ListAssets(req.Context(), owner, projectID, "")
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"options": screenplay.BuildCostumeChangeOptionsView(storyboard.Shots, assets)})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/costume/preview", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input screenplay.CostumeChangeOptions
+		if !decode(w, req, &input) {
+			return
+		}
+		storyboard, err := store.GetStoryboard(req.Context(), owner, projectID, episode, engine)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		plan, err := screenplay.PlanCostumeChange(storyboard.Shots, input)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		payload := map[string]any{"plan": plan}
+		if plan.Matched == 0 {
+			payload["message"] = screenplay.CostumeChangeEmptyMessage(plan)
+		}
+		writeJSON(w, http.StatusOK, payload)
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/costume/apply", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input screenplay.CostumeChangeOptions
+		if !decode(w, req, &input) {
+			return
+		}
+		storyboard, plan, err := screenplay.ApplyCostumeChange(req.Context(), store, owner, projectID, episode, engine, input)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"storyboard": storyboard, "plan": plan, "message": screenplay.CostumeChangeSuccessMessage(plan)})
+	})
+	// 故事摘要 Agent（洛水 synopsis）：分析原文生成 {title,synopsis,audience,genre,tags}，
+	// 写回创作配置的 synopsis_result；剧本页顶部据此渲染标题/题材标签/故事概要。
+	handle("POST /api/comic-screenplays/projects/{id}/synopsis/generate", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Model string `json:"model"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		cs, ok := store.(screenplay.CreativeStore)
+		if !ok {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "当前存储不支持保存创作配置"})
+			return
+		}
+		project, err := store.GetProject(req.Context(), owner, req.PathValue("id"))
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		generator := screenplayTextGenerator{owner: owner, resolver: resolver}
+		result, err := screenplay.GenerateSynopsis(req.Context(), project.SourceText, func(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+			response, err := generator.Generate(ctx, screenplay.TextRequest{
+				Model: input.Model, SystemPrompt: systemPrompt, UserPrompt: userPrompt,
+				MaxOutputTokens: 4000, SingleAttempt: true,
+			})
+			return response.Content, err
+		}, now())
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		config := screenplay.EffectiveCreativeConfig(project)
+		config.SynopsisResult = &result
+		saved, err := cs.SaveCreativeConfig(req.Context(), owner, project.ID, config, project.Revision)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"synopsis_result": saved.CreativeConfig.SynopsisResult, "revision": saved.Revision})
+	})
+	// 剧本医生：审核当前活动剧本（洛水 luoshui_doctors_v1 review 模式，只出报告不改稿）。
+	handle("POST /api/comic-screenplays/projects/{id}/doctor/screenplay", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var input struct {
+			Model string `json:"model"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		generator := screenplayTextGenerator{owner: owner, resolver: resolver}
+		review, err := screenplay.ReviewScreenplayDoctor(req.Context(), store, owner, req.PathValue("id"), now(), func(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+			response, err := generator.Generate(ctx, screenplay.TextRequest{
+				Model: input.Model, SystemPrompt: systemPrompt, UserPrompt: userPrompt,
+				MaxOutputTokens: 8000, SingleAttempt: true,
+			})
+			return response.Content, err
+		})
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"review": review})
+	})
+	// 分镜医生：对照剧本审核指定集分镜。
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/doctor/storyboard", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input struct {
+			Model string `json:"model"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		generator := screenplayTextGenerator{owner: owner, resolver: resolver}
+		review, err := screenplay.ReviewStoryboardDoctor(req.Context(), store, owner, projectID, episode, engine, now(), func(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+			response, err := generator.Generate(ctx, screenplay.TextRequest{
+				Model: input.Model, SystemPrompt: systemPrompt, UserPrompt: userPrompt,
+				MaxOutputTokens: 8000, SingleAttempt: true,
+			})
+			return response.Content, err
+		})
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"review": review})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/translate/prepare", func(w http.ResponseWriter, req *http.Request, owner string) {		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input screenplay.BatchTranslateInput
+		if !decode(w, req, &input) {
+			return
+		}
+		storyboard, err := store.GetStoryboard(req.Context(), owner, projectID, episode, engine)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		items, err := screenplay.PlanBatchTranslate(storyboard.Shots, input)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		payload := map[string]any{"items": items, "total": len(items)}
+		if len(items) == 0 {
+			payload["message"] = "没有需要翻译的分镜"
+		}
+		writeJSON(w, http.StatusOK, payload)
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/translate/item", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input struct {
+			ShotID  string `json:"shot_id"`
+			Model   string `json:"model"`
+			screenplay.BatchTranslateInput
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		if strings.TrimSpace(input.ShotID) == "" {
+			writeScreenplayError(w, fmt.Errorf("%w: 缺少 shot_id", screenplay.ErrInvalidState))
+			return
+		}
+		generator := screenplayTextGenerator{owner: owner, resolver: resolver}
+		storyboard, translated, err := screenplay.TranslateStoryboardShot(req.Context(), store, owner, projectID, episode, engine, input.ShotID, input.BatchTranslateInput, func(ctx context.Context, text string) (string, error) {
+			response, err := generator.Generate(ctx, screenplay.TextRequest{
+				Model:        input.Model,
+				SystemPrompt: screenplay.BatchTranslateSystemPrompt(input.Direction),
+				UserPrompt:   text,
+				MaxOutputTokens: 4000,
+				SingleAttempt: true,
+			})
+			return response.Content, err
+		})
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		var seq int
+		for _, shot := range storyboard.Shots {
+			if shot.ID == input.ShotID {
+				seq = shot.Seq
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"shot_id": input.ShotID, "seq": seq, "text": translated, "revision": storyboard.Revision})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/check", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		storyboard, err := store.GetStoryboard(req.Context(), owner, projectID, episode, engine)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		report, err := screenplay.CheckStoryboardShots(storyboard.Shots)
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"report": report})
+	})
+	handle("POST /api/comic-screenplays/projects/{id}/storyboards/{engine}/{episode}/check/fill", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, episode, engine, ok := storyboardPath(w, req)
+		if !ok {
+			return
+		}
+		var input struct {
+			Seq   int    `json:"seq"`
+			Model string `json:"model"`
+		}
+		if !decode(w, req, &input) {
+			return
+		}
+		if input.Seq <= 0 {
+			writeScreenplayError(w, fmt.Errorf("%w: 缺少要补全的分镜序号", screenplay.ErrInvalidState))
+			return
+		}
+		generator := screenplayTextGenerator{owner: owner, resolver: resolver}
+		storyboard, shot, err := screenplay.FillMissingStoryboardShot(req.Context(), store, owner, projectID, episode, engine, input.Seq, func(ctx context.Context, prompt string) (string, error) {
+			response, err := generator.Generate(ctx, screenplay.TextRequest{
+				Model:           input.Model,
+				SystemPrompt:    screenplay.StoryboardCheckFillSystemPrompt(),
+				UserPrompt:      prompt,
+				MaxOutputTokens: 4000,
+				SingleAttempt:   true,
+			})
+			return response.Content, err
+		})
+		if err != nil {
+			writeScreenplayError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"shot": shot, "revision": storyboard.Revision})
 	})
 	handle("POST /api/comic-screenplays/projects/{id}/batch", func(w http.ResponseWriter, req *http.Request, owner string) {
 		projectID := req.PathValue("id")

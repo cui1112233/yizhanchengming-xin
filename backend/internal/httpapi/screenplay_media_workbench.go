@@ -39,6 +39,8 @@ type ScreenplayMediaWorkbench struct {
 	Production         screenplay.ProductionRepository
 	Executors          *localexecutor.Service
 	Files              *localartifact.Store
+	Video              screenplayVideoService
+	Configs            *UserConfigStore
 }
 type screenplayMediaAction struct {
 	SourceProjectID   string                        `json:"sourceProjectId"`
@@ -364,6 +366,8 @@ func RegisterScreenplayMediaWorkbenchRoutes(mux *http.ServeMux, auth BridgeAuth,
 		w.Header().Set("Content-Length", fmt.Sprint(asset.ByteSize))
 		_, _ = io.Copy(w, body)
 	})
+	registerScreenplayLongVideoRoutes(mux, auth, s)
+	registerScreenplayReshootRoutes(mux, auth, s)
 }
 func (s *ScreenplayMediaWorkbench) validTarget(ctx context.Context, p screenplay.Project, target string) error {
 	if target == "" || target == "narrator" {

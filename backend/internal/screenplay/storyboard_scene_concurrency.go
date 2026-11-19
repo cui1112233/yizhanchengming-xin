@@ -37,7 +37,7 @@ func (s *StoryboardService) sceneConcurrency() int {
 	return n
 }
 
-func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, planning, model, aspectRatio string) ([]StoryboardShot, error) {
+func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, extra, planning, model, aspectRatio string) ([]StoryboardShot, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	type sceneResult struct {
@@ -70,7 +70,7 @@ func (s *StoryboardService) generateConcurrentScenes(ctx context.Context, req St
 				}
 				local := req
 				local.sceneOnlyIndex = &index
-				shots, err := s.generateSceneShots(ctx, local, episode, units, selected, roles, scenes, props, style, synopsis, prefix, planning, model, false, aspectRatio)
+				shots, err := s.generateSceneShots(ctx, local, episode, units, selected, roles, scenes, props, style, synopsis, prefix, extra, planning, model, false, aspectRatio)
 				<-storyboardSceneSlots
 				results[index] = sceneResult{shots, err}
 				// An uncertain request must be reconciled before scheduling more paid work.

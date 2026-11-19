@@ -105,6 +105,18 @@ export async function restoreComicScreenplayDocument(projectId, documentId, requ
   return response?.document;
 }
 
+// 版本择优：读取单个版本的完整正文用于横排对照（列表接口不返回正文）。
+export async function getComicScreenplayDocument(projectId, documentId, request = apiRequest) {
+  const response = await request(documentPath(projectId, documentId, ''));
+  return response?.document;
+}
+
+// 版本择优：删除一个历史版本（含其场次/人物/场景）；当前活动版本由后端拒绝。
+export async function deleteComicScreenplayDocument(projectId, documentId, request = apiRequest) {
+  await request(documentPath(projectId, documentId, ''), { method: 'DELETE', suppressGlobalError: true });
+  return true;
+}
+
 export async function loadComicScreenplayWorkspace(projectId, request = apiRequest) {
   return request(projectPath(projectId, '/workspace'));
 }
@@ -137,6 +149,14 @@ export async function parseComicScreenplaySource(projectId, file, request = apiR
   body.append('file', file, file.name || 'source.txt');
   const response = await request(projectPath(projectId, '/source/parse'), { method: 'POST', body, timeoutMs: 0 });
   return String(response?.content || '');
+}
+
+// 故事摘要 Agent（洛水 synopsis）：分析原文生成标题/摘要/受众/题材/标签，写回项目。
+export async function generateComicSynopsis(projectId, input = {}, request = apiRequest) {
+  return request(projectPath(projectId, '/synopsis/generate'), {
+    method: 'POST', timeoutMs: 300000, suppressGlobalError: true,
+    body: JSON.stringify({ model: String(input?.model || '') }),
+  });
 }
 
 export async function generateComicScreenplay(projectId, input, request = apiRequest) {

@@ -3,3 +3,165 @@
 .comic-e2-prep-modal{top:24px;padding-bottom:24px}.comic-e2-prep-modal .ant-modal-content{border-radius:16px;padding:18px 18px 16px;display:flex;flex-direction:column;max-height:calc(100dvh - 48px);overflow:hidden}.comic-e2-prep-modal .ant-modal-header,.comic-e2-prep-modal .ant-modal-footer{flex-shrink:0}.comic-e2-prep-modal .ant-modal-body{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}.comic-e2-prep-modal .ant-modal-footer{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px}.comic-e2-prep-modal .ant-modal-footer .ant-btn{margin-inline-start:0!important}.comic-e2-prep-modal .ant-modal-title{font-size:16px;font-weight:700}.comic-e2-prep-lead{margin:0;font-size:13px;color:var(--text-secondary)}.comic-e2-agent-hint{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:var(--surface-input);font-size:12px;line-height:1.6;color:var(--text-secondary)}.comic-e2-agent-hint b{font-weight:600;color:var(--text-primary)}.comic-e2-prep-task{display:grid;grid-template-columns:1fr 1fr;gap:8px}.comic-e2-prep-task>button,.comic-e2-plan-modes>button{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--border-default);background:var(--surface-input);color:var(--text-primary);border-radius:10px;padding:10px 12px;cursor:pointer}.comic-e2-prep-task strong,.comic-e2-plan-modes strong{font-size:13px;line-height:1.4}.comic-e2-prep-task button>span,.comic-e2-plan-modes button>span{font-size:12px;line-height:1.45;color:var(--text-secondary)}.comic-e2-prep-task button.is-active,.comic-e2-plan-modes button.is-active{border-color:var(--text-primary);background:var(--surface-elevated)}.comic-e2-plan-modes{display:flex;flex-direction:column;gap:8px}.comic-e2-plan-modes>b{font-size:12px;font-weight:600;color:var(--text-secondary)}.comic-e2-target{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--text-secondary)}.comic-e2-prep-note{margin:0;font-size:12px;line-height:1.6;color:var(--text-secondary)}.comic-e2-plan-view{white-space:pre-wrap;max-height:60dvh;overflow:auto;font-size:14px;line-height:1.8;margin-top:14px}
 
 .comic-e1-recent>button.is-active{background:#6366f11a;border-color:#818cf866;color:var(--text-primary)}.comic-e2-prep-modal .ant-modal-close{top:18px;right:18px;width:28px;height:28px;border-radius:8px;font-size:20px;line-height:1}
+.comic-e2-prep-config{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;padding:10px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-panel)}.comic-e2-prep-config-item{flex:1 1 150px;min-width:0;display:flex;flex-direction:column;gap:1px;padding:2px 4px}.comic-e2-prep-config-item>span{font-size:11px;color:var(--text-secondary);line-height:1.3}.comic-e2-prep-config-item>b{font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.comic-e2-prep-config-item>small{font-size:10px;color:var(--text-secondary);opacity:.75;line-height:1.3}.comic-e2-prep-config-switch{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;padding:4px 8px;border-radius:8px;font-size:12px;color:var(--text-secondary);white-space:nowrap;cursor:pointer}.comic-e2-prep-config-switch:hover{background:var(--surface-input)}.comic-e2-prep-config-switch>span{color:var(--text-primary)}.comic-sb-toolbar-context{display:inline-flex;align-items:center;gap:6px;padding:0 6px;font-size:12px;color:var(--text-secondary);white-space:nowrap}.comic-sb-toolbar-context>span{color:var(--text-primary)}.comic-sb-toolbar-model{display:inline-flex;align-items:center;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 6px;font-size:12px;color:var(--text-primary)}
+.comic-e2-prep-plan-section{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-input)}.comic-e2-prep-plan-section>div{display:flex;flex-direction:column;gap:3px;min-width:0}.comic-e2-prep-plan-section b{font-size:13px;color:var(--text-primary)}.comic-e2-prep-plan-section small{font-size:11px;line-height:1.5;color:var(--text-secondary)}.comic-e2-prep-plan-section .ant-switch{margin-top:2px;flex:0 0 auto}
+.comic-e2-prep-extra-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.comic-e2-prep-extra-fields>label{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:12px;font-weight:600;color:var(--text-secondary)}.comic-e2-prep-extra-fields textarea{font-size:12px;line-height:1.5;resize:vertical}.comic-e2-prep-extra-fields small{font-size:10px;line-height:1.4;color:var(--text-secondary);font-weight:400}
+@media(max-width:640px){.comic-e2-prep-extra-fields{grid-template-columns:1fr}}
+
+/* 分镜合并：按推荐时长把相邻分镜打包成组（洛水 2026-10-29 版能力） */
+.comic-sb-merge-controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.comic-sb-merge-controls>label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.comic-sb-merge-controls>label>span{font-size:12px;color:var(--text-secondary)}
+.comic-sb-merge-preview{display:flex;flex-direction:column;gap:10px}
+.comic-sb-merge-loading{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);padding:10px 0}
+.comic-sb-merge-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.comic-sb-merge-stats>div{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-panel)}
+.comic-sb-merge-stats span{font-size:11px;color:var(--text-secondary)}
+.comic-sb-merge-stats b{font-size:16px;color:var(--text-primary);line-height:1.2}
+.comic-sb-merge-groups{list-style:none;margin:0;padding:0;max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.comic-sb-merge-groups li{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;background:var(--surface-input);font-size:12px}
+.comic-sb-merge-groups li>span{color:var(--text-secondary);flex:0 0 auto}
+.comic-sb-merge-groups li>b{color:var(--text-primary);font-weight:600;flex:1 1 auto}
+.comic-sb-merge-groups li>em{font-style:normal;color:var(--text-secondary);flex:0 0 auto}
+.comic-sb-merge-more{margin:0;font-size:12px;color:var(--text-secondary)}
+.comic-sb-merge-hint{margin:14px 0 0;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+@media (max-width:640px){.comic-sb-merge-controls{grid-template-columns:1fr}.comic-sb-merge-stats{grid-template-columns:repeat(2,1fr)}}
+
+/* 超长视频：按推荐时长分组，逐组生成后合成成片（洛水 2026-10-29 版能力） */
+.comic-lv-controls{display:grid;grid-template-columns:180px 160px 1fr auto;gap:12px;align-items:end;margin-bottom:14px}
+.comic-lv-controls>label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.comic-lv-controls>label>span{font-size:12px;color:var(--text-secondary)}
+.comic-lv-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.comic-lv-summary>div{display:flex;flex-direction:column;gap:2px;padding:6px 10px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-panel);min-width:0}
+.comic-lv-summary span{font-size:11px;color:var(--text-secondary)}
+.comic-lv-summary b{font-size:13px;color:var(--text-primary);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comic-lv-actions{display:flex;align-items:flex-end}
+.comic-lv-loading{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);padding:10px 0}
+.comic-lv-body{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:16px;margin-top:12px;min-height:420px}
+.comic-lv-side{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border-default);padding-right:12px}
+.comic-lv-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;overflow:auto;max-height:440px}
+.comic-lv-row{width:100%;display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:left;padding:8px 10px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-panel);cursor:pointer}
+.comic-lv-row:hover{border-color:var(--border-strong,var(--border-default))}
+.comic-lv-row.is-active{border-color:var(--accent-primary,#7c3aed);background:var(--surface-selected,rgba(124,58,237,.08))}
+.comic-lv-row-title{font-size:13px;font-weight:600;color:var(--text-primary)}
+.comic-lv-row-sub{font-size:11px;color:var(--text-secondary);grid-column:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comic-lv-row-state{grid-row:1;grid-column:2}
+.comic-lv-row-error{grid-column:1/-1;font-size:11px;color:var(--danger-text,#d4380d);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comic-lv-row .ant-progress{grid-column:1/-1;margin:4px 0 0}
+.comic-lv-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.comic-lv-main-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.comic-lv-main-head h3{margin:0;font-size:15px;color:var(--text-primary)}
+.comic-lv-main-head p{margin:2px 0 0;font-size:12px;color:var(--text-secondary)}
+.comic-lv-main-actions{flex:0 0 auto}
+.comic-lv-video{background:var(--surface-input,#000);border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center}
+.comic-lv-video video{width:100%;height:100%;object-fit:contain;background:#000}
+.comic-lv-video-empty{font-size:12px;color:var(--text-secondary);padding:24px;text-align:center}
+.comic-lv-prompt{display:flex;flex-direction:column;gap:6px}
+.comic-lv-prompt>span{font-size:12px;color:var(--text-secondary)}
+.comic-lv-merged{margin:0;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+.comic-lv-merged p{margin:0}
+.comic-lv-final{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.comic-lv-final h4{margin:0;font-size:13px;color:var(--text-primary)}
+.comic-lv-final video{width:100%;max-height:320px;border-radius:10px;background:#000}
+.comic-lv-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.comic-lv-footer>span{font-size:12px;color:var(--text-secondary);text-align:left;flex:1 1 320px}
+.comic-lv-footer>div{display:flex;gap:8px}
+@media (max-width:900px){.comic-lv-controls{grid-template-columns:1fr 1fr}.comic-lv-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.comic-lv-body{grid-template-columns:1fr}.comic-lv-side{border-right:0;padding-right:0;border-bottom:1px solid var(--border-default);padding-bottom:10px}}
+
+/* 片段重拍：20 帧时间轴框选 + 首尾帧参考 + 拼回原视频 */
+.comic-reshoot-modal .ant-modal-body{padding-top:8px}
+.comic-rs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.comic-rs-title{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text-primary)}
+.comic-rs-title b{font-size:16px}
+.comic-rs-title>span{font-size:12px;color:var(--text-secondary)}
+.comic-rs-pickers{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.comic-rs-pickers>label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-secondary)}
+.comic-rs-pickers>label>.ant-select{min-width:180px}
+.comic-rs-hint{font-size:12px;color:var(--text-secondary);flex:1 1 240px;text-align:right}
+.comic-rs-player{background:#000;border-radius:10px;overflow:hidden;max-height:380px;display:flex;align-items:center;justify-content:center}
+.comic-rs-player video{width:100%;max-height:380px;object-fit:contain;background:#000;cursor:pointer}
+.comic-rs-player-empty{padding:40px;font-size:12px;color:var(--text-secondary)}
+.comic-rs-timeline{position:relative;height:64px;margin-top:10px;border-radius:8px;overflow:hidden;background:var(--surface-input,#111);cursor:crosshair;user-select:none}
+.comic-rs-frames{display:grid;grid-template-columns:repeat(20,1fr);height:100%}
+.comic-rs-frames img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.comic-rs-frames.is-loading,.comic-rs-frames.is-empty{display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary)}
+.comic-rs-shade{position:absolute;top:0;bottom:0;background:rgba(0,0,0,.55);pointer-events:none}
+.comic-rs-range{position:absolute;top:0;bottom:0;border-top:2px solid #7c3aed;border-bottom:2px solid #7c3aed;box-shadow:inset 0 0 0 1px rgba(124,58,237,.6);pointer-events:none}
+.comic-rs-handle{position:absolute;top:0;bottom:0;width:14px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;z-index:3}
+.comic-rs-handle>i{width:6px;height:26px;border-radius:3px;background:#7c3aed;box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+.comic-rs-playhead{position:absolute;top:0;bottom:0;width:2px;background:#ff4d4f;pointer-events:none;z-index:2}
+.comic-rs-meta{display:flex;align-items:center;gap:12px;margin-top:8px;font-size:12px;color:var(--text-secondary)}
+.comic-rs-meta .ant-input-number{width:110px}
+.comic-rs-flex{flex:1}
+.comic-rs-help{font-size:12px;color:var(--text-secondary)}
+.comic-rs-mode{display:flex;align-items:center;gap:8px;margin:8px 0}
+.comic-rs-result{padding:8px 0}
+.comic-rs-result-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--text-primary)}
+.comic-rs-result p{font-size:12px;color:var(--text-secondary);margin:6px 0}
+.comic-rs-applied{margin-top:10px}
+.comic-rs-applied video{width:100%;max-height:320px;border-radius:10px;background:#000}
+.comic-rs-footer{display:flex;align-items:center;gap:8px;margin-top:12px}
+
+/* 换装：分镜范围 + 场景筛选 + 原人物 → 目标人物，命中预览后批量替换 */
+.comic-sb-costume-modal .ant-modal-body{padding-top:8px}
+.comic-sb-costume-desc{margin:0 0 12px;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+.comic-sb-costume-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.comic-sb-costume-controls>label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-costume-controls>label>.ant-select{width:100%}
+.comic-sb-costume-range{display:flex;align-items:center;gap:6px}
+.comic-sb-costume-range .ant-input-number{width:88px}
+.comic-sb-costume-range>em{font-style:normal;font-size:12px;color:var(--text-secondary)}
+.comic-sb-costume-total{margin-left:auto;white-space:nowrap}
+.comic-sb-costume-preview{margin-top:12px}
+.comic-sb-costume-loading{display:flex;align-items:center;gap:8px;padding:10px 0;font-size:12px;color:var(--text-secondary)}
+.comic-sb-costume-stats{display:flex;gap:18px;padding:8px 10px;border-radius:8px;background:var(--surface-subtle,rgba(0,0,0,.03))}
+.comic-sb-costume-stats>div{display:flex;align-items:baseline;gap:6px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-costume-stats b{font-size:15px;color:var(--text-primary)}
+.comic-sb-costume-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.comic-sb-costume-list li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);padding:4px 8px;border-radius:6px;background:var(--surface-subtle,rgba(0,0,0,.02))}
+.comic-sb-costume-list li>span{min-width:120px;color:var(--text-primary)}
+.comic-sb-costume-list li>b{font-weight:500;color:var(--text-primary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comic-sb-costume-list li>em{font-style:normal;color:#7c3aed}
+.comic-sb-costume-more{margin:6px 0 0;font-size:12px;color:var(--text-secondary)}
+.comic-sb-costume-progress{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-costume-hint{margin:10px 0 0;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+
+/* 批量翻译：类型 + 翻译方向 + 范围（全部/未完成/自定义），逐条翻译后写回原字段 */
+.comic-sb-translate-modal .ant-modal-body{padding-top:8px}
+.comic-sb-translate-desc{margin:0 0 12px;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+.comic-sb-translate-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.comic-sb-translate-controls>label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-translate-controls>label>.ant-select{width:100%}
+.comic-sb-translate-range{display:flex;align-items:center;gap:6px}
+.comic-sb-translate-range .ant-input-number{width:88px}
+.comic-sb-translate-range>em{font-style:normal;font-size:12px;color:var(--text-secondary)}
+.comic-sb-translate-total{margin-left:auto;white-space:nowrap}
+.comic-sb-translate-progress{margin-top:12px}
+.comic-sb-translate-loading{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-translate-summary{font-size:12px}
+.comic-sb-translate-failures{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.comic-sb-translate-failures li{font-size:12px;color:#d46b08;padding:4px 8px;border-radius:6px;background:rgba(212,107,8,.08)}
+.comic-sb-translate-hint{margin:10px 0 0;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+
+/* 分镜检查：序号缺失/重复/异常报告 + AI 补齐缺失分镜（洛水 storyboard_check） */
+.comic-sb-check-modal .ant-modal-body{padding-top:8px}
+.comic-sb-check-desc{margin:0 0 12px;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+.comic-sb-check-controls{display:grid;grid-template-columns:1fr;gap:10px 12px;margin-bottom:10px}
+.comic-sb-check-controls>label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-check-controls>label>.ant-select{width:100%}
+.comic-sb-check-report{margin-top:12px}
+.comic-sb-check-stats{display:flex;gap:18px;padding:8px 10px;border-radius:8px;background:var(--surface-subtle,rgba(0,0,0,.03));margin-bottom:10px}
+.comic-sb-check-stats>div{display:flex;align-items:baseline;gap:6px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-check-stats b{font-size:15px;color:var(--text-primary)}
+.comic-sb-check-section{margin-top:10px;padding:8px 10px;border-radius:8px;font-size:12px;display:flex;flex-direction:column;gap:4px}
+.comic-sb-check-section.is-missing{background:rgba(212,107,8,.08);color:#d46b08}
+.comic-sb-check-section.is-warn{background:rgba(212,107,8,.08);color:#d46b08}
+.comic-sb-check-section>div:first-child{display:flex;align-items:baseline;gap:8px}
+.comic-sb-check-section>div:first-child>span{font-size:11px;color:var(--text-secondary)}
+.comic-sb-check-section .comic-sb-check-notice{font-size:12px}
+.comic-sb-check-section .ant-btn{align-self:flex-start;margin-top:4px}
+.comic-sb-check-progress{margin-top:12px}
+.comic-sb-check-loading{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)}
+.comic-sb-check-failures{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.comic-sb-check-failures li{font-size:12px;color:#d46b08;padding:4px 8px;border-radius:6px;background:rgba(212,107,8,.08)}
+.comic-sb-check-hint{margin:10px 0 0;font-size:12px;line-height:1.7;color:var(--text-secondary)}

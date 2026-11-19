@@ -44,6 +44,10 @@ type StoryboardRequest struct {
 	Synopsis  string         `json:"synopsis"`
 	Model     string         `json:"model"`
 	Confirmed bool           `json:"confirmed"`
+	// Prefix 非空指针表示客户端明确指定了本次分镜前缀；nil 时才使用账号已选前缀。
+	// ExtraContent 对应原版弹窗「额外内容」，只追加到本次分镜提示词末尾。
+	Prefix       *string `json:"prefix,omitempty"`
+	ExtraContent string  `json:"extraContent,omitempty"`
 }
 
 type StoryboardResult struct {
@@ -142,15 +146,20 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 		return StoryboardResult{}, err
 	}
 	prefix := ""
-	if ps, ok := s.Store.(StoryboardPreferencesStore); ok {
+	if req.Prefix != nil {
+		prefix = strings.TrimSpace(*req.Prefix)
+	} else if ps, ok := s.Store.(StoryboardPreferencesStore); ok {
 		preferences, e := ps.LoadStoryboardPreferences(ctx, req.Owner)
 		if e != nil {
 			return StoryboardResult{}, e
 		}
 		prefix = preferences.SelectedPrefix()
-		if len([]rune(prefix)) > 5000 {
-			return StoryboardResult{}, fmt.Errorf("%w: 分镜前缀超过5000字", ErrInvalidArgument)
-		}
+	}
+	if len([]rune(prefix)) > 5000 {
+		return StoryboardResult{}, fmt.Errorf("%w: 分镜前缀超过5000字", ErrInvalidArgument)
+	}
+	if len([]rune(req.ExtraContent)) > 5000 {
+		return StoryboardResult{}, fmt.Errorf("%w: 额外内容超过5000字", ErrInvalidArgument)
 	}
 	episodes, err := s.resolveEpisodes(ctx, req)
 	if err != nil {
@@ -225,6 +234,11 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 		external = generationExternalHistory(currentBoards, numbers)
 	}
 	base := map[string]any{"owner": req.Owner, "project": req.ProjectID, "engine": engine, "model": firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), "prompt_id": selected.ID, "prompt_digest": contentDigest(selected.Body), "config": EffectiveCreativeConfig(project), "prefix": prefix, "episodes": episodes, "planning": planningByEpisode, "style": style, "synopsis": synopsis, "chapter_id": req.ChapterID, "planning_chapter_id": req.PlanningChapterID, "use_original": req.UseOriginalContentDirectly, "use_planning": req.UsePlanning, "external_history": external, "scene_contract": "chapter-scenes-v1"}
+	// Only include a non-empty override in the digest so existing in-flight
+	// attempts made without this field keep their original fingerprint.
+	if strings.TrimSpace(req.ExtraContent) != "" {
+		base["extra_content"] = req.ExtraContent
+	}
 	if selected.SourceID > 0 {
 		base["scene_contract"] = "zip-chapter-scene-message-v1"
 	}
@@ -269,7 +283,7 @@ func (s *StoryboardService) Generate(ctx context.Context, req StoryboardRequest)
 			result.Warnings = append(result.Warnings, fmt.Sprintf("第 %d 集内容为空，已跳过", episode.No))
 			continue
 		}
-		shots, sceneErr := s.generateSceneShots(ctx, req, episode, sceneInputs[episode.No], selected, roles, scenes, props, style, synopsis, prefix, planningByEpisode[episode.No], firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), EffectiveCreativeConfig(project).StoryboardUseContextHistory, EffectiveCreativeConfig(project).AspectRatio)
+		shots, sceneErr := s.generateSceneShots(ctx, req, episode, sceneInputs[episode.No], selected, roles, scenes, props, style, synopsis, prefix, req.ExtraContent, planningByEpisode[episode.No], firstNonEmpty(req.Model, project.ModelID, "gpt-4o-mini"), EffectiveCreativeConfig(project).StoryboardUseContextHistory, EffectiveCreativeConfig(project).AspectRatio)
 		if sceneErr != nil {
 			if ctx.Err() != nil {
 				return result, wrapAIError(ctx.Err())
@@ -622,7 +636,7 @@ func parseStoryboardJSON(raw string) ([]StoryboardShot, error) {
 		if seq <= 0 {
 			seq = index + 1
 		}
-		shots = append(shots, StoryboardShot{
+		shot := StoryboardShot{
 			Seq:            seq,
 			SceneID:        int(anyNumber(group["scene_id"])),
 			Duration:       anyNumber(group["duration_sec"]),
@@ -636,7 +650,13 @@ func parseStoryboardJSON(raw string) ([]StoryboardShot, error) {
 			Line:           anyString(group["line"]),
 			SourceElements: sourceElements,
 			ProtocolFields: protocolFields,
-		})
+		}
+		// 洛水原生分镜词带 _scene_local_order（场次内的局部顺序）。原值已保存在
+		// ProtocolFields，这里补映射让专用字段可读；缺省时保持 0，不影响其他协议。
+		if _, ok := group["_scene_local_order"]; ok {
+			shot.SourceSceneLocalOrder = int(anyNumber(group["_scene_local_order"]))
+		}
+		shots = append(shots, shot)
 	}
 	if len(shots) == 0 {
 		return nil, ErrAIInvalidStoryboard

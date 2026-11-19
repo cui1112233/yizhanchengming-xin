@@ -3,7 +3,7 @@ import OriginalIcon from './ComicScreenplayIcon.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { comicEpisodesDocument, comicScriptEpisodes, reorderComicEpisodes } from './comic-screenplay-stages.js';
 
-export default function ComicScreenplayStoryStage({ project, synopsisResult, document, draft, onDraft, onSave, onTools, readOnly, working }) {
+export default function ComicScreenplayStoryStage({ project, synopsisResult, document, draft, onDraft, onSave, onTools, readOnly, working, onGenerateSynopsis, synopsisBusy, sourceReady }) {
   const episodes = useMemo(() => comicScriptEpisodes(draft), [draft]);
   const [collapsed, setCollapsed] = useState({}), [edit, setEdit] = useState(null), [dragFrom, setDragFrom] = useState(-1);
   useEffect(() => { setEdit(null); setCollapsed({}); }, [document?.id]);
@@ -23,7 +23,7 @@ export default function ComicScreenplayStoryStage({ project, synopsisResult, doc
   return <div className="comic-story-stage">
     <div className="comic-stage-title-row"><h1>{result?.title || project.title || '未命名项目'}</h1></div>
     {result&&(result.audience||result.genre||result.tags?.length)?<div className="comic-story-tags">{result.audience?<span className={result.audience==='女频'?'is-female':'is-male'}>{result.audience}</span>:null}{result.genre?<span>{result.genre}</span>:null}{Array.isArray(result.tags)?result.tags.map((tag,index)=><span key={index}>{tag}</span>):null}</div>:null}
-    {synopsis?<section className="comic-story-summary"><h2><OriginalIcon name="BookOutline" size={18}/>故事摘要</h2><p className="comic-story-synopsis">{synopsis}</p></section>:null}
+    <section className="comic-story-summary"><h2><OriginalIcon name="BookOutline" size={18}/>故事概要<Button size="small" type="link" className="comic-synopsis-generate" icon={<OriginalIcon name="SparklesOutline" size={13}/>} loading={!!synopsisBusy} disabled={readOnly || !!working || !!synopsisBusy || !sourceReady || typeof onGenerateSynopsis!=='function'} title={sourceReady?'分析原文自动生成标题、摘要、受众与题材标签':'请先上传或输入原文'} onClick={()=>void onGenerateSynopsis?.()}>AI 生成</Button></h2>{synopsis?<p className="comic-story-synopsis">{synopsis}</p>:<p className="comic-story-synopsis is-empty">尚未生成故事概要{sourceReady?'，点击右上角「AI 生成」分析原文。':'，请先上传或输入原文。'}</p>}</section>
     <div className="comic-story-count">共 {episodes.length} 集</div>
     {!document?.content ? <Alert type="info" showIcon message="尚未保存剧本" description="原文已保存不等于剧本已生成。可打开原文与剧本工具明确生成剧本，或直接导入已有剧本；切换阶段不会自动调用模型。" /> : null}
     {dirty ? <Alert type="warning" showIcon message="本地修改尚未保存为剧本版本" action={<Button disabled={readOnly || !!working} onClick={() => onSave(draft)}>保存剧本修改</Button>} /> : null}

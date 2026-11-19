@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, extractComicAssets, generateComicStoryboard, generateComicScreenplay, listComicScreenplayPrompts, mergeComicStoryboardShot, moveComicScreenplayShot, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from './comicScreenplay.js';
+import { cancelComicScreenplayBatch, createComicScreenplay, createComicScreenplayAsset, createComicScreenplayShot, createComicStoryboardShot, deleteComicScreenplayAsset, deleteComicScreenplayShot, deleteComicStoryboardShot, exportComicScreenplay, extractComicAssets, generateComicStoryboard, generateComicScreenplay, generateComicSynopsis, listComicScreenplayPrompts, mergeComicStoryboardShot, moveComicScreenplayShot, restoreComicScreenplayDocument, runComicScreenplayBatchNext, saveComicScreenplayDocument, saveComicScreenplaySource, splitComicStoryboardShot, startComicScreenplayBatch, updateComicScreenplay, updateComicScreenplayAsset, updateComicScreenplayShot, updateComicStoryboardShot } from './comicScreenplay.js';
+
+test('故事摘要生成调用项目专属接口', async () => {
+  let captured;
+  await generateComicSynopsis('comic-1', { model: 'text-main' }, async (path, options) => { captured = { path, body: JSON.parse(options.body), method: options.method }; return { synopsis_result: { title: '雨夜' } }; });
+  assert.equal(captured.path, '/api/comic-screenplays/projects/comic-1/synopsis/generate');
+  assert.equal(captured.method, 'POST');
+  assert.equal(captured.body.model, 'text-main');
+});
 
 test('项目设置和原文都调用已有项目接口', async () => {
   const calls = [];

@@ -125,6 +125,29 @@ func (m *MemoryStore) ListDocuments(_ context.Context, owner, projectID string) 
 	return out, nil
 }
 
+func (m *MemoryStore) DeleteDocument(_ context.Context, owner, projectID, documentID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := projectKey(owner, projectID)
+	stored := m.documents[key]
+	index := -1
+	for i := range stored {
+		if stored[i].ID == documentID {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return fmt.Errorf("%w: 剧本版本 %s", ErrNotFound, documentID)
+	}
+	m.documents[key] = append(stored[:index:index], stored[index+1:]...)
+	docKey := documentKey(owner, projectID, documentID)
+	delete(m.shots, docKey)
+	delete(m.characters, docKey)
+	delete(m.scenes, docKey)
+	return nil
+}
+
 func (m *MemoryStore) ListShots(_ context.Context, owner, projectID, documentID string) ([]Shot, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

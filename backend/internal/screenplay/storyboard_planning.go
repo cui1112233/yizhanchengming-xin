@@ -37,6 +37,9 @@ func NormalizePlanDensity(value any) string {
 }
 
 type StoryboardPlanRequest struct {
+	Continue         bool   `json:"continue,omitempty"`
+	IsContinue       bool   `json:"is_continue,omitempty"`
+	ExistingPlan     string `json:"existing_plan,omitempty"`
 	AutoContinue     *bool  `json:"auto_continue,omitempty"`
 	MaxRounds        *int   `json:"max_rounds,omitempty"`
 	IdempotencyKey   string `json:"idempotencyKey"`
@@ -103,7 +106,26 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		}
 		system, user := prompt.ScreenplayNativePlanningRequest(p.Title, firstNonEmpty(chapter.Title, fmt.Sprintf("第%d集", index+1)), selected.Name, selected.Body, density, previous, content)
 		limit := storyboardPlanningRoundLimit(in)
+		continuing := in.Continue || in.IsContinue
+		seed, seedDigest, seedSource := "", "", ""
+		if continuing {
+			limit = 1
+			seed = in.ExistingPlan
+			seedSource = "explicit"
+			if seed == "" {
+				seed = chapter.PlanningText
+				seedSource = "saved"
+			}
+			seed = strings.TrimSpace(seed)
+			seedDigest = contentDigest(seed)
+			if seedSource == "saved" && chapter.PlanningRequestKey == in.IdempotencyKey && chapter.PlanningContinuationSeedSHA256 != "" {
+				seedDigest = chapter.PlanningContinuationSeedSHA256
+			}
+		}
 		digest := contentDigest(fmt.Sprintf("%s\n%s\n%s\n%s\n%t\n%s\n%s\n%d", model, selected.ID, contentDigest(selected.Body), configDigest, in.UseOriginal, contentDigest(system), contentDigest(user), limit))
+		if continuing {
+			digest = contentDigest(digest + "\ncontinue\n" + seedSource + "\n" + seedDigest)
+		}
 		if chapter.PlanningRequestKey == in.IdempotencyKey {
 			if chapter.PlanningRequestDigest != digest {
 				return fmt.Errorf("%w: 同一规划请求标识的输入已变化，请核对已有结果", ErrInvalidArgument)
@@ -122,6 +144,7 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		}
 		chapter.PlanningRequestKey = in.IdempotencyKey
 		chapter.PlanningRequestDigest = digest
+		chapter.PlanningContinuationSeedSHA256 = seedDigest
 		chapter.PlanningStatus = "running"
 		chapter.PlanningModel = model
 		state.Chapters[index] = chapter
@@ -131,26 +154,37 @@ func (s *AuthoringService) GenerateStoryboardPlan(ctx context.Context, owner, pr
 		}
 		state = reserved
 		observe, finish := s.planningProgressObserver(owner, project, chapter.ID, in.IdempotencyKey, index)
-		run, runErr := generateStoryboardPlanRounds(ctx, generator, model, system, user, density, limit, observe)
+		var run storyboardPlanRun
+		var runErr error
+		if continuing {
+			run, runErr = generateStoryboardPlanContinuation(ctx, generator, model, system, user, density, seed, observe)
+		} else {
+			run, runErr = generateStoryboardPlanRounds(ctx, generator, model, system, user, density, limit, observe)
+		}
 		if ctx.Err() != nil {
 			runErr = ctx.Err()
 		}
 		text := run.Text
-		if runErr == nil && (text == "" || len([]rune(text)) > 100000) {
+		if runErr == nil && (text == "" || !continuing && len([]rune(text)) > 100000) {
 			runErr = fmt.Errorf("%w: 规划正文为空或过长", ErrArtifactInvalid)
 		}
 		if runErr == nil {
-			chapter.PlanningText = text
+			// An empty continuation response does not replace the saved file with
+			// an explicitly supplied (possibly unsaved) seed.
+			if !continuing || run.Appended {
+				chapter.PlanningText = text
+				chapter.PlanningRounds = run.Rounds
+				chapter.PlanningContinuationError = run.ContinuationError
+				chapter.PlanningPromptID = selected.ID
+				chapter.PlanningPromptDigest = contentDigest(selected.Body)
+				chapter.PlanningConfigDigest = configDigest
+				chapter.PlanDensity = density
+				chapter.PlanningSourceSHA256 = contentDigest(content)
+				chapter.PlanningUseOriginal = in.UseOriginal
+			}
 			chapter.PlanningRounds = run.Rounds
-			chapter.PlanningContinuationError = run.ContinuationError
-			chapter.PlanningPromptID = selected.ID
-			chapter.PlanningPromptDigest = contentDigest(selected.Body)
-			chapter.PlanningConfigDigest = configDigest
-			chapter.PlanDensity = density
-			chapter.PlanningSourceSHA256 = contentDigest(content)
-			chapter.PlanningUseOriginal = in.UseOriginal
 			chapter.PlanningStatus = "succeeded"
-			coverage := EvaluateStoryboardPlan(text, density)
+			coverage := EvaluateStoryboardPlan(chapter.PlanningText, density)
 			chapter.PlanningCoverage = &coverage
 			if !coverage.OK {
 				chapter.PlanningStatus = "partial"

@@ -43,6 +43,8 @@ type StoryboardGenerationSummary struct {
 	Error             string                               `json:"error,omitempty"`
 	CanRetry          bool                                 `json:"can_retry"`
 	CancelRequested   bool                                 `json:"cancel_requested"`
+	Prefix            *string                              `json:"prefix,omitempty"`
+	ExtraContent      string                               `json:"extra_content,omitempty"`
 	CreatedAt         time.Time                            `json:"created_at"`
 	UpdatedAt         time.Time                            `json:"updated_at"`
 }
@@ -52,6 +54,8 @@ func (a StoryboardGenerationAttempt) Summary() StoryboardGenerationSummary {
 	out.CanRetry = a.Status == "failed" || a.Status == "partial" || a.Status == "cancelled"
 	out.UsePlanning = a.UsePlanning
 	out.PlanningApplied = a.PlanningApplied
+	out.Prefix = a.Prefix
+	out.ExtraContent = a.ExtraContent
 	for _, n := range a.EpisodeNumbers {
 		ep := a.Episodes[n]
 		if ep == nil {
@@ -257,7 +261,7 @@ func beginStoryboardGeneration(ctx context.Context, store StoryboardGenerationSt
 			}
 		}
 		now := time.Now().UTC()
-		a := &StoryboardGenerationAttempt{RequestKey: req.IdempotencyKey, RetryOf: req.RetryOf, InputDigest: digest, Engine: engine, Status: "running", ChapterID: req.ChapterID, PlanningChapterID: req.PlanningChapterID, UseOriginal: req.UseOriginalContentDirectly, EpisodeNumbers: numbers, Episodes: map[int]*StoryboardGenerationEpisode{}, CreatedAt: now, UpdatedAt: now, Roles: roles, Scenes: scenes, Props: props, ExternalHistory: external}
+		a := &StoryboardGenerationAttempt{RequestKey: req.IdempotencyKey, RetryOf: req.RetryOf, InputDigest: digest, Engine: engine, Status: "running", ChapterID: req.ChapterID, PlanningChapterID: req.PlanningChapterID, UseOriginal: req.UseOriginalContentDirectly, EpisodeNumbers: numbers, Episodes: map[int]*StoryboardGenerationEpisode{}, CreatedAt: now, UpdatedAt: now, Roles: roles, Scenes: scenes, Props: props, ExternalHistory: external, Prefix: req.Prefix, ExtraContent: req.ExtraContent}
 		a.UsePlanning = req.UsePlanning
 		a.PromptID, _ = base["prompt_id"].(string)
 		a.PromptDigest, _ = base["prompt_digest"].(string)

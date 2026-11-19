@@ -52,6 +52,8 @@ type StoryboardGenerationAttempt struct {
 	Scenes            string                               `json:"scenes"`
 	Props             string                               `json:"props"`
 	ExternalHistory   map[int][]Storyboard                 `json:"external_history"`
+	Prefix            *string                              `json:"prefix,omitempty"`
+	ExtraContent      string                               `json:"extra_content,omitempty"`
 }
 type StoryboardGenerationState struct {
 	Revision int64                                   `json:"revision"`

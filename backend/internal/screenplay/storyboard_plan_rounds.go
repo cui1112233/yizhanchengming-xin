@@ -28,6 +28,7 @@ type storyboardPlanRun struct {
 	Text              string
 	Rounds            int
 	ContinuationError string
+	Appended          bool
 }
 
 func generateStoryboardPlanRounds(ctx context.Context, generator TextGenerator, model, system, user, density string, limit int, observers ...func(PlanningProgress)) (storyboardPlanRun, error) {

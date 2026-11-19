@@ -78,9 +78,9 @@ func splitStoryboardScenes(content string) ([]storyboardSceneInput, error) {
 	return scenes, nil
 }
 
-func (s *StoryboardService) generateSceneShots(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, planning, model string, useHistory bool, aspectRatio string) ([]StoryboardShot, error) {
+func (s *StoryboardService) generateSceneShots(ctx context.Context, req StoryboardRequest, episode episodeInput, units []storyboardSceneInput, selected prompt.CreativePromptSnapshot, roles, scenes, props, style, synopsis, prefix, extra, planning, model string, useHistory bool, aspectRatio string) ([]StoryboardShot, error) {
 	if req.sceneOnlyIndex == nil && selected.SourceID > 0 && !useHistory && len(units) > 1 && s.SceneConcurrency != 1 {
-		return s.generateConcurrentScenes(ctx, req, episode, units, selected, roles, scenes, props, style, synopsis, prefix, planning, model, aspectRatio)
+		return s.generateConcurrentScenes(ctx, req, episode, units, selected, roles, scenes, props, style, synopsis, prefix, extra, planning, model, aspectRatio)
 	}
 	all := []StoryboardShot{}
 	var firstErr error
@@ -116,6 +116,9 @@ func (s *StoryboardService) generateSceneShots(ctx context.Context, req Storyboa
 		}
 		if planning != "" {
 			user += "\n\n【本次分镜规划】\n" + planning
+		}
+		if strings.TrimSpace(extra) != "" {
+			user += "\n\n【额外内容】\n" + strings.TrimSpace(extra)
 		}
 		if useHistory {
 			history := req.generationSession.history(episode.No)

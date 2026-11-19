@@ -159,6 +159,27 @@ FROM screenplay_documents WHERE project_id = ? AND owner_username = ? ORDER BY v
 	return documents, rows.Err()
 }
 
+func (s *MySQLStore) DeleteDocument(ctx context.Context, owner, projectID, documentID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, table := range []string{"screenplay_shots", "screenplay_characters", "screenplay_scenes"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE document_id = ? AND project_id = ? AND owner_username = ?`, documentID, projectID, owner); err != nil {
+			return err
+		}
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM screenplay_documents WHERE id = ? AND project_id = ? AND owner_username = ?`, documentID, projectID, owner)
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return fmt.Errorf("%w: 剧本版本 %s", ErrNotFound, documentID)
+	}
+	return tx.Commit()
+}
+
 func (s *MySQLStore) ListShots(ctx context.Context, owner, projectID, documentID string) ([]Shot, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, document_id, project_id, owner_username, episode_no, sort_order, heading, script_text, character_names, scene_name, prop_names, location_reference
 FROM screenplay_shots WHERE project_id = ? AND owner_username = ? AND document_id = ? ORDER BY episode_no, sort_order`,

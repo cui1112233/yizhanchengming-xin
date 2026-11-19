@@ -34,6 +34,8 @@ type Store interface {
 	ActiveDocument(ctx context.Context, owner, projectID string) (Document, error)
 	GetDocument(ctx context.Context, owner, projectID, documentID string) (Document, error)
 	ListDocuments(ctx context.Context, owner, projectID string) ([]Document, error)
+	// DeleteDocument 删除一个历史剧本版本（含该版本的场次/人物/场景）；当前活动版本由领域层拦截。
+	DeleteDocument(ctx context.Context, owner, projectID, documentID string) error
 	ListShots(ctx context.Context, owner, projectID, documentID string) ([]Shot, error)
 	CreateShot(ctx context.Context, shot Shot) (Shot, error)
 	UpdateShot(ctx context.Context, owner, projectID, shotID string, changes Shot) (Shot, error)

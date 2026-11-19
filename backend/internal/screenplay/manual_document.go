@@ -55,6 +55,23 @@ func RestoreDocument(ctx context.Context, store Store, owner, projectID, documen
 	return cloneDocumentVersion(ctx, store, owner, projectID, source, source.Content, "restore")
 }
 
+// DeleteDocument 删除一个非当前的历史剧本版本，并连带清掉该版本的场次、人物和场景。
+// 当前活动版本不可删除：先选用其他版本再删，避免项目失去正在使用的剧本。
+func DeleteDocument(ctx context.Context, store Store, owner, projectID, documentID string) error {
+	documentID = strings.TrimSpace(documentID)
+	if documentID == "" {
+		return fmt.Errorf("%w: 剧本版本不能为空", ErrInvalidArgument)
+	}
+	source, err := store.GetDocument(ctx, owner, projectID, documentID)
+	if err != nil {
+		return err
+	}
+	if source.Status == "active" {
+		return fmt.Errorf("%w: 当前版本不可删除，请先选用其他版本", ErrInvalidArgument)
+	}
+	return store.DeleteDocument(ctx, owner, projectID, documentID)
+}
+
 func cloneDocumentVersion(ctx context.Context, store Store, owner, projectID string, source Document, content, sourceKind string) (Document, error) {
 	shots, err := store.ListShots(ctx, owner, projectID, source.ID)
 	if err != nil {
