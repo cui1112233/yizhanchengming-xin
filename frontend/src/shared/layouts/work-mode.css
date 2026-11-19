@@ -34,7 +34,7 @@
   transform: rotate(180deg);
 }
 
-/* 折叠态沿用原来的“隐藏 Logo 与标题”，只保留一个可点图标作为模式入口。 */
+/* 展开态隐藏备用图标，品牌行显示 Logo 与标题。 */
 .work-mode-collapsed-icon {
   display: none;
   align-items: center;
@@ -42,13 +42,9 @@
   color: var(--legacy-muted, currentColor);
 }
 
+/* 折叠态整行隐藏工作模式入口，避免收起后残留一个不明层叠图标。 */
 .legacy-sidebar.collapsed .work-mode-trigger {
-  gap: 0;
-  padding: 6px;
-}
-
-.legacy-sidebar.collapsed .work-mode-collapsed-icon {
-  display: inline-flex;
+  display: none;
 }
 
 .legacy-sidebar.collapsed .work-mode-chevron {

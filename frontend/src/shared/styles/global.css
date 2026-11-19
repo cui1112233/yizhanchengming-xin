@@ -775,7 +775,9 @@ html.window-bg-paused .legacy-shell.has-window-background::after,
 html.window-bg-paused .home-shell.has-window-background,
 html.window-bg-paused .home-shell.has-window-background::after { animation-play-state: paused; }
 
-.legacy-shell.has-window-background > .legacy-sidebar,
+/* 侧边栏需高于主内容区（z-index:2），否则收起态的导航悬浮文字
+   （.legacy-nav-tooltip）会被页面内容盖住；主内容区保持 1。 */
+.legacy-shell.has-window-background > .legacy-sidebar { position: relative; z-index: 2; }
 .legacy-shell.has-window-background > .legacy-main,
 .home-shell.has-window-background > .home-page { position: relative; z-index: 1; }
 .legacy-shell.has-window-background .legacy-sidebar { background: color-mix(in srgb, var(--surface-panel) var(--window-bg-panel-veil), transparent); }

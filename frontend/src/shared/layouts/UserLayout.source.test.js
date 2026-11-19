@@ -25,7 +25,7 @@ test('批量工厂工作区沿用水货生产主入口名称', () => {
 });
 
 test('小说获取侧边栏进入带导航的 Go 工作台外壳', () => {
-  assert.match(source, /href: '\/novel-fetch', icon: BookOpen, label: '小说获取', reload: true/);
+  assert.match(source, /href: '\/novel-fetch', icon: BookOpen, label: '批量测书', reload: true/);
   assert.match(source, /<Link key=\{item\.href\} href=\{item\.href\} reload=\{item\.reload\} className=/);
 });
 
@@ -78,5 +78,7 @@ test('logged-in account theme overrides cache and system mode resolves before re
 
 test('窗口背景不能把固定桌宠变成占据网页宽度的 flex 子项', () => {
   assert.doesNotMatch(stylesheet, /\.legacy-shell\.has-window-background\s*>\s*\*\s*\{/);
-  assert.match(stylesheet, /\.legacy-shell\.has-window-background\s*>\s*\.legacy-sidebar,\s*\.legacy-shell\.has-window-background\s*>\s*\.legacy-main,\s*\.home-shell\.has-window-background\s*>\s*\.home-page\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;/);
+  // 侧边栏必须高于主内容区（z-index:2），否则收起态导航悬浮文字会被页面内容盖住。
+  assert.match(stylesheet, /\.legacy-shell\.has-window-background\s*>\s*\.legacy-sidebar\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*2;/);
+  assert.match(stylesheet, /\.legacy-shell\.has-window-background\s*>\s*\.legacy-main,\s*\.home-shell\.has-window-background\s*>\s*\.home-page\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1;/);
 });
