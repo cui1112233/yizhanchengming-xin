@@ -186,6 +186,24 @@ func automationStageBudgetKey(stage string) string {
 	}
 }
 
+// isVideoModerationFailure 识别视频任务被平台内容审核拒绝的错误。视频阶段
+// 会先自动去敏改写一次提示词再重试，因此这类失败不能按普通瞬时错误无限重试。
+func isVideoModerationFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	if !strings.Contains(message, "视频任务失败") {
+		return false
+	}
+	for _, keyword := range []string{"内容不符合", "内容审核", "审核拒绝", "违规", "敏感", "content policy", "moderation"} {
+		if strings.Contains(strings.ToLower(message), keyword) {
+			return true
+		}
+	}
+	return false
+}
+
 // classifyAutomationFailure 把真实错误映射为稳定分类。判定顺序：
 // 人工类 → 致命确定性 → 在途协调 → 瞬时 → 确定性兜底。
 func classifyAutomationFailure(err error, stage string) automationFailureDisposition {
@@ -250,6 +268,14 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 		d.BaseBackoff = 30 * time.Second
 		d.MaxBackoff = 5 * time.Minute
 		return d
+	case isVideoModerationFailure(err):
+		// 视频任务被平台审核拒绝：第一次失败后安排一次重试，重试时由视频阶段
+		// 自动改写提示词（与漫画页一致）；改写后仍被拒则转人工。
+		return automationFailureDisposition{
+			Code: automationCodeContentPolicy, Class: automationFailureTransient,
+			CountsTowardRetryBudget: true, MinAttemptsBeforeRetry: 1,
+			MaxAttempts: 2, BudgetKey: budget,
+		}
 	case errors.Is(err, errShuihuoImageContentPolicy) || strings.Contains(msg, "content policy") ||
 		strings.Contains(msg, "内容审核"):
 		// 硬审核拒绝：每轮改写一次提示词。达到 comicPromptRepairMaxRounds

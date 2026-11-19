@@ -4485,6 +4485,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							persist()
 							continue
 						}
+						if isVideoModerationFailure(waitErr) {
+							appendAutomationBookLog(entry, c.now(), "video", "视频提示词被内容审核拒绝，重试时将自动去敏改写")
+						}
 						fail("video", waitErr, "视频生成失败")
 						continue
 					}

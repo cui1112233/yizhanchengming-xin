@@ -806,7 +806,7 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		return FinalPrompt{}, err
 	}
 	promptForAssetReferences := draft.FinalPrompt
-	if override, ok := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); ok {
+	if override, ok := videoPromptOverrideFor(video, variantIndex); ok {
 		promptForAssetReferences = override
 	}
 	selection, hasSelection := decodeVideoAssetSelection(video.SettingsState.Patch)
@@ -940,7 +940,7 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		// SD cards are already complete prompt bodies. A video-scope edit is
 		// therefore the user's replacement for this exact card, just as it is
 		// for structured director output below.
-		if override, ok := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); ok {
+		if override, ok := videoPromptOverrideFor(video, variantIndex); ok {
 			videoPrompt = stripSharedPromptSections(override)
 			displayPrompt = videoPrompt
 		}
@@ -975,7 +975,7 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		// replacement for this one card.  Stored pre-fix video_desc summaries are
 		// not overrides and must never win over the director's verified timeline.
 		// 用户手动覆盖的非 H3 文本同样剥离共享段，防止绕过开关与程序注入重复。
-		if override, ok := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); ok {
+		if override, ok := videoPromptOverrideFor(video, variantIndex); ok {
 			if !h3Renderer {
 				override = stripSharedPromptSections(override)
 			}

@@ -461,6 +461,12 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 			}
 		}
 	case BookStageVideo:
+		// 被内容审核拒绝的视频先用文本模型去敏改写，再重新编译提交；与漫画页
+		// 一致，每个视频/换开头变体最多自动改写一次，用尽后转人工。
+		if _, repairErr := s.RepairRejectedVideoPrompts(ctx, owner, batchID, bookID, videoID); repairErr != nil {
+			err = repairErr
+			break
+		}
 		effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 		provider := strings.TrimSpace(s.ProviderOverride)
 		if provider == "" {
