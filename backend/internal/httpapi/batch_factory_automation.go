@@ -2457,6 +2457,24 @@ func automationMergeRequestID(jobID, bookID string, retryAttempt, batchRetry int
 	return jobID + "-merge-" + bookID
 }
 
+// automationOpeningVideoRequestID scopes the production request by the opening
+// variants that must be produced. SubmitBookProductionWithOptions is idempotent
+// per request id, so adding a new 换开头 variant under the old id would return
+// the old job and leave the variant without any VIDEO task.
+func automationOpeningVideoRequestID(base string, batch batchfactoryv11.Batch, book batchfactoryv11.Book) string {
+	indices := batchfactoryv11.RequiredOpeningVariantIndices(batch, book)
+	if len(indices) <= 1 {
+		return base
+	}
+	var suffix strings.Builder
+	suffix.WriteString(base)
+	for _, index := range indices {
+		suffix.WriteString("-o")
+		suffix.WriteString(strconv.Itoa(index))
+	}
+	return suffix.String()
+}
+
 func automationCountsWithPending(total, pending int) map[string]any {
 	return map[string]any{"total": total, "ready": 0, "running": 0, "pending": pending, "failed": 0, "blocked": 0}
 }
@@ -3442,8 +3460,11 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	// the plain "-video-<book>" id would return the previous failed production
 	// job instead of submitting again, so retries use a distinct id suffix.
 	retryAttempt := automationNumberValue(job["retryAttempt"], 0)
-	videoRequestID := func(bookID string, batchRetry int) string {
-		return automationVideoRequestID(jobID, bookID, retryAttempt, batchRetry)
+	videoRequestID := func(book batchfactoryv11.Book, batchRetry int) string {
+		base := automationVideoRequestID(jobID, book.ID, retryAttempt, batchRetry)
+		// 换开头变体新增后必须换一个生产任务标识：同一 request id 会按幂等
+		// 返回旧生产任务，只包含当时已存在的变体，新变体永远拿不到视频。
+		return automationOpeningVideoRequestID(base, batch, book)
 	}
 	mergeRequestID := func(bookID string, batchRetry int) string {
 		return automationMergeRequestID(jobID, bookID, retryAttempt, batchRetry)
@@ -4422,18 +4443,28 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							fail("opening", stageErr, "换开头提示词生成失败")
 							continue
 						}
+						// 换开头阶段会把变体写进 VIDEO01 设置；视频提交和请求标识
+						// 都必须基于最新书籍快照，否则本次新生成的变体会被漏掉。
+						if latestBatch, refreshErr := c.store.GetBatch(ctx, owner, batchID); refreshErr == nil {
+							for _, candidate := range latestBatch.Books {
+								if candidate.ID == book.ID {
+									book = candidate
+									break
+								}
+							}
+						}
 					}
 					entry["stage"], entry["message"], entry["updatedAt"] = "video", "正在提交视频生成", c.now()
 					persist()
 					stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
-					_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageVideo, batchfactoryv11.StageModeMissing, videoRequestID(book.ID, automationNumberValue(entry["batchRetryCount"], 0)), "")
+					_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageVideo, batchfactoryv11.StageModeMissing, videoRequestID(book, automationNumberValue(entry["batchRetryCount"], 0)), "")
 					cancel()
 					if stageErr != nil {
 						fail("video", stageErr, "视频提交失败")
 						continue
 					}
 					stageCtx, cancel = context.WithTimeout(ctx, videoWaitTimeout)
-					completedProduction, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID, videoRequestID(book.ID, automationNumberValue(entry["batchRetryCount"], 0)), videoWaitIdleTimeout, func() {
+					completedProduction, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID, videoRequestID(book, automationNumberValue(entry["batchRetryCount"], 0)), videoWaitIdleTimeout, func() {
 						// 供应商侧任务状态在推进也算书内进展，避免慢视频被停滞看门狗误杀。
 						stallLast.Store(c.now())
 					})
