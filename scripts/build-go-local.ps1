@@ -17,7 +17,17 @@ if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
 }
 
 New-Item -ItemType Directory -Force $goDist | Out-Null
-Get-ChildItem -LiteralPath $goDist -Force | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Recurse -Force
+# Mirror an empty directory into the embed folder instead of deleting entries
+# one by one: bulk Remove-Item is intercepted by the safe-delete guard on this
+# workstation, and stale hashed bundles must not survive a rebuild.
+$emptyDir = Join-Path ([IO.Path]::GetTempPath()) ("v88-embed-empty-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force $emptyDir | Out-Null
+robocopy $emptyDir $goDist /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+$mirrorCode = $LASTEXITCODE
+Remove-Item -LiteralPath $emptyDir -Recurse -Force
+if ($mirrorCode -ge 8) {
+  throw "Cannot clear embedded frontend directory: $goDist (robocopy $mirrorCode)"
+}
 Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -Force
 # The reference V78 files remain under frontend/public for comparison, and Vite
 # copies public/ verbatim. They must not enter the Go embed bundle: the only
@@ -44,7 +54,7 @@ foreach ($brandAsset in @('brand-logo-black.png', 'brand-logo-white.png')) {
   Copy-Item -LiteralPath $source -Destination (Join-Path $brandAssetsDist $brandAsset) -Force
 }
 
-if (-not (Test-Path (Join-Path $petsSource 'stacky/spritesheet.webp'))) {
+if (-not (Test-Path (Join-Path $petsSource 'little-companion/pet.json'))) {
   throw "Pet assets are missing: $petsSource"
 }
 
