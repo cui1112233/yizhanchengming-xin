@@ -1,0 +1,7 @@
+=== RUN   TestNativeSettlementContinuityRealMySQL
+    native_settlement_test.go:53: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=1
+    native_settlement_test.go:53: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=2
+    native_settlement_test.go:100: 2 chapters saved; chapter2 delta omitted prior hook/fact; chapter3 frozen input reread both facts and old hook from MySQL; 11 fake calls, 0 paid calls
+--- PASS: TestNativeSettlementContinuityRealMySQL (70.99s)
+PASS
+ok  	qiantie/backend/internal/novelcreation	71.168s

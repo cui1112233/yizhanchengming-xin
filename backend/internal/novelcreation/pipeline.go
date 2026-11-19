@@ -457,8 +457,12 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		return ChapterBundle{}, err
 	}
 	var settlement truthSettlementOutput
+	settlementDefinition := novelprompt.TruthSettlement
+	if input.ReviewCycleVersion >= 4 {
+		settlementDefinition = novelprompt.IncrementalTruthSettlement
+	}
 	settlementRaw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
-		definition: novelprompt.TruthSettlement, step: RunSettling,
+		definition: settlementDefinition, step: RunSettling,
 		userPayload: map[string]any{
 			"chapter_content": bestContent,
 			"previous_truth":  rawJSONValue(input.PreviousTruth),
@@ -469,6 +473,12 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 	}, &settlement)
 	if err != nil {
 		return ChapterBundle{}, err
+	}
+	if input.ReviewCycleVersion >= 4 {
+		settlement, settlementRaw, err = mergeNativeSettlement(input.PreviousTruth, settlement, settlementRaw, plan.ChapterNumber)
+		if err != nil {
+			return ChapterBundle{}, err
+		}
 	}
 
 	if err := p.emitStage(ctx, input, sink, RunIndexing, "正在生成下一章可用的记忆索引", 92); err != nil {
