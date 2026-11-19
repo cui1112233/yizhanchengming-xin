@@ -33,6 +33,6 @@
 - [x] 重现未提及记录丢失
 - [x] 实现版本化兼容适配与原始增量保存
 - [x] 测试空/重复/冲突/旧任务与跨章持久化
-- [ ] 更新本地4001
+- [x] 更新本地4001（6f4a1bb6，核验见STATE-RUNTIME-VERIFICATION.json）
 
 原版写入顺序补充：Settler在0x180052020.fallback.annotated.c:2011调用apply_settler_runtime_delta；0x180298040.fallback.annotated.c:68-90会保存结构化快照。这发生在外层StateValidator之前，不能从外层函数名推断原版全流程是原子提交。CM继续沿用MySQL正文/记忆事务，不复制这一中途写入时序。
