@@ -2900,3 +2900,27 @@ func TestRetryableComicAutomationErrorTreatsModelShapeErrorsAsRetryable(t *testi
 		t.Fatal("config error must stay permanent")
 	}
 }
+
+// 书本 worker 修改自己的 entry 时不能影响共享 job 快照，否则 persist 线程
+// 遍历/序列化会与 worker 写入并发触发 concurrent map read and map write。
+func TestCloneAutomationEntryDeepCopiesNestedMaps(t *testing.T) {
+	nodes := map[string]any{"p1": map[string]any{"state": "running"}}
+	entry := map[string]any{
+		"nodes": nodes,
+		"logs":  []any{map[string]any{"message": "a"}},
+		"tags":  map[string]string{"k": "v"},
+	}
+	cloned := cloneAutomationEntry(entry)
+	nodes["p1"].(map[string]any)["state"] = "failed"
+	entry["logs"].([]any)[0].(map[string]any)["message"] = "b"
+	entry["tags"].(map[string]string)["k"] = "changed"
+	if got := cloned["nodes"].(map[string]any)["p1"].(map[string]any)["state"]; got != "running" {
+		t.Fatalf("nested map must be copied, got %v", got)
+	}
+	if got := cloned["logs"].([]any)[0].(map[string]any)["message"]; got != "a" {
+		t.Fatalf("nested slice value must be copied, got %v", got)
+	}
+	if got := cloned["tags"].(map[string]string)["k"]; got != "v" {
+		t.Fatalf("nested string map must be copied, got %v", got)
+	}
+}

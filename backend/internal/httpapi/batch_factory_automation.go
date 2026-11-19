@@ -1527,14 +1527,16 @@ func (c *BatchAutomationCoordinator) persistAutomationBookEntry(owner, batchID, 
 		return false, nil
 	}
 	// 原地合并，保持既有 map 引用（状态读取方与测试都持有旧引用）。
+	// 值要深拷贝：worker 之后还会继续改自己的嵌套 map，落盘序列化时不能
+	// 和共享状态共用引用。
 	clear(latest)
 	for key, value := range entry {
-		latest[key] = value
+		latest[key] = cloneAutomationValue(value)
 	}
 	if target != nil {
 		clear(target)
 		for key, value := range entry {
-			target[key] = value
+			target[key] = cloneAutomationValue(value)
 		}
 	}
 	books[bookID] = latest
@@ -3488,6 +3490,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	if imageGlobalConcurrency < 1 {
 		imageGlobalConcurrency = 8
 	}
+	// job 是跨书共享的 map，worker 运行期间 persist() 会写 counts/updatedAt；
+	// worker 必须只读启动时快照，否则并发 map 读写会直接打崩进程。
+	jobRunMode := automationStringValue(job["runMode"], "full_submit")
+	jobForceRegenerate := automationBoolValue(job["forceRegenerate"])
+	jobAutoPublish := automationBoolValue(job["autoPublish"])
+	jobSubmitDeferred := c.automationSubmitDeferred(job)
 	ctx = withShuihuoGlobalImageConcurrency(ctx, int(imageGlobalConcurrency))
 	var failed atomic.Int32
 	var workers sync.WaitGroup
@@ -3821,8 +3829,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 				}
 				// 幂等：已经发布成功的书，在重新执行/误点执行时直接跳过，
 				// 避免在 N8 重复创建合集。强制重生成时才允许重新发布。
-				if !automationBoolValue(job["forceRegenerate"]) &&
-					automationStringValue(job["runMode"], "full_submit") == "full_submit" &&
+				if !jobForceRegenerate &&
+					jobRunMode == "full_submit" &&
 					batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
 					if record, collectionID, published := c.publishedComicRecord(ctx, owner, batchID, book.ID); published {
 						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "该书已发布过，跳过重复上传", c.now()
@@ -3876,7 +3884,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					persist()
 					continue
 				}
-				if reason := c.automationBookPreflightReason(ctx, owner, batch, book, automationStringValue(job["runMode"], "full_submit")); reason != "" {
+				if reason := c.automationBookPreflightReason(ctx, owner, batch, book, jobRunMode); reason != "" {
 					entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "blocked", "preflight", "", reason, c.now()
 					appendAutomationBookLog(entry, c.now(), "preflight", reason)
 					persist()
@@ -3896,7 +3904,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 				}
 				effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 				if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
-					if automationStringValue(job["runMode"], "full_submit") == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+					if jobRunMode == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
 						entry["message"], entry["updatedAt"] = "正在继续发布已生成漫画合集", c.now()
 						persist()
 						publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
@@ -4064,7 +4072,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_resume", "已复用完整漫画资产和分页，继续补齐图片", c.now()
 						persist()
 					}
-					if automationStringValue(job["runMode"], "full_submit") == "storyboard_only" {
+					if jobRunMode == "storyboard_only" {
 						message := "已完成漫画资产、分页与每页提示词"
 						if comicPromptMissing > 0 {
 							// 缺页时必须保留真实缺口，不能覆盖成「每页提示词已完成」。
@@ -4290,8 +4298,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						delete(entry, "assetBackfillCount")
 						resetAutomationPageLedgerNode(entry, "comic_asset_images", c.now())
 					}
-					if automationStringValue(job["runMode"], "full_submit") == "full_submit" {
-						if c.automationSubmitDeferred(job) {
+					if jobRunMode == "full_submit" {
+						if jobSubmitDeferred {
 							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "scheduled", "waiting_submit", "漫画合集已提前完成，等待定时提交", c.now()
 							persist()
 							continue
@@ -4358,10 +4366,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 				// forceRegenerate authorizes the initial run only. A continuation
 				// retry must preserve completed work even when the original run was
 				// explicitly started as a full regeneration.
-				forceRegenerate := automationBoolValue(job["forceRegenerate"]) && resumeStage == ""
+				forceRegenerate := jobForceRegenerate && resumeStage == ""
 				// 视频阶段完成口径按 ordinal 统计，允许复用 orphaned 历史成片：
 				// 只要每个分镜都已有 succeeded + mediaUrl，就不再提交新一轮视频任务。
-				if !forceRegenerate && automationStringValue(job["runMode"], "full_submit") != "storyboard_only" {
+				if !forceRegenerate && jobRunMode != "storyboard_only" {
 					status, statusErr := c.stages.Production.GetBatchStatus(ctx, owner, batchID)
 					if statusErr != nil {
 						fail("video", statusErr, "读取已生成视频失败")
@@ -4436,7 +4444,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						appendAutomationBookLog(entry, c.now(), "director", skipMessage)
 						persist()
 					}
-					if automationStringValue(job["runMode"], "full_submit") == "storyboard_only" {
+					if jobRunMode == "storyboard_only" {
 						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "ready_for_video", "已完成资产与分镜提示词", c.now()
 						persist()
 						continue
@@ -4503,7 +4511,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						continue
 					}
 				}
-				if automationStringValue(job["runMode"], "full_submit") == "video_no_submit" {
+				if jobRunMode == "video_no_submit" {
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "ready_for_upload", "视频已完成，等待上传", c.now()
 					entry["productionTasks"] = len(production.Tasks)
 					persist()
@@ -4538,8 +4546,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						continue
 					}
 				}
-				if automationBoolValue(job["autoPublish"]) {
-					if c.automationSubmitDeferred(job) {
+				if jobAutoPublish {
+					if jobSubmitDeferred {
 						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "scheduled", "waiting_submit", "视频已提前生成并合成，等待定时提交", c.now()
 						persist()
 						continue
@@ -4708,9 +4716,45 @@ func normalizeQueuedBooksAtFinish(books map[string]any, now time.Time) int {
 func cloneAutomationEntry(entry map[string]any) map[string]any {
 	cloned := make(map[string]any, len(entry))
 	for key, value := range entry {
-		cloned[key] = value
+		cloned[key] = cloneAutomationValue(value)
 	}
 	return cloned
+}
+
+// cloneAutomationValue 深拷贝账本里的嵌套结构。书本 worker 会长时间修改
+// entry["nodes"] 等嵌套 map，如果与共享 job 快照共用引用，落盘线程遍历时
+// 会触发 concurrent map read and map write。
+func cloneAutomationValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		cloned := make(map[string]any, len(typed))
+		for key, item := range typed {
+			cloned[key] = cloneAutomationValue(item)
+		}
+		return cloned
+	case []any:
+		cloned := make([]any, len(typed))
+		for index, item := range typed {
+			cloned[index] = cloneAutomationValue(item)
+		}
+		return cloned
+	case []string:
+		return append([]string(nil), typed...)
+	case map[string]string:
+		cloned := make(map[string]string, len(typed))
+		for key, item := range typed {
+			cloned[key] = item
+		}
+		return cloned
+	case map[string]int:
+		cloned := make(map[string]int, len(typed))
+		for key, item := range typed {
+			cloned[key] = item
+		}
+		return cloned
+	default:
+		return value
+	}
 }
 
 // automationEntryTerminal 判断单本书是否已经落到终态或明确的等待态。
