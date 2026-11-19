@@ -1,21 +1,21 @@
 {
   "count": 75,
   "counts": {
-    "部分实现": 30,
+    "部分实现": 31,
     "合同不同": 10,
-    "缺失": 20,
+    "缺失": 19,
     "已有实现待对照": 10,
     "尚未验证": 5
   },
   "missingEvidenceAnchors": [],
-  "sourceHead": "d9c8b335",
+  "sourceHead": "e4fe05a1",
   "runtimeObserved": {
     "port": 4001,
-    "git_sha": "d9c8b335",
-    "entry": "/assets/user-C-PYiuT7.js"
+    "git_sha": "e4fe05a1",
+    "entry": "/assets/user-B66IWgQt.js"
   },
   "paidCalls": 0,
   "productFilesChanged": 17,
   "originalNativeParity": false,
-  "note": "75项为已列审计范围；本轮确认/调度纠错使A10为部分实现，完全等价仍为0。付费调用0。"
+  "note": "75项为已列审计范围；A02的37维目录与选择注入已本地交付，native算法和全局范围未对齐，完全等价仍为0。付费调用0。"
 }

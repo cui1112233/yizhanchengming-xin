@@ -1902,7 +1902,7 @@
     "id": "A02",
     "area": "Agent与提示词",
     "feature": "37项审核维度",
-    "status": "缺失",
+    "status": "部分实现",
     "priority": "P0",
     "original": {
       "file": "_local-archive-20261028/luoshui-novel-audit-20261117/recovered/frontend-current/NovelAgentSettings.readable.js",
@@ -1921,10 +1921,10 @@
     "evidenceIds": [
       "ev_e7f456c2f7b104d46a9413412cf5ea0386bae98d6da64a018e203421f9486311"
     ],
-    "finding": "自定义补充已补不等于内置37维、不可改说明、全选/全不选及勾选注入。",
+    "finding": "37项原版目录与默认29项已从novels.pyd恢复；后端目录/ID保存/任务冻结/所选审核与修订注入已实现，2项浏览器和真实MySQL及假模型实际请求检查通过。账户全局范围及native私有算法仍未对齐。",
     "acceptance": "原目录逐项有来源，启停真实影响审核；不捏造37条凑数。",
-    "runtimeAcceptance": "未做原/CM付费同输入成品对照；不得据此标为全功能通过",
-    "implementation": "按当前状态及repair-spec.md登记；没有修改产品代码",
+    "runtimeAcceptance": "4001 e4fe05a1 /assets/user-B66IWgQt.js；真实登录界面保存重开通过，0付费调用。未比较原版/CM真实生成质量。",
+    "implementation": "e4fe05a1；docs/acceptance/2026-11-19-novel-review-dimensions.md；4001已验证29/37，保存刷新恢复。",
     "baselineStatus": "缺失",
     "baselineFinding": "自定义补充已补不等于内置37维、不可改说明、全选/全不选及勾选注入。",
     "additionalCurrentEvidence": [

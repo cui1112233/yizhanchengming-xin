@@ -8,9 +8,9 @@
 输出：审稿和审后修订系统提示词包含选中项及说明，写作/规划不注入。重试沿用任务冻结设置。关闭全部不关闭基础审稿流程。
 
 - [x] 提取原版目录与默认集合，记录SHA和每项文件偏移。
-- [ ] 后端失败测试→目录、校验、保存、冻结、选中注入实现。
-- [ ] 前端失败测试→37行列表、计数、批量选择、保存和错误恢复。
-- [ ] Go、浏览器、真实MySQL验证；构建嵌入二进制更新4001。
-- [ ] 登记证据与剩余差距。
+- [x] 后端失败测试→目录、校验、保存、冻结、选中注入实现。
+- [x] 前端失败测试→37行列表、计数、批量选择、保存和错误恢复。
+- [x] Go、浏览器、真实MySQL验证；构建嵌入二进制更新4001。
+- [x] 登记证据与剩余差距，见docs/acceptance/2026-11-19-novel-review-dimensions.md。
 
 来源：docs/reverse-engineering/novel-review-dimensions-20261119；提取脚本scripts/extract-novel-review-dimensions.py。原版UI依据NovelAgentSettings.readable.js:354起及用户截图。不会据此宣称原native私有算法或整软件等价。
