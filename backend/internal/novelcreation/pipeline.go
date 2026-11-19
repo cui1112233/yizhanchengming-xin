@@ -388,14 +388,14 @@ func (p *Pipeline) Run(ctx context.Context, input RunContext, sink EventSink) (C
 		var revision chapterRevisionOutput
 		revisionRaw, callErr := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 			definition: novelprompt.ChapterRevision, step: RunRevising, key: fmt.Sprintf(":%d", round),
-			userPayload: map[string]any{
+			userPayload: withReviewDimensionContext(input, map[string]any{
 				"chapter_content":   bestContent,
 				"chapter_plan":      plan,
 				"audit_issues":      bestAudit.Issues,
 				"previous_truth":    rawJSONValue(input.PreviousTruth),
 				"previous_chapters": input.PreviousChapters,
 				"memory_context":    rawJSONValue(input.PreviousMemory),
-			},
+			}, foundation),
 			temperature: 0.55, maxTokens: 12000,
 			validate: func() error { return validateRevision(revision, bestAudit.Issues) },
 		}, &revision)
@@ -532,7 +532,7 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 	}
 	raw, err := p.callJSON(ctx, input, sink, provider, modelCallSpec{
 		definition: definition, step: RunAuditing, key: fmt.Sprintf(":%d", round),
-		userPayload: map[string]any{
+		userPayload: withReviewDimensionContext(input, map[string]any{
 			"foundation_plan":     foundation,
 			"chapter_plan":        plan,
 			"chapter_content":     content,
@@ -543,7 +543,7 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 			"previous_truth":      rawJSONValue(input.PreviousTruth),
 			"previous_chapters":   input.PreviousChapters,
 			"memory_context":      rawJSONValue(input.PreviousMemory),
-		},
+		}, foundation),
 		temperature: 0.2, maxTokens: 4500,
 		validate: func() error { return validateAudit(audit, p.threshold(input)) },
 	}, &audit)

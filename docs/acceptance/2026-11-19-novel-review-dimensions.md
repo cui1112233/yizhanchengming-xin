@@ -1,5 +1,13 @@
 # 37项审稿维度交付
 
+## 补充：维度实际作用与修订链路核查
+
+2026-11-19用户要求确保有效，继续核查实际模型请求。发现原审核请求缺少明确的style_profile/mode_inputs，原修订请求缺少规则、备忘、素材和基础设定，虽有问题列表但核对依据不完整。新增withReviewDimensionContext，针对含维度设置的新任务，将已冻结的这些资料同时传给审核和修订，不读取任务之后的新资料，不改变旧快照无维度字段的请求体。
+
+TestReviewDimensionsContextAndRevisionEffect先失败于审核请求缺style_profile，修复后通过：37项各自完整名称和说明均进入首次审核、修订和复审，10项关键上下文字段齐全，具体issue id/description传到修订。TestReviewDimensionFindingReachesSavedChapter验证选中6/32/33贯穿循环、未选37不泄漏，修订后的指纹动作写进最终正文而非只留在中间结果。
+
+TestReviewDimensionFindingRealMySQL在隔离MySQL8.4通过：测试模型8次响应，首次审稿70分→修订→复审92分，重新建Store读取最终正文已变更，数据库落下2条novel_audits、1条novel_revisions。整包novelcreation/prompt及HTTP相关测试通过。测试使用受控假模型，证明请求、修订、复审和持久化接通；不等于真实模型判断准确率或原版native质量已验证。没有真实收费调用。
+
 产品提交：`e4fe05a1`。本地4001运行同提交标记，入口`/assets/user-B66IWgQt.js`，二进制位于`_local-archive-20261028/novel-review-dimensions-20261119/qiantie-review-dimensions.exe`。未发布公网。
 
 ## 原版依据
