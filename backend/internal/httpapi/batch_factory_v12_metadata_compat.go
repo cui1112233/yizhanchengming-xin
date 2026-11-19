@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -38,12 +40,16 @@ func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchf
 				Themes:    firstMetadataString(book.SourceMetadata, "themes", "theme"),
 				Labels:    firstMetadataString(book.SourceMetadata, "labels", "tags"),
 			}
-			meta := finalizeFetchedBatchClassification(classifyFetchedBatchBook(req.Context(), identity.Username, info, book.SourceText, book.SourceMetadata, classification))
+			// 与单书分类入口一致：客户端断开（499）不得取消已开始的分类，
+			// 摘除取消信号保证结果总能落库。
+			runCtx, runCancel := context.WithTimeout(context.WithoutCancel(req.Context()), 4*time.Minute)
+			meta := finalizeFetchedBatchClassification(classifyFetchedBatchBook(runCtx, identity.Username, info, book.SourceText, book.SourceMetadata, classification))
 			decision := novelfetchworkshop.GenderDecision{
 				Gender: stringValue(meta["gender"]), Source: novelfetchworkshop.GenderSource(stringValue(meta["genderSource"])), Reason: stringValue(meta["genderReason"]),
 			}
 			style := firstMetadataString(meta, "style", "styleName", "style_name")
-			updated, updateErr := classifyBookMetadataWithRetry(req.Context(), store, identity.Username, batchID, book.ID, meta)
+			updated, updateErr := classifyBookMetadataWithRetry(runCtx, store, identity.Username, batchID, book.ID, meta)
+			runCancel()
 			status := "classified"
 			if updateErr != nil || stringValue(meta["classifyStatus"]) != "classified" {
 				status = "failed"

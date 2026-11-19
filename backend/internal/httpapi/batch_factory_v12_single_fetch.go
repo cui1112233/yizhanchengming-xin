@@ -659,8 +659,14 @@ func registerV12PublishClassificationRoute(mux *http.ServeMux, store batchfactor
 			Themes:   firstMetadataString(book.SourceMetadata, "themes", "theme"),
 			Labels:   firstMetadataString(book.SourceMetadata, "labels", "tags"),
 		}
-		metadata := finalizeFetchedBatchClassification(classifyFetchedBatchBook(r.Context(), owner, info, book.SourceText, book.SourceMetadata, classification))
-		updated, err := classifyBookMetadataWithRetry(r.Context(), store, owner, batch.ID, book.ID, metadata)
+		// 分类一旦开始就必须产出落库的结果：用户可能等不及刷新/关闭页面，
+		// 客户端断开（nginx 记 499）会取消 r.Context()，AI 判断与写回被中途
+		// 放弃，用户重开页面还是「待 AI 判断」，形成点了又失败的循环。
+		// 摘除取消信号后由分类调用自身的 60 秒超时兜底，结果总会写回。
+		runCtx, runCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 4*time.Minute)
+		defer runCancel()
+		metadata := finalizeFetchedBatchClassification(classifyFetchedBatchBook(runCtx, owner, info, book.SourceText, book.SourceMetadata, classification))
+		updated, err := classifyBookMetadataWithRetry(runCtx, store, owner, batch.ID, book.ID, metadata)
 		if err != nil {
 			writeStoreError(w, err)
 			return
