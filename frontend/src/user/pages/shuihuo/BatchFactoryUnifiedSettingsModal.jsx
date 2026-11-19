@@ -723,7 +723,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
       const confirmed = await new Promise(resolve => {
         Modal.confirm({
           title: `确认把整批切换为${nextLabel}？`,
-          content: `整批 ${batchBooks.length} 本将切换为${nextLabel}；${overrideCount ? `${overrideCount} 本单书的模式覆盖将被清除；` : ''}在途${previousMode === 'video' ? '视频' : '漫画'}任务不会迁移。`,
+          content: `整批 ${batchBooks.length} 本将切换为${nextLabel}；漫画页、视频与资产数据全部保留，随时可切回。${overrideCount ? `${overrideCount} 本单书的模式覆盖将被清除；` : ''}在途${previousMode === 'video' ? '视频' : '漫画'}任务不会迁移。`,
           okText: '确认切换',
           cancelText: '保持当前模式',
           okButtonProps: { danger: true },
