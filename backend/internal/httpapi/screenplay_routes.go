@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -557,8 +558,18 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 		request := screenplay.AssetRequest{Owner: owner, ProjectID: req.PathValue("id"), Type: input.Type, Degree: input.Degree, Content: input.Content, Chapters: input.Chapters, Model: input.Model, Concurrency: input.Concurrency, Confirmed: input.Confirmed, MissingOnly: input.MissingOnly}
 		var result screenplay.AssetResult
 		var err error
+		var autoSynopsis *screenplay.SynopsisResult
+		var autoSynopsisWarning string
 		switch input.Mode {
 		case "":
+			// 洛水对齐：资产推理流水线先自动附带跑「研读剧本 · 故事概要」。
+			// 已有结果跳过；失败只告警不阻断资产解析（洛水流水线同样继续跑后续 Agent）。
+			synopsis, synopsisErr := autoGenerateSynopsisIfNeeded(req.Context(), store, owner, req.PathValue("id"), input.Model, resolver, now)
+			if synopsisErr != nil {
+				log.Printf("auto synopsis skipped project=%s err=%v", req.PathValue("id"), synopsisErr)
+				autoSynopsisWarning = "故事概要自动生成失败，可稍后在剧本页手动生成；资产解析不受影响"
+			}
+			autoSynopsis = synopsis
 			result, err = service.Extract(req.Context(), request)
 		case "standalone":
 			result, err = service.Reparse(req.Context(), request)
@@ -570,13 +581,13 @@ func registerScreenplayRoutesWorkflow(mux *http.ServeMux, auth BridgeAuth, store
 			// failed_batches 和已保存资产一起返回，前端据此明确提示失败批次，
 			// 不能再整体当成成功，也不能只回一条 500 丢掉结果。
 			if errors.Is(err, screenplay.ErrPartialFailure) {
-				writeJSON(w, http.StatusOK, result)
+				writeJSON(w, http.StatusOK, synopsisAttachResult(result, autoSynopsis, autoSynopsisWarning))
 				return
 			}
 			writeScreenplayError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, result)
+		writeJSON(w, http.StatusOK, synopsisAttachResult(result, autoSynopsis, autoSynopsisWarning))
 	})
 	handle("GET /api/comic-screenplays/projects/{id}/assets", func(w http.ResponseWriter, req *http.Request, owner string) {
 		assets, err := store.ListAssets(req.Context(), owner, req.PathValue("id"), screenplay.AssetType(req.URL.Query().Get("type")))
