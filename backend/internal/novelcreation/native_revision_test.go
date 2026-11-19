@@ -12,7 +12,8 @@ func TestNativePatchRevisionRealMySQL(t *testing.T) {
 	db := studioOwnedDB(t)
 	ctx := context.Background()
 	owner := novelID("patch-review")
-	provider := &queuedPipelineProvider{responses: []string{foundationJSON, chapterPlanJSON, draftJSON, failedAuditJSON, nativeFixturePatch, passedAuditJSON, settlementJSON, memoryJSON}}
+	localAudit := strings.Replace(failedAuditJSON, `"category":"plot"`, `"category":"plot","repair_scope":"local"`, 1)
+	provider := &queuedPipelineProvider{responses: []string{foundationJSON, chapterPlanJSON, draftJSON, localAudit, nativeFixturePatch, passedAuditJSON, settlementJSON, memoryJSON}}
 	store := NewMySQLStore(db)
 	s := NewService(store, NewMemoryRuntime(), NewPipeline(func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) { return provider, nil }))
 	p, e := s.CreateProject(ctx, owner, CreateProjectInput{Title: "原版补丁持久化验证", Genre: "悬疑", ModelID: "fake-only", TargetChapterWords: 2000})
@@ -50,10 +51,21 @@ func TestNativePatchRevisionRealMySQL(t *testing.T) {
 	if e = json.Unmarshal(snapshot, &saved); e != nil || saved.Native.Applied != 1 || saved.Raw != nativeFixturePatch {
 		t.Fatal("revision evidence not persisted", e, string(snapshot))
 	}
+	if saved.Native.Route == nil || saved.Native.Route.Mode != "patch-only" {
+		t.Fatalf("explicit local scope was lost: %s", snapshot)
+	}
+	var savedAudit []byte
+	if e = db.QueryRowContext(ctx, "SELECT snapshot_json FROM novel_audits WHERE owner_username=? AND run_id=? ORDER BY created_at,audit_id LIMIT 1", owner, r.ID).Scan(&savedAudit); e != nil {
+		t.Fatal(e)
+	}
+	var storedAudit chapterAuditOutput
+	if e = json.Unmarshal(savedAudit, &storedAudit); e != nil || len(storedAudit.Issues) != 1 || string(storedAudit.Issues[0].RepairScopeSnake) != `"local"` {
+		t.Fatal("audit scope not durable", e, string(savedAudit))
+	}
 	if _, e = s.Run(ctx, owner, r.ID); e != nil || len(provider.requests) != 8 {
 		t.Fatal("repeated completed run generated again", e, len(provider.requests))
 	}
-	t.Log("8 fake-provider calls: original PATCHES -> re-audit -> durable MySQL chapter/revision -> repeat did not regenerate; 0 paid calls")
+	t.Log("8 fake-provider calls: explicit local scope -> patch-only request -> PATCHES -> re-audit -> durable MySQL chapter/audit scope/revision route -> repeat did not regenerate; 0 paid calls")
 }
 
 const nativeFixturePatch = "=== FIXED_ISSUES ===\n补上指纹线索。\n=== PATCHES ===\n--- PATCH 1 ---\nTARGET_TEXT:\n林澜拆开了那封没有寄件人的信。\nREPLACEMENT_TEXT:\n林澜拆开了那封没有寄件人的信，信封上留下失踪者的指纹。\n--- END PATCH ---\n=== UPDATED_STATE ===\n发现指纹线索"

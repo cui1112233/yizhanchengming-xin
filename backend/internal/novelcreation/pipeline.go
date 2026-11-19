@@ -132,12 +132,14 @@ type chapterAuditOutput struct {
 }
 
 type auditIssue struct {
-	Source      string          `json:"source,omitempty"`
-	ID          string          `json:"id"`
-	Severity    string          `json:"severity"`
-	Description string          `json:"description"`
-	Category    json.RawMessage `json:"category,omitempty"`
-	Evidence    json.RawMessage `json:"evidence,omitempty"`
+	RepairScope      json.RawMessage `json:"repairScope,omitempty"`
+	RepairScopeSnake json.RawMessage `json:"repair_scope,omitempty"`
+	Source           string          `json:"source,omitempty"`
+	ID               string          `json:"id"`
+	Severity         string          `json:"severity"`
+	Description      string          `json:"description"`
+	Category         json.RawMessage `json:"category,omitempty"`
+	Evidence         json.RawMessage `json:"evidence,omitempty"`
 }
 
 type chapterRevisionOutput struct {
@@ -550,6 +552,14 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 		validate: func() error { return validateAudit(audit, p.threshold(input)) },
 	}, &audit)
 	if err == nil {
+		if input.ReviewCycleVersion < 3 {
+			// Before version3 these fields were discarded during decoding. Keep
+			// old journal request fingerprints unchanged when replaying a reply.
+			for index := range audit.Issues {
+				audit.Issues[index].RepairScope = nil
+				audit.Issues[index].RepairScopeSnake = nil
+			}
+		}
 		audit, raw, err = mergePostWriteIntoAudit(input, plan, content, audit, raw)
 	}
 	return audit, raw, err

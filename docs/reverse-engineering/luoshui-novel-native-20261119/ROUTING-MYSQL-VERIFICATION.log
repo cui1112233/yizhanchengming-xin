@@ -1,0 +1,12 @@
+=== RUN   TestNativeRoutedFailureRealMySQL
+    native_revision_route_test.go:12: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=1
+    native_revision_route_test.go:12: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=2
+    native_revision_route_test.go:50: local scope required PATCHES; full JSON reply rejected; durable run failed with clear reason, 0 chapters/revisions, repeat generated no new requests; 0 paid calls
+--- PASS: TestNativeRoutedFailureRealMySQL (33.25s)
+=== RUN   TestNativePatchRevisionRealMySQL
+    native_revision_test.go:12: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=1
+    native_revision_test.go:12: owned studio schema=novelparity20261117ac92519bf9fa MySQL=8.4.11 novel-only migration-pass=2
+    native_revision_test.go:68: 8 fake-provider calls: explicit local scope -> patch-only request -> PATCHES -> re-audit -> durable MySQL chapter/audit scope/revision route -> repeat did not regenerate; 0 paid calls
+--- PASS: TestNativePatchRevisionRealMySQL (53.13s)
+PASS
+ok  	qiantie/backend/internal/novelcreation	86.483s

@@ -17,12 +17,13 @@ import (
 // Native evidence and CM compatibility boundaries: PATCH-SPEC.md.
 type nativePatch struct{ Target, Replacement string }
 type nativePatchResult struct {
-	Content      string `json:"content"`
-	Applied      int    `json:"applied_patch_count"`
-	Skipped      int    `json:"skipped_patch_count"`
-	Touched      int    `json:"touched_chars"`
-	Mode         string `json:"mode"`
-	UpdatedState string `json:"updated_state"`
+	Route        *nativeRevisionRoute `json:"route,omitempty"`
+	Content      string               `json:"content"`
+	Applied      int                  `json:"applied_patch_count"`
+	Skipped      int                  `json:"skipped_patch_count"`
+	Touched      int                  `json:"touched_chars"`
+	Mode         string               `json:"mode"`
+	UpdatedState string               `json:"updated_state"`
 }
 
 var nativePatchPattern = regexp.MustCompile(`(?s)--- PATCH(?:\s+\d+)? ---\s*TARGET_TEXT:\s*(.*?)\s*REPLACEMENT_TEXT:\s*(.*?)\s*--- END PATCH ---`)
@@ -162,6 +163,19 @@ func (p *Pipeline) callNativeRevision(ctx context.Context, input RunContext, sin
 	content, _ := payload["chapter_content"].(string)
 	issues, _ := payload["audit_issues"].([]auditIssue)
 	spec.definition = novelprompt.NativeChapterRevision
+	var route *nativeRevisionRoute
+	if input.ReviewCycleVersion >= 3 {
+		resolved := resolveNativeRevisionRoute(issues)
+		route = &resolved
+		spec.definition = novelprompt.RoutedNativeChapterRevision(resolved.Mode)
+		copy := make(map[string]any, len(payload)+2)
+		for k, v := range payload {
+			copy[k] = v
+		}
+		copy["revision_output_mode"] = resolved.Mode
+		copy["revision_route_reason"] = resolved.Reason
+		spec.userPayload = copy
+	}
 	if input.LongImitation != nil {
 		spec.definition.SystemPrompt += novelprompt.LongImitationSystemSupplement
 	}
@@ -182,6 +196,15 @@ func (p *Pipeline) callNativeRevision(ctx context.Context, input RunContext, sin
 	revision, report, e := decodeNativeRevision(reply, content, issues)
 	if e != nil {
 		return nil, &DomainError{Code: ErrInvalidOutput, Message: e.Error(), Cause: e}
+	}
+	if route != nil {
+		report.Route = route
+		if route.Mode == "patch-only" && report.Mode != "patches" {
+			return nil, &DomainError{Code: ErrInvalidOutput, Message: "本轮要求局部修改，模型返回了整章正文，原文未修改"}
+		}
+		if route.Mode == "rewrite-only" && report.Mode == "patches" {
+			return nil, &DomainError{Code: ErrInvalidOutput, Message: "本轮要求整章重写，模型只返回局部补丁，原文未修改"}
+		}
 	}
 	output, ok := target.(*chapterRevisionOutput)
 	if !ok {
