@@ -9,6 +9,20 @@ import (
 	"testing"
 )
 
+func TestAIReasoningPromptConfigResolvesLegacyConstraintIDs(t *testing.T) {
+	SetConstraintPresetBodyResolver(func(presetID string) (string, bool) {
+		if presetID == "script-constraint-quality-4k" {
+			return "画面约束正文", true
+		}
+		return "", false
+	})
+	t.Cleanup(func() { SetConstraintPresetBodyResolver(nil) })
+	config := aiReasoningPromptConfig(SettingsPatch{"aiPromptConfig": json.RawMessage(`{"constraints":{"enabled":true,"selections":[{"presetId":"script-constraint-quality-4k","constraintCategory":"quality"}]}}`)})
+	if body := selectedConstraintBody(config, Book{ID: "book-1"}, "quality"); body != "画面约束正文" {
+		t.Fatalf("quality constraint body = %q, want the published body resolved from the preset ID", body)
+	}
+}
+
 func seedCompiledVideo(t *testing.T) (*MemoryStore, Batch, Book, Video) {
 	t.Helper()
 	store, batch, book := seedDirectorBook(t, "original", false)

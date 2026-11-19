@@ -155,6 +155,18 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Director != nil && options.Director.PresetCatalog == nil {
 		options.Director.PresetCatalog = options.PresetCatalog
 	}
+	if options.PresetCatalog != nil {
+		// 历史批次可能只保存了约束预设 ID。用已发布预设正文兜底解析，
+		// 保证画质/限制/负面等约束层继续进入最终视频提示词。
+		catalog := options.PresetCatalog
+		batchfactoryv11.SetConstraintPresetBodyResolver(func(presetID string) (string, bool) {
+			preset, found, err := catalog.PublishedBody("script", presetID)
+			if err != nil || !found || strings.TrimSpace(preset.Body) == "" {
+				return "", false
+			}
+			return preset.Body, true
+		})
+	}
 	comicGenerationGate := newComicPageGenerationGate()
 	if options.Production == nil && options.Store != nil {
 		// Read-only status is safe before the production slice is enabled. Keep

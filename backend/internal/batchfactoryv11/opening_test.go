@@ -175,3 +175,29 @@ func TestRequiredOpeningVariantIndicesUsesSuccessfullyGeneratedVariants(t *testi
 		t.Fatalf("indices = %v, want %v (failed 换开头2 must not block the video stage)", indices, want)
 	}
 }
+
+// Novel Fetch 追加的书在导演前没有 VIDEO 槽位。自动化用批次快照判断时，
+// 0 个 VIDEO 只能说明分镜还没生成，绝不能被当成“换开头已完成”；否则新书
+// 会跳过换开头，最终合成和上传都缺 opening 1。
+func TestOpeningStageCompleteTreatsMissingVideosAsIncomplete(t *testing.T) {
+	batch := Batch{ID: "batch-1", SettingsState: SettingsState{Patch: SettingsPatch{
+		"openingEnabled": rawSetting(t, true),
+		"openingCount":   rawSetting(t, 2),
+	}}}
+	book := Book{ID: "book-1"}
+	if OpeningStageComplete(batch, book) {
+		t.Fatal("a book whose director has not created VIDEO slots must stay incomplete")
+	}
+	book.Videos = []Video{{ID: "video-1", Ordinal: 0}}
+	if !OpeningStageComplete(batch, book) {
+		t.Fatal("a single-storyboard book has no separate opening variant and must count as complete")
+	}
+	book.Videos = append(book.Videos, Video{ID: "video-2", Ordinal: 1})
+	if OpeningStageComplete(batch, book) {
+		t.Fatal("multi-storyboard book without opening variants must stay incomplete")
+	}
+	book.Videos[0].SettingsState.Patch = SettingsPatch{"openingVariants": rawSetting(t, []OpeningVariant{{Index: 1, Status: "success", Prompt: "雨夜推门而入。"}})}
+	if !OpeningStageComplete(batch, book) {
+		t.Fatal("a successfully generated opening variant must complete the stage")
+	}
+}

@@ -286,20 +286,31 @@ func successfulOpeningVariants(video Video) []OpeningVariant {
 	return out
 }
 
-// OpeningStageComplete 判断「换开头」阶段是否已经做完：开关关闭、只有一个
-// 分镜，或所需变体全部成功时视为完成。自动化每次触发都先查它，避免为了
-// 补齐一个变体而把整轮开头重新生成。
+// OpeningStageComplete 判断「换开头」阶段是否已经做完：开关关闭、只需要一个
+// 开头版本、单分镜书，或所需变体全部成功时视为完成。自动化每次触发都先查它，
+// 避免为了补齐一个变体而把整轮开头重新生成。
+//
+// VIDEO 槽位由导演阶段创建（Novel Fetch 追加的书在导演前没有视频），所以
+// len(Videos)==0 只代表“分镜还没生成”，不能当作已完成；否则新书会在导演
+// 完成后被直接跳过换开头，最终合成和上传都缺换开头版本。
 func OpeningStageComplete(batch Batch, book Book) bool {
-	if len(book.Videos) < 2 {
-		return true
-	}
 	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	if !rawBool(effective, "openingEnabled", false) {
 		return true
 	}
 	count := rawInt(effective, "openingCount", 4)
+	if count <= 1 {
+		return true
+	}
 	if count < 1 || count > 8 {
 		return false
+	}
+	if len(book.Videos) == 0 {
+		return false
+	}
+	// 单分镜书整段视频就是开头，没有可替换的独立开头版本。
+	if len(book.Videos) == 1 {
+		return true
 	}
 	return len(successfulOpeningVariants(book.Videos[0])) >= count-1
 }

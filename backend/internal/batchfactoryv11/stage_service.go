@@ -325,11 +325,8 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	}
 	effectiveSettings := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	effectiveMode := normalizeProductionMode(effectiveSettings)
-	if stage == BookStageAssets && effectiveMode != "comic" && !AssetImagesEnabled(effectiveSettings) {
-		// 视频模式沿用原有行为。漫画模式必须始终提取人物、场景和道具的
-		// 文字提示词；资产图片开关只在后续出图阶段生效。
-		return s.Summary(ctx, owner, batchID, bookID)
-	}
+	// 资产图片开关只决定是否生成资产参考图；人物/场景/道具的文字提示词
+	// 始终要提取，否则分镜和视频提示词会丢失“基础设定”信息。
 	if mode == StageModeMissing && effectiveMode == "comic" {
 		if stage == BookStageDirector {
 			if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {

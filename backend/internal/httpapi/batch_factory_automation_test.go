@@ -1408,19 +1408,17 @@ func TestAutomationRequiresOpeningStageWhenEnabled(t *testing.T) {
 	}
 }
 
-func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
+func TestVideoAutomationAssetImagesSwitchDoesNotSkipPromptExtraction(t *testing.T) {
 	cases := []struct {
-		name            string
-		setting         json.RawMessage
-		precreateBook   bool
-		wantCalls       int
-		wantSkipLog     bool
-		wantMissingText bool
+		name          string
+		setting       json.RawMessage
+		precreateBook bool
+		wantCalls     int
 	}{
-		{name: "default skips the assets stage", setting: nil, wantCalls: 1, wantSkipLog: true, wantMissingText: true},
-		{name: "explicit true keeps the assets stage", setting: json.RawMessage("true"), wantCalls: 2},
-		{name: "explicit false skips the assets stage", setting: json.RawMessage("false"), wantCalls: 1, wantSkipLog: true, wantMissingText: true},
-		{name: "disabled keeps existing assets", setting: json.RawMessage("false"), precreateBook: true, wantCalls: 1, wantSkipLog: true},
+		{name: "default still extracts asset prompts", setting: nil, wantCalls: 2},
+		{name: "explicit true extracts asset prompts", setting: json.RawMessage("true"), wantCalls: 2},
+		{name: "explicit false still extracts asset prompts", setting: json.RawMessage("false"), wantCalls: 2},
+		{name: "disabled keeps existing asset prompts", setting: json.RawMessage("false"), precreateBook: true, wantCalls: 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1490,18 +1488,11 @@ func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tc.wantCalls == 1 {
-				for _, asset := range latest.Books[0].AssetRecords {
-					images, err := store.ListBookAssetImages(ctx, "alice", batch.ID, book.ID, asset.ID)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if len(images) != 0 {
-						t.Fatalf("asset %s got images while the switch was off: %+v", asset.ID, images)
-					}
+			if !tc.precreateBook {
+				if len(latest.Books[0].AssetRecords) == 0 {
+					t.Fatal("asset prompts must still be extracted when asset images are off")
 				}
-			}
-			if tc.precreateBook {
+			} else {
 				found := false
 				for _, asset := range latest.Books[0].AssetRecords {
 					if asset.ID == existingAssetID {
@@ -1511,22 +1502,16 @@ func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 				if !found {
 					t.Fatalf("existing asset %s was dropped when the switch was off: %+v", existingAssetID, latest.Books[0].AssetRecords)
 				}
-				for _, asset := range latest.Books[0].AssetRecords {
-					images, err := store.ListBookAssetImages(ctx, "alice", batch.ID, book.ID, asset.ID)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if len(images) != 0 {
-						t.Fatalf("asset %s got images while the switch was off: %+v", asset.ID, images)
-					}
+			}
+			// 关闭资产图片时只跳过图片生成，文字提示词照常落库。
+			for _, asset := range latest.Books[0].AssetRecords {
+				images, err := store.ListBookAssetImages(ctx, "alice", batch.ID, book.ID, asset.ID)
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-			if tc.wantSkipLog && !strings.Contains(fmt.Sprint(entry["logs"]), "因资产图片开关关闭，已跳过资产生成阶段") {
-				t.Fatalf("logs=%v, want the explicit skip reason", entry["logs"])
-			}
-			merged := strings.Contains(fmt.Sprint(entry["logs"]), "无已存资产描述，已跳过合并")
-			if merged != tc.wantMissingText {
-				t.Fatalf("logs=%v, merged=%v want %v", entry["logs"], merged, tc.wantMissingText)
+				if len(images) != 0 {
+					t.Fatalf("asset %s got images while the switch was off: %+v", asset.ID, images)
+				}
 			}
 		})
 	}

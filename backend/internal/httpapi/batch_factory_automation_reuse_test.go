@@ -157,18 +157,13 @@ func TestAutomationBookUploadedSkipsRepeatedUpload(t *testing.T) {
 }
 
 func TestAutomationAssetsCompletion(t *testing.T) {
-	off := automationSettings(map[string]any{"assetImagesEnabled": false})
-	on := automationSettings(map[string]any{"assetImagesEnabled": true})
 	book := batchfactoryv11.Book{ID: "book-1"}
-	if !automationAssetsComplete(book, off) {
-		t.Fatal("assets switch off must count as complete")
-	}
-	if automationAssetsComplete(book, on) {
-		t.Fatal("assets switch on without any asset record must stay incomplete")
+	if automationAssetsComplete(book) {
+		t.Fatal("a book without any asset prompt must stay incomplete even when asset images are off")
 	}
 	book.AssetRecords = []batchfactoryv11.BookAsset{{Prompt: "角色描述"}}
-	if !automationAssetsComplete(book, on) {
-		t.Fatal("existing asset records must count as complete")
+	if !automationAssetsComplete(book) {
+		t.Fatal("existing asset prompts must count as complete")
 	}
 }
 

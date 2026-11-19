@@ -4342,33 +4342,26 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
 						appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
 						persist()
-					} else if batchfactoryv11.AssetImagesEnabled(effective) {
-						if automationAssetsComplete(book, effective) && !forceRegenerate {
-							const skipMessage = "资产已生成，跳过资产提取"
-							entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
-							appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
-							persist()
-						} else {
-							entry["stage"] = "assets"
-							entry["message"] = "正在提取资产"
-							entry["updatedAt"] = c.now()
-							stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
-							_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageAssets, stageMode, jobID+"-assets-"+book.ID, "")
-							cancel()
-							if stageErr != nil {
-								fail("assets", stageErr, "资产提取失败")
-								continue
-							}
-						}
-					} else {
-						// 显式跳过，不能静默：日志里写清原因，后续分镜/视频/合成照常推进。
-						const skipMessage = "因资产图片开关关闭，已跳过资产生成阶段"
+					} else if automationAssetsComplete(book) && !forceRegenerate {
+						const skipMessage = "资产提示词已生成，跳过资产提取"
 						entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
 						appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
-						if !bookHasStoredAssetDescription(book) {
-							appendAutomationBookLog(entry, c.now(), "assets", "无已存资产描述，已跳过合并")
-						}
 						persist()
+					} else {
+						entry["stage"] = "assets"
+						entry["message"] = "正在提取资产提示词"
+						if !batchfactoryv11.AssetImagesEnabled(effective) {
+							// 关闭资产图片只跳过分镜资产图片，文字提示词仍要生成。
+							entry["message"] = "正在提取资产提示词（资产图片开关关闭，不生成资产图片）"
+						}
+						entry["updatedAt"] = c.now()
+						stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
+						_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageAssets, stageMode, jobID+"-assets-"+book.ID, "")
+						cancel()
+						if stageErr != nil {
+							fail("assets", stageErr, "资产提取失败")
+							continue
+						}
 					}
 					if !automationResumeShouldRunStage(resumeStage, "director") {
 						const skipMessage = "从失败阶段继续，跳过已完成的分镜提示词阶段"
@@ -5073,23 +5066,10 @@ func productionJobError(job batchfactoryv11.ProductionJob) string {
 	return "视频模型未返回成片"
 }
 
-// bookHasStoredAssetDescription reports whether the book already carries any
-// stored asset description that the closed switch path can merge into prompts.
-func bookHasStoredAssetDescription(book batchfactoryv11.Book) bool {
-	for _, asset := range book.AssetRecords {
-		if strings.TrimSpace(asset.Prompt) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// automationAssetsComplete 资产阶段完成口径：开关关闭视为完成；开关打开时
-// 只要书里已有可用的资产条目就视为完成，不再重复调用模型提取。
-func automationAssetsComplete(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) bool {
-	if !batchfactoryv11.AssetImagesEnabled(effective) {
-		return true
-	}
+// automationAssetsComplete 资产阶段完成口径：只要书里已有可用的资产提示词
+// 就视为完成，不再重复调用模型提取。资产图片开关只决定是否出图，不参与
+// 文字提示词的完成判定。
+func automationAssetsComplete(book batchfactoryv11.Book) bool {
 	for _, asset := range book.AssetRecords {
 		if strings.TrimSpace(asset.Prompt) != "" {
 			return true

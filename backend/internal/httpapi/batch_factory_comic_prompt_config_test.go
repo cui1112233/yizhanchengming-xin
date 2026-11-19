@@ -89,6 +89,36 @@ func TestHydrateBatchFactoryComicPromptConfigFreezesPublishedBodies(t *testing.T
 	}
 }
 
+func TestHydrateBatchFactoryConstraintSelectionsFreezesPublishedBodies(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	data := `[
+		{"id":"script-constraint-quality-4k","module":"script","name":"画质约束","kind":"addon","version":2,"revision":2,"status":"published","body":"画质约束正文","protocolLock":{"format":"constraint","category":"quality"}},
+		{"id":"script-constraint-negative-clean","module":"script","name":"负面提示词","kind":"addon","version":1,"revision":1,"status":"published","body":"负面提示词正文","protocolLock":{"format":"constraint","category":"negative"}}
+	]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	raw := json.RawMessage(`{"constraints":{"enabled":true,"selections":[{"presetId":"script-constraint-quality-4k","constraintCategory":"quality"},{"presetId":"script-constraint-negative-clean","constraintCategory":"negative"}]}}`)
+	hydrated, err := hydrateBatchFactoryPromptConfig(prompt.NewCatalog(path), raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(hydrated, &got); err != nil {
+		t.Fatal(err)
+	}
+	selections := got["constraints"].(map[string]any)["selections"].([]any)
+	if len(selections) != 2 {
+		t.Fatalf("selections = %d, want 2", len(selections))
+	}
+	for index, want := range []string{"画质约束正文", "负面提示词正文"} {
+		selection := selections[index].(map[string]any)
+		if selection["body"] != want {
+			t.Fatalf("constraint %d body = %v, want %q", index, selection["body"], want)
+		}
+	}
+}
+
 func TestHydrateBatchFactoryVideoPromptConfigFreezesPublishedBody(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "presets.json")
 	data := `[

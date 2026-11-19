@@ -45,16 +45,30 @@ func hydrateBatchFactoryPromptConfig(catalog *prompt.Catalog, raw json.RawMessag
 			return nil, fmt.Errorf("视频提示词：%w", err)
 		}
 	}
+	// 约束层（前缀/画质/限制/负面）同样由浏览器只提交 presetId。这里必须把
+	// 已发布正文冻结进每个 selection；否则编译器看到空 body，会把所有约束
+	// 组件静默丢弃，最终视频提示词里就没有画质、限制和负面提示词。
+	if constraints, ok := config["constraints"].(map[string]any); ok && constraints != nil {
+		if values, ok := constraints["selections"].([]any); ok {
+			for index, value := range values {
+				selection, ok := value.(map[string]any)
+				if !ok || selection == nil {
+					return nil, fmt.Errorf("约束提示词第 %d 项格式不正确", index+1)
+				}
+				selectedCategory := strings.TrimSpace(stringValue(selection["constraintCategory"]))
+				if err := freezePromptSelection(catalog, selection, "script", "", selectedCategory); err != nil {
+					return nil, fmt.Errorf("约束提示词第 %d 项：%w", index+1, err)
+				}
+			}
+		}
+	}
 	comic, ok := config["comic"].(map[string]any)
 	if !ok || comic == nil {
-		if _, hasVideo := config["video"]; hasVideo {
-			encoded, err := json.Marshal(config)
-			if err != nil {
-				return nil, fmt.Errorf("保存视频提示词配置失败")
-			}
-			return encoded, nil
+		encoded, err := json.Marshal(config)
+		if err != nil {
+			return nil, fmt.Errorf("保存提示词配置失败")
 		}
-		return raw, nil
+		return encoded, nil
 	}
 	if err := freezePromptSelection(catalog, comic, "batch-factory", comicPageSlot, ""); err != nil {
 		return nil, fmt.Errorf("漫画提示词：%w", err)

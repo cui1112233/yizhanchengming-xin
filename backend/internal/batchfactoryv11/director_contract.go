@@ -215,7 +215,36 @@ func aiReasoningPromptConfig(patch SettingsPatch) AIReasoningPromptConfig {
 	// Character and scene output are separately selectable V12 renderers. Props
 	// remain on the combined extraction contract.
 	config.Assets.Prop = PresetSnapshot{}
+	hydrateConstraintSelectionBodies(&config)
 	return config
+}
+
+// constraintPresetBodyResolver is wired by the HTTP layer to the published
+// preset catalog. Historical batches may carry constraint selections that only
+// saved the preset ID (before the HTTP save path froze bodies); resolving them
+// here keeps the prefix/quality/restriction/negative layers in compiled VIDEO
+// prompts instead of silently dropping every empty-body selection.
+var constraintPresetBodyResolver func(presetID string) (string, bool)
+
+// SetConstraintPresetBodyResolver registers the published preset lookup used
+// as a compatibility fallback for ID-only constraint selections.
+func SetConstraintPresetBodyResolver(resolver func(presetID string) (string, bool)) {
+	constraintPresetBodyResolver = resolver
+}
+
+func hydrateConstraintSelectionBodies(config *AIReasoningPromptConfig) {
+	if config == nil || constraintPresetBodyResolver == nil {
+		return
+	}
+	for index := range config.Constraints.Selections {
+		selection := &config.Constraints.Selections[index]
+		if strings.TrimSpace(selection.Body) != "" || strings.TrimSpace(selection.ID) == "" {
+			continue
+		}
+		if body, ok := constraintPresetBodyResolver(selection.ID); ok {
+			selection.Body = body
+		}
+	}
 }
 
 // normalizeProductionMode keeps historical books on the existing video path
