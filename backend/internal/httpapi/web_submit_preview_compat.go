@@ -149,6 +149,11 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "waiting_config", "reason": "organization_missing", "deferred": true, "error": "网站上传配置缺少组织归属，请先同步或重新保存上传配置"})
 				continue
 			}
+			sourceBookID, ok := webSubmitSourceBookID(meta, id)
+			if !ok {
+				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "waiting_config", "reason": "invalid_site_book_id", "deferred": true, "error": "任务缺少合法的网站书号（纯数字），无法提交"})
+				continue
+			}
 			gender, style := submissionGenderStyle(doc)
 			profileID := "default"
 			profileName := "默认配置"
@@ -164,7 +169,7 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 				order = append(order, key)
 			}
 			items := group["items"].([]any)
-			items = append(items, map[string]any{"id": id, "version": version, "size": len([]byte(content.Content)), "profile_id": profileID, "profile_name": profileName, "confirmation_only": false})
+			items = append(items, map[string]any{"id": id, "source_book_id": sourceBookID, "version": version, "size": len([]byte(content.Content)), "profile_id": profileID, "profile_name": profileName, "confirmation_only": false})
 			group["items"] = items
 		}
 	}

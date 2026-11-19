@@ -166,6 +166,12 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		if len(done) == 0 {
 			done = anyStrings(meta["site_submit_done_versions"])
 		}
+		// 内部任务 ID 可能带账号前缀，上传/回读必须使用网站书号。
+		uploadBookID, hasSiteBookID := webSubmitSourceBookID(meta, bookID)
+		confirmedHashes := map[string][]string{}
+		if hasSiteBookID && !request.Force {
+			confirmedHashes = webSubmitConfirmedContentHashes(ctx, store, owner, bookID, done)
+		}
 		deferredStatus := ""
 		for _, version := range versions {
 			row := map[string]any{"bookId": bookID, "version": version, "status": "error", "operation_id": operationID, "retryable": false, "readback_status": "not_started"}
@@ -187,6 +193,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": status, "reason": reason, "error": message, "time": time.Now().UTC().Format(time.RFC3339Nano), "externalRequested": false})
 				result.Results = append(result.Results, row)
 				manifestItem(bookID, version, status, reason, message)
+			}
+			if !hasSiteBookID {
+				markDeferred("waiting_config", "invalid_site_book_id", "任务缺少合法的网站书号（纯数字），无法提交")
+				continue
 			}
 			failedVersion := func(message string, externalRequested bool) {
 				row["error"] = message
@@ -270,7 +280,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					failedVersion("视频管理系统 Go 连接器未执行回读确认", false)
 					continue
 				}
-				confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, bookID)
+				confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, uploadBookID)
 				if readbackErr != nil {
 					uncertainVersion("上传已接收，正在等待目标站回读确认", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version]))
 					if errors.Is(readbackErr, videomanagementconnector.ErrSiteContractChanged) {
@@ -279,11 +289,11 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					continue
 				}
 				attempt := mapOrEmpty(mapOrEmpty(meta["siteSubmitAttempts"])[version])
-				if !submissionMatchesAttempt(confirmed, firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID), firstText(attempt["started_at"])) {
+				if !submissionMatchesAttempt(confirmed, firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], uploadBookID), firstText(attempt["started_at"])) {
 					// 与批量原文改文系统源码对齐：目标站已存在该书的提交记录
 					// 即视为已提交；时间戳和回执号只作为证据，不再阻塞任务。
 					if strings.TrimSpace(firstText(confirmed.ID, mapOrEmpty(confirmed.ReadbackRaw)["bookid"])) == "" {
-						uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], bookID))
+						uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], uploadBookID))
 						continue
 					}
 				}
@@ -325,6 +335,29 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					continue
 				}
 			}
+			// 与参考实现一致：正文（规范化换行后）与其他已确认版本完全相同则跳过，
+			// 避免同一内容以不同版本号重复上传。
+			if !request.Force {
+				if candidates := confirmedHashes[webSubmitCanonicalContentHash(content.Content)]; len(candidates) > 0 {
+					// 与参考实现一致：只与其他已确认版本比较，不把当前版本算作重复。
+					matchedVersion := ""
+					for _, candidate := range candidates {
+						if candidate != version {
+							matchedVersion = candidate
+							break
+						}
+					}
+					if matchedVersion != "" {
+						row["status"] = "skipped"
+						row["reason"] = "duplicate_content"
+						message := fmt.Sprintf("内容与已确认版本 %s 相同，跳过重复上传", matchedVersion)
+						row["error"] = message
+						result.Results = append(result.Results, row)
+						manifestItem(bookID, version, "skipped", "duplicate_content", message)
+						continue
+					}
+				}
+			}
 			organization := webSubmitOrganization(web, profile)
 			if organization == "" {
 				markDeferred("waiting_config", "organization_missing", "网站上传配置缺少组织归属，请先同步或重新保存上传配置")
@@ -354,7 +387,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 			pendingErrors[version] = "提交请求已开始，等待目标站确认"
 			meta["siteSubmitFailedErrors"] = pendingErrors
 			pendingReceipts := mapOrEmpty(meta["siteSubmitPendingConfirmation"])
-			pendingReceipts[version] = bookID
+			pendingReceipts[version] = uploadBookID
 			meta["siteSubmitPendingConfirmation"] = pendingReceipts
 			manifestItem(bookID, version, "executing", "submission_in_progress", "提交请求已开始，等待目标站确认")
 			if err := store.PutDocument(ctx, owner, doc); err != nil {
@@ -363,7 +396,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 			var submission videomanagementconnector.Submission
 			var submitErr error
 			for attempt := 0; attempt <= retryTimes; attempt++ {
-				submission, submitErr = targets[0].Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: bookID, Filename: bookID + ".txt", Content: []byte(content.Content), FormFields: fields})
+				submission, submitErr = targets[0].Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: uploadBookID, Filename: uploadBookID + ".txt", Content: []byte(content.Content), FormFields: fields})
 				if submitErr == nil {
 					break
 				}
@@ -373,7 +406,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 			}
 			if submitErr != nil {
 				if errors.Is(submitErr, videomanagementconnector.ErrSiteContractChanged) {
-					uncertainVersion("接口结构变化，提交结果待回读确认；不会重复上传", bookID)
+					uncertainVersion("接口结构变化，提交结果待回读确认；不会重复上传", uploadBookID)
 					return result, blockContract()
 				}
 				if errors.Is(submitErr, videomanagementconnector.ErrSessionExpired) || errors.Is(submitErr, videomanagementconnector.ErrSessionMissing) {

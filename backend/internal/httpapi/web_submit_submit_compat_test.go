@@ -27,6 +27,29 @@ type uncertainSubmitConnector struct {
 	readbackCalls int
 }
 
+type recordingSubmitConnector struct {
+	submitCalls int
+	lastInput   videomanagementconnector.SubmissionInput
+}
+
+func (c *recordingSubmitConnector) Login(context.Context, videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
+	return videomanagementconnector.Session{}, nil
+}
+func (c *recordingSubmitConnector) CheckSession(context.Context, videomanagementconnector.Session) error {
+	return nil
+}
+func (c *recordingSubmitConnector) RefreshCatalogs(context.Context, videomanagementconnector.Session) (videomanagementconnector.Catalogs, error) {
+	return videomanagementconnector.Catalogs{}, nil
+}
+func (c *recordingSubmitConnector) Submit(_ context.Context, _ videomanagementconnector.Session, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+	c.submitCalls++
+	c.lastInput = input
+	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted"}, nil
+}
+func (c *recordingSubmitConnector) GetSubmission(context.Context, videomanagementconnector.Session, string) (videomanagementconnector.Submission, error) {
+	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted", Message: "已确认", ReadbackRaw: map[string]any{"success": true}}, nil
+}
+
 func (c *uncertainSubmitConnector) Login(context.Context, videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
 	return videomanagementconnector.Session{}, nil
 }
@@ -194,18 +217,18 @@ func TestWebSubmitPreviewBlocksUnclassifiedStyle(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
-		BookID: "book-preview", Gender: "女频", Meta: map[string]any{"style": "待判定", "platformId": "1"},
+		BookID: "700001", Gender: "女频", Meta: map[string]any{"style": "待判定", "platformId": "1"},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "book-preview", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "正文"}); err != nil {
+	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "700001", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "正文"}); err != nil {
 		t.Fatal(err)
 	}
 
 	mux := http.NewServeMux()
 	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}}
 	RegisterWebSubmitPreviewCompat(mux, middleware, store)
-	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/preview", stringsReader(`{"taskIds":["book-preview"],"versions":["ai1"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/preview", stringsReader(`{"taskIds":["700001"],"versions":["ai1"]}`))
 	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
@@ -363,11 +386,11 @@ func TestWebSubmitBlocksUnclassifiedStyleAndPersistsFailureLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
-		BookID: "book-submit", Gender: "女频", Meta: map[string]any{"style": "未判定", "platformId": "1"},
+		BookID: "700002", Gender: "女频", Meta: map[string]any{"style": "未判定", "platformId": "1"},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "book-submit", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "正文"}); err != nil {
+	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "700002", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "正文"}); err != nil {
 		t.Fatal(err)
 	}
 	usersDir := t.TempDir()
@@ -381,7 +404,7 @@ func TestWebSubmitBlocksUnclassifiedStyleAndPersistsFailureLog(t *testing.T) {
 	mux := http.NewServeMux()
 	middleware := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: &authTestStore{account: auth.Account{Username: "tester", Active: true}, session: auth.Session{Username: "tester", Token: "test-session", ExpiresAt: now.Add(time.Hour)}}}
 	RegisterWebSubmitSubmitCompat(mux, middleware, usersDir, store, nil, nil)
-	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/submit", stringsReader(`{"taskIds":["book-submit"],"versions":["ai1"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/submit", stringsReader(`{"taskIds":["700002"],"versions":["ai1"]}`))
 	req.Header.Set("Authorization", "Bearer test-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
@@ -408,7 +431,7 @@ func TestWebSubmitBlocksUnclassifiedStyleAndPersistsFailureLog(t *testing.T) {
 	if payload.Results[0]["status"] != "waiting_classify" || payload.Results[0]["deferred"] != true {
 		t.Fatalf("blocked item must be deferred, not failed: %s", res.Body.String())
 	}
-	doc, err := store.GetDocument(context.Background(), "tester", "book-submit")
+	doc, err := store.GetDocument(context.Background(), "tester", "700002")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -611,6 +634,114 @@ func TestWebSubmitForceResubmitsConfirmedVersion(t *testing.T) {
 	}
 	if row, _ := result.Results[0].(map[string]any); row["status"] != "skipped" {
 		t.Fatalf("result=%#v", result.Results[0])
+	}
+}
+
+func TestWebSubmitUsesSourceBookIDForUpload(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
+		"enabled": true, "min_file_size": 0, "organization": "org-1",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "owner-777", Gender: "女频", Meta: map[string]any{
+		"style": "现代悬疑", "platformId": "1", "source_book_id": "888888",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "owner-777", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "满足字数的正文内容，继续描述情节发展。"}); err != nil {
+		t.Fatal(err)
+	}
+	usersDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(usersDir, "tester"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	connector := &recordingSubmitConnector{}
+	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"owner-777"}, Versions: []string{"ai1"}}, nil, connector)
+	if err != nil || connector.submitCalls != 1 || result.Success != 1 {
+		t.Fatalf("result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	}
+	if connector.lastInput.BookID != "888888" || connector.lastInput.Filename != "888888.txt" {
+		t.Fatalf("upload must use source book id: %#v", connector.lastInput)
+	}
+}
+
+func TestWebSubmitRejectsInvalidSiteBookID(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
+		"enabled": true, "min_file_size": 0, "organization": "org-1",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "owner-777", Gender: "女频", Meta: map[string]any{
+		"style": "现代悬疑", "platformId": "1",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "owner-777", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "满足字数的正文内容，继续描述情节发展。"}); err != nil {
+		t.Fatal(err)
+	}
+	usersDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(usersDir, "tester"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	connector := &recordingSubmitConnector{}
+	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"owner-777"}, Versions: []string{"ai1"}}, nil, connector)
+	if err != nil || connector.submitCalls != 0 || len(result.Results) != 1 {
+		t.Fatalf("result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	}
+	row, _ := result.Results[0].(map[string]any)
+	if row["status"] != "waiting_config" || row["reason"] != "invalid_site_book_id" {
+		t.Fatalf("row=%#v", row)
+	}
+}
+
+func TestWebSubmitSkipsDuplicateContent(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
+		"enabled": true, "min_file_size": 0, "organization": "org-1",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "777777", Gender: "女频", Meta: map[string]any{
+		"style": "现代悬疑", "platformId": "1", "siteSubmitDoneVersions": []any{"ai1"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for version, content := range map[string]string{
+		"ai1": "满足字数的正文内容\r\n继续描述情节发展。",
+		"ai2": "满足字数的正文内容\n继续描述情节发展。",
+	} {
+		if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "777777", BodyRef: novelfetchworkshop.BodyRef{VersionID: version}, Content: content}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	usersDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(usersDir, "tester"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	connector := &recordingSubmitConnector{}
+	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"777777"}, Versions: []string{"ai1", "ai2"}}, nil, connector)
+	if err != nil || connector.submitCalls != 0 {
+		t.Fatalf("duplicate content must not upload: result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	}
+	found := false
+	for _, item := range result.Results {
+		if row, ok := item.(map[string]any); ok && row["reason"] == "duplicate_content" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("missing duplicate_content result: %#v", result.Results)
 	}
 }
 

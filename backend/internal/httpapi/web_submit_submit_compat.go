@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -249,6 +251,50 @@ func resolveSubmissionGender(ctx context.Context, doc *novelfetchworkshop.Docume
 func styleNeedsResolution(meta map[string]any) bool {
 	style := strings.TrimSpace(firstText(meta["style"], meta["styleName"], meta["style_name"]))
 	return style == "" || style == "待判定" || style == "未判定"
+}
+
+// webSubmitSourceBookID 解析目标站认可的书号。内部任务 ID 可能带账号前缀，
+// 因此优先取 source/display/book 字段；只接受纯数字，与连接器回读约束一致。
+func webSubmitSourceBookID(meta map[string]any, bookID string) (string, bool) {
+	source := strings.TrimSpace(firstText(
+		meta["source_book_id"], meta["sourceBookId"],
+		meta["display_book_id"], meta["displayBookId"],
+		meta["book_id"], meta["bookId"], bookID,
+	))
+	if source == "" {
+		return "", false
+	}
+	for _, char := range source {
+		if char < '0' || char > '9' {
+			return "", false
+		}
+	}
+	return source, true
+}
+
+// webSubmitCanonicalContentHash 与参考实现一致：统一换行后计算 SHA-256，
+// 用于判断不同版本是否承载了完全相同的正文。
+func webSubmitCanonicalContentHash(text string) string {
+	normalized := strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
+	if strings.TrimSpace(normalized) == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(sum[:])
+}
+
+func webSubmitConfirmedContentHashes(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, versions []string) map[string][]string {
+	hashes := map[string][]string{}
+	for _, version := range uniqueStrings(versions) {
+		body, err := store.GetBody(ctx, owner, bookID, version)
+		if err != nil || strings.TrimSpace(body.Content) == "" {
+			continue
+		}
+		if hash := webSubmitCanonicalContentHash(body.Content); hash != "" {
+			hashes[hash] = append(hashes[hash], version)
+		}
+	}
+	return hashes
 }
 
 func uniqueStrings(values []string) []string {
