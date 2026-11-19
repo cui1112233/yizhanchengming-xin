@@ -180,6 +180,7 @@ test('treats manually generated comic page primaries as image-ready', () => {
     ]
   };
   const timeline = batchFactoryBookTimeline(book, {
+    productionMode: 'comic',
     stageSummary: { runs: [], comicImageReady: true, comicImageReadyCount: 2, comicImageTotalCount: 2 }
   });
   assert.equal(timeline.find(item => item.key === 'video')?.status, 'completed');
@@ -212,6 +213,7 @@ test('marks a persisted comic collection as complete after all page images are r
     videos: [{ id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '图片一' }]
   };
   const timeline = batchFactoryBookTimeline(book, {
+    productionMode: 'comic',
     stageSummary: { runs: [], comicImageReady: true, comicImageReadyCount: 1, comicImageTotalCount: 1, comicCollectionReady: true, comicCollectionCount: 1, comicCollectionPageCount: 1 }
   });
   assert.equal(timeline.find(item => item.key === 'complete')?.status, 'completed');
@@ -295,6 +297,23 @@ test('uses comic production labels instead of video merge and upload labels', ()
   assert.deepEqual(timeline.map(item => item.label), ['原文已就绪', '漫画资产已就绪', '漫画分页与提示词已就绪', '漫画图片生成', '漫画合集']);
   assert.equal(timeline.find(item => item.key === 'video').label, '漫画图片生成');
   assert.equal(batchFactoryBookState(book, { productionMode: 'comic' }).detail, '漫画分页与提示词已就绪，等待生成漫画图片');
+});
+
+test('a video batch keeps the video timeline even when books carry legacy comic signals', () => {
+  // 批次切回视频生产后，书级遗留信号（旧漫画 patch、漫画资产、comicPrompt）
+  // 不允许把列表口径翻回漫画：统计、时间线都必须按视频语义显示。
+  const book = {
+    id: 'legacy-comic-in-video-batch',
+    sourceText: '正文',
+    settingsState: { patch: { productionMode: 'comic', aiPromptConfig: { comic: { enabled: true, body: '漫画提示词' } } } },
+    assetRecords: [{ id: 'comic-asset', source: 'comic' }],
+    videos: [{ id: 'comic-page-1', comicPrompt: '画面提示词', comicImagePrompt: '出图提示词' }]
+  };
+  const timeline = batchFactoryBookTimeline(book, { productionMode: 'video' });
+  assert.deepEqual(timeline.map(item => item.label), ['原文已就绪', '资产（人物/场景/图片）已就绪', '文本提示词已就绪', '视频生成', '上传网络', '完成']);
+  const state = batchFactoryBookState(book, { productionMode: 'video' });
+  assert.equal(state.label, '待开始');
+  assert.equal(state.detail, '原文已就绪');
 });
 
 test('counts only successfully uploaded books as batch completion', () => {

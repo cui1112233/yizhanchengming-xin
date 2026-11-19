@@ -8,6 +8,7 @@ const FIX_TARGET_LABELS = {
   book_settings: '单书设置',
   preset: '自动化预设',
   admin_models: '管理员 → 水货生产模型',
+  api_config: '个人中心 → API 配置',
   publish_settings: '发布设置'
 };
 

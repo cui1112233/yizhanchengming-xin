@@ -16,6 +16,7 @@ import {
   updateAutomationPreset
 } from '../../../shared/api/batchFactory';
 import { modelOptionsForProvider, normalizeModelProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
+import { automationPresetMode, automationPresetModeLabel, automationPresetsForMode, withAutomationPresetMode } from './batchFactoryAutomationSchedule';
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { audioMatchingModeOptions, normalizeBatchAutoAudioConfig } from './batchFactoryAudioCategory';
 import { getConstraintPresetTexts } from '../../../shared/api/generation';
@@ -627,13 +628,16 @@ export function BatchFactoryAiReasoningForm({ value, onChange, batchId, producti
   </Space>;
 }
 
-export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
+export function BatchFactoryAutomationPresetManager({ value, onLoad, productionMode = '' }) {
   const [presetOpen, setPresetOpen] = useState(false);
   const [presets, setPresets] = useState([]);
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [presetName, setPresetName] = useState('');
   const [presetBusy, setPresetBusy] = useState(false);
   const selectedPreset = presets.find(item => item.id === selectedPresetId);
+  // 预设按漫画/视频分家：下拉只显示与当前批次模式匹配（或通用）的预设，
+  // 标签标注归属；旧预设没有 config.productionMode 时视为「通用」。
+  const presetOptions = automationPresetsForMode(presets, productionMode);
   const loadPresets = async () => {
     const result = await listAutomationPresets();
     const values = Array.isArray(result?.presets) ? result.presets : [];
@@ -651,14 +655,15 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
   };
   const editPreset = () => {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
+    const modeSuffix = productionMode ? `预设将标记为${automationPresetModeLabel(productionMode)}预设。` : '';
     Modal.confirm({
       title: `编辑预设“${selectedPreset.name}”`,
-      content: '把当前统一配置草稿覆盖写入该预设，名称不变。建议先载入预设并调整配置，再点这里保存；已排期或执行中的任务不受影响。',
+      content: `把当前统一配置草稿覆盖写入该预设，名称不变。${modeSuffix}建议先载入预设并调整配置，再点这里保存；已排期或执行中的任务不受影响。`,
       okText: '覆盖保存',
       cancelText: '取消',
       onOk: async () => {
         try {
-          await updateAutomationPreset(selectedPreset.id, { name: selectedPreset.name, config: normalizeBatchAutoAudioConfig(value), expectedVersion: selectedPreset.version });
+          await updateAutomationPreset(selectedPreset.id, { name: selectedPreset.name, config: withAutomationPresetMode(normalizeBatchAutoAudioConfig(value), productionMode), expectedVersion: selectedPreset.version });
           await loadPresets();
           message.success('自动化预设已更新。');
         } catch (error) {
@@ -671,7 +676,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
     const name = presetName.trim();
     if (!name) return message.warning('请填写预设名称');
     setPresetBusy(true);
-    try { const result = await createAutomationPreset({ name, config: normalizeBatchAutoAudioConfig(value) }); const saved = result?.preset || result; await loadPresets(); setSelectedPresetId(saved?.id || ''); setPresetName(''); message.success('已保存自动化预设。'); }
+    try { const result = await createAutomationPreset({ name, config: withAutomationPresetMode(normalizeBatchAutoAudioConfig(value), productionMode) }); const saved = result?.preset || result; await loadPresets(); setSelectedPresetId(saved?.id || ''); setPresetName(''); message.success(productionMode ? `已保存为${automationPresetModeLabel(productionMode)}预设。` : '已保存自动化预设。'); }
     catch (error) { message.error(error?.message || '保存自动化预设失败'); }
     finally { setPresetBusy(false); }
   };
@@ -691,7 +696,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
   return <><Tooltip title="自动化预设"><Button type="text" icon={<SettingOutlined />} aria-label="自动化预设" onClick={openPresetManager} /></Tooltip>
   <Modal className="batch-factory-automation-preset-modal" title="自动化预设" open={presetOpen} onCancel={() => setPresetOpen(false)} footer={null} width={620} destroyOnClose><Space direction="vertical" size={14} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>预设只保存统一配置 <HelpTip title="预设只保存统一配置">不保存正文、资产、导演结果或视频结果；载入后仍须确认当前统一配置才会应用到批量。</HelpTip></span>} />
-    <label className="batch-factory-engine-field"><span><b>已保存预设</b></span><Select allowClear value={selectedPresetId || undefined} onChange={setSelectedPresetId} placeholder="选择自动化预设" options={presets.map(item => ({ value: item.id, label: `${item.name} · v${item.version}` }))} /></label>
+    <label className="batch-factory-engine-field"><span><b>已保存预设</b>{productionMode ? <small>（{automationPresetModeLabel(productionMode)}）</small> : null}</span><Select allowClear value={selectedPresetId || undefined} onChange={setSelectedPresetId} placeholder="选择自动化预设" options={presetOptions.map(item => ({ value: item.id, label: `${item.name} · v${item.version} · ${automationPresetModeLabel(automationPresetMode(item))}` }))} /></label>
     <Space wrap><Button disabled={!selectedPreset} onClick={loadPreset}>载入预设</Button><Tooltip title="把当前统一配置草稿保存回所选预设：先载入预设并调整配置，再点此按钮覆盖保存"><Button disabled={!selectedPreset} onClick={editPreset}>编辑所选预设</Button></Tooltip></Space>
     <Divider />
     <label className="batch-factory-engine-field"><span><b>{selectedPreset ? '预设新名称' : '新预设名称'}</b></span><Input value={presetName} maxLength={255} placeholder={selectedPreset?.name || '例如：女频 H3 全自动'} onChange={event => setPresetName(event.target.value)} /></label>
@@ -770,7 +775,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     } finally { setModeSaving(false); }
   };
   const productionMode = batchFactoryProductionModeVisibility(draftPatch.productionMode).mode;
-  return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} onLoad={setDraftPatch} /><span>统一配置</span><BatchFactoryProductionModeControl value={draftPatch.productionMode} disabled={modeSaving} onChange={changeProductionMode} /></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><span className="batch-factory-unified-settings-scope">保存将覆盖本批次 {(Array.isArray(batch?.books) ? batch.books.length : 0) || 0} 本书的对应配置（包括单书已改过的值）</span><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
+  return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} productionMode={productionMode} onLoad={setDraftPatch} /><span>统一配置</span><BatchFactoryProductionModeControl value={draftPatch.productionMode} disabled={modeSaving} onChange={changeProductionMode} /></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><span className="batch-factory-unified-settings-scope">保存将覆盖本批次 {(Array.isArray(batch?.books) ? batch.books.length : 0) || 0} 本书的对应配置（包括单书已改过的值）</span><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
     {modeNotice ? <Alert type="warning" showIcon closable message={modeNotice} style={{ marginBottom: 12 }} onClose={() => setModeNotice('')} /> : null}
     <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={draftPatch} onChange={setDraftPatch} sections={['models', 'audio', 'sensitive']} active={open && activeTab === 'models'} /> },

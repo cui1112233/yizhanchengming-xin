@@ -29,7 +29,7 @@ const (
 // 与 frontend/src/shared/apiErrorCodes.json 完全一致的文案镜像，仅用于契约
 // 测试与未来按码取文案；现有 error 响应仍走各自的既有中文。
 const (
-	MessageImageModelNotConfigured    = "图片模型未配置：请到「管理员 → 水货生产模型」添加并启用图片模型，并填写服务地址与服务端密钥。"
+	MessageImageModelNotConfigured    = "图片模型未配置：请到「个人中心 → API 配置」添加并启用图片模型，并填写服务地址与服务端密钥。"
 	MessageVideoProviderNotConfigured = "视频生成通道未配置：请到「批量工厂 → 设置 → 视频生成通道」选择通道并填写密钥后保存。"
 	MessageExecutorNotReady           = "执行器未就绪：请到「设置 → 执行器状态」生成配对码并安装执行器；巨量素材也可改用“优先直接获取原文”。"
 	MessageGiantPluginNotConfigured   = "巨量素材解析服务未配置：请在服务器设置 QIANTIE_GIANT_MATERIAL_PLUGIN_URL/TOKEN（或青语 N8 令牌）后重试。"

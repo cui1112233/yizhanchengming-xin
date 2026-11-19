@@ -1002,11 +1002,20 @@ func automationResumeShouldRunStage(resumeStage, stage string) bool {
 }
 
 // automationResumeStageForBook prevents a retry that previously failed at
-// video/merge/upload from skipping an opening prompt that is still missing.
-// It only moves the resume point backwards to opening; completed assets and
-// director work remain reused.
+// video/merge/upload from skipping stages whose output is still missing.
+// Assets that were never extracted (for example because the image switch used
+// to skip the whole stage) are generated first; completed assets and director
+// work remain reused, and a missing opening prompt still downgrades the resume
+// point to opening.
 func automationResumeStageForBook(resumeStage string, batch batchfactoryv11.Batch, book batchfactoryv11.Book) string {
-	if strings.TrimSpace(resumeStage) != "" && automationOpeningEnabled(batch, book) && !batchfactoryv11.OpeningStageComplete(batch, book) && !automationResumeShouldRunStage(resumeStage, "opening") {
+	resume := strings.TrimSpace(resumeStage)
+	if resume == "" {
+		return resumeStage
+	}
+	if !automationAssetsComplete(book) && !automationResumeShouldRunStage(resume, "assets") {
+		return "assets"
+	}
+	if automationOpeningEnabled(batch, book) && !batchfactoryv11.OpeningStageComplete(batch, book) && !automationResumeShouldRunStage(resume, "opening") {
 		return "opening"
 	}
 	return resumeStage
@@ -1958,11 +1967,18 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	if runMode == "full_submit" {
 		autoPublish = true
 	}
+	// 任务记录批次生产模式，前端用它判断“自动就绪”数字是否仍适用于当前批次。
+	// 旧前端/旧任务没有该字段时回退到批次设置，再不行就留空（视为通用）。
+	productionMode := automationStringValue(input["productionMode"], "")
+	if productionMode != "comic" && productionMode != "video" {
+		productionMode = batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, nil)
+	}
 	job := map[string]any{
 		"id": jobID, "owner": owner, "batchId": batchID, "state": initialState,
 		"runMode": runMode, "autoPublish": autoPublish, "forceRegenerate": forceRegenerate,
 		"scheduleMode": scheduleMode, "scheduledAt": scheduledAt,
 		"concurrency": automationNumberValue(input["concurrency"], 1), "preset": map[string]any{"id": preset.ID, "name": preset.Name, "version": preset.Version},
+		"productionMode": productionMode,
 		"createdAt": c.now(), "updatedAt": c.now(),
 		"counts": automationCounts(len(targetBooks), len(targetBooks), 0, 0), "books": map[string]any{},
 	}

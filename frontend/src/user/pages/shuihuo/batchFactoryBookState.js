@@ -203,7 +203,9 @@ export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, 
   // plural key. Accept both shapes so its timeline uses the same live status
   // as the list row.
   stageSummary = stageSummary || stageSummaries;
-  const comicMode = productionMode === 'comic' || book?.settingsState?.patch?.productionMode === 'comic' || book?.settingsState?.patch?.aiPromptConfig?.comic?.enabled === true || (book?.assetRecords || []).some(asset => asset?.source === 'comic') || (book?.videos || []).some(video => String(video?.comicPrompt || '').trim());
+  // 漫画/视频口径只看批次级 productionMode（effectiveBookSettings 已定批次优先）。
+  // 书级遗留信号（旧 patch、漫画资产、comicPrompt）不再把视频批次翻回漫画口径。
+  const comicMode = productionMode === 'comic';
   const sourceReady = Boolean(batchFactorySourceText(book?.sourceText));
   const assets = latestStageRun(stageSummary, 'assets');
   const director = latestStageRun(stageSummary, 'director');
@@ -291,7 +293,8 @@ export function batchFactoryBookState(book, { productionStatus, mergeStatus, sta
   if (sourceText && ['processing', 'queued'].includes(classifyStatus)) {
     return { label: '执行中…', detail: '男女频/风格分类：正在识别', tone: 'blue', manual };
   }
-  const comicMode = productionMode === 'comic' || book?.settingsState?.patch?.productionMode === 'comic' || book?.settingsState?.patch?.aiPromptConfig?.comic?.enabled === true || (book?.assetRecords || []).some(asset => asset?.source === 'comic') || (book?.videos || []).some(video => String(video?.comicPrompt || '').trim());
+  // 与 batchFactoryBookTimeline 一致：只认批次级 productionMode。
+  const comicMode = productionMode === 'comic';
   const timeline = batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary, productionMode: comicMode ? 'comic' : productionMode });
   const completeStep = timeline.find(item => item.key === 'complete');
   // 漫画模式下“完成”只代表合集已整理；只有发布记录落地（或状态回写）才算发布完成。

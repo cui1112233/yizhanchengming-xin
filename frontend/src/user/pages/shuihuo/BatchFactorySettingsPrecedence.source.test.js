@@ -177,7 +177,9 @@ test('unified settings save closes the dialog before audio measurement and promp
   assert.ok(background.length, 'background sync not found');
   assert.match(background, /await ensureBookAudioDuration\(book, \{ force: true, quiet: true, batchSnapshot: initialBatch \}\)/, 'background must measure per book using the per-book effective settings snapshot');
   assert.match(background, /await recompileUnifiedH3Prompts\(compiledBatch\)/);
-  assert.match(novelList, /后台处理中 · 配音测量 \$\{backgroundSettingsTask\.done\}\/\$\{backgroundSettingsTask\.total\}/);
+  assert.match(novelList, /后台处理中 · 视频配音测量 \$\{backgroundSettingsTask\.done\}\/\$\{backgroundSettingsTask\.total\}/);
+  // 每行重复的配音徽标已删除，只保留表格上方的一条总条。
+  assert.doesNotMatch(novelList, /batch-factory-book-row-bg-task/);
   assert.match(novelList, /重试后台处理/);
 });
 

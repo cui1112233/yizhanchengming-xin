@@ -173,7 +173,7 @@ import { BOOK_CONFIG_REGIONS, bookAssetSummary, bookConfigRegionStatus } from '.
 import { videoProviderForModel } from './videoProviderBinding';
 import { modelOptionsForProvider } from './providerModelBinding';
 import { stripBaseSetupSection } from '../scriptFinalSegment';
-import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
+import { automationPresetMode, automationPresetModeLabel, automationPresetsForMode, formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
 import { prioritizeBatchBook } from '../../../shared/api/batchFactoryPriority.js';
 import { batchFactoryPriorityAction } from './batchFactoryPriority.js';
 import { batchFactoryBookStageBadge, manualRetryBooks } from './batchFactoryBookStageBadge.js';
@@ -231,7 +231,7 @@ const BATCH_FACTORY_TABLE_COLUMNS = [
 
 
 
-function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks, onAddGiantBooks }) {
+function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, batch, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks, onAddGiantBooks }) {
   const selected = new Set(selectedBookIds);
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
   const selectedCount = selectedBookIds.length;
@@ -279,7 +279,7 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
       </span><span>入厂内容</span><span>风格</span><span>男女频</span><span>状态</span><span>操作</span>
     </div>
     {books.map((book, index) => {
-      const row = batchFactoryNovelTableRow(book, index, createdAt, { productionStatus, mergeStatus, stageSummary: stageSummaries?.[book.id] });
+      const row = batchFactoryNovelTableRow(book, index, createdAt, { productionStatus, mergeStatus, stageSummary: stageSummaries?.[book.id], productionMode: effectiveBookSettings(batch, book).productionMode });
       const metadata = book.sourceMetadata || {};
       const sourceSummary = batchFactorySourceSummary(book);
       const sourceStatus = batchFactorySourceStatus(book);
@@ -3774,6 +3774,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const mergeCapability = capability(capabilities, 'merge.run');
   const automationState = String(automationStatus?.state || 'idle');
   const automationCounts = automationStatus?.counts || { total: 0, ready: 0, running: 0, pending: 0, failed: 0, blocked: 0 };
+  // 后端 job 记录了启动时的生产模式。旧任务没有该字段视为通用，数字仍然显示；
+  // 模式不匹配时“自动就绪”数字属于另一个模式的旧任务，不再误导当前批次。
+  const automationJobMode = ['comic', 'video'].includes(String(automationStatus?.productionMode || '').trim()) ? String(automationStatus.productionMode).trim() : '';
   const automationActive = ['running', 'paused', 'scheduled', 'needs_attention'].includes(automationState);
   const automationStartBlockedLabel = '已有任务待处理，请先在任务/日志中处理当前任务';
   const automationStartButtonLabel = automationState === 'scheduled' ? '已有预约' : automationState === 'running' ? '运行中' : '待处理';
@@ -5136,7 +5139,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       setComicAnalysisCharacters(Number(firstBook?.sourceMetadata?.comicAnalysisCharacters || 2000));
       setContentCaptureCharacters(Number(firstBook?.sourceMetadata?.contentCaptureCharacters || 4000));
       const values = await loadAutomationPresets();
-      setAutomationPresetID(current => current || values[0]?.id || '');
+      // 默认选中第一个与当前批次模式匹配（或通用）的预设，避免选中另一个模式的预设。
+      setAutomationPresetID(current => current || automationPresetsForMode(values, batchProductionMode)[0]?.id || '');
       setAutomationScheduledAt(current => current || formatBeijingDatetimeLocal(new Date(Date.now() + 10 * 60 * 1000).toISOString()));
       const scopeBookIds = Array.isArray(explicitBookIds) ? explicitBookIds : selectedBookIds;
       setAutomationBookScope(scopeBookIds.length ? 'selected' : 'all');
@@ -5240,6 +5244,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     setAutomationPreflightOpen(false);
     // 水货生产模型页路由以 frontend/src/admin/App.jsx 的路由表为准（/admin/shuihuo-models）。
     if (fixTarget === 'admin_models') { window.location.assign('/admin/shuihuo-models'); return; }
+    // 图片模型统一配置入口在个人中心 → API 配置（/api-config）。
+    if (fixTarget === 'api_config') { window.location.assign('/api-config'); return; }
     if (fixTarget === 'book_settings') {
       const targetBook = books.find(book => book.id === bookId);
       if (targetBook) { setConfigTarget({ book: targetBook }); return; }
@@ -5306,6 +5312,15 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         ? selectedBookIds
         : [];
     if (key === 'start' && !selectedPresetID) { message.warning('请先选择自动化预设'); return; }
+    if (key === 'start') {
+      // 预设已按漫画/视频分家：另一个模式的预设不允许套到当前批次上。
+      const presetValues = automationPresets.length ? automationPresets : await loadAutomationPresets();
+      const presetMode = automationPresetMode((presetValues || []).find(item => String(item?.id || '') === String(selectedPresetID)));
+      if (presetMode && presetMode !== batchProductionMode) {
+        message.warning(`所选预设属于${automationPresetModeLabel(presetMode)}生产模式，不能用于当前${batchProductionMode === 'comic' ? '漫画' : '视频'}批次，请换一个预设`);
+        return;
+      }
+    }
     if (key === 'start' && automationBookScope === 'selected' && !targetBookIDs.length) { message.warning('请先勾选要执行的小说'); return; }
     if (key === 'start' && immediate && !skipPreflight) {
       // 客户端能力是全局开关，先给一条明确提示；逐本配置问题交给服务端预检面板。
@@ -5709,7 +5724,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 		{batchProductionMode === 'video' ? <Tooltip title={cancelCapability.available ? '取消可取消的本地执行器任务；其它供应商保持在途状态。' : cancelCapability.reason}><Button className="shuihuo-cancel-button" type="text" loading={actionBusy === 'cancel'} disabled={!cancelCapability.available || Boolean(actionBusy)} onClick={cancelProduction}>取消操作</Button></Tooltip> : null}
       </div>
       <div className="shuihuo-workbench-export"><Button type="text" icon={<BarsOutlined />} onClick={() => setLogsOpen(true)}>任务/日志</Button><Dropdown menu={{ items: uploadMenuItems, onClick: ({ key }) => batchProductionMode === 'comic' ? openComicBatchPublish(key) : setUploadMode(key) }}><Button icon={<UploadOutlined />}>{batchProductionMode === 'comic' ? '发布漫画' : '上传网络'}</Button></Dropdown></div>
-      <div className="shuihuo-project-stats"><span><b>{books.length}</b> 本小说</span>{hasComicBooks ? <><span className="is-uploaded"><b>{comicStats.imageReady}/{comicStats.imageTotal}</b> 漫画图片</span><span><b>{comicStats.collections}</b> 漫画合集（{comicStats.collectionPages} 页）</span><span className={comicStats.published > 0 ? 'is-uploaded' : 'is-disabled'}><b>{comicStats.published}</b> 已发布合集</span></> : <><span className="is-uploaded"><b>{batchProgress.uploaded}</b> 上传成功</span>{batchProgress.failed ? <span className="is-failed"><b>{batchProgress.failed}</b> 异常</span> : null}{batchProgress.running ? <span className="is-running"><b>{batchProgress.running}</b> 执行中</span> : null}{batchProgress.awaitingUpload ? <span className="is-awaiting-upload"><b>{batchProgress.awaitingUpload}</b> 待上传</span> : null}{batchProgress.pending ? <span><b>{batchProgress.pending}</b> 待开始</span> : null}</>}{automationState !== 'idle' ? <span className={automationState === 'needs_attention' ? 'is-failed' : automationActive ? 'is-running' : 'is-awaiting-upload'}><b>{automationCounts.ready || 0}/{automationCounts.total || books.length}</b> 自动就绪</span> : null}{!hasComicBooks ? <><span><b>{mediaCounts.storyboards}</b> 分镜</span>{productionCapability.available ? <span className="is-running"><b>{mediaCounts.playable}</b> 可播放</span> : <span className="is-disabled">视频模块未启用</span>}{mergeCapability.available ? <span className="is-uploaded"><b>{mediaCounts.merges}</b> 成片</span> : <span className="is-disabled">合并模块未启用</span>}</> : null}</div>
+      <div className="shuihuo-project-stats"><span><b>{books.length}</b> 本小说</span>{hasComicBooks ? <><span className="is-uploaded"><b>{comicStats.imageReady}/{comicStats.imageTotal}</b> 漫画图片</span><span><b>{comicStats.collections}</b> 漫画合集（{comicStats.collectionPages} 页）</span><span className={comicStats.published > 0 ? 'is-uploaded' : 'is-disabled'}><b>{comicStats.published}</b> 已发布合集</span></> : <><span className="is-uploaded"><b>{batchProgress.uploaded}</b> 上传成功</span>{batchProgress.failed ? <span className="is-failed"><b>{batchProgress.failed}</b> 异常</span> : null}{batchProgress.running ? <span className="is-running"><b>{batchProgress.running}</b> 执行中</span> : null}{batchProgress.awaitingUpload ? <span className="is-awaiting-upload"><b>{batchProgress.awaitingUpload}</b> 待上传</span> : null}{batchProgress.pending ? <span><b>{batchProgress.pending}</b> 待开始</span> : null}</>}{automationState !== 'idle' ? (automationJobMode && automationJobMode !== batchProductionMode ? <span className="is-disabled"><b></b>上次任务：{automationJobMode === 'comic' ? '漫画' : '视频'}自动生产</span> : <span className={automationState === 'needs_attention' ? 'is-failed' : automationActive ? 'is-running' : 'is-awaiting-upload'}><b>{automationCounts.ready || 0}/{automationCounts.total || books.length}</b> 自动就绪</span>) : null}{!hasComicBooks ? <><span><b>{mediaCounts.storyboards}</b> 分镜</span>{productionCapability.available ? <span className="is-running"><b>{mediaCounts.playable}</b> 可播放</span> : <span className="is-disabled">视频模块未启用</span>}{mergeCapability.available ? <span className="is-uploaded"><b>{mediaCounts.merges}</b> 成片</span> : <span className="is-disabled">合并模块未启用</span>}</> : null}</div>
     </header>
     {
       novelListOpen ? (
@@ -5743,6 +5758,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             mergeStatus={mergeStatus}
             stageSummaries={stageSummaries}
             batchId={batch?.id}
+            batch={batch}
             onContentReady={refreshBatch}
             onBackfill121Metadata={backfill121Metadata}
             backfilling121Metadata={actionBusy === "backfill-121-metadata"}
@@ -5828,8 +5844,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
               {backgroundSettingsTask.running ? (
                 <span className="batch-factory-background-task-text">
                   {backgroundSettingsTask.phase === 'recompile'
-                    ? '后台处理中 · 重编译提示词…'
-                    : `后台处理中 · 配音测量 ${backgroundSettingsTask.done}/${backgroundSettingsTask.total}`}
+                    ? '后台处理中 · 重编译最终视频提示词…'
+                    : `后台处理中 · 视频配音测量 ${backgroundSettingsTask.done}/${backgroundSettingsTask.total}`}
                   {backgroundSettingsTask.currentTitle ? `（${backgroundSettingsTask.currentTitle}）` : ''}
                 </span>
               ) : backgroundSettingsTask.errors.length ? (
@@ -6380,11 +6396,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     </div>
                   </div>
                 </div>
-                {backgroundSettingsTask?.running ? (
-                  <div className="batch-factory-book-row-bg-task" role="status">
-                    后台处理中 · 配音测量 {backgroundSettingsTask.done}/{backgroundSettingsTask.total}
-                  </div>
-                ) : null}
               </article>
             );
           })}

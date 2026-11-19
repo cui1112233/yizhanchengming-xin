@@ -32,7 +32,7 @@ export default function ImageCapacityControl({ modelId, aspectRatio = '9:16', ac
         setState(result);
         setError('');
       } catch (cause) {
-        if (!disposed && !controller.signal.aborted && generation.current === token) setError(cause.message || '无法读取图片并发状态');
+        if (!disposed && !controller.signal.aborted && generation.current === token) setError((cause.message || '无法读取图片并发状态').replace(/^capability unavailable\s*[:：]\s*/i, ''));
       } finally {
         if (!disposed && !controller.signal.aborted && generation.current === token) setBusy(false);
       }
@@ -47,7 +47,7 @@ export default function ImageCapacityControl({ modelId, aspectRatio = '9:16', ac
     <Space wrap><b>出图并发</b><span>系统自动调节</span><Button size="small" loading={busy} disabled={!modelId || !active} onClick={() => setRefresh(value => value + 1)}>刷新</Button></Space>
     <span style={{ fontSize: 12 }}>并发上限由系统按上游真实成功率自动升降，所有用户和书籍共享同一份额度，无需手动设置。</span>
     {!modelId ? <span>请先选择图片模型</span> : <>
-      {error && <Alert type="error" showIcon message={error} description="状态读取失败，请刷新后重试。" />}
+      {error && <Alert type="error" showIcon message={error} />}
       {state && !error && <Space wrap size={[16, 4]}>
         <span><b>总并发 {state.modelTotalRunning} / 上限 {state.policy.modelTotalLimit}</b></span>
         <span>当前规格 {state.modelRunning} / {state.effectiveLimit}</span>

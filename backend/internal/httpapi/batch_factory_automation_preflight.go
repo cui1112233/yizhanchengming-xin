@@ -24,7 +24,7 @@ const (
 	automationFixBatchSettings   = "batch_settings"
 	automationFixBookSettings    = "book_settings"
 	automationFixPreset          = "preset"
-	automationFixAdminModels     = "admin_models"
+	automationFixAPIConfig       = "api_config"
 	automationFixPublishSettings = "publish_settings"
 )
 
@@ -434,8 +434,8 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 		issues = append(issues, automationPreflightIssue{
 			Code:      "text_executor_missing",
 			Message:   "文本模型执行器未配置",
-			FixTarget: automationFixAdminModels,
-			FixLabel:  "管理员 → 水货生产模型",
+			FixTarget: automationFixAPIConfig,
+			FixLabel:  "个人中心 → API 配置",
 		})
 	}
 	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
@@ -444,15 +444,15 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 			issues = append(issues, automationPreflightIssue{
 				Code:      "image_executor_missing",
 				Message:   "图片生成执行器未配置",
-				FixTarget: automationFixAdminModels,
-				FixLabel:  "管理员 → 水货生产模型",
+				FixTarget: automationFixAPIConfig,
+				FixLabel:  "个人中心 → API 配置",
 			})
 		} else if ready, reason := c.stages.ImageReady(ctx, owner); !ready {
 			issues = append(issues, automationPreflightIssue{
 				Code:      "image_executor_unavailable",
 				Message:   reasonOrDefault(reason, "图片生成执行器不可用"),
-				FixTarget: automationFixAdminModels,
-				FixLabel:  "管理员 → 水货生产模型",
+				FixTarget: automationFixAPIConfig,
+				FixLabel:  "个人中心 → API 配置",
 			})
 		}
 	}
@@ -461,15 +461,15 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 			issues = append(issues, automationPreflightIssue{
 				Code:      "video_executor_missing",
 				Message:   "视频生成执行器未配置",
-				FixTarget: automationFixAdminModels,
-				FixLabel:  "管理员 → 水货生产模型",
+				FixTarget: automationFixAPIConfig,
+				FixLabel:  "个人中心 → API 配置",
 			})
 		} else if ready, reason := c.stages.VideoReady(ctx, owner); !ready {
 			issues = append(issues, automationPreflightIssue{
 				Code:      "video_executor_unavailable",
 				Message:   reasonOrDefault(reason, "视频生成执行器不可用"),
-				FixTarget: automationFixAdminModels,
-				FixLabel:  "管理员 → 水货生产模型",
+				FixTarget: automationFixAPIConfig,
+				FixLabel:  "个人中心 → API 配置",
 			})
 		}
 	}
@@ -518,15 +518,15 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 		issues = append(issues, automationPreflightIssue{
 			Code:      "text_model_missing",
 			Message:   "文本模型未配置",
-			FixTarget: automationFixAdminModels,
-			FixLabel:  "管理员 → 水货生产模型",
+			FixTarget: automationFixAPIConfig,
+			FixLabel:  "个人中心 → API 配置",
 		})
 	} else if extended && !c.automationTextModelAvailable(ctx, owner, textModelID) {
 		issues = append(issues, automationPreflightIssue{
 			Code:      "text_model_unavailable",
 			Message:   "选择的文本模型不可用：" + textModelID + "；请重新选择文本模型或启用该模型",
-			FixTarget: automationFixAdminModels,
-			FixLabel:  "管理员 → 水货生产模型",
+			FixTarget: automationFixAPIConfig,
+			FixLabel:  "个人中心 → API 配置",
 		})
 	}
 	if runMode == "storyboard_only" {
@@ -538,8 +538,8 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 			issues = append(issues, automationPreflightIssue{
 				Code:      "image_model_missing",
 				Message:   "图片模型未配置；" + setupHintImage,
-				FixTarget: automationFixAdminModels,
-				FixLabel:  "管理员 → 水货生产模型",
+				FixTarget: automationFixAPIConfig,
+				FixLabel:  "个人中心 → API 配置",
 			})
 		}
 	} else if comicSettingString(effective, "videoModelId", "") == "" {

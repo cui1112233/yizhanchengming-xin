@@ -596,6 +596,7 @@ func publicAutomationJob(job map[string]any) map[string]any {
 		"scheduledAt": job["scheduledAt"], "createdAt": job["createdAt"], "startedAt": job["startedAt"],
 		"updatedAt": job["updatedAt"], "completedAt": job["completedAt"], "lastError": job["lastError"],
 		"counts":            job["counts"],
+		"productionMode":    job["productionMode"],
 		"priorityBookIds":   automationPriorityIDs(job),
 		"concurrencyBudget": automationConcurrencyBudget(job),
 	}

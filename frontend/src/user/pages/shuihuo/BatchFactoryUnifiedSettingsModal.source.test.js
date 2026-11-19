@@ -117,7 +117,9 @@ test('automation preset manager changes the unified draft only after confirmatio
 test('automation preset manager can edit the selected preset with the current draft', () => {
   assert.match(source, /编辑所选预设/);
   assert.match(source, /把当前统一配置草稿覆盖写入该预设，名称不变/);
-  assert.match(source, /updateAutomationPreset\(selectedPreset\.id, \{ name: selectedPreset\.name, config: normalizeBatchAutoAudioConfig\(value\), expectedVersion: selectedPreset\.version \}\)/);
+  // 覆盖保存会把当前批次的生产模式写进预设（withAutomationPresetMode），
+  // 让预设与漫画/视频模式绑定。
+  assert.match(source, /updateAutomationPreset\(selectedPreset\.id, \{ name: selectedPreset\.name, config: withAutomationPresetMode\(normalizeBatchAutoAudioConfig\(value\), productionMode\), expectedVersion: selectedPreset\.version \}\)/);
   assert.match(source, /预设刚被其他窗口修改过/);
 });
 
@@ -289,7 +291,7 @@ test('keeps model dropdowns outside the label that owns the help-tip button', ()
 });
 
 test('keeps the automation gear beside the unified configuration label', () => {
-  assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
+  assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} productionMode=\{productionMode\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
 });
 
 test('makes selected segmented options unmistakable in the unified settings modal', () => {
