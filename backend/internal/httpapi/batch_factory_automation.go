@@ -3456,6 +3456,14 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	// 批次末尾统一回补：单本书失败时先跳过，等本批其余书全部跑完，再按顺序重跑
 	// 失败的书。生成链路是幂等的，回补会从缺失的页/阶段继续，不会重做已完成部分。
 	books := job["books"].(map[string]any)
+	// 服务重启后自动恢复的 job 不会经过 Start 的 providerSync 边界；内存里的
+	// 视频通道注册表为空时，新的视频任务会被误判成“通道未配置”。恢复执行前
+	// 补一次同步，失败只记录，不阻断已恢复的书。
+	if c.providerSync != nil {
+		if syncErr := c.providerSync(ctx, owner); syncErr != nil {
+			log.Printf("automation: provider sync failed job=%s owner=%s: %v", jobID, owner, syncErr)
+		}
+	}
 	// Video submissions are idempotent per request id. On a reopened (retry) run
 	// the plain "-video-<book>" id would return the previous failed production
 	// job instead of submitting again, so retries use a distinct id suffix.
