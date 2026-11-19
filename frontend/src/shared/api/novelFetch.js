@@ -55,6 +55,7 @@ export function saveWebSubmitConfig(payload) {
 }
 export function checkWebSubmitEnvironment() { return apiRequest(`${WEB_SUBMIT_API}/environment`); }
 export function getWebSubmitHistory() { return apiRequest(`${WEB_SUBMIT_API}/history`); }
+export function listWebSubmitManifests(limit = 10) { return apiRequest(`${WEB_SUBMIT_API}/manifests?limit=${encodeURIComponent(limit)}`); }
 export function webSubmitOrganizationsPath() { return '/api/batch-factory/v12/publish-121/organizations'; }
 export function getWebSubmitOrganizations() { return apiRequest(webSubmitOrganizationsPath()); }
 export function syncWebSubmitConfigs(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-configs`, { method: 'POST', body: JSON.stringify(payload) }); }

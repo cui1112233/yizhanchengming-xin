@@ -2300,7 +2300,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			for _, ids := range novelFetchSubmitChunks(job.BookIDs, batchSize) {
 				// 自动提交与手动提交一样，在上传前把本批计划落盘；
 				// 崩溃后可按 run id 判断 executing/unknown，而不是只依赖文档 meta。
-				if planPayload, planStatus, _ := buildWebSubmitPlanPayload(ctx, store, job.Owner, ids, job.SelectedVersions); planStatus == http.StatusOK {
+				if planPayload, planStatus, _ := buildWebSubmitPlanPayload(ctx, store, job.Owner, ids, job.SelectedVersions, false); planStatus == http.StatusOK {
 					if manifest, manifestErr := newWebSubmitManifest(usersDir, job.Owner, newWebSubmitRunID(), "auto_submit", planPayload); manifestErr == nil {
 						result, submitErr := executeWebSubmit(ctx, job.Owner, usersDir, store, webSubmitRequest{TaskIDs: ids, Versions: job.SelectedVersions, Queue: queue, Manifest: manifest}, func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
 							return resolveGenderJudgeFor(ctx, owner), nil

@@ -21,6 +21,9 @@ type webSubmitRequest struct {
 	Versions     []string
 	OperationID  string
 	ReadbackOnly bool
+	// Force 与参考实现一致：跳过“已确认提交”的保护，但不会绕过
+	// executing/unknown 的回读保护，避免重复派发。
+	Force bool
 	// Manifest 在上传前落盘，逐项记录 ready/executing/unknown 等状态。
 	Manifest *webSubmitManifest
 }
@@ -60,8 +63,8 @@ func submissionMatchesAttempt(receipt videomanagementconnector.Submission, expec
 }
 
 func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfetchworkshop.Store, request webSubmitRequest, genderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), targets ...videomanagementconnector.Service) (webSubmitExecution, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
-	defer cancel()
+	// 不再设置批次级总超时：单个外部请求由连接器的 120 秒超时兜底，
+	// 崩溃恢复由锁心跳与 manifest stale 判定负责。
 	if request.Queue == nil {
 		request.Queue, _ = ctx.Value(submitQueueKey{}).(novelfetchworkshop.ProcessQueue)
 	}
@@ -240,7 +243,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "submitted", "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": true, "remote_receipt": map[string]any{"verified": true, "submission_id": firstText(confirmed.ID, submission.ID), "upload_success_count": 1, "remote_record": confirmed.ReadbackRaw}})
 				manifestItem(bookID, version, "submitted", "confirmed_receipt", "")
 			}
-			if skipSubmitted && containsVersion(done, version) {
+			if skipSubmitted && !request.Force && containsVersion(done, version) {
 				row["status"] = "skipped"
 				row["reason"] = "confirmed_result"
 				row["error"] = "该版本已确认提交"

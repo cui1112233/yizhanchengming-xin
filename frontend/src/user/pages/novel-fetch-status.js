@@ -107,6 +107,21 @@ export function webSubmitStatusLabel(status) {
   return submitStatusLabels[key] || String(status ?? '').trim() || '未开始';
 }
 
+const submitRunStatusLabels = {
+  planned: '已计划',
+  executing: '执行中',
+  completed: '已完成',
+  aborted: '已中止',
+  recovered: '已恢复',
+  dry_run: '演练'
+};
+
+// 提交轮次（manifest）状态使用独立词汇，避免与逐本提交状态混淆。
+export function webSubmitRunStatusLabel(status) {
+  const key = text(status);
+  return submitRunStatusLabels[key] || webSubmitStatusLabel(status);
+}
+
 export function novelFetchSubmissionLabel(row = {}) {
   const submitStatus = text(row.siteSubmitStatus ?? row.site_submit_status);
   const versions = key => (Array.isArray(row[key]) ? row[key] : []).map(value => String(value || '').trim()).filter(Boolean).join('、');

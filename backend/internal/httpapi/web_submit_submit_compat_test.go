@@ -576,4 +576,42 @@ func TestWebSubmitExecutingVersionOnlyReadsBack(t *testing.T) {
 	}
 }
 
+func TestWebSubmitForceResubmitsConfirmedVersion(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
+		"enabled": true, "skip_submitted": true, "min_file_size": 0, "organization": "org-1",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "777777", Gender: "女频", Meta: map[string]any{
+		"style": "现代悬疑", "platformId": "1", "siteSubmitDoneVersions": []any{"ai1"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "777777", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "满足字数的正文"}); err != nil {
+		t.Fatal(err)
+	}
+	usersDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(usersDir, "tester"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	connector := &uncertainSubmitConnector{}
+	request := webSubmitRequest{TaskIDs: []string{"777777"}, Versions: []string{"ai1"}, Force: true}
+	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, request, nil, connector)
+	if err != nil || connector.submitCalls != 1 || result.Success != 1 {
+		t.Fatalf("force must resubmit confirmed version: result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	}
+	request.Force = false
+	result, err = executeWebSubmit(context.Background(), "tester", usersDir, store, request, nil, connector)
+	if err != nil || connector.submitCalls != 1 || result.Success != 0 || len(result.Results) != 1 {
+		t.Fatalf("without force confirmed version must be skipped: result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	}
+	if row, _ := result.Results[0].(map[string]any); row["status"] != "skipped" {
+		t.Fatalf("result=%#v", result.Results[0])
+	}
+}
+
 func stringsReader(value string) *strings.Reader { return strings.NewReader(value) }

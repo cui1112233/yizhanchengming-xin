@@ -55,7 +55,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		body.TaskIDs = resolvedIDs
 		// 参考实现的提交不依赖预览令牌，预览只用于查看。这里保留字段兼容旧前端，
 		// 但不再因为后台 meta 变化而拒绝提交；提交时按最新正文和配置重新生成计划。
-		planPayload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions)
+		planPayload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, body.TaskIDs, body.Versions, body.Force)
 		if status != http.StatusOK {
 			writeJSON(w, status, map[string]string{"error": message})
 			return
@@ -88,11 +88,10 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 				"submission_run_id": runID,
 				"groups":            planPayload["groups"],
 				"plan":              planPayload["plan"],
-				"material_limit":    planPayload["material_limit"],
 			})
 			return
 		}
-		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly, Manifest: manifest}, genderJudgeResolver, targets...)
+		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly, Force: body.Force, Manifest: manifest}, genderJudgeResolver, targets...)
 		if err != nil {
 			manifest.finish("aborted")
 			status := http.StatusInternalServerError

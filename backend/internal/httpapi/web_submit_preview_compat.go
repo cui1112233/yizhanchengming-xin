@@ -30,6 +30,7 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 			IDs      []string `json:"ids"`
 			Mode     string   `json:"mode"`
 			Versions []string `json:"versions"`
+			Force    bool     `json:"force"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
@@ -43,7 +44,7 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务失败"})
 			return
 		}
-		payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, taskIDs, body.Versions)
+		payload, status, message := buildWebSubmitPlanPayload(req.Context(), store, identity.Username, taskIDs, body.Versions, body.Force)
 		if status != http.StatusOK {
 			writeJSON(w, status, map[string]string{"error": message})
 			return
@@ -57,7 +58,7 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 // preview endpoint and the dry_run submit mode. 除 groups/skipped 外还返回
 // requested/planned/deferred/missing 与 plan_complete，调用方可以据此判断
 // 计划是否丢项，而不是只从 groups 是否为空猜测。
-func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Store, owner string, taskIDs, requestedVersions []string) (map[string]any, int, string) {
+func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Store, owner string, taskIDs, requestedVersions []string, force bool) (map[string]any, int, string) {
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
 		return nil, http.StatusInternalServerError, "读取提交配置失败"
@@ -99,7 +100,7 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 		for _, version := range versions {
 			requestedItems = append(requestedItems, map[string]any{"id": id, "version": version})
 			requestedKeys[webSubmitManifestKey(id, version)] = true
-			if skipSubmitted && containsVersion(done, version) {
+			if skipSubmitted && !force && containsVersion(done, version) {
 				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "reason": "confirmed_result", "error": "该版本已确认提交"})
 				continue
 			}
@@ -215,13 +216,13 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 			break
 		}
 	}
-	plan := map[string]any{"material_limit": 8, "groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete}
+	plan := map[string]any{"groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete}
 	revision, err := webSubmitPreviewRevision(ctx, store, owner, ids, requestedVersions)
 	if err != nil {
 		return nil, http.StatusInternalServerError, "生成提交预览校验失败"
 	}
 	plan["revision"] = revision
-	return map[string]any{"ok": true, "requested": len(ids), "material_limit": 8, "groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete, "plan": plan}, http.StatusOK, ""
+	return map[string]any{"ok": true, "requested": len(ids), "groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete, "plan": plan}, http.StatusOK, ""
 }
 
 func anyStrings(value any) []string {
