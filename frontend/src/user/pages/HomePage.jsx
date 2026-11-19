@@ -12,9 +12,17 @@ const quickActions = [
   { href: '/agent', icon: Bot, title: 'CM 画布', desc: '串联创作与生成流程' },
   { href: '/tts', icon: AudioLines, title: '配音工坊', desc: '为你的故事赋予声音' }
 ];
+// 与工作台侧栏（UserLayout navItems）保持同一份入口集合，避免首页导航缺项。
 const navItems = [
-  { href: '/script', label: '私人定制' }, { href: '/novel-fetch', label: '小说获取' },
-  { href: '/batch-factory', label: '水货生产' }, { href: '/agent', label: 'CM 画布' }
+  { href: '/script', label: '私人定制' },
+  { href: '/novel-fetch', label: '批量测书', reload: true },
+  { href: '/novel-creation', label: '小说创作' },
+  { href: '/batch-factory', label: '水货生产' },
+  { href: '/comic-screenplay', label: '漫剧创作' },
+  { href: '/agent', label: 'CM 画布' },
+  { href: '/tts', label: '配音' },
+  { href: '/ai-cut', label: 'AI-CUT' },
+  { href: '/plugins', label: '插件' }
 ];
 
 export function HomePage({ isLoggedIn, onOpenLogin }) {
@@ -65,7 +73,7 @@ export function HomePage({ isLoggedIn, onOpenLogin }) {
       <div className="content">
         <nav className="nav" aria-label="首页导航">
           <Link href="/" className="logo"><BrandLogo /><span className="shine">一战晟铭</span></Link>
-          <div className="glass navlinks">{navItems.map(item => <Link key={item.href} href={item.href} onClick={requireLogin}>{item.label}</Link>)}<Link href="/script" className="white" onClick={requireLogin}>{isLoggedIn ? '进入工作台' : '登录 / 进入工作台'}</Link></div>
+          <div className="glass navlinks">{navItems.map(item => <Link key={item.href} href={item.href} reload={item.reload} onClick={requireLogin}>{item.label}</Link>)}<Link href="/script" className="white" onClick={requireLogin}>{isLoggedIn ? '进入工作台' : '登录 / 进入工作台'}</Link></div>
           <button className="glass hamburger" aria-label="打开导航菜单" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21} /></button>
         </nav>
         <main className="hero">
@@ -78,6 +86,6 @@ export function HomePage({ isLoggedIn, onOpenLogin }) {
       </div>
       {failed && <div className="loading" role="status">背景暂时无法播放，创作入口仍可正常使用</div>}
     </section>
-    {menuOpen && <div className="mobile open"><button className="close" aria-label="关闭导航菜单" onClick={() => setMenuOpen(false)}><X size={22} /></button>{navItems.map(item => <Link key={item.href} href={item.href} onClick={requireLogin}>{item.label}</Link>)}<Link href="/script" className="white" onClick={requireLogin}>{isLoggedIn ? '进入工作台' : '登录 / 进入工作台'}</Link></div>}
+    {menuOpen && <div className="mobile open"><button className="close" aria-label="关闭导航菜单" onClick={() => setMenuOpen(false)}><X size={22} /></button>{navItems.map(item => <Link key={item.href} href={item.href} reload={item.reload} onClick={requireLogin}>{item.label}</Link>)}<Link href="/script" className="white" onClick={requireLogin}>{isLoggedIn ? '进入工作台' : '登录 / 进入工作台'}</Link></div>}
   </div>;
 }
