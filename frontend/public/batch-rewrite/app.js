@@ -611,7 +611,7 @@ function ensureWebSubmitConfig() {
     password: "",
     password_masked: Boolean(current.password_masked),
     skip_submitted: current.skip_submitted !== false,
-    min_text_chars: Math.max(0, Number(current.min_text_chars) || 0),
+    min_file_size: Math.max(0, Number(current.min_file_size ?? 3072) || 0),
     retry_times: Math.max(0, Number(current.retry_times) || 1),
     upload_profiles: asArray(current.upload_profiles),
     profile_bindings: current.profile_bindings && typeof current.profile_bindings === 'object' ? current.profile_bindings : {},
@@ -1726,7 +1726,7 @@ function renderWebSubmitConfig(settings = {}) {
   const cfg = ensureWebSubmitConfig();
   Object.assign(cfg, settings || {});
   $("webAllowResubmit").checked = cfg.skip_submitted === false;
-  $("webMinTextChars").value = cfg.min_text_chars ?? 0;
+  $("webMinFileSize").value = cfg.min_file_size ?? 3072;
   $("webRetryTimes").value = cfg.retry_times ?? 1;
   $("webProfilesJson").value = JSON.stringify(cfg.upload_profiles || [], null, 2);
   $("webProfileBindingsJson").value = JSON.stringify(cfg.profile_bindings || {}, null, 2);
@@ -1889,7 +1889,7 @@ function syncFormToWebSubmitConfig() {
   if ($("webPassword")) cfg.password = $("webPassword").value.trim();
   cfg.skip_submitted = !$("webAllowResubmit").checked;
   cfg.submit_mode = "version";
-  cfg.min_text_chars = numberValue("webMinTextChars", 0);
+  cfg.min_file_size = numberValue("webMinFileSize", 3072);
   cfg.retry_times = numberValue("webRetryTimes", 1);
   cfg.upload_profiles = parseJsonInput("webProfilesJson", []);
   cfg.profile_bindings = webProfileBindingsFromForm();

@@ -82,7 +82,6 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 	requestedItems := []any{}
 	requestedKeys := map[string]bool{}
 	skipSubmitted := webSubmitSkipSubmitted(web)
-	minTextChars := intValue(web["min_text_chars"])
 	minFileSize := webSubmitMinFileSize(web)
 	for _, id := range ids {
 		doc, getErr := store.GetDocument(ctx, owner, id)
@@ -137,10 +136,6 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 					status = "waiting_original"
 				}
 				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": status, "reason": "file_too_small", "deferred": true, "error": fmt.Sprintf("正文不足 %d 字节", minFileSize)})
-				continue
-			}
-			if minTextChars > 0 && len([]rune(content.Content)) < minTextChars {
-				skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "waiting_generate", "reason": "text_too_short", "deferred": true, "error": "正文少于最少字数"})
 				continue
 			}
 			if strings.HasPrefix(strings.ToLower(version), "ai") {
@@ -217,11 +212,6 @@ func buildWebSubmitPlanPayload(ctx context.Context, store novelfetchworkshop.Sto
 		}
 	}
 	plan := map[string]any{"groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete}
-	revision, err := webSubmitPreviewRevision(ctx, store, owner, ids, requestedVersions)
-	if err != nil {
-		return nil, http.StatusInternalServerError, "生成提交预览校验失败"
-	}
-	plan["revision"] = revision
 	return map[string]any{"ok": true, "requested": len(ids), "groups": result, "skipped": skipped, "deferred_items": deferredItems, "versions": versions, "requested_items": requestedItems, "planned_items": plannedItems, "missing_items": missingItems, "plan_complete": planComplete, "plan": plan}, http.StatusOK, ""
 }
 
@@ -237,7 +227,7 @@ func anyStrings(value any) []string {
 }
 
 // cleanStrings / containsVersion 从 HEAD 恢复：工作区的提交预览重构删除了定义，
-// 但 novel_fetch_automation / workshop / preview_revision 等文件仍在引用，缺了无法编译。
+// 但 novel_fetch_automation / workshop 等文件仍在引用，缺了无法编译。
 func cleanStrings(values []string) []string {
 	seen := map[string]bool{}
 	result := []string{}

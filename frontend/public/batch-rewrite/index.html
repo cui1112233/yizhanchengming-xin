@@ -558,7 +558,7 @@
               <div class="site-submit-guard-fields upload-settings-guard">
                 <label>组织归属<select id="webOrganization"></select></label>
                 <button id="syncWebOrganizationsBtn" type="button">同步组织归属</button>
-                <label>最小文案字数（0 不限制）<input id="webMinTextChars" type="number" min="0" max="100000" value="0" /></label>
+                <label>最小文件大小（字节，0 不限制）<input id="webMinFileSize" type="number" min="0" max="10485760" value="3072" /></label>
                 <label>单文案失败重试<input id="webRetryTimes" type="number" min="0" max="5" value="1" /></label>
                 <label class="inline-check repeat-submit-toggle" title="开启后，已成功提交过的文案也会再次上传"><input id="webAllowResubmit" type="checkbox" /> 允许二次提交已成功版本</label>
                 <span id="webResubmitHint" class="form-hint"></span>

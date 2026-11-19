@@ -236,7 +236,7 @@ func TestWebSubmitAppliesSavedProfileAndDoesNotResendAfterUncertainSubmit(t *tes
 	now := time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
-		"enabled": true, "retry_times": 1, "min_text_chars": 2, "min_file_size": 0, "skip_submitted": false,
+		"enabled": true, "retry_times": 1, "min_file_size": 0, "skip_submitted": false,
 		"organization": "org-9", "selected_profile": "profile-x", "profile_bindings": map[string]any{"ai1": "profile-y"},
 		"upload_profiles": []any{map[string]any{"id": "profile-y", "platform_id": "6", "organization": "org-profile", "advanced": map[string]any{"ziti": 4}}},
 	}}}); err != nil {

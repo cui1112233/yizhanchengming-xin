@@ -121,7 +121,6 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 		return result, &webSubmitRequestError{Status: http.StatusBadRequest, Message: "没有可提交的任务，请先勾选任务"}
 	}
 	skipSubmitted := webSubmitSkipSubmitted(web)
-	minTextChars := intValue(web["min_text_chars"])
 	minFileSize := webSubmitMinFileSize(web)
 	retryTimes := intValue(web["retry_times"])
 	if retryTimes < 0 {
@@ -317,10 +316,6 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					status = "waiting_original"
 				}
 				markDeferred(status, "file_too_small", fmt.Sprintf("正文不足 %d 字节", minFileSize))
-				continue
-			}
-			if minTextChars > 0 && len([]rune(content.Content)) < minTextChars {
-				markDeferred("waiting_generate", "text_too_short", "正文少于最少字数")
 				continue
 			}
 			if strings.HasPrefix(strings.ToLower(version), "ai") {

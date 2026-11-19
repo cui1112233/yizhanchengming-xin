@@ -16,6 +16,7 @@ import (
 const (
 	webSubmitManifestVersion     = 1
 	webSubmitManifestStaleSecond = 360
+	webSubmitManifestRetain      = 200
 )
 
 // webSubmitManifest 在第一次上传前把提交计划落盘，并逐项记录状态。
@@ -124,6 +125,7 @@ func newWebSubmitManifest(usersDir, owner, runID, reason string, plan map[string
 	if err := manifest.flush(); err != nil {
 		return nil, err
 	}
+	pruneWebSubmitManifests(usersDir, owner, webSubmitManifestRetain)
 	return manifest, nil
 }
 
@@ -247,6 +249,43 @@ func recoverStaleWebSubmitManifests(usersDir, owner string) int {
 		}
 	}
 	return recovered
+}
+
+// pruneWebSubmitManifests 只保留最近 keep 份清单，避免目录无限增长。
+func pruneWebSubmitManifests(usersDir, owner string, keep int) {
+	if keep <= 0 {
+		keep = webSubmitManifestRetain
+	}
+	dir, err := webSubmitManifestDir(usersDir, owner)
+	if err != nil {
+		return
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	type candidate struct {
+		path     string
+		modified time.Time
+	}
+	candidates := make([]candidate, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		candidates = append(candidates, candidate{path: filepath.Join(dir, entry.Name()), modified: info.ModTime()})
+	}
+	if len(candidates) <= keep {
+		return
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].modified.After(candidates[j].modified) })
+	for _, item := range candidates[keep:] {
+		_ = os.Remove(item.path)
+	}
 }
 
 // listWebSubmitManifests 返回最近的提交清单，按更新时间倒序，供历史/排障使用。

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -81,6 +82,32 @@ func TestRecoverStaleWebSubmitManifestsMarksExecutingUnknown(t *testing.T) {
 	}
 	if recent.Status != "planned" {
 		t.Fatalf("recent manifest must not be touched: %s", string(rawRecent))
+	}
+}
+
+func TestPruneWebSubmitManifestsKeepsLatest(t *testing.T) {
+	usersDir := t.TempDir()
+	dir := filepath.Join(usersDir, "tester", "web-submit", "manifests")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Now().UTC().Add(-time.Hour)
+	for i := 0; i < 3; i++ {
+		writeTestManifest(t, dir, fmt.Sprintf("run-%d.json", i), map[string]any{"submission_run_id": fmt.Sprintf("run-%d", i)}, base.Add(time.Duration(i)*time.Minute))
+	}
+	pruneWebSubmitManifests(usersDir, "tester", 2)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("entries=%d, want 2", len(entries))
+	}
+	if _, err := os.Stat(filepath.Join(dir, "run-0.json")); !os.IsNotExist(err) {
+		t.Fatalf("oldest manifest should be removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "run-2.json")); err != nil {
+		t.Fatalf("latest manifest must stay: %v", err)
 	}
 }
 

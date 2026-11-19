@@ -25,15 +25,14 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			return
 		}
 		var body struct {
-			TaskIDs         []string `json:"taskIds"`
-			IDs             []string `json:"ids"`
-			Mode            string   `json:"mode"`
-			Versions        []string `json:"versions"`
-			OperationID     string   `json:"operationId"`
-			ReadbackOnly    bool     `json:"readback_only"`
-			PreviewRevision string   `json:"previewRevision"`
-			// 参考实现接收 force/grouped/dry_run；其中 force 与 grouped
-			// 在提交计划里没有独立分支，dry_run 只生成计划不执行上传。
+			TaskIDs      []string `json:"taskIds"`
+			IDs          []string `json:"ids"`
+			Mode         string   `json:"mode"`
+			Versions     []string `json:"versions"`
+			OperationID  string   `json:"operationId"`
+			ReadbackOnly bool     `json:"readback_only"`
+			// 参考实现接收 force/grouped/dry_run；其中 force 允许重提已确认版本，
+			// dry_run 只生成计划不执行上传。
 			Force   bool `json:"force"`
 			Grouped bool `json:"grouped"`
 			DryRun  bool `json:"dry_run"`
