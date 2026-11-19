@@ -1,8 +1,0 @@
-{
-  "id": "qiantie-stacky",
-  "displayName": "CM",
-  "description": "CM，前贴的桌面宠物。",
-  "spriteVersionNumber": 2,
-  "spritesheetPath": "spritesheet.webp",
-  "source": "Codex built-in Stacky"
-}
