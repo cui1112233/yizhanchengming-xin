@@ -34,7 +34,7 @@ func TestContractPauseProbesReadOnlyAndRecoversReceiptWithoutResubmission(t *tes
 	store := novelfetchworkshop.NewMemoryStore()
 	dir := t.TempDir()
 	queue := novelfetchworkshop.NewMemoryQueue()
-	if err := store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true, "min_file_size": 0, "organization": "org-1"}}}); err != nil {
+	if err := store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true, "min_file_size": 0, "organization": "org-1", "parallel_upload_workers": 1}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"12345678", "22345678"} {

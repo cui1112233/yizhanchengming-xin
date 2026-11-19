@@ -1142,7 +1142,7 @@ func applyBatchRewriteDefaults(app map[string]any) {
 		"rewrite":    map[string]any{"default_ai_count": 1, "max_ai_count": 5, "process_line_count": 5, "anchor_line_count": 5, "temperature": 0.45, "strategy": "instruction", "method_sequence": []any{"high_imitation", "opening_instruction", "instruction"}, "prompt": "你是短视频小说正文改写师。请只根据原文、风格类型和男女频改写开头部分，保留故事事实、人物关系、时代背景和后续衔接。输出正文，不要解释。"},
 		"storage":    map[string]any{"cleanup_enabled": true, "retention_days": 7},
 		"parser":     map[string]any{"default_parse_mode": "smart", "default_column_preset_id": "sample_input", "custom_column_order": "书籍ID,书名,推荐理由,男女频,标签,评级"},
-		"web_submit": map[string]any{"enabled": false, "username": "", "password_masked": false, "skip_submitted": true, "retry_times": 1, "submit_mode": "version", "selected_profile": "", "advanced": map[string]any{}, "upload_profiles": []any{}, "profile_bindings": novelFetchVersionProfileBindings(nil), "version_profiles": novelFetchVersionProfileBindings(nil), "style_catalog": []any{}, "target": "two.121w.com"},
+		"web_submit": map[string]any{"enabled": false, "username": "", "password_masked": false, "skip_submitted": true, "retry_times": 1, "parallel_upload_workers": 4, "submit_mode": "version", "selected_profile": "", "advanced": map[string]any{}, "upload_profiles": []any{}, "profile_bindings": novelFetchVersionProfileBindings(nil), "version_profiles": novelFetchVersionProfileBindings(nil), "style_catalog": []any{}, "target": "two.121w.com"},
 	}
 	for key, value := range defaults {
 		if _, exists := app[key]; !exists || app[key] == nil {
@@ -1199,7 +1199,14 @@ func publicBatchWebSubmit(value any) map[string]any {
 	if configured := mapOrEmpty(cfg["version_profiles"]); len(configured) > 0 {
 		bindings = novelFetchVersionProfileBindings(configured)
 	}
-	out := map[string]any{"enabled": cfg["enabled"] == true, "username": firstText(cfg["username"]), "password": "", "password_masked": cfg["password_masked"] == true, "skip_submitted": cfg["skip_submitted"] != false, "retry_times": targetNumber(cfg["retry_times"]), "submit_mode": "version", "selected_profile": firstText(cfg["selected_profile"]), "advanced": mapOrEmpty(cfg["advanced"]), "upload_profiles": arrayOrEmpty(cfg["upload_profiles"]), "profile_bindings": bindings, "version_profiles": bindings, "style_catalog": arrayOrEmpty(cfg["style_catalog"]), "target": "two.121w.com"}
+	uploadWorkers := targetNumber(cfg["parallel_upload_workers"])
+	if uploadWorkers <= 0 {
+		uploadWorkers = 4
+	}
+	if uploadWorkers > 4 {
+		uploadWorkers = 4
+	}
+	out := map[string]any{"enabled": cfg["enabled"] == true, "username": firstText(cfg["username"]), "password": "", "password_masked": cfg["password_masked"] == true, "skip_submitted": cfg["skip_submitted"] != false, "retry_times": targetNumber(cfg["retry_times"]), "parallel_upload_workers": uploadWorkers, "submit_mode": "version", "selected_profile": firstText(cfg["selected_profile"]), "advanced": mapOrEmpty(cfg["advanced"]), "upload_profiles": arrayOrEmpty(cfg["upload_profiles"]), "profile_bindings": bindings, "version_profiles": bindings, "style_catalog": arrayOrEmpty(cfg["style_catalog"]), "target": "two.121w.com"}
 	// 仅在历史配置显式保存过时回传，缺省由前端展示 3072 字节。
 	if value, exists := cfg["min_file_size"]; exists && value != nil {
 		out["min_file_size"] = targetNumber(value)

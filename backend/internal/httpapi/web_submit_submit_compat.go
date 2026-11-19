@@ -253,6 +253,18 @@ func styleNeedsResolution(meta map[string]any) bool {
 	return style == "" || style == "待判定" || style == "未判定"
 }
 
+// webSubmitParallelism 返回同一账号内的传书并发数，默认 4，最大 4。
+func webSubmitParallelism(web map[string]any) int {
+	workers := intValue(web["parallel_upload_workers"])
+	if workers <= 0 {
+		workers = 4
+	}
+	if workers > 4 {
+		workers = 4
+	}
+	return workers
+}
+
 // webSubmitSourceBookID 解析目标站认可的书号。内部任务 ID 可能带账号前缀，
 // 因此优先取 source/display/book 字段；只接受纯数字，与连接器回读约束一致。
 func webSubmitSourceBookID(meta map[string]any, bookID string) (string, bool) {

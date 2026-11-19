@@ -612,10 +612,11 @@ function ensureWebSubmitConfig() {
     password_masked: Boolean(current.password_masked),
     skip_submitted: current.skip_submitted !== false,
     min_file_size: Math.max(0, Number(current.min_file_size ?? 3072) || 0),
+    parallel_upload_workers: Math.min(4, Math.max(1, Number(current.parallel_upload_workers) || 4)),
     retry_times: Math.max(0, Number(current.retry_times) || 1),
     upload_profiles: asArray(current.upload_profiles),
     profile_bindings: current.profile_bindings && typeof current.profile_bindings === 'object' ? current.profile_bindings : {},
-    organization: String(current.organization || '1'),
+    organization: String(current.organization || ''),
     organization_catalog: asArray(current.organization_catalog),
     advanced: {
       tl5: Number(current.advanced?.tl5) === 1 ? 1 : 0,
@@ -1727,6 +1728,7 @@ function renderWebSubmitConfig(settings = {}) {
   Object.assign(cfg, settings || {});
   $("webAllowResubmit").checked = cfg.skip_submitted === false;
   $("webMinFileSize").value = cfg.min_file_size ?? 3072;
+  $("webParallelUploadWorkers").value = cfg.parallel_upload_workers ?? 4;
   $("webRetryTimes").value = cfg.retry_times ?? 1;
   $("webProfilesJson").value = JSON.stringify(cfg.upload_profiles || [], null, 2);
   $("webProfileBindingsJson").value = JSON.stringify(cfg.profile_bindings || {}, null, 2);
@@ -1890,6 +1892,7 @@ function syncFormToWebSubmitConfig() {
   cfg.skip_submitted = !$("webAllowResubmit").checked;
   cfg.submit_mode = "version";
   cfg.min_file_size = numberValue("webMinFileSize", 3072);
+  cfg.parallel_upload_workers = Math.min(4, Math.max(1, numberValue("webParallelUploadWorkers", 4) || 4));
   cfg.retry_times = numberValue("webRetryTimes", 1);
   cfg.upload_profiles = parseJsonInput("webProfilesJson", []);
   cfg.profile_bindings = webProfileBindingsFromForm();

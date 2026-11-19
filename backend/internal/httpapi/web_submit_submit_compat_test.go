@@ -3,11 +3,13 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,6 +49,43 @@ func (c *recordingSubmitConnector) Submit(_ context.Context, _ videomanagementco
 	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted"}, nil
 }
 func (c *recordingSubmitConnector) GetSubmission(context.Context, videomanagementconnector.Session, string) (videomanagementconnector.Submission, error) {
+	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted", Message: "已确认", ReadbackRaw: map[string]any{"success": true}}, nil
+}
+
+type concurrencySubmitConnector struct {
+	mu      sync.Mutex
+	current int
+	max     int
+	calls   int
+	delay   time.Duration
+}
+
+func (c *concurrencySubmitConnector) Login(context.Context, videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
+	return videomanagementconnector.Session{}, nil
+}
+func (c *concurrencySubmitConnector) CheckSession(context.Context, videomanagementconnector.Session) error {
+	return nil
+}
+func (c *concurrencySubmitConnector) RefreshCatalogs(context.Context, videomanagementconnector.Session) (videomanagementconnector.Catalogs, error) {
+	return videomanagementconnector.Catalogs{}, nil
+}
+func (c *concurrencySubmitConnector) Submit(context.Context, videomanagementconnector.Session, videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+	c.mu.Lock()
+	c.current++
+	c.calls++
+	if c.current > c.max {
+		c.max = c.current
+	}
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		c.current--
+		c.mu.Unlock()
+	}()
+	time.Sleep(c.delay)
+	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted"}, nil
+}
+func (c *concurrencySubmitConnector) GetSubmission(context.Context, videomanagementconnector.Session, string) (videomanagementconnector.Submission, error) {
 	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted", Message: "已确认", ReadbackRaw: map[string]any{"success": true}}, nil
 }
 
@@ -742,6 +781,61 @@ func TestWebSubmitSkipsDuplicateContent(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("missing duplicate_content result: %#v", result.Results)
+	}
+}
+
+func TestWebSubmitParallelismDefaults(t *testing.T) {
+	cases := []struct {
+		web  map[string]any
+		want int
+	}{
+		{map[string]any{}, 4},
+		{map[string]any{"parallel_upload_workers": 0}, 4},
+		{map[string]any{"parallel_upload_workers": 1}, 1},
+		{map[string]any{"parallel_upload_workers": 2}, 2},
+		{map[string]any{"parallel_upload_workers": 9}, 4},
+	}
+	for _, tc := range cases {
+		if got := webSubmitParallelism(tc.web); got != tc.want {
+			t.Fatalf("webSubmitParallelism(%#v)=%d, want %d", tc.web, got, tc.want)
+		}
+	}
+}
+
+func TestWebSubmitUploadsBooksConcurrently(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
+		"enabled": true, "min_file_size": 0, "organization": "org-1", "parallel_upload_workers": 2,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	for index, bookID := range []string{"800001", "800002"} {
+		if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: bookID, Gender: "女频", Meta: map[string]any{
+			"style": "现代悬疑", "platformId": "1",
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: bookID, BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: fmt.Sprintf("满足字数的正文内容，用于并发测试的第 %d 本。", index)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	usersDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(usersDir, "tester"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	connector := &concurrencySubmitConnector{delay: 40 * time.Millisecond}
+	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{TaskIDs: []string{"800001", "800002"}, Versions: []string{"ai1"}}, nil, connector)
+	if err != nil || result.Success != 2 || connector.calls != 2 {
+		t.Fatalf("result=%#v err=%v calls=%d", result, err, connector.calls)
+	}
+	connector.mu.Lock()
+	maxConcurrent := connector.max
+	connector.mu.Unlock()
+	if maxConcurrent != 2 {
+		t.Fatalf("max concurrency=%d, want 2", maxConcurrent)
 	}
 }
 
