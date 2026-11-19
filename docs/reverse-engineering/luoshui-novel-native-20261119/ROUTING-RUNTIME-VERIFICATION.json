@@ -1,0 +1,25 @@
+{
+  "health": {
+    "ok": true
+  },
+  "pid": 41160,
+  "observedAt": "2026-11-19T09:05:41.1505736Z",
+  "build": {
+    "bridge_hits": 0,
+    "bridge_paths": {},
+    "frontend_entry": "/assets/user-BY0bmwQG.js",
+    "git_sha": "426f67e9",
+    "media_engine": {
+      "ffmpeg_path": "F:\\脚本测试\\一战晟铭-v88\\.tools\\ffmpeg\\ffmpeg.exe",
+      "ffmpeg_version": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "ffprobe_path": "F:\\脚本测试\\temp_20261022_01\\video-batch-studio\\tools\\ffmpeg-9.0.2-essentials_build\\bin\\ffprobe.exe",
+      "ffprobe_version": "ffprobe version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers",
+      "available": true
+    },
+    "runtime": "go",
+    "runtime_manifest_sha": "426f67e9",
+    "service": "go-api"
+  },
+  "scope": "local4001; no live paid generation; isolated MySQL verified separately",
+  "pageStatus": 200
+}

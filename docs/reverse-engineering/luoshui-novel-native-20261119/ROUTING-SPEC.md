@@ -42,6 +42,6 @@ CM现行明确失败规则继续保留：模型在patch-only返回整章正文�
 - [x] 按证据形成规格
 - [x] 实现分流、保留范围字段、提示词及输出验证
 - [x] 优先级、空/混合/未知、错误输出、取消、旧任务恢复测试
-- [ ] 实际MySQL保存与本地4001版本验收
+- [x] 实际MySQL保存与本地4001版本验收（426f67e9；ROUTING-MYSQL-VERIFICATION.log及ROUTING-RUNTIME-VERIFICATION.json）
 
 兼容范围：CM审稿接口仍使用既有low/medium/high/critical等级；info/warning在本轮仅作为原版分流算法的静态边界测试，不声称整个审稿等级协议已迁移。旧任务0/1/2还须在审稿解码后清除新增scope字段，以保持旧请求指纹；已先测出失败再修复并验证。

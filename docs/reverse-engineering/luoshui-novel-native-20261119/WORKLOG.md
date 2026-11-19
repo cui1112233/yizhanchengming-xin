@@ -50,7 +50,7 @@
 - [x] 16项分类边界、6项实际流水线用例、旧版本2请求不迁移测试通过。错误模式明确失败，不保存、不暗中补试。与原版静默保留原文的失败处理差异已登记。
 - [x] 手工审查发现旧任务新增scope字段会改变请求指纹；先用TestNativeVersion2DoesNotMigrateRoute复现失败，再在旧任务审稿解码后清除字段修复。小说与prompt整包重新通过；小说HTTP定向通过。
 - [x] 隔离MySQL8.4验证：TestNativeRoutedFailureRealMySQL 33.25秒，局部修订却返回整章JSON时RunFailed原因明确，0章节/0修订，重复任务仍为5次模拟请求；TestNativePatchRevisionRealMySQL 53.13秒，审稿范围、patch-only、正确正文及分流依据实际保存，重复任务不再生成。0真实收费调用。
-- [ ] 本轮Go嵌入构建与4001新版本核验。
+- [x] 本轮Go嵌入构建通过；4001运行426f67e9，PID41160（核验时），health正常、小说页200。入口沿用当前嵌入前端，实际记录见ROUTING-RUNTIME-VERIFICATION.json。
 
 运行观察：检查时4001没有监听，既有日志无进程停止原因；已先恢复上轮已验证二进制PID20328供用户使用，随后更新本轮版本。不能从日志中一次外键清理失败推断进程退出原因。
 
