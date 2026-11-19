@@ -584,6 +584,9 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 			delete(fields, "pass_score")
 		}
 	}
+	if input.ReviewCycleVersion >= 2 && spec.definition.ID == novelprompt.ChapterRevision.ID {
+		return p.callNativeRevision(ctx, input, sink, provider, spec, target)
+	}
 	userPrompt, err := marshalPromptPayload(withThinkingLevel(spec.userPayload, input.Run.ThinkingLevel))
 	if err != nil {
 		return nil, &DomainError{Code: ErrInvalidOutput, Message: "failed to build model input", Cause: err}

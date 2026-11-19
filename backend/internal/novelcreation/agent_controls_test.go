@@ -194,6 +194,7 @@ func legacyAgentRun(t *testing.T, f serviceFixture, r Run) Run {
 		t.Fatal(err)
 	}
 	delete(fields, "agent_contract_version")
+	delete(fields, "review_cycle_version") // This helper represents a pre-versioned frozen task.
 	settings := fields["project_settings"].(map[string]any)
 	settings["agent"] = map[string]any{"targetChapterWords": 2000, "maxRevisionRounds": 2, "thinkingLevel": "standard"}
 	r.PromptSnapshot, _ = json.Marshal(fields)

@@ -160,7 +160,7 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	snapshotFields := map[string]any{
 		"project_settings":       settings,
 		"agent_contract_version": 1,
-		"review_cycle_version":   1,
+		"review_cycle_version":   2,
 		"source_type":            input.SourceType, "source_plan_id": input.SourcePlanID, "source_round": input.SourceRound, "source_run_id": input.SourceRunID,
 		"version": 1, "mode": session.Mode, "user_message": input.Content,
 		"mode_inputs": selected.ModeInputs, "chapter_number": chapterNumber, "checkpoint": checkpoint,
