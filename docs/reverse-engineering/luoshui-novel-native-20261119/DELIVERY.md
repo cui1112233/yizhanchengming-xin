@@ -51,4 +51,4 @@
 已复现并修复当前CM结算整包替换造成的跨章资料遗失。新任务版本4按已有CM字段增量归并，保留未提及记录及已解决伏笔终态；旧任务协议不迁移。独立结算仍在审稿后进行，修订UPDATED_STATE不会直接污染已保存设定。
 实际隔离MySQL两章生成和第三章输入重读验证通过（70.99秒，11次模拟请求、0次付费调用），并非只测内存。原版结构化增量全部字段/状态验证模型仍未迁移，详细差异见STATE-SPEC.md。
 
-最终本地4001运行6f4a1bb6，PID58788（核验时），入口`/assets/user-BY0bmwQG.js`，health正常、小说页200。二进制archive/qiantie-native-state.exe，清单runtime-state-manifest.json；未推送/发布公网。
+最终本地4001运行6f4a1bb6，PID58788（核验时），入口`/assets/user-B8aYKeDh.js`，health正常、小说页200。二进制archive/qiantie-native-state.exe，清单runtime-state-manifest.json；未推送/发布公网。

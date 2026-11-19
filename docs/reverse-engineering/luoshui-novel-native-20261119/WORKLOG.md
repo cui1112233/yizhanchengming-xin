@@ -63,6 +63,6 @@
 - [x] 新任务冻结版本4，后端使用原始settler_prompts#27保留规则，加上明确标记的CM JSON适配。旧任务0/1/2/3保持原协议。facts按CM id增量合并，人物变化/时间线去重，伏笔按CM thread保留未提及项，resolved不被open重开。原始增量随本章快照保存。
 - [x] 空增量、重复应用、定点更新、重复id、无效前文、已解决伏笔保持终态、旧版本3协议及取消后不保存测试通过。小说/prompt整包、小说HTTP定向通过。
 - [x] TestNativeSettlementContinuityRealMySQL通过（70.99秒）：实际保存第1/2章；第2章增量未提到旧事实/伏笔；第3章冻结输入从MySQL重新读取到两章事实及旧伏笔。共11次模拟模型请求，0次真实收费调用。日志STATE-MYSQL-VERIFICATION.log。
-- [x] 本轮Go构建通过，4001运行6f4a1bb6，PID58788（核验时），入口user-BY0bmwQG.js，health正常、小说页200；见STATE-RUNTIME-VERIFICATION.json。新请求冻结版本4，旧任务按冻结版本继续。
+- [x] 本轮Go构建通过，4001运行6f4a1bb6，PID58788（核验时），入口user-B8aYKeDh.js，health正常、小说页200；见STATE-RUNTIME-VERIFICATION.json。新请求冻结版本4，旧任务按冻结版本继续。
 
 限制：CM JSON适配不等于完整原版RUNTIME_STATE_DELTA。原版事实有效期、hookId候选准入/提及/推进/延后、人物矩阵/支线/情感/账本和StateValidator协议仍未完全移植。新版遇到不兼容旧资料明确停止，不猜测迁移。真实模型输出质量没有新增预算，本轮没有执行收费对照。
