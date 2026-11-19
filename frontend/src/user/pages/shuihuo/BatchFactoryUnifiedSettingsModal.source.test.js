@@ -114,6 +114,13 @@ test('automation preset manager changes the unified draft only after confirmatio
   assert.doesNotMatch(source, /setDraftPatch\(.*saveBatchSettings/);
 });
 
+test('automation preset manager can edit the selected preset with the current draft', () => {
+  assert.match(source, /编辑所选预设/);
+  assert.match(source, /把当前统一配置草稿覆盖写入该预设，名称不变/);
+  assert.match(source, /updateAutomationPreset\(selectedPreset\.id, \{ name: selectedPreset\.name, config: normalizeBatchAutoAudioConfig\(value\), expectedVersion: selectedPreset\.version \}\)/);
+  assert.match(source, /预设刚被其他窗口修改过/);
+});
+
 test('unified configuration does not describe production settings as frozen preset metadata', () => {
   assert.doesNotMatch(source, /automationPresetSnapshot/);
   assert.doesNotMatch(source, /本批次已冻结自动化预设/);

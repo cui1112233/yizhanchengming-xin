@@ -649,6 +649,24 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
     Modal.confirm({ title: '确认载入此预设', content: '它只替换当前统一配置草稿；确认当前批量配置后才会应用。', okText: '载入草稿', onOk: () => onLoad(clonePresetConfig) });
   };
+  const editPreset = () => {
+    if (!selectedPreset) return message.warning('请先选择自动化预设');
+    Modal.confirm({
+      title: `编辑预设“${selectedPreset.name}”`,
+      content: '把当前统一配置草稿覆盖写入该预设，名称不变。建议先载入预设并调整配置，再点这里保存；已排期或执行中的任务不受影响。',
+      okText: '覆盖保存',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await updateAutomationPreset(selectedPreset.id, { name: selectedPreset.name, config: normalizeBatchAutoAudioConfig(value), expectedVersion: selectedPreset.version });
+          await loadPresets();
+          message.success('自动化预设已更新。');
+        } catch (error) {
+          message.error(Number(error?.status) === 409 ? '预设刚被其他窗口修改过，请重新选择后再编辑。' : (error?.message || '编辑自动化预设失败'));
+        }
+      }
+    });
+  };
   const savePreset = async () => {
     const name = presetName.trim();
     if (!name) return message.warning('请填写预设名称');
@@ -674,7 +692,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad }) {
   <Modal className="batch-factory-automation-preset-modal" title="自动化预设" open={presetOpen} onCancel={() => setPresetOpen(false)} footer={null} width={620} destroyOnClose><Space direction="vertical" size={14} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>预设只保存统一配置 <HelpTip title="预设只保存统一配置">不保存正文、资产、导演结果或视频结果；载入后仍须确认当前统一配置才会应用到批量。</HelpTip></span>} />
     <label className="batch-factory-engine-field"><span><b>已保存预设</b></span><Select allowClear value={selectedPresetId || undefined} onChange={setSelectedPresetId} placeholder="选择自动化预设" options={presets.map(item => ({ value: item.id, label: `${item.name} · v${item.version}` }))} /></label>
-    <Space wrap><Button disabled={!selectedPreset} onClick={loadPreset}>载入预设</Button></Space>
+    <Space wrap><Button disabled={!selectedPreset} onClick={loadPreset}>载入预设</Button><Tooltip title="把当前统一配置草稿保存回所选预设：先载入预设并调整配置，再点此按钮覆盖保存"><Button disabled={!selectedPreset} onClick={editPreset}>编辑所选预设</Button></Tooltip></Space>
     <Divider />
     <label className="batch-factory-engine-field"><span><b>{selectedPreset ? '预设新名称' : '新预设名称'}</b></span><Input value={presetName} maxLength={255} placeholder={selectedPreset?.name || '例如：女频 H3 全自动'} onChange={event => setPresetName(event.target.value)} /></label>
     <Space wrap><Button type="primary" loading={presetBusy} onClick={savePreset}>保存为新预设</Button><Button disabled={!selectedPreset} loading={presetBusy} onClick={renamePreset}>重命名所选预设</Button><Button danger disabled={!selectedPreset} onClick={removePreset}>删除所选预设</Button></Space>
