@@ -66,6 +66,8 @@ func TestClassifyFailureTable(t *testing.T) {
 		{"video submit moderation", errors.New("视频模型提交失败（video_abc）：这条内容刚被生成渠道判定为疑似侵权或违规，原样重复提交不会成功。"), "video", automationCodeContentPolicy, automationFailureTransient, true, false, 2},
 		// 自动改写轮次用尽后必须转人工，不能继续用同一份提示词重复提交。
 		{"video repair exhausted", batchfactoryv11.ErrVideoPromptRepairExhausted, "video", automationCodeContentPolicy, automationFailureManual, false, true, 1},
+		// YFAI 的 403 实测可能是临时风控，按可重试处理，不能终止整批。
+		{"yfai 403 transient", errors.New("视频模型提交失败（video_x）：YFAI Seedance returned HTTP 403（上游临时拒绝或密钥无权限，可重试）；上游原文：{\"error\":\"risk\"}"), "video", automationCodeTransient, automationFailureTransient, true, false, automationPageRetryMaxAttempts},
 		{"insufficient balance", errors.New("余额不足，请充值"), "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
 		// 上游文案中文化后不能再靠英文关键词；结构化 401/402/403 必须直接判定为确定性失败。
 		{"typed provider 402", shuihuoImageUpstreamError{StatusCode: http.StatusPaymentRequired, Message: "上游拒绝了本次请求"}, "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},

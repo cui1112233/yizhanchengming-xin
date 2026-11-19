@@ -186,6 +186,15 @@ func automationStageBudgetKey(stage string) string {
 	}
 }
 
+// isYFAITemporary403 识别 YFAI Seedance 的 403。上游把临时风控也用 403 返回，
+// 与真正的密钥失效无法只靠状态码区分，因此按可重试处理并在文案保留上游原文。
+func isYFAITemporary403(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "yfai seedance returned http 403")
+}
+
 // isVideoModerationFailure 识别视频任务被平台内容审核拒绝的错误。视频阶段
 // 会先自动去敏改写一次提示词再重试，因此这类失败不能按普通瞬时错误无限重试。
 func isVideoModerationFailure(err error) bool {
@@ -303,6 +312,14 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 		return automationFailureDisposition{
 			Code: automationCodePublishUnconfirmed, Class: automationFailureManual,
 			MaxAttempts: 1, AbortBook: true, BudgetKey: budget,
+		}
+	case isYFAITemporary403(err):
+		// YFAI 的 403 多为上游临时风控/权限抖动（生产实测同一请求稍后可成功），
+		// 按可重试处理，避免一本书的 403 直接把整批调度终止。
+		return automationFailureDisposition{
+			Code: automationCodeTransient, Class: automationFailureTransient,
+			CountsTowardRetryBudget: true, MinAttemptsBeforeRetry: 1,
+			MaxAttempts: automationPageRetryMaxAttempts, BudgetKey: budget,
 		}
 	case automationProviderAuthFailure(err), strings.Contains(msg, "余额不足"), strings.Contains(msg, "insufficient balance"),
 		strings.Contains(msg, "payment required"), strings.Contains(msg, "unauthorized"),

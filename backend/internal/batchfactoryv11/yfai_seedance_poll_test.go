@@ -158,3 +158,15 @@ func TestYFAISeedanceHTTPDateRetryAfterFallsBack(t *testing.T) {
 		t.Fatalf("retryAfter=%v", got)
 	}
 }
+
+// 403 不能只报状态码：上游原文必须进入错误，否则无法区分密钥问题和临时风控。
+func TestYFAIUpstreamErrorKeepsBody(t *testing.T) {
+	err := newYFAIUpstreamError(403, "", `{"error":{"message":"model temporarily unavailable"}}`)
+	message := err.Error()
+	if !strings.Contains(message, "model temporarily unavailable") {
+		t.Fatalf("403 must keep upstream body, got %q", message)
+	}
+	if !strings.Contains(message, "可重试") {
+		t.Fatalf("403 must stay retryable in wording, got %q", message)
+	}
+}

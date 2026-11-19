@@ -156,7 +156,7 @@ func (a *YFAISeedanceAdapter) do(ctx context.Context, method, endpoint string, p
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, newYFAIUpstreamError(resp.StatusCode, resp.Header.Get("Retry-After"))
+		return nil, newYFAIUpstreamError(resp.StatusCode, resp.Header.Get("Retry-After"), string(data))
 	}
 	return data, nil
 }
@@ -174,13 +174,15 @@ func (e *YFAIUpstreamError) Error() string { return e.Message }
 
 const yfaiDefaultRetryAfter = 30 * time.Second
 
-func newYFAIUpstreamError(statusCode int, retryAfterHeader string) *YFAIUpstreamError {
+func newYFAIUpstreamError(statusCode int, retryAfterHeader, body string) *YFAIUpstreamError {
 	err := &YFAIUpstreamError{StatusCode: statusCode}
 	switch statusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		err.Message = "YFAI Seedance returned HTTP 401（密钥无效或无权限，请检查 API Key）"
 		if statusCode == http.StatusForbidden {
-			err.Message = "YFAI Seedance returned HTTP 403（密钥无权限，请检查 API Key）"
+			// 403 不一定是密钥问题：生产已实测同一模型同一请求稍后可成功，
+			// 多为上游临时风控/权限抖动，所以文案要保留“可重试”的含义。
+			err.Message = "YFAI Seedance returned HTTP 403（上游临时拒绝或密钥无权限，可重试）"
 		}
 	case http.StatusPaymentRequired:
 		err.Message = "YFAI Seedance returned HTTP 402（账户余额不足，请充值）"
@@ -190,7 +192,19 @@ func newYFAIUpstreamError(statusCode int, retryAfterHeader string) *YFAIUpstream
 	default:
 		err.Message = fmt.Sprintf("YFAI Seedance returned HTTP %d", statusCode)
 	}
+	if snippet := yfaiErrorBodySnippet(body); snippet != "" {
+		err.Message += "；上游原文：" + snippet
+	}
 	return err
+}
+
+// yfaiErrorBodySnippet 保留上游错误正文，排查 403/400 时不再只有状态码。
+func yfaiErrorBodySnippet(body string) string {
+	snippet := strings.Join(strings.Fields(body), " ")
+	if len(snippet) > 300 {
+		snippet = snippet[:300]
+	}
+	return snippet
 }
 
 // parseYFAIRetryAfter accepts both the delta-seconds and HTTP-date forms of
