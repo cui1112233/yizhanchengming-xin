@@ -250,6 +250,12 @@ func classifyAutomationFailure(err error, stage string) automationFailureDisposi
 			Code: automationCodeContentPolicy, Class: automationFailureManual,
 			MaxAttempts: 1, BudgetKey: budget,
 		}
+	case errors.Is(err, batchfactoryv11.ErrVideoPromptRepairExhausted):
+		// 视频提示词自动去敏轮次用尽：转人工，不再用同一份提示词重复提交。
+		return automationFailureDisposition{
+			Code: automationCodeContentPolicy, Class: automationFailureManual,
+			MaxAttempts: 1, BudgetKey: budget,
+		}
 	case errors.Is(err, errShuihuoImageContentSoftRefusal):
 		// 对话式软拒绝：先走提示词改写，和硬审核共用轮次预算，但错误码独立。
 		return automationFailureDisposition{

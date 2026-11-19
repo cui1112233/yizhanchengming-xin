@@ -62,6 +62,8 @@ func TestClassifyFailureTable(t *testing.T) {
 		// 视频任务被平台审核拒绝：第一次失败后自动去敏改写一次提示词并重试，
 		// 改写后仍被拒则转人工。
 		{"video moderation", errors.New("视频任务失败：内容不符合平台规范，请调整提示词或图片后重试"), "video", automationCodeContentPolicy, automationFailureTransient, true, false, 2},
+		// 自动改写轮次用尽后必须转人工，不能继续用同一份提示词重复提交。
+		{"video repair exhausted", batchfactoryv11.ErrVideoPromptRepairExhausted, "video", automationCodeContentPolicy, automationFailureManual, false, true, 1},
 		{"insufficient balance", errors.New("余额不足，请充值"), "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
 		// 上游文案中文化后不能再靠英文关键词；结构化 401/402/403 必须直接判定为确定性失败。
 		{"typed provider 402", shuihuoImageUpstreamError{StatusCode: http.StatusPaymentRequired, Message: "上游拒绝了本次请求"}, "comic_images", automationCodeAuthQuota, automationFailureDeterministic, false, false, 1},
