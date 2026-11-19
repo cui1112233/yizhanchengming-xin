@@ -2,8 +2,10 @@ package batchfactoryv11
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 func (s *PromptCompilerService) CompileH3ForProduction(ctx context.Context, owner, batchID, bookID, videoID, compilationID string, referenceLimit int) (FinalPrompt, error) {
@@ -35,15 +37,26 @@ func (s *PromptCompilerService) CompileH3ForProduction(ctx context.Context, owne
 	}
 	durationSeconds := int((segment.RequestDurationMS + 999) / 1000)
 	trace := segment.CompileTrace
+	compiledPrompt := segment.CompiledPrompt
+	displayPrompt := segment.EditableCopy
+	snapshotHash := segment.CompiledPromptHash
+	// 用户手动编辑或自动去敏改写的视频提示词优先于冻结编译内容；否则重试
+	// 会再次提交被审核拒绝的原文，改写等于没生效。
+	if override, ok := videoPromptOverrideFor(video, 0); ok {
+		compiledPrompt = override
+		displayPrompt = override
+		snapshotHash = fmt.Sprintf("%x", sha256.Sum256([]byte(strings.TrimSpace(override))))
+		trace.EditableCopySource = "video_prompt_override"
+	}
 	return FinalPrompt{
 		BatchID:               batchID,
 		BookID:                bookID,
 		VideoID:               videoID,
 		DirectorRevisionID:    revision.Compilation.DirectorRevisionID,
-		SnapshotHash:          segment.CompiledPromptHash,
-		DisplayPrompt:         segment.EditableCopy,
-		CompiledPrompt:        segment.CompiledPrompt,
-		Components:            []PromptComponent{{Key: "h3", Label: "", Content: segment.CompiledPrompt}},
+		SnapshotHash:          snapshotHash,
+		DisplayPrompt:         displayPrompt,
+		CompiledPrompt:        compiledPrompt,
+		Components:            []PromptComponent{{Key: "h3", Label: "", Content: compiledPrompt}},
 		EffectiveSettings:     effective,
 		DurationSeconds:       durationSeconds,
 		ReferenceImageURLs:    references,

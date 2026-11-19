@@ -164,3 +164,113 @@ func TestVideoPromptOverrideDoesNotLeakIntoOpeningVariants(t *testing.T) {
 		t.Fatalf("videoPrompt must not leak into opening variants, got %q", value)
 	}
 }
+
+// 用户手动改过提示词后，1 轮自动改写预算不能把人永久拦住。
+func TestRepairLetsManualPromptEditBypassExhausted(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "b", Books: []CreateBookInput{{
+		Title:      "book",
+		SourceText: "正文",
+		Videos:     []CreateVideoInput{{Label: "VIDEO01", VideoPrompt: "原始提示词"}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	video := book.Videos[0]
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{"videoPrompt": rawSetting(t, "原始提示词")}, ExpectedRevision: video.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	repository, err := (&ProductionService{Store: store}).repository()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateProductionJob(ctx, ProductionJob{
+		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "req-3", DirectorRevisionID: "rev-1",
+		Status: ProductionFailed,
+		Tasks:  []ProductionTask{{VideoID: video.ID, Status: ProductionFailed, ErrorMessage: "内容审核拒绝"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &repairRecordingProvider{reply: "自动改写后的提示词"}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}, Production: &ProductionService{Store: store}}
+	if repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); err != nil || !repaired {
+		t.Fatalf("first repair=%v err=%v", repaired, err)
+	}
+	if _, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); !errors.Is(err, ErrVideoPromptRepairExhausted) {
+		t.Fatalf("same rewritten prompt must be exhausted, got %v", err)
+	}
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := latest.Books[0].Videos[0]
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{"videoPrompt": rawSetting(t, "用户手动修改后的提示词")}, ExpectedRevision: edited.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, "")
+	if err != nil {
+		t.Fatalf("manual edit must not be blocked: %v", err)
+	}
+	if repaired {
+		t.Fatal("manual edit must be submitted as-is, not rewritten again")
+	}
+	if provider.calls != 1 {
+		t.Fatalf("manual edit must not call the model again, calls=%d", provider.calls)
+	}
+}
+
+// H3 冻结编译也必须服从 videoPrompt 覆盖，否则审核拒绝后的改写不生效。
+func TestCompileH3ForProductionAppliesVideoPromptOverride(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book := seedH3DirectorRevision(t)
+	document := *book.DirectorRevision.Output.H3Director
+	timeline := mustH3Timeline(t, document, 7420)
+	timeline.DirectorRevisionID = book.DirectorRevision.ID
+	persistedTimeline, err := store.PersistH3CanonicalTimeline(ctx, "alice", batch.ID, book.ID, timeline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := completeH3CompileInput(document, timeline)
+	input.TimelineID = persistedTimeline.ID
+	compilation, err := CompileH3VideoSegments(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := store.PersistH3VideoCompilation(ctx, "alice", batch.ID, book.ID, compilation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	videos, err := store.ApplyH3CompilationVideos(ctx, "alice", batch.ID, book.ID, compiled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book.Videos = videos
+	compiler := &PromptCompilerService{Store: store}
+	videoID := book.Videos[0].ID
+	frozen, err := compiler.CompileH3ForProduction(ctx, "alice", batch.ID, book.ID, videoID, compiled.ID, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if frozen.CompiledPrompt != compiled.Compilation.Segments[0].CompiledPrompt {
+		t.Fatal("frozen compilation prompt must be used when no override exists")
+	}
+	video, ok := videoByID(book, videoID)
+	if !ok {
+		t.Fatal("video not found")
+	}
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: videoID}, SettingsUpdate{Patch: SettingsPatch{"videoPrompt": rawSetting(t, "去敏后的 H3 提示词")}, ExpectedRevision: video.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	overridden, err := compiler.CompileH3ForProduction(ctx, "alice", batch.ID, book.ID, videoID, compiled.ID, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overridden.CompiledPrompt != "去敏后的 H3 提示词" || overridden.DisplayPrompt != "去敏后的 H3 提示词" {
+		t.Fatalf("override not applied: compiled=%q display=%q", overridden.CompiledPrompt, overridden.DisplayPrompt)
+	}
+	if overridden.SnapshotHash == frozen.SnapshotHash {
+		t.Fatal("override must change the snapshot hash")
+	}
+}

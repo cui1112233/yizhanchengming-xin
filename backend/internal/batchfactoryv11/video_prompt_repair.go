@@ -2,6 +2,7 @@ package batchfactoryv11
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +17,9 @@ import (
 const videoPromptRepairMaxRounds = 1
 
 const (
-	videoPromptRepairCountsKey = "videoPromptRepairCounts"
-	openingVariantPromptsKey   = "openingVariantPrompts"
+	videoPromptRepairCountsKey  = "videoPromptRepairCounts"
+	videoPromptRepairMarkersKey = "videoPromptRepairMarkers"
+	openingVariantPromptsKey    = "openingVariantPrompts"
 )
 
 // ErrVideoPromptRepairExhausted 表示自动去敏轮次已用完。调用方不得再用原
@@ -102,6 +104,30 @@ func videoPromptRepairCounts(video Video) map[string]int {
 	return counts
 }
 
+// videoPromptRepairMarkers 记录自动改写后的提示词指纹。用于区分“自动改写后
+// 仍被拒”和“用户已手动修改提示词”：后者不应再被轮次上限拦住。
+func videoPromptRepairMarkers(video Video) map[string]string {
+	markers := map[string]string{}
+	raw, ok := video.SettingsState.Patch[videoPromptRepairMarkersKey]
+	if !ok || len(raw) == 0 {
+		return markers
+	}
+	var stored map[string]string
+	if json.Unmarshal(raw, &stored) != nil {
+		return markers
+	}
+	for key, value := range stored {
+		if strings.TrimSpace(value) != "" {
+			markers[key] = value
+		}
+	}
+	return markers
+}
+
+func promptDigest(text string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(strings.TrimSpace(text))))
+}
+
 func updatedOpeningVariantsWithPrompt(video Video, index int, prompt string) ([]OpeningVariant, error) {
 	var variants []OpeningVariant
 	raw, ok := video.SettingsState.Patch["openingVariants"]
@@ -182,6 +208,16 @@ func (s *BookStageService) RepairRejectedVideoPrompts(ctx context.Context, owner
 		indexKey := strconv.Itoa(task.OpeningVariantIndex)
 		counts := videoPromptRepairCounts(video)
 		if counts[indexKey] >= videoPromptRepairMaxRounds {
+			// 自动改写之后用户又手动改了提示词：这属于新的提交内容，不能被
+			// 轮次上限永久拦住。只有提示词仍是上次自动改写结果时才转人工。
+			current, promptErr := s.videoPromptForRepair(ctx, owner, batchID, book, video, task)
+			if promptErr != nil {
+				return repaired, promptErr
+			}
+			if marker := videoPromptRepairMarkers(video)[indexKey]; marker != "" && marker != promptDigest(current) {
+				log.Printf("batch-factory: video prompt manually edited, allowing resubmit owner=%s book=%s video=%s variant=%d", owner, bookID, video.ID, task.OpeningVariantIndex)
+				continue
+			}
 			exhausted = true
 			continue
 		}
@@ -227,6 +263,13 @@ func (s *BookStageService) RepairRejectedVideoPrompts(ctx context.Context, owner
 			return repaired, fmt.Errorf("%w: 保存视频提示词改写次数失败", ErrInvalid)
 		}
 		patch[videoPromptRepairCountsKey] = encodedCounts
+		markers := videoPromptRepairMarkers(video)
+		markers[indexKey] = promptDigest(rewritten)
+		encodedMarkers, marshalErr := json.Marshal(markers)
+		if marshalErr != nil {
+			return repaired, fmt.Errorf("%w: 保存视频提示词改写指纹失败", ErrInvalid)
+		}
+		patch[videoPromptRepairMarkersKey] = encodedMarkers
 		if _, err := s.Store.SaveSettings(ctx, owner, ScopeRef{Kind: ScopeVideo, BatchID: batchID, BookID: bookID, VideoID: video.ID}, SettingsUpdate{Patch: patch, ExpectedRevision: video.Revision}); err != nil {
 			return repaired, err
 		}

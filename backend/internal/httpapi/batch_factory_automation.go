@@ -4468,6 +4468,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageVideo, batchfactoryv11.StageModeMissing, videoRequestID(book, automationNumberValue(entry["batchRetryCount"], 0)), "")
 					cancel()
 					if stageErr != nil {
+						if isVideoModerationFailure(stageErr) {
+							appendAutomationBookLog(entry, c.now(), "video", "视频提示词被内容审核拒绝，重试时将自动去敏改写")
+						}
 						fail("video", stageErr, "视频提交失败")
 						continue
 					}
