@@ -1,0 +1,59 @@
+/* 统一上传按钮动效：点击轻压 → 纸飞机从按钮内飞出 + 「上传成功」→ 恢复。
+   上传类入口按钮（上传网络/发布漫画）共享同一段轻压反馈。 */
+.batch-factory-upload-sent {
+  position: relative;
+  transition: transform .12s ease, border-color .16s ease, background-color .16s ease, color .16s ease;
+}
+.batch-factory-upload-sent:not(:disabled):active,
+.batch-factory-upload-network-button:not(:disabled):active,
+.batch-factory-comic-publish-entry:not(:disabled):active {
+  transform: translateY(1px) scale(.97);
+}
+
+.batch-factory-upload-sent.is-sent {
+  color: var(--text-success, #30a46c) !important;
+  border-color: var(--text-success, #30a46c) !important;
+  background: rgba(48, 164, 108, .08) !important;
+}
+.batch-factory-upload-sent.is-sent.ant-btn-primary {
+  color: #fff !important;
+  border-color: transparent !important;
+  background: var(--text-success, #30a46c) !important;
+}
+.batch-factory-upload-sent.is-sent.ant-btn-dangerous {
+  border-color: transparent !important;
+}
+
+.batch-factory-upload-sent-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: batch-factory-upload-sent-pop .26s ease;
+}
+.batch-factory-upload-sent-plane {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -7px 0 0 -7px;
+  color: var(--text-success, #30a46c);
+  opacity: 0;
+  pointer-events: none;
+}
+.batch-factory-upload-sent.is-sent .batch-factory-upload-sent-plane {
+  animation: batch-factory-upload-sent-plane-fly 1.05s ease-out forwards;
+}
+@keyframes batch-factory-upload-sent-plane-fly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  22% { opacity: 1; }
+  100% { opacity: 0; transform: translate(48px, -36px) rotate(9deg) scale(.68); }
+}
+@keyframes batch-factory-upload-sent-pop {
+  from { opacity: 0; transform: scale(.88); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .batch-factory-upload-sent:not(:disabled):active,
+  .batch-factory-upload-network-button:not(:disabled):active,
+  .batch-factory-comic-publish-entry:not(:disabled):active { transform: none; }
+  .batch-factory-upload-sent.is-sent .batch-factory-upload-sent-plane { animation: none; }
+}
