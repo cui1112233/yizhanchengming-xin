@@ -686,6 +686,12 @@ select {
   --window-bg-tint-c: 66%;
   --window-bg-band-a: 100%;
   --window-bg-band-b: 92%;
+  /* 深色主题下浅色文字需要足够实的底色：亮色窗口背景把面板衬成灰白时，
+     浅字会失去对比（生产实况：批量工厂表格几乎不可读）。遮罩整体加强，
+     并显式给出各层浓度——calc 会超过 100% 使 color-mix 声明失效。 */
+  --window-bg-veil: 55%;
+  --window-bg-panel-veil: 92%;
+  --window-bg-main-veil: 88%;
 }
 
 .window-background-picker { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border-default); }
@@ -3547,11 +3553,11 @@ html.window-bg-paused .home-shell.has-window-background::after { animation-play-
 
 /* Ant Design portals mount outside .legacy-shell, so user dialogs need a body-level theme hook. */
 [data-shell='user'] .ant-modal-content,
-[data-shell='user'] .ant-drawer-content { color: var(--legacy-text); background: var(--legacy-card); }
+[data-shell='user'] .ant-drawer-content { color: var(--legacy-text); background: var(--surface-elevated, #141f2d); }
 [data-shell='user'] .ant-modal-header,
 [data-shell='user'] .ant-modal-footer,
 [data-shell='user'] .ant-drawer-header,
-[data-shell='user'] .ant-drawer-footer { background: var(--legacy-card); border-color: var(--legacy-border-strong); }
+[data-shell='user'] .ant-drawer-footer { background: var(--surface-elevated, #141f2d); border-color: var(--legacy-border-strong); }
 [data-shell='user'] .ant-modal-title,
 [data-shell='user'] .ant-drawer-title,
 [data-shell='user'] .ant-form-item-label > label { color: var(--legacy-text); font-weight: 600; }
@@ -3567,13 +3573,13 @@ html.window-bg-paused .home-shell.has-window-background::after { animation-play-
 [data-shell='user'] .ant-input-affix-wrapper input { color: var(--legacy-text) !important; background: transparent !important; }
 [data-shell='user'] .ant-select-dropdown,
 [data-shell='user'] .ant-dropdown-menu,
-[data-shell='user'] .ant-popover-inner { color: var(--legacy-text); background: var(--legacy-card); border: 1px solid var(--legacy-border-strong); }
+[data-shell='user'] .ant-popover-inner { color: var(--legacy-text); background: var(--surface-elevated, #141f2d); border: 1px solid var(--legacy-border-strong); }
 [data-shell='user'] .ant-select-item-option-active:not(.ant-select-item-option-disabled),
 [data-shell='user'] .ant-select-item-option-selected:not(.ant-select-item-option-disabled),
 [data-shell='user'] .ant-dropdown-menu-item:hover { background: var(--legacy-card-hover); }
 [data-shell='user'] .ant-message-notice-content,
 [data-shell='user'] .ant-notification-notice,
-[data-shell='user'] .ant-tooltip-inner { color: var(--legacy-text) !important; border: 1px solid var(--legacy-border-strong) !important; background: var(--legacy-card) !important; }
+[data-shell='user'] .ant-tooltip-inner { color: var(--legacy-text) !important; border: 1px solid var(--legacy-border-strong) !important; background: var(--surface-elevated, #141f2d) !important; }
 [data-shell='user'] .ant-alert { color: var(--legacy-text); border-color: var(--legacy-border-strong); background: var(--legacy-card-hover); }
 [data-theme] .ant-alert-message,
 [data-theme] .ant-alert-description,
