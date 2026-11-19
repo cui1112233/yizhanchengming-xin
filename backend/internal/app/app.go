@@ -36,6 +36,7 @@ import (
 	"qiantie/backend/internal/productionmedia"
 	"qiantie/backend/internal/projectretention"
 	"qiantie/backend/internal/prompt"
+	novelprompt "qiantie/backend/internal/prompt/novelcreation"
 	"qiantie/backend/internal/safehttp"
 	"qiantie/backend/internal/safepath"
 	"qiantie/backend/internal/screenplay"
@@ -227,6 +228,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	if err := prompt.EnsureComicPresets(cfg.PresetPath, cfg.LocalExecutorArtifactDir); err != nil {
 		return nil, err
 	}
+	if err := novelprompt.EnsureAdminPresets(cfg.PresetPath); err != nil {
+		return nil, err
+	}
 	migrations := append(storage.AppMigrations(), storage.NovelFetchWorkshopMigrations()...)
 	migrations = append(migrations, storage.AgentProxyMigrations()...)
 	migrations = append(migrations, storage.AuthMigrations()...)
@@ -372,6 +376,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	memberProfiles := httpapi.NewMemberProfileStore(cfg.MemberSystemDir)
 	novelCreationService := novelcreation.NewService(novelCreationStore, novelCreationRuntime, novelcreation.NewPipeline(novelcreation.ProviderResolver(httpapi.NovelCreationTextResolver(authStore, memberProfiles, textProviderForModel))))
+	novelCreationService.ConfigureSystemPrompts(prompt.NewCatalog(cfg.PresetPath))
 	if cfg.AgentAssetTOSBucket != "" {
 		documentObjects, documentErr := novelcreation.NewTOSDocumentStore(novelcreation.DocumentTOSConfig{Endpoint: cfg.AgentAssetTOSEndpoint, Region: cfg.AgentAssetTOSRegion, Bucket: cfg.AgentAssetTOSBucket, AccessKey: cfg.AgentAssetTOSAccessKey, SecretKey: cfg.AgentAssetTOSSecretKey})
 		if documentErr != nil {

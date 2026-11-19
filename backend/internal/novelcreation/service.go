@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	promptcatalog "qiantie/backend/internal/prompt"
 	"strings"
 	"time"
 )
@@ -25,6 +26,7 @@ type Snapshot struct {
 }
 
 type Service struct {
+	promptCatalog   *promptcatalog.Catalog
 	archiveProject  func(context.Context, string, string) error
 	restoreProject  func(context.Context, string, string) error
 	documents       DocumentObjectStore
@@ -157,7 +159,12 @@ func (s *Service) sendMessage(ctx context.Context, owner string, input SendMessa
 	if imitation != nil {
 		settings.Agent.TargetChapterWords = imitation.Input.TargetWordCount
 	}
+	systemPrompts, err := s.snapshotSystemPrompts()
+	if err != nil {
+		return Run{}, err
+	}
 	snapshotFields := map[string]any{
+		"system_prompts":         systemPrompts,
 		"project_settings":       settings,
 		"agent_contract_version": 1,
 		"review_cycle_version":   4,
@@ -223,6 +230,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		return s.finishWithError(ctx, owner, run, ErrSessionNotFound, "创作会话不存在", err)
 	}
 	var prompt struct {
+		SystemPrompts        *SystemPromptSnapshot  `json:"system_prompts"`
 		LongImitation        *LongImitationCreation `json:"long_imitation"`
 		AgentContractVersion int                    `json:"agent_contract_version"`
 		ReviewCycleVersion   int                    `json:"review_cycle_version"`
@@ -324,6 +332,7 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 		MaxRevisionRounds:   agent.MaxRevisionRounds,
 		Agent:               effectiveAgent,
 		ReviewCycleVersion:  prompt.ReviewCycleVersion,
+		SystemPrompts:       prompt.SystemPrompts,
 	}, sink)
 	if runErr != nil {
 		if IsCode(runErr, ErrSecondaryConfirmation) {

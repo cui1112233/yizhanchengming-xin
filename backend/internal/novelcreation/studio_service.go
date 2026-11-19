@@ -330,7 +330,15 @@ func (s *Service) SendStudioMessage(ctx context.Context, owner, id string, in St
 			return e
 		}
 		payload, _ := json.Marshal(map[string]any{"messages": contextMessages, "previousProposal": priorProposal, "mode": r.Session.Mode, "thinkingLevel": in.ThinkingLevel, "contextBudget": in.ContextBudget})
-		request = batchfactoryv11.TextCompletionRequest{SystemPrompt: novelprompt.StudioPlanningSystem, UserPrompt: string(payload), MaxTokens: 6000}
+		systemPrompts, lookupErr := s.snapshotSystemPrompts()
+		if lookupErr != nil {
+			return lookupErr
+		}
+		planningSystem, lookupErr := frozenSystemText(RunContext{SystemPrompts: systemPrompts}, novelprompt.StudioPlanningPresetID, novelprompt.StudioPlanningSystem)
+		if lookupErr != nil {
+			return lookupErr
+		}
+		request = batchfactoryv11.TextCompletionRequest{SystemPrompt: planningSystem, UserPrompt: string(payload), MaxTokens: 6000}
 		turnID = novelID("studio-turn")
 		r.Turns = append(r.Turns, studioTurnRecord{StudioTurn: StudioTurn{ID: turnID, IdempotencyKey: in.IdempotencyKey, State: "prepared", ModelID: in.ModelID}, Fingerprint: digest, Request: request, SentAt: time.Now().UTC()})
 		// Reserve space for the raw reply and its interpreted message/action.
@@ -554,6 +562,7 @@ func (s *Service) ConfirmStudioAction(ctx context.Context, owner, id string, in 
 			return e
 		}
 		child := NewService(tx, quietRuntime{s.runtime}, s.pipeline)
+		child.promptCatalog = s.promptCatalog
 		// Preserve the actual bounded planning input, not the complete durable
 		// transcript. Reinjecting excluded history here would defeat the chosen
 		// context limit. The studio ID traces the full original conversation.

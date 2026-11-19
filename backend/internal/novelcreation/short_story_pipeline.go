@@ -78,10 +78,11 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		return s.finishWithError(ctx, owner, run, ErrModelUnavailable, "独立短篇执行器未配置", nil)
 	}
 	var snap struct {
-		Story        ShortStory      `json:"short_story"`
-		Confirmed    bool            `json:"short_outline_confirmed"`
-		Settings     ProjectSettings `json:"project_settings"`
-		RetryOfRunID string          `json:"retry_of_run_id"`
+		SystemPrompts *SystemPromptSnapshot `json:"system_prompts"`
+		Story         ShortStory            `json:"short_story"`
+		Confirmed     bool                  `json:"short_outline_confirmed"`
+		Settings      ProjectSettings       `json:"project_settings"`
+		RetryOfRunID  string                `json:"retry_of_run_id"`
 	}
 	if e := json.Unmarshal(run.PromptSnapshot, &snap); e != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇快照损坏", e)
@@ -120,7 +121,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		}
 	}
 	agent := NormalizeAgentSettings(snap.Settings.Agent, 2000)
-	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent}
+	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent, SystemPrompts: snap.SystemPrompts}
 	sink := serviceEventSink{service: s, owner: owner}
 	result, e := p.buildShortStory(ctx, in, sink, story, snap.Confirmed)
 	if e != nil {

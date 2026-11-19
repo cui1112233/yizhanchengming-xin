@@ -6,6 +6,7 @@ import { archivePreset, createPresetDraft, deletePreset, listAdminPresetSlots, l
 const modules = [
   { label: '私人定制', value: 'script' },
   { label: '小说获取', value: 'novel-fetch' },
+  { label: '小说创作', value: 'novel-creation' },
   { label: '水货生产', value: 'shuihuo-production' },
   { label: '批量工厂', value: 'batch-factory' },
   { label: 'CM 插件', value: 'luoshui-plugin' }
@@ -599,6 +600,7 @@ export function PresetLibraryPage() {
   const librarySections = useMemo(() => {
     const knownSlots = new Set(slots.map(slot => slot.id));
     const cmModule = module === 'luoshui-plugin';
+    const novelModule = module === 'novel-creation';
     const sections = slots.map(slot => ({
       key: slot.id,
       title: slot.label,
@@ -606,8 +608,10 @@ export function PresetLibraryPage() {
         ? (slot.id === 'plugin.unassigned'
             ? '这些条目不被 5 个插件功能引用；批量链路条目编辑发布后生效，历史存档条目不受影响。'
             : '条目与顺序由插件代码固定；编辑并发布正文后生效。')
-        : '此处新增的预设词会直接归入该调用位置。',
-      createSlot: cmModule ? '' : slot.id,
+        : novelModule
+          ? '对应小说创作实际调用；编辑并发布后用于新任务，已排队任务保留创建时的版本。输出格式与流程条件由后端固定。'
+          : '此处新增的预设词会直接归入该调用位置。',
+      createSlot: cmModule || novelModule ? '' : slot.id,
       items: grouped.filter(item => item.slot === slot.id)
     }));
     const unassigned = grouped.filter(item => !knownSlots.has(item.slot));

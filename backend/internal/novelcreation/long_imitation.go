@@ -217,6 +217,7 @@ func (s *Service) StartLongImitation(ctx context.Context, owner string, input Lo
 			return e
 		}
 		child := NewService(tx, quietRuntime{s.runtime}, s.pipeline)
+		child.promptCatalog = s.promptCatalog
 		// Receipt keys support 128 characters; the existing run column supports
 		// 96. Keep the external receipt untouched and bind a short internal key.
 		internalKey := "long-imitation:" + fingerprint([]string{owner, longImitationKind, in.IdempotencyKey})

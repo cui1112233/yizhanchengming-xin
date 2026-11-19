@@ -12,6 +12,7 @@ import (
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/prompt"
+	novelprompt "qiantie/backend/internal/prompt/novelcreation"
 )
 
 func adminSystemFile(systemDir, name string) string {
@@ -235,6 +236,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 	root.Handle("GET /api/admin/preset-slots", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if catalog == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		if req.URL.Query().Get("module") == novelprompt.AdminModule {
+			writeJSON(w, http.StatusOK, map[string]any{"slots": novelprompt.AdminSlots()})
 			return
 		}
 		if req.URL.Query().Get("module") == prompt.LuoshuiAdminModule {

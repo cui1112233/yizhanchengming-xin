@@ -72,6 +72,7 @@ type RunContext struct {
 	MaxRevisionRounds  int
 	Agent              *AgentSettings
 	ReviewCycleVersion int
+	SystemPrompts      *SystemPromptSnapshot
 }
 
 type Pipeline struct {
@@ -576,8 +577,19 @@ func (p *Pipeline) auditChapter(ctx context.Context, input RunContext, sink Even
 }
 
 func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSink, provider batchfactoryv11.DirectorProvider, spec modelCallSpec, target any) (json.RawMessage, error) {
+	if !(input.ReviewCycleVersion >= 2 && spec.definition.ID == novelprompt.ChapterRevision.ID) {
+		var e error
+		spec.definition, e = frozenSystemDefinition(input, spec.definition, systemPresetKey(spec.definition))
+		if e != nil {
+			return nil, e
+		}
+	}
 	if input.LongImitation != nil && spec.definition.ID != novelprompt.LongImitationRequirements.ID {
-		spec.definition.SystemPrompt += novelprompt.LongImitationSystemSupplement
+		supplement, e := frozenSystemText(input, novelprompt.ImitationSupplementPresetID, novelprompt.LongImitationSystemSupplement)
+		if e != nil {
+			return nil, e
+		}
+		spec.definition.SystemPrompt += supplement
 		if payload, ok := spec.userPayload.(map[string]any); ok {
 			copy := map[string]any{}
 			for k, v := range payload {

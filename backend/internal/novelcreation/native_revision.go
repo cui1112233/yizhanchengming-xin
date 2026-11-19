@@ -163,11 +163,27 @@ func (p *Pipeline) callNativeRevision(ctx context.Context, input RunContext, sin
 	content, _ := payload["chapter_content"].(string)
 	issues, _ := payload["audit_issues"].([]auditIssue)
 	spec.definition = novelprompt.NativeChapterRevision
+	definition, resolveErr := frozenSystemDefinition(input, spec.definition, novelprompt.NativeRevisionPresetID)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	spec.definition = definition
 	var route *nativeRevisionRoute
 	if input.ReviewCycleVersion >= 3 {
 		resolved := resolveNativeRevisionRoute(issues)
 		route = &resolved
-		spec.definition = novelprompt.RoutedNativeChapterRevision(resolved.Mode)
+		spec.definition.Version = 3
+		if resolved.Mode != "allow-full" {
+			key := novelprompt.PatchOnlyPresetID
+			if resolved.Mode == "rewrite-only" {
+				key = novelprompt.RewriteOnlyPresetID
+			}
+			instruction, e := frozenSystemText(input, key, novelprompt.NativeRevisionRouteInstruction(resolved.Mode))
+			if e != nil {
+				return nil, e
+			}
+			spec.definition.SystemPrompt += instruction
+		}
 		copy := make(map[string]any, len(payload)+2)
 		for k, v := range payload {
 			copy[k] = v
@@ -177,7 +193,11 @@ func (p *Pipeline) callNativeRevision(ctx context.Context, input RunContext, sin
 		spec.userPayload = copy
 	}
 	if input.LongImitation != nil {
-		spec.definition.SystemPrompt += novelprompt.LongImitationSystemSupplement
+		supplement, e := frozenSystemText(input, novelprompt.ImitationSupplementPresetID, novelprompt.LongImitationSystemSupplement)
+		if e != nil {
+			return nil, e
+		}
+		spec.definition.SystemPrompt += supplement
 	}
 	user, e := marshalPromptPayload(withThinkingLevel(spec.userPayload, input.Run.ThinkingLevel))
 	if e != nil {

@@ -21,16 +21,17 @@ type MaintenanceInput struct {
 	IdempotencyKey string `json:"idempotencyKey"`
 }
 type maintenanceSnapshot struct {
-	Operation            string          `json:"operation"`
-	AgentContractVersion int             `json:"agent_contract_version"`
-	Settings             ProjectSettings `json:"project_settings"`
-	Chapters             []Chapter       `json:"chapters"`
-	Sources              []ChapterSource `json:"sources"`
-	Revision             int             `json:"revision"`
-	PreviousTruth        json.RawMessage `json:"previous_truth"`
-	PreviousMemory       json.RawMessage `json:"previous_memory"`
-	Style                *StyleSource    `json:"style,omitempty"`
-	StyleFingerprint     string          `json:"style_fingerprint,omitempty"`
+	SystemPrompts        *SystemPromptSnapshot `json:"system_prompts,omitempty"`
+	Operation            string                `json:"operation"`
+	AgentContractVersion int                   `json:"agent_contract_version"`
+	Settings             ProjectSettings       `json:"project_settings"`
+	Chapters             []Chapter             `json:"chapters"`
+	Sources              []ChapterSource       `json:"sources"`
+	Revision             int                   `json:"revision"`
+	PreviousTruth        json.RawMessage       `json:"previous_truth"`
+	PreviousMemory       json.RawMessage       `json:"previous_memory"`
+	Style                *StyleSource          `json:"style,omitempty"`
+	StyleFingerprint     string                `json:"style_fingerprint,omitempty"`
 }
 type MaintenanceResult struct {
 	Snapshot     maintenanceSnapshot `json:"snapshot"`
@@ -73,6 +74,10 @@ func (s *Service) QueueMaintenance(ctx context.Context, owner, project string, i
 		}
 		settings.Agent = NormalizeAgentSettings(settings.Agent, p.TargetChapterWords)
 		snap := maintenanceSnapshot{Operation: in.Kind, AgentContractVersion: 1, Settings: settings, PreviousTruth: json.RawMessage(`{}`), PreviousMemory: json.RawMessage(`{}`)}
+		snap.SystemPrompts, e = child.snapshotSystemPrompts()
+		if e != nil {
+			return Run{}, e
+		}
 		if in.Kind == "continuity_refresh" {
 			chapters, e := tx.ListChapters(ctx, owner, project)
 			if e != nil {
@@ -169,7 +174,7 @@ func (s *Service) runMaintenance(ctx context.Context, owner string, run Run) (Ru
 	if session.ArchivedAt != nil {
 		return s.finishWithError(ctx, owner, run, ErrInvalidTransition, "会话已归档", nil)
 	}
-	input := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Agent: &snap.Settings.Agent, Runtime: s.runtime}
+	input := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Agent: &snap.Settings.Agent, Runtime: s.runtime, SystemPrompts: snap.SystemPrompts}
 	sink := serviceEventSink{s, owner}
 	if e = p.emitStage(ctx, input, sink, RunAnalyzing, "正在分析已保存资料", 5); e != nil {
 		return run, e

@@ -324,7 +324,7 @@ func (s *Service) Run(ctx context.Context, owner, id string) (Run, error) {
 		}
 	}()
 	gs := &guardedStore{Store: s.store, lease: l}
-	child := &Service{store: gs, runtime: executionRuntime{Runtime: s.runtime, store: s.store, owner: owner}, pipeline: s.pipeline, control: s.control}
+	child := &Service{store: gs, runtime: executionRuntime{Runtime: s.runtime, store: s.store, owner: owner}, pipeline: s.pipeline, control: s.control, promptCatalog: s.promptCatalog}
 	if e.Maintenance != nil {
 		return child.saveMaintenance(runCtx, owner, current, *e.Maintenance)
 	}
@@ -641,7 +641,7 @@ func (r executionRuntime) IsCancelled(ctx context.Context, id string) (bool, err
 func (s *Service) queueAtomic(ctx context.Context, owner, project, hash string, fn func(*Service) (Run, error)) (Run, error) {
 	var out Run
 	err := s.store.Atomic(ctx, owner, project, func(tx Store) error {
-		child := &Service{store: tx, runtime: quietRuntime{s.runtime}, pipeline: s.pipeline, control: s.control}
+		child := &Service{store: tx, runtime: quietRuntime{s.runtime}, pipeline: s.pipeline, control: s.control, promptCatalog: s.promptCatalog}
 		var err error
 		out, err = fn(child)
 		if err != nil {

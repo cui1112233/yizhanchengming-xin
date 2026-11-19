@@ -46,3 +46,13 @@ func RoutedNativeChapterRevision(mode string) promptcatalog.Definition {
 	}
 	return d
 }
+
+func NativeRevisionRouteInstruction(mode string) string {
+	switch mode {
+	case "rewrite-only":
+		return nativeRewriteOnlyInstruction
+	case "patch-only":
+		return nativePatchOnlyInstruction
+	}
+	return ""
+}

@@ -269,6 +269,31 @@ func (c *Catalog) PublishedBody(module, id string) (PublishedPresetBody, bool, e
 	}, true, nil
 }
 
+// PublishedBodies reads one consistent catalog image for a durable job snapshot.
+func (c *Catalog) PublishedBodies(module string) ([]PublishedPresetBody, error) {
+	records, err := c.load()
+	if err != nil {
+		return nil, err
+	}
+	result := []PublishedPresetBody{}
+	seen := map[string]bool{}
+	for _, r := range records {
+		if r.Module != module || r.Status != "published" {
+			continue
+		}
+		if seen[r.ID] {
+			return nil, errors.New("同一提示词存在多个已发布版本，请先整理目录")
+		}
+		seen[r.ID] = true
+		revision := r.Revision
+		if revision < 1 {
+			revision = 1
+		}
+		result = append(result, PublishedPresetBody{ID: r.ID, Module: r.Module, Name: r.Name, Version: r.Version, Revision: revision, Body: r.Body, Slot: r.ProtocolLock.Slot})
+	}
+	return result, nil
+}
+
 func (c *Catalog) ConstraintText(ids []string) (map[string]string, error) {
 	texts := make(map[string]string)
 	for _, id := range ids {

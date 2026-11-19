@@ -83,9 +83,9 @@ test('puts a plus row below each slot-bound prompt table', () => {
   assert.match(source, /onClick=\{\(\) => openCreate\(slotID\)\}/);
 });
 
-test('uses the same slot-bound plus row for every non-batch prompt library', () => {
+test('uses slot-bound plus rows except for fixed runtime prompt registries', () => {
   assert.match(source, /const librarySections = useMemo/);
-  assert.match(source, /createSlot: cmModule \? '' : slot\.id/);
+  assert.match(source, /createSlot: cmModule \|\| novelModule \? '' : slot\.id/);
   assert.match(source, /module !== 'batch-factory'/);
   assert.match(source, /children: presetTable\(section\.items, section\.createSlot\)/);
 });
