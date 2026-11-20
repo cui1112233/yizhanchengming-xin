@@ -11,6 +11,7 @@ import (
 	"yizhanchengming/magic-cut-workbench/internal/authbridge"
 	"yizhanchengming/magic-cut-workbench/internal/config"
 	"yizhanchengming/magic-cut-workbench/internal/httpapi"
+	"yizhanchengming/magic-cut-workbench/internal/material"
 	"yizhanchengming/magic-cut-workbench/internal/project"
 	"yizhanchengming/magic-cut-workbench/web"
 )
@@ -24,16 +25,30 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var db *sql.DB
 	var projectRepository project.Repository
+	var materialHandler http.Handler
 	if cfg.DatabaseDSN != "" {
-		db, openErr := sql.Open("mysql", cfg.DatabaseDSN)
+		openedDB, openErr := sql.Open("mysql", cfg.DatabaseDSN)
 		if openErr != nil {
 			log.Fatal("open isolated Magic Cut database: ", openErr)
 		}
+		db = openedDB
 		db.SetMaxOpenConns(12)
 		db.SetMaxIdleConns(4)
 		db.SetConnMaxLifetime(5 * time.Minute)
 		projectRepository = project.NewStore(db, time.Now, project.NewID)
+		materialRepository := material.NewStore(db)
+		materialService := material.NewService(material.ServiceOptions{
+			StorageRoot:   cfg.StorageRoot,
+			MaxBytes:      10 << 30,
+			Probe:         material.FFprobe{},
+			Repository:    materialRepository,
+			NewMaterialID: material.NewID,
+			NewTaskID:     material.NewTaskID,
+			Now:           time.Now,
+		})
+		materialHandler = material.NewHandler(materialService, materialRepository, accountResolver.Resolve)
 	}
 
 	server := &http.Server{
@@ -43,10 +58,11 @@ func main() {
 			Auth:          authbridge.New(cfg.AuthBaseURL, &http.Client{Timeout: 15 * time.Second}),
 			AuthBootstrap: authbridge.NewBootstrap(cfg.AuthBaseURL, &http.Client{Timeout: 15 * time.Second}),
 			Projects:      project.NewHandler(projectRepository, accountResolver.Resolve),
+			Materials:     materialHandler,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadTimeout:       20 * time.Minute,
+		WriteTimeout:      20 * time.Minute,
 		IdleTimeout:       90 * time.Second,
 	}
 

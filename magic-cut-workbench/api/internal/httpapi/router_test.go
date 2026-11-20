@@ -82,3 +82,16 @@ func TestProjectRoutesUseTheIsolatedProjectHandler(t *testing.T) {
 		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestMaterialRoutesUseTheIsolatedMaterialHandler(t *testing.T) {
+	materials := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	})
+	handler := New(Dependencies{Materials: materials})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/magic-cut/projects/mcp_1/materials", nil))
+
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
+	}
+}

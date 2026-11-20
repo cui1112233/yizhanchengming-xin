@@ -2,12 +2,15 @@ import { Button, ConfigProvider, Spin, theme } from 'antd'
 import { useEffect, useState } from 'react'
 
 import { HomePage } from '../features/home/HomePage.jsx'
+import { EditorPage } from '../features/editor/EditorPage.jsx'
+import { projectIDFromPath } from '../features/editor/editorModel.js'
 import { loadSession } from '../shared/auth/session.js'
 import { WorkModeMenu } from '../shared/work-mode/WorkModeMenu.jsx'
 import './app.css'
 
 export function App() {
   const [session, setSession] = useState({ loading: true, authenticated: false, account: null, message: '' })
+  const [pathname, setPathname] = useState(window.location.pathname)
 
   useEffect(() => {
     let active = true
@@ -16,6 +19,14 @@ export function App() {
     })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    const updatePath = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', updatePath)
+    return () => window.removeEventListener('popstate', updatePath)
+  }, [])
+
+  const projectID = projectIDFromPath(pathname)
 
   return (
     <ConfigProvider
@@ -43,7 +54,7 @@ export function App() {
         ) : session.authenticated ? (
           <div className="magic-content">
             <div className="account-chip">{session.account?.displayName || session.account?.username}</div>
-            <HomePage />
+            {projectID ? <EditorPage projectID={projectID} /> : <HomePage />}
           </div>
         ) : (
           <main className="account-gate">

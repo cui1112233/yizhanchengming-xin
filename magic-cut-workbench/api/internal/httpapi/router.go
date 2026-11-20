@@ -11,6 +11,7 @@ type Dependencies struct {
 	Auth          http.Handler
 	AuthBootstrap http.Handler
 	Projects      http.Handler
+	Materials     http.Handler
 }
 
 func New(deps Dependencies) http.Handler {
@@ -31,6 +32,9 @@ func New(deps Dependencies) http.Handler {
 	if deps.Projects != nil {
 		mux.Handle("/api/magic-cut/projects", deps.Projects)
 		mux.Handle("/api/magic-cut/projects/", deps.Projects)
+	}
+	if deps.Materials != nil {
+		mux.Handle("/api/magic-cut/projects/{projectID}/materials", deps.Materials)
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{
