@@ -105,3 +105,13 @@ func TestTimelineRoutesUseTheVersionedTimelineHandler(t *testing.T) {
 		t.Fatalf("status=%d", recorder.Code)
 	}
 }
+
+func TestTaskRoutesUseTheTaskCenterHandler(t *testing.T) {
+	tasks := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	handler := New(Dependencies{Tasks: tasks})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/magic-cut/tasks", nil))
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d", recorder.Code)
+	}
+}

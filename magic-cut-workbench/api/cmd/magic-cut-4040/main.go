@@ -13,6 +13,7 @@ import (
 	"yizhanchengming/magic-cut-workbench/internal/httpapi"
 	"yizhanchengming/magic-cut-workbench/internal/material"
 	"yizhanchengming/magic-cut-workbench/internal/project"
+	worktask "yizhanchengming/magic-cut-workbench/internal/task"
 	"yizhanchengming/magic-cut-workbench/internal/timeline"
 	"yizhanchengming/magic-cut-workbench/web"
 )
@@ -30,6 +31,7 @@ func main() {
 	var projectRepository project.Repository
 	var materialHandler http.Handler
 	var timelineHandler http.Handler
+	var taskHandler http.Handler
 	if cfg.DatabaseDSN != "" {
 		openedDB, openErr := sql.Open("mysql", cfg.DatabaseDSN)
 		if openErr != nil {
@@ -52,6 +54,7 @@ func main() {
 		})
 		materialHandler = material.NewHandler(materialService, materialRepository, accountResolver.Resolve)
 		timelineHandler = timeline.NewHandler(timeline.NewStore(db, time.Now), accountResolver.Resolve)
+		taskHandler = worktask.NewHandler(worktask.NewSQLStore(db, time.Now), accountResolver.Resolve)
 	}
 
 	server := &http.Server{
@@ -63,6 +66,7 @@ func main() {
 			Projects:      project.NewHandler(projectRepository, accountResolver.Resolve),
 			Materials:     materialHandler,
 			Timeline:      timelineHandler,
+			Tasks:         taskHandler,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       20 * time.Minute,

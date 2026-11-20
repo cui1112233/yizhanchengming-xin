@@ -5,6 +5,7 @@ import { HomePage } from '../features/home/HomePage.jsx'
 import { EditorPage } from '../features/editor/EditorPage.jsx'
 import { projectIDFromPath } from '../features/editor/editorModel.js'
 import { AccountLogin } from '../features/account-login/AccountLogin.jsx'
+import { TaskCenter } from '../features/task-center/TaskCenter.jsx'
 import { loadSession } from '../shared/auth/session.js'
 import { WorkModeMenu } from '../shared/work-mode/WorkModeMenu.jsx'
 import './app.css'
@@ -45,8 +46,8 @@ export function App() {
         <aside className="magic-sidebar">
           <WorkModeMenu />
           <nav className="magic-sidebar__nav" aria-label="魔剪功能">
-            <a className="is-current" href="/">首页</a>
-            <a href="/tasks">任务中心</a>
+            <a className={pathname === '/' ? 'is-current' : ''} href="/">首页</a>
+            <a className={pathname === '/tasks' ? 'is-current' : ''} href="/tasks">任务中心</a>
           </nav>
           <p className="magic-sidebar__version">4040 独立开发版</p>
         </aside>
@@ -55,7 +56,7 @@ export function App() {
         ) : session.authenticated ? (
           <div className="magic-content">
             <div className="account-chip">{session.account?.displayName || session.account?.username}</div>
-            {projectID ? <EditorPage projectID={projectID} /> : <HomePage />}
+            {pathname === '/tasks' ? <TaskCenter /> : projectID ? <EditorPage projectID={projectID} /> : <HomePage />}
           </div>
         ) : (
           <main className="account-gate">
