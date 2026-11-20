@@ -25,7 +25,7 @@
 - [x] 两种素材动作原实现拒绝；新实现确认、重放、取消、账号隔离、不建作品、不调用模型通过。
 - [x] 两个真实页面弹窗的打开与取消回归通过；两个卡片无模型配置仍可打开且不锁讨论。
 - [x] 历史失败的现行合同迁移及定向复测：见下表。
-- [ ] 后端/前端相关回归、构建、本地4001验收与运行身份登记。
+- [x] 后端/前端相关回归、构建、本地4001验收与运行身份登记。
 
 ## 历史失败的分类
 
@@ -54,3 +54,15 @@
 本轮实际调用REA静态分析`NovelStudioPage.readable.js`与`NovelConfirmCard.readable.js`：2个文件解析成功，parse_failures=0。父证据`ev_f0e187d6e388d20a51d7fff0764f21a5a47e21229aa58b245e767bcd1947add9`，摘要证据`ev_c0e27039c65838a6e46d4a7b5839658c080d3c70da430e13fe28b26eb19f0ed3`，落盘`source/rea-intake-components-summary.json`。
 
 输入为已恢复的只读文件，不是新执行原程序；22文件未选，语义图partial/truncated、3208未知，不能把parse成功当作全链路正确或全量复刻证据。具体分流判断仍按前述文件行号人工核对。
+
+## 本地4001验收
+
+修复提交`016d1dc3`，构建与本地重启完成；未发布公网。实际`git_sha`与`runtime_manifest_sha`均为016d1dc3，health=true，用户入口`/assets/user-CwMHU1M2.js`，小说资源`/assets/NovelCreationPage-DrcAvVGw.js`。后台已创建`novel-creation.studio-planning-v3`，实际保存内容同时包含style_imitation和continuation_import。
+
+- 进程43524（验收时值），程序`.local-review/qiantie-novel-intake-016d1dc3.exe`。
+- 清单`.local-review/novel-intake-runtime-manifest.json`。
+- 重启：`scripts/start-local-go-review.ps1 -UseYcmMysql -SkipBuild -Detached -BinaryPath .local-review/qiantie-novel-intake-016d1dc3.exe -ManifestPath .local-review/novel-intake-runtime-manifest.json`。
+- 程序SHA256：4b6717400df0d8ee274200a0ea32a4df8e0a023f892f563c81e988c2f57ecf54。
+- 资源及后台预设验证：`../../verification/novel-contract-test-20261120/material-routing-runtime.json`。
+
+CUA刷新真实登录页面，作品仍3本，原anti2任务仍暂停5%、0章，未保存设置、恢复、重试或生成。实际材料动作完整交互由隔离浏览器模拟接口回归验证，未在用户数据中伪造提案；本轮收费调用0。原版独立审稿/修订及其他13条历史失败继续保留，不以本次结果宣布全部对齐。
