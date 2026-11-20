@@ -43,23 +43,9 @@ export function App() {
         },
       }}
     >
-      <div className="magic-shell">
-        <aside className="magic-sidebar">
-          <WorkModeMenu />
-          <nav className="magic-sidebar__nav" aria-label="魔剪功能">
-            <a className={pathname === '/' ? 'is-current' : ''} href="/">首页</a>
-            <a className={pathname === '/tasks' ? 'is-current' : ''} href="/tasks">任务中心</a>
-          </nav>
-          <p className="magic-sidebar__version">4040 独立开发版</p>
-        </aside>
-        {session.loading ? (
+      {session.loading ? (
           <main className="account-gate"><Spin size="large" /><p>正在读取一战晟铭账号……</p></main>
-        ) : session.authenticated ? (
-          <div className="magic-content">
-            <div className="account-chip">{session.account?.displayName || session.account?.username}</div>
-            {pathname === '/tasks' ? <TaskCenter /> : projectID ? <EditorPage projectID={projectID} /> : <HomePage />}
-          </div>
-        ) : (
+        ) : !session.authenticated ? (
           <main className="account-gate">
             <div className="account-gate__card">
               <span className="account-gate__mark">M</span>
@@ -68,8 +54,24 @@ export function App() {
               <Button type="primary" size="large" href={sessionGate.returnHref}>{sessionGate.returnLabel}</Button>
             </div>
           </main>
+        ) : pathname === '/' ? (
+          <HomePage account={session.account} />
+        ) : (
+          <div className="magic-shell">
+            <aside className="magic-sidebar">
+              <WorkModeMenu />
+              <nav className="magic-sidebar__nav" aria-label="魔剪功能">
+                <a href="/">首页</a>
+                <a className={pathname === '/tasks' ? 'is-current' : ''} href="/tasks">任务中心</a>
+              </nav>
+              <p className="magic-sidebar__version">4040 独立开发版</p>
+            </aside>
+            <div className="magic-content">
+              <div className="account-chip">{session.account?.displayName || session.account?.username}</div>
+              {pathname === '/tasks' ? <TaskCenter /> : <EditorPage projectID={projectID} />}
+            </div>
+          </div>
         )}
-      </div>
     </ConfigProvider>
   )
 }
