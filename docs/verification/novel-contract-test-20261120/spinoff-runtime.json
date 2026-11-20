@@ -1,0 +1,34 @@
+{
+  "verifiedAt": "2026-11-20T21:38:33.970585+08:00",
+  "runtime": {
+    "git_sha": "ed022e74",
+    "runtime_manifest_sha": "ed022e74",
+    "frontend_entry": "/assets/user-vowx3qMM.js",
+    "runtime": "go"
+  },
+  "health": {
+    "ok": true
+  },
+  "assets": {
+    "/assets/user-vowx3qMM.js": {
+      "bytes": 160445,
+      "sha256": "6a6775ee2f7cfef8890f13d6e1fc21394e40daaa9ef14d3d9214f9dc67af941c"
+    },
+    "/assets/NovelCreationPage-COVkGqdj.js": {
+      "bytes": 160187,
+      "sha256": "65d4580a078657b3d18213269fce3aa00cc27c0b391deecedc1cdd514738a92f"
+    }
+  },
+  "presetIDsPresentInLocalStore": [
+    "novel-creation.spinoff-parent-canon-v1",
+    "novel-creation.spinoff-foundation-v1"
+  ],
+  "binaryPath": "F:\\脚本测试\\一战晟铭-v88\\.local-review\\qiantie-novel-spinoff.exe",
+  "binarySha256": "d01cee879a761e2d0605e8f93c64ddf6bb5e451cdcf43e4482df54f1e5bd4600",
+  "paidCalls": 0,
+  "liveUI": "CUA actual4001: correct source/title/type/direction/reference/model/style form; four types/default sequel, empty title rejected, cancel returns to short discussion, works remain3",
+  "liveGeneratedWork": false,
+  "tests": "Go novelcreation and prompt complete short suites; HTTP creation/studio/import/spinoff; 4 whole-page usage journeys plus5 source contracts",
+  "reference": "Actual IDA SDK export 0x18007fc20/0x18012fd00/0x18011d170 plus recovered current frontend; original app not run",
+  "remaining": "Original parent bundle full取材 order and full foundation files/pixels; other open mode journeys"
+}
