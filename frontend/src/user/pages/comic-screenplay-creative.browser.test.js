@@ -37,6 +37,32 @@ test('真实画风弹窗取消保留原选择，确认和清空才修改草稿�
   assert.ok(/data-result="passed"/.test(output), output.match(/data-error="([^"]*)"/)?.[1] || 'browser did not finish');
 });
 
+test('真实画风空状态弹窗逐项对齐洛水截图', { skip: !browser }, async () => {
+  const bundle = await build({ stdin: { resolveDir: here, loader: 'jsx', contents: `
+    import React,{useState} from 'react'; import {createRoot} from 'react-dom/client';
+    import {ComicStylePicker} from './ComicScreenplayCreationFields.jsx';
+    const tick=()=>new Promise(resolve=>setTimeout(resolve,100));
+    function Harness(){const [value,setValue]=useState({});return <><ComicStylePicker value={value} onChange={setValue} styles={[]}/><output id="value">{JSON.stringify(value)}</output></>}
+    (async()=>{createRoot(document.getElementById('root')).render(<Harness/>);await tick();await tick();
+      document.querySelector('.style-picker-trigger').click();await tick();await tick();
+      const modal=document.querySelector('.screenplay-style-modal');if(!modal)throw Error('画风弹窗未打开');
+      const text=modal.textContent.replace(/\\s/g,'');
+      for(const label of ['选择我的画风','画风来自你的私人画风库；不选择也可以保存作品。','新增私人画风','待确认：无画风','不使用画风','私人画风库暂无画风，可先不选择','取消','确认选择'])if(!text.includes(label))throw Error('缺失：'+label);
+      if(!modal.querySelector('input[placeholder="搜索画风名称"]'))throw Error('缺失：搜索画风名称');
+      if(!modal.querySelector('.comic-style-empty-art path'))throw Error('空状态插画缺失');
+      const expected=['comic-style-caption','comic-style-add-btn','comic-style-search','comic-style-selection','comic-style-empty','comic-style-modal-footer'];
+      const all=[...modal.querySelectorAll('*')];
+      const positions=expected.map(name=>all.indexOf(modal.querySelector('.'+name)));
+      if(positions.some((position,index)=>position<0||(index&&position<=positions[index-1])))throw Error('弹窗顺序错误：'+JSON.stringify(positions));
+      document.body.dataset.result='passed';
+    })().catch(error=>{document.body.dataset.result='failed';document.body.dataset.error=error.message});
+  ` }, bundle: true, jsx: 'automatic', write: false, format: 'iife', platform: 'browser', loader: { '.css': 'empty' } });
+  const archive = path.resolve(here, '../../../../_local-archive-20261028/screenplay-creative-ui'); mkdirSync(archive, { recursive: true });
+  const dir = mkdtempSync(path.join(archive, 'style-modal-')); writeFileSync(path.join(dir, 'test.js'), bundle.outputFiles[0].text);
+  const html = path.join(dir, 'test.html'); writeFileSync(html, '<meta charset="utf-8"><div id="root"></div><script src="test.js"></script>');
+  const output = execFileSync(browser, ['--headless=new', '--disable-gpu', '--no-first-run', '--disable-background-networking', '--host-resolver-rules=MAP * ~NOTFOUND', '--virtual-time-budget=6000', '--user-data-dir='+path.join(dir, 'profile'), '--dump-dom', pathToFileURL(html).href], { encoding: 'utf8', timeout: 60000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 4000000 });
+  assert.ok(/data-result="passed"/.test(output), output.match(/data-error="([^"]*)"/)?.[1] || 'browser did not finish');
+});
 
 test('真实媒体页默认发送项目B/C模型，显式临时选择D，失效项目模型阻止提交', { skip: !browser }, async () => {
   const bundle = await build({ stdin: { resolveDir: here, loader: 'jsx', contents: `

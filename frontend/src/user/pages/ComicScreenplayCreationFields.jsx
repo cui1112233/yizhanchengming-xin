@@ -1,5 +1,5 @@
 import OriginalIcon from './ComicScreenplayIcon.jsx';
-import { Alert, Button, Empty, Input, Modal, Select, Spin, Upload } from 'antd';
+import { Alert, Button, Input, Modal, Select, Spin, Upload } from 'antd';
 import { Check, FileText, ImageOff, Palette, Search, UploadCloud, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createComicCreativeStyle, getComicStylePreview } from '../../shared/api/comicScreenplay.js';
@@ -52,6 +52,18 @@ function StylePreview({ src, name }) {
     : <span className="comic-style-placeholder"><ImageOff size={22} /><small>{failed ? '预览加载失败' : src ? '加载预览…' : '暂无预览图'}</small></span>;
 }
 
+function ComicStyleEmptyArt() {
+  return <svg className="comic-style-empty-art" viewBox="0 0 220 150" aria-hidden="true" focusable="false">
+    <ellipse cx="108" cy="138" rx="55" ry="7" fill="#495261" opacity=".42" />
+    <path d="M77 69h72a7 7 0 0 1 7 7v45a7 7 0 0 1-7 7H77a7 7 0 0 1-7-7V76a7 7 0 0 1 7-7z" fill="#6d7584" />
+    <rect x="79" y="77" width="68" height="44" rx="3" fill="#929bab" opacity=".72" />
+    <path d="M95 128h36l7 9H88z" fill="#6d7584" />
+    <rect x="80" y="134" width="66" height="7" rx="3.5" fill="#7d8695" />
+    <path d="M133 38a15 15 0 0 1 15 15c0 5.1-2.6 9.6-6.5 12.2l1.2 9.3-8.4-5.2a15.2 15.2 0 0 1-3.8.5 15 15 0 1 1 2.5-29.8z" fill="#8993a3" />
+    <circle cx="134" cy="52" r="3" fill="#c7cdd7" opacity=".82" />
+  </svg>;
+}
+
 export function ComicStylePicker({ value, onChange, styles = [], disabled = false, onLibraryChange, compact = false }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(null);
@@ -71,17 +83,30 @@ export function ComicStylePicker({ value, onChange, styles = [], disabled = fals
   }
   const filtered = styles.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   function choose() { setDraft({ ...value }); setQuery(''); setOpen(true); }
+  function confirmStyle() {
+    onChange({ style_id: draft?.style_id || null, style_name: draft?.style_name || '' });
+    setOpen(false);
+  }
   return <>
     <div className="comic-style-current"><button disabled={disabled} type="button" className="style-picker-trigger" onClick={choose}><OriginalIcon name="ColorPaletteOutline" size={compact ? 13 : 17} /><span>{value.style_name || '点击选择画风'}</span>{compact?<OriginalIcon name="ChevronDownOutline" size={12}/>:null}<span className="comic-style-change">选择</span></button>
       {value.style_id ? <Button disabled={disabled} type="text" size="small" aria-label="清除画风选择" icon={<OriginalIcon name="CloseOutline" size={14} />} onClick={() => onChange({ style_name: '', style_id: null })} /> : null}</div>
-    <Modal className="screenplay-style-modal" title="选择我的画风" open={open} onCancel={() => setOpen(false)} footer={<><Button onClick={() => setOpen(false)}>取消</Button><Button type="primary" onClick={() => { onChange({ style_id: draft?.style_id || null, style_name: draft?.style_name || '' }); setOpen(false); }}>确认选择</Button></>} width={780}>
-      <p className="comic-style-caption">画风来自你的私人画风库；不选择也可以保存作品。</p><Button onClick={() => { setNewName(''); setNewPrompt(''); setAddError(''); setAddOpen(true); }}>新增私人画风</Button>
-      <Input prefix={<OriginalIcon name="SearchOutline" size={14} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索画风名称" allowClear />
-      <div className="comic-style-selection">待确认：{draft?.style_name || '无画风'}<Button size="small" onClick={() => setDraft({ style_id: null, style_name: '' })}>不使用画风</Button></div>
+    <Modal
+      className="screenplay-style-modal comic-style-parity-modal"
+      title="选择我的画风"
+      closeIcon={<X size={18} />}
+      open={open}
+      onCancel={() => setOpen(false)}
+      footer={<div className="comic-style-modal-footer"><Button className="comic-style-cancel" onClick={() => setOpen(false)}>取消</Button><Button className="comic-style-confirm" type="primary" onClick={confirmStyle}>确认选择</Button></div>}
+      width={780}
+    >
+      <p className="comic-style-caption"><Palette size={13} />画风来自你的私人画风库；不选择也可以保存作品。</p>
+      <Button className="comic-style-add-btn" onClick={() => { setNewName(''); setNewPrompt(''); setAddError(''); setAddOpen(true); }}>新增私人画风</Button>
+      <Input className="comic-style-search" prefix={<Search size={14} />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索画风名称" allowClear />
+      <div className="comic-style-selection"><span>待确认：{draft?.style_name || '无画风'}</span><Button className="comic-style-none-btn" size="small" onClick={() => setDraft({ style_id: null, style_name: '' })}>不使用画风</Button></div>
       {draft?.style_id && !styles.some(item => item.id === draft.style_id) ? <Alert type="warning" showIcon message="已保存画风当前不在库中；原选择仍保留，可重新选择或清空。" /> : null}
-      <div className="comic-style-library">{filtered.map(style => <button type="button" key={style.id} aria-pressed={draft?.style_id === style.id} className={draft?.style_id === style.id ? 'is-active' : ''} onClick={() => setDraft({ style_name: style.name, style_id: style.id })}>
+      {filtered.length ? <div className="comic-style-library">{filtered.map(style => <button type="button" key={style.id} aria-pressed={draft?.style_id === style.id} className={draft?.style_id === style.id ? 'is-active' : ''} onClick={() => setDraft({ style_name: style.name, style_id: style.id })}>
         <StylePreview src={style.images?.[0]} name={style.name} /><div><b>{style.name}</b><span className="comic-choice-check">{draft?.style_id === style.id ? <Check size={13} /> : null}</span></div>
-      </button>)}</div>{!filtered.length ? <Empty description={query ? '没有匹配的画风' : '私人画风库暂无画风，可先不选择'} /> : null}
+      </button>)}</div> : <div className="comic-style-empty"><ComicStyleEmptyArt /><p>{query ? '没有匹配的画风' : '私人画风库暂无画风，可先不选择'}</p></div>}
     </Modal>
     <Modal title="新增私人画风" open={addOpen} onCancel={() => { if (!adding) setAddOpen(false); }} maskClosable={!adding} closable={!adding} confirmLoading={adding} onOk={addStyle} okText="保存到我的画风库" cancelButtonProps={{ disabled: adding }}>
       {addError ? <Alert type="error" showIcon message={addError} /> : null}

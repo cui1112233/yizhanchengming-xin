@@ -123,6 +123,30 @@
 .comic-creative-fields .ant-select{width:100%;min-width:0}
 .comic-style-current button:disabled{opacity:.6;cursor:not-allowed}
 .screenplay-style-modal .comic-style-selection{justify-content:space-between;gap:12px}
+/* 洛水「选择我的画风」弹窗 1:1 对版：深蓝弹层、紧凑新增按钮、独立空状态插画 */
+.comic-style-parity-modal.ant-modal .ant-modal-content{background:#1f2430!important;border:1px solid #3a4253!important;border-radius:12px!important;box-shadow:0 18px 60px rgba(0,0,0,.45)!important;color:#e8ebf0!important}
+.comic-style-parity-modal.ant-modal .ant-modal-header{background:transparent!important;border-bottom:0!important;padding:22px 24px 0!important}
+.comic-style-parity-modal.ant-modal .ant-modal-title{color:#f2f4f7!important;font-size:16px!important;font-weight:700!important;line-height:22px!important}
+.comic-style-parity-modal.ant-modal .ant-modal-close{top:18px!important;right:18px!important;color:#aeb6c5!important}
+.comic-style-parity-modal.ant-modal .ant-modal-close:hover{color:#f2f4f7!important}
+.comic-style-parity-modal.ant-modal .ant-modal-body{padding:12px 24px 8px!important}
+.comic-style-parity-modal.ant-modal .ant-modal-footer{border-top:0!important;padding:8px 24px 22px!important;text-align:right!important}
+.comic-style-parity-modal.ant-modal .comic-style-caption{display:flex;align-items:center;gap:7px;margin:0 0 14px!important;color:#aab3c2!important;font-size:12px!important;line-height:1.6!important}
+.comic-style-parity-modal.ant-modal .comic-style-add-btn{height:32px!important;padding:0 14px!important;border-color:#4a5364!important;border-radius:8px!important;background:transparent!important;color:#e6e9ef!important;font-size:12px!important}
+.comic-style-parity-modal.ant-modal .comic-style-search{height:38px!important;border-color:#3a4253!important;border-radius:8px!important;background:#171c26!important}
+.comic-style-parity-modal.ant-modal .comic-style-search .ant-input{color:#e6e9ef!important;background:#171c26!important}
+.comic-style-parity-modal.ant-modal .ant-input-prefix{color:#8e97a7!important}
+.comic-style-parity-modal.ant-modal .comic-style-selection{padding:16px 0 8px!important;color:#e6e9ef!important;font-size:13px!important}
+.comic-style-parity-modal.ant-modal .comic-style-none-btn{height:28px!important;padding:0 11px!important;border-color:#4a5364!important;border-radius:7px!important;background:transparent!important;color:#d5dae3!important;font-size:12px!important}
+.comic-style-parity-modal.ant-modal .comic-style-empty{min-height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#c8ced8!important}
+.comic-style-parity-modal.ant-modal .comic-style-empty-art{width:220px!important;height:150px!important;opacity:.92!important}
+.comic-style-parity-modal.ant-modal .comic-style-empty p{margin:0!important;color:#c8ced8!important;font-size:13px!important;font-weight:600!important}
+.comic-style-parity-modal.ant-modal .ant-btn-default{background:transparent!important;border-color:#4a5364!important;color:#d8dde6!important}
+.comic-style-parity-modal.ant-modal .ant-btn-primary{background:#323b4b!important;border-color:#424c60!important;color:#f2f4f8!important;box-shadow:none!important}
+.comic-style-parity-modal.ant-modal .ant-btn-primary:hover{background:#3b4557!important;border-color:#4d586d!important}
+.comic-style-parity-modal .comic-style-library{max-height:270px;padding-top:10px}
+/* 用户端 glass 主题对 .ant-modal-content 有 html[data-scheme][data-theme] 级覆盖；用更高特异性锁住洛水深蓝弹层 */
+body .comic-style-parity-modal.ant-modal .ant-modal-content{background:#1f2430!important;border-color:#3a4253!important}
 
 /* New-editor layout dimensions follow the verified qga template; shared glass colors remain inherited. */
 .comic-screenplay-page.comic-three-stage-workbench{height:calc(100dvh - 16px);min-height:540px;padding:0;display:flex;flex-direction:column;overflow:hidden;position:relative;border:1px solid var(--border-default);border-radius:12px;background:var(--surface-panel);backdrop-filter:blur(20px)}

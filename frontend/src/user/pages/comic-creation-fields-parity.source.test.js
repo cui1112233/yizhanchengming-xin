@@ -64,3 +64,39 @@ test('资产解析程度用洛水横排 4 段组件，默认提示词按用途�
   assert.match(creative, /export function defaultCreativePrompts/);
   assert.match(creative, /for \(const \{ field, purpose \} of creativePromptFields\)/);
 });
+
+test('选择我的画风弹窗按洛水截图逐项复刻', () => {
+  const modal = fields.slice(fields.indexOf('className="screenplay-style-modal comic-style-parity-modal"'));
+  const order = [
+    'title="选择我的画风"',
+    '画风来自你的私人画风库；不选择也可以保存作品。',
+    '>新增私人画风</Button>',
+    'placeholder="搜索画风名称"',
+    '待确认：',
+    '>不使用画风</Button>',
+    '<ComicStyleEmptyArt',
+    '私人画风库暂无画风，可先不选择',
+  ];
+  let cursor = -1;
+  for (const token of order) {
+    const at = modal.indexOf(token, cursor + 1);
+    assert.ok(at > cursor, `画风弹窗缺失或顺序错位：${token}`);
+    cursor = at;
+  }
+  assert.match(modal, /type="primary" onClick=\{confirmStyle\}>确认选择<\/Button>/);
+  assert.match(fields, /<path d="M133 38a15 15/);
+  assert.doesNotMatch(modal, /<Empty description=\{query/);
+});
+
+test('画风弹窗入口在配置读取中/失败时仍可打开，仅创建中禁用', () => {
+  assert.match(page, /<ComicStylePicker disabled=\{creating \|\| !!createdDraftId\}/);
+  assert.doesNotMatch(page, /ComicStylePicker disabled=\{creativeLoading/);
+});
+
+test('画风弹窗深蓝配色与洛水截图一致', () => {
+  const css = readFileSync(new URL('./comic-screenplay.css', import.meta.url), 'utf8');
+  assert.match(css, /\.comic-style-parity-modal \.ant-modal-content\{background:#1f2430;border:1px solid #3a4253/);
+  assert.match(css, /\.comic-style-parity-modal \.comic-style-add-btn\{height:32px/);
+  assert.match(css, /\.comic-style-parity-modal \.comic-style-empty-art\{width:220px;height:150px/);
+  assert.match(css, /\.comic-style-parity-modal \.ant-btn-primary\{background:#323b4b/);
+});
