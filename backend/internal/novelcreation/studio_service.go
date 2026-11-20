@@ -190,7 +190,7 @@ func settleStudio(r *studioRecord) bool {
 			normalized, shortErr := normalizeStudioShort(result.Action.StudioShortProposal)
 			e = shortErr
 			result.Action.StudioShortProposal = normalized
-		} else if result.Action.Type != "create_book" || b.Title == "" || b.Genre == "" || utf8.RuneCountInString(b.Title) > 255 || utf8.RuneCountInString(b.Genre) > 96 || utf8.RuneCountInString(b.World) > 12000 || utf8.RuneCountInString(b.Protagonist) > 4000 || utf8.RuneCountInString(b.CoreConflict) > 4000 || b.TargetChapterWords < 800 || b.TargetChapterWords > 8000 {
+		} else if studioAssistedRoute(result.Action.Type) == "" && (result.Action.Type != "create_book" || b.Title == "" || b.Genre == "" || utf8.RuneCountInString(b.Title) > 255 || utf8.RuneCountInString(b.Genre) > 96 || utf8.RuneCountInString(b.World) > 12000 || utf8.RuneCountInString(b.Protagonist) > 4000 || utf8.RuneCountInString(b.CoreConflict) > 4000 || b.TargetChapterWords < 800 || b.TargetChapterWords > 8000) {
 			e = errors.New("invalid action")
 		}
 	}
@@ -321,6 +321,11 @@ func (s *Service) SendStudioMessage(ctx context.Context, owner, id string, in St
 			// Proposed field content counts toward the same Unicode-character
 			// budget as message text; JSON keys/protocol syntax do not count.
 			proposalChars := utf8.RuneCountInString(b.Title + b.Genre + b.World + b.Protagonist + b.CoreConflict + strconv.Itoa(b.TargetChapterWords))
+			short := copy.StudioShortProposal
+			proposalChars += utf8.RuneCountInString(short.Title + short.Direction + short.Instruction + short.Summary + short.ReaderPreferences)
+			if copy.Type == "short_run" {
+				proposalChars += utf8.RuneCountInString(strconv.Itoa(short.TargetWordCount) + strconv.Itoa(short.TargetChapters))
+			}
 			remainingBudget -= proposalChars
 			if remainingBudget < utf8.RuneCountInString(in.Content) {
 				return inputError("已有建议的作品设定加本条消息超过所选上下文字数，请提高上限后再修改")
@@ -514,6 +519,9 @@ func (s *Service) ConfirmStudioAction(ctx context.Context, owner, id string, in 
 	}
 	if r.Action.Status != "pending" {
 		return out, conflict()
+	}
+	if studioAssistedRoute(r.Action.Type) != "" {
+		return s.confirmStudioAssisted(ctx, owner, id, in.ActionID)
 	}
 	if strings.TrimSpace(in.ThinkingLevel) == "" && len(r.Turns) > 0 {
 		var lastInput struct {

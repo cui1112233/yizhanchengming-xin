@@ -81,6 +81,8 @@ type StudioSnapshot struct {
 	Turn          *StudioTurn     `json:"turn,omitempty"`
 }
 type StudioTransition struct {
+	AssistedAction    string        `json:"assistedAction,omitempty"`
+	TargetRoute       string        `json:"targetRoute,omitempty"`
 	Story             *ShortStory   `json:"story,omitempty"`
 	Session           StudioSession `json:"session"`
 	Project           Project       `json:"project"`

@@ -8,7 +8,7 @@ const PatchOnlyPresetID = "novel-creation.revision-patch-only"
 const RewriteOnlyPresetID = "novel-creation.revision-rewrite-only"
 const IncrementalSettlementPresetID = "novel-creation.settlement-incremental"
 const ImitationSupplementPresetID = "novel-creation.imitation-supplement"
-const StudioPlanningPresetID = "novel-creation.studio-planning-v2"
+const StudioPlanningPresetID = "novel-creation.studio-planning-v3"
 
 type AdminPrompt struct {
 	ID, Name, Slot string
@@ -56,7 +56,7 @@ func AdminPrompts() []AdminPrompt {
 		{ShortBodyRevision.ID, "短篇正文修订", "novel.short", ShortBodyRevision},
 		{ShortRecommendation.ID, "短篇推荐文案", "novel.short", ShortRecommendation},
 		{StyleAnalysis.ID, "写作文风分析", "novel.tools", StyleAnalysis},
-		{StudioPlanningPresetID, "创作对话·长短篇动作分流", "novel.tools", catalog.Definition{SystemPrompt: StudioPlanningSystem}},
+		{StudioPlanningPresetID, "创作对话·创作与素材动作分流", "novel.tools", catalog.Definition{SystemPrompt: StudioPlanningSystem}},
 	}
 }
 
