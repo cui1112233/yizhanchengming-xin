@@ -18,6 +18,8 @@ type AdminPrompt struct {
 // Runtime and administrator defaults share these definitions; no frontend copy.
 func AdminPrompts() []AdminPrompt {
 	return []AdminPrompt{
+		{SpinoffCanonID, "番外创作·正传正典压缩", "novel.spinoff", catalog.Definition{SystemPrompt: SpinoffCanonSystem}},
+		{SpinoffFoundation.ID, "番外创作·基础设定", "novel.spinoff", SpinoffFoundation},
 		{ShortFullWriter.ID, "短篇全篇·正文写作系统要求", "novel.short", ShortFullWriter},
 		{ShortFullWriterUserID, "短篇全篇·首稿任务模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullWriterUserTemplate}},
 		{ShortFullContinuationUserID, "短篇全篇·缺章补写模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullContinuationUserTemplate}},

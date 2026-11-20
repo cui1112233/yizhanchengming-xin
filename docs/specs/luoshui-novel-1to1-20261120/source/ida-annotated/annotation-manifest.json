@@ -1,5 +1,10 @@
 [
   {
+    "file": "0x18007fc20.c",
+    "annotations": 14,
+    "originalLines": 586
+  },
+  {
     "file": "0x180082cb0.c",
     "annotations": 49,
     "originalLines": 1491
@@ -28,6 +33,16 @@
     "file": "0x1800d76c0.c",
     "annotations": 48,
     "originalLines": 1004
+  },
+  {
+    "file": "0x18011d170.c",
+    "annotations": 111,
+    "originalLines": 2968
+  },
+  {
+    "file": "0x18012fd00.c",
+    "annotations": 2,
+    "originalLines": 15
   },
   {
     "file": "0x1801308a0.c",

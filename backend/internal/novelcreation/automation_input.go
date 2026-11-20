@@ -117,6 +117,19 @@ func (s *Service) prepareGenerationInput(ctx context.Context, owner, projectID, 
 	// An explicitly selected style or reference material satisfies imitation's
 	// alternative input path. Other modes keep their own required fields.
 	modeInputs := input.ModeInputs
+	if session.Mode == "fanfiction" {
+		creation, e := loadSpinoff(ctx, s.store, owner, projectID)
+		if e != nil {
+			return result, e
+		}
+		if creation != nil {
+			if creation.ParentCanon == "" || len(creation.Foundation) == 0 {
+				return result, inputError("番外设定尚未完成，请先完成初始化任务")
+			}
+			// The stored source wins over browser input and survives refresh/retry.
+			modeInputs = map[string]string{"existingSetting": creation.ParentCanon + "\n\n" + creation.Input.StoryIdea + "\n\n" + creation.Input.ReferenceText, "spinoffType": creation.Input.SpinoffType, "parentBookId": creation.Input.ParentBookID}
+		}
+	}
 	if session.Mode == longImitationKind {
 		creation, e := loadLongImitation(ctx, s.store, owner, projectID)
 		if e != nil {

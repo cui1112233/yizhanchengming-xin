@@ -18,8 +18,8 @@ func TestNovelAdminPresetsSeedAndPublishedSnapshot(t *testing.T) {
 	}
 	store := catalog.NewAdminStore(path)
 	rows, e := store.List(AdminModule)
-	if e != nil || len(rows) != 39 {
-		t.Fatalf("expected39 active prompt entries, got%d %v", len(rows), e)
+	if e != nil || len(rows) != 41 {
+		t.Fatalf("expected41 active prompt entries, got%d %v", len(rows), e)
 	}
 	bodies, e := catalog.NewCatalog(path).PublishedBodies(AdminModule)
 	if e != nil {

@@ -262,3 +262,34 @@ func TestNovelChapterImportHTTPRealMySQL(t *testing.T) {
 	}
 	t.Logf("HTTP->MySQL->new-router replay book=%s version1=2 zero-runs TXT/MD verified schema=%s", out.Book.ID, schema)
 }
+
+func TestNovelSpinoffHTTPCreatesOwnedInitialization(t *testing.T) {
+	ctx := context.Background()
+	st := novelcreation.NewMemoryStore()
+	svc := novelcreation.NewService(st, novelcreation.NewMemoryRuntime(), chapterImportRejectPipeline{})
+	parent, e := svc.ImportChapters(ctx, "alice", novelcreation.ImportChaptersInput{Title: "正传", IdempotencyKey: "parent", Chapters: []novelcreation.ImportedChapterInput{{Content: "船已经靠岸。"}}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	now := time.Now().UTC()
+	mux := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, NovelCreation: svc})
+	in := map[string]any{"title": "番外", "parentBookId": parent.Book.ID, "spinoffType": "prequel", "modelId": "own", "idempotencyKey": "spin"}
+	first := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/novel-creation/spinoffs", in)
+	if first.Code != 201 {
+		t.Fatalf("%d %s", first.Code, first.Body.String())
+	}
+	var out novelcreation.SpinoffResult
+	_ = json.Unmarshal(first.Body.Bytes(), &out)
+	again := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/novel-creation/spinoffs", in)
+	if again.Code != 201 || again.Body.String() != first.Body.String() {
+		t.Fatal("replay differs")
+	}
+	get := signedJSONRequest(t, mux, now, "alice", http.MethodGet, "/api/novel-creation/projects/"+out.Book.ID+"/spinoff", nil)
+	if get.Code != 200 || !strings.Contains(get.Body.String(), "船已经靠岸") {
+		t.Fatalf("source absent %s", get.Body.String())
+	}
+	foreign := signedJSONRequest(t, mux, now, "bob", http.MethodGet, "/api/novel-creation/projects/"+out.Book.ID+"/spinoff", nil)
+	if foreign.Code == 200 {
+		t.Fatal("foreign source exposed")
+	}
+}

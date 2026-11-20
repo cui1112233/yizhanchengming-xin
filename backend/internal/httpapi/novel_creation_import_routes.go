@@ -9,6 +9,33 @@ import (
 )
 
 func registerNovelImportRoutes(handle func(string, func(http.ResponseWriter, *http.Request, string)), service *novelcreation.Service) {
+	handle("POST /api/novel-creation/spinoffs", func(w http.ResponseWriter, r *http.Request, owner string) {
+		var in novelcreation.SpinoffInput
+		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, novelCreationJSONLimit))
+		d.DisallowUnknownFields()
+		if e := d.Decode(&in); e != nil {
+			writeJSON(w, 400, map[string]string{"error": "番外请求内容无效"})
+			return
+		}
+		if e := d.Decode(new(any)); e != io.EOF {
+			writeJSON(w, 400, map[string]string{"error": "番外请求内容无效"})
+			return
+		}
+		out, e := service.StartSpinoff(r.Context(), owner, in)
+		if e != nil {
+			writeNovelCreationError(w, e)
+			return
+		}
+		writeJSON(w, http.StatusCreated, out)
+	})
+	handle("GET /api/novel-creation/projects/{projectID}/spinoff", func(w http.ResponseWriter, r *http.Request, owner string) {
+		out, e := service.GetSpinoff(r.Context(), owner, r.PathValue("projectID"))
+		if e != nil {
+			writeNovelCreationError(w, e)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"creation": out})
+	})
 	handle("GET /api/novel-creation/style-profiles", func(w http.ResponseWriter, r *http.Request, owner string) {
 		styles, err := service.ListStyleProfiles(r.Context(), owner)
 		if err != nil {

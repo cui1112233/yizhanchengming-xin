@@ -83,7 +83,7 @@ type ModeInputField struct {
 var modeInputFieldCatalog = map[string][]ModeInputField{
 	"long_imitation":  {{Key: "referenceText", Label: "参考文本", Required: true}},
 	"short_imitation": {{Key: "referenceText", Label: "参考文本", Required: true}},
-	"fanfiction":      {{Key: "existingSetting", Label: "既有人物与世界规则", Required: true}},
+	"fanfiction":      {{Key: "existingSetting", Label: "既有人物与世界规则", Required: true}, {Key: "spinoffType", Label: "番外类型"}, {Key: "parentBookId", Label: "正传书籍"}},
 	"continuation":    {{Key: "previousText", Label: "被续写的前文", Required: true}},
 }
 

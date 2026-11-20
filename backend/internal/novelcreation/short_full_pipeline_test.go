@@ -465,8 +465,8 @@ func TestShortFullReviewFailureReopensFrozenFirstDraft(t *testing.T) {
 	var snapshot struct {
 		Prompts *SystemPromptSnapshot `json:"system_prompts"`
 	}
-	if err = json.Unmarshal(started.Run.PromptSnapshot, &snapshot); err != nil || snapshot.Prompts == nil || len(snapshot.Prompts.Entries) != 39 {
-		t.Fatal("new task did not persist all 39 published presets", err)
+	if err = json.Unmarshal(started.Run.PromptSnapshot, &snapshot); err != nil || snapshot.Prompts == nil || len(snapshot.Prompts.Entries) != 41 {
+		t.Fatal("new task did not persist all 41 published presets", err)
 	}
 	failed, err := service.Run(ctx, "alice", started.Run.ID)
 	if !IsCode(err, ErrModelRateLimited) || failed.Status != RunFailed || len(provider.requests) != 7 {

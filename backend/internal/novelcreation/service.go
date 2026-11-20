@@ -222,6 +222,14 @@ func (s *Service) runPipeline(ctx context.Context, owner, runID string) (Run, er
 	if isTerminalRunStatus(run.Status) {
 		return run, nil
 	}
+	var spinoff struct {
+		Creation *SpinoffCreation      `json:"spinoff_init"`
+		Prompts  *SystemPromptSnapshot `json:"system_prompts"`
+		Settings ProjectSettings       `json:"project_settings"`
+	}
+	if json.Unmarshal(run.PromptSnapshot, &spinoff) == nil && spinoff.Creation != nil {
+		return s.runSpinoff(ctx, owner, run, *spinoff.Creation, spinoff.Prompts, spinoff.Settings)
+	}
 	var shortSnapshot struct {
 		Story *ShortStory `json:"short_story"`
 	}
