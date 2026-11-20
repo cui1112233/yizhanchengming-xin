@@ -43,7 +43,7 @@
 | MC-014 | 分割、复制、删除、撤销、重做 | 主剪辑器命令行为 | `timeline/commands.js`、`Timeline.jsx` | 已完成 | 命令测试通过，界面按钮可用 | 多选和跨轨批量操作未补齐 |
 | MC-015 | 移动、裁切、变速和关键帧 | 主剪辑器和预加载媒体能力 | `commands.js` 有移动/改长度底层命令 | 部分完成 | 纯函数测试覆盖部分命令 | 时间线拖拽手柄、变速面板和关键帧界面未做 |
 | MC-016 | 文字、字幕、字体和花字 | 原版编辑器模块 | 尚无 | 未开始 | 无 | 字幕轨、样式、字体资源、编辑和压制 |
-| MC-017 | 音频、TTS、录音、音量和变速 | `AudioPanel-Byk-yM2Y.js`、`ExportAudioPanel-Dfg5SDYr.js`、`main.context.v2.js` | `timeline/model.go`、`Timeline.jsx`、`export/service.go` | 部分完成 | 已按原版合同固定普通音频默认 70%、视频原声 100%、音量 0–200%；前端 45/45；4040 实际上传 880Hz 音频并加入音轨，任务 `mct_f8f45491c40a76930512f078069e2985` 完成 | 仍缺音量面板、口播录制、TTS、波形、淡入淡出、声道映射、降噪和变声 |
+| MC-017 | 音频、TTS、录音、音量和变速 | `Audio-BeyA9XJk.js`、`AudioPanel-Byk-yM2Y.js`、`ExportAudioPanel-Dfg5SDYr.js`、`main.context.v2.js` | `AudioInspector.jsx`、`audioInspectorModel.js`、`Timeline.jsx`、`timeline/model.go`、`export/service.go` | 部分完成 | 已按原版顺序在编辑器右侧补齐“音量 → 倍速 → 时长”；4040 实测 70% 改 35%、1 倍改 2 倍后时长联动为 0.50 秒，刷新仍保留；MySQL revision 4 保存 `0.35 / 2 / 500ms`；真实音频混合导出任务 `mct_f8f45491c40a76930512f078069e2985` 已完成 | 仍缺口播录制、TTS、波形、淡入淡出、声道映射、降噪和变声 |
 | MC-018 | 贴纸、特效、转场、马赛克和画中画 | 原版编辑器模块 | 尚无 | 未开始 | 无 | 资源面板、参数、预览和渲染 |
 | MC-019 | 自动保存和版本冲突 | 工程结构存储和异常恢复设计 | `api/internal/timeline/`、`Timeline.jsx` | 已完成 | 700ms 自动保存、修订号冲突测试通过 | 离线草稿和跨进程恢复仍需单列实现 |
 | MC-020 | 崩溃恢复和无响应保护 | watchdog、心跳、崩溃工程信息通道 | 任务恢复有底层，界面恢复尚无 | 部分完成 | 未完成端到端恢复实验 | 需要草稿恢复、进程重启、提示和恢复验收 |

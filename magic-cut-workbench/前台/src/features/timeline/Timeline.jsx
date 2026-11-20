@@ -9,7 +9,7 @@ function clipID() {
   return `clip_${crypto.randomUUID().replaceAll('-', '')}`
 }
 
-export function Timeline({ projectID, materialToInsert, onMaterialInserted, playheadMs = 0, onSeek, onSelectClip, onTimelineChange }) {
+export function Timeline({ projectID, materialToInsert, onMaterialInserted, clipUpdate, onClipUpdated, playheadMs = 0, onSeek, onSelectClip, onTimelineChange }) {
   const [timeline, setTimeline] = useState(null)
   const [selectedClip, setSelectedClip] = useState('')
   const [undoStack, setUndoStack] = useState([])
@@ -78,6 +78,12 @@ export function Timeline({ projectID, materialToInsert, onMaterialInserted, play
   }, [materialToInsert, timeline, run, onMaterialInserted])
 
   useEffect(() => {
+    if (!clipUpdate || !timeline) return
+    run({ type: 'update-properties', clipId: clipUpdate.clipId, patch: clipUpdate.patch })
+    onClipUpdated?.()
+  }, [clipUpdate, timeline, run, onClipUpdated])
+
+  useEffect(() => {
     if (!needsAutosave(dirtyVersion, savedDirtyVersion) || !timeline || conflict) return
     setSaveState('保存中')
     const snapshot = timeline
@@ -116,7 +122,7 @@ export function Timeline({ projectID, materialToInsert, onMaterialInserted, play
     const videoClip = timeline.tracks.find(track => track.kind === 'video')?.clips.find(clip => next >= clip.startMs && next <= clip.startMs + clip.durationMs)
     if (videoClip) {
       setSelectedClip(videoClip.id)
-      onSelectClip?.(videoClip, timeline.durationMs)
+      onSelectClip?.(videoClip, timeline.durationMs, 'video')
     }
     onSeek?.(next)
   }
@@ -140,7 +146,7 @@ export function Timeline({ projectID, materialToInsert, onMaterialInserted, play
           <div className="timeline-lane" onClick={seekFromPointer}>
             <i className="timeline-playhead" style={{ left: `${Math.max(0, playheadMs / 100)}px` }} aria-hidden="true" />
             {track.clips.length ? track.clips.map(clip => (
-              <button type="button" key={clip.id} className={`timeline-clip ${selectedClip === clip.id ? 'is-selected' : ''}`} style={{ left: `${Math.max(0, clip.startMs / 100)}px`, width: `${Math.max(72, clip.durationMs / 100)}px` }} onClick={event => { event.stopPropagation(); setSelectedClip(clip.id); onSelectClip?.(clip, timeline.durationMs); onSeek?.(clip.startMs) }}>
+              <button type="button" key={clip.id} className={`timeline-clip ${selectedClip === clip.id ? 'is-selected' : ''}`} style={{ left: `${Math.max(0, clip.startMs / 100)}px`, width: `${Math.max(72, clip.durationMs / 100)}px` }} onClick={event => { event.stopPropagation(); setSelectedClip(clip.id); onSelectClip?.(clip, timeline.durationMs, track.kind); onSeek?.(clip.startMs) }}>
                 {clip.name || clip.materialId}
               </button>
             )) : <span>双击左侧素材添加到这里</span>}

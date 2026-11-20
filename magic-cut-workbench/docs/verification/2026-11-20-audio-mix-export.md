@@ -7,6 +7,7 @@
 - REA JavaScript 应用分析父证据：`ev_0122c8437a7aadaa1c949cc2f5036d38dc280ccf2c13e3c103c492f74c92c2d1`。
 - REA 摘要证据：`ev_91bf66c518a8f5af02e3c694d9f4d58525b801e8b4af702453513e2fccaafdc2`。
 - 发布脚本直接核对：普通音频默认 `volume: .7`，口播默认 `volume: 1`，随机音乐音量范围 0–200%，普通音频轨和口播轨分别最多 10 条。
+- `Audio-BeyA9XJk.js` 直接核对：选中音频后的右侧属性顺序为“音量 → 倍速 → 时长”；音量为 0–200%，倍速为 0.1–4，0% 就是静音。
 - 主进程桥直接核对：`export-audio`、`export-audio-for-asr`、`export-audio-segments-for-asr`、`convert-audio-to-mp3`。
 - `mcengine/index.cjs` 直接核对：根据 `MCE_LOADER` 装载 `mce_napi.node` 或 `mce_term.node`。
 
@@ -18,7 +19,7 @@
 
 ## 3. 自动测试
 
-- 前端：45/45 通过。
+- 前端：52/52 通过，其中新增音频属性顺序、范围、静音、倍速/时长联动、保存命令测试。
 - Go：`go test ./...` 全部通过。
 - `TestBuildRenderPlanMixesVideoOriginalSoundAndTimelineAudio`：检查原声、独立音频、70% 音量、500ms 延迟和 `amix` 参数。
 - `TestFFmpegExportsPlayableOneSecondMP4`：真实保留视频原声，FFprobe 为 H.264/AAC，volumedetect 证明不是静音。
@@ -44,5 +45,13 @@
 - `mean_volume`: -20.1 dB。
 - `max_volume`: -10.5 dB。
 
-结论：这一条真实运行链已从“导出静音 AAC”提升为“保留视频原声并混合独立音轨”。音量面板、口播、TTS、波形等仍未完成，不能把 MC-017 或 MC-022 标成全部完成。
+## 6. 音频属性界面实测
+
+1. 在同一工程的时间线中选中音频片段，右侧原有空属性区切换成“音频属性”，没有跳到另一个页面。
+2. 页面按原版顺序显示“音量、倍速、时长”，并明确显示“调到 0% 即静音”。
+3. 把音量从 70% 改为 35%，倍速从 1 改为 2，时长自动从 1.00 秒联动为 0.50 秒。
+4. 页面显示“已保存”；刷新后重新选择音频片段，仍读回 `35 / 2.0 / 0.50`。
+5. MySQL 最新时间线快照为 revision 4，实际保存 `volume: 0.35`、`speed: 2`、`durationMs: 500`。
+
+结论：这一条真实运行链已从“导出静音 AAC”提升为“保留视频原声并混合独立音轨”，同时补齐了编辑器右侧的基础音频属性入口。口播、TTS、波形、淡入淡出、降噪和变声等仍未完成，不能把 MC-017 或 MC-022 标成全部完成。
 

@@ -67,6 +67,12 @@ export function executeCommand(current, command) {
   } else if (command.type === 'resize') {
     found.clip.durationMs = command.durationMs
     validateClip(found.clip)
+  } else if (command.type === 'update-properties') {
+    const allowed = new Set(['volume', 'speed', 'durationMs'])
+    const keys = Object.keys(command.patch || {})
+    if (!keys.length || keys.some(key => !allowed.has(key))) throw new Error('unsupported clip property')
+    Object.assign(found.clip, command.patch)
+    validateClip(found.clip)
   } else {
     throw new Error(`unknown command: ${command.type}`)
   }

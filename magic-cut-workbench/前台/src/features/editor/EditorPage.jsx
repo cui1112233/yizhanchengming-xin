@@ -8,6 +8,7 @@ import { Player } from '../player/Player.jsx'
 import { videoClipsFromTimeline } from '../player/playerModel.js'
 import { Timeline } from '../timeline/Timeline.jsx'
 import { commandForShortcut } from './editorModel.js'
+import { AudioInspector } from './AudioInspector.jsx'
 
 export function EditorPage({ projectID }) {
   const [queuedMaterial, setQueuedMaterial] = useState(null)
@@ -15,6 +16,8 @@ export function EditorPage({ projectID }) {
   const [preview, setPreview] = useState(null)
   const [playheadMs, setPlayheadMs] = useState(0)
   const [timelineSnapshot, setTimelineSnapshot] = useState(null)
+  const [selection, setSelection] = useState(null)
+  const [queuedClipUpdate, setQueuedClipUpdate] = useState(null)
   const videoClips = videoClipsFromTimeline(timelineSnapshot)
   useEffect(() => {
     const onKeyDown = event => {
@@ -45,20 +48,26 @@ export function EditorPage({ projectID }) {
           onPlayheadChange={setPlayheadMs}
           onClipChange={clip => setPreview({ clip, timelineDurationMs: timelineSnapshot?.durationMs || 0 })}
         />
-        <aside className="editor-panel inspector-panel" aria-label="检查器">
+        {selection?.trackKind === 'audio' ? <AudioInspector clip={selection.clip} onUpdate={patch => {
+          setSelection(current => current ? { ...current, clip: { ...current.clip, ...patch } } : current)
+          setQueuedClipUpdate({ clipId: selection.clip.id, patch, nonce: crypto.randomUUID() })
+        }} /> : <aside className="editor-panel inspector-panel" aria-label="检查器">
           <header><b>属性</b></header>
-          <div className="inspector-empty"><Settings2 size={28} /><p>选择一个素材或片段</p><small>这里会显示画面、音频和变速参数</small></div>
-        </aside>
+          <div className="inspector-empty"><Settings2 size={28} /><p>{selection ? '视频片段已选择' : '选择一个素材或片段'}</p><small>{selection ? '音频片段会在这里显示音量、倍速和时长' : '这里会显示画面、音频和变速参数'}</small></div>
+        </aside>}
       </div>
       <Timeline
         projectID={projectID}
         materialToInsert={queuedMaterial}
         onMaterialInserted={() => setQueuedMaterial(null)}
+        clipUpdate={queuedClipUpdate}
+        onClipUpdated={() => setQueuedClipUpdate(null)}
         playheadMs={playheadMs}
         onSeek={setPlayheadMs}
         onTimelineChange={setTimelineSnapshot}
-        onSelectClip={(clip, timelineDurationMs) => {
-          setPreview({ clip, timelineDurationMs })
+        onSelectClip={(clip, timelineDurationMs, trackKind) => {
+          setSelection({ clip, trackKind })
+          if (trackKind === 'video') setPreview({ clip, timelineDurationMs })
           setPlayheadMs(clip.startMs)
         }}
       />

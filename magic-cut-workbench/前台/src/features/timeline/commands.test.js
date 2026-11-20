@@ -30,6 +30,7 @@ for (const [name, command] of [
   ['split', { type: 'split', clipId: 'clip-1', atMs: 2500, newClipId: 'clip-2' }],
   ['move', { type: 'move', clipId: 'clip-1', trackId: 'audio-1', startMs: 300 }],
   ['resize', { type: 'resize', clipId: 'clip-1', durationMs: 1500 }],
+	['update-properties', { type: 'update-properties', clipId: 'clip-1', patch: { volume: 0.4, speed: 2, durationMs: 2000 } }],
 ]) {
   test(`${name} command returns an exact inverse`, () => {
     const result = executeCommand(original, command)
@@ -38,6 +39,10 @@ for (const [name, command] of [
     assert.deepEqual(restored.state, original)
   })
 }
+
+test('property update rejects fields outside the audio contract', () => {
+  assert.throws(() => executeCommand(original, { type: 'update-properties', clipId: 'clip-1', patch: { startMs: 0 } }), /property/)
+})
 
 test('commands reject negative clip bounds', () => {
   assert.throws(() => executeCommand(original, { type: 'move', clipId: 'clip-1', trackId: 'video-1', startMs: -1 }), /nonnegative/)

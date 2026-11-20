@@ -164,6 +164,15 @@ a { color: inherit; text-decoration: none; }
 .inspector-empty { display: grid; place-items: center; align-content: center; min-height: 210px; padding: 24px; color: #66748e; text-align: center; }
 .inspector-empty p { margin: 12px 0 4px; color: #a9b2c5; }
 .inspector-empty small { line-height: 1.6; }
+.audio-inspector header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.audio-inspector header small { max-width: 150px; color: #7f8ca5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audio-inspector__body { padding: 16px; }
+.audio-inspector__title { display: flex; align-items: center; gap: 8px; padding-bottom: 14px; color: #b9c2d4; border-bottom: 1px solid #25304a; }
+.audio-property { padding: 16px 0 8px; }
+.audio-property > label { display: block; margin-bottom: 10px; color: #d4daea; font-weight: 600; }
+.audio-property > div { display: grid; grid-template-columns: minmax(0, 1fr) 92px; align-items: center; gap: 12px; }
+.audio-property .ant-slider { margin-inline: 8px; }
+.audio-property > small { display: block; margin-top: 6px; color: #67758d; }
 .editor-timeline { min-height: 0; border-top: 1px solid #2b3650; background: #0e1525; overflow: auto; }
 .timeline-toolbar { display: flex; align-items: center; gap: 2px; height: 46px; padding: 0 12px; border-bottom: 1px solid #25304a; }
 .timeline-toolbar__spacer { flex: 1; }
