@@ -35,15 +35,22 @@ export function ComicChaptersPanel({projectId,onSaved,readOnly=false,canGenerate
   </Spin></div>;
 }
 
-export function ComicAssistantPanel({projectId,onSaved,readOnly=false,canGenerate=true,initialRequest}){
+export function ComicAssistantPanel({projectId,onSaved,onNavigate,readOnly=false,canGenerate=true,initialRequest}){
   const {data,setData,loading,error,refresh}=useAuthoringResource(projectId,getComicAssistant);
   const [text,setText]=useState(''),[busy,setBusy]=useState('');
   useEffect(()=>{if(initialRequest?.text)setText(initialRequest.text);},[initialRequest?.id,initialRequest?.text,projectId]);
   const state=data?.state||{};const messages=state.messages||state.conversation||[];const proposals=state.proposals||[];
+  const navigateLabel={source:'剧本',script:'剧本',assets:'资产',storyboard:'分镜',media:'媒体'};
   async function send(){if(!canGenerate||!text.trim()||busy||loading||error)return;setBusy('chat');try{setData(await sendComicAssistant(projectId,{message:text.trim(),expected_revision:state.revision||0}));setText('');}catch(err){errorMessage(err);}finally{setBusy('');}}
   async function apply(proposal){if(readOnly||busy||proposal.status!=='pending')return;setBusy(proposal.id);try{setData(await applyComicProposal(projectId,{proposal_id:proposal.id,expected_revision:state.revision||0,confirmed:true}));await onSaved?.();message.success('修改已应用并保存');}catch(err){errorMessage(err);}finally{setBusy('');}}
   return <div className="comic-assistant-panel"><ResourceError error={error} retry={refresh}/><div className="comic-panel-heading"><div><h3>作品助手</h3><p>读取当前作品与章节，提出可查看、可确认的修改。不会自行启动图片或视频生产。</p></div><Button onClick={refresh}>刷新会话</Button></div><Spin spinning={loading}>
-    <div className="comic-assistant-messages">{messages.length?messages.map((item,index)=><article key={item.id||index} className={`role-${item.role}`}><b>{item.role==='user'?'你':'作品助手'}</b><div>{item.content||item.text||''}</div></article>):<Empty description="说明你想修改的章节、人物或分镜"/>}</div>
+    <div className="comic-assistant-messages">{messages.length?messages.map((item,index)=>{
+      const kind=item.kind||'';
+      if(kind==='compacted')return <article key={item.id||index} className="comic-assistant-compacted"><div>{item.content||''}</div></article>;
+      if(kind==='question')return <article key={item.id||index} className="comic-assistant-question"><b>作品助手想确认</b><div>{item.content||item.text||''}</div><small className="comic-assistant-question-tip">在下方输入框回答，助手会据此继续。</small></article>;
+      const suggestions=Array.isArray(item.suggestions)?item.suggestions:[];
+      return <article key={item.id||index} className={`role-${item.role}`}><b>{item.role==='user'?'你':'作品助手'}</b><div>{item.content||item.text||''}</div>{suggestions.length?<div className="comic-assistant-suggestions">{suggestions.map((s,i)=><Button key={i} size="small" onClick={()=>onNavigate?.(s.entry)} title={s.reason||undefined}>{s.label||navigateLabel[s.entry]||'前往面板'}</Button>)}</div>:null}</article>;
+    }):<Empty description="说明你想修改的章节、人物或分镜"/>}</div>
     {proposals.map(proposal=><article key={proposal.id} className="comic-assistant-proposal"><b>{proposal.summary||'建议修改'}</b>{Array.isArray(proposal.actions)?<ul>{proposal.actions.map((action,index)=><li key={index}>{action.summary||action.title||action.description||({replace_chapters:'更新章节',save_document:'保存剧本新版本',update_asset:'修改资产设定',update_shot:'修改分镜'}[action.kind])||({document:'更新剧本',chapter:'修改章节',asset:'修改资产',shot:'修改场次'}[action.kind])||'作品内容修改'}{action.target_id?<small> · {action.target_id}</small>:null}<pre>{action.content||(action.chapter?JSON.stringify(action.chapter,null,2):'')||(action.asset?JSON.stringify(action.asset,null,2):'')||(action.shot?JSON.stringify(action.shot,null,2):'')||''}</pre></li>)}</ul>:null}<Popconfirm title="确认应用这些修改？" description="应用后会保存到当前作品，请先核对上述内容。" onConfirm={()=>apply(proposal)}><Button icon={<Check size={14}/>} type="primary" loading={busy===proposal.id} disabled={readOnly||!!busy||proposal.status!=='pending'||proposal.applied}> {proposal.status==='applied'||proposal.applied?'已应用':proposal.status==='stale'?'内容已变更，请重新询问':'应用修改'}</Button></Popconfirm></article>)}
     <div className="comic-assistant-compose"><Input.TextArea value={text} onChange={event=>setText(event.target.value)} rows={3} maxLength={10000} placeholder="例如：检查第一集节奏，给出修改建议；或把人物称呼统一。" disabled={!canGenerate}/><Button type="primary" icon={<Send size={14}/>} loading={busy==='chat'} disabled={!canGenerate||!text.trim()||!!busy||loading||!!error} onClick={send}>发送</Button></div>
   </Spin></div>;

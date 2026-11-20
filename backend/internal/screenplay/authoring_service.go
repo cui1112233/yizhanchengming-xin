@@ -41,8 +41,20 @@ type MemberGrant struct {
 	Generate bool   `json:"generate"`
 }
 type AssistantMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role        string             `json:"role"`
+	Content     string             `json:"content"`
+	Suggestions []AssistantNavigate `json:"suggestions,omitempty"`
+	// Kind 仅用于对话智能展示（question=助手追问 / compacted=历史折叠占位），
+	// 空值表示普通消息；omitempty 保证旧数据与旧客户端完全兼容。
+	Kind string `json:"kind,omitempty"`
+}
+
+// AssistantNavigate 是助手给出的只读导航建议：引导用户到某个面板继续，
+// 不含任何自动执行的工具动作、不改数据、不消耗额度。
+type AssistantNavigate struct {
+	Label  string `json:"label"`
+	Entry  string `json:"entry"`
+	Reason string `json:"reason,omitempty"`
 }
 type AuthoringAction struct {
 	Kind             string   `json:"kind"`

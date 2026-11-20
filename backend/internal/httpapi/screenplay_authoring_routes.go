@@ -21,7 +21,13 @@ func ScreenplayProjectArchived(ctx context.Context, repo screenplay.AuthoringRep
 	st, e := repo.Load(ctx, o, id)
 	return e == nil && st.Archived
 }
-func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, repo screenplay.AuthoringRepository, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error)) {
+// mediaStore 为可选：作品助手用它生成链路能力清单（只读媒体状态）。
+// 用可变参数是为了兼容既有调用点（测试与 workflow 注册），未提供时媒体环节按未就绪展示。
+func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, store screenplay.Store, repo screenplay.AuthoringRepository, resolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error), mediaStore ...screenplay.MediaStore) {
+	var media screenplay.MediaStore
+	if len(mediaStore) > 0 {
+		media = mediaStore[0]
+	}
 	if mux == nil || store == nil || repo == nil {
 		return
 	}
@@ -261,10 +267,19 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 				user := in.Message
 				jsonResponse := true
 				var chapterIndex = -1
-				contextData := map[string]any{"project": project, "chapters": st.Chapters, "conversation": st.Messages}
-				if doc, er := store.ActiveDocument(r.Context(), o, st.ProjectID); er == nil {
-					contextData["document"] = doc
-					shots, er := store.ListShots(r.Context(), o, st.ProjectID, doc.ID)
+				// 会话压缩：折叠过长历史，保留最近若干条原文。仅作用于助手会话消息，
+				// 不改作品内容、不消耗额度。压缩结果写回 st.Messages 后随本次 Save 落库。
+				conversation, compacted := screenplay.CompactAssistantMessages(st.Messages, screenplay.AssistantCompactConfig{})
+				if compacted && path == "assistant/chat" {
+					st.Messages = conversation
+				}
+				contextData := map[string]any{"project": project, "chapters": st.Chapters, "conversation": conversation}
+				var shots []screenplay.Shot
+				var hasDoc bool
+				if active, er := store.ActiveDocument(r.Context(), o, st.ProjectID); er == nil {
+					hasDoc = true
+					contextData["document"] = active
+					shots, er = store.ListShots(r.Context(), o, st.ProjectID, active.ID)
 					if er != nil {
 						return er
 					}
@@ -275,6 +290,15 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 					return er
 				}
 				contextData["assets"] = assets
+				if path == "assistant/chat" {
+					caps, cov, e := buildAssistantCapabilities(r.Context(), store, media, o, st.ProjectID, project, st, assets, shots, hasDoc)
+					if e != nil {
+						return e
+					}
+					contextData["capabilities"] = caps
+					contextData["coverage"] = cov
+					system += "\n\n" + screenplay.FormatCapabilitiesForPrompt(caps, cov)
+				}
 				switch path {
 				case "chapters/plan":
 					system = prompt.ScreenplayAuthoringPlan
@@ -336,9 +360,11 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 					}
 				default:
 					var parsed struct {
-						Reply   string                       `json:"reply"`
-						Summary string                       `json:"summary"`
-						Actions []screenplay.AuthoringAction `json:"actions"`
+						Reply       string                       `json:"reply"`
+						Summary     string                       `json:"summary"`
+						Actions     []screenplay.AuthoringAction `json:"actions"`
+						Question    string                       `json:"question"`
+						Suggestions []assistantSuggestion        `json:"suggestions"`
 					}
 					if json.Unmarshal([]byte(raw), &parsed) != nil || strings.TrimSpace(parsed.Reply) == "" {
 						return screenplay.ErrAIInvalidJSON
@@ -352,7 +378,28 @@ func RegisterScreenplayAuthoringRoutes(mux *http.ServeMux, auth BridgeAuth, stor
 						}
 						st.Proposals = append(st.Proposals, screenplay.AssistantProposal{ID: newAgentID("proposal"), Summary: parsed.Summary, Actions: parsed.Actions, Status: "pending", Revision: st.Revision + 1})
 					}
-					st.Messages = append(st.Messages, screenplay.AssistantMessage{Role: "user", Content: user}, screenplay.AssistantMessage{Role: "assistant", Content: parsed.Reply})
+					assistantContent := parsed.Reply
+					content := assistantContent
+					if strings.TrimSpace(parsed.Question) != "" {
+						// 主动追问落为独立消息，前端据此渲染追问卡片；不改任何作品数据。
+						st.Messages = append(st.Messages,
+							screenplay.AssistantMessage{Role: "user", Content: user},
+							screenplay.AssistantMessage{Role: "assistant", Content: assistantContent},
+							screenplay.AssistantMessage{Role: "assistant", Content: strings.TrimSpace(parsed.Question), Kind: screenplay.AssistantMessageKindQuestion})
+					} else {
+						st.Messages = append(st.Messages,
+							screenplay.AssistantMessage{Role: "user", Content: user},
+							screenplay.AssistantMessage{Role: "assistant", Content: content})
+					}
+					// 导航建议：校验入口标识后附加到最近一条普通助手消息，供前端点击跳转。
+					if safe := sanitizeAssistantSuggestions(parsed.Suggestions); len(safe) > 0 {
+						for i := len(st.Messages) - 1; i >= 0; i-- {
+							if st.Messages[i].Kind == "" && st.Messages[i].Role == "assistant" {
+								st.Messages[i].Suggestions = safe
+								break
+							}
+						}
+					}
 				}
 				out, e = svc.Save(r.Context(), o, st.ProjectID, st, in.Expected)
 				if e == nil && path == "chapters/{chapter}/script" {
