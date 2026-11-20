@@ -1,0 +1,17 @@
+{
+  "newPresets": 5,
+  "runtimeGitSha": "cf174fa4",
+  "dirtyUnrelatedWorkspacePreserved": true,
+  "publicDeployment": false,
+  "reviewDimensions": 37,
+  "healthStatus": 200,
+  "binarySha256": "ab00dab5e661711551430401809140e77c02434cf63cbaac2945bcb7ecc18fb0",
+  "manifestSha": "cf174fa4",
+  "novelPageStatus": 200,
+  "authenticatedDefaultsStatus": 200,
+  "sourceCommit": "cf174fa4",
+  "novelPageAsset": "NovelCreationPage-CFyH6vL_.js",
+  "paidCalls": 0,
+  "verifiedAt": "2026-11-20T04:02:16.1362596Z",
+  "frontendEntry": "/assets/user-DBY9u8w7.js"
+}

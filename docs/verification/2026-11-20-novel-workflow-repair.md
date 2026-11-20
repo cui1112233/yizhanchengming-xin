@@ -34,4 +34,8 @@
 
 ## 本地运行
 
-代码提交后重新构建前端及Go embed，再更新4001并核对运行SHA、页面资源与认证只读接口；运行回执在完成后补入此节。公网未发布。
+已完成：代码提交 `cf174fa4`；本地4001 PID38356，运行 `qiantie-novel-workflow.exe`，git_sha与runtime_manifest_sha均为cf174fa4。Go embed与前端index哈希一致；实际返回的 `NovelCreationPage-CFyH6vL_.js` 与新构建文件哈希一致，用户入口 `/assets/user-DBY9u8w7.js`。
+
+`/health`、`/novel-creation`均200；实际登录账号的认证GET `/api/novel-creation/agent-settings` 为200，返回37个维度及设置版本1。启动后本地预设数据中5项short-imitation ID和中文名称已确认。只读检查，没有对业务账号发生成请求。
+
+本地构建保留工作区其他任务的未提交修改，未将这些修改打包进本次Git提交；运行二进制单独存档并记录哈希。源码/测试提交cf174fa4，后续文档回执提交不改变运行代码。公网未发布。
