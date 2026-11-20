@@ -1,30 +1,26 @@
 import { Check, ChevronDown } from 'lucide-react'
 
-import { createWorkModeLinks } from './workModeLinks.js'
+import { createWorkModeModel } from './workModeLinks.js'
 
 export function WorkModeMenu() {
-  const links = createWorkModeLinks(window.location)
-  const modes = [
-    { id: 'studio', label: '一战晟铭', href: links.studio },
-    { id: 'agent', label: 'Agent 代理', href: links.agent },
-    { id: 'magic-cut', label: '魔剪', href: links.magicCut, active: true },
-    { id: 'duet', label: 'Duet', disabled: true },
-  ]
+  const model = createWorkModeModel(window.location)
 
   return (
     <details className="work-mode">
       <summary>
-        <span className="work-mode__mark">M</span>
-        <span>魔剪</span>
-        <ChevronDown size={15} />
+        <img className="work-mode__logo" src={model.logoSrc} alt="" />
+        <strong>{model.brandLabel}</strong>
+        <ChevronDown className="work-mode__chevron" size={15} />
       </summary>
       <nav className="work-mode__menu" aria-label="切换工作模式">
-        {modes.map((mode) => (
+        {model.modes.map((mode) => (
           <a
             key={mode.id}
             href={mode.disabled ? undefined : mode.href}
             aria-disabled={mode.disabled || undefined}
+            aria-current={mode.active ? 'page' : undefined}
             className={mode.active ? 'is-active' : mode.disabled ? 'is-disabled' : undefined}
+            onClick={mode.disabled ? event => event.preventDefault() : undefined}
           >
             <span>{mode.label}</span>
             {mode.active ? <Check size={15} /> : null}

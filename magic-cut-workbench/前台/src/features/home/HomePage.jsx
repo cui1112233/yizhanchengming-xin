@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from 'react'
 
 import { apiRequest } from '../../shared/api/client.js'
+import { WorkModeMenu } from '../../shared/work-mode/WorkModeMenu.jsx'
 import { CreateProjectDialog } from '../project-create/CreateProjectDialog.jsx'
 import { resolveHomeToolAction } from './homeInteractionModel.js'
 import { createHomeModel } from './homeModel.js'
@@ -68,10 +69,7 @@ export function HomePage({ account }) {
   return (
     <div className="original-home">
       <header className="original-home__topbar">
-        <div className="original-home__brand">
-          <span className="original-home__avatar">{avatarText}</span>
-          <b>{displayName}</b>
-        </div>
+        <WorkModeMenu />
         <div className="original-home__top-actions">
           <span className="top-action">行业 <b>短剧漫剧</b> <ChevronDown size={13} /></span>
           <span className="top-action"><BookOpen size={14} /> 使用指引</span>
