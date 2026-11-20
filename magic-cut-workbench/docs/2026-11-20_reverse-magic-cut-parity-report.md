@@ -12,9 +12,9 @@
 
 原版 Magic Cut 是一套 Electron 桌面视频生产工作台，不是单独一个剪辑页面。静态源码能确认它包含首页/工程、时间线剪辑、高光与钩子、批量短剧、选剧、仿剪、数字人、达人二创、脚本成片、漫剧转译、AI 前贴、任务中心、数据看板等至少 22 个路由级入口，并依赖 FFmpeg、FFprobe、SQLite、原生 `mcengine`、OCR/ONNX 和多个独立任务进程。
 
-当前 React + Antd + Go 重写已经建立 4040 独立入口，完成账号接入、工程创建、基础素材导入与探测、基础时间线命令、版本化自动保存和通用任务中心。它还没有真实播放器、导出 worker、可播放文件落盘，也没有原版的大部分业务工作流。因此当前结论是“核心底座开发中”，不能称为 1:1 完成。
+当前 React + Antd + Go 重写已经建立 4040 独立入口，完成账号接入、工程创建、基础素材导入与探测、基础时间线命令、版本化自动保存、通用任务中心，以及基础 FFmpeg 导出与成片下载。真实验收已经产出可播放的 H.264/AAC MP4，但当前还没有真实播放器，导出也没有混合原音/多音轨、复杂特效或完整的进程重启恢复，原版的大部分业务工作流仍未实现。因此当前结论仍是“核心底座开发中”，不能称为 1:1 完成。
 
-功能台账共登记 46 项：8 项已完成、15 项部分完成、23 项未开始。最优先缺口是“新建工程 → 导入素材 → 编辑 → 真实导出 → 文件落盘 → 失败重试”的完整闭环。
+功能台账共登记 46 项：8 项已完成、18 项部分完成、20 项未开始。基础闭环已经能从“新建工程 → 导入素材 → 编辑 → 真实导出 → 文件落盘 → 下载成片”跑通；下一批最优先缺口是真实播放器、原音/多音轨渲染和导出任务的进程重启恢复。
 
 ## 2. 范围和边界
 
@@ -72,14 +72,15 @@ flowchart LR
 | 编辑 | 五区布局、视频/音频轨、插入、分割、复制、删除、撤销/重做 | `前台/src/features/editor/`、`前台/src/features/timeline/` |
 | 保存 | 修订号、自动保存和冲突暂停 | `api/internal/timeline/`、`Timeline.jsx` |
 | 任务 | 持久列表、取消、重试和重启恢复入队底层 | `api/internal/task/`、`前台/src/features/task-center/` |
+| 导出 | 参数弹窗、FFmpeg 渲染、进度/attempt、取消重试代理和登录下载 | `api/internal/export/`、`前台/src/features/export/` |
 | 提示词 | 客户端可见原文与自有等价提示词统一放后端 | `api/internal/prompt/catalog.go`、`docs/prompt-inventory.json` |
 | 交付 | Vite 资源由 Go `embed` 提供，4040 单服务运行 | `api/web/web.go`、`api/web/dist/` |
 
 ## 5. 为什么现在还不是 1:1
 
-### 5.1 核心闭环还缺最后也是最关键的一段
+### 5.1 基础导出已跑通，但还不是原版等价渲染
 
-当前“导出”按钮没有连接导出参数、渲染计划或 worker。播放器也没有加载真实素材。任务中心虽然真实持久化，但还没有真实导出任务给它执行。因此接口、页面和测试通过不能替代“输出文件真实落盘并可播放”。
+当前“导出”按钮已经连接参数弹窗、渲染计划和 FFmpeg worker，任务中心能显示真实进度并下载完成文件。4040 实测得到 1 秒、640×360、25fps、H.264/AAC MP4，下载文件 SHA-256 与数据库记录一致。它仍然不是 1:1：播放器没有加载真实素材；音频目前是合成静音 AAC，不是原音或多轨混音；格式/码率预设、复杂特效、打开输出目录和进程重启后的导出恢复也未补齐。
 
 ### 5.2 大部分业务工作流尚未实现
 
@@ -185,6 +186,19 @@ flowchart LR
 - linked_workitem: `MC-001` 至 `MC-025`、`MC-041` 至 `MC-044`
 - supersedes: none
 
+#### E-007
+
+- title: 基础导出闭环真实运行验收
+- observed_at: 2026-11-20
+- source_type: runtime
+- source_ref: 4040 浏览器、MySQL 导出记录和下载文件
+- content_hash: `13E780ACEF96C11F9EA77156411408648D025B6919E3A98B9455209A39D1CEA2`
+- artifact_path: `G:\Backup\Downloads\验收成片.mp4`
+- repro_command: `ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json 'G:\Backup\Downloads\验收成片.mp4'`
+- raw_excerpt: 任务中心显示已完成 100%；下载文件为 1.000 秒、3821 字节、640×360、25fps，视频 H.264、音频 AAC；文件 SHA-256 与数据库一致。
+- linked_workitem: `MC-021` 至 `MC-024`
+- supersedes: none
+
 ### 7.2 Findings
 
 #### F-001
@@ -206,12 +220,12 @@ flowchart LR
 - severity: n/a_re
 - category: other
 - status: validated
-- evidence_ids: `[E-005, E-006]`
+- evidence_ids: `[E-005, E-006, E-007]`
 - location: `magic-cut-workbench`
-- impact: 现在不能对外声称 1:1，也不能把任务中心当作真实导出。
+- impact: 基础导出已经是真实任务和真实文件，但功能、交互和输出仍与原版有明显差距，不能对外声称 1:1。
 - confidence: high
 - repro_steps: 对比当前 API/页面路由和台账 46 项。
-- remediation: 按台账优先完成真实导出闭环。
+- remediation: 按台账优先完成真实播放器、原音/多音轨渲染和重启恢复，再继续补业务工作流。
 
 #### F-003
 
@@ -239,14 +253,14 @@ flowchart LR
   2. 新建工程并保存 MySQL — evidence: E-005, E-006 — finding: F-002
   3. 上传素材并由 FFprobe 探测 — evidence: E-003, E-005 — finding: F-002
   4. 素材进入版本化时间线并自动保存 — evidence: E-005, E-006 — finding: F-002
-  5. 根据时间线创建导出计划 — evidence: E-003 — finding: F-001
-  6. worker 渲染、写出文件并把进度写入任务中心 — evidence: E-003 — finding: F-001
-- residual_risks: 第 5、6 步当前尚未实现；真实播放器和原版渲染差异也未验证。
+  5. 根据时间线创建导出计划 — evidence: E-003, E-007 — finding: F-001
+  6. worker 渲染、写出文件并把进度写入任务中心 — evidence: E-003, E-007 — finding: F-002
+- residual_risks: 六步基础闭环已跑通；真实播放器、原音/多音轨、复杂效果、导出进程重启恢复和原版渲染差异仍未验证。
 
 ## 8. 后续开发顺序
 
-1. 先完成真实播放器、导出参数、FFmpeg worker、文件落盘和任务进度，把 P0 闭环跑通。
-2. 再补字幕/文字、音频/TTS、贴纸/转场/特效，完善通用编辑底座。
+1. 先完成真实播放器、原音/多音轨渲染和导出进程重启恢复，把基础 P0 从“能导出”提升到“可长期稳定使用”。
+2. 再补字幕/文字、音频/TTS、贴纸/转场/特效和更多导出格式，完善通用编辑底座。
 3. 然后按高光 → 批量短剧 → 仿剪 → 脚本成片 → 转译 → 数字人/AI 前贴逐个工作流实现。
 4. 每完成一项，同一提交更新 `parity/feature-ledger.md`，记录测试和真实运行结果。
 5. 最后再做隔离环境的原版/新版页面、交互、输出和像素 A/B。
@@ -257,4 +271,4 @@ flowchart LR
 - 范围、限制、Evidence、Finding、Path 均已写明。
 - 每个“已完成”都有当前代码或验证记录；未实现功能没有写成完成。
 - 没有真实密钥、令牌、内部地址或未知服务端提示词。
-- 当前状态与长期台账一致：8 项已完成、15 项部分完成、23 项未开始。
+- 当前状态与长期台账一致：8 项已完成、18 项部分完成、20 项未开始。
