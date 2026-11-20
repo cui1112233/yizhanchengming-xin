@@ -46,4 +46,7 @@
 - 独立静态审查未发现阻断问题，未把原版全篇规则与CM分段适配混称一致。
 - 独立MySQL8.4通过（178.233s）：原有蓝图编辑恢复、终审429复用19次模拟调用；旧/新对话协议分别12次模拟调用。新协议重开后实际发出四消息且消息存入metadata，旧协议仍两消息，无重复首稿。总计43次固定回复模拟调用，零付费。临时库和账号已清理。
 - 精简日志见[验收附件](novel-short-writer-recovery-20261120/)，原始测试日志在_local-archive-20261028/novel-short-writer-recovery-20261120/。
-- 本地构建及4001身份完成后补记。
+- React构建通过（1m47s），Go embed准备和Go编译通过。源码提交 `d8fdef38`；运行PID30572，`_local-archive-20261028/novel-writer-d8fdef38/qiantie-novel-writer.exe`；git_sha与runtime_manifest_sha均为d8fdef38，health.ok=true，小说入口200。
+- 实际小说chunk与嵌入构建相同（NovelCreationPage-C1UnCqa5.js，SHA256 57ecc75875c2cff8d07df9c41b7cf63fba3cb9601514243daad038ba0319f4f4）；本轮无小说前端业务改动。入口脚本仍为user-Bj7mg_zH.js。
+- 本地系统预设文件已核验新ID状态published，名称“短篇写作·修订跟进要求（四消息）”。现有已创建任务不会被新预设覆盖。
+- 本地包包含工作区现有其他并行改动，它们没有混入本轮提交；不声称干净检出的全站发布包。公网未部署、未推送，实际收费模型调用0。

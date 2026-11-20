@@ -9,7 +9,7 @@
 | 原版补写、修订和重新终审入口取证 | 已完成（限定范围） | 见docs/verification/novel-short-recovery-20261120/FINDINGS.md；最多3次缺章补写、一次第二版；未找到独立重审入口仅作有界结论 |
 | 修订对话规格 | 已确认限定规则 | 见docs/specs/novel-creation-alignment/2026-11-20-short-writer-conversation-contract.md；原版完整首稿→第二版一次修订，CM多轮为适配 |
 | 修订链路修复 | 已完成 | 新任务对话版本开关；修订4消息/格式修复6消息；后台新增来源明确的跟进预设；旧0协议保留；领域测试通过 |
-| 验证与本地更新 | 进行中 | 领域/prompt/storage和实际本地HTTP渠道消息验证通过；MySQL进行中，后续Go构建和4001身份核验 |
+| 验证与本地更新 | 已完成（本轮范围） | 领域/prompt/storage、HTTP传输、独立MySQL43次模拟调用通过；React/Go构建及4001 d8fdef38验证通过，新预设published；回执docs/verification/2026-11-20-novel-short-writer-recovery.md |
 
 ## 初步实现合同
 
