@@ -132,16 +132,57 @@ func TestDirectorSlotDigestIgnoresProviderAssignedIDs(t *testing.T) {
 	base := DirectorVideo{ID: "video-1", SceneID: "scene-1", DurationSec: 9, Characters: []string{"林晚"}, Scene: "客厅", FinalPrompt: "分镜内容", Shots: []DirectorShot{{StartSec: 0, EndSec: 3, ShotType: "wide_shot", Camera: "static", Description: "远景"}}}
 	renamed := base
 	renamed.ID, renamed.SceneID = "video-999", "scene-999"
-	if directorSlotDigest("original", "", `{"mode":"original"}`, base) != directorSlotDigest("original", "", `{"mode":"original"}`, renamed) {
+	if directorSlotDigest("original", "", `{"mode":"original"}`, 0, base) != directorSlotDigest("original", "", `{"mode":"original"}`, 0, renamed) {
 		t.Fatal("provider-assigned ID/SceneID must not affect the slot digest")
 	}
 	changed := base
 	changed.FinalPrompt = "改动后的分镜"
-	if directorSlotDigest("original", "", `{"mode":"original"}`, base) == directorSlotDigest("original", "", `{"mode":"original"}`, changed) {
+	if directorSlotDigest("original", "", `{"mode":"original"}`, 0, base) == directorSlotDigest("original", "", `{"mode":"original"}`, 0, changed) {
 		t.Fatal("a storyboard content change must change the slot digest")
 	}
-	if directorSlotDigest("original", "", `{"mode":"original"}`, base) == directorSlotDigest("original", "", `{"mode":"viral"}`, base) {
+	if directorSlotDigest("original", "", `{"mode":"original"}`, 0, base) == directorSlotDigest("original", "", `{"mode":"viral"}`, 0, base) {
 		t.Fatal("a frozen settings change must change the slot digest")
+	}
+}
+
+// 重新配音产生的 TTS 身份键、以及只作用于 VIDEO01 的 opening 设置，
+// 都不允许把整本书的分镜指纹一起改掉。
+func TestDirectorSlotDigestIgnoresTTSIdentityAndLaterSlotOpeningSettings(t *testing.T) {
+	draft := DirectorVideo{DurationSec: 9, FinalPrompt: "分镜内容"}
+	withOldAudio := `{"mode":"original","ttsAudioArtifactId":"tts-old","ttsFingerprint":"tts-old","openingEnabled":true,"openingCount":2}`
+	withNewAudio := `{"mode":"original","ttsAudioArtifactId":"tts-new","ttsFingerprint":"tts-new","openingEnabled":true,"openingCount":2}`
+	for ordinal := 0; ordinal < 3; ordinal++ {
+		if directorSlotDigest("original", "", withOldAudio, ordinal, draft) != directorSlotDigest("original", "", withNewAudio, ordinal, draft) {
+			t.Fatalf("ordinal %d: regenerated TTS identity must not rotate the slot", ordinal)
+		}
+	}
+	withOtherOpening := `{"mode":"original","ttsAudioArtifactId":"tts-old","ttsFingerprint":"tts-old","openingEnabled":false,"openingCount":1}`
+	if directorSlotDigest("original", "", withOldAudio, 0, draft) == directorSlotDigest("original", "", withOtherOpening, 0, draft) {
+		t.Fatal("opening settings must still affect VIDEO01")
+	}
+	if directorSlotDigest("original", "", withOldAudio, 1, draft) != directorSlotDigest("original", "", withOtherOpening, 1, draft) {
+		t.Fatal("opening settings must not affect later slots")
+	}
+}
+
+// 部署前写入的旧指纹使用整份设置 JSON，升级后第一次修订仍要能命中，
+// 否则收窄算法本身会再触发一次整本轮换。
+func TestPreviousSlotPlanMatchesLegacyDigest(t *testing.T) {
+	draft := DirectorVideo{DurationSec: 9, FinalPrompt: "分镜内容"}
+	oldSnapshot := `{"mode":"original","ttsFingerprint":"tts-old"}`
+	newSnapshot := `{"mode":"original","ttsFingerprint":"tts-new"}`
+	stored := legacyDirectorSlotDigest("original", "", oldSnapshot, draft)
+	plan := previousSlotPlan{
+		digests:      map[string]string{"video-1": stored},
+		mode:         "original",
+		snapshotJSON: oldSnapshot,
+	}
+	if !plan.matches("video-1", directorSlotDigest("original", "", newSnapshot, 1, draft), draft) {
+		t.Fatal("a legacy digest must still keep its slot when only ignored keys changed")
+	}
+	changedDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "新分镜"}
+	if plan.matches("video-1", directorSlotDigest("original", "", newSnapshot, 1, changedDraft), changedDraft) {
+		t.Fatal("a changed storyboard must not be kept through the legacy fallback")
 	}
 }
 
@@ -158,8 +199,8 @@ func TestPersistDirectorRevisionKeepsUnchangedSlots(t *testing.T) {
 	keptDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "保持不变的分镜"}
 	oldDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "旧版分镜二"}
 	newDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "新版分镜二"}
-	keptDigest := directorSlotDigest("original", "", `{"mode":"original"}`, keptDraft)
-	oldDigest := directorSlotDigest("original", "", `{"mode":"original"}`, oldDraft)
+	keptDigest := directorSlotDigest("original", "", `{"mode":"original"}`, 0, keptDraft)
+	oldDigest := directorSlotDigest("original", "", `{"mode":"original"}`, 1, oldDraft)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT revision FROM batch_factory_v12_books`).
@@ -178,11 +219,11 @@ func TestPersistDirectorRevisionKeepsUnchangedSlots(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO batch_factory_v12_director_revisions`).
 		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice", sqlmock.AnyArg(), sqlmock.AnyArg(), "original", "digest-new", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`SELECT l.video_id,COALESCE\(l.slot_digest,''\) FROM batch_factory_v12_director_video_links`).
+	mock.ExpectQuery(`SELECT l.video_id,COALESCE`).
 		WithArgs("batch-1", "book-1", "alice", int64(1)).
-		WillReturnRows(sqlmock.NewRows([]string{"video_id", "slot_digest"}).
-			AddRow("video-a", keptDigest).
-			AddRow("video-b", oldDigest))
+		WillReturnRows(sqlmock.NewRows([]string{"video_id", "slot_digest", "mode", "hook_revision_id", "effective_json"}).
+			AddRow("video-a", keptDigest, "original", "", `{"mode":"original"}`).
+			AddRow("video-b", oldDigest, "original", "", `{"mode":"original"}`))
 	mock.ExpectQuery(`SELECT v.id,v.ordinal,COALESCE`).
 		WithArgs("batch-1", "book-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "label", "video_prompt", "visual_prompt", "duration_seconds", "revision"}).
@@ -268,9 +309,9 @@ func TestPersistDirectorRevisionRotatesSlotsWhenDigestChanges(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice", sqlmock.AnyArg(), sqlmock.AnyArg(), "original", "digest-new", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// 上一修订的槽位 digest 全部为空（迁移前旧数据），保留永不命中，整本轮换。
-	mock.ExpectQuery(`SELECT l.video_id,COALESCE\(l.slot_digest,''\) FROM batch_factory_v12_director_video_links`).
+	mock.ExpectQuery(`SELECT l.video_id,COALESCE`).
 		WithArgs("batch-1", "book-1", "alice", int64(1)).
-		WillReturnRows(sqlmock.NewRows([]string{"video_id", "slot_digest"}))
+		WillReturnRows(sqlmock.NewRows([]string{"video_id", "slot_digest", "mode", "hook_revision_id", "effective_json"}))
 	mock.ExpectQuery(`SELECT v.id,v.ordinal,COALESCE`).
 		WithArgs("batch-1", "book-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "label", "video_prompt", "visual_prompt", "duration_seconds", "revision"}).

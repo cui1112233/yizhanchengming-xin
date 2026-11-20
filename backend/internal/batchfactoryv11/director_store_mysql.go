@@ -172,7 +172,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	// 逐槽位保留：上一修订的每个槽位都记录了自己的输入 digest，本次只有
 	// digest 真正变化的槽位才轮换；未变化槽位连同已成功的生产任务一起保留，
 	// 避免一次局部修订把整本书已生成好的视频全部废掉。
-	previousDigests, err := loadPreviousSlotDigests(ctx, tx, owner, book, currentRevision)
+	previousPlan, err := loadPreviousSlotPlan(ctx, tx, owner, book, currentRevision)
 	if err != nil {
 		return DirectorRevision{}, err
 	}
@@ -205,9 +205,9 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	newDigests := make([]string, len(output.Storyboard))
 	kept := map[int]string{}
 	for ordinal, draft := range output.Storyboard {
-		newDigests[ordinal] = directorSlotDigest(snapshot.Mode, hookID, string(snapshotJSON), draft)
+		newDigests[ordinal] = directorSlotDigest(snapshot.Mode, hookID, string(snapshotJSON), ordinal, draft)
 		previous, exists := oldByOrdinal[ordinal]
-		if exists && newDigests[ordinal] != "" && previousDigests[previous.video.ID] == newDigests[ordinal] {
+		if exists && newDigests[ordinal] != "" && previousPlan.matches(previous.video.ID, newDigests[ordinal], draft) {
 			kept[ordinal] = previous.video.ID
 		}
 	}
@@ -335,37 +335,109 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	return DirectorRevision{ID: revisionID, BatchID: book.BatchID, BookID: book.ID, Revision: currentRevision + 1, Mode: snapshot.Mode, SnapshotID: snapshotID, SourceDigest: digest, HookRevisionID: hookID, Output: output, Videos: videos, OrphanedOverrides: orphaned, CreatedAt: now}, nil
 }
 
-// loadPreviousSlotDigests returns the per-slot input digests recorded on the
-// links of the revision that preceded currentRevision. Rows written before the
+// previousSlotPlan 记录上一修订的槽位指纹，以及生成这些指纹时的冻结输入。
+// 后者只用于兼容部署前写入的旧指纹：旧算法把整份设置 JSON（含 TTS 身份键）
+// 纳入哈希，升级后第一次修订必须仍能命中，否则会再触发一次整本轮换。
+type previousSlotPlan struct {
+	digests      map[string]string
+	mode         string
+	hookID       string
+	snapshotJSON string
+}
+
+// loadPreviousSlotPlan returns the per-slot input digests recorded on the links
+// of the revision that preceded currentRevision. Rows written before the
 // slot_digest column existed read back as "" and therefore never match, which
 // keeps the legacy whole-book rotation as the safe fallback.
-func loadPreviousSlotDigests(ctx context.Context, q batchQueryer, owner string, book Book, previousRevision int64) (map[string]string, error) {
-	digests := map[string]string{}
+func loadPreviousSlotPlan(ctx context.Context, q batchQueryer, owner string, book Book, previousRevision int64) (previousSlotPlan, error) {
+	plan := previousSlotPlan{digests: map[string]string{}}
 	if previousRevision < 1 {
-		return digests, nil
+		return plan, nil
 	}
-	rows, err := q.QueryContext(ctx, `SELECT l.video_id,COALESCE(l.slot_digest,'') FROM batch_factory_v12_director_video_links l JOIN batch_factory_v12_director_revisions d ON d.id=l.director_revision_id WHERE d.batch_id=? AND d.book_id=? AND d.owner_username=? AND d.revision=?`, book.BatchID, book.ID, owner, previousRevision)
+	rows, err := q.QueryContext(ctx, `SELECT l.video_id,COALESCE(l.slot_digest,''),COALESCE(d.mode,''),COALESCE(d.hook_revision_id,''),COALESCE(cs.effective_json,'') FROM batch_factory_v12_director_video_links l JOIN batch_factory_v12_director_revisions d ON d.id=l.director_revision_id LEFT JOIN batch_factory_v12_config_snapshots cs ON cs.id=d.snapshot_id WHERE d.batch_id=? AND d.book_id=? AND d.owner_username=? AND d.revision=?`, book.BatchID, book.ID, owner, previousRevision)
 	if err != nil {
-		return nil, err
+		return previousSlotPlan{}, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var videoID, digest string
-		if err := rows.Scan(&videoID, &digest); err != nil {
-			return nil, err
+		var videoID, digest, mode, hookID, snapshotJSON string
+		if err := rows.Scan(&videoID, &digest, &mode, &hookID, &snapshotJSON); err != nil {
+			return previousSlotPlan{}, err
 		}
-		digests[videoID] = digest
+		plan.digests[videoID] = digest
+		plan.mode, plan.hookID, plan.snapshotJSON = mode, hookID, snapshotJSON
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return previousSlotPlan{}, err
 	}
-	return digests, nil
+	return plan, nil
 }
 
-// directorSlotDigest 哈希一个分镜槽位「会影响产出」的全部冻结输入：模式、
-// Hook、书本级冻结配置以及该槽位的分镜内容。ID/SceneID 是模型每次生成时
-// 随手分配的标识，同一输入重跑也会变，参与 digest 会让保留永远不命中。
-func directorSlotDigest(mode, hookID, snapshotJSON string, draft DirectorVideo) string {
+// matches 判断上一修订的槽位是否可以保留：先比新指纹，再按旧算法回算一次，
+// 让升级前写入的指纹不会因为算法收窄而整批失效。
+func (p previousSlotPlan) matches(videoID, newDigest string, draft DirectorVideo) bool {
+	stored := p.digests[videoID]
+	if stored == "" {
+		return false
+	}
+	if stored == newDigest {
+		return true
+	}
+	if p.snapshotJSON == "" {
+		return false
+	}
+	legacy := legacyDirectorSlotDigest(p.mode, p.hookID, p.snapshotJSON, draft)
+	return legacy != "" && stored == legacy
+}
+
+// digestIgnoredSettingKeys 不参与槽位指纹：它们是音频产物的身份与字节哈希，
+// 每次重新合成配音都会变化，但音频语义已经由 audioLineDurations /
+// audioDurationSeconds 等时长字段表达。把身份写进指纹会让一次重新配音
+// 把整本书已经生成好的分镜全部废掉。
+var digestIgnoredSettingKeys = []string{"ttsAudioArtifactId", "ttsFingerprint"}
+
+// digestOpeningSettingKeys 只作用于 VIDEO01 的开头变体，不能影响其余镜头
+// 的保留判断；否则改一次「换开头数量」就会重生成整本书。
+var digestOpeningSettingKeys = []string{"openingEnabled", "openingCount"}
+
+// narrowedEffectiveJSON 从冻结设置里剔除与当前槽位产出无关的键。
+// 剔除后仍是稳定 JSON（map 编码按 key 排序），保证同一输入得到同一指纹。
+func narrowedEffectiveJSON(snapshotJSON string, ordinal int) json.RawMessage {
+	if snapshotJSON == "" {
+		return nil
+	}
+	var settings map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(snapshotJSON), &settings); err != nil {
+		return json.RawMessage(snapshotJSON)
+	}
+	for _, key := range digestIgnoredSettingKeys {
+		delete(settings, key)
+	}
+	if ordinal > 0 {
+		for _, key := range digestOpeningSettingKeys {
+			delete(settings, key)
+		}
+	}
+	encoded, err := json.Marshal(settings)
+	if err != nil {
+		return json.RawMessage(snapshotJSON)
+	}
+	return encoded
+}
+
+// directorSlotDigest 哈希一个分镜槽位「会影响产出」的冻结输入：模式、Hook、
+// 与本槽位相关的设置以及分镜内容。TTS 产物身份与 VIDEO01 专属的 opening
+// 设置被排除，避免非本槽位的变更触发整本轮换。
+func directorSlotDigest(mode, hookID, snapshotJSON string, ordinal int, draft DirectorVideo) string {
+	return slotDigestPayload(mode, hookID, narrowedEffectiveJSON(snapshotJSON, ordinal), draft)
+}
+
+// legacyDirectorSlotDigest 保留部署前的整份设置哈希算法，只用于兼容旧指纹。
+func legacyDirectorSlotDigest(mode, hookID, snapshotJSON string, draft DirectorVideo) string {
+	return slotDigestPayload(mode, hookID, json.RawMessage(snapshotJSON), draft)
+}
+
+func slotDigestPayload(mode, hookID string, effective json.RawMessage, draft DirectorVideo) string {
 	type digestDraft struct {
 		DurationSec  int            `json:"duration_sec"`
 		Characters   []string       `json:"characters"`
@@ -386,7 +458,7 @@ func directorSlotDigest(mode, hookID, snapshotJSON string, draft DirectorVideo) 
 	}{
 		Mode:      mode,
 		Hook:      hookID,
-		Effective: json.RawMessage(snapshotJSON),
+		Effective: effective,
 		Draft: digestDraft{
 			DurationSec:  draft.DurationSec,
 			Characters:   draft.Characters,
