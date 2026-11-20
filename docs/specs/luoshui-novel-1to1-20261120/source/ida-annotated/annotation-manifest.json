@@ -1,0 +1,62 @@
+[
+  {
+    "file": "0x180082cb0.c",
+    "annotations": 49,
+    "originalLines": 1491
+  },
+  {
+    "file": "0x180084690.c",
+    "annotations": 45,
+    "originalLines": 1363
+  },
+  {
+    "file": "0x1800888e0.c",
+    "annotations": 13,
+    "originalLines": 490
+  },
+  {
+    "file": "0x180089120.c",
+    "annotations": 14,
+    "originalLines": 482
+  },
+  {
+    "file": "0x180091e60.c",
+    "annotations": 428,
+    "originalLines": 2321
+  },
+  {
+    "file": "0x1800d76c0.c",
+    "annotations": 48,
+    "originalLines": 1004
+  },
+  {
+    "file": "0x1801308a0.c",
+    "annotations": 435,
+    "originalLines": 3326
+  },
+  {
+    "file": "0x180157690.c",
+    "annotations": 27,
+    "originalLines": 634
+  },
+  {
+    "file": "0x180165140.c",
+    "annotations": 295,
+    "originalLines": 6320
+  },
+  {
+    "file": "0x1801f5cb0.c",
+    "annotations": 218,
+    "originalLines": 6297
+  },
+  {
+    "file": "0x1801fd690.c",
+    "annotations": 484,
+    "originalLines": 10779
+  },
+  {
+    "file": "0x180217350.c",
+    "annotations": 202,
+    "originalLines": 1392
+  }
+]

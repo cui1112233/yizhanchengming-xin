@@ -1,0 +1,2005 @@
+{
+  "sourceSha256": "7c2520565126cf49615a968a6bceefc5cfcf3e032f9858a9570adeab546336a6",
+  "methods": [
+    {
+      "method": "novels_list_books",
+      "nativeEntry": "0x18006cde0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1193,
+      "nameConstantIndex": 347,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "()"
+      ],
+      "argumentExpressions": [
+        "无显式实参"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_list_books.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_book",
+      "nativeEntry": "0x18006d730",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1213,
+      "nameConstantIndex": 350,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "共享桥接函数 Oan"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "e",
+        "t",
+        "s.bookId",
+        "W.value"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "storyId",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_get_book.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_rename_book",
+      "nativeEntry": "0x18006dee0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1233,
+      "nameConstantIndex": 353,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "G.value.id; N.value"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_rename_book.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_delete_book",
+      "nativeEntry": "0x18006e800",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1253,
+      "nameConstantIndex": 355,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "e.id"
+      ],
+      "responseFieldCandidates": [
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_delete_book.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_list_sessions",
+      "nativeEntry": "0x18006ed60",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1276,
+      "nameConstantIndex": 358,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "共享桥接函数 Ian"
+      ],
+      "parameters": [
+        "(e = null)"
+      ],
+      "argumentExpressions": [
+        "null",
+        "e"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_list_sessions.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_session",
+      "nativeEntry": "0x18006f6f0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1296,
+      "nameConstantIndex": 361,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "共享桥接函数 Nan"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "e"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "pendingAction",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_get_session.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_short_story",
+      "nativeEntry": "0x180071030",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1316,
+      "nameConstantIndex": 364,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "共享桥接函数 Man"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "n",
+        "e.storyId",
+        "s.storyId",
+        "y.value"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "storyId",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_get_short_story.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_read_short_story_file",
+      "nativeEntry": "0x1800717e0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1336,
+      "nameConstantIndex": 367,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioShortPanel"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "n.shortStoryId; e.key"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_read_short_story_file.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_save_short_story_file",
+      "nativeEntry": "0x180071f90",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1356,
+      "nameConstantIndex": 370,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioShortPanel"
+      ],
+      "parameters": [
+        "(e, t, n)"
+      ],
+      "argumentExpressions": [
+        "n.shortStoryId; l.value.key; e"
+      ],
+      "responseFieldCandidates": [
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_save_short_story_file.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_confirm_pipeline_checkpoint",
+      "nativeEntry": "0x1800727b0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1376,
+      "nameConstantIndex": 373,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  sessionId: r.sessionId || d.value,\n  tool: r.tool,\n  checkpoint: r.checkpoint,\n  storyId: r.storyId,\n  bookId: r.bookId,\n  message: r.message,\n  model: P.value || void 0,\n  codexReasoningEffort: l,\n  claudeReasoningEffort: l\n}"
+      ],
+      "responseFieldCandidates": [
+        "awaitingConfirmation",
+        "bookId",
+        "data",
+        "message",
+        "storyId",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_confirm_pipeline_checkpoint.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_create_session",
+      "nativeEntry": "0x180073da0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1399,
+      "nameConstantIndex": 376,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e = {})"
+      ],
+      "argumentExpressions": [
+        "{\n  kind: o,\n  bookId: t,\n  workflow: r,\n  title: a || K9t[r] || \"新会话\"\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_create_session.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_rename_session",
+      "nativeEntry": "0x180074f40",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1419,
+      "nameConstantIndex": 379,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "G.value.id; N.value"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_rename_session.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_bind_session_book",
+      "nativeEntry": "0x180075870",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1439,
+      "nameConstantIndex": 382,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "d.value; e.id"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_bind_session_book.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_delete_session",
+      "nativeEntry": "0x1800761f0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1459,
+      "nameConstantIndex": 384,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "e.id"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_delete_session.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_update_session_messages",
+      "nativeEntry": "0x180076750",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1479,
+      "nameConstantIndex": 386,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "共享桥接函数 qan"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "d.value; n",
+        "e; o",
+        "d.value; o"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_update_session_messages.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_list_style_sources",
+      "nativeEntry": "0x180077180",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1499,
+      "nameConstantIndex": 388,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "()"
+      ],
+      "argumentExpressions": [
+        "无显式实参"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_list_style_sources.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_style_profile",
+      "nativeEntry": "0x180077890",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1519,
+      "nameConstantIndex": 391,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStylePanel"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "e.id"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_get_style_profile.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_save_style_profile",
+      "nativeEntry": "0x1800780b0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1539,
+      "nameConstantIndex": 393,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStylePanel"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  id: l.value || void 0,\n  title: i.value.trim(),\n  sourceText: s.value,\n  styleGuide: c.value\n}"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_save_style_profile.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_delete_style_profile",
+      "nativeEntry": "0x180079700",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1559,
+      "nameConstantIndex": 395,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStylePanel"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "e.id"
+      ],
+      "responseFieldCandidates": [
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_delete_style_profile.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_import_style_files",
+      "nativeEntry": "0x180079ef0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1579,
+      "nameConstantIndex": 397,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStylePanel"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  id: l.value,\n  files: n\n}"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_import_style_files.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_pick_style_files",
+      "nativeEntry": "0x18007b680",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1599,
+      "nameConstantIndex": 399,
+      "frontendFunctionCandidates": 3,
+      "frontendComponentCandidates": [
+        "NovelImitationShortDialog",
+        "NovelImportPage",
+        "NovelStylePanel"
+      ],
+      "parameters": [
+        "()"
+      ],
+      "argumentExpressions": [
+        "无显式实参"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_pick_style_files.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_init_imitation",
+      "nativeEntry": "0x18007be90",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1619,
+      "nameConstantIndex": 401,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "t"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_init_imitation.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_run_imitation_short",
+      "nativeEntry": "0x18007c840",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1639,
+      "nameConstantIndex": 403,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  ...e,\n  sessionId: d.value,\n  model: P.value || void 0\n}"
+      ],
+      "responseFieldCandidates": [
+        "awaitingConfirmation",
+        "cancelled",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_run_imitation_short.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_init_fanfic",
+      "nativeEntry": "0x18007f270",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1659,
+      "nameConstantIndex": 405,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelImportPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  ...n,\n  fanficMode: p.value\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_init_fanfic.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_init_spinoff",
+      "nativeEntry": "0x18007fc20",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1679,
+      "nameConstantIndex": 407,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelImportPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  ...n,\n  parentBookId: d.value,\n  spinoffType: f.value\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_init_spinoff.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_import_chapters",
+      "nativeEntry": "0x1800805d0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1699,
+      "nameConstantIndex": 409,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelImportPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  ...n,\n  bookId: v.value || void 0,\n  chapters: a\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_import_chapters.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_agent_settings",
+      "nativeEntry": "0x180081b90",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1719,
+      "nameConstantIndex": 411,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelAgentSettings"
+      ],
+      "parameters": [
+        "()"
+      ],
+      "argumentExpressions": [
+        "无显式实参"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_get_agent_settings.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_save_agent_settings",
+      "nativeEntry": "0x1800823b0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1739,
+      "nameConstantIndex": 413,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelAgentSettings"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  modelRoutes: {\n    ...s.value\n  },\n  reviewPrompts: c.value.map(y),\n  customWritePrompts: u.value.map(e => ({\n    id: e.id,\n    category: e.category,\n    title: e.title,\n    content: e.content,\n    enabled: Boolean(e.enabled)\n  })),\n  reviewCycle: {\n    maxRetries: Math.max(0, Math.min(5, Number(d.value.maxRetries) || 3)),\n    passScore: Math.max(0, Math.min(100, Number(d.value.passScore) || 80)),\n    temperatureStep: Math.max(0, Math.min(.5, Number(d.value.temperatureStep) || .15)),\n    baseTemperature: Math.max(0, Math.min(2, Number(d.value.baseTemperature) || .65)),\n    enableLengthNorm: Boolean(d.value.enableLengthNorm),\n    enablePostWrite: Boolean(d.value.enablePostWrite),\n    enableAiTells: Boolean(d.value.enableAiTells),\n    requireSecondaryConfirm: Boolean(d.value.requireSecondaryConfirm)\n  }\n}"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_save_agent_settings.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_send_message",
+      "nativeEntry": "0x180082cb0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1759,
+      "nameConstantIndex": 415,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "s"
+      ],
+      "responseFieldCandidates": [
+        "action",
+        "bookId",
+        "cancelled",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_send_message.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_confirm_action",
+      "nativeEntry": "0x180084690",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1779,
+      "nameConstantIndex": 417,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  sessionId: d.value,\n  model: P.value || void 0,\n  codexReasoningEffort: A,\n  claudeReasoningEffort: A\n}"
+      ],
+      "responseFieldCandidates": [
+        "action",
+        "awaitingConfirmation",
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_confirm_action.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_cancel_operation",
+      "nativeEntry": "0x180085ca0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1799,
+      "nameConstantIndex": 420,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "共享桥接函数 Aan"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "n.bookId",
+        "t"
+      ],
+      "responseFieldCandidates": [
+        "bookId"
+      ],
+      "contractFile": "source/bridge-contracts/novels_cancel_operation.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_chapter",
+      "nativeEntry": "0x1800863b0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1819,
+      "nameConstantIndex": 423,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioBookPanel"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "n.bookId; e.chapterNumber"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_get_chapter.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_save_chapter",
+      "nativeEntry": "0x180086d40",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1842,
+      "nameConstantIndex": 426,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioBookPanel"
+      ],
+      "parameters": [
+        "(e, t, n, a = {})"
+      ],
+      "argumentExpressions": [
+        "n.bookId; l.value.chapterNumber; e; {\n  syncTruth: !0,\n  replayFrom: !0\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_save_chapter.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_read_story_file",
+      "nativeEntry": "0x180087910",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1862,
+      "nameConstantIndex": 429,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioBookPanel"
+      ],
+      "parameters": [
+        "(e, t)"
+      ],
+      "argumentExpressions": [
+        "n.bookId; e.key"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_read_story_file.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_save_story_file",
+      "nativeEntry": "0x1800880c0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1882,
+      "nameConstantIndex": 432,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioBookPanel"
+      ],
+      "parameters": [
+        "(e, t, n)"
+      ],
+      "argumentExpressions": [
+        "n.bookId; l.value.key; e"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_save_story_file.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_get_book_rules",
+      "nativeEntry": "0x1800888e0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1902,
+      "nameConstantIndex": 434,
+      "frontendFunctionCandidates": 0,
+      "frontendComponentCandidates": [],
+      "parameters": [],
+      "argumentExpressions": [],
+      "responseFieldCandidates": [],
+      "contractFile": "source/bridge-contracts/novels_get_book_rules.inspection.js",
+      "status": "未观察到前端调用；有原生函数体",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_save_book_rules",
+      "nativeEntry": "0x180089120",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1922,
+      "nameConstantIndex": 437,
+      "frontendFunctionCandidates": 0,
+      "frontendComponentCandidates": [],
+      "parameters": [],
+      "argumentExpressions": [],
+      "responseFieldCandidates": [],
+      "contractFile": "source/bridge-contracts/novels_save_book_rules.inspection.js",
+      "status": "未观察到前端调用；有原生函数体",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_write_next",
+      "nativeEntry": "0x1800899f0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1942,
+      "nameConstantIndex": 439,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  bookId: W.value,\n  sessionId: d.value,\n  model: P.value || void 0\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "cancelled",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_write_next.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_write_batch",
+      "nativeEntry": "0x18008a790",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 1962,
+      "nameConstantIndex": 441,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelBatchDialog"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  bookId: n.bookId,\n  sessionId: n.sessionId,\n  model: n.model,\n  count: r.value,\n  maxConsecutiveFailures: l.value\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "cancelled",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_write_batch.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_scheduler_start",
+      "nativeEntry": "0x18008c8a0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2002,
+      "nameConstantIndex": 445,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelSchedulerPanel"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  bookId: n.bookId,\n  sessionId: n.sessionId,\n  model: n.model,\n  intervalSeconds: 60 * i.value,\n  dailyChapterCap: s.value,\n  maxConsecutiveFailures: c.value\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_scheduler_start.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_scheduler_stop",
+      "nativeEntry": "0x18008dad0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2022,
+      "nameConstantIndex": 447,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelSchedulerPanel"
+      ],
+      "parameters": [
+        "(e = {})"
+      ],
+      "argumentExpressions": [
+        "无显式实参"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_scheduler_stop.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_scheduler_pause",
+      "nativeEntry": "0x18008e1b0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2042,
+      "nameConstantIndex": 449,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelSchedulerPanel"
+      ],
+      "parameters": [
+        "(e = {})"
+      ],
+      "argumentExpressions": [
+        "{\n  action: t\n}"
+      ],
+      "responseFieldCandidates": [
+        "action",
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_scheduler_pause.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_scheduler_status",
+      "nativeEntry": "0x18008e9d0",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2062,
+      "nameConstantIndex": 451,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelSchedulerPanel"
+      ],
+      "parameters": [
+        "(e = {})"
+      ],
+      "argumentExpressions": [
+        "无显式实参"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_scheduler_status.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_audit_chapter",
+      "nativeEntry": "0x18008ef80",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2082,
+      "nameConstantIndex": 453,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  bookId: W.value,\n  sessionId: d.value,\n  model: P.value || void 0\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_audit_chapter.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_revise_chapter",
+      "nativeEntry": "0x18008fb70",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2102,
+      "nameConstantIndex": 455,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e)"
+      ],
+      "argumentExpressions": [
+        "{\n  bookId: W.value,\n  sessionId: d.value,\n  model: P.value || void 0,\n  mode: \"polish\"\n}"
+      ],
+      "responseFieldCandidates": [
+        "bookId",
+        "cancelled",
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_revise_chapter.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    },
+    {
+      "method": "novels_export_book",
+      "nativeEntry": "0x180090e60",
+      "nativeConstructorSource": "source/ida/0x180091e60.c",
+      "nativeConstructorLine": 2125,
+      "nameConstantIndex": 459,
+      "frontendFunctionCandidates": 1,
+      "frontendComponentCandidates": [
+        "NovelStudioPage"
+      ],
+      "parameters": [
+        "(e, t = \"md\")"
+      ],
+      "argumentExpressions": [
+        "e.id; t.value"
+      ],
+      "responseFieldCandidates": [
+        "data",
+        "message",
+        "success"
+      ],
+      "contractFile": "source/bridge-contracts/novels_export_book.inspection.js",
+      "status": "前端异步候选＋原生入口已绑定",
+      "limitations": [
+        "static candidate only; backend signature and full branch behavior are separate",
+        "response field names are syntax candidates, not control/dataflow proof"
+      ]
+    }
+  ],
+  "excludedBranches": [
+    {
+      "method": "novels_rename_book",
+      "propertyRange": {
+        "utf16": [
+          8654933,
+          8654968
+        ],
+        "utf8": [
+          8913052,
+          8913087
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8654931,
+          8654969
+        ],
+        "utf8": [
+          8913050,
+          8913088
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "\"novel\"+o(O,0,0,M)+o(I,0,0,N)+\"ook\"",
+      "functionRange": {
+        "utf16": [
+          8654716,
+          8655203
+        ],
+        "utf8": [
+          8912835,
+          8913322
+        ]
+      },
+      "functionName": null,
+      "parameters": [],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8654978,
+              8655007
+            ],
+            "utf8": [
+              8913097,
+              8913126
+            ]
+          },
+          "arguments": [
+            "n",
+            "_0x8dfc1e",
+            "_0x55b3f9"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function () {\n  var n, a;\n  function o(e, t, n, a) {\n    return B(e - -87, a);\n  }\n  function r(e, t, n, a) {\n    return F(e, 0, 0, t - -281);\n  }\n  if (!V.bVyWz(V[r(W, 403)], V.EixiC)) {\n    const e = {\n      success: !1\n    };\n    return (null == (a = null == (n = V[o(P, 0, 0, R)](_0x11740c)) ? void 0 : n[\"novel\" + o(O, 0, 0, M) + o(I, 0, 0, N) + \"ook\"]) ? void 0 : a.call(n, _0x8dfc1e, _0x55b3f9)) ?? e;\n  }\n  if (t) {\n    if (V[o(y, 0, 0, b)](V[r(\"Tv^A\", k)], o(x, 0, 0, w))) {\n      const n = t[r(_, S)](e, arguments);\n      return t = null, n;\n    }\n    if (_0x3ba7ce) {\n      const e = _0x19919b[o(121, 0, 0, C)](_0x2c1d87, arguments);\n      return _0x5b27a5 = null, e;\n    }\n  }\n}"
+    },
+    {
+      "method": "novels_save_agent_settings",
+      "propertyRange": {
+        "utf16": [
+          8655313,
+          8655365
+        ],
+        "utf8": [
+          8913432,
+          8913484
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8655311,
+          8655366
+        ],
+        "utf8": [
+          8913430,
+          8913485
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "F(a,0,0,v)+F(p,0,0,f)+\"e_age\"+B(m,\"XGTO\")+B(h,g)+\"s\"",
+      "functionRange": {
+        "utf16": [
+          8654209,
+          8655400
+        ],
+        "utf8": [
+          8912328,
+          8913519
+        ]
+      },
+      "functionName": null,
+      "parameters": [
+        "e",
+        "t"
+      ],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8654978,
+              8655007
+            ],
+            "utf8": [
+              8913097,
+              8913126
+            ]
+          },
+          "arguments": [
+            "n",
+            "_0x8dfc1e",
+            "_0x55b3f9"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8655375,
+              8655394
+            ],
+            "utf8": [
+              8913494,
+              8913513
+            ]
+          },
+          "arguments": [
+            "q",
+            "_0x4428f9"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function (e, t) {\n  var q, T;\n  const z = 1450,\n    L = \"ZU!e\",\n    j = 581,\n    E = 36;\n  function F(e, t, n, a) {\n    return D(0, e, a - -639);\n  }\n  function B(e, t, n, a) {\n    return D(0, t, e - -1114);\n  }\n  const V = {\n    bmyxD: function (e) {\n      return A[t = G, n = -209, Qan(n - -554, t)](e);\n      var t, n;\n    },\n    bVyWz: function (e, t) {\n      return A[n = j, a = \"0UX(\", Qan(n - E, a)](e, t);\n      var n, a;\n    },\n    nbLzg: A[B(n, a)],\n    EixiC: A[F(o, 0, 0, r)],\n    nhqwf: function (e, t) {\n      return A[n = z, a = L, B(n - 897, a)](e, t);\n      var n, a;\n    },\n    StsTs: A[F(\"2CEX\", 0, 0, l)],\n    vaZnK: function (e) {\n      return A.KYdYz(e);\n    }\n  };\n  if (A[F(i, 0, 0, s)](A[F(\"S*tx\", 0, 0, c)], A.HGCBj)) {\n    const n = Q ? function () {\n      var n, a;\n      function o(e, t, n, a) {\n        return B(e - -87, a);\n      }\n      function r(e, t, n, a) {\n        return F(e, 0, 0, t - -281);\n      }\n      if (!V.bVyWz(V[r(W, 403)], V.EixiC)) {\n        const e = {\n          success: !1\n        };\n        return (null == (a = null == (n = V[o(P, 0, 0, R)](_0x11740c)) ? void 0 : n[\"novel\" + o(O, 0, 0, M) + o(I, 0, 0, N) + \"ook\"]) ? void 0 : a.call(n, _0x8dfc1e, _0x55b3f9)) ?? e;\n      }\n      if (t) {\n        if (V[o(y, 0, 0, b)](V[r(\"Tv^A\", k)], o(x, 0, 0, w))) {\n          const n = t[r(_, S)](e, arguments);\n          return t = null, n;\n        }\n        if (_0x3ba7ce) {\n          const e = _0x19919b[o(121, 0, 0, C)](_0x2c1d87, arguments);\n          return _0x5b27a5 = null, e;\n        }\n      }\n    } : function () {};\n    return Q = !1, n;\n  }\n  {\n    const e = {\n      success: !1\n    };\n    return (null == (T = null == (q = V[F(u, 0, 0, d)](_0x55ae81)) ? void 0 : q[F(a, 0, 0, v) + F(p, 0, 0, f) + \"e_age\" + B(m, \"XGTO\") + B(h, g) + \"s\"]) ? void 0 : T.call(q, _0x4428f9)) ?? e;\n  }\n}"
+    },
+    {
+      "method": "novels_scheduler_start",
+      "propertyRange": {
+        "utf16": [
+          8657599,
+          8657635
+        ],
+        "utf8": [
+          8915718,
+          8915754
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8657597,
+          8657636
+        ],
+        "utf8": [
+          8915716,
+          8915755
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "i(H,J)+l(0,0,Z,255)+i(X,$)+\"r_start\"",
+      "functionRange": {
+        "utf16": [
+          8657205,
+          8657671
+        ],
+        "utf8": [
+          8915324,
+          8915790
+        ]
+      },
+      "functionName": null,
+      "parameters": [],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8657645,
+              8657664
+            ],
+            "utf8": [
+              8915764,
+              8915783
+            ]
+          },
+          "arguments": [
+            "n",
+            "_0x1b8204"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function () {\n  var n, a;\n  const r = 204;\n  function l(e, t, n, a) {\n    return v(n, 0, a - r);\n  }\n  function i(e, t, n, a) {\n    return d(0, e, 0, t - o);\n  }\n  if (u[l(0, 0, N, G)] !== u[i(q, A)]) _0x50e78e = u.DzcBC(_0xcd1bbc, u[l(0, 0, T, 268)](u[i(z, Q)] + u[i(D, L)], \");\"))();else if (t) {\n    if (u.DgcDY(u[i(j, E)], u[i(F, B)])) {\n      const n = t[l(0, 0, V, -138)](e, arguments);\n      return t = null, n;\n    }\n    {\n      const e = {};\n      return e[i(U, K) + \"ss\"] = !1, (null == (a = null == (n = u.oQCpQ(_0x3aad1a)) ? void 0 : n[i(H, J) + l(0, 0, Z, 255) + i(X, $) + \"r_start\"]) ? void 0 : a.call(n, _0x1b8204)) ?? e;\n    }\n  }\n}"
+    },
+    {
+      "method": "novels_delete_book",
+      "propertyRange": {
+        "utf16": [
+          8657796,
+          8657843
+        ],
+        "utf8": [
+          8915915,
+          8915962
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8657794,
+          8657844
+        ],
+        "utf8": [
+          8915913,
+          8915963
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "d(0,h,0,626)+d(0,O,0,M)+v(O,0,-429)+v(I,0,-490)",
+      "functionRange": {
+        "utf16": [
+          8656672,
+          8657878
+        ],
+        "utf8": [
+          8914791,
+          8915997
+        ]
+      },
+      "functionName": null,
+      "parameters": [
+        "e",
+        "t"
+      ],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8657645,
+              8657664
+            ],
+            "utf8": [
+              8915764,
+              8915783
+            ]
+          },
+          "arguments": [
+            "n",
+            "_0x1b8204"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8657853,
+              8657872
+            ],
+            "utf8": [
+              8915972,
+              8915991
+            ]
+          },
+          "arguments": [
+            "n",
+            "_0x274b78"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function (e, t) {\n  var n, a;\n  const o = 70,\n    r = 657,\n    l = \"NnW0\",\n    i = 22,\n    s = 398,\n    c = 171,\n    u = {\n      DzcBC: function (e, t) {\n        return ae.mczcZ(e, t);\n      },\n      jjZJz: function (e, t) {\n        return e + t;\n      },\n      XUPNk: ae[d(m, h, 638, g)],\n      TyWGu: ae[d(W, y, b, k)],\n      oQCpQ: function (e) {\n        return ae[t = r, n = l, a = 920, d(t - i, n, n - s, a - c)](e);\n        var t, n, a;\n      },\n      iYySM: ae[v(x, -578, -296)],\n      DgcDY: function (e, t) {\n        return e !== t;\n      },\n      MWFBI: d(w, \"#WGY\", 1062, _),\n      ZVCjD: ae[v(S, -32, -111)],\n      EtvcP: function (e) {\n        return e();\n      }\n    };\n  function d(e, t, n, a) {\n    return te(a - Y, 0, 0, t);\n  }\n  function v(e, t, n, a) {\n    return te(n - -327, 0, 0, e);\n  }\n  if (ae[d(0, \"K)jY\", 0, C)] !== ae.DoQhI) {\n    const n = oe ? function () {\n      var n, a;\n      const r = 204;\n      function l(e, t, n, a) {\n        return v(n, 0, a - r);\n      }\n      function i(e, t, n, a) {\n        return d(0, e, 0, t - o);\n      }\n      if (u[l(0, 0, N, G)] !== u[i(q, A)]) _0x50e78e = u.DzcBC(_0xcd1bbc, u[l(0, 0, T, 268)](u[i(z, Q)] + u[i(D, L)], \");\"))();else if (t) {\n        if (u.DgcDY(u[i(j, E)], u[i(F, B)])) {\n          const n = t[l(0, 0, V, -138)](e, arguments);\n          return t = null, n;\n        }\n        {\n          const e = {};\n          return e[i(U, K) + \"ss\"] = !1, (null == (a = null == (n = u.oQCpQ(_0x3aad1a)) ? void 0 : n[i(H, J) + l(0, 0, Z, 255) + i(X, $) + \"r_start\"]) ? void 0 : a.call(n, _0x1b8204)) ?? e;\n        }\n      }\n    } : function () {};\n    return oe = !1, n;\n  }\n  {\n    const e = {};\n    return e[v(P, 0, -7) + \"ss\"] = !1, (null == (a = null == (n = u[d(0, R, 0, 770)](_0x4bfd15)) ? void 0 : n[d(0, h, 0, 626) + d(0, O, 0, M) + v(O, 0, -429) + v(I, 0, -490)]) ? void 0 : a.call(n, _0x274b78)) ?? e;\n  }\n}"
+    },
+    {
+      "method": "novels_confirm_pipeline_checkpoint",
+      "propertyRange": {
+        "utf16": [
+          8659864,
+          8659953
+        ],
+        "utf8": [
+          8917983,
+          8918072
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8659862,
+          8659954
+        ],
+        "utf8": [
+          8917981,
+          8918073
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "r(0,0,H,\")H@8\")+r(0,0,1030,\"oP9p\")+\"firm_\"+r(0,0,J,Z)+o(0,0,X,$)+r(0,0,Y,ee)+o(0,0,te,ne)",
+      "functionRange": {
+        "utf16": [
+          8659139,
+          8660100
+        ],
+        "utf8": [
+          8917258,
+          8918219
+        ]
+      },
+      "functionName": null,
+      "parameters": [],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8659963,
+              8659982
+            ],
+            "utf8": [
+              8918082,
+              8918101
+            ]
+          },
+          "arguments": [
+            "e",
+            "_0xf32486"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function () {\n  var e, t;\n  const n = 640,\n    a = 817;\n  function o(e, t, n, o) {\n    return he(0, n, 0, o - a);\n  }\n  function r(e, t, a, o) {\n    return ge(0, o, 0, a - n);\n  }\n  if (!We[o(0, 0, W, y)](We[o(0, 0, b, k)], We[o(0, 0, x, w)])) return _0x48231d[\"toStr\" + r(0, 0, 869, ae)]()[o(0, 0, oe, re) + \"h\"](We[o(0, 0, le, ie)])[\"toStr\" + r(0, 0, se, ce)]()[o(0, 0, ue, G) + r(0, 0, de, ve) + \"r\"](_0x22a00b)[o(0, 0, pe, fe) + \"h\"](\"(((.+\" + o(0, 0, me, 1016) + \"+$\");\n  {\n    const n = new RegExp(We[o(0, 0, _, 1203)]),\n      a = new RegExp(We[r(0, 0, 1302, S)], \"i\"),\n      l = We[r(0, 0, C, P)](Dan, We[o(0, 0, R, 1229)]);\n    if (n.test(We[r(0, 0, O, M)](l, We[r(0, 0, I, \"kdlK\")])) && a[r(0, 0, N, \"ASta\")](We[o(0, 0, q, A)](l, We[o(0, 0, T, z)]))) {\n      if (We[r(0, 0, E, F)](We[r(0, 0, B, V)], We.BCcjm)) {\n        const n = {};\n        return n[o(0, 0, U, 1165) + \"ss\"] = !1, (null == (t = null == (e = We[o(0, 0, \"ASta\", K)](_0x331c25)) ? void 0 : e[r(0, 0, H, \")H@8\") + r(0, 0, 1030, \"oP9p\") + \"firm_\" + r(0, 0, J, Z) + o(0, 0, X, $) + r(0, 0, Y, ee) + o(0, 0, te, ne)]) ? void 0 : t.call(e, _0xf32486)) ?? n;\n      }\n      We.KzBWX(Dan);\n    } else {\n      if (!We[o(0, 0, \"r[Mo\", Q)](We[r(0, 0, D, L)], We[o(0, 0, j, 1135)])) return !0;\n      We[r(0, 0, 1079, j)](l, \"0\");\n    }\n  }\n}"
+    },
+    {
+      "method": "novels_get_agent_settings",
+      "propertyRange": {
+        "utf16": [
+          8664690,
+          8664749
+        ],
+        "utf8": [
+          8922809,
+          8922868
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8664688,
+          8664750
+        ],
+        "utf8": [
+          8922807,
+          8922869
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "\"novel\"+u(\"q0!*\",0,Rt)+u(Ot,0,Mt)+i(-31,0,It,Nt)+u(ft,0,Gt)",
+      "functionRange": {
+        "utf16": [
+          8663496,
+          8664791
+        ],
+        "utf8": [
+          8921615,
+          8922910
+        ]
+      },
+      "functionName": null,
+      "parameters": [],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8664759,
+              8664768
+            ],
+            "utf8": [
+              8922878,
+              8922887
+            ]
+          },
+          "arguments": [
+            "e"
+          ],
+          "hasUnboundObfuscationPlaceholder": false
+        }
+      ],
+      "callers": [],
+      "classification": "non_async_scaffolding_not_proven_executable",
+      "source": "function () {\n  var e, t;\n  const n = 369,\n    a = 1126,\n    o = \"OCei\",\n    r = 486,\n    l = 554;\n  function i(e, t, n, a) {\n    return Ut(e - jt, n, a - -999);\n  }\n  const s = {\n    tEsdh: Et[i(-138, 0, Qe, -130)],\n    eBucJ: Et.vlmJQ,\n    dhrVd: function (e, t) {\n      return Et[n = Qt, a = Dt, o = Lt, i(n - r, 0, a, o - l)](e, t);\n      var n, a, o;\n    },\n    OQMTT: Et.veCik,\n    mgRfa: function (e, t) {\n      return Et[n = a, r = 880, l = o, i(n - 78, 0, l, r - 1015)](e, t);\n      var n, r, l;\n    },\n    qIpJN: Et[i(De, 0, Le, je)],\n    BVtpD: Et[i(-164, 0, Ee, -258)],\n    XeXjZ: function (e, t) {\n      return Et[a = Tt, o = zt, r = 171, u(a, o - n, r - 393)](e, t);\n      var a, o, r;\n    },\n    KkTRv: function (e) {\n      return Et[t = 1444, n = qt, a = At, i(t - 410, 0, a, n - 1477)](e);\n      var t, n, a;\n    }\n  };\n  let c;\n  function u(e, t, n, a) {\n    return Vt(e - 213, n - -1036, e);\n  }\n  try {\n    if (Et[u(Fe, 0, -Be)](Et[i(Ve, 0, Ue, Ke)], Et[u(\"hjoV\", 0, -68)])) {\n      const e = new _0x26b5ff(s[i(-He, 0, Je, -Ze)]),\n        t = new _0x1d7be3(s[u(Xe, 0, $e)], \"i\"),\n        n = s[i(Ye, 0, \"VQi*\", 102)](_0x1244ab, s[i(-et, 0, \"$ex^\", -227)]);\n      e.test(s[i(-tt, 0, nt, -at)](n, s[i(-ot, 0, rt, -lt)])) && t[u(it, 0, -4)](s[u(st, 0, -ct)](n, s[i(ut, 0, \"q0!*\", dt)])) ? s.KkTRv(_0x1304e3) : s.XeXjZ(n, \"0\");\n    } else c = Et[u(vt, 0, pt)](Function, Et[u(ft, 0, -mt)](Et.HgsbL(Et[u(ht, 0, gt)], Et[i(-Wt, 0, yt, -bt)]), \");\"))();\n  } catch (d) {\n    if (Et[u(\"MEJ&\", 0, kt)](Et[i(-130, 0, xt, wt)], Et[u(_t, 0, -24)])) {\n      const n = {\n        success: !1\n      };\n      return (null == (t = null == (e = Et[i(St, 0, Ct, Pt)](_0x174708)) ? void 0 : e[\"novel\" + u(\"q0!*\", 0, Rt) + u(Ot, 0, Mt) + i(-31, 0, It, Nt) + u(ft, 0, Gt)]) ? void 0 : t.call(e)) ?? n;\n    }\n    c = window;\n  }\n  return c;\n}"
+    },
+    {
+      "method": "novels_delete_style_profile",
+      "propertyRange": {
+        "utf16": [
+          8679394,
+          8679461
+        ],
+        "utf8": [
+          8937513,
+          8937580
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8679392,
+          8679462
+        ],
+        "utf8": [
+          8937511,
+          8937581
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "d(0,0,ze,se)+u(Qe,0,0,1284)+d(0,0,De,\"VXV*\")+d(0,0,Le,je)+\"profile\"",
+      "functionRange": {
+        "utf16": [
+          8679096,
+          8680720
+        ],
+        "utf8": [
+          8937215,
+          8938839
+        ]
+      },
+      "functionName": "Je",
+      "parameters": [
+        "e"
+      ],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8679471,
+              8679490
+            ],
+            "utf8": [
+              8937590,
+              8937609
+            ]
+          },
+          "arguments": [
+            "r",
+            "_0x21d4ea"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8679744,
+              8679763
+            ],
+            "utf8": [
+              8937863,
+              8937882
+            ]
+          },
+          "arguments": [
+            "t",
+            "_0x40c8f0"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8680076,
+              8680095
+            ],
+            "utf8": [
+              8938195,
+              8938214
+            ]
+          },
+          "arguments": [
+            "a",
+            "_0x4e9d36"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function Je(e) {\n  var t, n, a, o, r, l;\n  const i = 1297,\n    s = 18,\n    c = 1613;\n  function u(e, t, n, a) {\n    return Ke(0, 0, a - c, e);\n  }\n  function d(e, t, n, a) {\n    return Ze(n - -53, a);\n  }\n  const v = {\n    ZnKvh: function (e) {\n      return e();\n    }\n  };\n  if (u(N, 0, 0, G) !== He[d(0, 0, 79, \"vp#)\")]) {\n    const e = {};\n    return e[u(Ae, 0, 0, Te) + \"ss\"] = !1, (null == (l = null == (r = _0x1db2be()) ? void 0 : r[d(0, 0, ze, se) + u(Qe, 0, 0, 1284) + d(0, 0, De, \"VXV*\") + d(0, 0, Le, je) + \"profile\"]) ? void 0 : l.call(r, _0x21d4ea)) ?? e;\n  }\n  if (typeof e === He[d(0, 0, q, A)]) {\n    if (He[u(T, 0, 0, 1484)](He.sAHqZ, He[u(N, 0, 0, z)])) {\n      const e = {};\n      return e[u(Q, 0, 0, 1503) + \"ss\"] = !1, e[u(D, 0, 0, L)] = [], (null == (n = null == (t = He[d(0, 0, j, E)](_0x35a275)) ? void 0 : t[\"novel\" + d(0, 0, F, B) + u(\"x5I8\", 0, 0, V) + d(0, 0, -44, N)]) ? void 0 : n.call(t, _0x40c8f0)) ?? e;\n    }\n    return function (e) {}[\"const\" + u(U, 0, 0, 1622) + \"r\"](He[d(0, 0, K, H)])[d(0, 0, -26, J)](He[d(0, 0, -5, \"GI7c\")]);\n  }\n  if (He[d(0, 0, 24, Z)](He[u(X, 0, 0, 1404)], He[d(0, 0, 38, \"$ex^\")])) {\n    const e = {};\n    return e[u(Z, 0, 0, $) + \"ss\"] = !1, (null == (o = null == (a = v[d(0, 0, -21, Y)](_0x1595a8)) ? void 0 : a[d(0, 0, ee, Z) + u(te, 0, 0, ne) + d(0, 0, ae, oe) + \"xt\"]) ? void 0 : o.call(a, _0x4e9d36)) ?? e;\n  }\n  He[d(0, 0, re, \"0UX(\")](He[d(0, 0, le, \"NnW0\")](\"\", He[d(0, 0, ie, se)](e, e))[He[u(U, 0, 0, ce)]], 1) || He[d(0, 0, ue, de)](He[d(0, 0, ve, pe)](e, 20), 0) ? function () {\n    return !0;\n  }[u(D, 0, 0, fe) + d(0, 0, me, \"NnW0\") + \"r\"](He[u(\"!jb8\", 0, 0, he)](He[d(0, 0, ge, We)], He[d(0, 0, ye, be)]))[u(ke, 0, 0, 1490)](He[d(0, 0, 509, xe)]) : function () {\n    function e(e, t, n, a) {\n      return u(e, 0, 0, a - s);\n    }\n    if (He[t = Ee, n = 1502, d(0, 0, n - i, t)](He[e(Fe, 0, 0, Be)], He.zOtui)) return !1;\n    {\n      const t = _0x122730[e(Ve, 0, 0, Ue)](_0x50304e, arguments);\n      return _0x143621 = null, t;\n    }\n    var t, n;\n  }[u(we, 0, 0, _e) + \"ructor\"](He[u(Se, 0, 0, Ce)](u(\"vp#)\", 0, 0, Pe), He[d(0, 0, Re, Oe)]))[u(Me, 0, 0, Ie)](He[d(0, 0, 20, Ne)]), He[d(0, 0, Ge, qe)](Je, ++e);\n}"
+    },
+    {
+      "method": "novels_list_sessions",
+      "propertyRange": {
+        "utf16": [
+          8679687,
+          8679734
+        ],
+        "utf8": [
+          8937806,
+          8937853
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8679685,
+          8679735
+        ],
+        "utf8": [
+          8937804,
+          8937854
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "\"novel\"+d(0,0,F,B)+u(\"x5I8\",0,0,V)+d(0,0,-44,N)",
+      "functionRange": {
+        "utf16": [
+          8679096,
+          8680720
+        ],
+        "utf8": [
+          8937215,
+          8938839
+        ]
+      },
+      "functionName": "Je",
+      "parameters": [
+        "e"
+      ],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8679471,
+              8679490
+            ],
+            "utf8": [
+              8937590,
+              8937609
+            ]
+          },
+          "arguments": [
+            "r",
+            "_0x21d4ea"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8679744,
+              8679763
+            ],
+            "utf8": [
+              8937863,
+              8937882
+            ]
+          },
+          "arguments": [
+            "t",
+            "_0x40c8f0"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8680076,
+              8680095
+            ],
+            "utf8": [
+              8938195,
+              8938214
+            ]
+          },
+          "arguments": [
+            "a",
+            "_0x4e9d36"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function Je(e) {\n  var t, n, a, o, r, l;\n  const i = 1297,\n    s = 18,\n    c = 1613;\n  function u(e, t, n, a) {\n    return Ke(0, 0, a - c, e);\n  }\n  function d(e, t, n, a) {\n    return Ze(n - -53, a);\n  }\n  const v = {\n    ZnKvh: function (e) {\n      return e();\n    }\n  };\n  if (u(N, 0, 0, G) !== He[d(0, 0, 79, \"vp#)\")]) {\n    const e = {};\n    return e[u(Ae, 0, 0, Te) + \"ss\"] = !1, (null == (l = null == (r = _0x1db2be()) ? void 0 : r[d(0, 0, ze, se) + u(Qe, 0, 0, 1284) + d(0, 0, De, \"VXV*\") + d(0, 0, Le, je) + \"profile\"]) ? void 0 : l.call(r, _0x21d4ea)) ?? e;\n  }\n  if (typeof e === He[d(0, 0, q, A)]) {\n    if (He[u(T, 0, 0, 1484)](He.sAHqZ, He[u(N, 0, 0, z)])) {\n      const e = {};\n      return e[u(Q, 0, 0, 1503) + \"ss\"] = !1, e[u(D, 0, 0, L)] = [], (null == (n = null == (t = He[d(0, 0, j, E)](_0x35a275)) ? void 0 : t[\"novel\" + d(0, 0, F, B) + u(\"x5I8\", 0, 0, V) + d(0, 0, -44, N)]) ? void 0 : n.call(t, _0x40c8f0)) ?? e;\n    }\n    return function (e) {}[\"const\" + u(U, 0, 0, 1622) + \"r\"](He[d(0, 0, K, H)])[d(0, 0, -26, J)](He[d(0, 0, -5, \"GI7c\")]);\n  }\n  if (He[d(0, 0, 24, Z)](He[u(X, 0, 0, 1404)], He[d(0, 0, 38, \"$ex^\")])) {\n    const e = {};\n    return e[u(Z, 0, 0, $) + \"ss\"] = !1, (null == (o = null == (a = v[d(0, 0, -21, Y)](_0x1595a8)) ? void 0 : a[d(0, 0, ee, Z) + u(te, 0, 0, ne) + d(0, 0, ae, oe) + \"xt\"]) ? void 0 : o.call(a, _0x4e9d36)) ?? e;\n  }\n  He[d(0, 0, re, \"0UX(\")](He[d(0, 0, le, \"NnW0\")](\"\", He[d(0, 0, ie, se)](e, e))[He[u(U, 0, 0, ce)]], 1) || He[d(0, 0, ue, de)](He[d(0, 0, ve, pe)](e, 20), 0) ? function () {\n    return !0;\n  }[u(D, 0, 0, fe) + d(0, 0, me, \"NnW0\") + \"r\"](He[u(\"!jb8\", 0, 0, he)](He[d(0, 0, ge, We)], He[d(0, 0, ye, be)]))[u(ke, 0, 0, 1490)](He[d(0, 0, 509, xe)]) : function () {\n    function e(e, t, n, a) {\n      return u(e, 0, 0, a - s);\n    }\n    if (He[t = Ee, n = 1502, d(0, 0, n - i, t)](He[e(Fe, 0, 0, Be)], He.zOtui)) return !1;\n    {\n      const t = _0x122730[e(Ve, 0, 0, Ue)](_0x50304e, arguments);\n      return _0x143621 = null, t;\n    }\n    var t, n;\n  }[u(we, 0, 0, _e) + \"ructor\"](He[u(Se, 0, 0, Ce)](u(\"vp#)\", 0, 0, Pe), He[d(0, 0, Re, Oe)]))[u(Me, 0, 0, Ie)](He[d(0, 0, 20, Ne)]), He[d(0, 0, Ge, qe)](Je, ++e);\n}"
+    },
+    {
+      "method": "novels_write_next",
+      "propertyRange": {
+        "utf16": [
+          8680024,
+          8680066
+        ],
+        "utf8": [
+          8938143,
+          8938185
+        ]
+      },
+      "memberRange": {
+        "utf16": [
+          8680022,
+          8680067
+        ],
+        "utf8": [
+          8938141,
+          8938186
+        ]
+      },
+      "originalLine": 41,
+      "propertyExpression": "d(0,0,ee,Z)+u(te,0,0,ne)+d(0,0,ae,oe)+\"xt\"",
+      "functionRange": {
+        "utf16": [
+          8679096,
+          8680720
+        ],
+        "utf8": [
+          8937215,
+          8938839
+        ]
+      },
+      "functionName": "Je",
+      "parameters": [
+        "e"
+      ],
+      "component": null,
+      "async": false,
+      "callArguments": [
+        {
+          "range": {
+            "utf16": [
+              8679471,
+              8679490
+            ],
+            "utf8": [
+              8937590,
+              8937609
+            ]
+          },
+          "arguments": [
+            "r",
+            "_0x21d4ea"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8679744,
+              8679763
+            ],
+            "utf8": [
+              8937863,
+              8937882
+            ]
+          },
+          "arguments": [
+            "t",
+            "_0x40c8f0"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        },
+        {
+          "range": {
+            "utf16": [
+              8680076,
+              8680095
+            ],
+            "utf8": [
+              8938195,
+              8938214
+            ]
+          },
+          "arguments": [
+            "a",
+            "_0x4e9d36"
+          ],
+          "hasUnboundObfuscationPlaceholder": true
+        }
+      ],
+      "callers": [],
+      "classification": "injected_or_unresolved_branch_not_proven_executable",
+      "source": "function Je(e) {\n  var t, n, a, o, r, l;\n  const i = 1297,\n    s = 18,\n    c = 1613;\n  function u(e, t, n, a) {\n    return Ke(0, 0, a - c, e);\n  }\n  function d(e, t, n, a) {\n    return Ze(n - -53, a);\n  }\n  const v = {\n    ZnKvh: function (e) {\n      return e();\n    }\n  };\n  if (u(N, 0, 0, G) !== He[d(0, 0, 79, \"vp#)\")]) {\n    const e = {};\n    return e[u(Ae, 0, 0, Te) + \"ss\"] = !1, (null == (l = null == (r = _0x1db2be()) ? void 0 : r[d(0, 0, ze, se) + u(Qe, 0, 0, 1284) + d(0, 0, De, \"VXV*\") + d(0, 0, Le, je) + \"profile\"]) ? void 0 : l.call(r, _0x21d4ea)) ?? e;\n  }\n  if (typeof e === He[d(0, 0, q, A)]) {\n    if (He[u(T, 0, 0, 1484)](He.sAHqZ, He[u(N, 0, 0, z)])) {\n      const e = {};\n      return e[u(Q, 0, 0, 1503) + \"ss\"] = !1, e[u(D, 0, 0, L)] = [], (null == (n = null == (t = He[d(0, 0, j, E)](_0x35a275)) ? void 0 : t[\"novel\" + d(0, 0, F, B) + u(\"x5I8\", 0, 0, V) + d(0, 0, -44, N)]) ? void 0 : n.call(t, _0x40c8f0)) ?? e;\n    }\n    return function (e) {}[\"const\" + u(U, 0, 0, 1622) + \"r\"](He[d(0, 0, K, H)])[d(0, 0, -26, J)](He[d(0, 0, -5, \"GI7c\")]);\n  }\n  if (He[d(0, 0, 24, Z)](He[u(X, 0, 0, 1404)], He[d(0, 0, 38, \"$ex^\")])) {\n    const e = {};\n    return e[u(Z, 0, 0, $) + \"ss\"] = !1, (null == (o = null == (a = v[d(0, 0, -21, Y)](_0x1595a8)) ? void 0 : a[d(0, 0, ee, Z) + u(te, 0, 0, ne) + d(0, 0, ae, oe) + \"xt\"]) ? void 0 : o.call(a, _0x4e9d36)) ?? e;\n  }\n  He[d(0, 0, re, \"0UX(\")](He[d(0, 0, le, \"NnW0\")](\"\", He[d(0, 0, ie, se)](e, e))[He[u(U, 0, 0, ce)]], 1) || He[d(0, 0, ue, de)](He[d(0, 0, ve, pe)](e, 20), 0) ? function () {\n    return !0;\n  }[u(D, 0, 0, fe) + d(0, 0, me, \"NnW0\") + \"r\"](He[u(\"!jb8\", 0, 0, he)](He[d(0, 0, ge, We)], He[d(0, 0, ye, be)]))[u(ke, 0, 0, 1490)](He[d(0, 0, 509, xe)]) : function () {\n    function e(e, t, n, a) {\n      return u(e, 0, 0, a - s);\n    }\n    if (He[t = Ee, n = 1502, d(0, 0, n - i, t)](He[e(Fe, 0, 0, Be)], He.zOtui)) return !1;\n    {\n      const t = _0x122730[e(Ve, 0, 0, Ue)](_0x50304e, arguments);\n      return _0x143621 = null, t;\n    }\n    var t, n;\n  }[u(we, 0, 0, _e) + \"ructor\"](He[u(Se, 0, 0, Ce)](u(\"vp#)\", 0, 0, Pe), He[d(0, 0, Re, Oe)]))[u(Me, 0, 0, Ie)](He[d(0, 0, 20, Ne)]), He[d(0, 0, Ge, qe)](Je, ++e);\n}"
+    }
+  ]
+}

@@ -1,0 +1,1950 @@
+{
+  "targetSha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "constructor": "0x1803609a0",
+  "results": [
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180067d50",
+      "name": "__init__",
+      "qualifiedName": "NovelsApi.__init__",
+      "nameSlots": [
+        "0x1803b0958",
+        "0x1803b0960"
+      ],
+      "constantIndexes": [
+        321,
+        322
+      ],
+      "constantFileRanges": [
+        [
+          3930419,
+          3930429
+        ],
+        [
+          3930429,
+          3930449
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 945,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800681b0",
+      "name": "_data_root",
+      "qualifiedName": "NovelsApi._data_root",
+      "nameSlots": [
+        "0x1803affe8",
+        "0x1803b0970"
+      ],
+      "constantIndexes": [
+        19,
+        324
+      ],
+      "constantFileRanges": [
+        [
+          3924666,
+          3924678
+        ],
+        [
+          3930465,
+          3930487
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 965,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800688d0",
+      "name": "_data_dir",
+      "qualifiedName": "NovelsApi._data_dir",
+      "nameSlots": [
+        "0x1803affa0",
+        "0x1803b0980"
+      ],
+      "constantIndexes": [
+        10,
+        326
+      ],
+      "constantFileRanges": [
+        [
+          3924554,
+          3924565
+        ],
+        [
+          3930502,
+          3930523
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 985,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180068ce0",
+      "name": "_state",
+      "qualifiedName": "NovelsApi._state",
+      "nameSlots": [
+        "0x1803b0058",
+        "0x1803b0990"
+      ],
+      "constantIndexes": [
+        33,
+        328
+      ],
+      "constantFileRanges": [
+        [
+          3924931,
+          3924939
+        ],
+        [
+          3930553,
+          3930571
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1005,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800690a0",
+      "name": "_settings_provider",
+      "qualifiedName": "NovelsApi._settings_provider",
+      "nameSlots": [
+        "0x1803b00a8",
+        "0x1803b0998"
+      ],
+      "constantIndexes": [
+        43,
+        329
+      ],
+      "constantFileRanges": [
+        [
+          3925095,
+          3925115
+        ],
+        [
+          3930571,
+          3930601
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1024,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180069340",
+      "name": "_event_emitter",
+      "qualifiedName": "NovelsApi._event_emitter",
+      "nameSlots": [
+        "0x1803b00b8",
+        "0x1803b09b0"
+      ],
+      "constantIndexes": [
+        45,
+        332
+      ],
+      "constantFileRanges": [
+        [
+          3925130,
+          3925146
+        ],
+        [
+          3930676,
+          3930702
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1047,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180069b90",
+      "name": "_cover_image_generator",
+      "qualifiedName": "NovelsApi._cover_image_generator",
+      "nameSlots": [
+        "0x1803b00e0",
+        "0x1803b09c0"
+      ],
+      "constantIndexes": [
+        50,
+        334
+      ],
+      "constantFileRanges": [
+        [
+          3925281,
+          3925305
+        ],
+        [
+          3930766,
+          3930800
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1067,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006a620",
+      "name": "_pipeline",
+      "qualifiedName": "NovelsApi._pipeline",
+      "nameSlots": [
+        "0x1803b00d0",
+        "0x1803b09d8"
+      ],
+      "constantIndexes": [
+        48,
+        337
+      ],
+      "constantFileRanges": [
+        [
+          3925252,
+          3925263
+        ],
+        [
+          3930902,
+          3930923
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1090,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006ac60",
+      "name": "_agent_service",
+      "qualifiedName": "NovelsApi._agent_service",
+      "nameSlots": [
+        "0x1803b0248",
+        "0x1803b09e8"
+      ],
+      "constantIndexes": [
+        95,
+        339
+      ],
+      "constantFileRanges": [
+        [
+          3926073,
+          3926089
+        ],
+        [
+          3931026,
+          3931052
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1113,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006b5e0",
+      "name": "_set_cancel",
+      "qualifiedName": "NovelsApi._set_cancel",
+      "nameSlots": [
+        "0x1803b0628",
+        "0x1803b09f8"
+      ],
+      "constantIndexes": [
+        219,
+        341
+      ],
+      "constantFileRanges": [
+        [
+          3928485,
+          3928498
+        ],
+        [
+          3931091,
+          3931114
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1133,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006bd80",
+      "name": "_clear_cancel",
+      "qualifiedName": "NovelsApi._clear_cancel",
+      "nameSlots": [
+        "0x1803b0220",
+        "0x1803b0a08"
+      ],
+      "constantIndexes": [
+        90,
+        343
+      ],
+      "constantFileRanges": [
+        [
+          3925956,
+          3925971
+        ],
+        [
+          3931140,
+          3931165
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1153,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006c590",
+      "name": "_is_cancelled",
+      "qualifiedName": "NovelsApi._is_cancelled",
+      "nameSlots": [
+        "0x1803b00b0",
+        "0x1803b0a18"
+      ],
+      "constantIndexes": [
+        44,
+        345
+      ],
+      "constantFileRanges": [
+        [
+          3925115,
+          3925130
+        ],
+        [
+          3931191,
+          3931216
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1173,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006cde0",
+      "name": "novels_list_books",
+      "qualifiedName": "NovelsApi.novels_list_books",
+      "nameSlots": [
+        "0x1803b0a28",
+        "0x1803b0a30"
+      ],
+      "constantIndexes": [
+        347,
+        348
+      ],
+      "constantFileRanges": [
+        [
+          3931242,
+          3931261
+        ],
+        [
+          3931261,
+          3931290
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1193,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006d730",
+      "name": "novels_get_book",
+      "qualifiedName": "NovelsApi.novels_get_book",
+      "nameSlots": [
+        "0x1803b0a40",
+        "0x1803b0a48"
+      ],
+      "constantIndexes": [
+        350,
+        351
+      ],
+      "constantFileRanges": [
+        [
+          3931330,
+          3931347
+        ],
+        [
+          3931347,
+          3931374
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1213,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006dee0",
+      "name": "novels_rename_book",
+      "qualifiedName": "NovelsApi.novels_rename_book",
+      "nameSlots": [
+        "0x1803b0a58",
+        "0x1803b0a60"
+      ],
+      "constantIndexes": [
+        353,
+        354
+      ],
+      "constantFileRanges": [
+        [
+          3931422,
+          3931442
+        ],
+        [
+          3931442,
+          3931472
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1233,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006e800",
+      "name": "novels_delete_book",
+      "qualifiedName": "NovelsApi.novels_delete_book",
+      "nameSlots": [
+        "0x1803b0a68",
+        "0x1803b0a70"
+      ],
+      "constantIndexes": [
+        355,
+        356
+      ],
+      "constantFileRanges": [
+        [
+          3931472,
+          3931492
+        ],
+        [
+          3931492,
+          3931522
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1253,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006ed60",
+      "name": "novels_list_sessions",
+      "qualifiedName": "NovelsApi.novels_list_sessions",
+      "nameSlots": [
+        "0x1803b0a80",
+        "0x1803b0a88"
+      ],
+      "constantIndexes": [
+        358,
+        359
+      ],
+      "constantFileRanges": [
+        [
+          3931597,
+          3931619
+        ],
+        [
+          3931619,
+          3931651
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1276,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18006f6f0",
+      "name": "novels_get_session",
+      "qualifiedName": "NovelsApi.novels_get_session",
+      "nameSlots": [
+        "0x1803b0a98",
+        "0x1803b0aa0"
+      ],
+      "constantIndexes": [
+        361,
+        362
+      ],
+      "constantFileRanges": [
+        [
+          3931694,
+          3931714
+        ],
+        [
+          3931714,
+          3931744
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1296,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180071030",
+      "name": "novels_get_short_story",
+      "qualifiedName": "NovelsApi.novels_get_short_story",
+      "nameSlots": [
+        "0x1803b0ab0",
+        "0x1803b0ab8"
+      ],
+      "constantIndexes": [
+        364,
+        365
+      ],
+      "constantFileRanges": [
+        [
+          3931785,
+          3931809
+        ],
+        [
+          3931809,
+          3931843
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1316,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800717e0",
+      "name": "novels_read_short_story_file",
+      "qualifiedName": "NovelsApi.novels_read_short_story_file",
+      "nameSlots": [
+        "0x1803b0ac8",
+        "0x1803b0ad0"
+      ],
+      "constantIndexes": [
+        367,
+        368
+      ],
+      "constantFileRanges": [
+        [
+          3931890,
+          3931920
+        ],
+        [
+          3931920,
+          3931960
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1336,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180071f90",
+      "name": "novels_save_short_story_file",
+      "qualifiedName": "NovelsApi.novels_save_short_story_file",
+      "nameSlots": [
+        "0x1803b0ae0",
+        "0x1803b0ae8"
+      ],
+      "constantIndexes": [
+        370,
+        371
+      ],
+      "constantFileRanges": [
+        [
+          3932017,
+          3932047
+        ],
+        [
+          3932047,
+          3932087
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1356,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800727b0",
+      "name": "novels_confirm_pipeline_checkpoint",
+      "qualifiedName": "NovelsApi.novels_confirm_pipeline_checkpoint",
+      "nameSlots": [
+        "0x1803b0af8",
+        "0x1803b0b00"
+      ],
+      "constantIndexes": [
+        373,
+        374
+      ],
+      "constantFileRanges": [
+        [
+          3932138,
+          3932174
+        ],
+        [
+          3932174,
+          3932220
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1376,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180073da0",
+      "name": "novels_create_session",
+      "qualifiedName": "NovelsApi.novels_create_session",
+      "nameSlots": [
+        "0x1803b0b10",
+        "0x1803b0b18"
+      ],
+      "constantIndexes": [
+        376,
+        377
+      ],
+      "constantFileRanges": [
+        [
+          3932281,
+          3932304
+        ],
+        [
+          3932304,
+          3932337
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1399,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180074f40",
+      "name": "novels_rename_session",
+      "qualifiedName": "NovelsApi.novels_rename_session",
+      "nameSlots": [
+        "0x1803b0b28",
+        "0x1803b0b30"
+      ],
+      "constantIndexes": [
+        379,
+        380
+      ],
+      "constantFileRanges": [
+        [
+          3932388,
+          3932411
+        ],
+        [
+          3932411,
+          3932444
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1419,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180075870",
+      "name": "novels_bind_session_book",
+      "qualifiedName": "NovelsApi.novels_bind_session_book",
+      "nameSlots": [
+        "0x1803b0b40",
+        "0x1803b0b48"
+      ],
+      "constantIndexes": [
+        382,
+        383
+      ],
+      "constantFileRanges": [
+        [
+          3932497,
+          3932523
+        ],
+        [
+          3932523,
+          3932559
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1439,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800761f0",
+      "name": "novels_delete_session",
+      "qualifiedName": "NovelsApi.novels_delete_session",
+      "nameSlots": [
+        "0x1803b0b50",
+        "0x1803b0b58"
+      ],
+      "constantIndexes": [
+        384,
+        385
+      ],
+      "constantFileRanges": [
+        [
+          3932559,
+          3932582
+        ],
+        [
+          3932582,
+          3932615
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1459,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180076750",
+      "name": "novels_update_session_messages",
+      "qualifiedName": "NovelsApi.novels_update_session_messages",
+      "nameSlots": [
+        "0x1803b0b60",
+        "0x1803b0b68"
+      ],
+      "constantIndexes": [
+        386,
+        387
+      ],
+      "constantFileRanges": [
+        [
+          3932615,
+          3932647
+        ],
+        [
+          3932647,
+          3932689
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1479,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180077180",
+      "name": "novels_list_style_sources",
+      "qualifiedName": "NovelsApi.novels_list_style_sources",
+      "nameSlots": [
+        "0x1803b0b70",
+        "0x1803b0b78"
+      ],
+      "constantIndexes": [
+        388,
+        389
+      ],
+      "constantFileRanges": [
+        [
+          3932689,
+          3932716
+        ],
+        [
+          3932716,
+          3932753
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1499,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180077890",
+      "name": "novels_get_style_profile",
+      "qualifiedName": "NovelsApi.novels_get_style_profile",
+      "nameSlots": [
+        "0x1803b0b88",
+        "0x1803b0b90"
+      ],
+      "constantIndexes": [
+        391,
+        392
+      ],
+      "constantFileRanges": [
+        [
+          3932796,
+          3932822
+        ],
+        [
+          3932822,
+          3932858
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1519,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800780b0",
+      "name": "novels_save_style_profile",
+      "qualifiedName": "NovelsApi.novels_save_style_profile",
+      "nameSlots": [
+        "0x1803b0b98",
+        "0x1803b0ba0"
+      ],
+      "constantIndexes": [
+        393,
+        394
+      ],
+      "constantFileRanges": [
+        [
+          3932858,
+          3932885
+        ],
+        [
+          3932885,
+          3932922
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1539,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180079700",
+      "name": "novels_delete_style_profile",
+      "qualifiedName": "NovelsApi.novels_delete_style_profile",
+      "nameSlots": [
+        "0x1803b0ba8",
+        "0x1803b0bb0"
+      ],
+      "constantIndexes": [
+        395,
+        396
+      ],
+      "constantFileRanges": [
+        [
+          3932922,
+          3932951
+        ],
+        [
+          3932951,
+          3932990
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1559,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180079ef0",
+      "name": "novels_import_style_files",
+      "qualifiedName": "NovelsApi.novels_import_style_files",
+      "nameSlots": [
+        "0x1803b0bb8",
+        "0x1803b0bc0"
+      ],
+      "constantIndexes": [
+        397,
+        398
+      ],
+      "constantFileRanges": [
+        [
+          3932990,
+          3933017
+        ],
+        [
+          3933017,
+          3933054
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1579,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18007b680",
+      "name": "novels_pick_style_files",
+      "qualifiedName": "NovelsApi.novels_pick_style_files",
+      "nameSlots": [
+        "0x1803b0bc8",
+        "0x1803b0bd0"
+      ],
+      "constantIndexes": [
+        399,
+        400
+      ],
+      "constantFileRanges": [
+        [
+          3933054,
+          3933079
+        ],
+        [
+          3933079,
+          3933114
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1599,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18007be90",
+      "name": "novels_init_imitation",
+      "qualifiedName": "NovelsApi.novels_init_imitation",
+      "nameSlots": [
+        "0x1803b0bd8",
+        "0x1803b0be0"
+      ],
+      "constantIndexes": [
+        401,
+        402
+      ],
+      "constantFileRanges": [
+        [
+          3933114,
+          3933137
+        ],
+        [
+          3933137,
+          3933170
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1619,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18007c840",
+      "name": "novels_run_imitation_short",
+      "qualifiedName": "NovelsApi.novels_run_imitation_short",
+      "nameSlots": [
+        "0x1803b0be8",
+        "0x1803b0bf0"
+      ],
+      "constantIndexes": [
+        403,
+        404
+      ],
+      "constantFileRanges": [
+        [
+          3933170,
+          3933198
+        ],
+        [
+          3933198,
+          3933236
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1639,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18007f270",
+      "name": "novels_init_fanfic",
+      "qualifiedName": "NovelsApi.novels_init_fanfic",
+      "nameSlots": [
+        "0x1803b0bf8",
+        "0x1803b0c00"
+      ],
+      "constantIndexes": [
+        405,
+        406
+      ],
+      "constantFileRanges": [
+        [
+          3933236,
+          3933256
+        ],
+        [
+          3933256,
+          3933286
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1659,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18007fc20",
+      "name": "novels_init_spinoff",
+      "qualifiedName": "NovelsApi.novels_init_spinoff",
+      "nameSlots": [
+        "0x1803b0c08",
+        "0x1803b0c10"
+      ],
+      "constantIndexes": [
+        407,
+        408
+      ],
+      "constantFileRanges": [
+        [
+          3933286,
+          3933307
+        ],
+        [
+          3933307,
+          3933338
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1679,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800805d0",
+      "name": "novels_import_chapters",
+      "qualifiedName": "NovelsApi.novels_import_chapters",
+      "nameSlots": [
+        "0x1803b0c18",
+        "0x1803b0c20"
+      ],
+      "constantIndexes": [
+        409,
+        410
+      ],
+      "constantFileRanges": [
+        [
+          3933338,
+          3933362
+        ],
+        [
+          3933362,
+          3933396
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1699,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180081b90",
+      "name": "novels_get_agent_settings",
+      "qualifiedName": "NovelsApi.novels_get_agent_settings",
+      "nameSlots": [
+        "0x1803b0c28",
+        "0x1803b0c30"
+      ],
+      "constantIndexes": [
+        411,
+        412
+      ],
+      "constantFileRanges": [
+        [
+          3933396,
+          3933423
+        ],
+        [
+          3933423,
+          3933460
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1719,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800823b0",
+      "name": "novels_save_agent_settings",
+      "qualifiedName": "NovelsApi.novels_save_agent_settings",
+      "nameSlots": [
+        "0x1803b0c38",
+        "0x1803b0c40"
+      ],
+      "constantIndexes": [
+        413,
+        414
+      ],
+      "constantFileRanges": [
+        [
+          3933460,
+          3933488
+        ],
+        [
+          3933488,
+          3933526
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1739,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180082cb0",
+      "name": "novels_send_message",
+      "qualifiedName": "NovelsApi.novels_send_message",
+      "nameSlots": [
+        "0x1803b0c48",
+        "0x1803b0c50"
+      ],
+      "constantIndexes": [
+        415,
+        416
+      ],
+      "constantFileRanges": [
+        [
+          3933526,
+          3933547
+        ],
+        [
+          3933547,
+          3933578
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1759,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180084690",
+      "name": "novels_confirm_action",
+      "qualifiedName": "NovelsApi.novels_confirm_action",
+      "nameSlots": [
+        "0x1803b0c58",
+        "0x1803b0c60"
+      ],
+      "constantIndexes": [
+        417,
+        418
+      ],
+      "constantFileRanges": [
+        [
+          3933578,
+          3933601
+        ],
+        [
+          3933601,
+          3933634
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1779,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180085ca0",
+      "name": "novels_cancel_operation",
+      "qualifiedName": "NovelsApi.novels_cancel_operation",
+      "nameSlots": [
+        "0x1803b0c70",
+        "0x1803b0c78"
+      ],
+      "constantIndexes": [
+        420,
+        421
+      ],
+      "constantFileRanges": [
+        [
+          3933670,
+          3933695
+        ],
+        [
+          3933695,
+          3933730
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1799,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800863b0",
+      "name": "novels_get_chapter",
+      "qualifiedName": "NovelsApi.novels_get_chapter",
+      "nameSlots": [
+        "0x1803b0c88",
+        "0x1803b0c90"
+      ],
+      "constantIndexes": [
+        423,
+        424
+      ],
+      "constantFileRanges": [
+        [
+          3933791,
+          3933811
+        ],
+        [
+          3933811,
+          3933841
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1819,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180086d40",
+      "name": "novels_save_chapter",
+      "qualifiedName": "NovelsApi.novels_save_chapter",
+      "nameSlots": [
+        "0x1803b0ca0",
+        "0x1803b0ca8"
+      ],
+      "constantIndexes": [
+        426,
+        427
+      ],
+      "constantFileRanges": [
+        [
+          3933951,
+          3933972
+        ],
+        [
+          3933972,
+          3934003
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1842,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180087910",
+      "name": "novels_read_story_file",
+      "qualifiedName": "NovelsApi.novels_read_story_file",
+      "nameSlots": [
+        "0x1803b0cb8",
+        "0x1803b0cc0"
+      ],
+      "constantIndexes": [
+        429,
+        430
+      ],
+      "constantFileRanges": [
+        [
+          3934049,
+          3934073
+        ],
+        [
+          3934073,
+          3934107
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1862,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800880c0",
+      "name": "novels_save_story_file",
+      "qualifiedName": "NovelsApi.novels_save_story_file",
+      "nameSlots": [
+        "0x1803b0cd0",
+        "0x1803b0cd8"
+      ],
+      "constantIndexes": [
+        432,
+        433
+      ],
+      "constantFileRanges": [
+        [
+          3934163,
+          3934187
+        ],
+        [
+          3934187,
+          3934221
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1882,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800888e0",
+      "name": "novels_get_book_rules",
+      "qualifiedName": "NovelsApi.novels_get_book_rules",
+      "nameSlots": [
+        "0x1803b0ce0",
+        "0x1803b0ce8"
+      ],
+      "constantIndexes": [
+        434,
+        435
+      ],
+      "constantFileRanges": [
+        [
+          3934221,
+          3934244
+        ],
+        [
+          3934244,
+          3934277
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1902,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180089120",
+      "name": "novels_save_book_rules",
+      "qualifiedName": "NovelsApi.novels_save_book_rules",
+      "nameSlots": [
+        "0x1803b0cf8",
+        "0x1803b0d00"
+      ],
+      "constantIndexes": [
+        437,
+        438
+      ],
+      "constantFileRanges": [
+        [
+          3934342,
+          3934366
+        ],
+        [
+          3934366,
+          3934400
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1922,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x1800899f0",
+      "name": "novels_write_next",
+      "qualifiedName": "NovelsApi.novels_write_next",
+      "nameSlots": [
+        "0x1803b0d08",
+        "0x1803b0d10"
+      ],
+      "constantIndexes": [
+        439,
+        440
+      ],
+      "constantFileRanges": [
+        [
+          3934400,
+          3934419
+        ],
+        [
+          3934419,
+          3934448
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1942,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008a790",
+      "name": "novels_write_batch",
+      "qualifiedName": "NovelsApi.novels_write_batch",
+      "nameSlots": [
+        "0x1803b0d18",
+        "0x1803b0d20"
+      ],
+      "constantIndexes": [
+        441,
+        442
+      ],
+      "constantFileRanges": [
+        [
+          3934448,
+          3934468
+        ],
+        [
+          3934468,
+          3934498
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1962,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008b840",
+      "name": "_get_scheduler",
+      "qualifiedName": "NovelsApi._get_scheduler",
+      "nameSlots": [
+        "0x1803b0770",
+        "0x1803b0d30"
+      ],
+      "constantIndexes": [
+        260,
+        444
+      ],
+      "constantFileRanges": [
+        [
+          3929363,
+          3929379
+        ],
+        [
+          3934524,
+          3934550
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 1982,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008c8a0",
+      "name": "novels_scheduler_start",
+      "qualifiedName": "NovelsApi.novels_scheduler_start",
+      "nameSlots": [
+        "0x1803b0d38",
+        "0x1803b0d40"
+      ],
+      "constantIndexes": [
+        445,
+        446
+      ],
+      "constantFileRanges": [
+        [
+          3934550,
+          3934574
+        ],
+        [
+          3934574,
+          3934608
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2002,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008dad0",
+      "name": "novels_scheduler_stop",
+      "qualifiedName": "NovelsApi.novels_scheduler_stop",
+      "nameSlots": [
+        "0x1803b0d48",
+        "0x1803b0d50"
+      ],
+      "constantIndexes": [
+        447,
+        448
+      ],
+      "constantFileRanges": [
+        [
+          3934608,
+          3934631
+        ],
+        [
+          3934631,
+          3934664
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2022,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008e1b0",
+      "name": "novels_scheduler_pause",
+      "qualifiedName": "NovelsApi.novels_scheduler_pause",
+      "nameSlots": [
+        "0x1803b0d58",
+        "0x1803b0d60"
+      ],
+      "constantIndexes": [
+        449,
+        450
+      ],
+      "constantFileRanges": [
+        [
+          3934664,
+          3934688
+        ],
+        [
+          3934688,
+          3934722
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2042,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008e9d0",
+      "name": "novels_scheduler_status",
+      "qualifiedName": "NovelsApi.novels_scheduler_status",
+      "nameSlots": [
+        "0x1803b0d68",
+        "0x1803b0d70"
+      ],
+      "constantIndexes": [
+        451,
+        452
+      ],
+      "constantFileRanges": [
+        [
+          3934722,
+          3934747
+        ],
+        [
+          3934747,
+          3934782
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2062,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008ef80",
+      "name": "novels_audit_chapter",
+      "qualifiedName": "NovelsApi.novels_audit_chapter",
+      "nameSlots": [
+        "0x1803b0d78",
+        "0x1803b0d80"
+      ],
+      "constantIndexes": [
+        453,
+        454
+      ],
+      "constantFileRanges": [
+        [
+          3934782,
+          3934804
+        ],
+        [
+          3934804,
+          3934836
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2082,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x18008fb70",
+      "name": "novels_revise_chapter",
+      "qualifiedName": "NovelsApi.novels_revise_chapter",
+      "nameSlots": [
+        "0x1803b0d88",
+        "0x1803b0d90"
+      ],
+      "constantIndexes": [
+        455,
+        456
+      ],
+      "constantFileRanges": [
+        [
+          3934836,
+          3934859
+        ],
+        [
+          3934859,
+          3934892
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2102,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.api.novels_api",
+      "nativeEntry": "0x180090e60",
+      "name": "novels_export_book",
+      "qualifiedName": "NovelsApi.novels_export_book",
+      "nameSlots": [
+        "0x1803b0da8",
+        "0x1803b0db0"
+      ],
+      "constantIndexes": [
+        459,
+        460
+      ],
+      "constantFileRanges": [
+        [
+          3934944,
+          3934964
+        ],
+        [
+          3934964,
+          3934994
+        ]
+      ],
+      "initializerSource": "source/ida/0x180091e60.c",
+      "initializerLine": 2125,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1801f4b80",
+      "name": "__init__",
+      "qualifiedName": "AgentSessionService.__init__",
+      "nameSlots": [
+        "0x1803beb58",
+        "0x1803beb60"
+      ],
+      "constantIndexes": [
+        393,
+        394
+      ],
+      "constantFileRanges": [
+        [
+          4313984,
+          4313994
+        ],
+        [
+          4313994,
+          4314024
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 948,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1801f5210",
+      "name": "_emit",
+      "qualifiedName": "AgentSessionService._emit",
+      "nameSlots": [
+        "0x1803be0f8",
+        "0x1803beb70"
+      ],
+      "constantIndexes": [
+        61,
+        396
+      ],
+      "constantFileRanges": [
+        [
+          4307721,
+          4307728
+        ],
+        [
+          4314071,
+          4314098
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 968,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1801f5880",
+      "name": "_resolve_chat_model",
+      "qualifiedName": "AgentSessionService._resolve_chat_model",
+      "nameSlots": [
+        "0x1803bdf88",
+        "0x1803beb88"
+      ],
+      "constantIndexes": [
+        15,
+        399
+      ],
+      "constantFileRanges": [
+        [
+          4307129,
+          4307150
+        ],
+        [
+          4314148,
+          4314189
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 991,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1801f5cb0",
+      "name": "send_message",
+      "qualifiedName": "AgentSessionService.send_message",
+      "nameSlots": [
+        "0x1803beba0",
+        "0x1803beba8"
+      ],
+      "constantIndexes": [
+        402,
+        403
+      ],
+      "constantFileRanges": [
+        [
+          4314548,
+          4314562
+        ],
+        [
+          4314562,
+          4314596
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1015,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1801fd690",
+      "name": "confirm_action",
+      "qualifiedName": "AgentSessionService.confirm_action",
+      "nameSlots": [
+        "0x1803bebb8",
+        "0x1803bebc0"
+      ],
+      "constantIndexes": [
+        405,
+        406
+      ],
+      "constantFileRanges": [
+        [
+          4314661,
+          4314677
+        ],
+        [
+          4314677,
+          4314713
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1038,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1802095a0",
+      "name": "confirm_pipeline_checkpoint",
+      "qualifiedName": "AgentSessionService.confirm_pipeline_checkpoint",
+      "nameSlots": [
+        "0x1803bebd0",
+        "0x1803bebd8"
+      ],
+      "constantIndexes": [
+        408,
+        409
+      ],
+      "constantFileRanges": [
+        [
+          4314803,
+          4314832
+        ],
+        [
+          4314832,
+          4314881
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1061,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x18020df00",
+      "name": "_should_expose_propose_tool",
+      "qualifiedName": "AgentSessionService._should_expose_propose_tool",
+      "nameSlots": [
+        "0x1803be130",
+        "0x1803bebe8"
+      ],
+      "constantIndexes": [
+        68,
+        411
+      ],
+      "constantFileRanges": [
+        [
+          4307891,
+          4307920
+        ],
+        [
+          4314921,
+          4314970
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1081,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x18020e2d0",
+      "name": "_handle_play_message",
+      "qualifiedName": "AgentSessionService._handle_play_message",
+      "nameSlots": [
+        "0x1803bdfb8",
+        "0x1803bebf8"
+      ],
+      "constantIndexes": [
+        21,
+        413
+      ],
+      "constantFileRanges": [
+        [
+          4307220,
+          4307242
+        ],
+        [
+          4315061,
+          4315103
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1108,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x180213700",
+      "name": "_tool_message",
+      "qualifiedName": "AgentSessionService._tool_message",
+      "nameSlots": [
+        "0x1803be2d8",
+        "0x1803bec08"
+      ],
+      "constantIndexes": [
+        121,
+        415
+      ],
+      "constantFileRanges": [
+        [
+          4308756,
+          4308771
+        ],
+        [
+          4315167,
+          4315202
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1128,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x180213e10",
+      "name": "_normalize_propose_action",
+      "qualifiedName": "AgentSessionService._normalize_propose_action",
+      "nameSlots": [
+        "0x1803be1a0",
+        "0x1803bec18"
+      ],
+      "constantIndexes": [
+        82,
+        417
+      ],
+      "constantFileRanges": [
+        [
+          4308126,
+          4308153
+        ],
+        [
+          4315238,
+          4315285
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1148,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x180215d90",
+      "name": "_route_for_action",
+      "qualifiedName": "AgentSessionService._route_for_action",
+      "nameSlots": [
+        "0x1803be1e0",
+        "0x1803bec28"
+      ],
+      "constantIndexes": [
+        90,
+        419
+      ],
+      "constantFileRanges": [
+        [
+          4308261,
+          4308280
+        ],
+        [
+          4315309,
+          4315348
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1168,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x1802160a0",
+      "name": "_split_action",
+      "qualifiedName": "AgentSessionService._split_action",
+      "nameSlots": [
+        "0x1803be228",
+        "0x1803bec38"
+      ],
+      "constantIndexes": [
+        99,
+        421
+      ],
+      "constantFileRanges": [
+        [
+          4308380,
+          4308395
+        ],
+        [
+          4315410,
+          4315445
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1188,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    },
+    {
+      "module": "novels.services.agent_session",
+      "nativeEntry": "0x180216d20",
+      "name": "_is_cancelled",
+      "qualifiedName": "AgentSessionService._is_cancelled",
+      "nameSlots": [
+        "0x1803be2a8",
+        "0x1803bec48"
+      ],
+      "constantIndexes": [
+        115,
+        423
+      ],
+      "constantFileRanges": [
+        [
+          4308651,
+          4308666
+        ],
+        [
+          4315471,
+          4315506
+        ]
+      ],
+      "initializerSource": "source/ida/0x180217350.c",
+      "initializerLine": 1208,
+      "evidenceType": "IDA constructor argument + decoded module constant slot; not runtime callgraph"
+    }
+  ]
+}

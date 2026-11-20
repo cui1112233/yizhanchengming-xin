@@ -1,5 +1,5 @@
 {
-  "time": "2026-11-20T16:52:55.752964+08:00",
+  "time": "2026-11-20T17:16:00.896385+08:00",
   "scope": "document inventory and source traceability only; no runtime/model acceptance",
   "checks": [
     {
@@ -17,7 +17,7 @@
     },
     {
       "check": "frontend_source_line_references",
-      "count": 1237,
+      "count": 1240,
       "passed": true
     },
     {
