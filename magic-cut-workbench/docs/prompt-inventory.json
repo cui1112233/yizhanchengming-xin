@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "product": "Magic Cut",
+    "version": "1.5.3-rc.52.23",
+    "appAsarSha256": "2FD5AA2AA61A964B4AD2579160771CD4778BDCB98F64A5A0588183349B49B7E1",
+    "decompiledRoot": "F:/软件/magic-cut-reverse/decompiled"
+  },
+  "rules": {
+    "frontendMayContainSystemPrompts": false,
+    "executeRecoveredBundle": false,
+    "copyUnknownServicePromptAsOriginal": false
+  },
+  "entries": [
+    {
+      "id": "magic_cut.ai_pre_roll.negative_constraints.v1",
+      "classification": "observed-client",
+      "text": "不生成字幕；画面无水印、台标和乱码。",
+      "sourceLocation": "app.asar/assets/index-lgtcjTmg.js:16",
+      "use": "backend-system-constraint"
+    },
+    {
+      "id": "magic_cut.ai_pre_roll.narration_mix.v1",
+      "classification": "observed-client",
+      "text": "解说旁白由独立配音音轨合成，不生成解说旁白；人物对白和环境声按画面提示词生成。",
+      "sourceLocation": "app.asar/assets/index-lgtcjTmg.js:165",
+      "use": "backend-system-constraint"
+    },
+    {
+      "id": "magic_cut.ai_pre_roll.voice_policy.independent_narration",
+      "classification": "observed-client",
+      "text": "只使用独立视频解说旁白，不生成人物对白",
+      "sourceLocation": "app.asar/assets/index-lgtcjTmg.js@bytes:5622-5679",
+      "sha256": "5d2c99d0d4d86c6b9ee20669c3a70e1aba902cd6009dddff8d3c25a2f7eebd1d",
+      "use": "future-backend-policy"
+    },
+    {
+      "id": "magic_cut.ai_pre_roll.voice_policy.dialogue_only",
+      "classification": "observed-client",
+      "text": "只生成正文明确标注的人物对白，不生成解说旁白",
+      "sourceLocation": "app.asar/assets/index-lgtcjTmg.js@bytes:5687-5753",
+      "sha256": "21ffec082dfe10a9f73d176c4e5710fbd603812b894d8f86543c7516e6f98c29",
+      "use": "future-backend-policy"
+    },
+    {
+      "id": "magic_cut.hot_replication.infer_video.v1",
+      "classification": "derived-equivalent",
+      "text": null,
+      "sourceLocation": "behavior:/hot-replication AI 推理",
+      "replacementLocation": "api/internal/prompt/catalog.go",
+      "reason": "发布包能看到入口和结果编辑，未发现可证明为服务端原文的系统提示词"
+    },
+    {
+      "id": "magic_cut.script_batch.match_shots.v1",
+      "classification": "derived-equivalent",
+      "text": null,
+      "sourceLocation": "behavior:/script-batch-compose/:id? 画面匹配",
+      "replacementLocation": "api/internal/prompt/catalog.go",
+      "reason": "原服务端提示词不在客户端发布包内"
+    }
+  ]
+}
