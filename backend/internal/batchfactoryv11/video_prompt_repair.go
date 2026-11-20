@@ -12,9 +12,9 @@ import (
 )
 
 // videoPromptRepairMaxRounds 与漫画页的自动去敏保持一致：每个视频、每个换
-// 开头变体在内容审核拒绝后最多自动改写一次提示词；仍未通过就转人工，避免
-// 用同一份提示词反复提交、重复扣费。
-const videoPromptRepairMaxRounds = 1
+// 开头变体在内容审核拒绝后最多自动改写两轮提示词；仍未通过就转人工，避免
+// 用同一份提示词反复提交、重复扣费。生产实测 1 轮不足以过审，故为 2 轮。
+const videoPromptRepairMaxRounds = 2
 
 const (
 	videoPromptRepairCountsKey  = "videoPromptRepairCounts"
@@ -24,7 +24,7 @@ const (
 
 // ErrVideoPromptRepairExhausted 表示自动去敏轮次已用完。调用方不得再用原
 // 提示词重新提交，必须等待人工调整提示词或参考图。
-var ErrVideoPromptRepairExhausted = errors.New("视频提示词被内容审核拒绝，自动去敏改写 1 轮后仍未通过，请人工调整提示词或参考图后重试")
+var ErrVideoPromptRepairExhausted = errors.New("视频提示词被内容审核拒绝，自动去敏改写 2 轮后仍未通过，请人工调整提示词或参考图后重试")
 
 const videoPromptRepairSystemPrompt = `你是短视频分镜提示词的内容安全改写器。输入是一条会被视频平台审核拒绝的提示词，请在不改变剧情事实的前提下改写为可过审版本。
 
@@ -36,9 +36,12 @@ const videoPromptRepairSystemPrompt = `你是短视频分镜提示词的内容�
 - 暴力、血腥、流血、伤口、尸体、武器直接攻击、掐颈、殴打、自残、昏迷、死亡特写
 - 露骨、性暗示、未成年人不当描写
 - 恐怖、惊悚、引起不适的细节
+- 真实公众人物、明星、影视角色、品牌或商标的直接姓名/标识；用“年轻女演员”“某品牌汽车”等身份描述替代
+- 真实案件、真实机构或可能引发侵权联想的专有名称
 
 处理方式：
 - 用安全等价画面替代：例如“掐住脖子”改为“逼近对峙”，“鲜血直流”改为“踉跄后退”，“举刀”改为“握紧手中物件”
+- 删除武器细节与攻击动作，只保留人物关系、情绪和剧情结果
 - 不新增人物、不改变镜头数量、不写解释
 - 只输出改写后的提示词正文，不要标题、序号、引号或 Markdown 代码块`
 

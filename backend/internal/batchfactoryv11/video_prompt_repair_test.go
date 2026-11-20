@@ -17,7 +17,7 @@ func (p *repairRecordingProvider) Complete(context.Context, TextCompletionReques
 	return p.reply, nil
 }
 
-func TestRepairRejectedVideoPromptRewritesOverrideOnce(t *testing.T) {
+func TestRepairRejectedVideoPromptRewritesWithinBudget(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()
 	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "b", Books: []CreateBookInput{{
@@ -78,10 +78,17 @@ func TestRepairRejectedVideoPromptRewritesOverrideOnce(t *testing.T) {
 		t.Fatalf("repair counts=%v, want variant 0 repaired once", counts)
 	}
 
-	if _, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); !errors.Is(err, ErrVideoPromptRepairExhausted) {
-		t.Fatalf("second repair error=%v, want ErrVideoPromptRepairExhausted", err)
+	// 第二轮改写仍然允许，直到 videoPromptRepairMaxRounds 用尽。
+	if repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); err != nil || !repaired {
+		t.Fatalf("second repair=%v err=%v, want another rewrite", repaired, err)
 	}
-	if provider.calls != 1 {
+	if provider.calls != 2 {
+		t.Fatalf("provider calls=%d, want 2 rounds", provider.calls)
+	}
+	if _, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); !errors.Is(err, ErrVideoPromptRepairExhausted) {
+		t.Fatalf("third repair error=%v, want ErrVideoPromptRepairExhausted", err)
+	}
+	if provider.calls != 2 {
 		t.Fatalf("exhausted repair must not call the model again, calls=%d", provider.calls)
 	}
 }
@@ -198,6 +205,9 @@ func TestRepairLetsManualPromptEditBypassExhausted(t *testing.T) {
 	if repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); err != nil || !repaired {
 		t.Fatalf("first repair=%v err=%v", repaired, err)
 	}
+	if repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); err != nil || !repaired {
+		t.Fatalf("second repair=%v err=%v", repaired, err)
+	}
 	if _, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, ""); !errors.Is(err, ErrVideoPromptRepairExhausted) {
 		t.Fatalf("same rewritten prompt must be exhausted, got %v", err)
 	}
@@ -216,7 +226,7 @@ func TestRepairLetsManualPromptEditBypassExhausted(t *testing.T) {
 	if repaired {
 		t.Fatal("manual edit must be submitted as-is, not rewritten again")
 	}
-	if provider.calls != 1 {
+	if provider.calls != 2 {
 		t.Fatalf("manual edit must not call the model again, calls=%d", provider.calls)
 	}
 }
