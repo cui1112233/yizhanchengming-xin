@@ -348,6 +348,102 @@ func TestDeterministicFailureSkipsBudget(t *testing.T) {
 	}
 }
 
+// 可本地修复的失败（如缺提示词页）在修复预算内保持 skipped 等补齐；
+// 超过 MaxAttempts 后必须转 needs_manual，否则书级续跑每轮都重新检测到
+// 同一批页，300 秒一轮无限循环，永远到不了人工处理。
+func TestRepairablePromptMissingEscalatesToNeedsManual(t *testing.T) {
+	now := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	disposition := classifyAutomationFailure(errors.New("漫画页 11 缺少独立的图片提示词"), "comic_images")
+	if !disposition.Repairable || disposition.CountsTowardRetryBudget {
+		t.Fatalf("promptMissing 必须 Repairable 且不吃预算: %+v", disposition)
+	}
+	if disposition.MaxAttempts != 2 {
+		t.Fatalf("MaxAttempts=%d, want 2", disposition.MaxAttempts)
+	}
+	ledger := map[string]any{}
+	for attempt := 1; attempt <= disposition.MaxAttempts; attempt++ {
+		entry := applyAutomationPageFailure(ledger, "video-11", "漫画页 11", "comic_images",
+			disposition.Code, "漫画页 11 缺少独立的图片提示词", disposition, 0, now)
+		if entry["state"] != "skipped" {
+			t.Fatalf("attempt %d state=%v, want skipped（仍在修复预算内）", attempt, entry["state"])
+		}
+		if manual, _ := entry["needsManual"].(bool); manual {
+			t.Fatalf("attempt %d 不得提前转人工", attempt)
+		}
+	}
+	entry := applyAutomationPageFailure(ledger, "video-11", "漫画页 11", "comic_images",
+		disposition.Code, "漫画页 11 缺少独立的图片提示词", disposition, 0, now)
+	if entry["state"] != "needs_manual" {
+		t.Fatalf("超限 state=%v, want needs_manual", entry["state"])
+	}
+	if manual, _ := entry["needsManual"].(bool); !manual {
+		t.Fatal("修复预算用尽后必须转 needs_manual")
+	}
+}
+
+// 历史数据（进程重启后 attempts 已是 float64 且远超上限）必须立即升级为
+// needs_manual，而不是继续无限续跑。
+func TestRepairableLegacyFloat64AttemptsEscalateImmediately(t *testing.T) {
+	now := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	disposition := classifyAutomationFailure(errors.New("漫画页 11 缺少独立的图片提示词"), "comic_images")
+	ledger := map[string]any{
+		"video-11": map[string]any{
+			"attempts":    float64(10),
+			"state":       "skipped",
+			"needsManual": false,
+		},
+	}
+	entry := applyAutomationPageFailure(ledger, "video-11", "漫画页 11", "comic_images",
+		disposition.Code, "漫画页 11 缺少独立的图片提示词", disposition, 0, now)
+	if entry["state"] != "needs_manual" {
+		t.Fatalf("attempts=10 时 state=%v, want needs_manual", entry["state"])
+	}
+	if attempts := automationNumberValue(entry["attempts"], 0); attempts != 11 {
+		t.Fatalf("attempts=%d, want 11", attempts)
+	}
+}
+
+// recordOne 读取页级 attempts 必须兼容 float64（落库重载后的形态），
+// 否则 outcome.MaxAttempts 恒为 0，书级 5 次上限判断失效。
+func TestRecordAutomationPageLedgerReadsFloat64Attempts(t *testing.T) {
+	now := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	entry := map[string]any{}
+	ledger := automationFailureLedger(entry, "comic_images")
+	ledger["video-11"] = map[string]any{"attempts": float64(10), "state": "skipped", "needsManual": false}
+	err := &comicPageWorkError{Failures: []comicPageFailure{{
+		VideoID: "video-11", Label: "漫画页 11", Code: automationCodePromptMissing,
+		Err: comicPageBusinessError{message: "漫画页 11 缺少独立的图片提示词", cause: batchfactoryv11.ErrConflict},
+	}}}
+	outcome := recordAutomationPageLedger(entry, err, "comic_images", now)
+	if outcome.MaxAttempts != 11 {
+		t.Fatalf("outcome.MaxAttempts=%d, want 11", outcome.MaxAttempts)
+	}
+	if !outcome.NeedsManual {
+		t.Fatal("attempts 超过修复上限后 outcome.NeedsManual 必须为 true")
+	}
+}
+
+// 本机图片名额排队（Repairable 且 MaxAttempts=0）没有修复上限：反复排队
+// 只说明通道忙，不得升级成 needs_manual。
+func TestImageQueueBusyRepairableNeverEscalates(t *testing.T) {
+	now := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	disposition := classifyAutomationFailure(errShuihuoImageQueueBusy, "comic_images")
+	if !disposition.Repairable || disposition.MaxAttempts != 0 {
+		t.Fatalf("queue busy 必须 Repairable 且 MaxAttempts=0: %+v", disposition)
+	}
+	ledger := map[string]any{}
+	for attempt := 1; attempt <= 3; attempt++ {
+		entry := applyAutomationPageFailure(ledger, "video-1", "漫画页 01", "comic_images",
+			disposition.Code, "图片通道排队", disposition, 0, now)
+		if entry["state"] != "skipped" {
+			t.Fatalf("attempt %d state=%v, want skipped", attempt, entry["state"])
+		}
+		if manual, _ := entry["needsManual"].(bool); manual {
+			t.Fatal("排队等待不得转 needs_manual")
+		}
+	}
+}
+
 // 内容审核拒绝第一轮必须进入自动重试，而不是直接 needs_manual。
 func TestContentPolicyEntersAutoRepairRetry(t *testing.T) {
 	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)

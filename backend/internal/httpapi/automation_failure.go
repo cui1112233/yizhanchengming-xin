@@ -445,8 +445,10 @@ func applyAutomationPageFailure(
 	switch {
 	case !disposition.CountsTowardRetryBudget:
 		// 确定性/人工类不吃重试预算。可本地修复的保持 skipped，等修复动作；
-		// 其余直接定论为 needs_manual。
-		if disposition.Repairable {
+		// 其余直接定论为 needs_manual。修复动作本身也要有上限：缺提示词页
+		// 反复补齐失败时，书级续跑每轮都会重新检测到同一批页，「等修复」
+		// 会变成 300 秒一轮的无限循环，永远到不了人工处理。
+		if disposition.Repairable && (disposition.MaxAttempts <= 0 || attempts <= disposition.MaxAttempts) {
 			state = "skipped"
 		} else {
 			state = "needs_manual"
@@ -662,7 +664,10 @@ func recordAutomationPageLedger(entry map[string]any, err error, stage string, n
 		record := applyAutomationPageFailure(nodeLedger, videoID, label, itemStage,
 			code, message, itemDisposition, cost, now)
 		outcome.HasFailures = true
-		if attempts, ok := record["attempts"].(int); ok && attempts > outcome.MaxAttempts {
+		// attempts 落库重载后是 float64，必须走统一数值入口；用类型断言会在
+		// 进程重启后拿不到真实次数，书级上限判断失效，部分失败续跑变成
+		// 无限循环。
+		if attempts := automationNumberValue(record["attempts"], 0); attempts > outcome.MaxAttempts {
 			outcome.MaxAttempts = attempts
 		}
 		if queued, _ := record["retryQueued"].(bool); queued {
