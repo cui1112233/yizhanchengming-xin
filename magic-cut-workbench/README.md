@@ -7,7 +7,7 @@
 开发构建使用 Node 22 LTS 和 pnpm；运行已构建的 Go 单文件时不需要 Node。
 
 ```powershell
-.\scripts\start-dev.ps1
+.\scripts\start-dev.ps1 -UseYcmMysql
 ```
 
 默认地址是 `http://127.0.0.1:4040`，健康检查是 `http://127.0.0.1:4040/health`。

@@ -69,3 +69,16 @@ func TestAuthBootstrapUsesTheDedicatedCrossPortHandler(t *testing.T) {
 		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestProjectRoutesUseTheIsolatedProjectHandler(t *testing.T) {
+	projects := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := New(Dependencies{Projects: projects})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/magic-cut/projects", nil))
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
+	}
+}

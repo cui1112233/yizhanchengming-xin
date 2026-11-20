@@ -1,5 +1,6 @@
 param(
-  [switch]$NoStart
+  [switch]$NoStart,
+  [switch]$UseYcmMysql
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,22 @@ $apiDist = Join-Path $apiRoot 'web\dist'
 $repositoryRoot = Split-Path -Parent $workbenchRoot
 $outputRoot = Join-Path $repositoryRoot '_local-archive-20261028\magic-cut'
 $binaryPath = Join-Path $outputRoot 'magic-cut-4040.exe'
+
+if ($UseYcmMysql) {
+  $mysqlPassword = (& docker inspect ycm-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' 2>$null |
+    Where-Object { $_ -match '^MYSQL_ROOT_PASSWORD=' } |
+    Select-Object -First 1) -replace '^MYSQL_ROOT_PASSWORD=', ''
+  if ([string]::IsNullOrWhiteSpace($mysqlPassword)) {
+    throw '无法读取 ycm-mysql 的数据库密码'
+  }
+  'CREATE DATABASE IF NOT EXISTS qiantie_magic_cut_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' |
+    docker exec -i ycm-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot'
+  if ($LASTEXITCODE -ne 0) { throw '魔剪独立数据库创建失败' }
+  Get-Content -Raw -LiteralPath (Join-Path $workbenchRoot 'migrations\0001_magic_cut_core.sql') |
+    docker exec -i ycm-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot qiantie_magic_cut_dev'
+  if ($LASTEXITCODE -ne 0) { throw '魔剪数据库迁移失败' }
+  $env:MAGIC_CUT_DATABASE_DSN = "root:$mysqlPassword@tcp(127.0.0.1:3306)/qiantie_magic_cut_dev?parseTime=true&loc=UTC"
+}
 
 pnpm --dir $frontendRoot install --registry 'https://registry.npmjs.org'
 if ($LASTEXITCODE -ne 0) { throw '前端依赖安装失败' }

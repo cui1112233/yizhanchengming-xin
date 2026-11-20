@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,5 +86,13 @@ func TestListAlwaysScopesTheQueryToTheAuthenticatedOwner(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNewIDProducesOpaqueProjectIdentifiers(t *testing.T) {
+	first := NewID()
+	second := NewID()
+	if !strings.HasPrefix(first, "mcp_") || len(first) != 36 || first == second {
+		t.Fatalf("first=%q second=%q", first, second)
 	}
 }
