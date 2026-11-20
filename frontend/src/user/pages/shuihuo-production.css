@@ -785,6 +785,8 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 @media (max-width:900px) { .batch-factory-automation-modal.ant-modal { width:calc(100vw - 96px)!important; } .batch-factory-automation-grid { grid-template-columns:1fr; } .batch-factory-automation-footer { justify-content:flex-end; } .batch-factory-automation-footer > span { display:none; } }
 @media (max-width:560px) { .batch-factory-automation-modal.ant-modal { width:calc(100vw - 24px)!important; } .batch-factory-automation-modal .ant-modal-header,.batch-factory-automation-modal .ant-modal-body { padding-left:16px; padding-right:16px; } .batch-factory-automation-footer { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .batch-factory-automation-footer .ant-btn { width:100%; margin:0; } }
 .batch-factory-engine-field .ant-segmented { width:max-content; max-width:100%; }
+/* 图片画幅有 8 个选项，半行控制列放不下会溢出到相邻卡片外；跨满整行给足宽度。 */
+.batch-factory-engine-field.is-aspect-row { grid-column: 1 / -1; }
 /* Grid items stretch by default; switches must remain controls, never become progress bars. */
 .batch-factory-engine-field > .ant-switch, .batch-factory-audio-option > .ant-switch { justify-self:start; width:auto; min-width:44px; }
 .batch-factory-book-audio { display:grid; gap:12px; padding:14px; border:1px solid var(--sh-line); border-radius:10px; background:var(--sh-panel); }

@@ -36,8 +36,8 @@ const TTS_STYLE_OPTIONS = [
 function HelpTip({ title, children }) {
   return <Popover trigger="click" placement="top" title={title} content={<div className="batch-factory-help-popover">{children}</div>}><button type="button" className="batch-factory-help-button" aria-label={`查看${title}说明`}>?</button></Popover>;
 }
-function Field({ label, children, note }) {
-  return <label className="batch-factory-engine-field"><span><b>{label}</b>{note ? <small>{note}</small> : null}</span>{children}</label>;
+function Field({ label, children, note, full }) {
+  return <label className={`batch-factory-engine-field${full ? ' is-aspect-row' : ''}`}><span><b>{label}</b>{note ? <small>{note}</small> : null}</span>{children}</label>;
 }
 function EngineCard({ title, description, children }) {
   return <section className="batch-factory-engine-card"><header><b>{title}</b>{description ? <small>{description}</small> : null}</header><div className="batch-factory-engine-card-body">{children}</div></section>;
@@ -247,7 +247,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
               <Field label="视频引擎" note="生成通道"><Select value={form.videoProvider || 'personal_api'} options={videoProviderOptions} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId, expandFanKeModels: true }))} /></Field>
               <Field label="视频模型" note="选择后自动匹配生成通道"><Select allowClear loading={form.videoProvider === 'doubao_local_executor' ? false : modelsLoading} value={form.videoModelId || undefined} options={videoModelOptions} placeholder={modelPlaceholder('video', '视频')} onChange={videoModelId => patch({ videoModelId: videoModelId || '', ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), form.videoProvider) } : {}) })} /></Field>
               <Field label="分镜时长" note="单个 VIDEO 的目标上限"><Segmented value={storyboardDuration(form.storyboardDurationLimit)} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} /></Field>
-              <Field label="图片画幅" note="漫画成图与视频参考图；资产图默认 16:9"><Segmented value={form.imageAspectRatio || form.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIOS} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></Field>
+              <Field full label="图片画幅" note="漫画成图与视频参考图；资产图默认 16:9"><Segmented value={form.imageAspectRatio || form.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIOS} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></Field>
               <Field label="视频画幅" note="只影响视频输出"><Segmented value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} options={['16:9', '9:16']} onChange={videoAspectRatio => patch({ videoAspectRatio })} /></Field>
               <Field label="视频分辨率" note="随视频任务提交"><Segmented value={form.videoResolution || '720p'} options={['480p', '720p', '1080p']} onChange={videoResolution => patch({ videoResolution })} /></Field>
             </div>
@@ -358,7 +358,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
     className="batch-factory-vms-login-modal"
   >
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      <Alert type="info" showIcon message="账号与小说获取共用" description="登录会话保存在当前用户的共享网站配置中；密码不会写入批量作品设置。" />
+      <Alert type="info" showIcon message="账号与批量测书共用" description="登录会话保存在当前用户的共享网站配置中；密码不会写入批量作品设置。" />
       <Input value={loginUsername} autoComplete="username" placeholder="视频管理系统账号" onChange={event => setLoginUsername(event.target.value)} />
       <Input.Password value={loginPassword} autoComplete="current-password" placeholder="视频管理系统密码" onChange={event => setLoginPassword(event.target.value)} />
       <a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">打开视频管理系统后台</a>

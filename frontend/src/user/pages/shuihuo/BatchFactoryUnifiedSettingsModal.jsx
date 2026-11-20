@@ -82,7 +82,7 @@ const websiteProfileOrganization = profile => {
     || advanced?.org_id
     || '';
 };
-// 小说获取旧版浏览器登录器仍返回“目标站登录会话”。它与当前直连
+// 批量测书旧版浏览器登录器仍返回“目标站登录会话”。它与当前直连
 // 登录器的两个名称表达的是同一份账号级会话，不能因此把已验证会话
 // 误判为未登录。
 const SESSION_CHECK_NAMES = ['视频管理系统登录会话', '121 后台登录会话', '目标站登录会话'];
@@ -140,7 +140,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
       <label className="batch-factory-engine-field"><span><b>文本模型</b></span><Select allowClear loading={modelsLoading} value={value.textModelId || undefined} options={modelOptions.text} placeholder="选择已启用文本模型" onChange={textModelId => patch({ textModelId: textModelId || '' })} /></label>
       <label className="batch-factory-engine-field"><span><b>图片生成通道</b></span><Select value={value.imageProvider || 'personal_api'} options={imageProviderOptions} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: value.imageModelId }))} /></label>
       <label className="batch-factory-engine-field"><span><b>图片模型</b></span><Select allowClear loading={modelsLoading} value={value.imageModelId || undefined} options={imageModelOptions} placeholder="选择当前通道的图片模型" onChange={imageModelId => patch({ imageModelId: imageModelId || '', ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), value.imageProvider) } : {}) })} /></label>
-      <label className="batch-factory-engine-field"><span><b>图片画幅</b><HelpTip title="图片画幅">用于漫画成图与视频参考图；资产图默认 9:16，可单独覆盖。</HelpTip></span><Segmented value={value.imageAspectRatio || value.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIOS} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></label>
+      <label className="batch-factory-engine-field is-aspect-row"><span><b>图片画幅</b><HelpTip title="图片画幅">用于漫画成图与视频参考图；资产图默认 9:16，可单独覆盖。</HelpTip></span><Segmented value={value.imageAspectRatio || value.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIOS} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></label>
       <ImageCapacityControl modelId={value.imageModelId} aspectRatio={value.imageAspectRatio || value.aspectRatio || '9:16'} active={active} />
       <label className="batch-factory-engine-field"><span><b>生成资产图片</b><HelpTip title="生成资产图片">默认关闭。开启后自动化会提取人物、场景和道具资产并生成参考图；关闭时跳过资产生成阶段（不调用生图、不消耗额度），不影响分镜、视频与漫画流程；已有资产图片仍会照常使用，没有资产图片时沿用文字描述继续生成。</HelpTip></span><Switch checked={value.assetImagesEnabled === true} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} /></label>
       <label className="batch-factory-engine-field"><span><b>添加水印</b><HelpTip title="添加水印">开启后在每张漫画图片右下角叠加白底方框文字。</HelpTip></span><Switch checked={value.watermarkEnabled === true} onChange={watermarkEnabled => patch({ watermarkEnabled })} /></label>
@@ -164,7 +164,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
       <label className="batch-factory-engine-field"><span><b>AI 修复</b><HelpTip title="AI 修复">默认关闭；只有显式开启后才会调用 AI 修复，关闭时只走规则脱敏/打码，不影响后续阶段。</HelpTip></span><Switch checked={value.sensitiveAIEnabled === true} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} /></label>
       {/* 这里不能用 label 包住字段：同一 label 内的“？”帮助按钮是 label 的受控元素，
           浏览器会把点击下拉当成激活帮助按钮，导致弹层打开后立即失焦收回（闪回）。 */}
-      <div className="batch-factory-engine-field"><span><b>修复模型</b><HelpTip title="修复模型">可多选，按顺序逐个尝试；留空表示继承小说获取页的全局修复模型。</HelpTip></span><Select mode="multiple" allowClear value={Array.isArray(value.sensitiveAIModels) ? value.sensitiveAIModels : []} options={modelOptions.text} placeholder="默认继承全局修复模型" onChange={sensitiveAIModels => patch({ sensitiveAIModels })} /></div>
+      <div className="batch-factory-engine-field"><span><b>修复模型</b><HelpTip title="修复模型">可多选，按顺序逐个尝试；留空表示继承批量测书页的全局修复模型。</HelpTip></span><Select mode="multiple" allowClear value={Array.isArray(value.sensitiveAIModels) ? value.sensitiveAIModels : []} options={modelOptions.text} placeholder="默认继承全局修复模型" onChange={sensitiveAIModels => patch({ sensitiveAIModels })} /></div>
       <label className="batch-factory-engine-field"><span><b>失败时策略</b><HelpTip title="失败时策略">“自动打码并继续”不会中断生产；“判为失败”会停止当前书。</HelpTip></span><Segmented block value={value.sensitiveAIOnFailure === 'fail' ? 'fail' : 'review'} options={[{ value: 'review', label: '自动打码并继续' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
     </div></section> : null}
     {visibility.video && sections.includes('audio') ? <section className="batch-factory-engine-card"><header><b>跟随配音</b><HelpTip title="跟随配音">开启后只测量没有有效缓存的视频原文非空行。</HelpTip></header><div className="batch-factory-engine-card-body"><Space direction="vertical" style={{ width: '100%' }}>
