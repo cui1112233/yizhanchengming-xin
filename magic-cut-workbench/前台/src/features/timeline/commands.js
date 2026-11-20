@@ -17,6 +17,11 @@ function locate(state, clipId) {
 function validateClip(clip) {
   if (clip.startMs < 0 || clip.sourceStartMs < 0) throw new Error('clip bounds must be nonnegative')
   if (clip.durationMs <= 0 || clip.speed <= 0) throw new Error('clip duration and speed must be positive')
+  if (clip.volume != null && (clip.volume < 0 || clip.volume > 2)) throw new Error('clip volume must stay between 0 and 2')
+}
+
+export function defaultClipVolume(kind) {
+  return kind === 'audio' ? 0.7 : 1
 }
 
 export function executeCommand(current, command) {

@@ -3,7 +3,7 @@ import { Copy, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { apiRequest } from '../../shared/api/client.js'
-import { executeCommand, needsAutosave } from './commands.js'
+import { defaultClipVolume, executeCommand, needsAutosave } from './commands.js'
 
 function clipID() {
   return `clip_${crypto.randomUUID().replaceAll('-', '')}`
@@ -73,7 +73,7 @@ export function Timeline({ projectID, materialToInsert, onMaterialInserted, play
     const kind = materialToInsert.mediaType === 'audio' ? 'audio' : 'video'
     const track = timeline.tracks.find(item => item.kind === kind) || timeline.tracks[0]
     const startMs = Math.max(0, ...track.clips.map(clip => clip.startMs + clip.durationMs))
-    run({ type: 'insert', trackId: track.id, clip: { id: clipID(), materialId: materialToInsert.id, name: materialToInsert.originalName, startMs, durationMs: materialToInsert.metadata?.durationMs || 5000, sourceStartMs: 0, speed: 1 } })
+    run({ type: 'insert', trackId: track.id, clip: { id: clipID(), materialId: materialToInsert.id, name: materialToInsert.originalName, startMs, durationMs: materialToInsert.metadata?.durationMs || 5000, sourceStartMs: 0, speed: 1, volume: defaultClipVolume(kind) } })
     onMaterialInserted?.()
   }, [materialToInsert, timeline, run, onMaterialInserted])
 

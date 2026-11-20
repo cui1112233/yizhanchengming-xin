@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { executeCommand, needsAutosave } from './commands.js'
+import { defaultClipVolume, executeCommand, needsAutosave } from './commands.js'
 
 const original = {
   revision: 2,
@@ -11,6 +11,17 @@ const original = {
     { id: 'audio-1', kind: 'audio', clips: [] },
   ],
 }
+
+test('ordinary audio uses original 70 percent default while video original sound stays at 100 percent', () => {
+  assert.equal(defaultClipVolume('audio'), 0.7)
+  assert.equal(defaultClipVolume('video'), 1)
+})
+
+test('clip volume accepts mute and rejects values outside the original 0 to 200 percent range', () => {
+  const muted = executeCommand(original, { type: 'insert', trackId: 'audio-1', clip: { id: 'muted', materialId: 'audio', startMs: 0, durationMs: 1000, sourceStartMs: 0, speed: 1, volume: 0 } })
+  assert.equal(muted.state.tracks[1].clips[0].volume, 0)
+  assert.throws(() => executeCommand(original, { type: 'insert', trackId: 'audio-1', clip: { id: 'too-loud', materialId: 'audio', startMs: 0, durationMs: 1000, sourceStartMs: 0, speed: 1, volume: 2.1 } }), /volume/)
+})
 
 for (const [name, command] of [
 	['insert', { type: 'insert', trackId: 'video-1', clip: { id: 'clip-2', materialId: 'mcm-2', startMs: 5000, durationMs: 1000, sourceStartMs: 0, speed: 1 } }],

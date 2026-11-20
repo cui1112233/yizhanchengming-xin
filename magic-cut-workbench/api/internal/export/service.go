@@ -307,6 +307,7 @@ func BuildRenderPlan(value timeline.Timeline, materials []material.Material, inp
 	args := []string{"-hide_banner", "-loglevel", "error", "-nostats"}
 	filters := make([]string, 0, len(clips)+2)
 	labels := make([]string, 0, len(clips))
+	audioSegmentLabels := make([]string, 0, len(clips))
 	for index, clip := range clips {
 		item, ok := byID[clip.MaterialID]
 		if !ok || item.MediaType != "video" || strings.TrimSpace(item.StorageKey) == "" {
@@ -320,6 +321,20 @@ func BuildRenderPlan(value timeline.Timeline, materials []material.Material, inp
 		label := fmt.Sprintf("v%d", index)
 		filters = append(filters, fmt.Sprintf("[%d:v:0]setpts=(PTS-STARTPTS)/%s,scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=%d,setsar=1,format=yuv420p[%s]", index, number(clip.Speed), input.Width, input.Height, input.Width, input.Height, input.FrameRate, label))
 		labels = append(labels, "["+label+"]")
+		audioLabel := fmt.Sprintf("va%d", index)
+		if item.Metadata.AudioCodec == "" {
+			filters = append(filters, fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=%s,asetpts=PTS-STARTPTS[%s]", seconds(float64(clip.DurationMs)/1000), audioLabel))
+		} else {
+			chain := []string{
+				fmt.Sprintf("[%d:a:0]atrim=duration=%s", index, seconds(sourceDuration)),
+				"asetpts=PTS-STARTPTS",
+				"aresample=48000",
+			}
+			chain = append(chain, atempoFilters(clip.Speed)...)
+			chain = append(chain, "volume="+number(clipVolume(clip, 1)))
+			filters = append(filters, strings.Join(chain, ",")+"["+audioLabel+"]")
+		}
+		audioSegmentLabels = append(audioSegmentLabels, "["+audioLabel+"]")
 		plan.Inputs = append(plan.Inputs, PlanInput{MaterialID: clip.MaterialID, Path: item.StorageKey, SourceStartMs: clip.SourceStartMs, DurationMs: clip.DurationMs, Speed: clip.Speed})
 		plan.DurationMs += clip.DurationMs
 	}
@@ -328,7 +343,52 @@ func BuildRenderPlan(value timeline.Timeline, materials []material.Material, inp
 	} else {
 		filters = append(filters, strings.Join(labels, "")+fmt.Sprintf("concat=n=%d:v=1:a=0[vout]", len(labels)))
 	}
-	filters = append(filters, fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=%s,asetpts=PTS-STARTPTS[aout]", seconds(float64(plan.DurationMs)/1000)))
+	if len(audioSegmentLabels) == 1 {
+		filters = append(filters, audioSegmentLabels[0]+"anull[baseaudio]")
+	} else {
+		filters = append(filters, strings.Join(audioSegmentLabels, "")+fmt.Sprintf("concat=n=%d:v=0:a=1[baseaudio]", len(audioSegmentLabels)))
+	}
+	audioClips := make([]timeline.Clip, 0)
+	for _, track := range value.Tracks {
+		if track.Kind == "audio" {
+			audioClips = append(audioClips, track.Clips...)
+		}
+	}
+	sort.SliceStable(audioClips, func(i, j int) bool { return audioClips[i].StartMs < audioClips[j].StartMs })
+	overlayLabels := make([]string, 0, len(audioClips))
+	for _, clip := range audioClips {
+		item, ok := byID[clip.MaterialID]
+		if !ok || item.MediaType != "audio" || strings.TrimSpace(item.StorageKey) == "" {
+			return RenderPlan{}, &ServiceError{Code: "EXPORT_MATERIAL_MISSING", Err: fmt.Errorf("时间线素材不可用：%s", clip.MaterialID)}
+		}
+		if clip.DurationMs <= 0 || clip.SourceStartMs < 0 || clip.StartMs < 0 || clip.Speed <= 0 {
+			return RenderPlan{}, &ServiceError{Code: "EXPORT_TIMELINE_INVALID", Err: fmt.Errorf("片段参数无效：%s", clip.ID)}
+		}
+		inputIndex := len(plan.Inputs)
+		sourceDuration := float64(clip.DurationMs) * clip.Speed / 1000
+		args = append(args, "-ss", seconds(float64(clip.SourceStartMs)/1000), "-t", seconds(sourceDuration), "-i", item.StorageKey)
+		label := fmt.Sprintf("audio%d", len(overlayLabels))
+		chain := []string{
+			fmt.Sprintf("[%d:a:0]atrim=duration=%s", inputIndex, seconds(sourceDuration)),
+			"asetpts=PTS-STARTPTS",
+			"aresample=48000",
+		}
+		chain = append(chain, atempoFilters(clip.Speed)...)
+		chain = append(chain,
+			"volume="+number(clipVolume(clip, .7)),
+			fmt.Sprintf("adelay=%d|%d", clip.StartMs, clip.StartMs),
+			"apad",
+			"atrim=duration="+seconds(float64(plan.DurationMs)/1000),
+		)
+		filters = append(filters, strings.Join(chain, ",")+"["+label+"]")
+		overlayLabels = append(overlayLabels, "["+label+"]")
+		plan.Inputs = append(plan.Inputs, PlanInput{MaterialID: clip.MaterialID, Path: item.StorageKey, SourceStartMs: clip.SourceStartMs, DurationMs: clip.DurationMs, Speed: clip.Speed})
+	}
+	if len(overlayLabels) == 0 {
+		filters = append(filters, "[baseaudio]anull[aout]")
+	} else {
+		filters = append(filters, "[baseaudio]"+strings.Join(overlayLabels, "")+fmt.Sprintf("amix=inputs=%d:duration=first:dropout_transition=0:normalize=0,atrim=duration=%s[aout]", len(overlayLabels)+1, seconds(float64(plan.DurationMs)/1000)))
+	}
 	args = append(args,
 		"-filter_complex", strings.Join(filters, ";"),
 		"-map", "[vout]", "-map", "[aout]",
@@ -341,6 +401,32 @@ func BuildRenderPlan(value timeline.Timeline, materials []material.Material, inp
 
 func seconds(value float64) string { return strconv.FormatFloat(value, 'f', 3, 64) }
 func number(value float64) string  { return strconv.FormatFloat(value, 'f', -1, 64) }
+
+func clipVolume(clip timeline.Clip, fallback float64) float64 {
+	if clip.Volume == nil {
+		return fallback
+	}
+	return *clip.Volume
+}
+
+func atempoFilters(speed float64) []string {
+	if speed == 1 {
+		return nil
+	}
+	filters := make([]string, 0, 3)
+	for speed > 2 {
+		filters = append(filters, "atempo=2")
+		speed /= 2
+	}
+	for speed < .5 {
+		filters = append(filters, "atempo=0.5")
+		speed /= .5
+	}
+	if speed != 1 {
+		filters = append(filters, "atempo="+number(speed))
+	}
+	return filters
+}
 
 type FFmpeg struct {
 	Path string

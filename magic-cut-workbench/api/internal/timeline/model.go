@@ -18,12 +18,13 @@ type Track struct {
 }
 
 type Clip struct {
-	ID            string  `json:"id"`
-	MaterialID    string  `json:"materialId"`
-	StartMs       int64   `json:"startMs"`
-	DurationMs    int64   `json:"durationMs"`
-	SourceStartMs int64   `json:"sourceStartMs"`
-	Speed         float64 `json:"speed"`
+	ID            string   `json:"id"`
+	MaterialID    string   `json:"materialId"`
+	StartMs       int64    `json:"startMs"`
+	DurationMs    int64    `json:"durationMs"`
+	SourceStartMs int64    `json:"sourceStartMs"`
+	Speed         float64  `json:"speed"`
+	Volume        *float64 `json:"volume,omitempty"`
 }
 
 func Validate(value Timeline) error {
@@ -49,6 +50,9 @@ func Validate(value Timeline) error {
 			}
 			if clip.DurationMs <= 0 || clip.Speed <= 0 {
 				return errors.New("clip duration and speed must be positive")
+			}
+			if clip.Volume != nil && (*clip.Volume < 0 || *clip.Volume > 2) {
+				return errors.New("clip volume must stay between 0 and 2")
 			}
 			clipIDs[clip.ID] = true
 		}
