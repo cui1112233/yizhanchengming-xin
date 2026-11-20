@@ -1,0 +1,35 @@
+{
+  "verifiedAt": "2026-11-20T19:48:38.030429+08:00",
+  "runtime": {
+    "git_sha": "2b6a8f5b",
+    "runtime_manifest_sha": "2b6a8f5b",
+    "frontend_entry": "/assets/user-BSMKinSn.js",
+    "runtime": "go"
+  },
+  "health": {
+    "ok": true
+  },
+  "assets": {
+    "/assets/user-BSMKinSn.js": {
+      "bytes": 160445,
+      "sha256": "7810a0d353cad260258381b521ad7bc046af23aadfcbd8a105f256d3e52c89b5"
+    },
+    "/assets/NovelCreationPage-D2ROe7g6.js": {
+      "bytes": 152810,
+      "sha256": "454452fc6cc02ced8f4cf2587fef228f3a02a163940ee2289bf5dac5560246b6"
+    }
+  },
+  "preset": {
+    "id": "novel-creation.studio-planning-v4",
+    "name": "创作对话·长短篇会话与素材分流",
+    "containsShortMode": true
+  },
+  "binarySha256": "691f24184187f2e7b29207e70c3b9d369c0d41ece09bb025e3aad92b262885f2",
+  "paidCalls": 0,
+  "originalReference": "Recovered current frontend handlers; original app not open and not launched",
+  "liveBefore": "Short original -> Start creation -> New novel project modal with genre/chapter words; cancelled without creating",
+  "liveAfter": "Short discussion -> Send empty -> requirement validation, no project modal; long/short mode switch verified; kept short discussion open",
+  "workCountBefore": 3,
+  "workCountAfter": 3,
+  "testScope": "11 page journeys, 11 Studio browser cases, 5 source cases; Go novel/prompt/http; no real paid generation"
+}
