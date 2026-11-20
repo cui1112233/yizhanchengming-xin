@@ -7,8 +7,8 @@ import { listAvailableModels } from '../../shared/api/modelCatalog.js';
 import { creativePromptFields, creativePromptOptions } from './comic-screenplay-creative.js';
 
 export const comicDegreeOptions = [
-  { value: 'master', label: '大师模式 · 3D', description: '人物、场景、道具 · 3D 设定', detail: '包含颜值定位与出现集数' },
-  { value: 'master_real', label: '大师模式 · 写实', description: '人物、场景、道具 · 写实设定', detail: '包含颜值定位与出现集数' },
+  { value: 'master', label: '大模型-3D', description: '人物、场景、道具 · 3D 设定', detail: '包含颜值定位与出现集数' },
+  { value: 'master_real', label: '大模型-写实', description: '人物、场景、道具 · 写实设定', detail: '包含颜值定位与出现集数' },
   { value: 'more_diff', label: '差异化', description: '强化人物的外形差异', detail: '场景与道具使用标准解析' },
   { value: 'standard', label: '标准', description: '提取基础人物设定', detail: '场景与道具使用标准解析' },
 ];
@@ -61,7 +61,7 @@ export function ComicStylePicker({ value, onChange, styles = [], disabled = fals
   const filtered = styles.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   function choose() { setDraft({ ...value }); setQuery(''); setOpen(true); }
   return <>
-    <div className="comic-style-current"><button disabled={disabled} type="button" className="style-picker-trigger" onClick={choose}><OriginalIcon name="ColorPaletteOutline" size={compact ? 13 : 17} /><span>{value.style_name || '无画风（可选）'}</span>{compact?<OriginalIcon name="ChevronDownOutline" size={12}/>:null}<span className="comic-style-change">选择</span></button>
+    <div className="comic-style-current"><button disabled={disabled} type="button" className="style-picker-trigger" onClick={choose}><OriginalIcon name="ColorPaletteOutline" size={compact ? 13 : 17} /><span>{value.style_name || '点击选择画风'}</span>{compact?<OriginalIcon name="ChevronDownOutline" size={12}/>:null}<span className="comic-style-change">选择</span></button>
       {value.style_id ? <Button disabled={disabled} type="text" size="small" aria-label="清除画风选择" icon={<OriginalIcon name="CloseOutline" size={14} />} onClick={() => onChange({ style_name: '', style_id: null })} /> : null}</div>
     <Modal className="screenplay-style-modal" title="选择我的画风" open={open} onCancel={() => setOpen(false)} footer={<><Button onClick={() => setOpen(false)}>取消</Button><Button type="primary" onClick={() => { onChange({ style_id: draft?.style_id || null, style_name: draft?.style_name || '' }); setOpen(false); }}>确认选择</Button></>} width={780}>
       <p className="comic-style-caption">画风来自你的私人画风库；不选择也可以保存作品。</p><Button onClick={() => { setNewName(''); setNewPrompt(''); setAddError(''); setAddOpen(true); }}>新增私人画风</Button>
@@ -97,7 +97,7 @@ export function ComicCreativeFields({ value, onChange, library, loading, error, 
     {error ? <Alert type="error" showIcon message={error} action={<Button size="small" onClick={onRetry}>重新读取</Button>} /> : null}
     <Spin spinning={loading}>
       {creativePromptFields.map(({ field, purpose, label }) => <label key={field}><span>{label}</span><Select aria-label={label} disabled={disabled || loading || !!error} value={value[field] || undefined} placeholder={`请选择${label}`} options={creativePromptOptions(library.prompts, purpose, value[field])} onChange={id => onChange({ [field]: id })} /></label>)}
-      <label><span>作品画风</span><ComicStylePicker disabled={disabled || loading || !!error} value={value} styles={library.styles} onChange={onChange} onLibraryChange={onLibraryChange} /></label>
+      <label><span>选择风格</span><ComicStylePicker disabled={disabled || loading || !!error} value={value} styles={library.styles} onChange={onChange} onLibraryChange={onLibraryChange} /></label>
       <label><span>图片核心要求</span><Input.TextArea disabled={disabled} rows={2} value={value.image_core_instruction??''} placeholder="人物与场景图片共同遵守的补充要求" onChange={event => onChange({ image_core_instruction: event.target.value })} /></label>
       <label><span>图片生成模型</span><Select disabled={disabled} allowClear value={value.image_model_id || undefined} options={modelOptions(value.image_model_id)} placeholder="使用账号默认模型（可选）" onChange={id => onChange({ image_model_id: id || '' })} /></label>
       <label><span>图片编辑模型</span><Select disabled={disabled} allowClear value={value.image_edit_model_id || undefined} options={modelOptions(value.image_edit_model_id)} placeholder="使用账号默认模型（可选）" onChange={id => onChange({ image_edit_model_id: id || '' })} /></label>{modelError ? <Alert type="warning" showIcon message={modelError} action={<Button size="small" onClick={() => setModelAttempt(current => current + 1)}>重试模型列表</Button>} /> : null}
@@ -107,12 +107,12 @@ export function ComicCreativeFields({ value, onChange, library, loading, error, 
 
 export function ComicSourceInput({ mode, onModeChange, content, onContentChange, filename, parsing, onFile, onRemove, disabled = false }) {
   return <section className="comic-source-input" aria-label="原文内容">
-    <div className="comic-source-heading"><b>原文内容 <i>*</i></b><span>小说正文 / 已有剧本 / 故事大纲</span></div>
+    <div className="comic-source-heading"><b>上传剧本格式 <i>*</i></b><span>小说正文 / 已有剧本 / 故事大纲</span></div>
     <div className="comic-source-tabs" role="group" aria-label="内容输入方式">
       <button type="button" aria-pressed={mode === 'text'} className={mode === 'text' ? 'is-active' : ''} onClick={() => onModeChange('text')}><FileText size={15} />直接输入</button>
       <button type="button" aria-pressed={mode === 'file'} className={mode === 'file' ? 'is-active' : ''} onClick={() => onModeChange('file')}><UploadCloud size={15} />上传文件</button>
     </div>
-    {mode === 'file' ? <Upload.Dragger accept=".txt,.docx" disabled={parsing || disabled} beforeUpload={file => { void onFile(file); return false; }} showUploadList={false}><UploadCloud size={23} /><p>{parsing ? '正在读取文件…' : filename || '点击或拖入 TXT / DOCX 文件'}</p><small>导入后可在下方预览并修改内容</small></Upload.Dragger> : null}
+    {mode === 'file' ? <Upload.Dragger accept=".txt,.docx" disabled={parsing || disabled} beforeUpload={file => { void onFile(file); return false; }} showUploadList={false}><UploadCloud size={23} /><p>{parsing ? '正在读取文件…' : filename || '点击或拖动文件 (txt / docx)'}</p><small>导入后可在下方预览并修改内容</small></Upload.Dragger> : null}
     {filename ? <div className="comic-source-file"><FileText size={14} /><span>{filename}</span><Button type="text" size="small" onClick={onRemove}>移除文件</Button></div> : null}
     <Input.TextArea aria-label="原文内容" value={content} onChange={event => onContentChange(event.target.value)} rows={6} placeholder="在这里输入或粘贴内容，也可以切换到上传文件。" />
     <div className="comic-source-count"><span>原文按你的编辑内容保存</span><span>{[...content].length.toLocaleString()} / 600,000 字</span></div>
