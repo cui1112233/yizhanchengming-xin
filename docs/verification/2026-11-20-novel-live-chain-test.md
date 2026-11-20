@@ -32,7 +32,17 @@
 
 - Go novelcreation/prompt/storage三包通过（4.829s/0.425s/0.213s）。
 - 进度测试2/2通过，实际旧事件序列“阶段5→暂停100”显示5%、非成功状态。
-- 新全篇隔离MySQL、HTTP回归、构建和本地页面复核结果在完成后登记。
+- 新全篇隔离MySQL通过118.51s：真实MySQL8.4、补写、保留首稿、包装429和重开续跑，12次固定回复，未调用收费模型；临时schema已按nonce清理。
+- HTTP小说相关回归通过0.649s。前端生产构建通过28.20s；安全路径检查、Go embed和Go二进制构建通过。
 - 本轮模型检查的临时测试程序在archive目录，正常测试和产品中不包含收费探测入口；未保存/输出真实API凭据。
 
 证据目录：`_local-archive-20261028/novel-live-chain-20261120/`。当前程序最初SHA256 `62404758bbb709becae80494e207dbf095d70164e36cdf5fee9dceafc25a66b9`，4001的git信息为空，未沿用上一轮d421ccb1身份声称此时实际二进制相同。后续修复版本会单独登记。
+
+## 修复后的本地运行
+
+- 代码提交a0b1b508；本地4001 PID55716，二进制 `_local-archive-20261028/novel-live-a0b1b508/qiantie-novel-live.exe`。
+- git_sha与runtime_manifest_sha均a0b1b508；入口 `/assets/user-C72w3RjT.js`。
+- NovelCreationPage-BvlNoyT7.js的服务返回SHA256与构建一致：`6ee18ad4966170270e371533f0272a8f30e455cba2b3f9702eb667323c8e7fdf`。
+- 已用实际已登录页面重新打开第二任务，显示暂停、5%而非100%、0章；下拉模型已恢复aistudio。截图 `final-paused-5-percent.png`。
+- 历史两次unknown记录保留原始事实，不伪造provider响应改写历史；新的结构化503/model_not_found才使用明确失败分类。
+- 没有为验证提示修复再消耗模型请求，预算仍Used=4/12。真正完成全文的付费验收仍需要可正常执行的模型通道。
