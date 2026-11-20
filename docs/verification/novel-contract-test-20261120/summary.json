@@ -1,0 +1,267 @@
+{
+  "backend": {
+    "testResults": {
+      "pass": 665,
+      "skip": 41
+    },
+    "packages": [
+      {
+        "Time": "2026-11-20T17:20:30.65083+08:00",
+        "Action": "pass",
+        "Package": "qiantie/backend/internal/prompt/novelcreation",
+        "Elapsed": 0.234
+      },
+      {
+        "Time": "2026-11-20T17:20:35.5343376+08:00",
+        "Action": "pass",
+        "Package": "qiantie/backend/internal/novelcreation",
+        "Elapsed": 5.119
+      }
+    ],
+    "failedTests": [],
+    "skippedTests": [
+      "TestChapterImportRealMySQL",
+      "TestConfirmationSchedulerRealMySQLRoundTrip",
+      "TestLongImitationRealMySQLOwnerCreateRollbackReplaySummary",
+      "TestMySQLJSONTransportReadOnly",
+      "TestNativePostWriteReviewRealMySQL",
+      "TestNativeRoutedFailureRealMySQL",
+      "TestNativePatchRevisionRealMySQL",
+      "TestNativeSettlementContinuityRealMySQL",
+      "TestNovelParityRealMySQLModes/long_original",
+      "TestNovelParityRealMySQLModes/short_original",
+      "TestNovelParityRealMySQLModes/long_imitation",
+      "TestNovelParityRealMySQLModes/short_imitation",
+      "TestNovelParityRealMySQLModes/fanfiction",
+      "TestNovelParityRealMySQLModes/continuation",
+      "TestNovelParityRealMySQLSchema",
+      "TestNovelParityRealMySQLContent",
+      "TestNovelParityRealMySQLAtomicAndClaim",
+      "TestNovelParityRealMySQLContinuity",
+      "TestNovelParityRealMySQLRecovery/ready",
+      "TestNovelParityRealMySQLRecovery/event",
+      "TestNovelParityRealMySQLRecovery/completed",
+      "TestNovelParityRealMySQLRecovery/save_pending",
+      "TestNovelParityRealMySQLFenceAndCancel/fence",
+      "TestNovelParityRealMySQLFenceAndCancel/cancel",
+      "TestNovelParityRealMySQLCreationIntents/schedule",
+      "TestNovelParityRealMySQLCreationIntents/batch",
+      "TestNovelParityRealMySQLAutomation/schedule",
+      "TestNovelParityRealMySQLAutomation/batch",
+      "TestNovelParityRealMySQLAutomation/rejection",
+      "TestNovelParityRealMySQLCreationProcessHelper",
+      "TestNovelParityRealMySQLCrossProcessCreation",
+      "TestNovelParityRealMySQLArchivedBatchesDoNotStarveActive",
+      "TestReviewDimensionFindingRealMySQL",
+      "TestReviewDimensionsRealMySQLRoundTrip",
+      "TestShortFullPipelineOwnedMySQLCompletionFallbackAndRetry",
+      "TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen",
+      "TestShortControlledRealMySQLReauditSaveAndRestart",
+      "TestShortStoryRealMySQLCheckpointAndReopen",
+      "TestShortWriterConversationOwnedMySQLRetry",
+      "TestStudioRealMySQLOwnerIsolationAndRestart",
+      "TestSystemPresetRealMySQLSnapshotSurvivesRestart"
+    ]
+  },
+  "http": {
+    "testResults": {
+      "pass": 8
+    },
+    "packages": [
+      {
+        "Time": "2026-11-20T17:28:53.8692727+08:00",
+        "Action": "pass",
+        "Package": "qiantie/backend/internal/httpapi",
+        "Elapsed": 1.6320000000000001
+      }
+    ],
+    "failedTests": [],
+    "skippedTests": []
+  },
+  "frontend": {
+    "summary": {
+      "tests": "94",
+      "pass": "76",
+      "fail": "18",
+      "cancelled": "0",
+      "skipped": "0",
+      "duration_ms": "1680111.697"
+    },
+    "complete": true,
+    "failedTests": [
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:100:1",
+        "name": "C1b 恢复记录无法保存时保留正文并阻止无法去重的提交 (59781.4383ms)",
+        "error": "AssertionError [ERR_ASSERTION]: test browser did not expose its inspection port",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:137:1",
+        "name": "C5a 四工具切换主工作区并返回原会话草稿 (32436.6837ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout C5a workspace",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:152:1",
+        "name": "C5a R1 定时内部补建会话保持工具页和编辑内容 (16344.5882ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout C5a R1 ensure session",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:160:1",
+        "name": "C5a 无作品不显示虚构资料且工具导航不偷建作品或调用项目接口 (7897.0551ms)",
+        "error": "AssertionError [ERR_ASSERTION]: missing honest project restriction",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:199:1",
+        "name": "草稿按账号作品会话模式隔离，慢旧请求不能写入新作品 (5899.2796ms)",
+        "error": "AssertionError [ERR_ASSERTION]: missing input scopes",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:210:1",
+        "name": "Agent真实表单保存零值false和八个收费路由；本地检查不配置模型 (6426.2879ms)",
+        "error": "AssertionError [ERR_ASSERTION]: sidebar width",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:214:1",
+        "name": "资料真实粘贴解析、按顺序选章、引用与备忘录进入定时和批量完整DTO，上限默认值可见 (13634.5382ms)",
+        "error": "AssertionError [ERR_ASSERTION]: missing input materials",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:226:1",
+        "name": "文风统计不调用模型，明确分析丢回包后刷新仅恢复原maintenance编号；文风单独可作为仿写输入 (11401.385ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout style",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:246:1",
+        "name": "四种现有会话模式保留发送合同，空要求不提交 (30212.9657ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout six modes",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:258:45",
+        "name": "schedules创建丢回包及迟到同内容旧计划不认作本意图，刷新后只恢复原key (19788.1256ms)",
+        "error": "AssertionError [ERR_ASSERTION]: missing/disabled button intent schedules",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:266:1",
+        "name": "编辑s2仿写计划保持原会话完整引用；明确修改参考文本仍提交给s2 (28675.7512ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout edit original session",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:272:1",
+        "name": "原计划会话读取失败保留编辑输入并禁保存，重新读取后仍使用原s2 (39424.0389ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout original failure",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:278:1",
+        "name": "迟到原计划会话查询不能改新作品或保留旧保存操作 (18141.7738ms)",
+        "error": "AssertionError [ERR_ASSERTION]: timeout original late",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-creation.browser.test.js:336:1",
+        "name": "LIM 仿写长篇专用弹窗默认值与取消保留原对话 (86395.7517ms)",
+        "error": "Error: test page inspection timed out",
+        "classification": "browser inspection timeout"
+      },
+      {
+        "location": "src\\user\\pages\\novel-scheduler.browser.test.js:15:1",
+        "name": "内容暂停与模型调用确认在真实Agent表单中独立保存并重开 (59395.1332ms)",
+        "error": "Error: test page inspection timed out",
+        "classification": "browser inspection timeout"
+      },
+      {
+        "location": "src\\user\\pages\\novel-scheduler.browser.test.js:16:1",
+        "name": "已有历史计划可进入真实管理，默认三参数页面不展开旧创建表单 (101019.4239ms)",
+        "error": "Error: test page inspection timed out",
+        "classification": "browser inspection timeout"
+      },
+      {
+        "location": "src\\user\\pages\\novel-scheduler.browser.test.js:18:1",
+        "name": "旧设置缺少内容暂停字段时，改其他选项保存不会静默改义 (51901.9321ms)",
+        "error": "AssertionError [ERR_ASSERTION]: test browser did not expose its inspection port",
+        "classification": "assertion failure; product versus fixture requires review"
+      },
+      {
+        "location": "src\\user\\pages\\novel-short-artifact.browser.test.js:22:1",
+        "name": "空文本文件仍可查看编辑，未返回权限的快捷入口只读 (60612.7716ms)",
+        "error": "Error: test page inspection timed out",
+        "classification": "browser inspection timeout"
+      }
+    ]
+  },
+  "mockBrowserArtifacts": {
+    "completedCases": 61,
+    "failed": [
+      {
+        "case": "agent-layout-6NATcj",
+        "result": "failed",
+        "error": "sidebar width"
+      },
+      {
+        "case": "c5a-empty-fkfA4T",
+        "result": "failed",
+        "error": "missing honest project restriction"
+      },
+      {
+        "case": "c5a-r1-ensure-session-yvvAYd",
+        "result": "failed",
+        "error": "timeout C5a R1 ensure session"
+      },
+      {
+        "case": "c5a-workspaces-nsWUCf",
+        "result": "failed",
+        "error": "timeout C5a workspace"
+      },
+      {
+        "case": "fix-edit-failure-Susy9p",
+        "result": "failed",
+        "error": "timeout original failure"
+      },
+      {
+        "case": "fix-edit-late-tKZcAf",
+        "result": "failed",
+        "error": "timeout original late"
+      },
+      {
+        "case": "fix-edit-original-sM0WEY",
+        "result": "failed",
+        "error": "timeout edit original session"
+      },
+      {
+        "case": "fix-intent-schedules-2nuVae",
+        "result": "failed",
+        "error": "missing/disabled button intent schedules"
+      },
+      {
+        "case": "material-automation-JK2BZl",
+        "result": "failed",
+        "error": "missing input materials"
+      },
+      {
+        "case": "scopes-lLvx9z",
+        "result": "failed",
+        "error": "missing input scopes"
+      },
+      {
+        "case": "six-modes-dZdZod",
+        "result": "failed",
+        "error": "timeout six modes"
+      },
+      {
+        "case": "style-maintenance-ueMtVG",
+        "result": "failed",
+        "error": "timeout style"
+      }
+    ]
+  }
+}

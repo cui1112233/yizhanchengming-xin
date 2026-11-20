@@ -1,0 +1,6 @@
+=== RUN   TestNativeShortRunParityDiagnostic
+    zz_native_action_probe_test.go:14: action_type=create_book state=completed pending_action_created=true
+    zz_native_action_probe_test.go:16: action_type=short_run state=invalid_output pending_action_created=false message=模型回复格式不正确，已保留原始结果，未创建作品。
+--- PASS: TestNativeShortRunParityDiagnostic (0.00s)
+PASS
+ok  	qiantie/backend/internal/novelcreation	0.141s

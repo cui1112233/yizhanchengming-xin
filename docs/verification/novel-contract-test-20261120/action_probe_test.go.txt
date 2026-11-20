@@ -1,0 +1,18 @@
+package novelcreation
+
+import (
+ "strings"
+ "testing"
+)
+
+// Reproduce the documented native multi-action mismatch without providers or DB.
+// Pass means the incompatibility was reproduced, NOT that parity succeeded.
+func TestNativeShortRunParityDiagnostic(t *testing.T) {
+ r := studioRecord{Turns: []studioTurnRecord{{StudioTurn: StudioTurn{State: "received"}, RawReply: `{"message":"请确认生成短篇。","action":{"type":"short_run","book":{"title":"短篇诊断","genre":"悬疑","world":"小镇","protagonist":"林舟","coreConflict":"寻找来信者","targetChapterWords":2000}}}`}}}
+ baseline := studioRecord{Turns: []studioTurnRecord{{StudioTurn: StudioTurn{State: "received"}, RawReply: strings.Replace(r.Turns[0].RawReply, `"short_run"`, `"create_book"`, 1)}}}
+ if !settleStudio(&baseline) || baseline.Turns[0].State != "completed" || baseline.Action == nil { t.Fatal("create_book control did not succeed; probe cannot isolate action-type mismatch") }
+ t.Logf("action_type=create_book state=%s pending_action_created=%t", baseline.Turns[0].State, baseline.Action != nil)
+ if !settleStudio(&r) { t.Fatal("raw result was not processed") }
+ t.Logf("action_type=short_run state=%s pending_action_created=%t message=%s", r.Turns[0].State, r.Action != nil, r.Turns[0].ErrorMessage)
+ if r.Turns[0].State != "invalid_output" || r.Action != nil { t.Fatal("documented mismatch changed; inspect before updating specification") }
+}

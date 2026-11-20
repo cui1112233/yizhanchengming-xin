@@ -1,0 +1,378 @@
+✔ 小说创作拥有独立导航与路由 (28.9254ms)
+✔ 六模式使用批准的中文合同 (0.9513ms)
+✔ 草稿键编码分隔符且账号作品会话模式分别隔离 (0.1624ms)
+✔ 同run增量事件去重按游标合并，换run不混旧事件 (0.159ms)
+✔ 不可用显式模型保留为禁选提示，授权模型不被改写 (0.1354ms)
+✔ C1b 续写入口直接打开原专用表单，新建正式章节并刷新无会话正文 (12968.1141ms)
+✔ C1b 已有书不要求新书名，校验失败留窗留正文，取消不提交 (3934.9406ms)
+✔ C1b 丢回包冻结输入，重开恢复原编号且双击只导入一次 (3857.2045ms)
+✔ C1b 账号切换隔离冻结导入并拒绝旧回包与旧作品正文 (4004.4799ms)
+✔ C1b 已有作品追加后从服务器重读全部章节，迟到旧书读取不能串入 (4161.8741ms)
+✔ C1b 空作品库直接导入，空正文不发送，取消保留草稿且不建会话 (4493.8964ms)
+✔ C1b 已有续写会话沿用快照，导入刷新保持会话且不重复全量读口 (7872.3527ms)
+✖ C1b 恢复记录无法保存时保留正文并阻止无法去重的提交 (59781.4383ms)
+✔ C1b 工具页进入续写窗后取消回到对话并保留原模式草稿 (34538.6381ms)
+✔ C1b 导入不发送，随后显式发送只引用服务端最后正式章 (4294.7715ms)
+✔ C1b 无正式章节时显式续写拒绝发送且不建会话 (4973.7411ms)
+✔ C1b 恢复旧续写提交保持原快照，不用更新后的章节重算前文 (25735.1636ms)
+✔ C1b 没有作品时普通聊天发送也先提示导入，不打开通用建书窗 (14181.7478ms)
+✔ C1b R1 取消在途导入后切作品和工具，迟到成功不抢导航且可原编号恢复 (7144.1043ms)
+✔ C1b R1 同书导入后无会话章节挂起或失败禁止新发送，成功读回才用最新章 (14704.9681ms)
+✔ C1b R1 同书导入后会话快照挂起或失败禁止新发送，成功读回才用最新章 (17152.2451ms)
+✔ C1b R1 取消但留在同书，迟到成功仍使章节失效且读回前不发送 (19206.3877ms)
+✔ C1b R1 取消后重开窗口，旧成功不关闭新窗口或清掉冻结输入 (7786.6735ms)
+✔ C1b R1 正式章节仍在读取时旧消息intent可按原快照恢复 (4111.378ms)
+✔ C5a 六入口连续排列且六工具只在左栏底部 (16580.162ms)
+✖ C5a 四工具切换主工作区并返回原会话草稿 (32436.6837ms)
+✔ C5a 工具页点击当前作品或当前会话回到对话且不新建不丢草稿 (21682.1211ms)
+✔ C5a R1 四工具新建会话成功才返回对话，失败保留工具与原会话草稿 (9849.944ms)
+✖ C5a R1 定时内部补建会话保持工具页和编辑内容 (16344.5882ms)
+✔ C5a 导入弹窗与备忘录独立浮层保留当前工作区和草稿 (52614.719ms)
+✖ C5a 无作品不显示虚构资料且工具导航不偷建作品或调用项目接口 (7897.0551ms)
+✔ 新建会话真实创建，失败保留原会话及草稿 (5794.8991ms)
+✔ 真实空run对象新建会话后可首次发送且无假进度 (4385.8228ms)
+✔ 最终审核展示零分与未解决问题，资料维护不冒充章节审核 (5350.1666ms)
+✔ 停止批次无继续动作 (2740.5412ms)
+✔ 短篇导出只消费正式已保存能力，空长篇维护和蓝图不能导出短篇 (6014.7077ms)
+✔ 刷新恢复持久运行与正文；增量游标轮询只有一个在途请求 (12164.1991ms)
+✔ 输入法Enter不发送、Shift Enter换行不发送、同一帧双击仅一次提交 (6344.7224ms)
+✔ 回包丢失与刷新保留原提交编号，显式恢复重复相同DTO (11763.1139ms)
+✖ 草稿按账号作品会话模式隔离，慢旧请求不能写入新作品 (5899.2796ms)
+✔ 模型二次确认使用当前token与同一run，过期确认回包保留新token；蓝图走独立合同 (20739.183ms)
+✖ Agent真实表单保存零值false和八个收费路由；本地检查不配置模型 (6426.2879ms)
+✖ 资料真实粘贴解析、按顺序选章、引用与备忘录进入定时和批量完整DTO，上限默认值可见 (13634.5382ms)
+✔ 上传校验与真实multipart；活动原件无重试删除，失败资料不可选择 (19012.4563ms)
+✔ 章节版本冲突保留编辑草稿，成功编辑后标记事实待刷新并显式maintenance稳定恢复 (4913.4598ms)
+✖ 文风统计不调用模型，明确分析丢回包后刷新仅恢复原maintenance编号；文风单独可作为仿写输入 (11401.385ms)
+✔ 归档可恢复且保持自动任务暂停提示，清理中禁恢复；旧弹窗切作品后不再操作 (5380.6599ms)
+✔ 章节历史恢复请求保留expectedVersion；整本和短篇只下载已保存正文，空作品给出错误 (16143.5643ms)
+✔ 未知上游无普通重试；保存待恢复保持同run，维护分析不显示为新章节 (6117.6897ms)
+✔ 慢旧会话快照不能覆盖新作品；不可用的显式模型不能静默换成付费模型 (12862.17ms)
+✖ 四种现有会话模式保留发送合同，空要求不提交 (30212.9657ms)
+✔ 运行展示实际模型、有效零值与不支持未发送，维护未知结果无普通重试 (4289.3604ms)
+✔ 批量创建丢回包冻结原编号，重开同key恢复原任务 (21870.4793ms)
+✖ schedules创建丢回包及迟到同内容旧计划不认作本意图，刷新后只恢复原key (19788.1256ms)
+✔ batches创建丢回包及迟到同内容旧计划不认作本意图，刷新后只恢复原key (19017.2709ms)
+✖ 编辑s2仿写计划保持原会话完整引用；明确修改参考文本仍提交给s2 (28675.7512ms)
+✖ 原计划会话读取失败保留编辑输入并禁保存，重新读取后仍使用原s2 (39424.0389ms)
+✖ 迟到原计划会话查询不能改新作品或保留旧保存操作 (18141.7738ms)
+✔ 刷新后的本地检查读取持久报告且不发模型或修改正文 (4180.5409ms)
+✔ Agent自定义要求可新增停用分类删除保存，不触发生成 (5865.936ms)
+✔ Agent空值阻止保存、失败保留草稿、重试与重新进入可读回要求 (6734.355ms)
+✔ Agent跟随深色磨砂主题，分组不能白底白字 (4088.8174ms)
+✔ CORE01 新建无书会话迟到回包不抢当前会话 (4382.0797ms)
+✔ CORE01 讨论确认后切到正式作品且刷新保留生产会话 (5974.0681ms)
+✖ LIM 仿写长篇专用弹窗默认值与取消保留原对话 (86395.7517ms)
+✔ LIM 创建后进入正确仿写作品，摘要重开和续写继承配置不重建 (35362.005ms)
+✔ Agent账号默认无作品可保存，禁止无作品时选择作品范围 (5337.3599ms)
+✔ 仿写阶段资料可查看下载，终审需修改不会显示通过 (18626.5173ms)
+✔ 续写拆章保持源序、分离标题、去空白按UTF16计数 (7.0391ms)
+✔ 无标题、空白、仅标题及不支持的标题按已恢复拆章合同处理 (0.7396ms)
+✔ 同一行多个章节标记仍按每个源标记拆分 (0.5986ms)
+✔ 首个模型失败或暂停的100终止事件不能伪装生成完成 (4.4102ms)
+✔ 确认与取消沿用已完成步骤进度，仅成功显示100 (2.0207ms)
+✔ 37项原目录、默认29项、全选全不选、逐项保存重开和自定义隔离 (9867.8281ms)
+✔ 显式全不选保存恢复、保存失败保留未保存选择 (9017.2553ms)
+✔ 原版三参数调度器可无书打开，启动时明确拒绝且不创建隐藏任务 (9884.0451ms)
+✔ 调度启动只提交三参数和当前上下文，暂停恢复停止都发真实接口 (34257.449ms)
+✔ 调度启动回包丢失只查列表核对原编号，不重复启动 (41684.9017ms)
+✖ 内容暂停与模型调用确认在真实Agent表单中独立保存并重开 (59395.1332ms)
+✖ 已有历史计划可进入真实管理，默认三参数页面不展开旧创建表单 (101019.4239ms)
+✖ 旧设置缺少内容暂停字段时，改其他选项保存不会静默改义 (51901.9321ms)
+✔ 调度等待确认时显示原因，并能回到该计划原会话 (56704.4801ms)
+✔ 专用蓝图在通用大纲之前确认；稍后不发请求且刷新恢复 (55369.4517ms)
+✔ 文件编辑保存读回；取消无请求；失败保留草稿和原版本；重复点击只保存一次 (69490.8788ms)
+✔ 只读报告不可编辑，切换项目清除草稿和预览 (48996.6959ms)
+✔ 已完成正文快捷入口采用匹配文件权限，生成完成和过期终审分别展示 (7688.0528ms)
+✖ 空文本文件仍可查看编辑，未返回权限的快捷入口只读 (60612.7716ms)
+✔ 确认继续传递当前模型与思考设置 (33940.2358ms)
+✔ 首稿已保存与二稿采用状态明确分开，真实版本文件只读打开 (25576.1306ms)
+✔ 无效二稿保留首稿并显示原因；缺少文件不生成查看入口 (9684.4783ms)
+✔ 缺章阶段不把未完成稿称为完整首稿，旧短篇不出现版本区 (7791.982ms)
+✔ 创作与Agent设置说明整篇补写和修订范围，不改变旧模式说明 (7244.4712ms)
+✔ 补写和审稿失败或取消时不宣称仍在进行，也不宣称已采用第二稿 (4246.8568ms)
+✔ 后端真实writing状态在首轮正文生成时显示进行中 (17898.4808ms)
+ℹ tests 94
+ℹ suites 0
+ℹ pass 76
+ℹ fail 18
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1680111.697
+
+✖ failing tests:
+
+test at src\user\pages\novel-creation.browser.test.js:100:1
+✖ C1b 恢复记录无法保存时保留正文并阻止无法去重的提交 (59781.4383ms)
+  AssertionError [ERR_ASSERTION]: test browser did not expose its inspection port
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:21:10)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:137:1
+✖ C5a 四工具切换主工作区并返回原会话草稿 (32436.6837ms)
+  AssertionError [ERR_ASSERTION]: timeout C5a workspace
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:152:1
+✖ C5a R1 定时内部补建会话保持工具页和编辑内容 (16344.5882ms)
+  AssertionError [ERR_ASSERTION]: timeout C5a R1 ensure session
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:160:1
+✖ C5a 无作品不显示虚构资料且工具导航不偷建作品或调用项目接口 (7897.0551ms)
+  AssertionError [ERR_ASSERTION]: missing honest project restriction
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:199:1
+✖ 草稿按账号作品会话模式隔离，慢旧请求不能写入新作品 (5899.2796ms)
+  AssertionError [ERR_ASSERTION]: missing input scopes
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:210:1
+✖ Agent真实表单保存零值false和八个收费路由；本地检查不配置模型 (6426.2879ms)
+  AssertionError [ERR_ASSERTION]: sidebar width
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:214:1
+✖ 资料真实粘贴解析、按顺序选章、引用与备忘录进入定时和批量完整DTO，上限默认值可见 (13634.5382ms)
+  AssertionError [ERR_ASSERTION]: missing input materials
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:226:1
+✖ 文风统计不调用模型，明确分析丢回包后刷新仅恢复原maintenance编号；文风单独可作为仿写输入 (11401.385ms)
+  AssertionError [ERR_ASSERTION]: timeout style
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:246:1
+✖ 四种现有会话模式保留发送合同，空要求不提交 (30212.9657ms)
+  AssertionError [ERR_ASSERTION]: timeout six modes
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:258:45
+✖ schedules创建丢回包及迟到同内容旧计划不认作本意图，刷新后只恢复原key (19788.1256ms)
+  AssertionError [ERR_ASSERTION]: missing/disabled button intent schedules
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:266:1
+✖ 编辑s2仿写计划保持原会话完整引用；明确修改参考文本仍提交给s2 (28675.7512ms)
+  AssertionError [ERR_ASSERTION]: timeout edit original session
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:272:1
+✖ 原计划会话读取失败保留编辑输入并禁保存，重新读取后仍使用原s2 (39424.0389ms)
+  AssertionError [ERR_ASSERTION]: timeout original failure
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:278:1
+✖ 迟到原计划会话查询不能改新作品或保留旧保存操作 (18141.7738ms)
+  AssertionError [ERR_ASSERTION]: timeout original late
+
+  'failed' !== 'passed'
+
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:30:402)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation.browser.test.js:65:460)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-creation.browser.test.js:336:1
+✖ LIM 仿写长篇专用弹窗默认值与取消保留原对话 (86395.7517ms)
+  Error: test page inspection timed out
+      at Timeout._onTimeout (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:25:135)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at src\user\pages\novel-scheduler.browser.test.js:15:1
+✖ 内容暂停与模型调用确认在真实Agent表单中独立保存并重开 (59395.1332ms)
+  Error: test page inspection timed out
+      at Timeout._onTimeout (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:25:135)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at src\user\pages\novel-scheduler.browser.test.js:16:1
+✖ 已有历史计划可进入真实管理，默认三参数页面不展开旧创建表单 (101019.4239ms)
+  Error: test page inspection timed out
+      at Timeout._onTimeout (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:25:135)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at src\user\pages\novel-scheduler.browser.test.js:18:1
+✖ 旧设置缺少内容暂停字段时，改其他选项保存不会静默改义 (51901.9321ms)
+  AssertionError [ERR_ASSERTION]: test browser did not expose its inspection port
+      at runNovelBrowserDOM (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:21:10)
+      at async run (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-scheduler.browser.test.js:10:743)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src\user\pages\novel-short-artifact.browser.test.js:22:1
+✖ 空文本文件仍可查看编辑，未返回权限的快捷入口只读 (60612.7716ms)
+  Error: test page inspection timed out
+      at Timeout._onTimeout (file:///F:/%E8%84%9A%E6%9C%AC%E6%B5%8B%E8%AF%95/%E4%B8%80%E6%88%98%E6%99%9F%E9%93%AD-v88/frontend/src/user/pages/novel-creation/browserEvidence.js:25:135)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)

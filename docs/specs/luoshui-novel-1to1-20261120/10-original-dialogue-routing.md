@@ -87,3 +87,7 @@ CM摘要与文件哈希见`source/cm-studio-routing-snapshot.json`。这是源�
 2. 原版全部提案字段验证和默认值；失败、取消、重复确认的每条出口。
 3. 建书、短篇、审稿、修订、批量、封面的完整类型与UI反馈。
 4. 将确认的新协议差异转为CM实施规格，再连同原有防重复/权限/持久化一起实现和验证。本轮没有改产品代码，也没用收费模型测试。
+
+## 9. 后续测试登记
+
+现状测试已补：[2026-11-20测试报告](../../verification/novel-contract-test-20261120/README.md)。Go overlay诊断对同一JSON仅改变action.type：create_book建立pending action，short_run返回invalid_output。诊断没有调用模型或数据库，证明这条入口的类型限制，不代表原版模型原始回复或全部短篇入口都不可用。前端94项回归仍有18失败；未将它们以“测试通过”登记。

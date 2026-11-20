@@ -1,0 +1,9 @@
+{
+  "runtime": "go",
+  "git_sha": "b88a02d7",
+  "runtime_manifest_sha": "b88a02d7",
+  "frontend_entry": "/assets/user-BUGX6vCb.js",
+  "health": true,
+  "page": "http://127.0.0.1:4001/novel-creation",
+  "time": "2026-11-20T17:30:48.1962573+08:00"
+}
