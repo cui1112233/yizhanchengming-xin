@@ -48,7 +48,20 @@ type StudioBook struct {
 	CoreConflict       string `json:"coreConflict"`
 	TargetChapterWords int    `json:"targetChapterWords"`
 }
+
+// Short proposal fields follow the original confirmation action; model credentials
+// and executable state always come from our server, never from this payload.
+type StudioShortProposal struct {
+	Title             string `json:"title,omitempty"`
+	Direction         string `json:"direction,omitempty"`
+	Instruction       string `json:"instruction,omitempty"`
+	Summary           string `json:"summary,omitempty"`
+	TargetWordCount   int    `json:"targetWordCount,omitempty"`
+	TargetChapters    int    `json:"targetChapters,omitempty"`
+	ReaderPreferences string `json:"readerPreferences,omitempty"`
+}
 type StudioAction struct {
+	StudioShortProposal
 	ID     string     `json:"id"`
 	Type   string     `json:"type"`
 	Status string     `json:"status"`
@@ -68,6 +81,7 @@ type StudioSnapshot struct {
 	Turn          *StudioTurn     `json:"turn,omitempty"`
 }
 type StudioTransition struct {
+	Story             *ShortStory   `json:"story,omitempty"`
 	Session           StudioSession `json:"session"`
 	Project           Project       `json:"project"`
 	ProductionSession Session       `json:"productionSession"`

@@ -166,6 +166,7 @@ func settleStudio(r *studioRecord) bool {
 	var result struct {
 		Message string `json:"message"`
 		Action  *struct {
+			StudioShortProposal
 			Type string     `json:"type"`
 			Book StudioBook `json:"book"`
 		} `json:"action"`
@@ -185,7 +186,11 @@ func settleStudio(r *studioRecord) bool {
 		b := &result.Action.Book
 		b.Title = strings.TrimSpace(b.Title)
 		b.Genre = strings.TrimSpace(b.Genre)
-		if result.Action.Type != "create_book" || b.Title == "" || b.Genre == "" || utf8.RuneCountInString(b.Title) > 255 || utf8.RuneCountInString(b.Genre) > 96 || utf8.RuneCountInString(b.World) > 12000 || utf8.RuneCountInString(b.Protagonist) > 4000 || utf8.RuneCountInString(b.CoreConflict) > 4000 || b.TargetChapterWords < 800 || b.TargetChapterWords > 8000 {
+		if result.Action.Type == "short_run" {
+			normalized, shortErr := normalizeStudioShort(result.Action.StudioShortProposal)
+			e = shortErr
+			result.Action.StudioShortProposal = normalized
+		} else if result.Action.Type != "create_book" || b.Title == "" || b.Genre == "" || utf8.RuneCountInString(b.Title) > 255 || utf8.RuneCountInString(b.Genre) > 96 || utf8.RuneCountInString(b.World) > 12000 || utf8.RuneCountInString(b.Protagonist) > 4000 || utf8.RuneCountInString(b.CoreConflict) > 4000 || b.TargetChapterWords < 800 || b.TargetChapterWords > 8000 {
 			e = errors.New("invalid action")
 		}
 	}
@@ -196,7 +201,7 @@ func settleStudio(r *studioRecord) bool {
 	}
 	r.Messages = append(r.Messages, StudioMessage{ID: novelID("studio-msg"), Role: "assistant", Content: result.Message, Status: "completed"})
 	if result.Action != nil {
-		r.Action = &StudioAction{ID: novelID("action"), Type: "create_book", Status: "pending", Book: result.Action.Book}
+		r.Action = &StudioAction{ID: novelID("action"), Type: result.Action.Type, Status: "pending", Book: result.Action.Book, StudioShortProposal: result.Action.StudioShortProposal}
 	} else if r.Action != nil {
 		r.Action.Status = "superseded"
 	}
@@ -551,6 +556,38 @@ func (s *Service) ConfirmStudioAction(ctx context.Context, owner, id string, in 
 		}
 		if r.Action.Status != "pending" {
 			return conflict()
+		}
+		if r.Action.Type == "short_run" {
+			proposal, e := normalizeStudioShort(r.Action.StudioShortProposal)
+			if e != nil {
+				return e
+			}
+			child := NewService(tx, quietRuntime{s.runtime}, s.pipeline)
+			child.promptCatalog = s.promptCatalog
+			input, e := normalizeShortStory(ShortStoryInput{
+				IdempotencyKey: "studio-confirm:" + r.Action.ID,
+				Mode:           "short_original", ModelID: in.ModelID, ThinkingLevel: in.ThinkingLevel,
+				Title: proposal.Title, Requirements: studioShortDirection(proposal),
+				TargetWordCount: proposal.TargetWordCount, TargetChapters: proposal.TargetChapters,
+				ReaderPreferences: proposal.ReaderPreferences,
+			})
+			if e != nil {
+				return e
+			}
+			result, e := child.startShortStoryInTransaction(ctx, owner, input)
+			if e != nil {
+				return e
+			}
+			r.Session.ProjectID = result.Project.ID
+			r.Session.ProductionSessionID = result.Session.ID
+			r.Session.ProductionRunID = result.Run.ID
+			r.Action.Status = "confirmed"
+			out = StudioTransition{Session: r.Session, Project: result.Project, ProductionSession: result.Session, Run: result.Run, Story: &result.Story}
+			r.Transition = &out
+			return writeStudio(ctx, tx, owner, r, false)
+		}
+		if r.Action.Type != "create_book" {
+			return inputError("此创作动作尚未接通，未启动任务")
 		}
 		b := r.Action.Book
 		project, e := tx.CreateProject(ctx, owner, CreateProjectInput{Title: b.Title, Genre: b.Genre, World: b.World, Protagonist: b.Protagonist, CoreConflict: b.CoreConflict, TargetChapterWords: b.TargetChapterWords, ModelID: in.ModelID})

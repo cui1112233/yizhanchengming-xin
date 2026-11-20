@@ -11,25 +11,33 @@ export default function AgentPanel({ projectId, models, mode }) {
   const [form] = Form.useForm(); const [settings, setSettings] = useState(null); const [busy, setBusy] = useState(false);
   const [dimensionCatalog, setDimensionCatalog] = useState([]);
   const saving = useRef(false), pauseTouched = useRef(false);
+  const [loadState, setLoadState] = useState({ key: '', status: 'loading', error: '' });
+  const [reload, setReload] = useState(0);
   const [scopeKind, setScopeKind] = useState('account');
+  const loadKey = `${projectId || ''}:${scopeKind}`;
+  const loading = loadState.key !== loadKey || loadState.status === 'loading';
+  const ready = !loading && loadState.status === 'ready';
   const projectScope = scopeKind === 'project' && !!projectId;
   const scope = useWorkspaceScope(projectScope ? projectId : 'account-agent-defaults');
   const request = (input, options) => projectScope ? novelProjectRequest(projectId, '/settings', input, options) : novelRequest('/agent-settings', input, options);
   useEffect(() => {
-    setSettings(null); form.resetFields();
+    setSettings(null); setDimensionCatalog([]); form.resetFields();
+    setLoadState({key:loadKey,status:'loading',error:''});
     scope.call(request(undefined, { signal: scope.signal }), r => {
-      pauseTouched.current = false; setSettings(r.settings || {}); const a = r.settings?.agent || {};
       const catalog = Array.isArray(r.reviewDimensionCatalog) ? r.reviewDimensionCatalog : [];
+      if (!r.settings || !catalog.length) throw Error('审稿维度目录读取失败，请重新读取设置');
+      pauseTouched.current = false; setSettings(r.settings); const a = r.settings.agent || {};
       setDimensionCatalog(catalog);
       form.setFieldValue('reviewDimensionIds', a.reviewDimensionIds ?? catalog.filter(d => d.defaultEnabled).map(d => d.id));
       form.setFieldsValue({ ...a, reviewPrompts: a.reviewPrompts || [], customWritePrompts: a.customWritePrompts || [], targetChapterWords: a.targetChapterWords ?? 2000, maxRevisionRounds: a.maxRevisionRounds ?? 3,
         passScore: a.passScore ?? 80, baseTemperature: a.baseTemperature ?? 0.65, temperatureStep: a.temperatureStep ?? 0.15,
         thinkingLevel: a.thinkingLevel ?? 'standard', enableLengthNorm: a.enableLengthNorm ?? true,
         enablePostWrite: a.enablePostWrite ?? true, enableAiTells: a.enableAiTells ?? true, requireSecondaryConfirm: a.requireSecondaryConfirm ?? false, pauseAfterBlueprint: a.pauseAfterBlueprint ?? (mode ? ['long_original','long_imitation'].includes(mode) : true) });
-    }).catch(e => message.error(e.message));
-  }, [projectId, scopeKind]);
+      setLoadState({key:loadKey,status:'ready',error:''});
+    }).catch(e => { if (scope.isCurrent()) setLoadState({key:loadKey,status:'error',error:e.message || '读取设置失败'}); });
+  }, [projectId, scopeKind, reload]);
   async function save() {
-    if (saving.current || !scope.isCurrent()) return;
+    if (saving.current || !scope.isCurrent() || !ready) return;
     saving.current = true;
     try {
       const agent = await form.validateFields();
@@ -40,7 +48,7 @@ export default function AgentPanel({ projectId, models, mode }) {
       await scope.call(request(projectScope ? { styleProfile: settings?.styleProfile || '', rules: settings?.rules || [], agent } : {agent}, { method: 'PUT', signal: scope.signal }), r => { setSettings(r.settings); message.success('Agent设置已保存'); });
     } catch (e) { if (!e.errorFields) message.error(e.message); } finally { saving.current = false; if (scope.isCurrent()) setBusy(false); }
   }
-  return <Form form={form} layout="vertical" className="novel-panel novel-agent-page" disabled={busy}>
+  return <Form form={form} layout="vertical" className="novel-panel novel-agent-page" disabled={busy || !ready}>
     <div className="novel-agent-intro"><h2>Agent 设置</h2><p>为创作步骤指定自己的模型，设置审稿与写作要求。</p></div>
     <div className="novel-agent-scope" role="group" aria-label="设置保存范围"><Button type={!projectScope ? 'primary' : 'default'} disabled={busy} onClick={()=>setScopeKind('account')}>账号默认</Button><Button type={projectScope ? 'primary' : 'default'} disabled={!projectId || busy} onClick={()=>setScopeKind('project')}>当前作品</Button></div>
     <p>{projectScope ? '仅影响当前作品的新任务。' : '新作品会继承此设置；已有作品和历史任务保持原设置。'}</p>
@@ -63,13 +71,13 @@ export default function AgentPanel({ projectId, models, mode }) {
     </section>
     <p>大纲、蓝图或基础设定生成后暂停，可修改已保存内容后继续。旧作品未明确设置时保留原有暂停规则。</p>
     <section className="novel-agent-section"><h3>模型调用确认</h3><Form.Item name="requireSecondaryConfirm" label="每次后续模型调用前确认" valuePropName="checked"><Switch aria-label="每次后续模型调用前确认" /></Form.Item><p>此项保留旧设置的逐次调用保护，与上面的内容暂停分别生效。</p></section>
-    <Form.Item name="reviewDimensionIds" noStyle><ReviewDimensions catalog={dimensionCatalog} disabled={busy || !settings} /></Form.Item>
+    <Form.Item name="reviewDimensionIds" noStyle><ReviewDimensions catalog={dimensionCatalog} disabled={busy || !ready} loading={loading} error={!loading && !ready ? loadState.error : ''} onRetry={()=>setReload(n=>n+1)} /></Form.Item>
     <AgentRequirements />
     <AgentRequirements writing />
     {projectScope && <section className="novel-agent-section"><h3>当前作品设置</h3><div className="novel-form-grid">
       <Form.Item name="targetChapterWords" label="每章目标字数"><InputNumber aria-label="每章目标字数" min={800} max={10000} step={100} /></Form.Item>
       <Form.Item name="thinkingLevel" label="默认思考强度"><Select options={THINKING} /></Form.Item>
     </div></section>}
-    <footer className="novel-agent-footer"><span>{projectScope ? '保存到当前作品，新任务生效。' : '保存到当前账号，新作品自动继承。'}</span><Button type="primary" disabled={!settings} loading={busy} onClick={save}>保存Agent设置</Button></footer>
+    <footer className="novel-agent-footer"><span>{projectScope ? '保存到当前作品，新任务生效。' : '保存到当前账号，新作品自动继承。'}</span><Button type="primary" disabled={!ready} loading={busy} onClick={save}>保存Agent设置</Button></footer>
   </Form>;
 }

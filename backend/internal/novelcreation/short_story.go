@@ -140,8 +140,24 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 	if err != nil {
 		return out, err
 	}
-	digest := fingerprint(in)
 	err = s.store.AtomicCreate(ctx, owner, func(tx Store) error {
+		child := NewService(tx, quietRuntime{s.runtime}, s.pipeline)
+		child.promptCatalog = s.promptCatalog
+		out, err = child.startShortStoryInTransaction(ctx, owner, in)
+		return err
+	})
+	if err == nil {
+		s.Notify(ctx, owner, out.Run.ID)
+	}
+	return
+}
+
+// Caller owns the account transaction, including its durable confirmation receipt.
+// Never notify a worker until that outer transaction has committed.
+func (s *Service) startShortStoryInTransaction(ctx context.Context, owner string, in ShortStoryInput) (out ShortStoryResult, err error) {
+	tx := s.store
+	digest := fingerprint(in)
+	err = func() error {
 		receipt, e := tx.ReserveSubmission(ctx, owner, shortStoryKind, in.IdempotencyKey, digest)
 		if e != nil {
 			return e
@@ -250,12 +266,10 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 		out = ShortStoryResult{p, session, run, story}
 		result, _ := json.Marshal(out)
 		return tx.CompleteSubmission(ctx, owner, shortStoryKind, in.IdempotencyKey, submissionReceipt{Fingerprint: digest, ProjectID: p.ID, Result: result})
-	})
-	if err == nil {
-		s.Notify(ctx, owner, out.Run.ID)
-	}
+	}()
 	return
 }
+
 func (s *Service) GetShortStoryRequest(ctx context.Context, owner, key string) (out ShortStoryResult, err error) {
 	owner, err = requiredOwner(owner)
 	if err != nil {
