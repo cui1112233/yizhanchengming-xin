@@ -14,6 +14,7 @@ type Dependencies struct {
 	Materials     http.Handler
 	Timeline      http.Handler
 	Tasks         http.Handler
+	Exports       http.Handler
 }
 
 func New(deps Dependencies) http.Handler {
@@ -44,6 +45,10 @@ func New(deps Dependencies) http.Handler {
 	if deps.Tasks != nil {
 		mux.Handle("/api/magic-cut/tasks", deps.Tasks)
 		mux.Handle("/api/magic-cut/tasks/", deps.Tasks)
+	}
+	if deps.Exports != nil {
+		mux.Handle("/api/magic-cut/exports", deps.Exports)
+		mux.Handle("/api/magic-cut/exports/", deps.Exports)
 	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{

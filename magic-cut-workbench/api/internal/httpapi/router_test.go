@@ -115,3 +115,13 @@ func TestTaskRoutesUseTheTaskCenterHandler(t *testing.T) {
 		t.Fatalf("status=%d", recorder.Code)
 	}
 }
+
+func TestExportRoutesUseTheExportHandler(t *testing.T) {
+	exports := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	handler := New(Dependencies{Exports: exports})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/magic-cut/exports", nil))
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d", recorder.Code)
+	}
+}

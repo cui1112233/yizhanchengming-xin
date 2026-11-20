@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 
 	"yizhanchengming/magic-cut-workbench/internal/authbridge"
 	"yizhanchengming/magic-cut-workbench/internal/config"
+	workexport "yizhanchengming/magic-cut-workbench/internal/export"
 	"yizhanchengming/magic-cut-workbench/internal/httpapi"
 	"yizhanchengming/magic-cut-workbench/internal/material"
 	"yizhanchengming/magic-cut-workbench/internal/project"
@@ -32,6 +34,7 @@ func main() {
 	var materialHandler http.Handler
 	var timelineHandler http.Handler
 	var taskHandler http.Handler
+	var exportHandler http.Handler
 	if cfg.DatabaseDSN != "" {
 		openedDB, openErr := sql.Open("mysql", cfg.DatabaseDSN)
 		if openErr != nil {
@@ -53,8 +56,21 @@ func main() {
 			Now:           time.Now,
 		})
 		materialHandler = material.NewHandler(materialService, materialRepository, accountResolver.Resolve)
-		timelineHandler = timeline.NewHandler(timeline.NewStore(db, time.Now), accountResolver.Resolve)
-		taskHandler = worktask.NewHandler(worktask.NewSQLStore(db, time.Now), accountResolver.Resolve)
+		timelineRepository := timeline.NewStore(db, time.Now)
+		timelineHandler = timeline.NewHandler(timelineRepository, accountResolver.Resolve)
+		exportService := workexport.NewService(workexport.ServiceOptions{
+			StorageRoot: cfg.StorageRoot,
+			Timelines:   timelineRepository,
+			Materials:   materialRepository,
+			Repository:  workexport.NewSQLRepository(db),
+			Renderer:    workexport.FFmpeg{},
+			Probe:       material.FFprobe{},
+			NewExportID: func() string { return "mce_" + strings.TrimPrefix(material.NewTaskID(), "mct_") },
+			NewTaskID:   material.NewTaskID,
+			Now:         time.Now,
+		})
+		taskHandler = worktask.NewHandlerWithActions(worktask.NewSQLStore(db, time.Now), accountResolver.Resolve, exportService)
+		exportHandler = workexport.NewHandler(exportService, accountResolver.Resolve)
 	}
 
 	server := &http.Server{
@@ -67,6 +83,7 @@ func main() {
 			Materials:     materialHandler,
 			Timeline:      timelineHandler,
 			Tasks:         taskHandler,
+			Exports:       exportHandler,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       20 * time.Minute,

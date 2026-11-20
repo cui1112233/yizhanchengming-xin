@@ -13,13 +13,21 @@ type CenterStore interface {
 	Retry(context.Context, string, string) error
 }
 type OwnerResolver func(context.Context, *http.Request) (string, error)
+type ActionDelegate interface {
+	CancelTask(context.Context, string, string) (bool, error)
+	RetryTask(context.Context, string, string) (bool, error)
+}
 type handler struct {
-	store CenterStore
-	owner OwnerResolver
+	store   CenterStore
+	owner   OwnerResolver
+	actions ActionDelegate
 }
 
 func NewHandler(store CenterStore, owner OwnerResolver) http.Handler {
 	return &handler{store: store, owner: owner}
+}
+func NewHandlerWithActions(store CenterStore, owner OwnerResolver, actions ActionDelegate) http.Handler {
+	return &handler{store: store, owner: owner, actions: actions}
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +53,22 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok || r.Method != http.MethodPost {
 		writeTaskError(w, http.StatusNotFound, "TASK_ROUTE_NOT_FOUND", "任务接口不存在")
 		return
+	}
+	if h.actions != nil {
+		var handled bool
+		if action == "cancel" {
+			handled, err = h.actions.CancelTask(r.Context(), owner, id)
+		} else {
+			handled, err = h.actions.RetryTask(r.Context(), owner, id)
+		}
+		if err != nil {
+			writeTaskError(w, http.StatusConflict, "TASK_ACTION_FAILED", err.Error())
+			return
+		}
+		if handled {
+			writeTaskJSON(w, http.StatusOK, map[string]any{"ok": true})
+			return
+		}
 	}
 	if action == "cancel" {
 		err = h.store.Cancel(r.Context(), owner, id)

@@ -10,3 +10,7 @@ const statuses = {
 export function taskStatus(status) { return statuses[status] || { label: status || '未知', color: 'default' } }
 export function taskAction(task) { if (task?.status === 'pending' || task?.status === 'running') return 'cancel'; if (task?.status === 'failed' || task?.status === 'canceled') return 'retry'; return '' }
 export function taskTypeLabel(type) { return { material_probe: '素材解析', export_video: '视频导出' }[type] || type || '任务' }
+export function taskDownloadHref(task) {
+  const exportId = task?.input?.exportId
+  return task?.type === 'export_video' && task?.status === 'succeeded' && exportId ? `/api/magic-cut/exports/${exportId}/file` : ''
+}

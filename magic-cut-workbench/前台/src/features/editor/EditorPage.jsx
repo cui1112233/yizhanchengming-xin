@@ -2,6 +2,7 @@ import { Button, Segmented } from 'antd'
 import { Download, Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { ExportDialog } from '../export/ExportDialog.jsx'
 import { MaterialPanel } from '../materials/MaterialPanel.jsx'
 import { Player } from '../player/Player.jsx'
 import { Timeline } from '../timeline/Timeline.jsx'
@@ -9,6 +10,7 @@ import { commandForShortcut } from './editorModel.js'
 
 export function EditorPage({ projectID }) {
   const [queuedMaterial, setQueuedMaterial] = useState(null)
+  const [exportOpen, setExportOpen] = useState(false)
   useEffect(() => {
     const onKeyDown = event => {
       const command = commandForShortcut(event)
@@ -25,7 +27,7 @@ export function EditorPage({ projectID }) {
       <header className="editor-topbar">
         <div><b>未命名工程</b><small>{projectID}</small></div>
         <Segmented size="small" options={['剪辑', '字幕', '配音']} defaultValue="剪辑" />
-        <div><Button icon={<Settings2 size={16} />}>工程设置</Button><Button type="primary" icon={<Download size={16} />}>导出</Button></div>
+        <div><Button icon={<Settings2 size={16} />}>工程设置</Button><Button type="primary" icon={<Download size={16} />} onClick={() => setExportOpen(true)}>导出</Button></div>
       </header>
       <div className="editor-workspace">
         <MaterialPanel projectID={projectID} onInsert={setQueuedMaterial} />
@@ -36,6 +38,7 @@ export function EditorPage({ projectID }) {
         </aside>
       </div>
       <Timeline projectID={projectID} materialToInsert={queuedMaterial} onMaterialInserted={() => setQueuedMaterial(null)} />
+      <ExportDialog open={exportOpen} projectID={projectID} onClose={() => setExportOpen(false)} />
     </main>
   )
 }
