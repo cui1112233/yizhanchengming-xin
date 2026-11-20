@@ -1,0 +1,205 @@
+{
+  "source": "docs\\reverse-engineering\\luoshui-novel-native-20261119\\constants\\novels--pipeline--imitation_short_runner.json",
+  "pool": "0x1803b2b00",
+  "note": "tuple item keys used by native helper calls; not a dynamic request sample",
+  "entries": [
+    {
+      "tag": "T",
+      "fileRange": [
+        3953786,
+        3953807
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3953788,
+              3953807
+            ],
+            "value": "selectedDirection"
+          }
+        ]
+      },
+      "index": 84
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3954344,
+        3954400
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3954346,
+              3954361
+            ],
+            "value": "event_emitter"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3954361,
+              3954377
+            ],
+            "value": "cancel_checker"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3954377,
+              3954392
+            ],
+            "value": "review_config"
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3954392,
+              3954400
+            ],
+            "value": "nested"
+          }
+        ]
+      },
+      "index": 120
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3954405,
+        3954427
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "a",
+            "fileRange": [
+              3954407,
+              3954426
+            ],
+            "value": "finalMarkdownPath"
+          },
+          {
+            "tag": "s",
+            "fileRange": [
+              3954426,
+              3954427
+            ],
+            "value": ""
+          }
+        ]
+      },
+      "index": 122
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3954441,
+        3954467
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3954443,
+              3954445
+            ],
+            "value": 9
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3954445,
+              3954453
+            ],
+            "value": "active"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3954453,
+              3954467
+            ],
+            "value": "编辑审核"
+          }
+        ]
+      },
+      "index": 125
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3954490,
+        3954505
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3954492,
+              3954494
+            ],
+            "value": 9
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3954494,
+              3954505
+            ],
+            "value": "completed"
+          }
+        ]
+      },
+      "index": 127
+    },
+    {
+      "tag": "T",
+      "fileRange": [
+        3954505,
+        3954543
+      ],
+      "value": {
+        "type": "tuple",
+        "items": [
+          {
+            "tag": "l",
+            "fileRange": [
+              3954507,
+              3954509
+            ],
+            "value": 9
+          },
+          {
+            "tag": "a",
+            "fileRange": [
+              3954509,
+              3954520
+            ],
+            "value": "completed"
+          },
+          {
+            "tag": "u",
+            "fileRange": [
+              3954520,
+              3954543
+            ],
+            "value": "跳过（无正文）"
+          }
+        ]
+      },
+      "index": 128
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+[
+  {
+    "file": "_local-archive-20261028\\novel-rea-workflow-20261120\\review-cycle-config.rea.json",
+    "sha256": "0619abd89d6c2f77c01cc78b38b1781e2d5b649d1ea667f9078a171f0f73989f",
+    "bytes": 4440494,
+    "evidence_id": "ev_3044484ffce83756e9ee496767b2ac8041915dfac0fb099b57eff5d7853c73e1",
+    "provider": {
+      "id": "ghidra",
+      "name": "Ghidra",
+      "version": "12.1.4"
+    },
+    "relationship_coverage": {
+      "status": "partial",
+      "limitations": [
+        "Ghidra's callee inventory omits targets of 70 call reference(s) or decoded call(s) without destinations."
+      ],
+      "limited_directions": [
+        "callees"
+      ],
+      "diagnostics": [
+        "Only resolved Ghidra call references are returned; unresolved computed or indirect calls remain unknown, while function classifications distinguish thunks and externals."
+      ]
+    },
+    "limitations": [
+      "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+      "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+      "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+      "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+      "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+      "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+      "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+      "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+      "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+      "Windows Ghidra P0 accepts native x86 and x86-64 PE applications and DLLs, and explicitly selected raw 6502 images; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+      "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+      "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+    ]
+  },
+  {
+    "file": "_local-archive-20261028\\novel-rea-workflow-20261120\\rea-current-entrypoints.json",
+    "sha256": "3918a620e6fce0a1d1ab1292d62af2030968bf479410c3cca71028c05b0bd10f",
+    "bytes": 12623240,
+    "evidence_id": "ev_85d200b39b6596c45ca334bd7e66289ed310c631c1adf0de1256b39a837eea55",
+    "provider": {
+      "id": "rea-javascript-application",
+      "name": "REA JavaScript application analyzer",
+      "version": "1"
+    },
+    "relationship_coverage": null,
+    "limitations": [
+      "Caller-selected source analysis leaves 21 inventoried files outside analysis scope. Inventory identity covers the complete artifact; relationships through unselected sources remain unknown.",
+      "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+      "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+      "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+      "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+      "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+      "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+    ]
+  },
+  {
+    "file": "_local-archive-20261028\\novel-rea-workflow-20261120\\imitation-short-run.rea.json",
+    "bytes": 6480816,
+    "sha256": "686c06f54440c62e39516aa107585b6bfe9ce711321f9f87f7d575afa3e6138b",
+    "evidence_id": "ev_6b44caf2989e697505e613bd996c893c4198175cc8b38313ba4bcf371c5e55ca",
+    "relationship_coverage": {
+      "status": "partial",
+      "limitations": [
+        "Ghidra's callee inventory omits targets of 130 call reference(s) or decoded call(s) without destinations."
+      ],
+      "limited_directions": [
+        "callees"
+      ],
+      "diagnostics": [
+        "Only resolved Ghidra call references are returned; unresolved computed or indirect calls remain unknown, while function classifications distinguish thunks and externals."
+      ]
+    }
+  },
+  {
+    "file": "_local-archive-20261028\\novel-rea-workflow-20261120\\imitation-short-produce.rea.json",
+    "bytes": 7534280,
+    "sha256": "4d15c559cde3fdc520e10e8457beb455e14d02e525f564ab8d78e1af75c804a0",
+    "evidence_id": "ev_a31e4b4aa970e79ea15d8e72a9743752e14d529b17a4c43d3224d844d2ecc52c",
+    "relationship_coverage": {
+      "status": "partial",
+      "limitations": [
+        "Ghidra's callee inventory omits targets of 174 call reference(s) or decoded call(s) without destinations."
+      ],
+      "limited_directions": [
+        "callees"
+      ],
+      "diagnostics": [
+        "Only resolved Ghidra call references are returned; unresolved computed or indirect calls remain unknown, while function classifications distinguish thunks and externals."
+      ]
+    }
+  }
+]

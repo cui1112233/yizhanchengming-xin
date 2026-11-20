@@ -1,0 +1,14 @@
+{
+  "source": "docs\\reverse-engineering\\luoshui-novel-native-20261119\\constants\\novels--pipeline--imitation_short_runner.json",
+  "native_sha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "observation_type": "literal_not_call_trace",
+  "entry": {
+    "tag": "u",
+    "fileRange": [
+      3957779,
+      3958079
+    ],
+    "value": "Imitation short-fiction pipeline.\n\nFlow: deconstruct reference → pick direction → build blueprint →\n      run 7-stage short fiction pipeline with injected imitation context.\n\nAll intermediate artefacts are persisted to disk under the story directory\nso the right-side panel can display them.\n",
+    "index": 251
+  }
+}
