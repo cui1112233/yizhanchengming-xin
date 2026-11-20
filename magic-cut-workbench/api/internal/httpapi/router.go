@@ -38,6 +38,7 @@ func New(deps Dependencies) http.Handler {
 	}
 	if deps.Materials != nil {
 		mux.Handle("/api/magic-cut/projects/{projectID}/materials", deps.Materials)
+		mux.Handle("/api/magic-cut/projects/{projectID}/materials/{materialID}/file", deps.Materials)
 	}
 	if deps.Timeline != nil {
 		mux.Handle("/api/magic-cut/projects/{projectID}/timeline", deps.Timeline)

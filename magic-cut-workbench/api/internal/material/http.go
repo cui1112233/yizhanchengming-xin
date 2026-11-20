@@ -4,8 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 
 	worktask "yizhanchengming/magic-cut-workbench/internal/task"
@@ -17,6 +22,9 @@ type Importer interface {
 
 type ListRepository interface {
 	List(context.Context, string, string) ([]Material, error)
+}
+type FileRepository interface {
+	Get(context.Context, string, string, string) (Material, error)
 }
 type OwnerResolver func(context.Context, *http.Request) (string, error)
 
@@ -31,10 +39,14 @@ func NewHandler(importer Importer, repository ListRepository, owner OwnerResolve
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	projectID, ok := materialProjectID(r.URL.Path)
-	if !ok {
-		writeError(w, http.StatusNotFound, "MATERIAL_ROUTE_NOT_FOUND", "素材接口不存在")
-		return
+	projectID, materialID, fileRoute := materialFileIDs(r.URL.Path)
+	if !fileRoute {
+		var ok bool
+		projectID, ok = materialProjectID(r.URL.Path)
+		if !ok {
+			writeError(w, http.StatusNotFound, "MATERIAL_ROUTE_NOT_FOUND", "素材接口不存在")
+			return
+		}
 	}
 	if h.owner == nil {
 		writeError(w, http.StatusServiceUnavailable, "MATERIAL_STORE_UNAVAILABLE", "素材服务尚未连接")
@@ -43,6 +55,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	owner, err := h.owner(r.Context(), r)
 	if err != nil || owner == "" {
 		writeError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "请先从一战晟铭登录后再进入魔剪")
+		return
+	}
+	if fileRoute {
+		h.serveFile(w, r, owner, projectID, materialID)
 		return
 	}
 	switch r.Method {
@@ -98,6 +114,49 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, owner, projectID, materialID string) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "请求方式不允许")
+		return
+	}
+	repository, ok := h.repository.(FileRepository)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "MATERIAL_STORE_UNAVAILABLE", "素材服务尚未连接")
+		return
+	}
+	item, err := repository.Get(r.Context(), owner, projectID, materialID)
+	if err != nil || strings.TrimSpace(item.StorageKey) == "" {
+		writeError(w, http.StatusNotFound, "MATERIAL_NOT_FOUND", "素材不存在")
+		return
+	}
+	if item.Status != "ready" {
+		writeError(w, http.StatusConflict, "MATERIAL_NOT_READY", "素材还在处理中")
+		return
+	}
+	file, err := os.Open(item.StorageKey)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "MATERIAL_FILE_NOT_FOUND", "素材文件不存在")
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		writeError(w, http.StatusNotFound, "MATERIAL_FILE_NOT_FOUND", "素材文件不存在")
+		return
+	}
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(item.OriginalName)))
+	if contentType == "" {
+		contentType = map[string]string{"video": "video/mp4", "audio": "audio/mpeg", "image": "image/jpeg"}[item.MediaType]
+	}
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename*=UTF-8''%s", url.PathEscape(item.OriginalName)))
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, item.OriginalName, info.ModTime(), file)
+}
+
 func materialProjectID(path string) (string, bool) {
 	const prefix = "/api/magic-cut/projects/"
 	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, "/materials") {
@@ -108,6 +167,18 @@ func materialProjectID(path string) (string, bool) {
 		return "", false
 	}
 	return value, true
+}
+
+func materialFileIDs(path string) (string, string, bool) {
+	const prefix = "/api/magic-cut/projects/"
+	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, "/file") {
+		return "", "", false
+	}
+	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(path, prefix), "/file"), "/")
+	if len(parts) != 3 || parts[1] != "materials" || parts[0] == "" || parts[2] == "" || strings.Contains(parts[0], "..") || strings.Contains(parts[2], "..") {
+		return "", "", false
+	}
+	return parts[0], parts[2], true
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

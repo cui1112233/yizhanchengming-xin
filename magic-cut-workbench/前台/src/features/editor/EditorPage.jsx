@@ -11,6 +11,8 @@ import { commandForShortcut } from './editorModel.js'
 export function EditorPage({ projectID }) {
   const [queuedMaterial, setQueuedMaterial] = useState(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [playheadMs, setPlayheadMs] = useState(0)
   useEffect(() => {
     const onKeyDown = event => {
       const command = commandForShortcut(event)
@@ -31,13 +33,23 @@ export function EditorPage({ projectID }) {
       </header>
       <div className="editor-workspace">
         <MaterialPanel projectID={projectID} onInsert={setQueuedMaterial} />
-        <Player />
+        <Player projectID={projectID} clip={preview?.clip} timelineDurationMs={preview?.timelineDurationMs || 0} playheadMs={playheadMs} onPlayheadChange={setPlayheadMs} />
         <aside className="editor-panel inspector-panel" aria-label="检查器">
           <header><b>属性</b></header>
           <div className="inspector-empty"><Settings2 size={28} /><p>选择一个素材或片段</p><small>这里会显示画面、音频和变速参数</small></div>
         </aside>
       </div>
-      <Timeline projectID={projectID} materialToInsert={queuedMaterial} onMaterialInserted={() => setQueuedMaterial(null)} />
+      <Timeline
+        projectID={projectID}
+        materialToInsert={queuedMaterial}
+        onMaterialInserted={() => setQueuedMaterial(null)}
+        playheadMs={playheadMs}
+        onSeek={setPlayheadMs}
+        onSelectClip={(clip, timelineDurationMs) => {
+          setPreview({ clip, timelineDurationMs })
+          setPlayheadMs(clip.startMs)
+        }}
+      />
       <ExportDialog open={exportOpen} projectID={projectID} onClose={() => setExportOpen(false)} />
     </main>
   )

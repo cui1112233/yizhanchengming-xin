@@ -12,6 +12,7 @@ import (
 const insertMaterialSQL = `INSERT INTO magic_cut_materials (id, project_id, owner_username, original_name, media_type, storage_key, size_bytes, metadata_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 const insertTaskSQL = `INSERT INTO magic_cut_tasks (id, project_id, owner_username, task_type, status, progress, input_json, output_json, error_code, error_message, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 const listMaterialsSQL = `SELECT id, project_id, owner_username, original_name, media_type, storage_key, size_bytes, metadata_json, status, created_at, updated_at FROM magic_cut_materials WHERE owner_username = ? AND project_id = ? ORDER BY created_at DESC`
+const getMaterialSQL = `SELECT id, project_id, owner_username, original_name, media_type, storage_key, size_bytes, metadata_json, status, created_at, updated_at FROM magic_cut_materials WHERE owner_username = ? AND project_id = ? AND id = ? LIMIT 1`
 
 type Store struct{ db *sql.DB }
 
@@ -76,4 +77,20 @@ func (s *Store) List(ctx context.Context, owner, projectID string) ([]Material, 
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func (s *Store) Get(ctx context.Context, owner, projectID, materialID string) (Material, error) {
+	if s == nil || s.db == nil {
+		return Material{}, fmt.Errorf("material store is not configured")
+	}
+	var item Material
+	var metadata []byte
+	err := s.db.QueryRowContext(ctx, getMaterialSQL, owner, projectID, materialID).Scan(&item.ID, &item.ProjectID, &item.Owner, &item.OriginalName, &item.MediaType, &item.StorageKey, &item.SizeBytes, &metadata, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+	if err != nil {
+		return Material{}, err
+	}
+	if len(metadata) > 0 {
+		_ = json.Unmarshal(metadata, &item.Metadata)
+	}
+	return item, nil
 }

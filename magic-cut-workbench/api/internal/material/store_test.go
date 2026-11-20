@@ -50,3 +50,25 @@ func TestStoreListsOnlyMaterialsOwnedByRequestedAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestStoreGetsPlaybackMaterialOnlyInsideOwnedProject(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	now := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(regexp.QuoteMeta(getMaterialSQL)).WithArgs("alice", "mcp_1", "mcm_1").WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "owner_username", "original_name", "media_type", "storage_key", "size_bytes", "metadata_json", "status", "created_at", "updated_at"}).AddRow("mcm_1", "mcp_1", "alice", "clip.mp4", "video", `C:\data\mcm_1.mp4`, 12, `{"durationMs":1000}`, "ready", now, now))
+
+	item, err := NewStore(db).Get(context.Background(), "alice", "mcp_1", "mcm_1")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.ID != "mcm_1" || item.Owner != "alice" || item.StorageKey == "" {
+		t.Fatalf("item=%+v", item)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

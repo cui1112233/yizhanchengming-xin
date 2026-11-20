@@ -1,18 +1,96 @@
 import { Button } from 'antd'
-import { Maximize2, Pause, Play, RotateCcw, Volume2 } from 'lucide-react'
-import { useState } from 'react'
+import { Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
-export function Player() {
+import { formatTimecode, materialFileURL, mediaTimeFromPlayhead, playheadFromMediaTime } from './playerModel.js'
+
+export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0, onPlayheadChange }) {
+  const canvasRef = useRef(null)
+  const videoRef = useRef(null)
   const [playing, setPlaying] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [error, setError] = useState('')
+  const source = materialFileURL(projectID, clip?.materialId)
+  const clipEndMs = clip ? clip.startMs + clip.durationMs : 0
+
+  useEffect(() => {
+    setPlaying(false)
+    setError('')
+  }, [source])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !clip || !Number.isFinite(video.duration)) return
+    const target = mediaTimeFromPlayhead(clip, playheadMs)
+    if (Math.abs(video.currentTime - target) > 0.12) video.currentTime = target
+  }, [clip, playheadMs])
+
+  const seekToClipStart = () => {
+    const video = videoRef.current
+    if (!video || !clip) return
+    video.pause()
+    video.currentTime = mediaTimeFromPlayhead(clip, clip.startMs)
+    setPlaying(false)
+    onPlayheadChange?.(clip.startMs)
+  }
+
+  const togglePlayback = async () => {
+    const video = videoRef.current
+    if (!video || !clip) return
+    if (!video.paused) {
+      video.pause()
+      setPlaying(false)
+      return
+    }
+    if (playheadMs >= clipEndMs) seekToClipStart()
+    try {
+      video.playbackRate = Number(clip.speed) > 0 ? Number(clip.speed) : 1
+      await video.play()
+      setPlaying(true)
+      setError('')
+    } catch {
+      setPlaying(false)
+      setError('浏览器未能开始播放，请再次点击播放按钮')
+    }
+  }
+
+  const updatePlayhead = event => {
+    if (!clip) return
+    const next = playheadFromMediaTime(clip, event.currentTarget.currentTime)
+    onPlayheadChange?.(next)
+    if (next >= clipEndMs) {
+      event.currentTarget.pause()
+      setPlaying(false)
+    }
+  }
+
   return (
     <section className="editor-player" aria-label="播放器">
-      <div className="editor-player__canvas"><span>选择时间线中的素材开始预览</span></div>
+      <div className="editor-player__canvas" ref={canvasRef}>
+        {source ? (
+          <video
+            ref={videoRef}
+            src={source}
+            preload="metadata"
+            playsInline
+            muted={muted}
+            onLoadedMetadata={event => { event.currentTarget.currentTime = mediaTimeFromPlayhead(clip, playheadMs); event.currentTarget.playbackRate = Number(clip?.speed) || 1 }}
+            onTimeUpdate={updatePlayhead}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onError={() => setError('素材无法播放，请确认文件仍在素材库中且编码受浏览器支持')}
+            onClick={togglePlayback}
+          />
+        ) : <span>选择时间线中的视频片段开始预览</span>}
+        {error ? <div className="editor-player__error" role="alert">{error}</div> : null}
+      </div>
       <div className="editor-player__controls">
-        <Button type="text" icon={<RotateCcw size={16} />} />
-        <Button type="text" icon={playing ? <Pause size={18} /> : <Play size={18} />} onClick={() => setPlaying(value => !value)} />
-        <span>00:00:00 / 00:00:00</span>
-        <Button type="text" icon={<Volume2 size={16} />} />
-        <Button type="text" icon={<Maximize2 size={16} />} />
+        <Button type="text" title="回到片段开头" aria-label="回到片段开头" icon={<RotateCcw size={16} />} disabled={!clip} onClick={seekToClipStart} />
+        <Button type="text" title={playing ? '暂停' : '播放'} aria-label={playing ? '暂停' : '播放'} icon={playing ? <Pause size={18} /> : <Play size={18} />} disabled={!clip} onClick={togglePlayback} />
+        <span>{formatTimecode(playheadMs)} / {formatTimecode(timelineDurationMs)}</span>
+        <Button type="text" title={muted ? '打开声音' : '静音'} aria-label={muted ? '打开声音' : '静音'} icon={muted ? <VolumeX size={16} /> : <Volume2 size={16} />} disabled={!clip} onClick={() => setMuted(value => !value)} />
+        <Button type="text" title="全屏" aria-label="全屏" icon={<Maximize2 size={16} />} disabled={!clip} onClick={() => canvasRef.current?.requestFullscreen?.()} />
       </div>
     </section>
   )
