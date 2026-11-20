@@ -30,17 +30,20 @@
 
 **Interfaces:**
 - Consumes: `loadSession(): Promise<{authenticated, account, errorCode, message}>`
-- Produces: `createSessionGateModel(session): {title, message, returnLabel, returnHref}`
+- Produces: `createSessionGateModel(session, locationLike): {title, message, returnLabel, returnHref}`
 
 - [ ] **Step 1: Write the failing test**
 
 ```js
 test('unauthenticated magic cut only offers returning to yizhanchengming', () => {
-  assert.deepEqual(createSessionGateModel({ errorCode: 'AUTH_REQUIRED', message: 'ignored' }), {
+  assert.deepEqual(createSessionGateModel(
+    { errorCode: 'AUTH_REQUIRED', message: 'ignored' },
+    { protocol: 'http:', hostname: '192.168.1.20' },
+  ), {
     title: '请从一战晟铭进入魔剪',
     message: '当前魔剪会话已失效，请返回一战晟铭后重新切换到魔剪。',
     returnLabel: '返回一战晟铭',
-    returnHref: 'http://127.0.0.1:4001/',
+    returnHref: 'http://192.168.1.20:4001/',
   })
 })
 ```
