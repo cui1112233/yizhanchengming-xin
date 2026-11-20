@@ -20,6 +20,24 @@ type shortReview struct {
 }
 
 func (p *Pipeline) shortCall(ctx context.Context, in RunContext, sink EventSink, def catalog.Definition, key string, status RunStatus, payload any, target any, validate func() error, tokens int) error {
+	if in.ShortReviewVersion >= 1 && def.ID == prompt.ShortReviewPrompt.ID && in.Agent != nil {
+		if fields, ok := payload.(map[string]any); ok {
+			fields["pass_score"] = in.Agent.PassScore
+		}
+		// An explicit zero is different from a missing/null score. Preserve the
+		// legacy decoder for journals created before this protocol.
+		var checked requiredShortReview
+		_, e := p.callJSON(ctx, in, sink, nil, modelCallSpec{definition: def, key: key, step: status, userPayload: payload, temperature: .65, maxTokens: tokens, validate: func() error {
+			if checked.Score == nil || checked.Issues == nil {
+				return inputError("短篇审核必须包含score和issues，不能把缺失评分当作0分")
+			}
+			return validShortReview(shortReview{Score: *checked.Score, Issues: *checked.Issues})
+		}}, &checked)
+		if e == nil {
+			*(target.(*shortReview)) = shortReview{Score: *checked.Score, Issues: *checked.Issues}
+		}
+		return e
+	}
 	_, e := p.callJSON(ctx, in, sink, nil, modelCallSpec{definition: def, key: key, step: status, userPayload: payload, temperature: .65, maxTokens: tokens, validate: validate}, target)
 	return e
 }
@@ -78,14 +96,18 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		return s.finishWithError(ctx, owner, run, ErrModelUnavailable, "独立短篇执行器未配置", nil)
 	}
 	var snap struct {
-		SystemPrompts *SystemPromptSnapshot `json:"system_prompts"`
-		Story         ShortStory            `json:"short_story"`
-		Confirmed     bool                  `json:"short_outline_confirmed"`
-		Settings      ProjectSettings       `json:"project_settings"`
-		RetryOfRunID  string                `json:"retry_of_run_id"`
+		ShortReviewVersion int                   `json:"short_review_version"`
+		SystemPrompts      *SystemPromptSnapshot `json:"system_prompts"`
+		Story              ShortStory            `json:"short_story"`
+		Confirmed          bool                  `json:"short_outline_confirmed"`
+		Settings           ProjectSettings       `json:"project_settings"`
+		RetryOfRunID       string                `json:"retry_of_run_id"`
 	}
 	if e := json.Unmarshal(run.PromptSnapshot, &snap); e != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇快照损坏", e)
+	}
+	if snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇审核快照版本无效，已停止生成", nil)
 	}
 	project, e := s.store.GetProject(ctx, owner, run.ProjectID)
 	if e != nil {
@@ -121,7 +143,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		}
 	}
 	agent := NormalizeAgentSettings(snap.Settings.Agent, 2000)
-	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent, SystemPrompts: snap.SystemPrompts}
+	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent, SystemPrompts: snap.SystemPrompts, ShortReviewVersion: snap.ShortReviewVersion}
 	sink := serviceEventSink{service: s, owner: owner}
 	result, e := p.buildShortStory(ctx, in, sink, story, snap.Confirmed)
 	if e != nil {
@@ -204,6 +226,9 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	return out, nil
 }
 func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink EventSink, story ShortStory, confirmed bool) (ShortStory, error) {
+	if in.ShortReviewVersion >= 1 && in.Agent == nil {
+		return story, inputError("短篇审核设置缺失，已停止生成")
+	}
 	brief := shortBrief(story)
 	outline := story.Outline
 	stage := func(label string, progress int, status RunStatus) error {
@@ -232,7 +257,12 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 			return story, e
 		}
 		story.OutlineAudit, _ = json.Marshal(review)
-		if len(review.Issues) > 0 {
+		if in.ShortReviewVersion >= 1 {
+			v, e = p.reviewControlledShortOutline(ctx, in, sink, &story, brief, v, review)
+			if e != nil {
+				return story, e
+			}
+		} else if len(review.Issues) > 0 {
 			if e = stage("修订短篇大纲", 20, RunPlanning); e != nil {
 				return story, e
 			}
@@ -265,6 +295,10 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 	memory, ending := "", ""
 	completed := []ShortOutlineChapter{}
 	for i, c := range outline.Chapters {
+		remainingRevisions := 0
+		if in.Agent != nil {
+			remainingRevisions = in.Agent.MaxRevisionRounds
+		}
 		chapter := ShortChapter{Number: c.Number, Title: c.Title}
 		target := story.Input.TargetWordCount / story.Input.TargetChapters
 		if i == len(outline.Chapters)-1 {
@@ -298,7 +332,13 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 			}
 			audit, _ := json.Marshal(review)
 			story.ChapterAudits = append(story.ChapterAudits, audit)
-			if len(review.Issues) > 0 || needsLengthNormalization(v.Content, partTarget) {
+			if in.ShortReviewVersion >= 1 {
+				var err error
+				v, err = p.reviewControlledShortBody(ctx, in, sink, &story, brief, outline, c, v, review, partTarget, j+1, pieces, key, memory, &remainingRevisions)
+				if err != nil {
+					return story, err
+				}
+			} else if len(review.Issues) > 0 || needsLengthNormalization(v.Content, partTarget) {
 				if e := stage(fmt.Sprintf("修订短篇第%d章 · 第%d/%d段", i+1, j+1, pieces), 85, RunWriting); e != nil {
 					return story, e
 				}

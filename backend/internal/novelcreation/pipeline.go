@@ -73,6 +73,7 @@ type RunContext struct {
 	Agent              *AgentSettings
 	ReviewCycleVersion int
 	SystemPrompts      *SystemPromptSnapshot
+	ShortReviewVersion int
 }
 
 type Pipeline struct {
