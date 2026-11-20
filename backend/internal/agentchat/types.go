@@ -90,6 +90,7 @@ type SessionInfo struct {
 	ID                  int64  `json:"id"`
 	Title               string `json:"title"`
 	Model               string `json:"model"`
+	WorkModel           string `json:"work_model,omitempty"`
 	CreatedAt           string `json:"created_at"`
 	UpdatedAt           string `json:"updated_at"`
 	Kind                string `json:"kind"`
@@ -183,6 +184,7 @@ type SendRequest struct {
 	SessionID   int64
 	WorkspaceID string
 	Model       string
+	WorkModel   string
 	Permission  string
 	Content     string
 	Attachments []map[string]any

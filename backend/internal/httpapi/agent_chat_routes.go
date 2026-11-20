@@ -215,6 +215,7 @@ func RegisterAgentChatRoutes(
 			Title       string `json:"title"`
 			WorkspaceID string `json:"workspaceId"`
 			Model       string `json:"model"`
+			WorkModel   string `json:"workModel"`
 			Permission  string `json:"permission"`
 			ChatMode    string `json:"chatMode"`
 		}
@@ -240,6 +241,7 @@ func RegisterAgentChatRoutes(
 		}
 		session, err := service.store.CreateSession(req.Context(), owner, agentchat.SessionInfo{
 			Title: body.Title, WorkspaceID: workspaceID, Model: model,
+			WorkModel: strings.TrimSpace(body.WorkModel),
 			PermissionMode: body.Permission, ChatMode: body.ChatMode,
 		})
 		if err != nil {
@@ -257,6 +259,7 @@ func RegisterAgentChatRoutes(
 		var body struct {
 			Title      *string `json:"title"`
 			Model      *string `json:"model"`
+			WorkModel  *string `json:"workModel"`
 			Permission *string `json:"permission"`
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&body) != nil {
@@ -264,7 +267,7 @@ func RegisterAgentChatRoutes(
 			return
 		}
 		session, err := service.store.UpdateSession(req.Context(), owner, sessionID, agentchat.SessionPatch{
-			Title: body.Title, Model: body.Model, Permission: body.Permission,
+			Title: body.Title, Model: body.Model, WorkModel: body.WorkModel, Permission: body.Permission,
 		})
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "加载 Agent 会话失败:"})
@@ -333,12 +336,18 @@ func RegisterAgentChatRoutes(
 		var body struct {
 			Content     string           `json:"content"`
 			Model       string           `json:"model"`
+			WorkModel   string           `json:"workModel"`
 			Permission  string           `json:"permission"`
 			Attachments []map[string]any `json:"attachments"`
+			ContextRefs []map[string]any `json:"contextRefs"`
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 512<<10)).Decode(&body) != nil || strings.TrimSpace(body.Content) == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "消息不能为空"})
 			return
+		}
+		content := strings.TrimSpace(body.Content)
+		if refs := formatAgentContextRefs(body.ContextRefs); refs != "" {
+			content += "\n\n上下文引用：\n" + refs
 		}
 		session, err := service.store.Session(req.Context(), owner, sessionID)
 		if err != nil {
@@ -379,8 +388,8 @@ func RegisterAgentChatRoutes(
 		emit := func(event agentchat.Event) { writeAgentChatEvent(w, flusher, event) }
 		_, runErr := service.runner.Run(ctx, owner, agentchat.SendRequest{
 			SessionID: sessionID, WorkspaceID: workspace.ID, Model: body.Model,
-			Permission: body.Permission, Content: body.Content, Attachments: body.Attachments,
-			EnabledSkillIDs: workspace.EnabledSkillIDs,
+			WorkModel: body.WorkModel, Permission: body.Permission, Content: content,
+			Attachments: body.Attachments, EnabledSkillIDs: workspace.EnabledSkillIDs,
 		}, emit)
 		if runErr != nil {
 			writeAgentChatEvent(w, flusher, agentchat.Event{Type: agentchat.EventError, Data: map[string]string{"message": runErr.Error()}})
@@ -439,6 +448,35 @@ func (a agentChatProviderAdapter) Complete(ctx context.Context, system, user str
 		Temperature:         0.7,
 		DisableJSONResponse: true,
 	})
+}
+
+func formatAgentContextRefs(refs []map[string]any) string {
+	lines := make([]string, 0, len(refs))
+	seen := map[string]bool{}
+	for _, ref := range refs {
+		if len(lines) >= 20 {
+			break
+		}
+		kind, _ := ref["type"].(string)
+		id, _ := ref["id"].(string)
+		name, _ := ref["name"].(string)
+		kind = strings.TrimSpace(kind)
+		id = strings.TrimSpace(id)
+		name = strings.TrimSpace(name)
+		if kind == "" || id == "" {
+			continue
+		}
+		key := kind + ":" + id
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if name == "" {
+			name = id
+		}
+		lines = append(lines, fmt.Sprintf("- %s：%s（%s）", kind, name, id))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func agentChatPathID(w http.ResponseWriter, req *http.Request) (int64, bool) {

@@ -159,6 +159,10 @@ func (r *Runner) Run(ctx context.Context, owner string, req SendRequest, emit fu
 	if model == "" {
 		model = session.Model
 	}
+	workModel := strings.TrimSpace(req.WorkModel)
+	if workModel == "" {
+		workModel = session.WorkModel
+	}
 	emitEvent(emit, EventAgentStatus, map[string]any{"status": "connecting", "text": "正在连接 Agent…"})
 
 	history, err := r.Store.Messages(ctx, owner, req.SessionID)
@@ -193,7 +197,7 @@ func (r *Runner) Run(ctx context.Context, owner string, req SendRequest, emit fu
 	}
 
 	catalog := r.skillCatalog(owner, req.EnabledSkillIDs)
-	systemPrompt := buildSystemPrompt(workspace, session, mode, catalog)
+	systemPrompt := buildSystemPrompt(workspace, session, mode, workModel, catalog)
 	transcript := buildTranscript(history)
 
 	assistant := EmptyMessage("assistant")
@@ -386,10 +390,14 @@ func (r *Runner) writeAudit(workspace Workspace, session SessionInfo, model, mod
 	}
 }
 
-func buildSystemPrompt(workspace Workspace, session SessionInfo, mode string, catalog *SkillCatalog) string {
+func buildSystemPrompt(workspace Workspace, session SessionInfo, mode, workModel string, catalog *SkillCatalog) string {
 	var builder strings.Builder
 	builder.WriteString("你是 Agent 工作区的执行代理，直接完成用户委托的工作。\n")
-	fmt.Fprintf(&builder, "当前工作区：%s\n当前权限模式：%s（%s）\n", workspace.Name, PermissionLabel(mode), mode)
+	fmt.Fprintf(&builder, "当前工作区：%s\n当前主模型：%s\n", workspace.Name, strings.TrimSpace(session.Model))
+	if strings.TrimSpace(workModel) != "" {
+		fmt.Fprintf(&builder, "当前工作模型：%s\n", strings.TrimSpace(workModel))
+	}
+	fmt.Fprintf(&builder, "当前权限模式：%s（%s）\n", PermissionLabel(mode), mode)
 	switch mode {
 	case PermissionPlan:
 		builder.WriteString("计划模式：只输出工具使用计划，不要声称已执行任何工具。\n")

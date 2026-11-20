@@ -46,6 +46,7 @@ type WorkspacePatch struct {
 type SessionPatch struct {
 	Title      *string
 	Model      *string
+	WorkModel  *string
 	Permission *string
 	Pinned     *bool
 }
@@ -452,6 +453,9 @@ func (s *FileStore) UpdateSession(ctx context.Context, owner string, id int64, p
 	}
 	if patch.Model != nil {
 		info.Model = strings.TrimSpace(*patch.Model)
+	}
+	if patch.WorkModel != nil {
+		info.WorkModel = strings.TrimSpace(*patch.WorkModel)
 	}
 	if patch.Permission != nil {
 		mode := NormalizePermission(*patch.Permission)

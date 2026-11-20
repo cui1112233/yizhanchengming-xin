@@ -35,10 +35,10 @@ export function listAgentChatSessions(workspaceId = '') {
   return apiRequest(`/api/agent/sessions${query}`);
 }
 
-export function createAgentChatSession({ title, workspaceId, model, permission }) {
+export function createAgentChatSession({ title, workspaceId, model, workModel, permission, chatMode }) {
   return apiRequest('/api/agent/sessions', {
     method: 'POST',
-    body: JSON.stringify({ title, workspaceId, model, permission })
+    body: JSON.stringify({ title, workspaceId, model, workModel, permission, chatMode })
   });
 }
 
@@ -64,6 +64,10 @@ export function listAgentChatPermissions() {
 
 export function listAgentChatModels() {
   return apiRequest('/api/agent/models');
+}
+
+export function listAgentChatSkills() {
+  return apiRequest('/api/agent/skills');
 }
 
 export function stopAgentChatRun(id) {
