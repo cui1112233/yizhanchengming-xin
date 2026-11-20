@@ -755,6 +755,9 @@ func (s *DirectorService) persistComicPromptResults(ctx context.Context, owner, 
 	updated := make([]Video, 0, len(videos))
 	for _, video := range videos {
 		parsed := results[video.ID]
+		if comicPromptIsJSONLike(parsed.ScreenPrompt) || comicPromptIsJSONLike(parsed.ImagePrompt) {
+			return nil, fmt.Errorf("%w: 漫画提示词是原始 JSON，拒绝写入", ErrInvalid)
+		}
 		encodedScreen, _ := json.Marshal(parsed.ScreenPrompt)
 		encodedImage, _ := json.Marshal(parsed.ImagePrompt)
 		encodedRoles, _ := json.Marshal(parsed.Roles)
@@ -822,6 +825,12 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 		page.VideoID = strings.TrimSpace(page.VideoID)
 		page.ScreenPrompt = strings.TrimSpace(page.ScreenPrompt)
 		page.ImagePrompt = strings.TrimSpace(page.ImagePrompt)
+		if comicPromptIsJSONLike(page.ScreenPrompt) {
+			page.ScreenPrompt = ""
+		}
+		if comicPromptIsJSONLike(page.ImagePrompt) {
+			page.ImagePrompt = ""
+		}
 		page.Roles = normalizedStringList(page.Roles)
 		page.ScenePresets = normalizedStringList(page.ScenePresets)
 		page.RoleStage = normalizedStringMap(page.RoleStage)
@@ -964,9 +973,24 @@ func parseComicPromptResult(completion string) comicPromptResult {
 			}
 		}
 	}
+	// 模型被截断时会把 {"pages":[...]} 这类原始 JSON 当成正文返回。
+	// 绝不能把 JSON 当出图提示词落库，否则图片模型会忽略文字区指令。
+	if comicPromptIsJSONLike(completion) {
+		return comicPromptResult{}
+	}
 	// Older providers returned one final prompt. Keep those books usable while
 	// new presets return the structured pair above.
 	return comicPromptResult{ScreenPrompt: completion, ImagePrompt: completion}
+}
+
+// comicPromptIsJSONLike 识别模型原始 JSON 或被截断的 JSON 信封。
+// 正常提示词是中文描述，不会以 { 或 [ 开头。
+func comicPromptIsJSONLike(text string) bool {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	return trimmed[0] == '{' || trimmed[0] == '['
 }
 
 func normalizedStringList(values []string) []string {

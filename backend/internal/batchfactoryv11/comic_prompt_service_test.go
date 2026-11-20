@@ -419,6 +419,34 @@ func TestBuildComicPromptContractCarriesPageContextAndImageDerivation(t *testing
 	}
 }
 
+func TestParseComicPromptResultRejectsTruncatedJSON(t *testing.T) {
+	raw := `{"pages":[{"video_id":"video-1","screen_prompt":"单页图文卡，本页文字八句`
+	result := parseComicPromptResult(raw)
+	if result.ScreenPrompt != "" || result.ImagePrompt != "" {
+		t.Fatalf("截断 JSON 不得作为提示词: %+v", result)
+	}
+}
+
+func TestParseComicBookPromptResultsAcceptsSinglePageEnvelope(t *testing.T) {
+	videos := []Video{{ID: "video-1", Label: "漫画页 01"}}
+	completion := `{"pages":[{"video_id":"video-1","screen_prompt":"导演说明","image_prompt":"上半文字区，下半插画"}]}`
+	results, err := parseComicBookPromptResults(completion, videos, DirectorSnapshot{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := results["video-1"].ImagePrompt; got != "上半文字区，下半插画" {
+		t.Fatalf("image_prompt=%q", got)
+	}
+}
+
+func TestParseComicBookPromptResultsRejectsJSONImagePrompt(t *testing.T) {
+	videos := []Video{{ID: "video-1", Label: "漫画页 01"}}
+	completion := `{"pages":[{"video_id":"video-1","screen_prompt":"导演说明","image_prompt":"{\"pages\":[]}"}]}`
+	if _, err := parseComicBookPromptResults(completion, videos, DirectorSnapshot{}); err == nil {
+		t.Fatal("JSON 形态的 image_prompt 必须被拒绝")
+	}
+}
+
 func TestBuildComicBookPromptContractUsesBoundSourceSegmentsAsPageContent(t *testing.T) {
 	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "漫画规则"}})
 	book := Book{ID: "book-1", Title: "连续分页", SourceText: "第一段原文。第二段原文。", AssetRecords: []BookAsset{{Kind: "character", Name: "林晚", Prompt: "黑发女性", Source: "comic"}}}
