@@ -1,0 +1,15 @@
+{
+  "observedAt": "2026-11-20T04:49:42.495Z",
+  "window": {
+    "app": "process:F:\\软件\\洛水2026\\洛水2026\\Python312\\pythonw.exe",
+    "id": 6882506,
+    "title": "洛水 v2.9.4"
+  },
+  "observation": "accessibility-only",
+  "visibleNovelEntry": true,
+  "observedContentPage": "剧本创作",
+  "navigationFailure": "coordinate input geometry is unavailable",
+  "screenshotFailure": "window is minimized",
+  "clickedGeneration": false,
+  "pixelParityVerified": false
+}

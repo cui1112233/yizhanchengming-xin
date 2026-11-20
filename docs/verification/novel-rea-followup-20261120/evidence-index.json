@@ -1,0 +1,82 @@
+{
+  "date": "2026-11-20",
+  "scope": "read-only static comparison; no paid calls; no UI parity acceptance",
+  "results": [
+    {
+      "file": "_local-archive-20261028/novel-rea-followup-20261120/pause.rea.json",
+      "sha256": "36ff3992a7139df252d811071c27c0f41b62b4b63d7064560b1c224d99fec97f",
+      "bytes": 4315374,
+      "ok": true,
+      "evidence_id": "ev_1549b301da78ef4f43576fdc8444f8d9e68a2b3f98df2772c592f6f6e545963b",
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "relationship_coverage": {
+        "status": "partial",
+        "limitations": [
+          "Ghidra's callee inventory omits targets of 47 call reference(s) or decoded call(s) without destinations."
+        ],
+        "limited_directions": [
+          "callees"
+        ],
+        "diagnostics": [
+          "Only resolved Ghidra call references are returned; unresolved computed or indirect calls remain unknown, while function classifications distinguish thunks and externals."
+        ]
+      }
+    },
+    {
+      "file": "_local-archive-20261028/novel-rea-followup-20261120/editorial.rea.json",
+      "sha256": "59611caf49e757a895493dbdb51e61020417c013be5cfb45379ee629672c87c5",
+      "bytes": 3703504,
+      "ok": true,
+      "evidence_id": "ev_2d67b205f91ed552f02c9da30ea9c71e03f58e6781a1e5b5b4eba4fb08bdaaca",
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "relationship_coverage": {
+        "status": "partial",
+        "limitations": [
+          "Ghidra's callee inventory omits targets of 28 call reference(s) or decoded call(s) without destinations."
+        ],
+        "limited_directions": [
+          "callees"
+        ],
+        "diagnostics": [
+          "Only resolved Ghidra call references are returned; unresolved computed or indirect calls remain unknown, while function classifications distinguish thunks and externals."
+        ]
+      }
+    },
+    {
+      "file": "_local-archive-20261028/novel-rea-followup-20261120/frontend-panels.rea.json",
+      "sha256": "65548dca4e1591396e4ed0a9f9f4b643e0a31fa22d5bb753507ff504872bc29f",
+      "bytes": 5279939,
+      "ok": true,
+      "evidence_id": "ev_9deadbcfa15aa57fbce81c92c595a44b138505ce3401545a027e88610a0fb372",
+      "provider": {
+        "id": "rea-javascript-application",
+        "name": "REA JavaScript application analyzer",
+        "version": "1"
+      },
+      "relationship_coverage": null
+    },
+    {
+      "file": "_local-archive-20261028/novel-rea-followup-20261120/inject.rea.json",
+      "sha256": "d7ab25365314b909fd34dc50c333cbe62fe0d8a29d8381d090b3fb483920c201",
+      "bytes": 22473,
+      "ok": false,
+      "evidence_id": null,
+      "provider": null,
+      "relationship_coverage": null,
+      "error": {
+        "code": "provider_timeout",
+        "category": "timeout",
+        "message": "Analysis took too long. Try a smaller request, then run `rea doctor` if it continues."
+      },
+      "timeout_ms": 330000
+    }
+  ]
+}
