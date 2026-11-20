@@ -2216,10 +2216,29 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			return
 		}
 		result, runErr := director.RunComicPromptExtractionForPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), videoIDs)
+		// 提示词提取只写视频级设置；漫画页行才是出图时的唯一提示词来源，
+		// 因此重抽成功后必须同步回页行，并把页面标记为待重新生成。
+		synced, syncFailed := 0, 0
+		if patcher, ok := comicStore.(batchfactoryv11.ComicPagePatcher); ok {
+			for _, video := range result.Updated {
+				comicPrompt := video.ComicPrompt
+				imagePrompt := video.ComicImagePrompt
+				status := "prompt_ready"
+				if _, patchErr := patcher.PatchComicPage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), video.ID, batchfactoryv11.PatchComicPageInput{
+					ComicPrompt: &comicPrompt, ImagePrompt: &imagePrompt, Status: &status,
+				}); patchErr != nil {
+					syncFailed++
+					continue
+				}
+				synced++
+			}
+		}
 		payload := map[string]any{
 			"candidatePages": len(videoIDs),
 			"updated":        len(result.Updated),
 			"failed":         len(result.Failed),
+			"syncedPages":    synced,
+			"syncFailed":     syncFailed,
 		}
 		if runErr != nil {
 			payload["error"] = runErr.Error()
