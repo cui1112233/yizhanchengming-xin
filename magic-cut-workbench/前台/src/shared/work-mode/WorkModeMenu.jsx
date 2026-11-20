@@ -1,13 +1,16 @@
 import { Check, ChevronDown } from 'lucide-react'
 
-const modes = [
-  { id: 'studio', label: '一战景铭', href: 'http://127.0.0.1:4001/' },
-  { id: 'agent', label: 'Agent 代理', href: 'http://127.0.0.1:4001/agent' },
-  { id: 'magic-cut', label: '魔剪', href: '/', active: true },
-  { id: 'duet', label: 'Duet', disabled: true },
-]
+import { createWorkModeLinks } from './workModeLinks.js'
 
 export function WorkModeMenu() {
+  const links = createWorkModeLinks(window.location)
+  const modes = [
+    { id: 'studio', label: '一战晟铭', href: links.studio },
+    { id: 'agent', label: 'Agent 代理', href: links.agent },
+    { id: 'magic-cut', label: '魔剪', href: links.magicCut, active: true },
+    { id: 'duet', label: 'Duet', disabled: true },
+  ]
+
   return (
     <details className="work-mode">
       <summary>

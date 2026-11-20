@@ -7,7 +7,9 @@ import (
 )
 
 type Dependencies struct {
-	Frontend http.Handler
+	Frontend      http.Handler
+	Auth          http.Handler
+	AuthBootstrap http.Handler
 }
 
 func New(deps Dependencies) http.Handler {
@@ -18,6 +20,13 @@ func New(deps Dependencies) http.Handler {
 			"service": "magic-cut-4040",
 		})
 	})
+	if deps.Auth != nil {
+		mux.Handle("/api/login", deps.Auth)
+		mux.Handle("/api/login/", deps.Auth)
+	}
+	if deps.AuthBootstrap != nil {
+		mux.Handle("/api/auth/bootstrap", deps.AuthBootstrap)
+	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{
 			"code":    "API_ROUTE_NOT_FOUND",

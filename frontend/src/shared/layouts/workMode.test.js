@@ -8,6 +8,7 @@ import {
   WORK_MODE_DUET,
   WORK_MODE_MAGIC_CUT,
   WORK_MODE_STUDIO,
+  magicCutBootstrapRequest,
   workModeForLocation,
   workModeForPath,
   workModeHref
@@ -45,6 +46,18 @@ test('本地模式在 4001 和 4040 之间只替换端口', () => {
   assert.equal(workModeHref(WORK_MODE_MAGIC_CUT, studio), 'http://127.0.0.1:4040/');
   assert.equal(workModeHref(WORK_MODE_STUDIO, magicCut), 'http://127.0.0.1:4001/');
   assert.equal(workModeHref(WORK_MODE_AGENT, magicCut), 'http://127.0.0.1:4001/agent/chat');
+});
+
+test('进入魔剪前用不落地的 Bearer 请求换取 4040 HttpOnly 会话', () => {
+  assert.deepEqual(magicCutBootstrapRequest('account-token', 'http://127.0.0.1:4040/'), {
+    url: 'http://127.0.0.1:4040/api/auth/bootstrap',
+    options: {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Authorization: 'Bearer account-token' }
+    }
+  });
+  assert.equal(magicCutBootstrapRequest('', 'http://127.0.0.1:4040/'), null);
 });
 
 test('左侧菜单移除 Agent 对话，Agent 工作区改名 CM 画布', () => {

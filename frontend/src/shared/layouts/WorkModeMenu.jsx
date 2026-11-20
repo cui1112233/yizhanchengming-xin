@@ -1,7 +1,15 @@
 import { Check, ChevronDown, Layers } from 'lucide-react';
 import { Dropdown, message } from 'antd';
 import { useState } from 'react';
-import { WORK_MODES, WORK_MODE_DUET, workModeForLocation, workModeHref } from './workMode.js';
+import { getToken } from '../api/client.js';
+import {
+  WORK_MODES,
+  WORK_MODE_DUET,
+  WORK_MODE_MAGIC_CUT,
+  magicCutBootstrapRequest,
+  workModeForLocation,
+  workModeHref
+} from './workMode.js';
 import './work-mode.css';
 
 // 品牌行即工作模式入口：样式跟我们的主题走，交互形态参考洛水的三段式下拉。
@@ -26,7 +34,7 @@ export default function WorkModeMenu({ pathname, className = '', children, ariaL
     )
   }));
 
-  function handleMenuClick({ key }) {
+  async function handleMenuClick({ key }) {
     if (key === WORK_MODE_DUET) {
       message.info('Duet 模式尚未实现');
       return;
@@ -36,6 +44,21 @@ export default function WorkModeMenu({ pathname, className = '', children, ariaL
     if (!target) return;
     const targetURL = new URL(target, window.location.href);
     if (targetURL.origin !== window.location.origin) {
+      if (key === WORK_MODE_MAGIC_CUT) {
+        const bootstrap = magicCutBootstrapRequest(getToken(), targetURL.href);
+        if (bootstrap) {
+          try {
+            const response = await fetch(bootstrap.url, bootstrap.options);
+            if (!response.ok) {
+              message.error('魔剪账号连接失败，请确认 4040 已启动');
+              return;
+            }
+          } catch (_) {
+            message.error('无法连接魔剪，请确认 4040 已启动');
+            return;
+          }
+        }
+      }
       window.location.assign(targetURL.href);
       return;
     }

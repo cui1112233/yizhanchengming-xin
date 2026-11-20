@@ -40,3 +40,32 @@ func TestUnknownAPIRouteReturnsJSONNotTheFrontend(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want application/json", contentType)
 	}
 }
+
+func TestLoginRoutesUseTheAccountBridge(t *testing.T) {
+	auth := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/login/session" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := New(Dependencies{Auth: auth})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/login/session", nil))
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAuthBootstrapUsesTheDedicatedCrossPortHandler(t *testing.T) {
+	bootstrap := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := New(Dependencies{AuthBootstrap: bootstrap})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/auth/bootstrap", nil))
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
+	}
+}

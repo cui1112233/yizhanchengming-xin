@@ -48,3 +48,17 @@ export function workModeHref(id, locationLike = {}) {
   const port = targetPort ? `:${targetPort}` : '';
   return `${protocol}//${hostname}${port}${mode.href}`;
 }
+
+export function magicCutBootstrapRequest(token, targetHref) {
+  const value = String(token || '').trim();
+  if (!value) return null;
+  const target = new URL(targetHref);
+  return {
+    url: `${target.origin}/api/auth/bootstrap`,
+    options: {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${value}` }
+    }
+  };
+}
