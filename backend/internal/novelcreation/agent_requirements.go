@@ -81,7 +81,7 @@ func agentRequirementsSystemPrompt(input RunContext, definition promptcatalog.De
 		}
 	}
 	for _, p := range input.Agent.CustomWritePrompts {
-		if p.Enabled && p.Category == category && strings.TrimSpace(p.Content) != "" {
+		if p.Enabled && (p.Category == category || (definition.ID == novelprompt.ShortFullWriter.ID && (p.Category == "short_fiction" || p.Category == "imitation"))) && strings.TrimSpace(p.Content) != "" {
 			writing = append(writing, novelprompt.UserRequirement{Title: p.Title, Content: p.Content})
 		}
 	}

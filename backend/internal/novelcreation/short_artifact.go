@@ -148,6 +148,11 @@ func (s *Service) EditShortStoryArtifact(ctx context.Context, owner, project str
 			}
 		}
 		story.Artifacts[index].Content = content
+		if story.FullDraft != nil && (key == "outline/story.json" || strings.HasPrefix(key, "chapters/")) {
+			if e = refreshShortFullCurrentArtifact(&story); e != nil {
+				return e
+			}
+		}
 		if story.Status == "completed" && key != "recommendation.txt" {
 			story.QualityStale = true
 		}

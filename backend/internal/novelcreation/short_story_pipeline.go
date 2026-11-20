@@ -101,6 +101,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		return s.finishWithError(ctx, owner, run, ErrModelUnavailable, "独立短篇执行器未配置", nil)
 	}
 	var snap struct {
+		ShortFullDraftVersion          int                   `json:"short_full_draft_version"`
 		ShortWriterConversationVersion int                   `json:"short_writer_conversation_version"`
 		ShortReviewVersion             int                   `json:"short_review_version"`
 		ShortImitationVersion          int                   `json:"short_imitation_version"`
@@ -113,8 +114,11 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	if e := json.Unmarshal(run.PromptSnapshot, &snap); e != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇快照损坏", e)
 	}
-	if snap.ShortWriterConversationVersion < 0 || snap.ShortWriterConversationVersion > 1 || snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 2 {
+	if snap.ShortFullDraftVersion < 0 || snap.ShortFullDraftVersion > 1 || snap.ShortWriterConversationVersion < 0 || snap.ShortWriterConversationVersion > 1 || snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 2 {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇审核快照版本无效，已停止生成", nil)
+	}
+	if snap.ShortFullDraftVersion == 1 && snap.Story.Input.Mode != "short_imitation" {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "全篇短篇协议只能用于短篇仿写，已停止生成", nil)
 	}
 	project, e := s.store.GetProject(ctx, owner, run.ProjectID)
 	if e != nil {
@@ -123,6 +127,9 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	session, e := s.store.GetSession(ctx, owner, run.SessionID)
 	if e != nil {
 		return run, e
+	}
+	if snap.ShortFullDraftVersion == 1 && session.Mode != "short_imitation" {
+		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "全篇短篇会话模式与快照不符，已停止生成", nil)
 	}
 	story := snap.Story
 	story.RunID = run.ID
@@ -177,6 +184,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	}
 	agent := NormalizeAgentSettings(snap.Settings.Agent, 2000)
 	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent, SystemPrompts: snap.SystemPrompts, ShortReviewVersion: snap.ShortReviewVersion}
+	in.ShortFullDraftVersion = snap.ShortFullDraftVersion
 	in.ShortImitationVersion = snap.ShortImitationVersion
 	in.ShortWriterConversationVersion = snap.ShortWriterConversationVersion
 	if in.ShortImitationVersion >= 1 {
@@ -389,6 +397,9 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 	}
 	if e := validateShortOutline(*outline, story.Input.TargetChapters); e != nil {
 		return story, e
+	}
+	if in.ShortFullDraftVersion == 1 {
+		return p.buildFullShortStory(ctx, in, sink, story)
 	}
 	story.Chapters = []ShortChapter{}
 	story.Artifacts = []ShortArtifact{}

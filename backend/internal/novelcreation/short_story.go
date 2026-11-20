@@ -50,28 +50,29 @@ type ShortArtifact struct {
 	Content  string `json:"content"`
 }
 type ShortStory struct {
-	Checkpoint     string              `json:"checkpoint,omitempty"`
-	QualityStale   bool                `json:"qualityStale,omitempty"`
-	Imitation      *ShortImitationData `json:"imitation,omitempty"`
-	ID             string              `json:"storyId"`
-	ProjectID      string              `json:"projectId"`
-	SessionID      string              `json:"sessionId"`
-	RunID          string              `json:"runId"`
-	Version        int                 `json:"version"`
-	Status         string              `json:"status"`
-	Title          string              `json:"title"`
-	Input          ShortStoryInput     `json:"input"`
-	Outline        *ShortOutline       `json:"outline"`
-	Chapters       []ShortChapter      `json:"chapters"`
-	Artifacts      []ShortArtifact     `json:"artifacts"`
-	Recommendation string              `json:"recommendation"`
-	Styles         []StyleProfile      `json:"styles"`
-	Notes          []ProjectNote       `json:"notes"`
-	LinkedContext  string              `json:"linkedContext,omitempty"`
-	OutlineAudit   json.RawMessage     `json:"outlineAudit,omitempty"`
-	ChapterAudits  []json.RawMessage   `json:"chapterAudits"`
-	CreatedAt      time.Time           `json:"createdAt"`
-	UpdatedAt      time.Time           `json:"updatedAt"`
+	FullDraft      *ShortFullDraftState `json:"fullDraft,omitempty"`
+	Checkpoint     string               `json:"checkpoint,omitempty"`
+	QualityStale   bool                 `json:"qualityStale,omitempty"`
+	Imitation      *ShortImitationData  `json:"imitation,omitempty"`
+	ID             string               `json:"storyId"`
+	ProjectID      string               `json:"projectId"`
+	SessionID      string               `json:"sessionId"`
+	RunID          string               `json:"runId"`
+	Version        int                  `json:"version"`
+	Status         string               `json:"status"`
+	Title          string               `json:"title"`
+	Input          ShortStoryInput      `json:"input"`
+	Outline        *ShortOutline        `json:"outline"`
+	Chapters       []ShortChapter       `json:"chapters"`
+	Artifacts      []ShortArtifact      `json:"artifacts"`
+	Recommendation string               `json:"recommendation"`
+	Styles         []StyleProfile       `json:"styles"`
+	Notes          []ProjectNote        `json:"notes"`
+	LinkedContext  string               `json:"linkedContext,omitempty"`
+	OutlineAudit   json.RawMessage      `json:"outlineAudit,omitempty"`
+	ChapterAudits  []json.RawMessage    `json:"chapterAudits"`
+	CreatedAt      time.Time            `json:"createdAt"`
+	UpdatedAt      time.Time            `json:"updatedAt"`
 }
 type ShortStoryResult struct {
 	Project Project    `json:"project"`
@@ -228,6 +229,7 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 		snapshot := map[string]any{"short_imitation_version": imitationVersion, "short_story": story, "project_settings": settings, "agent_contract_version": 1, "short_review_version": 1, "mode": in.Mode, "system_prompts": systemPrompts}
 		if writerConversationVersion > 0 {
 			snapshot["short_writer_conversation_version"] = writerConversationVersion
+			snapshot["short_full_draft_version"] = 1
 		}
 		raw, _ := json.Marshal(snapshot)
 		run, e := tx.CreateRun(ctx, owner, Run{ProjectID: p.ID, SessionID: session.ID, ModelID: in.ModelID, ThinkingLevel: in.ThinkingLevel, IdempotencyKey: "short:" + fingerprint([]string{owner, in.IdempotencyKey}), Status: RunQueued, PromptSnapshot: raw})

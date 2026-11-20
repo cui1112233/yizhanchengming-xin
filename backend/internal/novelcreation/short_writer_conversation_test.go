@@ -67,6 +67,7 @@ func TestShortWriterConversationRetryRebuildsHistoryWithoutRedrafting(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
+	freezeLegacyShortFullDraft(t, service, "alice", started.Run.ID)
 	var snapshot map[string]any
 	_ = json.Unmarshal(started.Run.PromptSnapshot, &snapshot)
 	if snapshot["short_writer_conversation_version"] != float64(1) {
@@ -273,6 +274,7 @@ func TestShortWriterConversationOwnedMySQLRetry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			freezeLegacyShortFullDraft(t, service, owner, started.Run.ID)
 			if version == 0 {
 				if _, err = db.Exec(`UPDATE novel_runs SET prompt_snapshot_json=JSON_SET(prompt_snapshot_json,'$.short_writer_conversation_version',0) WHERE owner_username=? AND run_id=?`, owner, started.Run.ID); err != nil {
 					t.Fatal(err)

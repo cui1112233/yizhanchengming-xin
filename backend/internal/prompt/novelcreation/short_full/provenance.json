@@ -1,0 +1,49 @@
+{
+  "targetSHA256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "module": "novels.prompts.inkos.short_fiction_prompts",
+  "evidence": "docs/verification/novel-full-draft-20261120/FINDINGS.md",
+  "adaptations": [
+    "Only placeholders normalized to non-executing Go syntax",
+    "CM confirmed blueprint and JSON outline converted to Markdown input",
+    "CM resource and cancellation/unknown-result/persistence protections retained",
+    "New tasks only; old frozen protocol unchanged"
+  ],
+  "templates": [
+    {
+      "file": "chapter-block.txt",
+      "sha256": "ee5bc2a14c11c6a097c7e6421a51bd2cc9fe4dfb4346372a10e1a3c21803d46f"
+    },
+    {
+      "file": "continuation-user.txt",
+      "sha256": "8c5e2165b2bb0a0162aa41c34c4de65a045bb78dae35737abc7ec3464b88f5ec"
+    },
+    {
+      "file": "package-system.txt",
+      "sha256": "a4ba0992e3e442dea2f48b9536a9241ccc38ef679b038409fe75716a5ba0accc"
+    },
+    {
+      "file": "package-user.txt",
+      "sha256": "eda8e8e0c68ecdae15b60f40d4ceba3622aabb88b39948db18a0e14818e5510d"
+    },
+    {
+      "file": "review-system.txt",
+      "sha256": "788546a6216b5831e2d7870449003863d466704730367e2ce90430c3339a0c1c"
+    },
+    {
+      "file": "review-user.txt",
+      "sha256": "83f25d25d94337d1554d8875a8744ccb172202adb9969de83732bb98fc68eb9a"
+    },
+    {
+      "file": "revision-user.txt",
+      "sha256": "53929319d641067f745399199179a7142f776e986289ec39e04318c23a03afd0"
+    },
+    {
+      "file": "writer-system.txt",
+      "sha256": "4b44dc44173cc58c8135e17e28902a930202ae65c4c5003cefa22ce52f6c45ba"
+    },
+    {
+      "file": "writer-user.txt",
+      "sha256": "976dd010a5a27231db07641e6b0ef43dd1448d0321cabf7de69e0edda457bef8"
+    }
+  ]
+}

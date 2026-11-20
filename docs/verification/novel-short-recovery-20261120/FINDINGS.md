@@ -47,7 +47,7 @@
 - existing_draft_markdown：`render_short_fiction_draft_markdown(draft_v1)`。
 - missing_chapters：当前 missing 编号列表。
 
-消息为 `[system(writer_sys), user(build_short_fiction_draft_continuation_user_prompt(cont_input))]`，agent=writer，temperature=0.68；max_tokens 仍按原 chapter_count 与 chars_per_chapter 估算，而不是把 missing 数量冒充总章节数。
+消息为 `[system(writer_sys), user(build_short_fiction_draft_continuation_user_prompt(cont_input))]`，agent=writer，temperature=0.68；max_tokens 使用 `estimate_short_fiction_max_tokens(len(missing), chars_per_chapter)`。2026-11-20后续聚焦复核已更正前轮误判：0x18016682f 的 helper 0x180375370 对当前missing取长度，再作为estimate第一参，证据见 `../novel-full-draft-20261120/0x180375370.fallback.c`；补写用户提示里的chapter_count仍是原总章节数。
 
 响应处理：
 

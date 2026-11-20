@@ -178,6 +178,7 @@ func TestShortStoryIndependentResultCheckpointEditAndReadback(t *testing.T) {
 	// Freeze a pre-v2 task: old outline checkpoints remain editable and resumable.
 	var legacySnapshot map[string]any
 	_ = json.Unmarshal(out.Run.PromptSnapshot, &legacySnapshot)
+	legacySnapshot["short_full_draft_version"] = 0
 	legacySnapshot["short_imitation_version"] = 1
 	legacySnapshot["short_writer_conversation_version"] = 0
 	legacyRaw, _ := json.Marshal(legacySnapshot)
@@ -255,6 +256,7 @@ func TestShortStoryTwentyThousandWordsKeepsOneChapterAndBoundedRequests(t *testi
 	if e != nil {
 		t.Fatal(e)
 	}
+	freezeLegacyShortFullDraft(t, s, "alice", out.Run.ID)
 	run, e := s.Run(ctx, "alice", out.Run.ID)
 	if e != nil || run.Status != RunSucceeded {
 		t.Fatal(run.Status, e)

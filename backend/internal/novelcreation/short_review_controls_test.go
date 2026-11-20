@@ -182,6 +182,10 @@ func TestShortControlledRealMySQLReauditSaveAndRestart(t *testing.T) {
 	if e = json.Unmarshal(created.Run.PromptSnapshot, &frozen); e != nil || frozen.ShortReviewVersion != 1 {
 		t.Fatal("new task missing version", e)
 	}
+	// This fixture tests the earlier JSON piece review protocol, not whole drafts.
+	if _, e = db.Exec(`UPDATE novel_runs SET prompt_snapshot_json=JSON_SET(prompt_snapshot_json,'$.short_imitation_version',0,'$.short_writer_conversation_version',0,'$.short_full_draft_version',0) WHERE owner_username=? AND run_id=?`, owner, created.Run.ID); e != nil {
+		t.Fatal(e)
+	}
 	run, e := s.Run(context.Background(), owner, created.Run.ID)
 	if e != nil || run.Status != RunSucceeded || len(provider.requests) != 8 {
 		t.Fatal(run.Status, e, len(provider.requests))
@@ -200,6 +204,9 @@ func TestShortControlledRealMySQLReauditSaveAndRestart(t *testing.T) {
 	input.IdempotencyKey = novelID("failed-create")
 	bad, e := s.StartShortStory(context.Background(), owner, input)
 	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE novel_runs SET prompt_snapshot_json=JSON_SET(prompt_snapshot_json,'$.short_imitation_version',0,'$.short_writer_conversation_version',0,'$.short_full_draft_version',0) WHERE owner_username=? AND run_id=?`, owner, bad.Run.ID); e != nil {
 		t.Fatal(e)
 	}
 	failed, e := s.Run(context.Background(), owner, bad.Run.ID)

@@ -50,6 +50,7 @@ export default function AgentPanel({ projectId, models, mode }) {
       </Form.Item>)}</div>
     </section>
     <section className="novel-agent-section"><h3>写章审稿循环</h3><p>写章后自动审稿。未达通过分将尝试修订，并保留审核结果较好的版本。</p>
+      <p aria-label="审稿设置适用范围">通过分、修订轮数和字数整理用于长篇和历史短篇任务。新建短篇仿写采用整篇写作、文字审稿和一次第二稿，不按通过分反复修订；分步骤模型、审稿维度和自定义要求继续生效。</p>
       <div className="novel-form-grid">{[
         ['maxRevisionRounds', '最多修订轮数', 0, 5, 1], ['passScore', '审核通过分', 0, 100, 1],
         ['baseTemperature', '基础温度', 0, 2, 0.05], ['temperatureStep', '修订温度增量', 0, 0.5, 0.05]

@@ -1,0 +1,19 @@
+{
+  "note": "Analyst synthetic re-only probe of decoded patterns; does not import or execute target.",
+  "rows": [
+    {
+      "n": 1,
+      "titleRegex": "^##\\s*(?:第\\s*1\\s*章\\s*)?(.+)$",
+      "contentRegex": "^##\\s*(?:第\\s*1\\s*章\\s*)?.*$\\n([\\s\\S]*?)(?=^##\\s*(?:第\\s*2\\s*章\\s*)?.*$|$(?![\\s\\S]))",
+      "title": "第一章标题",
+      "content": "第一章正文"
+    },
+    {
+      "n": 2,
+      "titleRegex": "^##\\s*(?:第\\s*2\\s*章\\s*)?(.+)$",
+      "contentRegex": "^##\\s*(?:第\\s*2\\s*章\\s*)?.*$\\n([\\s\\S]*?)(?=^##\\s*(?:第\\s*3\\s*章\\s*)?.*$|$(?![\\s\\S]))",
+      "title": "第1章 第一章标题",
+      "content": "第一章正文"
+    }
+  ]
+}

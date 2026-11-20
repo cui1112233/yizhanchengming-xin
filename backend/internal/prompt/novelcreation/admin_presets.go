@@ -18,6 +18,15 @@ type AdminPrompt struct {
 // Runtime and administrator defaults share these definitions; no frontend copy.
 func AdminPrompts() []AdminPrompt {
 	return []AdminPrompt{
+		{ShortFullWriter.ID, "短篇全篇·正文写作系统要求", "novel.short", ShortFullWriter},
+		{ShortFullWriterUserID, "短篇全篇·首稿任务模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullWriterUserTemplate}},
+		{ShortFullContinuationUserID, "短篇全篇·缺章补写模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullContinuationUserTemplate}},
+		{ShortFullReview.ID, "短篇全篇·文字审稿系统要求", "novel.short", ShortFullReview},
+		{ShortFullReviewUserID, "短篇全篇·文字审稿任务模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullReviewUserTemplate}},
+		{ShortFullRevisionUserID, "短篇全篇·第二稿跟进模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullRevisionUserTemplate}},
+		{ShortFullPackage.ID, "短篇全篇·成品包装系统要求", "novel.short", ShortFullPackage},
+		{ShortFullPackageUserID, "短篇全篇·成品包装任务模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullPackageUserTemplate}},
+		{ShortFullChapterBlockID, "短篇全篇·章节输出区块模板", "novel.short", catalog.Definition{SystemPrompt: ShortFullChapterBlockTemplate}},
 		{ShortWriterRevisionFollowupID, "短篇写作·修订跟进要求（四消息）", "novel.short", catalog.Definition{SystemPrompt: ShortWriterRevisionFollowupSystem}},
 		{ShortImitationDeconstruction.ID, "短篇仿写·六维拆书", "novel.short", ShortImitationDeconstruction},
 		{ShortImitationDirections.ID, "短篇仿写·三个方向", "novel.short", ShortImitationDirections},

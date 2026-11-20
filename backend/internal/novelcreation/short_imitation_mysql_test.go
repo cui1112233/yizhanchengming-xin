@@ -36,6 +36,7 @@ func TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	freezeLegacyShortFullDraft(t, s, "stage-owner", out.Run.ID)
 	first, e := s.Run(ctx, "stage-owner", out.Run.ID)
 	if e != nil || first.Status != RunAwaitingConfirmation {
 		t.Fatal(first.Status, e)
@@ -103,6 +104,7 @@ func TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	freezeLegacyShortFullDraft(t, s, "stage-owner", out.Run.ID)
 	first, e = s.Run(ctx, "stage-owner", out.Run.ID)
 	if !IsCode(e, ErrModelRateLimited) || first.Status != RunFailed {
 		t.Fatal("未触发终审限流", first.Status, e)

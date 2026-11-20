@@ -189,6 +189,7 @@ func TestShortImitationRetryAfterEditorialRateLimitReusesSuccessfulCalls(t *test
 	if e != nil {
 		t.Fatal(e)
 	}
+	freezeLegacyShortFullDraft(t, s, "alice", out.Run.ID)
 	run, e := s.Run(ctx, "alice", out.Run.ID)
 	if !IsCode(e, ErrModelRateLimited) || run.Status != RunFailed {
 		t.Fatal("未到终审限流", run.Status, e)
@@ -241,6 +242,7 @@ func TestShortImitationInvalidSecondChapterRetryKeepsFirstChapterCalls(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
+	freezeLegacyShortFullDraft(t, s, "alice", out.Run.ID)
 	first, e := s.Run(ctx, "alice", out.Run.ID)
 	if !IsCode(e, ErrInvalidOutput) || first.Status != RunFailed || len(provider.requests) != 10 {
 		t.Fatal("未在第二章格式失败", first.Status, e, len(provider.requests))

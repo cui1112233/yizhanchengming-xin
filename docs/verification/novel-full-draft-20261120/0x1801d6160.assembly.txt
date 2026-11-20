@@ -1,0 +1,499 @@
+0x1801d6160 48895c2410               mov qword ptr [rsp + 0x10], rbx
+0x1801d6165 55                       push rbp
+0x1801d6166 56                       push rsi
+0x1801d6167 57                       push rdi
+0x1801d6168 4154                     push r12
+0x1801d616a 4155                     push r13
+0x1801d616c 4156                     push r14
+0x1801d616e 4157                     push r15
+0x1801d6170 4883ec20                 sub rsp, 0x20
+0x1801d6174 488b2d0d671e00           mov rbp, qword ptr [rip + 0x1e670d]
+0x1801d617b 4533ed                   xor r13d, r13d
+0x1801d617e 488b0553bc1b00           mov rax, qword ptr [rip + 0x1bbc53]
+0x1801d6185 488bf9                   mov rdi, rcx
+0x1801d6188 4d8b20                   mov r12, qword ptr [r8]
+0x1801d618b 4889442460               mov qword ptr [rsp + 0x60], rax
+0x1801d6190 4885ed                   test rbp, rbp
+0x1801d6193 742c                     je 0x1801d61c1
+0x1801d6195 48837d0001               cmp qword ptr [rbp], 1
+0x1801d619a 7f06                     jg 0x1801d61a2
+0x1801d619c 4c396d10                 cmp qword ptr [rbp + 0x10], r13
+0x1801d61a0 7445                     je 0x1801d61e7
+0x1801d61a2 4885ed                   test rbp, rbp
+0x1801d61a5 741a                     je 0x1801d61c1
+0x1801d61a7 44396d00                 cmp dword ptr [rbp], r13d
+0x1801d61ab 7c14                     jl 0x1801d61c1
+0x1801d61ad 48836d0001               sub qword ptr [rbp], 1
+0x1801d61b2 750d                     jne 0x1801d61c1
+0x1801d61b4 488b4508                 mov rax, qword ptr [rbp + 8]
+0x1801d61b8 488bcd                   mov rcx, rbp
+0x1801d61bb 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d61bf ffd2                     call rdx
+0x1801d61c1 4c8b0520441f00           mov r8, qword ptr [rip + 0x1f4420]
+0x1801d61c8 41b910000000             mov r9d, 0x10
+0x1801d61ce 488b15db661e00           mov rdx, qword ptr [rip + 0x1e66db]
+0x1801d61d5 488bcf                   mov rcx, rdi
+0x1801d61d8 e8336b1900               call 0x18036cd10
+0x1801d61dd 488be8                   mov rbp, rax
+0x1801d61e0 488905a1661e00           mov qword ptr [rip + 0x1e66a1], rax
+0x1801d61e7 488bd5                   mov rdx, rbp
+0x1801d61ea 488bcf                   mov rcx, rdi
+0x1801d61ed e80ebbe2ff               call 0x180001d00
+0x1801d61f2 488b1dcf681e00           mov rbx, qword ptr [rip + 0x1e68cf] ; novels.prompts.inkos.short_fiction_prompts#43="## 任务"
+0x1801d61f9 488bcf                   mov rcx, rdi
+0x1801d61fc ba11000000               mov edx, 0x11
+0x1801d6201 e85abf1900               call 0x180372160
+0x1801d6206 4c8bf0                   mov r14, rax
+0x1801d6209 8b03                     mov eax, dword ptr [rbx]
+0x1801d620b 83c001                   add eax, 1
+0x1801d620e 7402                     je 0x1801d6212
+0x1801d6210 8903                     mov dword ptr [rbx], eax
+0x1801d6212 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d6216 488918                   mov qword ptr [rax], rbx
+0x1801d6219 488b4f10                 mov rcx, qword ptr [rdi + 0x10]
+0x1801d621d 488b35ac681e00           mov rsi, qword ptr [rip + 0x1e68ac] ; novels.prompts.inkos.short_fiction_prompts#44="一次写完整 "
+0x1801d6224 4c8bb9b81d0400           mov r15, qword ptr [rcx + 0x41db8]
+0x1801d622b 4d85ff                   test r15, r15
+0x1801d622e 741a                     je 0x1801d624a
+0x1801d6230 498b4718                 mov rax, qword ptr [r15 + 0x18]
+0x1801d6234 488981b81d0400           mov qword ptr [rcx + 0x41db8], rax
+0x1801d623b ff89481e0400             dec dword ptr [rcx + 0x41e48]
+0x1801d6241 49c70701000000           mov qword ptr [r15], 1
+0x1801d6248 eb14                     jmp 0x1801d625e
+0x1801d624a 488b0dd7a01b00           mov rcx, qword ptr [rip + 0x1ba0d7]
+0x1801d6251 ba05000000               mov edx, 5
+0x1801d6256 e875891800               call 0x18035ebd0
+0x1801d625b 4c8bf8                   mov r15, rax
+0x1801d625e 33c0                     xor eax, eax
+0x1801d6260 498d5ff0                 lea rbx, [r15 - 0x10]
+0x1801d6264 49894718                 mov qword ptr [r15 + 0x18], rax
+0x1801d6268 49894720                 mov qword ptr [r15 + 0x20], rax
+0x1801d626c 49894728                 mov qword ptr [r15 + 0x28], rax
+0x1801d6270 49894730                 mov qword ptr [r15 + 0x30], rax
+0x1801d6274 49894738                 mov qword ptr [r15 + 0x38], rax
+0x1801d6278 ff153aa51b00             call qword ptr [rip + 0x1ba53a]
+0x1801d627e 488b4810                 mov rcx, qword ptr [rax + 0x10]
+0x1801d6282 488b91d0000000           mov rdx, qword ptr [rcx + 0xd0]
+0x1801d6289 488b4208                 mov rax, qword ptr [rdx + 8]
+0x1801d628d 488918                   mov qword ptr [rax], rbx
+0x1801d6290 4883630803               and qword ptr [rbx + 8], 3
+0x1801d6295 48094308                 or qword ptr [rbx + 8], rax
+0x1801d6299 488913                   mov qword ptr [rbx], rdx
+0x1801d629c 48895a08                 mov qword ptr [rdx + 8], rbx
+0x1801d62a0 8b06                     mov eax, dword ptr [rsi]
+0x1801d62a2 83c001                   add eax, 1
+0x1801d62a5 7402                     je 0x1801d62a9
+0x1801d62a7 8906                     mov dword ptr [rsi], eax
+0x1801d62a9 49897718                 mov qword ptr [r15 + 0x18], rsi
+0x1801d62ad 498bd4                   mov rdx, r12
+0x1801d62b0 4c8b05e1661e00           mov r8, qword ptr [rip + 0x1e66e1] ; novels.prompts.inkos.short_fiction_prompts#5="chapter_count"
+0x1801d62b7 e8048e1a00               call 0x18037f0c0
+0x1801d62bc 488bd8                   mov rbx, rax
+0x1801d62bf 4885c0                   test rax, rax
+0x1801d62c2 0f8493000000             je 0x1801d635b
+0x1801d62c8 4c8b05b1661e00           mov r8, qword ptr [rip + 0x1e66b1] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d62cf 488bd0                   mov rdx, rax
+0x1801d62d2 488bcf                   mov rcx, rdi
+0x1801d62d5 e846f21900               call 0x180375520
+0x1801d62da 488bf0                   mov rsi, rax
+0x1801d62dd 44392b                   cmp dword ptr [rbx], r13d
+0x1801d62e0 7c13                     jl 0x1801d62f5
+0x1801d62e2 48832b01                 sub qword ptr [rbx], 1
+0x1801d62e6 750d                     jne 0x1801d62f5
+0x1801d62e8 488b4b08                 mov rcx, qword ptr [rbx + 8]
+0x1801d62ec 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x1801d62f0 488bcb                   mov rcx, rbx
+0x1801d62f3 ffd2                     call rdx
+0x1801d62f5 4885f6                   test rsi, rsi
+0x1801d62f8 7461                     je 0x1801d635b
+0x1801d62fa 49897720                 mov qword ptr [r15 + 0x20], rsi
+0x1801d62fe 488b0d9b661e00           mov rcx, qword ptr [rip + 0x1e669b] ; novels.prompts.inkos.short_fiction_prompts#6=" 章，每章约 "
+0x1801d6305 8b01                     mov eax, dword ptr [rcx]
+0x1801d6307 83c001                   add eax, 1
+0x1801d630a 7402                     je 0x1801d630e
+0x1801d630c 8901                     mov dword ptr [rcx], eax
+0x1801d630e 49894f28                 mov qword ptr [r15 + 0x28], rcx
+0x1801d6312 498bd4                   mov rdx, r12
+0x1801d6315 4c8b058c661e00           mov r8, qword ptr [rip + 0x1e668c] ; novels.prompts.inkos.short_fiction_prompts#7="chars_per_chapter"
+0x1801d631c e89f8d1a00               call 0x18037f0c0
+0x1801d6321 488bd8                   mov rbx, rax
+0x1801d6324 4885c0                   test rax, rax
+0x1801d6327 7432                     je 0x1801d635b
+0x1801d6329 4c8b0550661e00           mov r8, qword ptr [rip + 0x1e6650] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d6330 488bd0                   mov rdx, rax
+0x1801d6333 488bcf                   mov rcx, rdi
+0x1801d6336 e8e5f11900               call 0x180375520
+0x1801d633b 488bf0                   mov rsi, rax
+0x1801d633e 44392b                   cmp dword ptr [rbx], r13d
+0x1801d6341 7c13                     jl 0x1801d6356
+0x1801d6343 48832b01                 sub qword ptr [rbx], 1
+0x1801d6347 750d                     jne 0x1801d6356
+0x1801d6349 488b4b08                 mov rcx, qword ptr [rbx + 8]
+0x1801d634d 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x1801d6351 488bcb                   mov rcx, rbx
+0x1801d6354 ffd2                     call rdx
+0x1801d6356 4885f6                   test rsi, rsi
+0x1801d6359 7532                     jne 0x1801d638d
+0x1801d635b 488b5f60                 mov rbx, qword ptr [rdi + 0x60]
+0x1801d635f bec4000000               mov esi, 0xc4
+0x1801d6364 4c896f60                 mov qword ptr [rdi + 0x60], r13
+0x1801d6368 45392f                   cmp dword ptr [r15], r13d
+0x1801d636b 0f8ca4010000             jl 0x1801d6515
+0x1801d6371 49832f01                 sub qword ptr [r15], 1
+0x1801d6375 0f859a010000             jne 0x1801d6515
+0x1801d637b 498b4708                 mov rax, qword ptr [r15 + 8]
+0x1801d637f 498bcf                   mov rcx, r15
+0x1801d6382 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d6386 ffd2                     call rdx
+0x1801d6388 e988010000               jmp 0x1801d6515
+0x1801d638d 49897730                 mov qword ptr [r15 + 0x30], rsi
+0x1801d6391 488b0d18661e00           mov rcx, qword ptr [rip + 0x1e6618] ; novels.prompts.inkos.short_fiction_prompts#8=" 字。"
+0x1801d6398 8b01                     mov eax, dword ptr [rcx]
+0x1801d639a 83c001                   add eax, 1
+0x1801d639d 7402                     je 0x1801d63a1
+0x1801d639f 8901                     mov dword ptr [rcx], eax
+0x1801d63a1 49894f38                 mov qword ptr [r15 + 0x38], rcx
+0x1801d63a5 488b0dd4651e00           mov rcx, qword ptr [rip + 0x1e65d4] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d63ac 498bd7                   mov rdx, r15
+0x1801d63af ff157ba41b00             call qword ptr [rip + 0x1ba47b]
+0x1801d63b5 488bd8                   mov rbx, rax
+0x1801d63b8 45392f                   cmp dword ptr [r15], r13d
+0x1801d63bb 7c13                     jl 0x1801d63d0
+0x1801d63bd 49832f01                 sub qword ptr [r15], 1
+0x1801d63c1 750d                     jne 0x1801d63d0
+0x1801d63c3 498b4f08                 mov rcx, qword ptr [r15 + 8]
+0x1801d63c7 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x1801d63cb 498bcf                   mov rcx, r15
+0x1801d63ce ffd2                     call rdx
+0x1801d63d0 4885db                   test rbx, rbx
+0x1801d63d3 750a                     jne 0x1801d63df
+0x1801d63d5 bec4000000               mov esi, 0xc4
+0x1801d63da e92e010000               jmp 0x1801d650d
+0x1801d63df 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d63e3 48895808                 mov qword ptr [rax + 8], rbx
+0x1801d63e7 488b0dea661e00           mov rcx, qword ptr [rip + 0x1e66ea] ; novels.prompts.inkos.short_fiction_prompts#45="先读完整故事方案，再写正文。正文要承接大纲的压力链、证据链、反转链和情绪回报，不要临时改成另一种故事。"
+0x1801d63ee 8b01                     mov eax, dword ptr [rcx]
+0x1801d63f0 83c001                   add eax, 1
+0x1801d63f3 7402                     je 0x1801d63f7
+0x1801d63f5 8901                     mov dword ptr [rcx], eax
+0x1801d63f7 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d63fb 48894810                 mov qword ptr [rax + 0x10], rcx
+0x1801d63ff 488b0d7a651e00           mov rcx, qword ptr [rip + 0x1e657a] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d6406 8b01                     mov eax, dword ptr [rcx]
+0x1801d6408 83c001                   add eax, 1
+0x1801d640b 7402                     je 0x1801d640f
+0x1801d640d 8901                     mov dword ptr [rcx], eax
+0x1801d640f 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d6413 48894818                 mov qword ptr [rax + 0x18], rcx
+0x1801d6417 488bcf                   mov rcx, rdi
+0x1801d641a e8e1d3ffff               call 0x1801d3800
+0x1801d641f 488bcf                   mov rcx, rdi
+0x1801d6422 4885c0                   test rax, rax
+0x1801d6425 7520                     jne 0x1801d6447
+0x1801d6427 4c8b05b2661e00           mov r8, qword ptr [rip + 0x1e66b2] ; novels.prompts.inkos.short_fiction_prompts#46="_build_short_fiction_craft_prompt"
+0x1801d642e 488d542460               lea rdx, [rsp + 0x60]
+0x1801d6433 e808cf1900               call 0x180373340
+0x1801d6438 488b5c2460               mov rbx, qword ptr [rsp + 0x60]
+0x1801d643d bec7000000               mov esi, 0xc7
+0x1801d6442 e9ce000000               jmp 0x1801d6515
+0x1801d6447 bec7000000               mov esi, 0xc7
+0x1801d644c 488bd0                   mov rdx, rax
+0x1801d644f 897528                   mov dword ptr [rbp + 0x28], esi
+0x1801d6452 e8b9fd1900               call 0x180376210
+0x1801d6457 488bc8                   mov rcx, rax
+0x1801d645a 4885c0                   test rax, rax
+0x1801d645d 0f84aa000000             je 0x1801d650d
+0x1801d6463 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d6467 48894820                 mov qword ptr [rax + 0x20], rcx
+0x1801d646b 488b0d0e651e00           mov rcx, qword ptr [rip + 0x1e650e] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d6472 8b01                     mov eax, dword ptr [rcx]
+0x1801d6474 83c001                   add eax, 1
+0x1801d6477 7402                     je 0x1801d647b
+0x1801d6479 8901                     mov dword ptr [rcx], eax
+0x1801d647b 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d647f 48894828                 mov qword ptr [rax + 0x28], rcx
+0x1801d6483 488b0de6641e00           mov rcx, qword ptr [rip + 0x1e64e6] ; novels.prompts.inkos.short_fiction_prompts#0="## 创作方向"
+0x1801d648a 8b01                     mov eax, dword ptr [rcx]
+0x1801d648c 83c001                   add eax, 1
+0x1801d648f 7402                     je 0x1801d6493
+0x1801d6491 8901                     mov dword ptr [rcx], eax
+0x1801d6493 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d6497 498bd4                   mov rdx, r12
+0x1801d649a 48894830                 mov qword ptr [rax + 0x30], rcx
+0x1801d649e 4c8b05d3641e00           mov r8, qword ptr [rip + 0x1e64d3] ; novels.prompts.inkos.short_fiction_prompts#1="direction"
+0x1801d64a5 e8168c1a00               call 0x18037f0c0
+0x1801d64aa 488bc8                   mov rcx, rax
+0x1801d64ad 4885c0                   test rax, rax
+0x1801d64b0 7507                     jne 0x1801d64b9
+0x1801d64b2 beca000000               mov esi, 0xca
+0x1801d64b7 eb54                     jmp 0x1801d650d
+0x1801d64b9 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d64bd 48894838                 mov qword ptr [rax + 0x38], rcx
+0x1801d64c1 488b0db8641e00           mov rcx, qword ptr [rip + 0x1e64b8] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d64c8 8b01                     mov eax, dword ptr [rcx]
+0x1801d64ca 83c001                   add eax, 1
+0x1801d64cd 7402                     je 0x1801d64d1
+0x1801d64cf 8901                     mov dword ptr [rcx], eax
+0x1801d64d1 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d64d5 48894840                 mov qword ptr [rax + 0x40], rcx
+0x1801d64d9 488b0d08661e00           mov rcx, qword ptr [rip + 0x1e6608] ; novels.prompts.inkos.short_fiction_prompts#47="## 故事方案"
+0x1801d64e0 8b01                     mov eax, dword ptr [rcx]
+0x1801d64e2 83c001                   add eax, 1
+0x1801d64e5 7402                     je 0x1801d64e9
+0x1801d64e7 8901                     mov dword ptr [rcx], eax
+0x1801d64e9 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d64ed 498bd4                   mov rdx, r12
+0x1801d64f0 48894848                 mov qword ptr [rax + 0x48], rcx
+0x1801d64f4 4c8b05f5651e00           mov r8, qword ptr [rip + 0x1e65f5] ; novels.prompts.inkos.short_fiction_prompts#48="outline_markdown"
+0x1801d64fb e8c08b1a00               call 0x18037f0c0
+0x1801d6500 488bc8                   mov rcx, rax
+0x1801d6503 4885c0                   test rax, rax
+0x1801d6506 7532                     jne 0x1801d653a
+0x1801d6508 becd000000               mov esi, 0xcd
+0x1801d650d 488b5f60                 mov rbx, qword ptr [rdi + 0x60]
+0x1801d6511 4c896f60                 mov qword ptr [rdi + 0x60], r13
+0x1801d6515 45392e                   cmp dword ptr [r14], r13d
+0x1801d6518 0f8c9b010000             jl 0x1801d66b9
+0x1801d651e 49832e01                 sub qword ptr [r14], 1
+0x1801d6522 0f8591010000             jne 0x1801d66b9
+0x1801d6528 498b4608                 mov rax, qword ptr [r14 + 8]
+0x1801d652c 498bce                   mov rcx, r14
+0x1801d652f 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d6533 ffd2                     call rdx
+0x1801d6535 e97f010000               jmp 0x1801d66b9
+0x1801d653a 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d653e 48894850                 mov qword ptr [rax + 0x50], rcx
+0x1801d6542 488b0d37641e00           mov rcx, qword ptr [rip + 0x1e6437] ; novels.prompts.inkos.short_fiction_prompts#2=""
+0x1801d6549 8b01                     mov eax, dword ptr [rcx]
+0x1801d654b 83c001                   add eax, 1
+0x1801d654e 7402                     je 0x1801d6552
+0x1801d6550 8901                     mov dword ptr [rcx], eax
+0x1801d6552 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d6556 48894858                 mov qword ptr [rax + 0x58], rcx
+0x1801d655a 488b0d07651e00           mov rcx, qword ptr [rip + 0x1e6507] ; novels.prompts.inkos.short_fiction_prompts#31="## 输出格式"
+0x1801d6561 8b01                     mov eax, dword ptr [rcx]
+0x1801d6563 83c001                   add eax, 1
+0x1801d6566 7402                     je 0x1801d656a
+0x1801d6568 8901                     mov dword ptr [rcx], eax
+0x1801d656a 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d656e 48894860                 mov qword ptr [rax + 0x60], rcx
+0x1801d6572 488b0d7f651e00           mov rcx, qword ptr [rip + 0x1e657f] ; novels.prompts.inkos.short_fiction_prompts#49="=== SHORT_FICTION_TITLE ==="
+0x1801d6579 8b01                     mov eax, dword ptr [rcx]
+0x1801d657b 83c001                   add eax, 1
+0x1801d657e 7402                     je 0x1801d6582
+0x1801d6580 8901                     mov dword ptr [rcx], eax
+0x1801d6582 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d6586 48894868                 mov qword ptr [rax + 0x68], rcx
+0x1801d658a 488b0d6f651e00           mov rcx, qword ptr [rip + 0x1e656f] ; novels.prompts.inkos.short_fiction_prompts#50="短篇标题，只写纯文本平台标题"
+0x1801d6591 8b01                     mov eax, dword ptr [rcx]
+0x1801d6593 83c001                   add eax, 1
+0x1801d6596 7402                     je 0x1801d659a
+0x1801d6598 8901                     mov dword ptr [rcx], eax
+0x1801d659a 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d659e 48894870                 mov qword ptr [rax + 0x70], rcx
+0x1801d65a2 488b0d5f651e00           mov rcx, qword ptr [rip + 0x1e655f] ; novels.prompts.inkos.short_fiction_prompts#51="=== SHORT_FICTION_OPENING_HOOK ==="
+0x1801d65a9 8b01                     mov eax, dword ptr [rcx]
+0x1801d65ab 83c001                   add eax, 1
+0x1801d65ae 7402                     je 0x1801d65b2
+0x1801d65b0 8901                     mov dword ptr [rcx], eax
+0x1801d65b2 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d65b6 48894878                 mov qword ptr [rax + 0x78], rcx
+0x1801d65ba 488b0d4f651e00           mov rcx, qword ptr [rip + 0x1e654f] ; novels.prompts.inkos.short_fiction_prompts#52="可选正文前小钩子，约 200 字；如果不需要独立引子，也要写第 1 章第一屏的入局小场面"
+0x1801d65c1 8b01                     mov eax, dword ptr [rcx]
+0x1801d65c3 83c001                   add eax, 1
+0x1801d65c6 7402                     je 0x1801d65ca
+0x1801d65c8 8901                     mov dword ptr [rcx], eax
+0x1801d65ca 498b4618                 mov rax, qword ptr [r14 + 0x18]
+0x1801d65ce 48898880000000           mov qword ptr [rax + 0x80], rcx
+0x1801d65d5 488bcf                   mov rcx, rdi
+0x1801d65d8 4d8bee                   mov r13, r14
+0x1801d65db e830d3ffff               call 0x1801d3910
+0x1801d65e0 488bd8                   mov rbx, rax
+0x1801d65e3 4885c0                   test rax, rax
+0x1801d65e6 7523                     jne 0x1801d660b
+0x1801d65e8 4c8b0529651e00           mov r8, qword ptr [rip + 0x1e6529] ; novels.prompts.inkos.short_fiction_prompts#53="_chapter_output_blocks"
+0x1801d65ef 488d542460               lea rdx, [rsp + 0x60]
+0x1801d65f4 488bcf                   mov rcx, rdi
+0x1801d65f7 e844cd1900               call 0x180373340
+0x1801d65fc 488b5c2460               mov rbx, qword ptr [rsp + 0x60]
+0x1801d6601 bed5000000               mov esi, 0xd5
+0x1801d6606 e9ae000000               jmp 0x1801d66b9
+0x1801d660b 4c8b0586631e00           mov r8, qword ptr [rip + 0x1e6386] ; novels.prompts.inkos.short_fiction_prompts#5="chapter_count"
+0x1801d6612 498bd4                   mov rdx, r12
+0x1801d6615 e8a68a1a00               call 0x18037f0c0
+0x1801d661a 4c8bf8                   mov r15, rax
+0x1801d661d bed5000000               mov esi, 0xd5
+0x1801d6622 4885c0                   test rax, rax
+0x1801d6625 0f8482000000             je 0x1801d66ad
+0x1801d662b 4c8bc0                   mov r8, rax
+0x1801d662e 897528                   mov dword ptr [rbp + 0x28], esi
+0x1801d6631 488bd3                   mov rdx, rbx
+0x1801d6634 488bcf                   mov rcx, rdi
+0x1801d6637 e834011a00               call 0x180376770
+0x1801d663c 41833f00                 cmp dword ptr [r15], 0
+0x1801d6640 488bd8                   mov rbx, rax
+0x1801d6643 7c13                     jl 0x1801d6658
+0x1801d6645 49832f01                 sub qword ptr [r15], 1
+0x1801d6649 750d                     jne 0x1801d6658
+0x1801d664b 498b4f08                 mov rcx, qword ptr [r15 + 8]
+0x1801d664f 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x1801d6653 498bcf                   mov rcx, r15
+0x1801d6656 ffd2                     call rdx
+0x1801d6658 4885db                   test rbx, rbx
+0x1801d665b 7450                     je 0x1801d66ad
+0x1801d665d 4c8bc3                   mov r8, rbx
+0x1801d6660 498bd6                   mov rdx, r14
+0x1801d6663 488bcf                   mov rcx, rdi
+0x1801d6666 e8f5bc1900               call 0x180372360
+0x1801d666b 833b00                   cmp dword ptr [rbx], 0
+0x1801d666e 440fb6f8                 movzx r15d, al
+0x1801d6672 7c13                     jl 0x1801d6687
+0x1801d6674 48832b01                 sub qword ptr [rbx], 1
+0x1801d6678 750d                     jne 0x1801d6687
+0x1801d667a 488b4b08                 mov rcx, qword ptr [rbx + 8]
+0x1801d667e 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x1801d6682 488bcb                   mov rcx, rbx
+0x1801d6685 ffd2                     call rdx
+0x1801d6687 4584ff                   test r15b, r15b
+0x1801d668a 7421                     je 0x1801d66ad
+0x1801d668c 488b0d4d631e00           mov rcx, qword ptr [rip + 0x1e634d] ; novels.prompts.inkos.short_fiction_prompts#14="\n"
+0x1801d6693 498bd6                   mov rdx, r14
+0x1801d6696 ff1594a11b00             call qword ptr [rip + 0x1ba194]
+0x1801d669c 488bd8                   mov rbx, rax
+0x1801d669f 4885c0                   test rax, rax
+0x1801d66a2 0f855f010000             jne 0x1801d6807
+0x1801d66a8 bed6000000               mov esi, 0xd6
+0x1801d66ad 488b5f60                 mov rbx, qword ptr [rdi + 0x60]
+0x1801d66b1 48c7476000000000         mov qword ptr [rdi + 0x60], 0
+0x1801d66b9 4c8b7328                 mov r14, qword ptr [rbx + 0x28]
+0x1801d66bd 4d85f6                   test r14, r14
+0x1801d66c0 751e                     jne 0x1801d66e0
+0x1801d66c2 8bd6                     mov edx, esi
+0x1801d66c4 488bcd                   mov rcx, rbp
+0x1801d66c7 e8d47b1b00               call 0x18038e2a0
+0x1801d66cc 483b05e5a11b00           cmp rax, qword ptr [rip + 0x1ba1e5]
+0x1801d66d3 488bf0                   mov rsi, rax
+0x1801d66d6 488b4b28                 mov rcx, qword ptr [rbx + 0x28]
+0x1801d66da 7537                     jne 0x1801d6713
+0x1801d66dc 33c0                     xor eax, eax
+0x1801d66de eb41                     jmp 0x1801d6721
+0x1801d66e0 49396e18                 cmp qword ptr [r14 + 0x18], rbp
+0x1801d66e4 7476                     je 0x1801d675c
+0x1801d66e6 8bd6                     mov edx, esi
+0x1801d66e8 488bcd                   mov rcx, rbp
+0x1801d66eb e8b07b1b00               call 0x18038e2a0
+0x1801d66f0 488bf0                   mov rsi, rax
+0x1801d66f3 4c897010                 mov qword ptr [rax + 0x10], r14
+0x1801d66f7 418b0e                   mov ecx, dword ptr [r14]
+0x1801d66fa 83c101                   add ecx, 1
+0x1801d66fd 7403                     je 0x1801d6702
+0x1801d66ff 41890e                   mov dword ptr [r14], ecx
+0x1801d6702 483b35afa11b00           cmp rsi, qword ptr [rip + 0x1ba1af]
+0x1801d6709 488b4b28                 mov rcx, qword ptr [rbx + 0x28]
+0x1801d670d 7504                     jne 0x1801d6713
+0x1801d670f 33c0                     xor eax, eax
+0x1801d6711 eb0e                     jmp 0x1801d6721
+0x1801d6713 4885f6                   test rsi, rsi
+0x1801d6716 7409                     je 0x1801d6721
+0x1801d6718 8b10                     mov edx, dword ptr [rax]
+0x1801d671a 83c201                   add edx, 1
+0x1801d671d 7402                     je 0x1801d6721
+0x1801d671f 8910                     mov dword ptr [rax], edx
+0x1801d6721 48894328                 mov qword ptr [rbx + 0x28], rax
+0x1801d6725 4885c9                   test rcx, rcx
+0x1801d6728 7415                     je 0x1801d673f
+0x1801d672a 833900                   cmp dword ptr [rcx], 0
+0x1801d672d 7c10                     jl 0x1801d673f
+0x1801d672f 48832901                 sub qword ptr [rcx], 1
+0x1801d6733 750a                     jne 0x1801d673f
+0x1801d6735 488b4108                 mov rax, qword ptr [rcx + 8]
+0x1801d6739 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d673d ffd2                     call rdx
+0x1801d673f 4885f6                   test rsi, rsi
+0x1801d6742 7418                     je 0x1801d675c
+0x1801d6744 833e00                   cmp dword ptr [rsi], 0
+0x1801d6747 7c13                     jl 0x1801d675c
+0x1801d6749 48832e01                 sub qword ptr [rsi], 1
+0x1801d674d 750d                     jne 0x1801d675c
+0x1801d674f 488b4608                 mov rax, qword ptr [rsi + 8]
+0x1801d6753 488bce                   mov rcx, rsi
+0x1801d6756 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d675a ffd2                     call rdx
+0x1801d675c 4d8bcd                   mov r9, r13
+0x1801d675f 488d157eb41b00           lea rdx, [rip + 0x1bb47e]
+0x1801d6766 4d8bc4                   mov r8, r12
+0x1801d6769 488bcd                   mov rcx, rbp
+0x1801d676c e82f691900               call 0x18036d0a0
+0x1801d6771 488b0d10611e00           mov rcx, qword ptr [rip + 0x1e6110]
+0x1801d6778 483be9                   cmp rbp, rcx
+0x1801d677b 7520                     jne 0x1801d679d
+0x1801d677d 833900                   cmp dword ptr [rcx], 0
+0x1801d6780 7c10                     jl 0x1801d6792
+0x1801d6782 48832901                 sub qword ptr [rcx], 1
+0x1801d6786 750a                     jne 0x1801d6792
+0x1801d6788 488b4108                 mov rax, qword ptr [rcx + 8]
+0x1801d678c 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d6790 ffd2                     call rdx
+0x1801d6792 48c705eb601e0000000000   mov qword ptr [rip + 0x1e60eb], 0
+0x1801d679d 488bcf                   mov rcx, rdi
+0x1801d67a0 e8dbb5e2ff               call 0x180001d80
+0x1801d67a5 4d85ed                   test r13, r13
+0x1801d67a8 741b                     je 0x1801d67c5
+0x1801d67aa 41837d0000               cmp dword ptr [r13], 0
+0x1801d67af 7c14                     jl 0x1801d67c5
+0x1801d67b1 49836d0001               sub qword ptr [r13], 1
+0x1801d67b6 750d                     jne 0x1801d67c5
+0x1801d67b8 498b4508                 mov rax, qword ptr [r13 + 8]
+0x1801d67bc 498bcd                   mov rcx, r13
+0x1801d67bf 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d67c3 ffd2                     call rdx
+0x1801d67c5 41833c2400               cmp dword ptr [r12], 0
+0x1801d67ca 7c15                     jl 0x1801d67e1
+0x1801d67cc 49832c2401               sub qword ptr [r12], 1
+0x1801d67d1 750e                     jne 0x1801d67e1
+0x1801d67d3 498b442408               mov rax, qword ptr [r12 + 8]
+0x1801d67d8 498bcc                   mov rcx, r12
+0x1801d67db 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d67df ffd2                     call rdx
+0x1801d67e1 488b4f60                 mov rcx, qword ptr [rdi + 0x60]
+0x1801d67e5 48895f60                 mov qword ptr [rdi + 0x60], rbx
+0x1801d67e9 4885c9                   test rcx, rcx
+0x1801d67ec 7415                     je 0x1801d6803
+0x1801d67ee 833900                   cmp dword ptr [rcx], 0
+0x1801d67f1 7c10                     jl 0x1801d6803
+0x1801d67f3 48832901                 sub qword ptr [rcx], 1
+0x1801d67f7 750a                     jne 0x1801d6803
+0x1801d67f9 488b4108                 mov rax, qword ptr [rcx + 8]
+0x1801d67fd 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d6801 ffd2                     call rdx
+0x1801d6803 33c0                     xor eax, eax
+0x1801d6805 eb40                     jmp 0x1801d6847
+0x1801d6807 488bcf                   mov rcx, rdi
+0x1801d680a e871b5e2ff               call 0x180001d80
+0x1801d680f 41833e00                 cmp dword ptr [r14], 0
+0x1801d6813 7c13                     jl 0x1801d6828
+0x1801d6815 49832e01                 sub qword ptr [r14], 1
+0x1801d6819 750d                     jne 0x1801d6828
+0x1801d681b 498b4608                 mov rax, qword ptr [r14 + 8]
+0x1801d681f 498bce                   mov rcx, r14
+0x1801d6822 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d6826 ffd2                     call rdx
+0x1801d6828 41833c2400               cmp dword ptr [r12], 0
+0x1801d682d 7c15                     jl 0x1801d6844
+0x1801d682f 49832c2401               sub qword ptr [r12], 1
+0x1801d6834 750e                     jne 0x1801d6844
+0x1801d6836 498b442408               mov rax, qword ptr [r12 + 8]
+0x1801d683b 498bcc                   mov rcx, r12
+0x1801d683e 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801d6842 ffd2                     call rdx
+0x1801d6844 488bc3                   mov rax, rbx
+0x1801d6847 488b5c2468               mov rbx, qword ptr [rsp + 0x68]
+0x1801d684c 4883c420                 add rsp, 0x20
+0x1801d6850 415f                     pop r15
+0x1801d6852 415e                     pop r14
+0x1801d6854 415d                     pop r13
+0x1801d6856 415c                     pop r12
+0x1801d6858 5f                       pop rdi
+0x1801d6859 5e                       pop rsi
+0x1801d685a 5d                       pop rbp
+0x1801d685b c3                       ret

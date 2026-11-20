@@ -1,0 +1,56 @@
+INFO  Using log config file: jar:file:/C:/Users/Administrator/.codex/tools/ghidra/12.1.4/Ghidra/Framework/Generic/lib/Generic.jar!/generic.log4j.xml (LoggingInitialization)
+INFO  Using log file: C:\Users\Administrator\AppData\Roaming\ghidra\ghidra_12.1.4_PUBLIC\application.log (LoggingInitialization)
+INFO  Loading user preferences: C:\Users\Administrator\AppData\Roaming\ghidra\ghidra_12.1.4_PUBLIC\preferences (Preferences)
+INFO  Loading previous preferences: C:\Users\Administrator\AppData\Roaming\ghidra\ghidra_12.2_PUBLIC\preferences (Preferences)
+INFO  Searching for classes... (ClassSearcher)
+INFO  Class search complete (738 ms) (ClassSearcher)
+INFO  Initializing SSL Context (DefaultSSLContextInitializer)
+INFO  Initializing Random Number Generator... (SecureRandomFactory)
+INFO  Random Number Generator initialization complete: SHA1PRNG (SecureRandomFactory)
+INFO  Trust manager disabled, cacerts have not been set (DefaultTrustManagerFactory)
+INFO  Headless startup complete (2581 ms) (AnalyzeHeadless)
+INFO  Class searcher loaded 59 extension points (20 false positives) (ClassSearcher)
+INFO  HEADLESS Script Paths:
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\GnuDemangler\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\Base\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\WildcardAssembler\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Processors\JVM\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Processors\PIC\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\FileFormats\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\PyGhidra\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Debug\Debugger\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\DecompilerDependent\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Processors\8051\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\Decompiler\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\SwiftDemangler\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Processors\Atmel\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Processors\DATA\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Debug\Debugger-rmi-trace\ghidra_scripts
+    F:\脚本测试\一战晟铭-v88\docs\verification\novel-short-recovery-20261120
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\PDB\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\SystemEmulation\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\BytePatterns\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\FunctionID\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\VersionTracking\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\BSim\ghidra_scripts
+    C:\Users\Administrator\.codex\tools\ghidra\12.1.4\Ghidra\Features\MicrosoftCodeAnalyzer\ghidra_scripts (HeadlessAnalyzer)
+INFO  HEADLESS: execution starts (HeadlessAnalyzer)
+INFO  Opening existing project: F:\脚本测试\一战晟铭-v88\_local-archive-20261028\luoshui-novel-native-20261119\ghidra-project\novel-verified-native (HeadlessAnalyzer)
+INFO  Opening project: F:\脚本测试\一战晟铭-v88\_local-archive-20261028\luoshui-novel-native-20261119\ghidra-project\novel-verified-native (HeadlessProject)
+INFO  REPORT: Processing read-only project file: /novels-b5b22086.pyd (HeadlessAnalyzer)
+INFO  REPORT: Execute script: ExportRecoveryAssembly.java 'F:/脚本测试/一战晟铭-v88/docs/verification/novel-full-draft-20261120' '0x18014e500' '0x180150000' '0x18014f130' '0x18014f860' '0x180151160' '0x1801519b0' '0x180152350' '0x1801533f0' '0x180159910' '0x1801d6160' '0x1801d7d70' '0x1801d8730' '0x1801d5660' '0x180161530'  (HeadlessAnalyzer)
+INFO  SCRIPT: F:\脚本测试\一战晟铭-v88\docs\verification\novel-short-recovery-20261120\ExportRecoveryAssembly.java (HeadlessAnalyzer)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x18014e500 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x180150000 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x18014f130 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x18014f860 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x180151160 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x1801519b0 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x180152350 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x1801533f0 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x180159910 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x1801d6160 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x1801d7d70 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x1801d8730 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x1801d5660 (GhidraScript)
+INFO  ExportRecoveryAssembly.java> EXPORTED 0x180161530 (GhidraScript)

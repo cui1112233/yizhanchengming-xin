@@ -14,6 +14,8 @@ export default function ShortStoryPanel({owner,projectId,refreshKey,onRun,onTitl
  const download=f=>downloadBlob(new Blob([f.content],{type:'text/plain;charset=utf-8'}),f.key.replaceAll('/','-'));
  // Only the server's matching artifact can grant editing, including chapter shortcuts.
  const selected=preview&&(story?.artifacts.find(f=>f.key===preview.key)||{...preview,editable:false});
+ // ShortStory persists "writing" through full-draft writing, review and revision.
+ const producing=['queued','running','writing'].includes(story?.status);
  function openFile(file){setPreview(file);setDraft(null);setError('');}
  function back(){setPreview(null);setDraft(null);setError('');}
  async function saveFile(){if(!draft||!selected?.editable)return;await action(async()=>{const r=await scope.call(novelProjectRequest(projectId,'/short-story/artifact',{version:draft.version,key:draft.key,content:draft.content},{method:'PUT',signal:scope.signal}));if(r){setStory(r.story);onTitle?.(r.story.title);setPreview(r.story.artifacts.find(f=>f.key===draft.key)||{...selected,content:draft.content});setDraft(null);}});}
@@ -25,6 +27,17 @@ export default function ShortStoryPanel({owner,projectId,refreshKey,onRun,onTitl
    {draft?<Input.TextArea aria-label="文件内容" value={draft.content} disabled={busy} autoSize={{minRows:14,maxRows:30}} onChange={e=>setDraft(v=>({...v,content:e.target.value}))}/>:<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:'65vh',overflow:'auto'}}>{selected.content??'文件不存在'}</pre>}
   </section>:story&&<><p>目标总字数 {story.input.targetWordCount.toLocaleString()} · {story.input.targetChapters} 章</p>
   {story.status==='completed'&&<p role="status">生成完成，正文与资料已保存。</p>}
+  {story.fullDraft&&<section aria-label="正文版本">
+   <h4>正文版本</h4>
+   {story.fullDraft.revisionStatus!=='drafting'&&['v001','v002'].includes(story.fullDraft.currentVersion)&&<p>当前采用{story.fullDraft.currentVersion==='v002'?'第二稿':'第一稿'}。</p>}
+   {story.fullDraft.revisionStatus==='drafting'&&<p role="status">{story.fullDraft.missingChapters?.length?`${producing?'正在补齐正文':'正文尚未补齐'}，已补写${story.fullDraft.completionAttempts}次（最多3次），还缺第${story.fullDraft.missingChapters.join('、')}章。`:producing?'正在生成整篇正文。':'整篇正文尚未完成。'}</p>}
+   {story.fullDraft.revisionStatus==='pending'&&<p role="status">{producing?'第一稿已保存，正在审稿或修订。':'第一稿已保存，审稿或修订未完成。'}</p>}
+   {story.fullDraft.revisionStatus==='adopted'&&<p role="status">已采用第二稿，第一稿保留供查看。</p>}
+   {story.fullDraft.revisionStatus==='rejected'&&<p role="alert">第二稿未采用，继续保留第一稿。{story.fullDraft.revisionWarning}</p>}
+   <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{[
+    ['drafts/v001.md','查看第一稿'],['drafts/v002.md','查看第二稿'],['drafts/v002-rejected.md','查看未采用的第二稿'],['drafts/v001-incomplete.md','查看未完成稿'],['reviews/full-draft.md','查看整篇审稿'],['package/report.md','查看成品报告']
+   ].map(([key,label])=>{const file=story.artifacts.find(f=>f.key===key);return file?<Button size="small" key={key} onClick={()=>openFile(file)}>{label}</Button>:null;})}</div>
+  </section>}
   <details open><summary>章节（{story.chapters.length}）</summary>{story.chapters.length?story.chapters.map(c=><Button block type="text" key={c.number} onClick={()=>openFile({key:`chapters/${String(c.number).padStart(3,'0')}.txt`,title:c.title,content:c.content})}>{c.number}. {c.title}</Button>):<p>暂无已保存正文。</p>}</details>
   <details open><summary>大纲</summary>{story.outline?<><p>{story.outline.summary.slice(0,180)}{story.outline.summary.length>180?'…':''}</p><Button type="link" onClick={()=>openFile({key:'outline.txt',title:'短篇大纲',content:[story.outline.title,story.outline.summary,...story.outline.chapters.map(c=>`${c.number}. ${c.title}\n${c.summary}`)].join('\n\n')})}>查看完整大纲 →</Button></>:<p>大纲生成后显示摘要。</p>}</details>
   <details open><summary>创作资料与成品</summary>{story.artifacts.length?story.artifacts.map(f=><Button block type="text" key={f.key} onClick={()=>openFile(f)}>{f.title}</Button>):<p>暂无成品文件。</p>}</details>

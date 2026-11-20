@@ -67,6 +67,7 @@ func TestShortBlueprintEditPersistsAndEntersConfirmedGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	freezeLegacyShortFullDraft(t, s, "alice", started.Run.ID)
 	if _, err = s.EditShortStoryArtifact(ctx, "alice", started.Project.ID, started.Story.Version, "imitation/blueprint.md", "premature"); err == nil {
 		t.Fatal("queued edit accepted")
 	}
@@ -178,6 +179,7 @@ func TestShortV2ConfirmChangesOnlyContinuationModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	freezeLegacyShortFullDraft(t, service, "alice", started.Run.ID)
 	if _, err = service.Run(ctx, "alice", started.Run.ID); err != nil {
 		t.Fatal(err)
 	}

@@ -74,6 +74,8 @@ type RunContext struct {
 	ReviewCycleVersion             int
 	SystemPrompts                  *SystemPromptSnapshot
 	ShortReviewVersion             int
+	ShortFullDraftVersion          int
+	allowEmptyCompletion           bool
 	ShortWriterConversationVersion int
 	shortWriterConversation        *shortWriterConversation
 	ShortImitationVersion          int
@@ -736,13 +738,13 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 		switch route {
 		case "short-source-analysis", "short-outline", "short-outline-revision", "short-imitation-deconstruction", "short-imitation-directions", "short-imitation-blueprint":
 			routeKey = "foundation-plan"
-		case "short-body":
+		case "short-body", "short-full-draft", "short-full-continuation":
 			routeKey = "chapter-draft"
-		case "short-review", "short-imitation-editorial":
+		case "short-review", "short-imitation-editorial", "short-full-review":
 			routeKey = "chapter-audit"
-		case "short-body-revision":
+		case "short-body-revision", "short-full-revision":
 			routeKey = "chapter-revision"
-		case "short-recommendation", "short-continuity":
+		case "short-recommendation", "short-continuity", "short-full-package":
 			routeKey = "memory-index"
 		}
 		modelID := input.Agent.ModelRoutes[routeKey]
@@ -760,7 +762,7 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 			return nil, request, nil, &DomainError{Code: ErrModelUnavailable, Message: "所选文本模型当前不可用"}
 		}
 		meta := ModelCallMetadata{ChosenModelID: modelID, PromptID: "novel-creation." + route, PromptVersion: promptVersion, Temperature: request.Temperature, MaxTokens: request.MaxTokens, TemperatureStatus: "sent", MaxTokensStatus: "sent"}
-		if input.ShortWriterConversationVersion == 1 && (route == "short-body" || route == "short-body-revision") {
+		if (input.ShortWriterConversationVersion == 1 && (route == "short-body" || route == "short-body-revision")) || (input.ShortFullDraftVersion == 1 && strings.HasPrefix(route, "short-full-")) {
 			meta.Messages = request.CompletionMessages()
 		}
 		if withMeta, ok := actual.(batchfactoryv11.TextModelMetadataProvider); ok {
@@ -782,7 +784,7 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 	if err := p.checkCancelled(ctx, input); err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(reply) == "" {
+	if strings.TrimSpace(reply) == "" && !input.allowEmptyCompletion {
 		return "", &DomainError{Code: ErrInvalidOutput, Message: "model returned empty output"}
 	}
 	payload, _ := json.Marshal(map[string]string{"delta": reply})

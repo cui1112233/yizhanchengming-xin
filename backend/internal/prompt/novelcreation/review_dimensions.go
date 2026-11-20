@@ -46,7 +46,7 @@ func WithReviewDimensions(def promptcatalog.Definition, system string, ids *[]in
 		return system
 	}
 	switch def.ID {
-	case ChapterAudit.ID, AgentChapterAudit.ID, ShortReviewPrompt.ID, ShortImitationEditorial.ID, ChapterRevision.ID, ShortBodyRevision.ID, ShortOutlineRevision.ID:
+	case ChapterAudit.ID, AgentChapterAudit.ID, ShortReviewPrompt.ID, ShortImitationEditorial.ID, ChapterRevision.ID, ShortBodyRevision.ID, ShortOutlineRevision.ID, ShortFullReview.ID, ShortFullRevision.ID:
 	default:
 		return system
 	}

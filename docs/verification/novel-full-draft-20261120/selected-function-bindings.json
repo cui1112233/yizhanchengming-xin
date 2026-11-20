@@ -1,0 +1,439 @@
+[
+  {
+    "name": "_normalize_chapter_title",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 55,
+    "constantFileRange": [
+      3999563,
+      3999589
+    ],
+    "nativeEntry": "0x180152350",
+    "constructorCall": "0x180159ee4",
+    "argumentEvidence": [
+      {
+        "address": "0x180159edd",
+        "bytes": "488d0d6c84ffff",
+        "instruction": "lea rcx, [rip - 0x7b94]"
+      },
+      {
+        "address": "0x180159ece",
+        "bytes": "488b1513cf2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25cf13]"
+      }
+    ]
+  },
+  {
+    "name": "_format_chapter_heading",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 96,
+    "constantFileRange": [
+      4000525,
+      4000550
+    ],
+    "nativeEntry": "0x180152b30",
+    "constructorCall": "0x180159f34",
+    "argumentEvidence": [
+      {
+        "address": "0x180159f2d",
+        "bytes": "488d0dfc8bffff",
+        "instruction": "lea rcx, [rip - 0x7404]"
+      },
+      {
+        "address": "0x180159f1e",
+        "bytes": "488b150bd02500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25d00b]"
+      }
+    ]
+  },
+  {
+    "name": "_count_zh_chars",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 65,
+    "constantFileRange": [
+      3999824,
+      3999841
+    ],
+    "nativeEntry": "0x1801533f0",
+    "constructorCall": "0x180159f84",
+    "argumentEvidence": [
+      {
+        "address": "0x180159f7d",
+        "bytes": "488d0d6c94ffff",
+        "instruction": "lea rcx, [rip - 0x6b94]"
+      },
+      {
+        "address": "0x180159f6e",
+        "bytes": "488b15c3ce2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25cec3]"
+      }
+    ]
+  },
+  {
+    "name": "validate_short_fiction_draft_for_final",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 177,
+    "constantFileRange": [
+      4002200,
+      4002240
+    ],
+    "nativeEntry": "0x180157690",
+    "constructorCall": "0x18015a114",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a10d",
+        "bytes": "488d0d7cd5ffff",
+        "instruction": "lea rcx, [rip - 0x2a84]"
+      },
+      {
+        "address": "0x18015a102",
+        "bytes": "488b15afd02500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25d0af]"
+      }
+    ]
+  },
+  {
+    "name": "render_short_fiction_draft_markdown",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 179,
+    "constantFileRange": [
+      4002286,
+      4002323
+    ],
+    "nativeEntry": "0x180158570",
+    "constructorCall": "0x18015a164",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a15d",
+        "bytes": "488d0d0ce4ffff",
+        "instruction": "lea rcx, [rip - 0x1bf4]"
+      },
+      {
+        "address": "0x18015a14e",
+        "bytes": "488b1573d02500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25d073]"
+      }
+    ]
+  },
+  {
+    "name": "estimate_short_fiction_max_tokens",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 181,
+    "constantFileRange": [
+      4002374,
+      4002409
+    ],
+    "nativeEntry": "0x180159910",
+    "constructorCall": "0x18015a1b4",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a1ad",
+        "bytes": "488d0d5cf7ffff",
+        "instruction": "lea rcx, [rip - 0x8a4]"
+      },
+      {
+        "address": "0x18015a19e",
+        "bytes": "488b1533d02500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25d033]"
+      }
+    ]
+  },
+  {
+    "name": "_extract_tagged_blocks",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 18,
+    "constantFileRange": [
+      3998941,
+      3998965
+    ],
+    "nativeEntry": "0x18014cdf0",
+    "constructorCall": "0x18015a204",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a1fd",
+        "bytes": "488d0dec2bffff",
+        "instruction": "lea rcx, [rip - 0xd414]"
+      },
+      {
+        "address": "0x18015a1ee",
+        "bytes": "488b15cbca2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25cacb]"
+      }
+    ]
+  },
+  {
+    "name": "_extract_last_nonempty_tagged_block",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 59,
+    "constantFileRange": [
+      3999662,
+      3999699
+    ],
+    "nativeEntry": "0x18014e500",
+    "constructorCall": "0x18015a2a4",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a29d",
+        "bytes": "488d0d5c42ffff",
+        "instruction": "lea rcx, [rip - 0xbda4]"
+      },
+      {
+        "address": "0x18015a28e",
+        "bytes": "488b1573cb2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25cb73]"
+      }
+    ]
+  },
+  {
+    "name": "_extract_markdown_chapter_title",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 57,
+    "constantFileRange": [
+      3999602,
+      3999635
+    ],
+    "nativeEntry": "0x18014f130",
+    "constructorCall": "0x18015a344",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a33d",
+        "bytes": "488d0dec4dffff",
+        "instruction": "lea rcx, [rip - 0xb214]"
+      },
+      {
+        "address": "0x18015a32e",
+        "bytes": "488b15c3ca2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25cac3]"
+      }
+    ]
+  },
+  {
+    "name": "_extract_markdown_chapter_content",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 62,
+    "constantFileRange": [
+      3999758,
+      3999793
+    ],
+    "nativeEntry": "0x18014f860",
+    "constructorCall": "0x18015a394",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a38d",
+        "bytes": "488d0dcc54ffff",
+        "instruction": "lea rcx, [rip - 0xab34]"
+      },
+      {
+        "address": "0x18015a37e",
+        "bytes": "488b159bca2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25ca9b]"
+      }
+    ]
+  },
+  {
+    "name": "_extract_duplicate_title_tagged_chapter_content",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 61,
+    "constantFileRange": [
+      3999709,
+      3999758
+    ],
+    "nativeEntry": "0x180150000",
+    "constructorCall": "0x18015a3e4",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a3dd",
+        "bytes": "488d0d1c5cffff",
+        "instruction": "lea rcx, [rip - 0xa3e4]"
+      },
+      {
+        "address": "0x18015a3ce",
+        "bytes": "488b1543ca2500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25ca43]"
+      }
+    ]
+  },
+  {
+    "name": "_sanitize_chapter_content",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 58,
+    "constantFileRange": [
+      3999635,
+      3999662
+    ],
+    "nativeEntry": "0x180151160",
+    "constructorCall": "0x18015a434",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a42d",
+        "bytes": "488d0d2c6dffff",
+        "instruction": "lea rcx, [rip - 0x92d4]"
+      },
+      {
+        "address": "0x18015a41e",
+        "bytes": "488b15dbc92500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25c9db]"
+      }
+    ]
+  },
+  {
+    "name": "_normalize_title",
+    "module": "novels.pipeline.short_fiction_parsers",
+    "constantIndex": 39,
+    "constantFileRange": [
+      3999307,
+      3999325
+    ],
+    "nativeEntry": "0x1801519b0",
+    "constructorCall": "0x18015a484",
+    "argumentEvidence": [
+      {
+        "address": "0x18015a47d",
+        "bytes": "488d0d2c75ffff",
+        "instruction": "lea rcx, [rip - 0x8ad4]"
+      },
+      {
+        "address": "0x18015a46e",
+        "bytes": "488b15f3c82500",
+        "instruction": "mov rdx, qword ptr [rip + 0x25c8f3]"
+      }
+    ]
+  },
+  {
+    "name": "_writer_sys_prompt",
+    "module": "novels.pipeline.short_fiction_runner",
+    "constantIndex": 103,
+    "constantFileRange": [
+      4004657,
+      4004677
+    ],
+    "nativeEntry": "0x180161530",
+    "constructorCall": "0x180170feb",
+    "argumentEvidence": [
+      {
+        "address": "0x180170fd5",
+        "bytes": "488d0d5405ffff",
+        "instruction": "lea rcx, [rip - 0xfaac]"
+      },
+      {
+        "address": "0x180170fba",
+        "bytes": "488b1577682400",
+        "instruction": "mov rdx, qword ptr [rip + 0x246877]"
+      }
+    ]
+  },
+  {
+    "name": "build_short_fiction_draft_continuation_user_prompt",
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constantIndex": 143,
+    "constantFileRange": [
+      4244301,
+      4244353
+    ],
+    "nativeEntry": "0x1801d6860",
+    "constructorCall": "0x1801d8cc4",
+    "argumentEvidence": [
+      {
+        "address": "0x1801d8cbd",
+        "bytes": "488d0d9cdbffff",
+        "instruction": "lea rcx, [rip - 0x2464]"
+      },
+      {
+        "address": "0x1801d8cae",
+        "bytes": "488b1533411e00",
+        "instruction": "mov rdx, qword ptr [rip + 0x1e4133]"
+      }
+    ]
+  },
+  {
+    "name": "build_short_fiction_draft_review_user_prompt",
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constantIndex": 147,
+    "constantFileRange": [
+      4244899,
+      4244945
+    ],
+    "nativeEntry": "0x1801d7d70",
+    "constructorCall": "0x1801d8d74",
+    "argumentEvidence": [
+      {
+        "address": "0x1801d8d6d",
+        "bytes": "488d0dfcefffff",
+        "instruction": "lea rcx, [rip - 0x1004]"
+      },
+      {
+        "address": "0x1801d8d5e",
+        "bytes": "488b15a3401e00",
+        "instruction": "mov rdx, qword ptr [rip + 0x1e40a3]"
+      }
+    ]
+  },
+  {
+    "name": "build_short_fiction_package_user_prompt",
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constantIndex": 153,
+    "constantFileRange": [
+      4245522,
+      4245563
+    ],
+    "nativeEntry": "0x1801d8730",
+    "constructorCall": "0x1801d8e74",
+    "argumentEvidence": [
+      {
+        "address": "0x1801d8e6d",
+        "bytes": "488d0dbcf8ffff",
+        "instruction": "lea rcx, [rip - 0x744]"
+      },
+      {
+        "address": "0x1801d8e5e",
+        "bytes": "488b15d33f1e00",
+        "instruction": "mov rdx, qword ptr [rip + 0x1e3fd3]"
+      }
+    ]
+  },
+  {
+    "name": "_chapter_output_blocks",
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constantIndex": 53,
+    "constantFileRange": [
+      4238163,
+      4238187
+    ],
+    "nativeEntry": "0x1801d5660",
+    "constructorCall": "0x1801d9134",
+    "argumentEvidence": [
+      {
+        "address": "0x1801d912d",
+        "bytes": "488d0d2cc5ffff",
+        "instruction": "lea rcx, [rip - 0x3ad4]"
+      },
+      {
+        "address": "0x1801d911e",
+        "bytes": "488b15f3391e00",
+        "instruction": "mov rdx, qword ptr [rip + 0x1e39f3]"
+      }
+    ]
+  },
+  {
+    "name": "build_short_fiction_writer_user_prompt",
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constantIndex": 141,
+    "constantFileRange": [
+      4244192,
+      4244232
+    ],
+    "nativeEntry": "0x1801d6160",
+    "constructorCall": "0x1801d9184",
+    "argumentEvidence": [
+      {
+        "address": "0x1801d917d",
+        "bytes": "488d0ddccfffff",
+        "instruction": "lea rcx, [rip - 0x3024]"
+      },
+      {
+        "address": "0x1801d916e",
+        "bytes": "488b15633c1e00",
+        "instruction": "mov rdx, qword ptr [rip + 0x1e3c63]"
+      }
+    ]
+  }
+]
