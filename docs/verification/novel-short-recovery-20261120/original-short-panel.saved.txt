@@ -1,0 +1,288 @@
+1: // Inspection only. Original SHA256: 7c2520565126cf49615a968a6bceefc5cfcf3e032f9858a9570adeab546336a6
+2: // Original UTF16 offsets [8691913, 8697920); original line 41
+3: // External dependencies and runtime equivalence remain unresolved.
+4: const recoveredComponent = {
+5:   __name: "NovelStudioShortPanel",
+6:   props: {
+7:     shortStory: {
+8:       type: Object,
+9:       default: null
+10:     },
+11:     shortStoryId: {
+12:       type: String,
+13:       default: ""
+14:     },
+15:     collapsed: {
+16:       type: Boolean,
+17:       default: !1
+18:     },
+19:     isDarkMode: Boolean
+20:   },
+21:   emits: ["update:collapsed", "saved"],
+22:   setup(e, {
+23:     emit: t
+24:   }) {
+25:     const n = e,
+26:       a = t,
+27:       o = $q(),
+28:       r = Nt("list"),
+29:       l = Nt(null),
+30:       i = Nt(""),
+31:       s = Nt(!1),
+32:       c = Nt(!1),
+33:       u = Nt({
+34:         chapters: !0,
+35:         outline: !0,
+36:         artifacts: !0,
+37:         sales: !1
+38:       }),
+39:       d = ml(() => {
+40:         var e;
+41:         return (null == (e = n.shortStory) ? void 0 : e.chapters) || [];
+42:       }),
+43:       v = ml(() => {
+44:         var e;
+45:         return (null == (e = n.shortStory) ? void 0 : e.artifacts) || [];
+46:       }),
+47:       p = ml(() => {
+48:         var e;
+49:         return String((null == (e = n.shortStory) ? void 0 : e.outlinePreview) || "").trim();
+50:       }),
+51:       f = ml(() => {
+52:         var e;
+53:         return String((null == (e = n.shortStory) ? void 0 : e.salesPreview) || "").trim();
+54:       }),
+55:       m = ml(() => {
+56:         var e;
+57:         return String((null == (e = n.shortStory) ? void 0 : e.coverImagePath) || "").trim();
+58:       }),
+59:       h = ml(() => {
+60:         var e;
+61:         const t = null == (e = n.shortStory) ? void 0 : e.status;
+62:         return "completed" === t ? "已完成" : "draft" === t ? "草稿" : t || "进行中";
+63:       }),
+64:       g = ml(() => {
+65:         var e;
+66:         return (null == (e = l.value) ? void 0 : e.title) || "";
+67:       });
+68:     function W(e) {
+69:       u.value[e] = !u.value[e];
+70:     }
+71:     function y() {
+72:       r.value = "list", l.value = null, i.value = "";
+73:     }
+74:     async function b(e) {
+75:       var t;
+76:       if (n.shortStoryId) {
+77:         r.value = "artifact", l.value = {
+78:           ...e,
+79:           readOnly: !1
+80:         }, i.value = "", s.value = !0;
+81:         try {
+82:           const a = await async function (e, t) {
+83:             var n, a;
+84:             const o = "#WGY",
+85:               r = 1466,
+86:               l = 1234,
+87:               i = "K)jY",
+88:               s = 1233,
+89:               c = "A3ag",
+90:               u = 1220,
+91:               d = "rlaI",
+92:               v = 1022,
+93:               p = 308,
+94:               f = "x5I8",
+95:               m = 491,
+96:               h = 1336,
+97:               g = 1081,
+98:               W = 1011,
+99:               y = 71;
+100:             function b(e, t, n, a) {
+101:               return Tan(0, 0, n - y, t);
+102:             }
+103:             function k(e, t, n, a) {
+104:               return Tan(0, 0, n - W, t);
+105:             }
+106:             const x = {};
+107:             return x[k(1328, "4M#3", 1157) + "ss"] = !1, (null == (a = null == (n = {
+108:               BYhuQ: function (e) {
+109:                 return e();
+110:               }
+111:             }[k(1565, o, r)](Ran)) ? void 0 : n[k(966, "GI7c", 1057) + k(l, i, s) + b(410, c, 615) + k(u, d, v) + b(p, f, m) + k(h, "!jb8", g)]) ? void 0 : a.call(n, e, t)) ?? x;
+112:           }(n.shortStoryId, e.key);
+113:           i.value = (null == a ? void 0 : a.success) ? (null == (t = a.data) ? void 0 : t.content) ?? "" : null;
+114:         } catch {
+115:           i.value = null;
+116:         } finally {
+117:           s.value = !1;
+118:         }
+119:       }
+120:     }
+121:     async function k(e) {
+122:       if (l.value && n.shortStoryId) {
+123:         c.value = !0;
+124:         try {
+125:           const t = await async function (e, t, n) {
+126:             var a, o;
+127:             const r = 1412,
+128:               l = "XGTO",
+129:               i = 1066,
+130:               s = "BBks",
+131:               c = 1618,
+132:               u = 1408,
+133:               d = "2CEX",
+134:               v = 925,
+135:               p = 909,
+136:               f = "kdlK",
+137:               m = 1208,
+138:               h = "*^FY",
+139:               g = 678,
+140:               W = {};
+141:             function y(e, t, n, a) {
+142:               return Gan(0, n, t - g);
+143:             }
+144:             return W[b = "VQi*", k = 324, Tan(0, 0, k - -184, b) + "ss"] = !1, (null == (o = null == (a = {
+145:               QqStw: function (e) {
+146:                 return e();
+147:               }
+148:             }[y(r, 1311, l)](Ran)) ? void 0 : a["novel" + y(i, 1234, s) + y(c, u, d) + y(v, p, f) + y(1437, m, h) + "ile"]) ? void 0 : o.call(a, e, t, n)) ?? W;
+149:             var b, k;
+150:           }(n.shortStoryId, l.value.key, e);
+151:           if (!(null == t ? void 0 : t.success)) return void o.error((null == t ? void 0 : t.message) || "保存失败");
+152:           i.value = e, o.success("已保存"), a("saved");
+153:         } finally {
+154:           c.value = !1;
+155:         }
+156:       }
+157:     }
+158:     function x(e) {
+159:       b({
+160:         key: e.key,
+161:         title: e.label || e.title || "文件"
+162:       });
+163:     }
+164:     function w() {
+165:       var e, t;
+166:       const a = null == (t = null == (e = n.shortStory) ? void 0 : e.artifacts) ? void 0 : t.find(e => String(e.key).startsWith("outline/"));
+167:       a && b({
+168:         key: a.key,
+169:         title: "短篇大纲"
+170:       });
+171:     }
+172:     function _() {
+173:       b({
+174:         key: "final/sales.md",
+175:         title: "推荐"
+176:       });
+177:     }
+178:     return Ro(() => n.shortStoryId, () => {
+179:       r.value = "list", l.value = null, i.value = "";
+180:     }), (t, n) => {
+181:       var o;
+182:       return e.shortStory ? (Cr(), Ir("aside", {
+183:         key: 0,
+184:         class: K(["book-side-panel", {
+185:           dark: e.isDarkMode
+186:         }])
+187:       }, ["list" === r.value ? (Cr(), Ir(br, {
+188:         key: 0
+189:       }, [zr("header", mon, [zr("div", null, [zr("div", hon, Y(e.shortStory.title), 1), zr("div", gon, Y(h.value) + " · 约 " + Y(e.shortStory.wordCount || 0) + " 字 ", 1)]), zr("button", {
+190:         type: "button",
+191:         class: "icon-btn",
+192:         onClick: n[0] || (n[0] = e => a("update:collapsed", !0))
+193:       }, "−")]), Qr(Tt(IE), {
+194:         class: "panel-scroll"
+195:       }, {
+196:         default: Sn(() => [m.value ? (Cr(), Ir("section", Won, [zr("div", yon, [n[5] || (n[5] = zr("div", {
+197:           class: "cover-card-title"
+198:         }, "封面图", -1)), Qr(mtn, {
+199:           "image-path": m.value,
+200:           alt: "封面图",
+201:           compact: ""
+202:         }, null, 8, ["image-path"])])])) : Fr("", !0), zr("section", bon, [zr("button", {
+203:           type: "button",
+204:           class: "section-head",
+205:           onClick: n[1] || (n[1] = e => W("chapters"))
+206:         }, [Qr(Tt($I), {
+207:           component: u.value.chapters ? Tt(MH) : Tt(qH),
+208:           size: 14
+209:         }, null, 8, ["component"]), n[6] || (n[6] = zr("span", null, "章节结构", -1))]), Cn(zr("div", kon, [(Cr(!0), Ir(br, null, Va(d.value, e => (Cr(), Ir("button", {
+210:           key: e.number,
+211:           type: "button",
+212:           class: "list-item",
+213:           onClick: t => x({
+214:             key: "final/full.md",
+215:             title: e.title
+216:           })
+217:         }, [Qr(Tt($I), {
+218:           component: Tt(BZ),
+219:           size: 14
+220:         }, null, 8, ["component"]), zr("span", won, Y(e.title), 1), zr("span", _on, Y(e.wordCount) + " 字", 1)], 8, xon))), 128)), d.value.length ? Fr("", !0) : (Cr(), Ir("div", Son, "成稿生成后可查看章节结构"))], 512), [[Xl, u.value.chapters]])]), zr("section", Con, [zr("button", {
+221:           type: "button",
+222:           class: "section-head",
+223:           onClick: n[2] || (n[2] = e => W("outline"))
+224:         }, [Qr(Tt($I), {
+225:           component: u.value.outline ? Tt(MH) : Tt(qH),
+226:           size: 14
+227:         }, null, 8, ["component"]), n[7] || (n[7] = zr("span", null, "大纲", -1))]), Cn(zr("div", Pon, [zr("p", Ron, [jr(Y(p.value || "大纲生成后显示摘要"), 1), p.value ? (Cr(), Ir("span", Oon, "...")) : Fr("", !0)]), e.shortStory.hasOutline ? (Cr(), Ir("button", {
+228:           key: 0,
+229:           type: "button",
+230:           class: "link-btn",
+231:           onClick: w
+232:         }, " 查看完整大纲 → ")) : Fr("", !0)], 512), [[Xl, u.value.outline]])]), zr("section", Mon, [zr("button", {
+233:           type: "button",
+234:           class: "section-head",
+235:           onClick: n[3] || (n[3] = e => W("artifacts"))
+236:         }, [Qr(Tt($I), {
+237:           component: u.value.artifacts ? Tt(MH) : Tt(qH),
+238:           size: 14
+239:         }, null, 8, ["component"]), n[8] || (n[8] = zr("span", null, "成品文件", -1))]), Cn(zr("div", Ion, [(Cr(!0), Ir(br, null, Va(v.value, e => (Cr(), Ir("button", {
+240:           key: e.key,
+241:           type: "button",
+242:           class: "list-item",
+243:           onClick: t => x(e)
+244:         }, [Qr(Tt($I), {
+245:           component: Tt(BZ),
+246:           size: 14
+247:         }, null, 8, ["component"]), zr("span", Gon, Y(e.label), 1), zr("button", {
+248:           type: "button",
+249:           class: "row-edit-btn",
+250:           title: "编辑",
+251:           onClick: Zi(t => function (e) {
+252:             b({
+253:               key: e.key,
+254:               title: e.label || e.title || "文件",
+255:               autoEdit: !0
+256:             });
+257:           }(e), ["stop"])
+258:         }, [Qr(Tt($I), {
+259:           component: Tt($J),
+260:           size: 13
+261:         }, null, 8, ["component"])], 8, qon)], 8, Non))), 128)), v.value.length ? Fr("", !0) : (Cr(), Ir("div", Aon, "暂无成品文件"))], 512), [[Xl, u.value.artifacts]])]), f.value ? (Cr(), Ir("section", Ton, [zr("button", {
+262:           type: "button",
+263:           class: "section-head",
+264:           onClick: n[4] || (n[4] = e => W("sales"))
+265:         }, [Qr(Tt($I), {
+266:           component: u.value.sales ? Tt(MH) : Tt(qH),
+267:           size: 14
+268:         }, null, 8, ["component"]), n[9] || (n[9] = zr("span", null, "推荐", -1))]), Cn(zr("div", zon, [zr("p", Qon, Y(f.value) + "...", 1), zr("button", {
+269:           type: "button",
+270:           class: "link-btn",
+271:           onClick: _
+272:         }, "查看完整推荐 →")], 512), [[Xl, u.value.sales]])])) : Fr("", !0)]),
+273:         _: 1
+274:       })], 64)) : (Cr(), Nr(xan, {
+275:         key: 1,
+276:         title: g.value,
+277:         content: i.value,
+278:         loading: s.value,
+279:         saving: c.value,
+280:         "read-only": !1,
+281:         "auto-edit": Boolean(null == (o = l.value) ? void 0 : o.autoEdit),
+282:         "is-dark-mode": e.isDarkMode,
+283:         onBack: y,
+284:         onSave: k
+285:       }, null, 8, ["title", "content", "loading", "saving", "auto-edit", "is-dark-mode"]))], 2)) : Fr("", !0);
+286:     };
+287:   }
+288: };

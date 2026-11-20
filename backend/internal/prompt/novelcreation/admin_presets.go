@@ -18,6 +18,7 @@ type AdminPrompt struct {
 // Runtime and administrator defaults share these definitions; no frontend copy.
 func AdminPrompts() []AdminPrompt {
 	return []AdminPrompt{
+		{ShortWriterRevisionFollowupID, "短篇写作·修订跟进要求（四消息）", "novel.short", catalog.Definition{SystemPrompt: ShortWriterRevisionFollowupSystem}},
 		{ShortImitationDeconstruction.ID, "短篇仿写·六维拆书", "novel.short", ShortImitationDeconstruction},
 		{ShortImitationDirections.ID, "短篇仿写·三个方向", "novel.short", ShortImitationDirections},
 		{ShortImitationBlueprint.ID, "短篇仿写·创作蓝图", "novel.short", ShortImitationBlueprint},

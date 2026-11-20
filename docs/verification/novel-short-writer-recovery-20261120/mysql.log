@@ -1,0 +1,17 @@
+=== RUN   TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen
+    short_imitation_mysql_test.go:12: owned studio schema=novelparity20261117adb9b1538e2a MySQL=8.4.11 novel-only migration-pass=1
+    short_imitation_mysql_test.go:12: owned studio schema=novelparity20261117adb9b1538e2a MySQL=8.4.11 novel-only migration-pass=2
+    short_imitation_mysql_test.go:119: account defaults, checkpoint/reopen, completed artifacts, terminal429 retry and completed-call reuse verified in owned MySQL; 19 fake provider calls, zero paid requests
+--- PASS: TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen (110.77s)
+=== RUN   TestShortWriterConversationOwnedMySQLRetry
+    short_writer_conversation_test.go:250: owned studio schema=novelparity20261117adb9b1538e2a MySQL=8.4.11 novel-only migration-pass=1
+    short_writer_conversation_test.go:250: owned studio schema=novelparity20261117adb9b1538e2a MySQL=8.4.11 novel-only migration-pass=2
+=== RUN   TestShortWriterConversationOwnedMySQLRetry/legacy
+    short_writer_conversation_test.go:319: version=0: writer draft sent once; revision429 resumed through a reopened service; stored messages=0; 12 fake calls, zero paid requests
+=== RUN   TestShortWriterConversationOwnedMySQLRetry/conversation
+    short_writer_conversation_test.go:319: version=1: writer draft sent once; revision429 resumed through a reopened service; stored messages=4; 12 fake calls, zero paid requests
+--- PASS: TestShortWriterConversationOwnedMySQLRetry (67.34s)
+    --- PASS: TestShortWriterConversationOwnedMySQLRetry/legacy (25.81s)
+    --- PASS: TestShortWriterConversationOwnedMySQLRetry/conversation (41.15s)
+PASS
+ok  	qiantie/backend/internal/novelcreation	178.233s

@@ -179,6 +179,7 @@ func TestShortStoryIndependentResultCheckpointEditAndReadback(t *testing.T) {
 	var legacySnapshot map[string]any
 	_ = json.Unmarshal(out.Run.PromptSnapshot, &legacySnapshot)
 	legacySnapshot["short_imitation_version"] = 1
+	legacySnapshot["short_writer_conversation_version"] = 0
 	legacyRaw, _ := json.Marshal(legacySnapshot)
 	legacyRun := st.runs[memoryKey("alice", out.Run.ID)]
 	legacyRun.PromptSnapshot = legacyRaw

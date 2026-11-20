@@ -1,0 +1,230 @@
+{
+  "rule": "Strip line-end whitespace, LF, one final newline; interior line numbers and instruction addresses preserved. Raw exports: _local-archive-20261028/novel-short-writer-recovery-20261120/native-raw/",
+  "files": [
+    {
+      "file": "0x180153e50.assembly.txt",
+      "rawSha256": "4f7801b4d7a5b9ebd41ff1fc0cf9d2ecbfd477a05b087bee884d755cb7e7a233",
+      "normalizedSha256": "46c3e7f7dde5e3d7308d9eefde77852801e55f862e0513378f215cfcfdf95e2b"
+    },
+    {
+      "file": "0x180153e50.fallback.annotated.c",
+      "rawSha256": "bcd9b2526d7037bdb3c844791aaa3fc7a2ac3ca22fe3b64017b17611859cfa48",
+      "normalizedSha256": "7b2e925a9861aea200cb06858de5e058606e34a24d3b7d9a107cfc29b690bc11"
+    },
+    {
+      "file": "0x180153e50.fallback.c",
+      "rawSha256": "d5794c1c04cfb680686aaf04fd8157f0832e6d0c46b27644993348c0c963f429",
+      "normalizedSha256": "0ae2634c71c337bb90dc47b8a879fe2ffd73baec84780f3e2b7364b31ebd775a"
+    },
+    {
+      "file": "0x180153e50.full.assembly.txt",
+      "rawSha256": "8bcac27dab53bfff2fa2ebd84207a6a6e604dd86e7eb5f87f2e79228c50215ec",
+      "normalizedSha256": "14ef4e10029724d4cc0735504bad7baee66d188e73e4c03705fe0b4deb11e814"
+    },
+    {
+      "file": "0x180153e50.ghidra-assembly.txt",
+      "rawSha256": "571a157195da117662d6d6cc6995cc0d665215c9dad812f63d64f04cbdebd9cd",
+      "normalizedSha256": "571a157195da117662d6d6cc6995cc0d665215c9dad812f63d64f04cbdebd9cd"
+    },
+    {
+      "file": "0x180156ff0.assembly.txt",
+      "rawSha256": "c1051b6b25476456ba48648555a24d2998afbe512b257dd2ccb89a129db913a3",
+      "normalizedSha256": "99280d67e2f9a79bf113b77647375451ef1a41cf6cfd8afd1965f1c948166af2"
+    },
+    {
+      "file": "0x180156ff0.fallback.annotated.c",
+      "rawSha256": "7c6c854354aaec0e46e200e8ccf7027ec8ced9b5864e09856b453b1800baf0b3",
+      "normalizedSha256": "38d23412c873b01316d12698d408b369939bb32b6874609348958a7efd8e24d2"
+    },
+    {
+      "file": "0x180156ff0.fallback.c",
+      "rawSha256": "2dfb5e169d356d533e971895966256adee37e4305c500e6a8e7efbae2f4c828c",
+      "normalizedSha256": "38d23412c873b01316d12698d408b369939bb32b6874609348958a7efd8e24d2"
+    },
+    {
+      "file": "0x180157690.assembly.txt",
+      "rawSha256": "ff9502230d7295d42969f4e332ea054668122aa488ddccd16a373f81b056148b",
+      "normalizedSha256": "f18e6d788847f7dde445291c6d8ee466e24aab5ae49c0f49da51734cc07b3235"
+    },
+    {
+      "file": "0x180157690.fallback.annotated.c",
+      "rawSha256": "2228c4241a53741128a4f4652349057380a53d2b52496d6c13fa344c6bf4fbef",
+      "normalizedSha256": "6243d924f956f543c8ba649164e873d0d6c4e19dea0f4213029700fec43bd725"
+    },
+    {
+      "file": "0x180157690.fallback.c",
+      "rawSha256": "9038e0728c493f2aeda31b7fcefc28d2a77fc9818f1e390a0ce345210158877f",
+      "normalizedSha256": "59588c69cfbbbaae8ab66f9adb7da257d807350d0df9a739e06490415ac1204a"
+    },
+    {
+      "file": "0x180160790.assembly.txt",
+      "rawSha256": "4a58600ec61674351fed948273fb1576fa67d2d310835de4d24298c560aed3d7",
+      "normalizedSha256": "9ca78bd62973b9d2d0f66209af69178c7ab95f24c74cddac459eac340d868e15"
+    },
+    {
+      "file": "0x180160790.fallback.annotated.c",
+      "rawSha256": "4a9f04e852339c24cef1bfa4cd706334db0f704992219ce73276b0f041ae558d",
+      "normalizedSha256": "919fabd9ce86e14b4613e62a6559789bc5e026b8e4a88aaea2dc0a49cc7cc2d9"
+    },
+    {
+      "file": "0x180160790.fallback.c",
+      "rawSha256": "65b9fee9f29411673e8f9d4f299f587a737682ef7b5ef0c13fc1f9cfa15be931",
+      "normalizedSha256": "12922c394a165d4369162d76852265567ce0d0a118e310f0446fef1d713db5c6"
+    },
+    {
+      "file": "0x180160f00.assembly.txt",
+      "rawSha256": "d1a47002c959778c390cfa942caaf6df2c86105f9263243146ff6d173568c6fe",
+      "normalizedSha256": "b9a4a1ed07e77bfadf874862c0f9c5727b5320cdc0197365f368e3325dc073e4"
+    },
+    {
+      "file": "0x180160f00.fallback.annotated.c",
+      "rawSha256": "0bcc1f851e53ddb3031255b8f34f7a97a7592044cdf6585619a2980a936415d2",
+      "normalizedSha256": "8275caaa63e571d90ee6be6d2b9a9b57381ca643a6d2a621adf7aa8a289c90ec"
+    },
+    {
+      "file": "0x180160f00.fallback.c",
+      "rawSha256": "dc84f69fc3d691ad8216236b20d75f26d98f024462658259e1f72da4778c85ad",
+      "normalizedSha256": "9ea73f193f764737459cc3ffaebd85feb4a820def3ca2c556278ccedfb5f26d2"
+    },
+    {
+      "file": "0x180165140.assembly.txt",
+      "rawSha256": "b9f047705644fe8224afc39418db6a6f4839f7a671c0d535c8757616e7bbdb6b",
+      "normalizedSha256": "d0b94b3c8947c1b2d8638d0a3744bd332943c24093d1840a3584bf04bb5de2d0"
+    },
+    {
+      "file": "0x180165140.full.assembly.txt",
+      "rawSha256": "a3160e12922def0b36036d50a5e91a3190ea1575dbb4c92b951225966452f80a",
+      "normalizedSha256": "3603b523187103d7afea89f48e1e1d5fed55b491aebaf9462d83eb5dcba3ef03"
+    },
+    {
+      "file": "0x180165140.ghidra-assembly.txt",
+      "rawSha256": "2d0c6ffc8107e951a2f68da87401c64716f5a23f79930b01d3d9882e41722ea6",
+      "normalizedSha256": "2d0c6ffc8107e951a2f68da87401c64716f5a23f79930b01d3d9882e41722ea6"
+    },
+    {
+      "file": "0x1801d6860.assembly.txt",
+      "rawSha256": "150e601d5c36e4dd1b9a0e639f5598e15d370dc402a5e852a842635dc9e71919",
+      "normalizedSha256": "3a83497d2b271b7a50b04c27fb163341159ae72fa3ccc1085359f9967d5c2ae8"
+    },
+    {
+      "file": "0x1801d6860.fallback.annotated.c",
+      "rawSha256": "e945de70151b29d49d9907ad31d40644deb3baa3641bfbb6783657e9f81b987a",
+      "normalizedSha256": "42de6947d77d2f9c52dd4ed8f90df0c646ead440d2d41265d5070ef0245bb9f2"
+    },
+    {
+      "file": "0x1801d6860.fallback.c",
+      "rawSha256": "8292d1e1e6902da3e7e386305e6d1afe856ef5ae9f48abfaefb435bb3882e163",
+      "normalizedSha256": "eb4546982da32602b93f3caaf9e43815c29acc2388896ae81e3e7133a24cf5b7"
+    },
+    {
+      "file": "0x1801d8140.assembly.txt",
+      "rawSha256": "c8e1971de76a17cda814af754d7274423bc621ad1152c79ebeab6faa75c84257",
+      "normalizedSha256": "e4ffb3a7c45e8737486e6c1ac5882dd055a7ee555cc433feeb0ee89ae4dfbdd8"
+    },
+    {
+      "file": "0x1801d8140.fallback.annotated.c",
+      "rawSha256": "118ad77bdc790c2958b47f6d830f4caa781d8c2a1228d6c27419c9ece3b0c1e6",
+      "normalizedSha256": "6b2c6bca2007b6a9cebf0718a6cc6eef2551eddc0649f65f35c366ba552ab468"
+    },
+    {
+      "file": "0x1801d8140.fallback.c",
+      "rawSha256": "70fb0f2bd31e23da2f0dd5a3817d6c42e0c4a3b75596095b89f4791e99c6dabf",
+      "normalizedSha256": "4053600509e17c0d6405020912ed6474f0fc4e538dcd2c505fd3c83f62686918"
+    },
+    {
+      "file": "0x1801d8140.full.assembly.txt",
+      "rawSha256": "155ec2a5e4b5fdfcd8413c954b8fb716ab8326afd43f0127c400e6fb0b9a635a",
+      "normalizedSha256": "9887a30499d0efdbc4c2cc0545de7fb2f53c8c26f1495eb729072172999f9c03"
+    },
+    {
+      "file": "0x1801d8140.ghidra-assembly.txt",
+      "rawSha256": "eb2550f7a98337050df3e8cb1348d0b12734b0be41661e60b36c92275e589046",
+      "normalizedSha256": "eb2550f7a98337050df3e8cb1348d0b12734b0be41661e60b36c92275e589046"
+    },
+    {
+      "file": "0x18035cbe0.fallback.annotated.c",
+      "rawSha256": "502ba0d9d04a4da8f8bf5403d8c0288a6c30e0df88d15f414aaf5bbe596dd383",
+      "normalizedSha256": "f8f48e73cdd6759b872324424245a2c976e08e54b58405d6260d822c175de91f"
+    },
+    {
+      "file": "0x18035cbe0.fallback.c",
+      "rawSha256": "a2a5324d53be214085999a7aef59285cad7e707f7d0c023bd1c48d4f54eb2741",
+      "normalizedSha256": "cd446a8d5949416cfe1157d08232fd12450804aa3e1e3074a0a3f03fe2c38d8f"
+    },
+    {
+      "file": "0x18035cbe0.full.assembly.txt",
+      "rawSha256": "e35dba39085d79b5800ca2a273fc33187c85daec6a4da2155d65527546c3179e",
+      "normalizedSha256": "92b8b0613834b5707f8fd2487c1d7bcece826ec56207418d5f3a8f273fb70ce6"
+    },
+    {
+      "file": "0x18035cbe0.ghidra-assembly.txt",
+      "rawSha256": "de41ba11813a6510d8e2336183946d0346f0f975a4e5818f3f2aac800435d203",
+      "normalizedSha256": "de41ba11813a6510d8e2336183946d0346f0f975a4e5818f3f2aac800435d203"
+    },
+    {
+      "file": "annotate_evidence.py",
+      "rawSha256": "aec52c5dbf40f038813863764c78e1a67a31bfdb4f4d1a448ae42aa17cfaf4d3",
+      "normalizedSha256": "712490c8b2bcc840d79dec565fe6271a075e7ed4b63fe4adbb1a2ec3eba51660"
+    },
+    {
+      "file": "annotate_listing.py",
+      "rawSha256": "78bb13400e68dee1ede7e741a9a548fb7ed41eeed5ba67113ecf070ca7d56e12",
+      "normalizedSha256": "bc21e863383f0802d15e9c6fc83aa5be5890db14c3d80e9d66504ea36ec75ab3"
+    },
+    {
+      "file": "ExportRecoveryAssembly.java",
+      "rawSha256": "b15e893e3874e743c128a242cde83bd180229baad4ab45f2e77b3965404ef0d4",
+      "normalizedSha256": "1b6fb14403facbf39e8b1b02079b82c2798bd1e4900d2d2088fa61c246709a48"
+    },
+    {
+      "file": "FINDINGS.md",
+      "rawSha256": "cf2f8e1966d95345c589711697416e966c83ae610413253ed63493ba32801565",
+      "normalizedSha256": "e9448e996072a4a4dbe30fb1a153f8a7528ae8c71b63d56a392b270e25843f54"
+    },
+    {
+      "file": "frontend-source-identities.json",
+      "rawSha256": "1b183c236230cf49c641341c73e4d06a9f87dba5584e1d3f9452da31a4ae5417",
+      "normalizedSha256": "b79c5186668538f49b070456e6c51bcc02a509fdda2c065f96ddef0c8966021b"
+    },
+    {
+      "file": "ghidra-helpers-readonly.log",
+      "rawSha256": "559378b12357e26fc9c4339ce09b0cda3fcc5f6b911b2f6f831a3b6f32bc4ae3",
+      "normalizedSha256": "64c97e2cc19cc190bfbc5f542e6df2231b484dd5b169fabbcc77d73b9717b5ed"
+    },
+    {
+      "file": "ghidra-listing-readonly.log",
+      "rawSha256": "f75316736e995e7b27ca468380d8d5616c5eeb319f26fe4d3d45578b91696d31",
+      "normalizedSha256": "2e5f48fb305cb89febef840e444ab000e905c91ed6c030b2f771519052816723"
+    },
+    {
+      "file": "ghidra-recovery-readonly.log",
+      "rawSha256": "5157a109d42f33edccf838e6d1d82e7e6ed55ee56e4acb65fdd39b56d0bbc733",
+      "normalizedSha256": "9e7dbc976837f39bc0c893be0655ff6cf071ccc538e4f2ca3013612252ea23e1"
+    },
+    {
+      "file": "original-api-inventory.json",
+      "rawSha256": "c9f44351c74b7924ddde328cf6cbc5c40d72fba15a2c9855d9146330a9f7f55b",
+      "normalizedSha256": "8af4bead41bfb69db4bdaf961358b44e5c9a2d656e7878ca2ae8a90bb2bcf8d9"
+    },
+    {
+      "file": "original-short-panel.saved.txt",
+      "rawSha256": "abd5668893dd669f8a86a736654c2e568f387ce1481787f890aff33eee5879d6",
+      "normalizedSha256": "1f47a6b43e541f98a9c90b5cd6d1333a8b19559ea6163c7d9d9024df74baa586"
+    },
+    {
+      "file": "original-studio-saved-excerpts.txt",
+      "rawSha256": "c76b1a087617bace6a7196cf96d8ec358a4ff0e313a2c05566685de1d6564896",
+      "normalizedSha256": "b0631456c40a9762ac39631d41b9880b8a8c120deed8d0a16cb04625eaa0b84a"
+    },
+    {
+      "file": "parser-module-selected-bindings.assembly.txt",
+      "rawSha256": "0307009ce70309f3246cc754871cb2b268fe6a95c4d8cbeb5778b4ed44a748f9",
+      "normalizedSha256": "ee68bbcaa55272e9def0e85e03a8f46513ffd2d87552f3f7f4647a79dd58ac3b"
+    },
+    {
+      "file": "revision-followup-template.txt",
+      "rawSha256": "d952e7e101d58bea0454c98f6bfbe6b26eaaff123fc10e02689811d5f5986fb1",
+      "normalizedSha256": "6ca5ed83fdb1ce9396904c3dd7697ffc0530701b22f7e55d518d98aed94667a5"
+    }
+  ]
+}

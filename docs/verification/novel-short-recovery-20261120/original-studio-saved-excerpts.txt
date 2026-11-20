@@ -1,0 +1,42 @@
+1615:       }, null, 8, ["checkpoint", "loading"])) : Fr("", !0), zr("div", $Wn, [se.value ? (Cr(), Nr(fon, {
+1616:         key: 0,
+1617:         book: p.value,
+1618:         "book-id": W.value,
+1619:         collapsed: ee.value,
+1620:         "onUpdate:collapsed": n[5] || (n[5] = e => ee.value = e),
+1621:         "is-dark-mode": e.isDarkMode,
+1622:         onSaved: ht
+1623:       }, null, 8, ["book", "book-id", "collapsed", "is-dark-mode"])) : Fr("", !0), ce.value ? (Cr(), Nr(Lon, {
+1624:         key: 1,
+1625:         "short-story": f.value,
+1626:         "short-story-id": y.value,
+1627:         collapsed: ee.value,
+1628:         "onUpdate:collapsed": n[6] || (n[6] = e => ee.value = e),
+1629:         "is-dark-mode": e.isDarkMode,
+1623:       }, null, 8, ["book", "book-id", "collapsed", "is-dark-mode"])) : Fr("", !0), ce.value ? (Cr(), Nr(Lon, {
+1624:         key: 1,
+1625:         "short-story": f.value,
+1626:         "short-story-id": y.value,
+1627:         collapsed: ee.value,
+1628:         "onUpdate:collapsed": n[6] || (n[6] = e => ee.value = e),
+1629:         "is-dark-mode": e.isDarkMode,
+1630:         onSaved: gt
+1631:       }, null, 8, ["short-story", "short-story-id", "collapsed", "is-dark-mode"])) : Fr("", !0), !de.value || se.value || ce.value ? Fr("", !0) : (Cr(), Ir("div", YWn, " 任务执行中，AI 输出请查看左侧对话框 "))])])], 4)], 64)) : Fr("", !0)])) : "style" === h.value ? (Cr(), Nr(rrn, {
+1632:         key: 1,
+1633:         "style-sources": O.value,
+1634:         "selected-style-ids": M.value,
+1635:         "onUpdate:selectedStyleIds": n[7] || (n[7] = e => M.value = e),
+1636:         "is-dark-mode": e.isDarkMode,
+1637:         onBack: ge,
+1089:     async function ht() {
+1090:       if (!W.value) return;
+1091:       const e = await Oan(W.value);
+1092:       (null == e ? void 0 : e.success) && (p.value = e.data);
+1093:     }
+1094:     async function gt() {
+1095:       if (!y.value) return;
+1096:       const e = await Man(y.value);
+1097:       (null == e ? void 0 : e.success) && (f.value = e.data);
+1098:     }
+1099:     async function yt() {
+1100:       var e, t, a, o, r, l, i, s, c, u, v;

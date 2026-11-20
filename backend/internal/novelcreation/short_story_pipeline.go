@@ -101,18 +101,19 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		return s.finishWithError(ctx, owner, run, ErrModelUnavailable, "独立短篇执行器未配置", nil)
 	}
 	var snap struct {
-		ShortReviewVersion    int                   `json:"short_review_version"`
-		ShortImitationVersion int                   `json:"short_imitation_version"`
-		SystemPrompts         *SystemPromptSnapshot `json:"system_prompts"`
-		Story                 ShortStory            `json:"short_story"`
-		Confirmed             bool                  `json:"short_outline_confirmed"`
-		Settings              ProjectSettings       `json:"project_settings"`
-		RetryOfRunID          string                `json:"retry_of_run_id"`
+		ShortWriterConversationVersion int                   `json:"short_writer_conversation_version"`
+		ShortReviewVersion             int                   `json:"short_review_version"`
+		ShortImitationVersion          int                   `json:"short_imitation_version"`
+		SystemPrompts                  *SystemPromptSnapshot `json:"system_prompts"`
+		Story                          ShortStory            `json:"short_story"`
+		Confirmed                      bool                  `json:"short_outline_confirmed"`
+		Settings                       ProjectSettings       `json:"project_settings"`
+		RetryOfRunID                   string                `json:"retry_of_run_id"`
 	}
 	if e := json.Unmarshal(run.PromptSnapshot, &snap); e != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇快照损坏", e)
 	}
-	if snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 2 {
+	if snap.ShortWriterConversationVersion < 0 || snap.ShortWriterConversationVersion > 1 || snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 2 {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇审核快照版本无效，已停止生成", nil)
 	}
 	project, e := s.store.GetProject(ctx, owner, run.ProjectID)
@@ -177,6 +178,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	agent := NormalizeAgentSettings(snap.Settings.Agent, 2000)
 	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent, SystemPrompts: snap.SystemPrompts, ShortReviewVersion: snap.ShortReviewVersion}
 	in.ShortImitationVersion = snap.ShortImitationVersion
+	in.ShortWriterConversationVersion = snap.ShortWriterConversationVersion
 	if in.ShortImitationVersion >= 1 {
 		latest, er := s.GetShortStory(ctx, owner, run.ProjectID)
 		if er != nil {
@@ -411,6 +413,10 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 			if e := stage(fmt.Sprintf("撰写短篇第%d章 · 第%d/%d段", i+1, j+1, pieces), 25+50*i/len(outline.Chapters), RunWriting); e != nil {
 				return story, e
 			}
+			pieceIn := in
+			if in.ShortWriterConversationVersion == 1 {
+				pieceIn.shortWriterConversation = &shortWriterConversation{}
+			}
 			v := shortText{}
 			partTarget := target / pieces
 			if j == pieces-1 {
@@ -418,7 +424,7 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 			}
 			payload := map[string]any{"creation": brief, "outline": outline, "current_chapter": c, "completed_chapters": completed, "piece_index": j + 1, "piece_total": pieces, "target_piece_words": partTarget, "story_memory": memory, "previous_text_excerpt": ending}
 			key := fmt.Sprintf(":%d:%d", i, j)
-			if e := p.shortCall(ctx, in, sink, prompt.ShortBodyPrompt, key, RunWriting, payload, &v, func() error { return validShortText(v, 12000) }, partTarget*2+4000); e != nil {
+			if e := p.shortCall(ctx, pieceIn, sink, prompt.ShortBodyPrompt, key, RunWriting, payload, &v, func() error { return validShortText(v, 12000) }, partTarget*2+4000); e != nil {
 				return story, e
 			}
 			if e := stage(fmt.Sprintf("审阅短篇第%d章 · 第%d/%d段", i+1, j+1, pieces), 80, RunWriting); e != nil {
@@ -433,7 +439,7 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 			story.ChapterAudits = append(story.ChapterAudits, audit)
 			if in.ShortReviewVersion >= 1 {
 				var err error
-				v, err = p.reviewControlledShortBody(ctx, in, sink, &story, brief, outline, c, v, review, partTarget, j+1, pieces, key, memory, &remainingRevisions)
+				v, err = p.reviewControlledShortBody(ctx, pieceIn, sink, &story, brief, outline, c, v, review, partTarget, j+1, pieces, key, memory, &remainingRevisions)
 				if err != nil {
 					return story, err
 				}
@@ -442,7 +448,7 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 					return story, e
 				}
 				var revised shortText
-				if e := p.shortCall(ctx, in, sink, prompt.ShortBodyRevision, key, RunWriting, map[string]any{"creation": brief, "outline": outline, "chapter": piece, "review": review, "target_words": partTarget, "piece_index": j + 1, "piece_total": pieces, "story_memory": memory}, &revised, func() error { return validShortText(revised, 12000) }, partTarget*2+4000); e != nil {
+				if e := p.shortCall(ctx, pieceIn, sink, prompt.ShortBodyRevision, key, RunWriting, map[string]any{"creation": brief, "outline": outline, "chapter": piece, "review": review, "target_words": partTarget, "piece_index": j + 1, "piece_total": pieces, "story_memory": memory}, &revised, func() error { return validShortText(revised, 12000) }, partTarget*2+4000); e != nil {
 					return story, e
 				}
 				v = revised

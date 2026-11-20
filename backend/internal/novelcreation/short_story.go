@@ -220,10 +220,16 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 			return e
 		}
 		imitationVersion := 0
+		writerConversationVersion := 0
 		if in.Mode == "short_imitation" {
 			imitationVersion = 2
+			writerConversationVersion = 1
 		}
-		raw, _ := json.Marshal(map[string]any{"short_imitation_version": imitationVersion, "short_story": story, "project_settings": settings, "agent_contract_version": 1, "short_review_version": 1, "mode": in.Mode, "system_prompts": systemPrompts})
+		snapshot := map[string]any{"short_imitation_version": imitationVersion, "short_story": story, "project_settings": settings, "agent_contract_version": 1, "short_review_version": 1, "mode": in.Mode, "system_prompts": systemPrompts}
+		if writerConversationVersion > 0 {
+			snapshot["short_writer_conversation_version"] = writerConversationVersion
+		}
+		raw, _ := json.Marshal(snapshot)
 		run, e := tx.CreateRun(ctx, owner, Run{ProjectID: p.ID, SessionID: session.ID, ModelID: in.ModelID, ThinkingLevel: in.ThinkingLevel, IdempotencyKey: "short:" + fingerprint([]string{owner, in.IdempotencyKey}), Status: RunQueued, PromptSnapshot: raw})
 		if e != nil {
 			return e

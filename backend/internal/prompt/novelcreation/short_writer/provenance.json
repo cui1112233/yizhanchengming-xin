@@ -1,0 +1,91 @@
+{
+  "targetSHA256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d",
+  "module": "novels.prompts.inkos.short_fiction_prompts",
+  "function": "build_short_fiction_draft_revision_followup",
+  "nativeFunctionAddress": "0x1801d8140",
+  "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--short_fiction_prompts.json",
+  "constants": [
+    {
+      "tag": "u",
+      "fileRange": [
+        4238903,
+        4238959
+      ],
+      "value": "根据审稿意见，继续写第二版完整正文。",
+      "index": 72
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4238959,
+        4239078
+      ],
+      "value": "这是同一篇的第二轮写作：保留上一版能打的地方，修掉会让读者出戏或不想读的问题。",
+      "index": 73
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239078,
+        4239155
+      ],
+      "value": "不要只列修改建议，不要只改几章片段，输出完整正文。",
+      "index": 74
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239155,
+        4239172
+      ],
+      "value": "## 审稿意见",
+      "index": 75
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239172,
+        4239192
+      ],
+      "value": "## 第二轮重点",
+      "index": 76
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239192,
+        4239295
+      ],
+      "value": "- 修时间线、逻辑、人物关系、证据权限、身体状态等会让读者出戏的问题。",
+      "index": 77
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239295,
+        4239356
+      ],
+      "value": "- 补后半段有效场面，不要用结果摘要收尾。",
+      "index": 78
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239356,
+        4239486
+      ],
+      "value": "- 保持标题、开篇、章节标题和正文主标题一致，但标题可以基于正文重新压得更有平台点击感。",
+      "index": 79
+    },
+    {
+      "tag": "u",
+      "fileRange": [
+        4239486,
+        4239568
+      ],
+      "value": "- 字数只做校准：偏短补有效场面，偏长删解释和重复反应。",
+      "index": 80
+    }
+  ],
+  "adaptation": "revision_followup.txt adapts whole-story second-draft instructions to current CM chapter/piece JSON. Native output block builder and chapter-count loop are not used as CM JSON transport. Revision priorities are derived from constants77-80; existing frozen configured revision preset is also included in the actual final user message."
+}

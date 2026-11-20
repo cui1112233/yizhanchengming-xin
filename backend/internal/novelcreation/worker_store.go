@@ -23,14 +23,15 @@ const (
 )
 
 type ModelCallMetadata struct {
-	ChosenModelID     string                            `json:"chosenModelId"`
-	Provider          batchfactoryv11.TextModelMetadata `json:"provider"`
-	PromptID          string                            `json:"promptId"`
-	PromptVersion     int                               `json:"promptVersion"`
-	Temperature       float64                           `json:"temperature"`
-	MaxTokens         int                               `json:"maxTokens"`
-	TemperatureStatus string                            `json:"temperatureStatus"`
-	MaxTokensStatus   string                            `json:"maxTokensStatus"`
+	Messages          []batchfactoryv11.TextCompletionMessage `json:"messages,omitempty"`
+	ChosenModelID     string                                  `json:"chosenModelId"`
+	Provider          batchfactoryv11.TextModelMetadata       `json:"provider"`
+	PromptID          string                                  `json:"promptId"`
+	PromptVersion     int                                     `json:"promptVersion"`
+	Temperature       float64                                 `json:"temperature"`
+	MaxTokens         int                                     `json:"maxTokens"`
+	TemperatureStatus string                                  `json:"temperatureStatus"`
+	MaxTokensStatus   string                                  `json:"maxTokensStatus"`
 }
 
 type CallRecord struct {

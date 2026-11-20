@@ -1,0 +1,312 @@
+[
+  {
+    "name": "emit",
+    "nativeEntry": "0x1800694b0",
+    "constructorCall": "0x180069410"
+  },
+  {
+    "name": "write_fn",
+    "nativeEntry": "0x18008bf00",
+    "constructorCall": "0x18008ba31"
+  },
+  {
+    "name": "event_fn",
+    "nativeEntry": "0x18008c2e0",
+    "constructorCall": "0x18008ba91"
+  },
+  {
+    "name": "__init__",
+    "nativeEntry": "0x180067d50",
+    "constructorCall": "0x18009334b"
+  },
+  {
+    "name": "_data_root",
+    "nativeEntry": "0x1800681b0",
+    "constructorCall": "0x1800933d3"
+  },
+  {
+    "name": "_data_dir",
+    "nativeEntry": "0x1800688d0",
+    "constructorCall": "0x18009345b"
+  },
+  {
+    "name": "_state",
+    "nativeEntry": "0x180068ce0",
+    "constructorCall": "0x1800934e3"
+  },
+  {
+    "name": "_settings_provider",
+    "nativeEntry": "0x1800690a0",
+    "constructorCall": "0x18009355c"
+  },
+  {
+    "name": "_event_emitter",
+    "nativeEntry": "0x180069340",
+    "constructorCall": "0x1800935f4"
+  },
+  {
+    "name": "_cover_image_generator",
+    "nativeEntry": "0x180069b90",
+    "constructorCall": "0x18009367c"
+  },
+  {
+    "name": "_pipeline",
+    "nativeEntry": "0x18006a620",
+    "constructorCall": "0x180093714"
+  },
+  {
+    "name": "_agent_service",
+    "nativeEntry": "0x18006ac60",
+    "constructorCall": "0x1800937ac"
+  },
+  {
+    "name": "_set_cancel",
+    "nativeEntry": "0x18006b5e0",
+    "constructorCall": "0x180093834"
+  },
+  {
+    "name": "_clear_cancel",
+    "nativeEntry": "0x18006bd80",
+    "constructorCall": "0x1800938bc"
+  },
+  {
+    "name": "_is_cancelled",
+    "nativeEntry": "0x18006c590",
+    "constructorCall": "0x180093944"
+  },
+  {
+    "name": "novels_list_books",
+    "nativeEntry": "0x18006cde0",
+    "constructorCall": "0x1800939cc"
+  },
+  {
+    "name": "novels_get_book",
+    "nativeEntry": "0x18006d730",
+    "constructorCall": "0x180093a54"
+  },
+  {
+    "name": "novels_rename_book",
+    "nativeEntry": "0x18006dee0",
+    "constructorCall": "0x180093adc"
+  },
+  {
+    "name": "novels_delete_book",
+    "nativeEntry": "0x18006e800",
+    "constructorCall": "0x180093b64"
+  },
+  {
+    "name": "novels_list_sessions",
+    "nativeEntry": "0x18006ed60",
+    "constructorCall": "0x180093bfc"
+  },
+  {
+    "name": "novels_get_session",
+    "nativeEntry": "0x18006f6f0",
+    "constructorCall": "0x180093c84"
+  },
+  {
+    "name": "novels_get_short_story",
+    "nativeEntry": "0x180071030",
+    "constructorCall": "0x180093d0c"
+  },
+  {
+    "name": "novels_read_short_story_file",
+    "nativeEntry": "0x1800717e0",
+    "constructorCall": "0x180093d94"
+  },
+  {
+    "name": "novels_save_short_story_file",
+    "nativeEntry": "0x180071f90",
+    "constructorCall": "0x180093e1c"
+  },
+  {
+    "name": "novels_confirm_pipeline_checkpoint",
+    "nativeEntry": "0x1800727b0",
+    "constructorCall": "0x180093ea4"
+  },
+  {
+    "name": "novels_create_session",
+    "nativeEntry": "0x180073da0",
+    "constructorCall": "0x180093f3c"
+  },
+  {
+    "name": "novels_rename_session",
+    "nativeEntry": "0x180074f40",
+    "constructorCall": "0x180093fc4"
+  },
+  {
+    "name": "novels_bind_session_book",
+    "nativeEntry": "0x180075870",
+    "constructorCall": "0x18009404c"
+  },
+  {
+    "name": "novels_delete_session",
+    "nativeEntry": "0x1800761f0",
+    "constructorCall": "0x1800940d4"
+  },
+  {
+    "name": "novels_update_session_messages",
+    "nativeEntry": "0x180076750",
+    "constructorCall": "0x18009415c"
+  },
+  {
+    "name": "novels_list_style_sources",
+    "nativeEntry": "0x180077180",
+    "constructorCall": "0x1800941e4"
+  },
+  {
+    "name": "novels_get_style_profile",
+    "nativeEntry": "0x180077890",
+    "constructorCall": "0x18009426c"
+  },
+  {
+    "name": "novels_save_style_profile",
+    "nativeEntry": "0x1800780b0",
+    "constructorCall": "0x1800942f4"
+  },
+  {
+    "name": "novels_delete_style_profile",
+    "nativeEntry": "0x180079700",
+    "constructorCall": "0x18009437c"
+  },
+  {
+    "name": "novels_import_style_files",
+    "nativeEntry": "0x180079ef0",
+    "constructorCall": "0x180094404"
+  },
+  {
+    "name": "novels_pick_style_files",
+    "nativeEntry": "0x18007b680",
+    "constructorCall": "0x18009448c"
+  },
+  {
+    "name": "novels_init_imitation",
+    "nativeEntry": "0x18007be90",
+    "constructorCall": "0x180094514"
+  },
+  {
+    "name": "novels_run_imitation_short",
+    "nativeEntry": "0x18007c840",
+    "constructorCall": "0x18009459c"
+  },
+  {
+    "name": "novels_init_fanfic",
+    "nativeEntry": "0x18007f270",
+    "constructorCall": "0x180094624"
+  },
+  {
+    "name": "novels_init_spinoff",
+    "nativeEntry": "0x18007fc20",
+    "constructorCall": "0x1800946ac"
+  },
+  {
+    "name": "novels_import_chapters",
+    "nativeEntry": "0x1800805d0",
+    "constructorCall": "0x180094734"
+  },
+  {
+    "name": "novels_get_agent_settings",
+    "nativeEntry": "0x180081b90",
+    "constructorCall": "0x1800947bc"
+  },
+  {
+    "name": "novels_save_agent_settings",
+    "nativeEntry": "0x1800823b0",
+    "constructorCall": "0x180094844"
+  },
+  {
+    "name": "novels_send_message",
+    "nativeEntry": "0x180082cb0",
+    "constructorCall": "0x1800948cc"
+  },
+  {
+    "name": "novels_confirm_action",
+    "nativeEntry": "0x180084690",
+    "constructorCall": "0x180094954"
+  },
+  {
+    "name": "novels_cancel_operation",
+    "nativeEntry": "0x180085ca0",
+    "constructorCall": "0x1800949dc"
+  },
+  {
+    "name": "novels_get_chapter",
+    "nativeEntry": "0x1800863b0",
+    "constructorCall": "0x180094a64"
+  },
+  {
+    "name": "novels_save_chapter",
+    "nativeEntry": "0x180086d40",
+    "constructorCall": "0x180094afc"
+  },
+  {
+    "name": "novels_read_story_file",
+    "nativeEntry": "0x180087910",
+    "constructorCall": "0x180094b84"
+  },
+  {
+    "name": "novels_save_story_file",
+    "nativeEntry": "0x1800880c0",
+    "constructorCall": "0x180094c0c"
+  },
+  {
+    "name": "novels_get_book_rules",
+    "nativeEntry": "0x1800888e0",
+    "constructorCall": "0x180094c94"
+  },
+  {
+    "name": "novels_save_book_rules",
+    "nativeEntry": "0x180089120",
+    "constructorCall": "0x180094d1c"
+  },
+  {
+    "name": "novels_write_next",
+    "nativeEntry": "0x1800899f0",
+    "constructorCall": "0x180094da4"
+  },
+  {
+    "name": "novels_write_batch",
+    "nativeEntry": "0x18008a790",
+    "constructorCall": "0x180094e2c"
+  },
+  {
+    "name": "_get_scheduler",
+    "nativeEntry": "0x18008b840",
+    "constructorCall": "0x180094eb4"
+  },
+  {
+    "name": "novels_scheduler_start",
+    "nativeEntry": "0x18008c8a0",
+    "constructorCall": "0x180094f3c"
+  },
+  {
+    "name": "novels_scheduler_stop",
+    "nativeEntry": "0x18008dad0",
+    "constructorCall": "0x180094fc4"
+  },
+  {
+    "name": "novels_scheduler_pause",
+    "nativeEntry": "0x18008e1b0",
+    "constructorCall": "0x18009504c"
+  },
+  {
+    "name": "novels_scheduler_status",
+    "nativeEntry": "0x18008e9d0",
+    "constructorCall": "0x1800950d4"
+  },
+  {
+    "name": "novels_audit_chapter",
+    "nativeEntry": "0x18008ef80",
+    "constructorCall": "0x18009515c"
+  },
+  {
+    "name": "novels_revise_chapter",
+    "nativeEntry": "0x18008fb70",
+    "constructorCall": "0x1800951e4"
+  },
+  {
+    "name": "novels_export_book",
+    "nativeEntry": "0x180090e60",
+    "constructorCall": "0x18009527c"
+  }
+]
