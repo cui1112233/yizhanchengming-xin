@@ -13,7 +13,7 @@ function MediaIcon({ type }) {
   return <FileVideo size={18} />
 }
 
-export function MaterialPanel({ projectID }) {
+export function MaterialPanel({ projectID, onInsert }) {
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
   const [progress, setProgress] = useState(0)
@@ -79,7 +79,7 @@ export function MaterialPanel({ projectID }) {
       {loading ? <div className="panel-loading"><Spin /></div> : materials.length ? (
         <div className="material-list">
           {materials.map(material => (
-            <button type="button" className="material-item" key={material.id}>
+            <button type="button" className="material-item" key={material.id} onDoubleClick={() => onInsert?.(material)} title="双击添加到时间线">
               <span className={`material-item__icon is-${material.mediaType}`}><MediaIcon type={material.mediaType} /></span>
               <span><b>{material.originalName}</b><small>{materialSummary(material)}</small></span>
               <em>{material.status === 'ready' ? '可用' : material.status}</em>

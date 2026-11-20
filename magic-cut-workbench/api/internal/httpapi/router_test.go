@@ -95,3 +95,13 @@ func TestMaterialRoutesUseTheIsolatedMaterialHandler(t *testing.T) {
 		t.Fatalf("status = %d; body=%s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestTimelineRoutesUseTheVersionedTimelineHandler(t *testing.T) {
+	timeline := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusAccepted) })
+	handler := New(Dependencies{Timeline: timeline})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPut, "/api/magic-cut/projects/mcp_1/timeline", nil))
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d", recorder.Code)
+	}
+}
