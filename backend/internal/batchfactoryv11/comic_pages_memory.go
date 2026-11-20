@@ -64,6 +64,9 @@ func applyComicPagePatch(base UpsertComicPageInput, patch PatchComicPageInput) (
 	if base.ComicPrompt == "" || base.ImagePrompt == "" {
 		return UpsertComicPageInput{}, ErrInvalid
 	}
+	if err := rejectJSONComicPrompt(base.ComicPrompt, base.ImagePrompt); err != nil {
+		return UpsertComicPageInput{}, err
+	}
 	base.ModelID = strings.TrimSpace(base.ModelID)
 	base.AspectRatio = strings.TrimSpace(base.AspectRatio)
 	if base.AspectRatio == "" {
@@ -90,6 +93,9 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 	if input.ComicPrompt == "" || input.ImagePrompt == "" {
 		return UpsertComicPageInput{}, ErrInvalid
 	}
+	if err := rejectJSONComicPrompt(input.ComicPrompt, input.ImagePrompt); err != nil {
+		return UpsertComicPageInput{}, err
+	}
 	if input.AspectRatio == "" {
 		input.AspectRatio = "9:16"
 	}
@@ -97,6 +103,15 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 		input.Status = "prompt_ready"
 	}
 	return input, nil
+}
+
+// rejectJSONComicPrompt 在持久化边界拦截模型原始 JSON 或被截断的 JSON 信封。
+// 解析层已经拦截一次，这里再兜一层，确保任何写入路径都不会把 JSON 存成出图提示词。
+func rejectJSONComicPrompt(comicPrompt, imagePrompt string) error {
+	if comicPromptIsJSONLike(comicPrompt) || comicPromptIsJSONLike(imagePrompt) {
+		return fmt.Errorf("%w: 出图提示词不能是 JSON", ErrInvalid)
+	}
+	return nil
 }
 
 func normalizeComicReferenceURLs(urls []string) []string {

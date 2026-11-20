@@ -1194,3 +1194,18 @@ func TestComicPromptMessagesNeverExposeEnglishSentinels(t *testing.T) {
 		t.Fatalf("partial message must keep the failure count in Chinese: %s", partial.Error())
 	}
 }
+
+func TestComicPagePersistenceRejectsJSONPrompts(t *testing.T) {
+	valid := UpsertComicPageInput{ComicPrompt: "导演说明", ImagePrompt: "上半文字区，下半插画"}
+	if _, err := normalizeComicPageInput(valid); err != nil {
+		t.Fatalf("正常提示词不应被拒绝: %v", err)
+	}
+	truncated := `{"pages":[{"video_id":"video-1","screen_prompt":"...`
+	if _, err := normalizeComicPageInput(UpsertComicPageInput{ComicPrompt: "导演说明", ImagePrompt: truncated}); err == nil {
+		t.Fatal("截断 JSON 不能写入 image_prompt")
+	}
+	bad := `{"pages":[]}`
+	if _, err := applyComicPagePatch(UpsertComicPageInput{ComicPrompt: "导演说明", ImagePrompt: "正常画面"}, PatchComicPageInput{ImagePrompt: &bad}); err == nil {
+		t.Fatal("JSON 形态的 image_prompt 不能在补丁写入")
+	}
+}
