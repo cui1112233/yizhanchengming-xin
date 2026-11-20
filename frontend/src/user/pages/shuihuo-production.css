@@ -4324,6 +4324,9 @@ body.shuihuo-reference-shell
 .batch-factory-comic-media-preview-empty strong{color:var(--sh-text);font-size:14px;font-weight:600}
 .batch-factory-comic-media-preview-empty span{color:var(--sh-accent)}
 .batch-factory-comic-media-preview-empty small{font-size:11px;color:var(--sh-muted)}
+.batch-factory-comic-media-generating{position:absolute;inset:0;z-index:3;display:grid;place-content:center;justify-items:center;gap:8px;padding:24px;background:color-mix(in srgb,var(--sh-bg) 82%,transparent);text-align:center}
+.batch-factory-comic-media-generating strong{color:var(--sh-text);font-size:14px;font-weight:600}
+.batch-factory-comic-media-generating span{color:var(--sh-muted);font-size:11px}
 .batch-factory-comic-media-tools{display:grid;min-width:0;min-height:0;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden;background:var(--sh-panel)}
 .batch-factory-comic-media-header{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-height:0;padding:10px 14px;border-bottom:1px solid var(--sh-line);background:var(--sh-panel-strong)}
 .batch-factory-comic-media-title{display:flex;order:1;flex:1 1 100%;align-items:center;flex-wrap:wrap;min-width:0;gap:3px 8px}
