@@ -1,0 +1,87 @@
+{
+  "source": "F:/软件/洛水2026/洛水2026/dist/assets/index-CVcgNnrd.css",
+  "sha256": "071381c2e7565688bbf24c67f20a2bc9b94bc1fae2282e0823a13ae338ec0fba",
+  "selection": "selector regex novel|imitation|scheduler|hooks-panel|agent-settings|style-panel",
+  "rules": [
+    {
+      "selector": ".script-editor.is-novel .script-highlight[data-v-366d6f43],.script-editor.is-novel .script-input[data-v-366d6f43]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".script-editor.is-novel.jump-flash .script-input[data-v-366d6f43]::-moz-selection",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".script-editor.is-novel.jump-flash .script-input[data-v-366d6f43]::selection,.script-editor.is-novel.jump-flash .script-input[data-v-366d6f43]::-moz-selection",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-create-icon[data-v-763a0223]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-sidebar[data-v-2a029557]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".is-dark .confirm-card[data-v-ce9a70c1],.novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat[data-v-05e78624]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-chat.is-dark[data-v-05e78624]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".agent-settings-page[data-v-57fd31f0]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".agent-settings-page.dark[data-v-57fd31f0]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".scheduler-panel[data-v-1dc0a349]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".hooks-panel[data-v-d8480def]",
+      "sourceLine": 1
+    },
+    {
+      "selector": ".novel-studio-page[data-v-0a51ccad]",
+      "sourceLine": 1
+    }
+  ],
+  "limitations": [
+    "shared generic styles and unresolved external class mappings are not fully included",
+    "pixel equivalence not verified"
+  ]
+}

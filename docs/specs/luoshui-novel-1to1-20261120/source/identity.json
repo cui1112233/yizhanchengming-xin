@@ -1,0 +1,15 @@
+{
+  "frontend": {
+    "path": "F:/软件/洛水2026/洛水2026/dist/assets/index-DgTjggsH.js",
+    "sha256": "7c2520565126cf49615a968a6bceefc5cfcf3e032f9858a9570adeab546336a6"
+  },
+  "native": {
+    "path": "F:/软件/洛水2026/洛水2026/modules/novels.pyd",
+    "sha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d"
+  },
+  "limitations": [
+    "Recovered Vue render fragments, not original author source",
+    "Static evidence does not establish runtime or pixel equivalence",
+    "Old frontend 5278a6d1 is historical only"
+  ]
+}

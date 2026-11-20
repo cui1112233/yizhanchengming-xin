@@ -1,0 +1,19 @@
+.script-editor.is-novel .script-highlight[data-v-366d6f43],.script-editor.is-novel .script-input[data-v-366d6f43]{padding-left:28px}
+.script-editor.is-novel.jump-flash .script-input[data-v-366d6f43]::-moz-selection{background:transparent}
+.script-editor.is-novel.jump-flash .script-input[data-v-366d6f43]::selection,.script-editor.is-novel.jump-flash .script-input[data-v-366d6f43]::-moz-selection{background:transparent}
+.novel-create-icon[data-v-763a0223]{display:block;flex-shrink:0;color:inherit}
+.novel-sidebar[data-v-2a029557]{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--ns-border);background:var(--ns-sidebar-bg);height:100%;overflow:hidden}
+.is-dark .confirm-card[data-v-ce9a70c1],.novel-chat.is-dark{border-color:#5b8c5a59;background:#5b8c5a14}
+.novel-chat.is-dark{color:#ffffffeb}
+.novel-chat.is-dark{color:#ffffff8c}
+.novel-chat.is-dark{background:#ffffff0f;border-color:#ffffff14}
+.novel-chat.is-dark{color:#ffffffe6}
+.novel-chat.is-dark{border-color:#ffffff1f;background:#ffffff0f;color:#ffffffa6}
+.novel-chat.is-dark{color:#ffffff73}
+.novel-chat[data-v-05e78624]{flex:1;min-width:0;display:flex;flex-direction:column;height:100%;background:#faf9f7;color:#111}
+.novel-chat.is-dark[data-v-05e78624]{background:#101012;color:#f2f2f2}
+.agent-settings-page[data-v-57fd31f0]{flex:1;min-width:0;display:flex;flex-direction:column;height:100%;background:#faf9f7}
+.agent-settings-page.dark[data-v-57fd31f0]{background:#101012}
+.scheduler-panel[data-v-1dc0a349]{padding:16px}
+.hooks-panel[data-v-d8480def]{padding:8px 0}
+.novel-studio-page[data-v-0a51ccad]{display:flex;width:100%;height:100%;min-height:0;overflow:hidden;background:var(--ns-bg);color:var(--ns-text)}

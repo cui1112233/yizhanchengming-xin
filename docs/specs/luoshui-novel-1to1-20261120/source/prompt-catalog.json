@@ -1,0 +1,4454 @@
+[
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 6,
+    "fileRange": [
+      4016983,
+      4018079
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 17,
+    "characters": 538,
+    "sha256": "bcefff985861d10983b862f9e08a95a1a73982628f3ab41068f438985ad70daa",
+    "preview": "\n\n## 输出要求\n\n严格按照以下 Markdown 模板输出完整拆书报告（不要跳过任何维度）：\n\n```\n# 《原作标题》拆书报告\n\n## 一、核心情绪曲线\n- 一句话概括全篇情绪走向：____\n- 逐拍情绪图谱：\n ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 11,
+    "fileRange": [
+      4018348,
+      4018939
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 62,
+    "characters": 307,
+    "sha256": "3a6e7d3b1d84b3d7c71a36642e728b1a4d34440f053a746bfed1f1c139342175",
+    "preview": "\n\n## 要求\n\n1. 三个方向在题材/时代/设定上拉开差距（如：现代现实、古代架空、脑洞重生）\n2. 共享同一核心价值观\n3. 每个方向给出：\n   - 题材类型\n   - 一句话设定（高概念钩子）\n   - 故事概要",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 23,
+    "fileRange": [
+      4019371,
+      4020132
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 94,
+    "characters": 333,
+    "sha256": "e5a09bbfb12ce6bdbb6bf02ae1f9a2de2dc86cb5258e4e0711be5ccc4cd6ed2b",
+    "preview": "\n\n## 蓝图要求\n\n输出以下内容：\n\n### 1. 放大后的情绪曲线\n在原作每个情绪节点上标注「如何比原作更狠/更爽/更上头」\n\n### 2. 新人物关系\n相对原作做了哪些微调\n\n### 3. 新主线结构（事件链）——",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 33,
+    "fileRange": [
+      4020317,
+      4020797
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 125,
+    "characters": 198,
+    "sha256": "d95c7fe4ae6b3e3eeed0a4b70d6f3a6de4cd36dad2bf09ac36948a639432fc42",
+    "preview": "1. 核心价值观必须与原作相同\n2. 情绪曲线要比原作更饱满\n3. 绝不抄袭——不允许与原文连续相同的字词句\n4. 主线结构要不同——保留情绪功能链，换掉事件\n5. 人物关系有变化\n6. 金句全部重写\n7. 全文禁用破折",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 42,
+    "fileRange": [
+      4021145,
+      4021754
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 139,
+    "characters": 307,
+    "sha256": "ede93f1461ccefb0f5a473a01d6c6200d7e98086d80d0dec0a68964fa791c55e",
+    "preview": "\n\n## 审核要求\n\n1. 逐维度审稿，产出《编辑审核意见单》\n2. 总评级：可过审 / 需修改 / 打回\n3. 重点维度：开篇留存、追读性、爽虐兑现、情绪冲击、逻辑自洽、价值观导向、内容合规、AI 味检查（含破折号/禁",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 56,
+    "fileRange": [
+      4021995,
+      4022252
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 178,
+    "characters": 255,
+    "sha256": "ce7e574b180a849a62c7d1a9ae7684f9484877bc1129bcb52ca447312e7d8b49",
+    "preview": "Imitation short-fiction prompt builders.\n\nCompiles the zhihu-fiction-rewrite skill's methodology into structur",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 80,
+    "fileRange": [
+      4022761,
+      4022797
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 213,
+    "characters": 34,
+    "sha256": "fdf4d15fd6c57cd33e1b8f8732d520b67b69692111c478d5921b48c89f6978bc",
+    "preview": "build_deconstruction_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 82,
+    "fileRange": [
+      4022829,
+      4022863
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 218,
+    "characters": 32,
+    "sha256": "236b3e24d52475643295cbcf78c9466c9deef24cd040260c1931d0ab9a363ecf",
+    "preview": "build_deconstruction_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 83,
+    "fileRange": [
+      4022863,
+      4022894
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 223,
+    "characters": 29,
+    "sha256": "522087647441f3fbaeb5f8a8e33f76ea8e1d5e410d5a561c3e6f096f20ce1213",
+    "preview": "build_direction_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 86,
+    "fileRange": [
+      4023057,
+      4023086
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 228,
+    "characters": 27,
+    "sha256": "562ff5ad160bf2936ef18b34cc3a8b7c1787dde4c73a7f253094db9ce571f363",
+    "preview": "build_direction_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 87,
+    "fileRange": [
+      4023086,
+      4023117
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 233,
+    "characters": 29,
+    "sha256": "3522fe47459c69127b9bc71ce77dbe7010c281daf98e82cd75d1869ae6e3962c",
+    "preview": "build_blueprint_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 90,
+    "fileRange": [
+      4023304,
+      4023333
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 238,
+    "characters": 27,
+    "sha256": "ce45a4704c1e37ee8d9f0dac4bee32b393bfb6758d1202c542a66a77594ecdfb",
+    "preview": "build_blueprint_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 92,
+    "fileRange": [
+      4023403,
+      4023442
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--imitation_short.json",
+    "line": 1679,
+    "characters": 37,
+    "sha256": "d95cf98becf7770d7c7b7cb36c933832b43650e1342e88b7c3e07b063d0c1861",
+    "preview": "build_imitation_short_writer_addendum",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 93,
+    "fileRange": [
+      4023442,
+      4023480
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 243,
+    "characters": 36,
+    "sha256": "6e5083094c0fdc5e2668c768a045f107daac50b0030bff838a30a75f02afb220",
+    "preview": "build_editorial_review_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short",
+    "constant": 95,
+    "fileRange": [
+      4023512,
+      4023548
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md",
+    "line": 248,
+    "characters": 34,
+    "sha256": "3e76708b151d23d34c0143db8c5e50921c5cbc68121815975a082b7907767887",
+    "preview": "build_editorial_review_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 0,
+    "fileRange": [
+      4024223,
+      4024420
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 5,
+    "characters": 193,
+    "sha256": "569f6dc9f3311b6f11fd4b589cc7d96a1e69605954c34863e1bbe836b7b9166d",
+    "preview": "Imitation-short reference texts — embedded as Python constants.\n\nAll methodology content from the zhihu-fictio",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 6,
+    "fileRange": [
+      4024473,
+      4032233
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 14,
+    "characters": 3287,
+    "sha256": "7c8ae46354dfdea6378ea43428e236f81bd9cf38ff9009a931df6b30e654a718",
+    "preview": "# 六维拆书方法论\n\n> 第一步「拆书」时阅读。目标：把原作拆成一张**可复用的内核蓝图**，而非剧情复述。\n> 拆书的标准是：拆完后，即使忘记原作所有具体情节，也能凭这份报告写出一篇「同魂不同骨」的新作。\n\n## 一、",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 8,
+    "fileRange": [
+      4032249,
+      4036048
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 185,
+    "characters": 1553,
+    "sha256": "e2c38d15fe846ece63ec9328b2c3061f7caf9337e298827434b71d1105f931e9",
+    "preview": "# 知乎风写作技法\n\n> 知乎盐选短篇的「手机阅读体质」：强钩子、快节奏、短段落、对话驱动、踩点的爽 / 虐、追读的小节钩子、有余味的落点。\n\n## 一、开篇钩子\n\n知乎读者划走只需一秒。**前 3 句必须出钩子**，前",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 10,
+    "fileRange": [
+      4036055,
+      4038874
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 273,
+    "characters": 1220,
+    "sha256": "7c35591697924e0a3c83c2d7ec6cc61347053182c8d7fba3c2e447f019dfce18",
+    "preview": "# 仿写引擎：保魂 · 换骨 · 放大 · 超越\n\n> 一句话方针：**价值观对齐（保魂）→ 主线求异 + 题材置换（换骨）→ 情绪曲线放大（增效）→ 防抄袭红线（守底线）→ 超越原作（提质）。**\n\n## 一、价值观对",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 12,
+    "fileRange": [
+      4038890,
+      4041951
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 364,
+    "characters": 1240,
+    "sha256": "43bb8c9a6220de36766ed8af10890a55cec9bfd86bb3e3e0b6a7a7bb9346b45c",
+    "preview": "# 去 AI 味 · 纯知乎文风指南\n\n## 一、先认清「AI 味」长什么样（全部躲开）\n\n1. 滥用破折号制造停顿和「高级感」。**直接禁用**。\n2. 爱用对仗句式：「不是…而是…」「与其说…不如说…」。\n3. 爱排",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 14,
+    "fileRange": [
+      4041966,
+      4045521
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 436,
+    "characters": 1529,
+    "sha256": "7bdfecdf27a524763e6414c5a06407eff6a4620b06e40fd5dcbc3b483d3ee77f",
+    "preview": "# 知乎题材库 + 题材置换法\n\n> 用于：给同一内核包装出 3 个差异化题材方向；把原作做时代 / 题材置换。\n\n## 怎么用这个库生成 3 个方向\n\n拆书拿到「核心价值观 + 主底层渴望」后，目标是把**同一个魂**",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 16,
+    "fileRange": [
+      4045529,
+      4047742
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 520,
+    "characters": 995,
+    "sha256": "82ca5c916e82d3314d927e96b0b4d38585cd339e0f2b5fdb62f95e21391aeb0b",
+    "preview": "# 知乎小说编辑审核流程\n\n> 成稿写完后，切换到「知乎盐选频道编辑」的身份，像真实过稿审核那样把关。\n\n## 一、审稿心态\n\n你现在不是作者，是一名**挑剔的签约编辑**。只认三件事：**留得住人吗？过得了审吗？读者会",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.imitation_short.references",
+    "constant": 18,
+    "fileRange": [
+      4047757,
+      4049105
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short--references.md",
+    "line": 582,
+    "characters": 531,
+    "sha256": "5f8f2cb3eb2677a3570974dc55334d4875abfe0d119b8deeb0621afcd2d018c3",
+    "preview": "# 某乎仿写改编 · 拆书仿写工作流\n\n你现在是一位**资深知乎盐选短篇小说操盘手**，集三种身份于一身：\n\n- **拆书师**：能把一篇爆款短篇拆到骨髓，情绪怎么走、人物怎么立、价值观打的是哪根神经、金句怎么炼成。\n-",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 1,
+    "fileRange": [
+      4049537,
+      4049851
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 14,
+    "characters": 312,
+    "sha256": "23cff40bc40ccc31a5cd320cdbbedec463737a3398f0642ea37c86c55847cedf",
+    "preview": "## Output Rules\n\n- Do not use emoji.\n- Answer ordinary discussion directly. When a tool call is needed, the to",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 2,
+    "fileRange": [
+      4049851,
+      4051819
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 23,
+    "characters": 942,
+    "sha256": "911c8b4df7cac4214ab270c00a2612ce8f58644888c3e3793b7c4dcfb6e93c45",
+    "preview": "你是 InkOS 普通聊天助手。\n\n这里不是自动生产入口。用户讨论、提问、比较方案时，直接回答。\n\n可用工具：propose_action。用户明确要创建长篇、生成短篇、启动互动世界、生成封面，或打开同人/续写/番外/仿",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 6,
+    "fileRange": [
+      4051845,
+      4054219
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 41,
+    "characters": 2372,
+    "sha256": "35e2f032543686a5174a157f141d3649be7d4964ede3ef865ce12f1a4458e835",
+    "preview": "You are the InkOS general chat assistant.\n\nThis is not an automatic production surface. Answer questions, disc",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 8,
+    "fileRange": [
+      4054222,
+      4055600
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 59,
+    "characters": 582,
+    "sha256": "557cf0a76bdb36841d466438e4ec9e19544eb98f909051e3948746b4f4e96c8c",
+    "preview": "你是 InkOS 建书助手。当前入口先分阶段聊清长篇/连载书籍草案，再让用户确认是否创建。\n\n还不能直接建书。故事核心齐全时必须调用 propose_action，action=create_book；不要用普通文字手写",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 9,
+    "fileRange": [
+      4055600,
+      4057188
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 72,
+    "characters": 1586,
+    "sha256": "5fed8a5e918853d695d0487fdb3e522d58892a946fdb131d091857c204ab57da",
+    "preview": "You are the InkOS book creation assistant. This surface stages a long-form / serialized book draft and asks fo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 10,
+    "fileRange": [
+      4057188,
+      4057624
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 85,
+    "characters": 204,
+    "sha256": "50d16d53d24db442add31be61e5e2db056eb4bc6601d8cc5b85470b3f77f751a",
+    "preview": "你是 InkOS 建书助手。用户已经确认创建长篇/连载书籍。\n\n唯一动作：立即调用 sub_agent(agent=\"architect\")。必须传 title；instruction 写清确认后的标题、题材、平台、篇幅",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 11,
+    "fileRange": [
+      4057624,
+      4058115
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 95,
+    "characters": 489,
+    "sha256": "74b5a5412dbe5e1de5f40ebe63c51e11144fa173770b0f3a58185eb95886f061",
+    "preview": "You are the InkOS book creation assistant. The user has confirmed long-form / serialized book creation.\n\nOnly ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 13,
+    "fileRange": [
+      4058126,
+      4058608
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 105,
+    "characters": 198,
+    "sha256": "cb3636687948dec03d901a5bc84b4a300845d76f1d55a72c109438028975c328",
+    "preview": "你是 InkOS Short 助手。用户已经点击确认生成独立短篇。\n\n唯一动作：立即调用 short_fiction_run，生成故事方案、完整正文、审稿记录、简介卖点、封面提示词和可选封面图，输出到 shorts/。\n",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 14,
+    "fileRange": [
+      4058608,
+      4059155
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 116,
+    "characters": 545,
+    "sha256": "4f787c7a19c6b6fe41e32c633690d5c368c074a959e11fcd1fba5b9d181530c6",
+    "preview": "You are the InkOS Short assistant. The user has confirmed standalone short-fiction generation.\n\nOnly action: i",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 16,
+    "fileRange": [
+      4059171,
+      4059407
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 127,
+    "characters": 100,
+    "sha256": "2617eb553eb71684ae6bf358ddbae5c0315e2a8f8bbb13c5020a0b1f1a445643",
+    "preview": "你是 InkOS Short 封面助手。用户已经点击确认生成或重做封面。\n\n唯一动作：立即调用 generate_cover，只生成或重做封面图/封面提示词；不要重跑正文，不要创建长篇或互动世界。\n\n",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 17,
+    "fileRange": [
+      4059407,
+      4059667
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 136,
+    "characters": 258,
+    "sha256": "68762a0894fe1fbc4c251abf73a126a24d30bd456dbfc6091ecbd748d93a34db",
+    "preview": "You are the InkOS Short cover assistant. The user has confirmed cover generation or regeneration.\n\nOnly action",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 18,
+    "fileRange": [
+      4059667,
+      4060741
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 145,
+    "characters": 496,
+    "sha256": "a49557f355215c7577ab5dfbd5440b43f613b0d700f186dd1ab9cc38f1cea48d",
+    "preview": "你是 InkOS Short 助手。当前入口只负责把独立短篇或短篇封面需求聊清楚，然后让用户确认。\n\n可用工具：propose_action。短篇成品用 action=short_run；只做封面用 action=gen",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 19,
+    "fileRange": [
+      4060741,
+      4061969
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 156,
+    "characters": 1226,
+    "sha256": "ebd1b275cfe15a3c8c1921a83e7d6ed5109aadd941507203b1eae215e8861119",
+    "preview": "You are the InkOS Short assistant. This surface clarifies standalone short-fiction or cover requests and asks ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 20,
+    "fileRange": [
+      4061969,
+      4062977
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 167,
+    "characters": 432,
+    "sha256": "17ae97f42614621b7a4c3e58bd6749a90d2881d0a686fbca902f4b9c73465ec4",
+    "preview": "你是 InkOS Play 助手。用户已经点击确认启动互动世界。\n\n唯一动作：立即调用 play_start。title 写世界标题；premise 写玩家身份、起始地点、压力和核心冲突；initialScene 写第一",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 21,
+    "fileRange": [
+      4062977,
+      4064054
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 179,
+    "characters": 1073,
+    "sha256": "7e67a67bd3660eb469ab03fcaf26eb7e3e97b324549803f7720198ebfbfc0625",
+    "preview": "You are the InkOS Play assistant. The user has confirmed starting an interactive world.\n\nOnly action: immediat",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 22,
+    "fileRange": [
+      4064054,
+      4066390
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 191,
+    "characters": 1008,
+    "sha256": "4e304d1cc47eb74970f5054db43301ebfe6c058fac377f9df9e99401a9c11f4a",
+    "preview": "你是 InkOS Play 助手。当前入口只负责启动新的互动世界，但现在还没有已创建的世界。\n\n现在还没有已创建世界。可用工具：propose_action，action=play_start。玩家身份、起始地点、压力和",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 23,
+    "fileRange": [
+      4066390,
+      4068912
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 206,
+    "characters": 2520,
+    "sha256": "16858e6fe73a7afe2714398a89c4034ac9688eab0005c9cea38cdf7317fc62d7",
+    "preview": "You are the InkOS Play assistant. This surface can start a new interactive world, but no world exists yet.\n\nNo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 24,
+    "fileRange": [
+      4068912,
+      4070989
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 221,
+    "characters": 913,
+    "sha256": "32bc16cb3c294befcaa61d503f389e8ff9b8629e4760f9f0c976dab98515dae1",
+    "preview": "你是 InkOS Play 助手。当前入口只负责互动世界。\n\n## 可用工具\n\n- play_edit：持久编辑当前互动世界的世界契约、视觉契约、玩家 persona、角色/物件/规则卡；不推进时间、不生成新场景。\n- ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 25,
+    "fileRange": [
+      4070989,
+      4073241
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 249,
+    "characters": 2248,
+    "sha256": "e0c3f3df882c70c618bfb4d820cb087e639e272f23bdcbeab07a5f00eef4f212",
+    "preview": "You are the InkOS Play assistant. This surface only runs interactive worlds.\n\n## Available Tools\n\n- play_edit:",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 29,
+    "fileRange": [
+      4073451,
+      4074422
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 277,
+    "characters": 451,
+    "sha256": "22f2a9702c80c32f07d74f6a87a5006ec213ac6936c20f2b69f91012d5d77a52",
+    "preview": "\n\n## 可用工具\n\n- read：读取当前书内容或设定。\n- write_truth_file：覆盖当前书的真相/设定文件。\n- 角色卡也是可编辑设定文件：主要角色用 roles/主要角色/<角色名>.md 或 rol",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 33,
+    "fileRange": [
+      4074607,
+      4075653
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 307,
+    "characters": 1028,
+    "sha256": "cb6573f19973fcb57b114e5fbdfa7bca755f9b32baf247dc317bb4a632f5adb2",
+    "preview": "\n\n## Available Tools\n\n- read: read active-book content or settings.\n- write_truth_file: replace active-book tr",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 36,
+    "fileRange": [
+      4075772,
+      4079750
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 330,
+    "characters": 2138,
+    "sha256": "acd0ab249318a72ae33aec93e095f08e5b2cd8bbd0758c5cc5083eb74ca630ca",
+    "preview": "」。业务工具不要传其他 bookId；省略 bookId 时默认使用当前书。\n- 只围绕当前书读、写、审、改和导出。\n- 不要调用 architect 创建新书；如果用户想新建书，让用户回到首页开启新建流程。\n- 不要在",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 41,
+    "fileRange": [
+      4080092,
+      4084138
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 389,
+    "characters": 4002,
+    "sha256": "85753514c7e0c844f71cbf9ff72e779f5b777edbe02cbb5e6644c5d0ce4b37a8",
+    "preview": "\". Do not pass another bookId to business tools; omit bookId to use the active book.\n- Work only on reading, w",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 43,
+    "fileRange": [
+      4084194,
+      4084356
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 439,
+    "characters": 160,
+    "sha256": "d5245bdb0fa4c656682140fcf68aacb302a1a3750d1a2c1dce3fc5172092a246",
+    "preview": "/chapters/`, named `0001_Title.md`.\n\nIf the index and files disagree, explain the inconsistency and suggested ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.agent_system_prompt",
+    "constant": 85,
+    "fileRange": [
+      4085518,
+      4085545
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--agent_system_prompt.md",
+    "line": 478,
+    "characters": 25,
+    "sha256": "ea39a1fe8f0ad85e31e0ccbd7b577373856a6617e43c0d98bfa5b1c1fa3f147a",
+    "preview": "build_agent_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 5,
+    "fileRange": [
+      4086096,
+      4086280
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--architect_prompts.md",
+    "line": 5,
+    "characters": 182,
+    "sha256": "1639fdf6b6dc625023d682d8c2c633c648081c1c53ef4f95af5566bcfad1c293",
+    "preview": "\n\n## Previous Review Feedback\nThe previous foundation draft was rejected. You must explicitly fix the followin",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 16,
+    "fileRange": [
+      4087018,
+      4087366
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--architect_prompts.md",
+    "line": 15,
+    "characters": 152,
+    "sha256": "98bf5985f7b2973111d90ccaa110cf5062aba58855effcd1b088d5cb5eed9f59",
+    "preview": "你是这本书的总架构师。你的唯一输出是**散文密度的基础设定**——不是表格、不是 schema、不是条目化 bullet。v6 以后这本书的\"灵气\"从哪里来？从你这里来。你的散文密度决定了后面 planner 能不能读出",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 32,
+    "fileRange": [
+      4087634,
+      4099740
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--architect_prompts.md",
+    "line": 20,
+    "characters": 5258,
+    "sha256": "3aa2a37dd97ba060ebd3fbb2614a42734ba5b79b3a42c103619a0e27c62296e7",
+    "preview": "\n\n## 输出结构（5 个 SECTION，严格按 === SECTION: === 分块，不要漏任何一块）\n\n## 去重铁律（必读）\n禁止在多段里重复同一事实。主角弧线只写在 roles；世界铁律只写在 story_f",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 35,
+    "fileRange": [
+      4099909,
+      4101583
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--architect_prompts.md",
+    "line": 160,
+    "characters": 742,
+    "sha256": "f102a8427b89daa4140a2da920c96ede395bac5fef2077d7bf1e479a19ffc286",
+    "preview": "\n\n## 禁止事项\n- <3-5 条本书禁忌>\n\n=== SECTION: pending_hooks ===\n\n初始伏笔池（Markdown表格），Phase 7 扩展列：\n| hook_id | 起始章节 | 类型 ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 37,
+    "fileRange": [
+      4101600,
+      4102886
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--architect_prompts.md",
+    "line": 188,
+    "characters": 732,
+    "sha256": "0f555bb0f0d9ad9245fd4759d5aae491920a869e87a398a100a8fa724552411d",
+    "preview": "题材特征\n- 主角人设鲜明、行为边界清晰\n- 伏笔前后呼应、配角有独立动机不是工具人\n- **story_frame / volume_map / roles 必须是散文密度，不要退化成 bullet**\n- **boo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 78,
+    "fileRange": [
+      4103497,
+      4103518
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--architect_prompts.json",
+    "line": 1035,
+    "characters": 19,
+    "sha256": "96d764821f0c8219ceaed7236ba362859c1d99d3e866b2b7ee42b54c18a38c3b",
+    "preview": "build_context_block",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 81,
+    "fileRange": [
+      4103580,
+      4103609
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--architect_prompts.json",
+    "line": 1145,
+    "characters": 27,
+    "sha256": "671493123872a0ea6c4fff13af57097e4f436a8fdad2ce4106c559563a23d3a0",
+    "preview": "build_review_feedback_block",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 83,
+    "fileRange": [
+      4103659,
+      4103684
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--architect_prompts.json",
+    "line": 1201,
+    "characters": 23,
+    "sha256": "fa3e04d3393994af59967b8c84e58e818ce7c1f5cad264f227e7a10afad43992",
+    "preview": "build_constraint_blocks",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 86,
+    "fileRange": [
+      4103922,
+      4103955
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--architect_prompts.md",
+    "line": 202,
+    "characters": 31,
+    "sha256": "e7fdbd385b364f408ee2d3f29a39dd181b35680362f619a881a0f35a1a4527db",
+    "preview": "build_chinese_foundation_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.architect_prompts",
+    "constant": 88,
+    "fileRange": [
+      4104010,
+      4104041
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--architect_prompts.json",
+    "line": 1815,
+    "characters": 29,
+    "sha256": "0d35a6c2521bc91f1ccfbf0e81cee05ac966f8e19b603c9172b00b02bd6c074a",
+    "preview": "build_foundation_user_message",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 1,
+    "fileRange": [
+      4104697,
+      4105035
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 5,
+    "characters": 336,
+    "sha256": "9302fc68e49515ab90648d92b2d297f60110a184da0fd83446ac0dbad7c22abd",
+    "preview": "You are InkOS's semantic outline-section selector.\nSelect only the outline sections needed for the current cha",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 2,
+    "fileRange": [
+      4105035,
+      4105352
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 12,
+    "characters": 141,
+    "sha256": "8c45630efee74813cb2ef42beb87677336fc80a2d1760f1af0474309aad52b8a",
+    "preview": "你是 InkOS 的语义大纲选段器。\n只选择当前章节真正需要的大纲段落。按语义相关性判断，不要按关键词重合机械选择。\n只返回严格 JSON：{\"selectedSources\":[\"...\"]}。必须使用候选里的精确 s",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 22,
+    "fileRange": [
+      4105561,
+      4105941
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 19,
+    "characters": 378,
+    "sha256": "6075a78f577d3a58321f4d9c37b70957de166a9c8d63dcb687fbaf3d9fba7d35",
+    "preview": "You are InkOS's semantic context compiler.\nOnly compile the COMPRESSIBLE CONTEXT. The PROTECTED CONTEXT is bin",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 23,
+    "fileRange": [
+      4105941,
+      4106273
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 26,
+    "characters": 122,
+    "sha256": "f3d0b14dc9619cb113f342bd0b1283b1d2a61e07ea310a9eedca93116ec61cad",
+    "preview": "你是 InkOS 的语义上下文编译器。\n只能编译【可压缩上下文】。【受保护上下文】是绑定参照，不得改写、不得替代总结、不得削弱。\n输出简洁 Markdown，保留来源指针。保留会影响下一章的人名、未兑现承诺、证据、时间点",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 37,
+    "fileRange": [
+      4106678,
+      4106908
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 33,
+    "characters": 228,
+    "sha256": "af1e3c563ebe549b1be133764cb4354853425327bccb92905ff0ea5f47d4babe",
+    "preview": "You are a writing-context compressor. Compress the input into a writing context package of no more than 2500 w",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 53,
+    "fileRange": [
+      4107270,
+      4107316
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 38,
+    "characters": 44,
+    "sha256": "9fbdfe64a7a3985d61373bf391a614071e98b45959a7f3fd25e9b99a2169610b",
+    "preview": "build_outline_section_selector_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 64,
+    "fileRange": [
+      4107473,
+      4107517
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 43,
+    "characters": 42,
+    "sha256": "8515a8283716da679f933e6335abe2ac547c91af5475137aebc0d1d05c7ec07f",
+    "preview": "build_outline_section_selector_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 65,
+    "fileRange": [
+      4107517,
+      4107568
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 48,
+    "characters": 49,
+    "sha256": "49beb3646061d1bd4fd4fdd5ebe4fe7ce43f2917692c9adff6ed88b26f7874d7",
+    "preview": "build_compressible_context_compiler_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 68,
+    "fileRange": [
+      4107662,
+      4107711
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 53,
+    "characters": 47,
+    "sha256": "c9ea0eb9f1ab8b65477f2e679548b0b9008ed082aa299db412194c7aa0160b13",
+    "preview": "build_compressible_context_compiler_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.composer_prompts",
+    "constant": 69,
+    "fileRange": [
+      4107711,
+      4107756
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--composer_prompts.md",
+    "line": 58,
+    "characters": 43,
+    "sha256": "4c78075e2897f799a33981fb45915f8a17451730f71a453ce789f93db4c6c8fc",
+    "preview": "build_legacy_context_compress_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 16,
+    "fileRange": [
+      4108789,
+      4108927
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 5,
+    "characters": 136,
+    "sha256": "084dd7d1ea238892d6ec629a98ba00ace7e79f25f17958fea7c842e9b2b1f69f",
+    "preview": "In OOC mode, personality drift can be intentional; record only, do not fail. Evaluate against the character do",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 19,
+    "fileRange": [
+      4109064,
+      4109204
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 10,
+    "characters": 138,
+    "sha256": "ee955105792423b853dc411981b9906afcb02bd297b5596436d6cfa8bb62f239",
+    "preview": "Canon-faithful fanfic: characters must stay close to their original personality core. Evaluate against fanfic_",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 24,
+    "fileRange": [
+      4109232,
+      4109361
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 15,
+    "characters": 103,
+    "sha256": "6acc6e8f7a6880b5e2c6ca211fcc086648af29ea4b316c9721eb16a215dc4584",
+    "preview": ". Also check AI tell markers (仿佛/不禁/宛如/竟然/忽然/猛地); warn when any appears more than once per 3,000 words.",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 32,
+    "fileRange": [
+      4109538,
+      4109870
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 20,
+    "characters": 112,
+    "sha256": "3eb37824984b4e99783683d6965143ed199da86438d9988b9a84e90e59f77532",
+    "preview": "检查欲望驱动：本章是否制造了情绪缺口（读者渴望释放）或完成了超出预期的兑现？只满足读者70%期待的兑现等于爽点虚化。如果本章处于小目标周期的后效阶段，检查是否展示了具体改变——不只是情绪反应，而是地位、关系或资源的实际变",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 34,
+    "fileRange": [
+      4109872,
+      4110434
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 25,
+    "characters": 196,
+    "sha256": "f12670b4ab2d623a81df553d8c965e0dff8fc2b1a11919ed090398cd29ae53c8",
+    "preview": "检查节奏波形：最近 3-5 章是否形成了完整的「蓄压→升级→爆发→后效」周期？如果连续 5 章没有爆发（兑现/回报/翻转），标记为节奏停滞。如果上一章是爆发/高潮/大反转，本章是否写出了改变？如果直接跳到新蓄压而没有展示",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 35,
+    "fileRange": [
+      4110434,
+      4111038
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 30,
+    "characters": 596,
+    "sha256": "cf6430ce12a9c562629db81297abff041b461eb8ed1d55a20f54fc05885f8ae6",
+    "preview": "Check pacing rhythm: Do the recent 3-5 chapters form a complete mini-goal cycle (build-up → escalation → clima",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 38,
+    "fileRange": [
+      4111058,
+      4111464
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 35,
+    "characters": 402,
+    "sha256": "f5bcb2ffbb0c19c700843f7ac8e0e28f426344f737f80d72d3ffa26ea40aeee4",
+    "preview": "Check desire engine: Has the chapter created an emotional gap (reader wants release) OR delivered a payoff tha",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 83,
+    "fileRange": [
+      4115534,
+      4115556
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--continuity_prompts.json",
+    "line": 1473,
+    "characters": 20,
+    "sha256": "ab5ae63b9a72e8b11e06a4409f428492586cb2bdec56371123356e56626303c6",
+    "preview": "build_dimension_note",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 100,
+    "fileRange": [
+      4115696,
+      4115829
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 73,
+    "characters": 131,
+    "sha256": "9c4b985b9b953b1a8286a9b195b73bc8fbed43016013ce86405847efaed63958",
+    "preview": " web-fiction structural editor. Audit the chapter for completion and structure, not for prose craft. ALL OUTPU",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 101,
+    "fileRange": [
+      4115829,
+      4118236
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 78,
+    "characters": 2401,
+    "sha256": "655df3ab186bcf944885b99d04960db37a3d539aa4830d67179420802faf1b22",
+    "preview": "\n\n## Reviewer Scope (hard constraints)\n\nYou audit completion and structure only. Your job is to decide whether",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 102,
+    "fileRange": [
+      4118236,
+      4119130
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 98,
+    "characters": 890,
+    "sha256": "1ace2e7c2328c18c43ee4cc366bc34abfcbd7afea9b556a486f74bf71784f378",
+    "preview": "\n\nOutput format MUST be JSON:\n{\n  \"passed\": true/false,\n  \"overall_score\": 0-100,\n  \"issues\": [\n\t    {\n\t      ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 105,
+    "fileRange": [
+      4119233,
+      4120907
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 129,
+    "characters": 732,
+    "sha256": "45494bf5c8921bf27dd8d1a521c961e7e326061e1779011b1dfe8e6419c02d56",
+    "preview": "\n\n## 审稿边界（硬约束）\n\n你不审文笔、不审排版、不审句式——这些归 Polisher。你发现的文笔问题只能以 severity=\"info\" 标注供 Polisher 参考，不计入 reviewer 的 passe",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 106,
+    "fileRange": [
+      4120907,
+      4121749
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 149,
+    "characters": 520,
+    "sha256": "c1bb3ca06cd7a02b876704a2fb16cc0a8bf2a4e4d1a92c6e64169b1b15387355",
+    "preview": "\n\n输出格式必须为 JSON：\n{\n  \"passed\": true/false,\n  \"overall_score\": 0-100,\n  \"issues\": [\n\t    {\n\t      \"severity\": \"c",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 127,
+    "fileRange": [
+      4122120,
+      4122164
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--continuity_prompts.json",
+    "line": 1953,
+    "characters": 42,
+    "sha256": "6bdf4f6afc13056052276fc51b638d5832656ad4ecbdf895245db9d92f9357bc",
+    "preview": "build_protagonist_block.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 128,
+    "fileRange": [
+      4122164,
+      4122379
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 180,
+    "characters": 213,
+    "sha256": "321a33384fe09cdd666733e651f426c6b91206153b19e5ea86e56b63f1422082",
+    "preview": "\n\nYou have web-search capability (search_web / fetch_url). For real-world eras, people, events, geography, or ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 167,
+    "fileRange": [
+      4130013,
+      4130047
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--continuity_prompts.json",
+    "line": 6893,
+    "characters": 32,
+    "sha256": "e48f4f5d1ce56843d403edd518080562fbe501e0b718b90493b419daed917b36",
+    "preview": "build_settings_dimension_catalog",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 171,
+    "fileRange": [
+      4130260,
+      4130282
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--continuity_prompts.json",
+    "line": 7097,
+    "characters": 20,
+    "sha256": "c84c2d9a26543d0b96b4a17dc7ff73841453f917b833d87e3b9e2ca541d767d4",
+    "preview": "build_dimension_list",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 176,
+    "fileRange": [
+      4130569,
+      4130601
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 194,
+    "characters": 30,
+    "sha256": "a559af542622baeb92607891000dfef641475f123ef8ac802bc6e4c5355dc97f",
+    "preview": "build_continuity_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 179,
+    "fileRange": [
+      4130757,
+      4130787
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--continuity_prompts.md",
+    "line": 199,
+    "characters": 28,
+    "sha256": "067eb4838009e489508f7d379df663f66207b8ac80fa145407a4b78fa117c282",
+    "preview": "build_continuity_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 181,
+    "fileRange": [
+      4130857,
+      4130882
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--continuity_prompts.json",
+    "line": 7693,
+    "characters": 23,
+    "sha256": "663bf09b0951bec204f4abf42edc12f733d53d31b3c5f08d30e7b4fb67dffbac",
+    "preview": "build_protagonist_block",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.continuity_prompts",
+    "constant": 183,
+    "fileRange": [
+      4130935,
+      4130954
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--continuity_prompts.json",
+    "line": 7765,
+    "characters": 17,
+    "sha256": "90fa834741283c8a88d1492cca8fd8b93a2a5bb1df8ed46ed050422d3fab19cd",
+    "preview": "build_search_note",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 23,
+    "fileRange": [
+      4132723,
+      4132777
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--en_prompt_sections.json",
+    "line": 257,
+    "characters": 52,
+    "sha256": "ba73aa6d67bd02895d03063926ccdb1d5264c003582a4b024f4fd1c6d86e39f7",
+    "preview": "build_english_pre_write_checklist.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 26,
+    "fileRange": [
+      4132808,
+      4132924
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--en_prompt_sections.md",
+    "line": 10,
+    "characters": 114,
+    "sha256": "ff6e55bb6c3bf8a9842845997c4984458a004cf5094a1407da5f57b2b9aea529",
+    "preview": " web fiction author writing for English-speaking platforms (Royal Road, Kindle Unlimited, Scribble Hub).\n\nTarg",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 29,
+    "fileRange": [
+      4132962,
+      4133122
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--en_prompt_sections.md",
+    "line": 17,
+    "characters": 158,
+    "sha256": "4174898db1dac19b80b9a8d69cbf9907e648fbd23157795c4abdf9717246a8d9",
+    "preview": " total chapters.\n\nWrite in English. Vary sentence length. Mix short punchy sentences with longer flowing ones.",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 38,
+    "fileRange": [
+      4133231,
+      4137803
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--en_prompt_sections.md",
+    "line": 24,
+    "characters": 4554,
+    "sha256": "a9c96981a6dc9b8a2b2d6591ca5421dccfa633357b0de192082f41ce89560a07",
+    "preview": "## Universal Writing Rules\n\n### Character Rules\n1. **Consistency**: Behavior driven by \"past experience + curr",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 39,
+    "fileRange": [
+      4137803,
+      4137829
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--en_prompt_sections.json",
+    "line": 439,
+    "characters": 24,
+    "sha256": "498f8d4a6f3702b80a49ba743058f6f6c3dda62ab111130f9e3b9ba0a015a6e6",
+    "preview": "build_english_core_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 41,
+    "fileRange": [
+      4137844,
+      4139969
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--en_prompt_sections.md",
+    "line": 71,
+    "characters": 2105,
+    "sha256": "6fbdb10d0aff6bdb05f18de9f4acf63afb4c8f2b7d35363fba01484e4271512d",
+    "preview": "## Anti-AI Iron Laws\n\n**[IRON LAW 1]** The narrator never tells the reader what to conclude.\nIf the reader can",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 42,
+    "fileRange": [
+      4139969,
+      4139998
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--en_prompt_sections.json",
+    "line": 488,
+    "characters": 27,
+    "sha256": "ffec5610ab4e432611511fa7e3418cb76cc4608dca7df1cec2f7f4f526bd4608",
+    "preview": "build_english_anti_ai_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 43,
+    "fileRange": [
+      4139998,
+      4140572
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--en_prompt_sections.md",
+    "line": 113,
+    "characters": 572,
+    "sha256": "303b9b7977a059c3faac1edb8a59ddc00f997a6a716cafe79fe4c84463cf4dbe",
+    "preview": "## Character Psychology Method (Internal Planning Tool)\n\nBefore writing any character's action or dialogue, ru",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 44,
+    "fileRange": [
+      4140572,
+      4140604
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--en_prompt_sections.json",
+    "line": 506,
+    "characters": 30,
+    "sha256": "2351d011800f1de0ab86c9e3eccea43032e670773d504492452e8851ac1c7392",
+    "preview": "build_english_character_method",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 46,
+    "fileRange": [
+      4140661,
+      4140696
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--en_prompt_sections.json",
+    "line": 578,
+    "characters": 33,
+    "sha256": "46a5f29d564a36a2ab8d673dc2bc02fb642ec37632a06009c85919ea4b0773e3",
+    "preview": "build_english_pre_write_checklist",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.en_prompt_sections",
+    "constant": 47,
+    "fileRange": [
+      4140696,
+      4140723
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--en_prompt_sections.json",
+    "line": 587,
+    "characters": 25,
+    "sha256": "10447230c6f52c0e5a9f9542c0ce86e4a23cf10bf20a3fe2e423eb922f54fd54",
+    "preview": "build_english_genre_intro",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.fanfic_prompt_sections",
+    "constant": 34,
+    "fileRange": [
+      4143704,
+      4143755
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--fanfic_prompt_sections.json",
+    "line": 392,
+    "characters": 49,
+    "sha256": "f2f653ede61e97e6cd6f82131619272626ecd7efe3a630f6e3b62f45146c80d5",
+    "preview": "build_fanfic_mode_instructions.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.fanfic_prompt_sections",
+    "constant": 49,
+    "fileRange": [
+      4145702,
+      4145730
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--fanfic_prompt_sections.json",
+    "line": 757,
+    "characters": 26,
+    "sha256": "30963b087f92ec11db0247022b637cd036f1d8a07df15a331f523d13a39bf2c8",
+    "preview": "build_fanfic_canon_section",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.fanfic_prompt_sections",
+    "constant": 51,
+    "fileRange": [
+      4145760,
+      4145792
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--fanfic_prompt_sections.json",
+    "line": 822,
+    "characters": 30,
+    "sha256": "33203a7928456ab904b9fa9ce9cc8027a59d8e50748a78f457aef19a71e80db8",
+    "preview": "build_character_voice_profiles",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.fanfic_prompt_sections",
+    "constant": 53,
+    "fileRange": [
+      4145856,
+      4145888
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--fanfic_prompt_sections.json",
+    "line": 894,
+    "characters": 30,
+    "sha256": "83b1e7121bb493e3a795f8fe23080a119ea23f12e3e0ba22d5695a504017f70a",
+    "preview": "build_fanfic_mode_instructions",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 31,
+    "fileRange": [
+      4147296,
+      4147429
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 20,
+    "characters": 131,
+    "sha256": "d43563c6d3fc8af847a8b8ce5bfc2d482e8897eea1db5dacd855a2035ff9b74e",
+    "preview": "New Narrative Space (Is there a clear divergence point or new territory that gives the story room to be ORIGIN",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 33,
+    "fileRange": [
+      4147525,
+      4147636
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 30,
+    "characters": 109,
+    "sha256": "4f8a2194a483a7efa680e7f82255f76916bc91f74774c9a0b04b7617b4128c8e",
+    "preview": "Opening Momentum (Can the first 5 chapters create a page-turning hook without requiring 3 chapters of setup?)",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 44,
+    "fileRange": [
+      4148381,
+      4148847
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 40,
+    "characters": 248,
+    "sha256": "b401277ef7a50144d799745b46b71c58cbc5a884520591de5d21ba0c75b5de08",
+    "preview": "\n\n## 评分标准\n- 80+ 通过，可以开始写作\n- 60-79 有明显问题，需要修改\n- <60 方向性错误，需要重新设计\n\n## 输出格式（严格遵守）\n=== DIMENSION: 1 ===\n分数：{0-100}",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 48,
+    "fileRange": [
+      4148974,
+      4149022
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 67,
+    "characters": 46,
+    "sha256": "26a23fc35654b30615507aefd75c1b43dcd749d796f95b0c4a5d2f0fe63d7bca",
+    "preview": "build_chinese_review_prompt.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 49,
+    "fileRange": [
+      4149022,
+      4149180
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 72,
+    "characters": 156,
+    "sha256": "cb249905f096626dbfd67a7582ec90b3a874bbeceba713930790d6d9594068db",
+    "preview": "You are a senior fiction editor reviewing a new book's foundation (worldbuilding + outline + rules).\n\nScore ea",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 50,
+    "fileRange": [
+      4149180,
+      4149572
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 81,
+    "characters": 386,
+    "sha256": "722c0bf4d764e7b2f97430ccd55542a90433c807ae736d5f61ed609fa8d3afb8",
+    "preview": "\n\n## Scoring\n- 80+ Pass — ready to write\n- 60-79 Needs revision\n- <60 Fundamental direction problem\n\n## Output",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 52,
+    "fileRange": [
+      4149630,
+      4149678
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 108,
+    "characters": 46,
+    "sha256": "28c264f350e3211b3ebe348169d7a1234fb812954a0e5cb303ef6f99d9d056a8",
+    "preview": "build_english_review_prompt.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 91,
+    "fileRange": [
+      4150414,
+      4150443
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 113,
+    "characters": 27,
+    "sha256": "bff4dabca6c89cdecca7bb3e1402b3fbf1ff2f0068f3a0a887e29ddbe2478a02",
+    "preview": "build_chinese_review_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 92,
+    "fileRange": [
+      4150443,
+      4150472
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--foundation_reviewer_prompts.md",
+    "line": 118,
+    "characters": 27,
+    "sha256": "8d3f21b738a47d8035494d9cab02e3f00b0923b1202ac1aba16cbd5a33daef46",
+    "preview": "build_english_review_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.foundation_reviewer_prompts",
+    "constant": 95,
+    "fileRange": [
+      4150541,
+      4150567
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--foundation_reviewer_prompts.json",
+    "line": 1359,
+    "characters": 24,
+    "sha256": "8ec5b836c84591ce150c9529678db010ba160f6ab6cb547b065e1442f36060a4",
+    "preview": "build_foundation_excerpt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.length_governance",
+    "constant": 83,
+    "fileRange": [
+      4159308,
+      4159327
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--length_governance.json",
+    "line": 1188,
+    "characters": 17,
+    "sha256": "28d58d0967c2d28a3b8615f4afc2582af581b87cb7505880dbf6de5830462a60",
+    "preview": "build_length_spec",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 6,
+    "fileRange": [
+      4160302,
+      4160949
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 5,
+    "characters": 643,
+    "sha256": "23aa8e29af9f0dc9159b0e307978e945ac8ae7d2dfb2c55d5bbf32d1be8a0fe6",
+    "preview": "## Extraction Categories\n\n1. **Character actions**: Who did what, to whom, why\n2. **Location changes**: Who mo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 7,
+    "fileRange": [
+      4160949,
+      4161256
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 20,
+    "characters": 303,
+    "sha256": "3b285cdfe1a87ed2a7cd9bd4cbad22d8553b394f3d86ab1cacb770befd5500f3",
+    "preview": "## Rules\n\n- Extract from the TEXT ONLY — do not infer what might happen\n- Over-extract: if unsure whether some",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 8,
+    "fileRange": [
+      4161256,
+      4161909
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 31,
+    "characters": 643,
+    "sha256": "ecc8bb0551d9423088f1d9fd2a0a015f59f87effc04e6a35b56adedf0611383b",
+    "preview": "=== OBSERVATIONS ===\n\n[CHARACTERS]\n- <name>: <action/state change> (scene: <location>)\n\n[LOCATIONS]\n- <charact",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 11,
+    "fileRange": [
+      4162009,
+      4162633
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 66,
+    "characters": 260,
+    "sha256": "b524ea9a5cea8a14b3b89b50ac3cf3e20151602ff57e7b211bb2a10dcd13eade",
+    "preview": "## 提取类别\n\n1. **角色行为**：谁做了什么，对谁，为什么\n2. **位置变化**：谁去了哪里，从哪里来\n3. **资源变化**：获得、失去、消耗了什么，具体数量\n4. **关系变化**：新相遇、信任/不信任转变",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 12,
+    "fileRange": [
+      4162633,
+      4162897
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 81,
+    "characters": 104,
+    "sha256": "29ee361b11d2b229a4fb48b17315a16dadd5e1275a465b832ee3b361ce6370ad",
+    "preview": "## 规则\n\n- 只从正文提取——不推测可能发生的事\n- 宁多勿少：不确定是否重要时也要记录\n- 具体化：\"陆承烬左肩旧伤开裂\" 而非 \"陆承烬受伤了\"\n- 记录章节内的时间标记\n- 标注每个场景中在场的角色",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 13,
+    "fileRange": [
+      4162897,
+      4163524
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 92,
+    "characters": 351,
+    "sha256": "777bed1eaea7a002ddcea7c60786c836f304e967c8c9e8c35d7bc766b0434516",
+    "preview": "=== OBSERVATIONS ===\n\n[角色行为]\n- <角色名>: <行为/状态变化> (场景: <地点>)\n\n[位置变化]\n- <角色> 从 <A> 到 <B>\n\n[资源变化]\n- <角色> 获得/失去 <物品",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 39,
+    "fileRange": [
+      4163910,
+      4163940
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 127,
+    "characters": 28,
+    "sha256": "f292baac7a4ee17ad0c2e6d109b007818986ab983a525c3dec6c1a2130b999e3",
+    "preview": "build_observer_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.observer_prompts",
+    "constant": 42,
+    "fileRange": [
+      4164024,
+      4164052
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--observer_prompts.md",
+    "line": 132,
+    "characters": 26,
+    "sha256": "327243385fbc531e86d1643ade386ca9699ea4c6697f44f7da30bd47c434c9c4",
+    "preview": "build_observer_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 8,
+    "fileRange": [
+      4164531,
+      4164992
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 15,
+    "characters": 459,
+    "sha256": "38b14d6c9e7a86f51eb098ce91ef31d35d2bf9a4802301775b9543257fd9546b",
+    "preview": "\n\nThe brief is the user's direct instruction. When planning this chapter, honor the brief's core setup (protag",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 10,
+    "fileRange": [
+      4165055,
+      4165507
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 22,
+    "characters": 176,
+    "sha256": "968c8007d827bc60444a0a93ecb6b0912718c85d84f0bce1b6177d3a432b9fd7",
+    "preview": "\n\nbrief 是用户的直接指令。本章规划时，必须优先兑现 brief 里写明的核心设定（主角设定、世界前提、开场机制、样本章回钩子等）。如果 brief 里指定了内容比例、双主线权重或某条关系线必须占比，本章 memo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 12,
+    "fileRange": [
+      4165577,
+      4165929
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 29,
+    "characters": 350,
+    "sha256": "cc45a9c634bcd7193f6ddb7752a37a585493188202966289f575e1d74654ba80",
+    "preview": "\n\nThis is the user's direct instruction for the current chapter. The memo must obey it before the outline fall",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 14,
+    "fileRange": [
+      4165980,
+      4166283
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 36,
+    "characters": 119,
+    "sha256": "97c25862cd1c616e1219d9bb312a92e8bbb816fc70fc6998a98524df29fa542c",
+    "preview": "\n\n这是用户对当前章节的直接指令。memo 必须优先遵守它，再参考卷纲兜底。如果用户指定了章节标题，必须在 memo 中原样保留该标题，供写手作为 CHAPTER_TITLE 使用。若它与卷纲不完全一致，保持连续性，但以",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 18,
+    "fileRange": [
+      4166346,
+      4167754
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 43,
+    "characters": 1394,
+    "sha256": "437ad5743a75dad2b5203bea7a764c185b00d7a985c98ca804874bb2c962df74",
+    "preview": " of the opening three — the chapters that decide whether a reader stays. The Golden Three Chapters rule assign",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 21,
+    "fileRange": [
+      4167828,
+      4169024
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 50,
+    "characters": 444,
+    "sha256": "45775d6975d3caad73b5e7726e6a078b226af5c89aebb4c932170c54b399e94a",
+    "preview": " 章——决定读者是否留下来的关键章节。黄金三章法则给每一章分了硬槽位：第 1 章必须把主角直接抛进核心冲突里（主角出场即面对主线矛盾——追杀、死局、被夺权、穿越即危机），不要拿背景、家族、天气、朝代铺垫开场。第 2 章必",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 28,
+    "fileRange": [
+      4169085,
+      4169104
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--planner_prompts.json",
+    "line": 278,
+    "characters": 17,
+    "sha256": "f7bc84c6b9f4582d71a23ab5afdcac14c06ca4322bbfbd072b662d72e1bbd8f0",
+    "preview": "build_brief_block",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 30,
+    "fileRange": [
+      4169111,
+      4169140
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--planner_prompts.json",
+    "line": 296,
+    "characters": 27,
+    "sha256": "f67b815f2946e7d2bd10f537a763d14b041e314fff59c8361b97e1791a4f1241",
+    "preview": "build_chapter_context_block",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 57,
+    "fileRange": [
+      4169691,
+      4169722
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--planner_prompts.json",
+    "line": 539,
+    "characters": 29,
+    "sha256": "24fc20371670bd17050d67954151e12bd75da55ab8eaaf18962967784af79422",
+    "preview": "build_golden_opening_guidance",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 72,
+    "fileRange": [
+      4169868,
+      4175605
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 57,
+    "characters": 2627,
+    "sha256": "c9e4f6fd094065d8c3154230de1da03ade1ce3c1e5417dd8bb4e84f94ef499fe",
+    "preview": "你是这本小说的创作总编，职责是为下一章产生一份 chapter_memo。你不写正文——你只规划这章要完成什么、兑现什么、不要做什么。下游写手（writer）会按你的 memo 扩写正文。\n\n你的工作原则（内化，不要在 ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 73,
+    "fileRange": [
+      4175605,
+      4182236
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 158,
+    "characters": 6579,
+    "sha256": "769dd3ecd7438fff47860cb60873d2cc7ce0240468fc1306bd71634128c406d3",
+    "preview": "You are this novel's editor-in-chief. Your job is to produce a chapter_memo for the next chapter. You do NOT w",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 74,
+    "fileRange": [
+      4182236,
+      4183070
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 259,
+    "characters": 570,
+    "sha256": "bbdadf641274ca70b91634357253019a9f483a10b0265274e6b84e4aabb55c24",
+    "preview": "# 第 {{chapterNumber}} 章 memo 请求\n\n{{brief_block}}\n{{chapter_context_block}}\n\n## 上一章最后一屏（原文节选）\n{{previous_chapte",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 75,
+    "fileRange": [
+      4183070,
+      4183988
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--planner_prompts.md",
+    "line": 298,
+    "characters": 914,
+    "sha256": "0ade8b44fd4d1526db8a2f1fe0d32059b9eb44e07479206172a360da52100b32",
+    "preview": "# Chapter {{chapterNumber}} memo request\n\n{{brief_block}}\n{{chapter_context_block}}\n\n## Last screen of previou",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.planner_prompts",
+    "constant": 93,
+    "fileRange": [
+      4184373,
+      4184401
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--planner_prompts.json",
+    "line": 1169,
+    "characters": 26,
+    "sha256": "c5c096cddab893b46ca1418c891549a09477db5615d393c9884e0eaa564ec279",
+    "preview": "build_planner_user_message",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 1,
+    "fileRange": [
+      4184778,
+      4184901
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 5,
+    "characters": 121,
+    "sha256": "f00dfda23efac2b095476fb55f9b4c640975020ad605dc50c0387bc4338a86c2",
+    "preview": "That was not strict JSON. Output ONLY one JSON object {\"sceneText\": \"...\", \"suggestedActions\": [\"...\"]} and no",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 3,
+    "fileRange": [
+      4185036,
+      4185503
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 15,
+    "characters": 465,
+    "sha256": "d3decd826d67252a749281ce113c83934497a0b02cf67a404720f73a8ce421b2",
+    "preview": "You are an interactive-fiction action interpreter.\nYour job is to normalize one line of the player's natural l",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 4,
+    "fileRange": [
+      4185503,
+      4185912
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 24,
+    "characters": 181,
+    "sha256": "7def15957cde880d3de9a6597c74e68f6519854d0f62ae44d306c25b91c740cb",
+    "preview": "你是互动小说动作理解器。\n你的任务是把玩家一句自然语言，归一成五类动作之一：look / say / move / do / wait。\n不要替玩家加戏，不要直接推进剧情，不要写场景正文。\nlook=观察/检查/回忆线索",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 12,
+    "fileRange": [
+      4185976,
+      4186097
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 33,
+    "characters": 119,
+    "sha256": "9f781af390fe03e2b91d0f16cf9dc80f6340ad6c53d2daf4e5e237ee62acf378",
+    "preview": "Output fields: actionKind, targetEntityLabel?, targetLocationLabel?, intent, manner, risk, ambiguity, secondar",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 15,
+    "fileRange": [
+      4186131,
+      4186254
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 38,
+    "characters": 109,
+    "sha256": "c0f4533444ea304af8e4d0de5608cc0ed830b7d6437ef44105b7da7f8070631b",
+    "preview": "输出字段：actionKind, targetEntityLabel?, targetLocationLabel?, intent, manner, risk, ambiguity, secondaryActions。",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 17,
+    "fileRange": [
+      4186307,
+      4186422
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 43,
+    "characters": 113,
+    "sha256": "45ef415f079c78be9e0438a91a9e6dc448c2dac7bf4ab7c5151fa3f759a6bc73",
+    "preview": "Based only on the player's action and the current context, propose this turn's possible state changes as a dra",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 18,
+    "fileRange": [
+      4186422,
+      4186558
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 48,
+    "characters": 134,
+    "sha256": "01e9b0bb69b1421b01153f9f76fe3b658af4a608f62a8a3c0b17201253d9af4e",
+    "preview": "Do not write final prose; do not commit to the store on the reducer's behalf; do not let key states jump to co",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 19,
+    "fileRange": [
+      4186558,
+      4186817
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 53,
+    "characters": 257,
+    "sha256": "220effacc163d0b0ebaa5730b94ba18b7b940e0a07bb638702c97b14efc8387b",
+    "preview": "One player input advances one adjacent beat. If the player gives a chain of actions, apply only the literal ch",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 20,
+    "fileRange": [
+      4186817,
+      4187077
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 58,
+    "characters": 258,
+    "sha256": "9339fa56842c4db5b20c67ec8f631b145669b80015f14cc904888b46b8de9327",
+    "preview": "Do not leap over the process. If the player runs toward, reaches for, uses, opens, or confronts something, acc",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 21,
+    "fileRange": [
+      4187077,
+      4187301
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 63,
+    "characters": 220,
+    "sha256": "def6af9670ce7cbb77db8c5e6ffc35f4158142b6d1d78cdcdb92c6cfccba1e64",
+    "preview": "This engine is genre-neutral: romance, adventure, wuxia, mystery, slice-of-life all use the same structure. En",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 22,
+    "fileRange": [
+      4187301,
+      4187471
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 68,
+    "characters": 166,
+    "sha256": "8948eff0b3c24199f981d3c068477437707c1a8387445b8a61c33ceda6fc5041",
+    "preview": "Give every new or important entity a one-line summary (who/what it is and why it matters), not just a status w",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 23,
+    "fileRange": [
+      4187471,
+      4187807
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 73,
+    "characters": 332,
+    "sha256": "66e294d5285a2c905c1f363e971e8841f33b84ce41385745364552097ff8ecdb",
+    "preview": "Tangible things the player discovers or holds (a clue, a document, a weapon, a token, key evidence) MUST be th",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 24,
+    "fileRange": [
+      4187807,
+      4188098
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 78,
+    "characters": 289,
+    "sha256": "4da3178eda465c62d32a4968c52af5611d8f31e812bdd0e6083f94337acbfab1",
+    "preview": "Use entity.status to record state progress for any genre, with status words suited to this world's genre, adva",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 25,
+    "fileRange": [
+      4188098,
+      4188284
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 83,
+    "characters": 184,
+    "sha256": "aa73f3f186eea09618de6f416dd9d030ed7af8afa9d637b8433d0de701633aae",
+    "preview": "The player entity id is fixed: always use id actor_player for the player character. Never rename this id; only",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 26,
+    "fileRange": [
+      4188284,
+      4188667
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 88,
+    "characters": 377,
+    "sha256": "d03e20602bc93a91d7886b6bcf422f8f2572a155b80b5bcba0839addae27f62d",
+    "preview": "Whenever a meaningful relationship forms or shifts between entities (ally / rival / kin / suspicion / debt / m",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 27,
+    "fileRange": [
+      4188667,
+      4189034
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 93,
+    "characters": 365,
+    "sha256": "a48697f1c1b47acda374f1ec292a21afbf534f55090e6b5716c6362fd6d95d24",
+    "preview": "When the player physically holds/carries/keeps/takes a tangible thing, record an edge from actor_player to tha",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 28,
+    "fileRange": [
+      4189034,
+      4189287
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 98,
+    "characters": 251,
+    "sha256": "fe5a375a2088b6736bec765ddbb5e9eb0bd1c0de4924c4913a7a10519a236d0e",
+    "preview": "The current context may include an entity roster. Reuse those exact ids in entities, edges, evidence, and stat",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 29,
+    "fileRange": [
+      4189287,
+      4189573
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 103,
+    "characters": 284,
+    "sha256": "d698475f9ac233fea71ed6120e8ce07cc3e7784a37a6e3e273aebf26f900850a",
+    "preview": "State tracking is optional and governed by the user's world contract. If the world contract rejects stats, num",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 30,
+    "fileRange": [
+      4189573,
+      4189815
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 108,
+    "characters": 240,
+    "sha256": "1f0717182c338b9a280356c4948aff60e926594b3caab7e14d037f920204bd7d",
+    "preview": "When stateSlots are appropriate, prefer natural-language values unless the user explicitly asked for quantitat",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 31,
+    "fileRange": [
+      4189815,
+      4190168
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 113,
+    "characters": 351,
+    "sha256": "be514ae5d4121a542073f89b3b1056339204c9a025396d290efc7a7b6f5fbf43",
+    "preview": "Early on (the first few turns), seed only the state the premise already establishes: a concrete deadline may b",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 32,
+    "fileRange": [
+      4190168,
+      4190309
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 118,
+    "characters": 137,
+    "sha256": "f7281e8beda29c381d48da452f6af60a86f4679b182a71a6efa63596bac7db12",
+    "preview": "Restraint: only create entities and meters the story actually makes real — never invent gratuitous stats or it",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 33,
+    "fileRange": [
+      4190309,
+      4190448
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 123,
+    "characters": 137,
+    "sha256": "66466ebe3dc7511e25f55c1d115cf5bb033cdc12fb4dbfdbab14cd099952196a",
+    "preview": "Only use evidence.transitions for the evidence lifecycle when this world is genuinely an investigation/mystery",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 34,
+    "fileRange": [
+      4190448,
+      4190557
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 128,
+    "characters": 107,
+    "sha256": "74745ef1fc2b50a59e029db9dae7d400cbbb369d2996b8316abe3865912e2155",
+    "preview": "If the player's action is invalid or information is insufficient, set blocked=true and write blockedReason.",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 35,
+    "fileRange": [
+      4190557,
+      4191144
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 133,
+    "characters": 583,
+    "sha256": "24a1b7ff0c66753ae1c0b6387bc4097b8f6b4a5ee1c37146517e2951f3ae9b49",
+    "preview": "Time is a synchronization axis, not a fixed tick. For every non-opening turn, set timeAdvance with: elapsed = ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 36,
+    "fileRange": [
+      4191144,
+      4191306
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 138,
+    "characters": 160,
+    "sha256": "8daf2fe65f9e4223db09ff89538b69270f1a0b0814031c4062f65960ac54f4de",
+    "preview": "Output strict JSON matching PlayMutation: eventId, turn, actionKind, summary, timeAdvance, entities, edges, st",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 37,
+    "fileRange": [
+      4191306,
+      4191515
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 143,
+    "characters": 207,
+    "sha256": "c34972c31ad0e182f60f3b149bd86ec416897ad7e5d32a906e59e0ae381c4bfb",
+    "preview": "The following is only a JSON-shape example. Do not reuse its labels, names, or story facts in the actual world",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 44,
+    "fileRange": [
+      4192219,
+      4192444
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 148,
+    "characters": 129,
+    "sha256": "3b13e613f0ce5d1d6db0b12e625c8576d1ecb7538c4c263ccf0100c1241715cc",
+    "preview": "这套引擎是品类中立的：恋情、冒险、武侠、悬疑、日常等都用同一套结构表达。实体类型用 actor/location/item/evidence/clue/claim/proof_chain/organization/rul",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 46,
+    "fileRange": [
+      4192630,
+      4192948
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 153,
+    "characters": 122,
+    "sha256": "fa881166a0bbce93017c26316c429d2a12d098ad8986be71ea960344eb8a20c1",
+    "preview": "玩家发现或获得的「实物」（线索、文件、凶器、信物、关键证据等）必须建成独立实体（item/evidence/clue），不要塞进某个人物的 status——这样它们才能进入玩家的「持有物」并被追踪。观察到的现象、知识、印",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 49,
+    "fileRange": [
+      4193385,
+      4193794
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 168,
+    "characters": 195,
+    "sha256": "b8ead69e05ef8446d4049fcce7d87e99ef5e07e8c5741bb0bcd0448b48c51628",
+    "preview": "人物之间（或人物与组织/地点之间）一旦形成或改变有意义的关系（盟友/敌对/亲属/怀疑/欠债/上下级/师徒等），就在 edges.upsert 里记一条 {\"fromId\":\"<实体>\",\"type\":\"<关系词>\",\"t",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 50,
+    "fileRange": [
+      4193794,
+      4194162
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 173,
+    "characters": 210,
+    "sha256": "edc7209edb93358d8c98a8cce1d347eb6afc7898d4e943915cb06dd40ffd9166",
+    "preview": "玩家实际持有/携带/收进包里/拿走某个实物时，必须记一条 actor_player 指向该实体的 edge，并设置 value.role=\"holding\"。如果目标是 evidence/clue/claim/proof",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 51,
+    "fileRange": [
+      4194162,
+      4194432
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 178,
+    "characters": 120,
+    "sha256": "41c9db7bc8c92908d60a336579a345d2e1791e3d23ef29bea5f99ef847f98a09",
+    "preview": "当前上下文可能包含实体名册。entities、edges、evidence、stateSlots 都优先复用名册里的精确 id；如果只知道名字，就用名册里的精确 label。绝不要把同一个人/物换个新 id 重建（否则侧",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 52,
+    "fileRange": [
+      4194432,
+      4194674
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 183,
+    "characters": 122,
+    "sha256": "859122f8766961a4989f3c21ed808446c68a71f4a4d6d6afd1a2d05df94fc045",
+    "preview": "状态追踪是可选的，必须服从用户的世界契约。世界契约禁止数值、面板、等级、RPG 化或量化进度时，不要输出 stateSlots；改用 entity.status / summary / evidence transiti",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 54,
+    "fileRange": [
+      4194887,
+      4195177
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 193,
+    "characters": 120,
+    "sha256": "79d1db6893e8c0424abec2947c48a05170808da86748c012529b40c1b2528bea",
+    "preview": "开局阶段（前几回合），只播种前提里已经确立的状态：明确期限在世界允许量化时才可成为 timer；核心谜题/目标物→第一条 clue/evidence 实体；已点名的关键人物→actor 实体并配一句 summary。不要",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 58,
+    "fileRange": [
+      4195500,
+      4196055
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 198,
+    "characters": 223,
+    "sha256": "ade048363d924f3523bf380eccbe826b92f530ddc9768bd866528a30ab8ca4a1",
+    "preview": "时间是世界同步轴，不是固定 tick。每个非开场回合都要写 timeAdvance：elapsed=本动作按语义经过了多久；anchor=动作结束后世界处在什么时间/阶段（若本局有钟点、昼夜、季节、闭关期、期限、潮汐、巡",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 59,
+    "fileRange": [
+      4196055,
+      4196225
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 203,
+    "characters": 146,
+    "sha256": "63ab4bc84b0c6ecaf7fe8a304b86b4031a0a3ad8a27390bc1fcd5b76c1def084",
+    "preview": "输出严格 JSON，必须符合 PlayMutation：eventId, turn, actionKind, summary, timeAdvance, entities, edges, stateSlots, evid",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 81,
+    "fileRange": [
+      4201090,
+      4201313
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 273,
+    "characters": 217,
+    "sha256": "d04ec5e321672882e2be72d2b3541297f9c442690a1c7bf242b6630df9b4ce90",
+    "preview": "suggestedActions: give 0-3 as optional springboards ('you could…'), ONLY at a genuine decision point — not eve",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 82,
+    "fileRange": [
+      4201313,
+      4201445
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 278,
+    "characters": 130,
+    "sha256": "6581404974ef60f4d134497572c38d4fb7c6f6df688d29e4b4ef5b6293674f3c",
+    "preview": "suggestedActions: 0-3 short hints, optional, never restricting the player's input; omit them when there is no ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 103,
+    "fileRange": [
+      4206276,
+      4207170
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 333,
+    "characters": 892,
+    "sha256": "0548a89fb1d6af198acfed22e6c131a2a0cdc856858607324e473412f115c9d2",
+    "preview": "You reconcile an interactive-fiction scene with the world graph.\nCompare the rendered prose against the alread",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 104,
+    "fileRange": [
+      4207170,
+      4207998
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 343,
+    "characters": 390,
+    "sha256": "8c912cff85d76bd5ca5cf8baae394eaef5285f515cefca7e6f2cd3850a52104d",
+    "preview": "你负责把互动小说正文和世界图谱对齐。\n对照已经应用的本回合变化、当前状态摘要和最终正文。\n如果正文里出现了具体且具名的新物件、线索、证据、地点、组织或人物，但它还没有体现在已应用变化/当前状态里，只输出这些缺失图谱事实的",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 137,
+    "fileRange": [
+      4208416,
+      4210090
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 353,
+    "characters": 1672,
+    "sha256": "35885d7e63d25bcc3e21fe84e87caf06618378897ce48c7fe77814f5837560c4",
+    "preview": "{\"eventId\":\"evt-1\",\"turn\":1,\"actionKind\":\"look\",\"summary\":\"The player-character finds a sample clue and a samp",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 138,
+    "fileRange": [
+      4210090,
+      4211799
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 358,
+    "characters": 1247,
+    "sha256": "6cfb4ed3ad3b63fc97cee9d49f278827cb1ccbaf10d38b3f58cdf961cea0b8b7",
+    "preview": "{\"eventId\":\"evt-1\",\"turn\":1,\"actionKind\":\"look\",\"summary\":\"玩家角色发现了一个示例线索和一个示例道具。\",\"timeAdvance\":{\"elapsed\":\"几息",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 141,
+    "fileRange": [
+      4211840,
+      4211880
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--play_prompts.json",
+    "line": 1695,
+    "characters": 38,
+    "sha256": "3c3b02c918b060c0e04f25ec8289d0801cb0f2a482513fd217d084de1594ef02",
+    "preview": "build_scene_renderer_strict_json_retry",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 142,
+    "fileRange": [
+      4211880,
+      4211920
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 363,
+    "characters": 38,
+    "sha256": "0681e9edee031d4c7b54fb69c4b81242345249538d6f67b91e16f893c5fa12df",
+    "preview": "build_action_interpreter_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 152,
+    "fileRange": [
+      4212052,
+      4212090
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 368,
+    "characters": 36,
+    "sha256": "ff07a66f3f7b9d6df0abd011cde1bb31c99f1c6207b31c0b225f28bf0cfc765f",
+    "preview": "build_action_interpreter_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 153,
+    "fileRange": [
+      4212090,
+      4212125
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 373,
+    "characters": 33,
+    "sha256": "c74c2609f065754b95743df9804d2e17951f39482ea04dca8356d2da4ad8e207",
+    "preview": "build_world_mutator_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 158,
+    "fileRange": [
+      4212204,
+      4212237
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 378,
+    "characters": 31,
+    "sha256": "2faa6440ad45d8bb0ff60f11cb48ae988c411f0a2eb9f3d59bba2e8045a3be93",
+    "preview": "build_world_mutator_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 161,
+    "fileRange": [
+      4212317,
+      4212353
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 383,
+    "characters": 34,
+    "sha256": "d4144e63c399d6c8f41a8db0789b2068f17a6aa6f1a5293e0ede1eddc98ad5e3",
+    "preview": "build_scene_renderer_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 164,
+    "fileRange": [
+      4212409,
+      4212443
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 388,
+    "characters": 32,
+    "sha256": "34831f2c48471de361df23ab90dc5f11476114ab7ae93a0501e172b430470910",
+    "preview": "build_scene_renderer_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 165,
+    "fileRange": [
+      4212443,
+      4212481
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 393,
+    "characters": 36,
+    "sha256": "e20b89a2a9743fe8db4abd3d3b2199282d0fe80619c49a18400094519a9f973b",
+    "preview": "build_scene_reconciler_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.play_prompts",
+    "constant": 168,
+    "fileRange": [
+      4212543,
+      4212579
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--play_prompts.md",
+    "line": 398,
+    "characters": 34,
+    "sha256": "1d613b6c4e87b98674598c03ee23358627b6b2d97e92853205f4c0fbc027f7e7",
+    "preview": "build_scene_reconciler_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 55,
+    "fileRange": [
+      4213927,
+      4213971
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--reviser_prompts.json",
+    "line": 719,
+    "characters": 42,
+    "sha256": "6bdf4f6afc13056052276fc51b638d5832656ad4ecbdf895245db9d92f9357bc",
+    "preview": "build_protagonist_block.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 56,
+    "fileRange": [
+      4213971,
+      4214099
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 5,
+    "characters": 122,
+    "sha256": "19a83cff9a82aab63dccd2d0b38bbbf9469713dd0e6f02890c484a4f19355a51",
+    "preview": "【LANGUAGE OVERRIDE】ALL output (FIXED_ISSUES, PATCHES, REVISED_CONTENT, UPDATED_STATE, UPDATED_HOOKS) MUST be i",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 70,
+    "fileRange": [
+      4214478,
+      4214830
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 12,
+    "characters": 348,
+    "sha256": "e05c4bb1e3cde0a16a6e93a97fae8fdb285ed4b48462baa5c431f3c4da08b6e8",
+    "preview": "\n\nROUTING: The reviewer's blocking issues are structural / semantic (character collapse, mainline drift, missi",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 71,
+    "fileRange": [
+      4214830,
+      4215085
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 19,
+    "characters": 251,
+    "sha256": "5912f28f143135b3ae5e2ac49aa15148cd5deb04bb54ba4ac833c4fc1fd39f5d",
+    "preview": "\n\nROUTING: The reviewer's blocking issues are local (wording, paragraph shape, fatigue word, information bound",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 75,
+    "fileRange": [
+      4215194,
+      4215859
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 26,
+    "characters": 655,
+    "sha256": "9aaf81a036bbec0f9426acdd136f9fdc97dddc96371154135d19163f59578de6",
+    "preview": "\n\nPATCHES and REVISED_CONTENT serve different problems — choose by problem type, not preference:\n\nPATCHES — fo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 76,
+    "fileRange": [
+      4215859,
+      4216064
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 39,
+    "characters": 201,
+    "sha256": "be7334374e2f833f2c065573ec724a956d70dda9e65627692fb5a769951ba650",
+    "preview": "\n\nIf Critical issues include both local and whole-chapter problems, use REVISED_CONTENT (it addresses everythi",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 77,
+    "fileRange": [
+      4216064,
+      4217735
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 49,
+    "characters": 1657,
+    "sha256": "d262af9e358053ea0ab0900fb71c66ce58f250f49e3b810f8e35006d28a0bd2e",
+    "preview": "\n2. Hook status must stay in sync with the hooks board. If hook debt briefs are provided, preserve hook payoff",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 79,
+    "fileRange": [
+      4217786,
+      4218123
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 86,
+    "characters": 159,
+    "sha256": "02d1e1a85c90bfeda133854987c07955f8b497922bfa34ccd92c7b631754cc70",
+    "preview": "\n\n分流指令：reviewer 报告的阻塞问题属于结构/语义错（人设崩、主线偏、爽点缺、时间线错、伏笔未收、memo 偏离等）。你必须输出 REVISED_CONTENT——禁止输出 PATCHES，这类问题不能靠补丁修",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 83,
+    "fileRange": [
+      4218462,
+      4219091
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 100,
+    "characters": 277,
+    "sha256": "36847364afc395ba4f6fa534ce0fa742cc7b4e7fba0df46f065f2a9b7dfe7a82",
+    "preview": "\n\nPATCHES 和 REVISED_CONTENT 分别处理不同类型的问题——按问题类型选择，不是按偏好：\n\nPATCHES——处理局部文字问题（措辞、对话、AI痕迹、小的连续性错误）。\n  每个 PATCH 引用要",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 85,
+    "fileRange": [
+      4219262,
+      4220704
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 113,
+    "characters": 634,
+    "sha256": "0b02d442a640462614c6891d6b952f82269faff9d1a0380c9b4b66cc4bca28e0",
+    "preview": "\n2. 伏笔状态必须与伏笔池同步。如果提供了 Hook Debt 简报，必须保留伏笔兑现段落\n3. 不改变剧情走向和核心冲突\n4. 保持原文的语言风格、节奏和呼吸——不要压缩过渡段、不要删掉减速段\n5. 情绪用动作外化（",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 90,
+    "fileRange": [
+      4220795,
+      4221151
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 150,
+    "characters": 210,
+    "sha256": "ec9eeb6584905a993d43be0b19ee1787584d6a93b06a2bfb6b2e9977e2a07a63",
+    "preview": "=== FIXED_ISSUES ===\n(逐条说明修正了什么，一行一条；如果无法安全定点修复，也在这里说明)\n\n=== PATCHES ===\n--- PATCH 1 ---\nTARGET_TEXT:\n(必须从原文中精",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 91,
+    "fileRange": [
+      4221151,
+      4221324
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 168,
+    "characters": 109,
+    "sha256": "34de05dd6318d65baeb2054485c240fb6ee5be5ea5eb730c6894f93194ee537a",
+    "preview": "=== FIXED_ISSUES ===\n(逐条说明修正了什么，一行一条)\n\n=== REVISED_CONTENT ===\n(修正后的完整正文)\n\n=== UPDATED_STATE ===\n(更新后的完整状态卡)\n",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 170,
+    "fileRange": [
+      4225288,
+      4225313
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--reviser_prompts.json",
+    "line": 2058,
+    "characters": 23,
+    "sha256": "f562a4a8e334723c17feca046b1c18565bfdb40212477f3a840a045a575fd927",
+    "preview": "build_tiered_issue_list",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 175,
+    "fileRange": [
+      4225471,
+      4225496
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--reviser_prompts.json",
+    "line": 2207,
+    "characters": 23,
+    "sha256": "663bf09b0951bec204f4abf42edc12f733d53d31b3c5f08d30e7b4fb67dffbac",
+    "preview": "build_protagonist_block",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 178,
+    "fileRange": [
+      4225753,
+      4225779
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 214,
+    "characters": 24,
+    "sha256": "af70710a61ad10b1f90e33ba34e74a954c788ffd062fe7933377c55bf42f10b9",
+    "preview": "build_auto_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 181,
+    "fileRange": [
+      4225971,
+      4225999
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 219,
+    "characters": 26,
+    "sha256": "349b9976dfb3e514bedcf308e1e07204c136e2194d579c0ddad92af0f48ec196",
+    "preview": "build_legacy_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.reviser_prompts",
+    "constant": 190,
+    "fileRange": [
+      4226120,
+      4226147
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--reviser_prompts.md",
+    "line": 234,
+    "characters": 25,
+    "sha256": "3966428ca61cd76a5994059ba3ba5f1445d3744d7eec1730e09b7dd77a4e29d4",
+    "preview": "build_reviser_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 4,
+    "fileRange": [
+      4227001,
+      4228519
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 5,
+    "characters": 1198,
+    "sha256": "cd7ea2e9b77fd1ebef83ea88f6cae21f7782c7331e33822dd0278d97f0fe0bb4",
+    "preview": "=== POST_SETTLEMENT ===\n（简要说明本章有哪些状态变动、伏笔推进、结算注意事项；允许 Markdown 表格或要点）\n\n=== RUNTIME_STATE_DELTA ===\n（必须输出 JSON，",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 6,
+    "fileRange": [
+      4228520,
+      4229267
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 59,
+    "characters": 469,
+    "sha256": "8d38e2d5f8b3b90a34b8614d187ec5be78e42b824460e00488c23ec33bf5ba5e",
+    "preview": "\"\n  },\n  \"subplotOps\": [],\n  \"emotionalArcOps\": [],\n  \"characterMatrixOps\": [],\n  \"notes\": []\n}\n```\n\n规则：\n1. 只输",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 14,
+    "fileRange": [
+      4229701,
+      4229875
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 88,
+    "characters": 168,
+    "sha256": "5d3fab7c8d80a7541be6d40c0d1355111835e615b85bdc7269a7e85de7cc4af3",
+    "preview": "【LANGUAGE OVERRIDE】ALL output (state card, hooks, summaries, subplots, emotional arcs, character matrix) MUST ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 15,
+    "fileRange": [
+      4229875,
+      4230526
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 95,
+    "characters": 275,
+    "sha256": "36d098ce35c6837277fa5571fea7e94a3600bcd32ef030e7c4c25a3fd676db14",
+    "preview": "你是状态追踪分析师。给定新章节正文和当前 truth 文件，你的任务是产出更新后的 truth 文件。\n\n## 工作模式\n\n你不是在写作。你的任务是：\n1. 仔细阅读正文，提取所有状态变化\n2. 基于\"当前追踪文件\"做增",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 24,
+    "fileRange": [
+      4230615,
+      4232056
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 122,
+    "characters": 627,
+    "sha256": "c2b12bd22af02e652f84340b809794c4e891dbd4e83b4d6ef6c7d2426f9a3f82",
+    "preview": "\n\n## 伏笔追踪规则（严格执行）\n\n- 新伏笔：只有当正文中出现一个会延续到后续章节、且有具体回收方向的未解问题时，才新增 hook_id。不要为旧 hook 的换说法、重述、抽象总结再开新 hook\n- 提及伏笔：已",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 26,
+    "fileRange": [
+      4232101,
+      4232130
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--settler_prompts.json",
+    "line": 344,
+    "characters": 27,
+    "sha256": "738fc04ac044e2122de1b89b5bcee50db0e403e4dfc2722ab610036344cbabdc",
+    "preview": "build_settler_output_format",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 27,
+    "fileRange": [
+      4232130,
+      4233519
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 138,
+    "characters": 527,
+    "sha256": "1be66b89c94d8a0539d27bceb6e3487d504133d050181ec20dbd632aa062c844",
+    "preview": "\n\n## 关键规则\n\n1. 状态卡和伏笔池必须基于\"当前追踪文件\"做增量更新，不是从零开始\n2. 正文中的每一个事实性变化都必须反映在对应的追踪文件中\n3. 不要遗漏细节：数值变化、位置变化、关系变化、信息变化都要记录\n",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 82,
+    "fileRange": [
+      4234870,
+      4234899
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 160,
+    "characters": 27,
+    "sha256": "df826f46bb5ff8c8646cf9732c443078c8bf160d3895a61272ed4b533e98cc05",
+    "preview": "build_settler_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.settler_prompts",
+    "constant": 92,
+    "fileRange": [
+      4235037,
+      4235064
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--settler_prompts.md",
+    "line": 175,
+    "characters": 25,
+    "sha256": "65def03af3d4de823b0e493e28569afbf22c5e0c91e1f7bed6ba35fc8b717b4e",
+    "preview": "build_settler_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 65,
+    "fileRange": [
+      4238515,
+      4238586
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 15,
+    "characters": 69,
+    "sha256": "4ed72ec9299a78c8c3e87093fb1ba7c920288c4a92c23e358ebf55761a68add4",
+    "preview": "build_short_fiction_draft_continuation_user_prompt.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 126,
+    "fileRange": [
+      4240681,
+      4241316
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 75,
+    "characters": 241,
+    "sha256": "0ef54e6bacd8d1ff1df5e6e90f51c475386c6362b07d0b11d243dcceb5bbbc61",
+    "preview": "你是短篇小说总编，负责把一个创作方向做成完整短篇故事方案。\n只基于本次创作方向和用户提供的参考文本创作；没有提供的资料，不要声称读过、引用过或继承过。\n目标是内容优先：标题、开篇、人物压力、证据/关系/身份杠杆、升级链、",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 127,
+    "fileRange": [
+      4241316,
+      4241359
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 84,
+    "characters": 41,
+    "sha256": "defd499b43147f6ab457a75b014727ec5a3a5f2d1e90939c818a5cd596fd8940",
+    "preview": "build_short_fiction_outline_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 129,
+    "fileRange": [
+      4241418,
+      4241459
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 94,
+    "characters": 39,
+    "sha256": "12410c5b7d421fde5822cc925e5df8ab1ef89bd14b1310154357848e00fc14b3",
+    "preview": "build_short_fiction_outline_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 130,
+    "fileRange": [
+      4241459,
+      4241890
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 99,
+    "characters": 151,
+    "sha256": "811bc904a0c4f75a14602b5e864cea78aca405bdeb8ab0c681583ece89d4c6cf",
+    "preview": "你是短篇审纲编辑。你不负责打分，也不负责判抄。\n你的任务是判断这个故事方案能不能支撑一次写完整篇：题材发动机是否清楚、人物动机是否成立、压力链是否递进、反派反扑是否可信、结尾回报是否够。\n审稿要像真实读者和编辑，不要只列",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 131,
+    "fileRange": [
+      4241890,
+      4241940
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 107,
+    "characters": 48,
+    "sha256": "a3266f8a1dc8b388127c39cfa1e19c04347ff29a0e3ec1cdc24f444b2903c9ee",
+    "preview": "build_short_fiction_outline_review_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 133,
+    "fileRange": [
+      4242005,
+      4242053
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 117,
+    "characters": 46,
+    "sha256": "7313ee2d4a6d7d025dba62b84523603d44a6684cf94dc27a5d294789c6aba988",
+    "preview": "build_short_fiction_outline_review_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 135,
+    "fileRange": [
+      4242120,
+      4242167
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--short_fiction_prompts.json",
+    "line": 1497,
+    "characters": 45,
+    "sha256": "8da712366ab0136168f24a644b7c8481ea6ecd0f781e3dbee97c152cd145cbb0",
+    "preview": "build_short_fiction_outline_revision_followup",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 136,
+    "fileRange": [
+      4242167,
+      4242932
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 127,
+    "characters": 273,
+    "sha256": "c208d8ba18493a5918404155feb8c2761f6b96dfe886fb39841bf2ea27b921f4",
+    "preview": "你是中文短篇 BatchWriter。你要根据故事方案一次 API 写完整短篇正文。\n这不是长篇连载续写，也不是章节梗概。每章都要有当场发生的戏：人物行动、对话或反应、局面变化、章尾继续读的理由。\n网文戏剧性要足：现实压",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 137,
+    "fileRange": [
+      4242932,
+      4242974
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 137,
+    "characters": 40,
+    "sha256": "abc240fc2d07fc229a2201a59ea94d11c583953ae91c402ebaadb2c90b890f53",
+    "preview": "build_short_fiction_writer_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 138,
+    "fileRange": [
+      4242974,
+      4244094
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 142,
+    "characters": 406,
+    "sha256": "4ccf69ca1484d3ad5a5fa476789774f2b9b2f10c68c5c1b56fb883dfaa0fae7e",
+    "preview": "## 写法提醒\n- 盐溶于汤：人物价值观和野心靠行动表现，不靠口号。\n- Show don't tell：用行为、证据、细节和场景让读者自己感到人物状态。\n- 明喻节制：别把「像/仿佛/如同」当默认修辞反复用，每个场景最",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 141,
+    "fileRange": [
+      4244192,
+      4244232
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 161,
+    "characters": 38,
+    "sha256": "a6350fa099494a9517455979e54d0bcc51c374febe96ad6bc817b4952781cda7",
+    "preview": "build_short_fiction_writer_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 143,
+    "fileRange": [
+      4244301,
+      4244353
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 171,
+    "characters": 50,
+    "sha256": "f6441c950b9afcabe91948349e4544da43a4cadcb370f08443a1157949b2c9f6",
+    "preview": "build_short_fiction_draft_continuation_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 144,
+    "fileRange": [
+      4244353,
+      4244788
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 176,
+    "characters": 153,
+    "sha256": "501a8cb9d009526f6cd226c749ed84876f1a7337c64453af86a847301c887f63",
+    "preview": "你是短篇成稿审稿编辑。\n你只看内容是否能卖、是否顺、是否有继续读的欲望；不要把审稿变成确定性打分。\n重点看标题、章节标题、开篇、人物动机、时间线、人物关系、证据/权限、压力递进、反派反扑、后半段是否泄气、结尾回报是否落地",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 145,
+    "fileRange": [
+      4244788,
+      4244836
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 184,
+    "characters": 46,
+    "sha256": "692dac5fcd3c4b730362a023bd308114417f5b2194d67a0144b1bcacb4bc9308",
+    "preview": "build_short_fiction_draft_review_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 147,
+    "fileRange": [
+      4244899,
+      4244945
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 194,
+    "characters": 44,
+    "sha256": "85c2ce4643662fe93e8a38675e2a6964a1b85dd2577fba2ae90fe5039fd8e066",
+    "preview": "build_short_fiction_draft_review_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 149,
+    "fileRange": [
+      4245010,
+      4245055
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--short_fiction_prompts.json",
+    "line": 1813,
+    "characters": 43,
+    "sha256": "cc58c60bf517a9baeb23db4e103d0bc3b58bfbe23774fef71240e53dbee7378a",
+    "preview": "build_short_fiction_draft_revision_followup",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 150,
+    "fileRange": [
+      4245055,
+      4245420
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 204,
+    "characters": 125,
+    "sha256": "7b98e8d0f1c8e72d7b6bb3863ef1260df7368fd56c0ce1f754dcf41615cc4d93",
+    "preview": "你是短篇小说包装编辑，负责根据最终正文生成简介、卖点和封面提示词。\n不要另起一个和正文不同的主标题。包装必须围绕正文实际标题和剧情。\n封面提示词按手机端竖版书封思考：3:4 竖图、大标题区、强人物情绪、少量一眼可识别道具",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 151,
+    "fileRange": [
+      4245420,
+      4245463
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 211,
+    "characters": 41,
+    "sha256": "9625a8a07ba73d86db75b7308deb72f9a22d5978abf7eef007e6fee57b4e30e3",
+    "preview": "build_short_fiction_package_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.short_fiction_prompts",
+    "constant": 153,
+    "fileRange": [
+      4245522,
+      4245563
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--short_fiction_prompts.md",
+    "line": 221,
+    "characters": 39,
+    "sha256": "393a67f63d4650c8eebb1da59f46b332c424bc56cbd696efc8f0a29ada6230f5",
+    "preview": "build_short_fiction_package_user_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 3,
+    "fileRange": [
+      4245878,
+      4245897
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 53,
+    "characters": 17,
+    "sha256": "28d58d0967c2d28a3b8615f4afc2582af581b87cb7505880dbf6de5830462a60",
+    "preview": "build_length_spec",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 7,
+    "fileRange": [
+      4245929,
+      4245967
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 89,
+    "characters": 36,
+    "sha256": "1e72b4664f7fcd73cfc35c0c43a1586a19ee8d158734436fdc863bc2a2d46142",
+    "preview": "build_english_creative_output_format",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 8,
+    "fileRange": [
+      4245967,
+      4245996
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 98,
+    "characters": 27,
+    "sha256": "bc3adf89ac2fae78496c432df3b8ca380cdf56b9bf6729c1aff10ce5d1ab2b78",
+    "preview": "build_english_output_format",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 9,
+    "fileRange": [
+      4245996,
+      4246026
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 107,
+    "characters": 28,
+    "sha256": "95ae0d7df1decaa9aa80ca356ce81314f23342a433d2fdb0669910dc75d6e698",
+    "preview": "build_creative_output_format",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 10,
+    "fileRange": [
+      4246026,
+      4246047
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 116,
+    "characters": 19,
+    "sha256": "af4f7206b1c03a2b865027f0d30b79a9f69cf32c67328ddf23793f7362d4be43",
+    "preview": "build_output_format",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 11,
+    "fileRange": [
+      4246047,
+      4246074
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 125,
+    "characters": 25,
+    "sha256": "10447230c6f52c0e5a9f9542c0ce86e4a23cf10bf20a3fe2e423eb922f54fd54",
+    "preview": "build_english_genre_intro",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 14,
+    "fileRange": [
+      4246095,
+      4246121
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 152,
+    "characters": 24,
+    "sha256": "498f8d4a6f3702b80a49ba743058f6f6c3dda62ab111130f9e3b9ba0a015a6e6",
+    "preview": "build_english_core_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 15,
+    "fileRange": [
+      4246121,
+      4246152
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 161,
+    "characters": 29,
+    "sha256": "908e39213e06661f2551b337471e76351f79839b7771f718d86f36ec90d431f3",
+    "preview": "build_governed_input_contract",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 16,
+    "fileRange": [
+      4246152,
+      4246181
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 170,
+    "characters": 27,
+    "sha256": "d3d9f2ad2987e043b019c8e89e53edae28ee5dd925b035dde88eb36666d49d72",
+    "preview": "build_chapter_memo_contract",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 17,
+    "fileRange": [
+      4246181,
+      4246204
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 179,
+    "characters": 21,
+    "sha256": "b6361dada240cfc0004d266582801aeb4795e879c2b24b877d7f5d1057070ce2",
+    "preview": "build_length_guidance",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 19,
+    "fileRange": [
+      4246226,
+      4246252
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 197,
+    "characters": 24,
+    "sha256": "c6df9d70dbc78d62eba8ae980861d1cf17e0b8c29ae8f456722e46ff655d3fae",
+    "preview": "build_writing_craft_card",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 21,
+    "fileRange": [
+      4246258,
+      4246287
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 227,
+    "characters": 27,
+    "sha256": "33d4e8fc89c0dbc73f615838449261ab62248394eb8b8cdfa85981cbc54e12d3",
+    "preview": "build_prose_execution_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 22,
+    "fileRange": [
+      4246287,
+      4246316
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 236,
+    "characters": 27,
+    "sha256": "4d836cc90fb21369b43bbfa4b3b8aea665a6089bb39084e32877d257c0ce9f4f",
+    "preview": "build_creative_constitution",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 23,
+    "fileRange": [
+      4246316,
+      4246341
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 245,
+    "characters": 23,
+    "sha256": "82e64c5d412965fce47ede6d2dc1bcb392c387a9540ef7a5a43e7e4987badb4c",
+    "preview": "build_immersion_pillars",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 24,
+    "fileRange": [
+      4246341,
+      4246374
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 254,
+    "characters": 31,
+    "sha256": "9a5ec61fb402df1053a7bb40bf45e7ab5c74df4a15224d8f3ab825a611918d71",
+    "preview": "build_golden_opening_discipline",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 25,
+    "fileRange": [
+      4246374,
+      4246393
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 263,
+    "characters": 17,
+    "sha256": "7b0d5160e39c45f6077a092e5427d366199afcb703d3b9106edc111e69f35b9e",
+    "preview": "build_genre_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 26,
+    "fileRange": [
+      4246393,
+      4246418
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 272,
+    "characters": 23,
+    "sha256": "f374f6e37ed809ab093aa49279b13b443ee78acf38ec8efcda86ec49f2230131",
+    "preview": "build_protagonist_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 27,
+    "fileRange": [
+      4246418,
+      4246447
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 281,
+    "characters": 27,
+    "sha256": "382e7d305f494d3b34e9d2e0cac062f8dfe38e39f39a1960a3958cfaa9299e22",
+    "preview": "build_narrative_person_rule",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 28,
+    "fileRange": [
+      4246447,
+      4246470
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 290,
+    "characters": 21,
+    "sha256": "07e61669c1e1a10d511b6fdfe666b0703cabe9fcc2a38a5dc7973d5b3a0e95d5",
+    "preview": "build_book_rules_body",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 29,
+    "fileRange": [
+      4246470,
+      4246489
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 299,
+    "characters": 17,
+    "sha256": "079f13351b65f576b8b7d02a1ed87e1143e11acdcad6ddc0024b28e5c0c3615f",
+    "preview": "build_style_guide",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 30,
+    "fileRange": [
+      4246489,
+      4246514
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 308,
+    "characters": 23,
+    "sha256": "ead9617c19b22154e8aa3af83b4e10af8b27ae8ac21f96d0c233cdca7f42f678",
+    "preview": "build_style_fingerprint",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 31,
+    "fileRange": [
+      4246514,
+      4246542
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 317,
+    "characters": 26,
+    "sha256": "30963b087f92ec11db0247022b637cd036f1d8a07df15a331f523d13a39bf2c8",
+    "preview": "build_fanfic_canon_section",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 35,
+    "fileRange": [
+      4246568,
+      4246600
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 353,
+    "characters": 30,
+    "sha256": "33203a7928456ab904b9fa9ce9cc8027a59d8e50748a78f457aef19a71e80db8",
+    "preview": "build_character_voice_profiles",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 36,
+    "fileRange": [
+      4246600,
+      4246632
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 362,
+    "characters": 30,
+    "sha256": "83b1e7121bb493e3a795f8fe23080a119ea23f12e3e0ba22d5695a504017f70a",
+    "preview": "build_fanfic_mode_instructions",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 38,
+    "fileRange": [
+      4246651,
+      4246670
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 380,
+    "characters": 17,
+    "sha256": "c2c47a2e8ae9eb7ba3e27860de10d49f6b19c1c0f95e1543fcc6a0e63f2b087f",
+    "preview": "build_genre_intro",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 39,
+    "fileRange": [
+      4246670,
+      4246688
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 389,
+    "characters": 16,
+    "sha256": "b70855867e4da8129246dfcae463ce7102a4d2efc2c5061a447fe1c69ddc1418",
+    "preview": "build_core_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 41,
+    "fileRange": [
+      4246694,
+      4246723
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 419,
+    "characters": 27,
+    "sha256": "72d5b77643b62c6cdcee58d864db07f5b352df10c640f4b9876e6264e4d3fd9e",
+    "preview": "build_golden_chapters_rules",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 44,
+    "fileRange": [
+      4246754,
+      4246780
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 458,
+    "characters": 24,
+    "sha256": "04de4bbcbb10576ae2a52ae5eff4d6cfc4fc3876ea254c2190cc1724956700ba",
+    "preview": "build_full_cast_tracking",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 47,
+    "fileRange": [
+      4246795,
+      4246842
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 5,
+    "characters": 45,
+    "sha256": "629c65b3494f0afa532b264a760553265ea4669c45e95195ac18958736b87cbd",
+    "preview": "build_writer_system_prompt.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 53,
+    "fileRange": [
+      4246927,
+      4248180
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 10,
+    "characters": 1249,
+    "sha256": "d1ab0309c7fbd40fde14032bfaa17d10dcec9955c8ffca50e1942ae870d31876",
+    "preview": "## Input Governance Contract\n\n- Chapter-specific steering comes from the provided chapter intent and composed ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 54,
+    "fileRange": [
+      4248180,
+      4249358
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 25,
+    "characters": 534,
+    "sha256": "0718f6b067b7f000d1499a6d0c41370aed16e26326835bca154807c2f85b3086",
+    "preview": "## 输入治理契约\n\n- 本章具体写什么，以提供给你的 chapter intent 和 composed context package 为准。\n- 卷纲是默认规划，不是全局最高规则。\n- 当 runtime rule",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 55,
+    "fileRange": [
+      4249358,
+      4251469
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 40,
+    "characters": 1975,
+    "sha256": "33d1b072a3e0ba003ac9b80341ec54020215ed8cc62501340e82153481fb4f1a",
+    "preview": "## Chapter Memo Alignment\n\nYou will receive a chapter_memo composed of 7 markdown sections:\n\n- ## 当前任务 → the c",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 56,
+    "fileRange": [
+      4251469,
+      4253328
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 58,
+    "characters": 821,
+    "sha256": "e9a9588d883358319ecf7609bb9e4099489046005574730ecdd3e1b4668c0560",
+    "preview": "## 章节备忘对齐\n\n你将收到本章的 chapter_memo，由 7 段 markdown 组成：\n\n- ## 当前任务 → 本章必须完成的具体动作，写作时始终对齐这条\n- ## 读者此刻在等什么 → 控制情绪缺口的制",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 73,
+    "fileRange": [
+      4253706,
+      4261406
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 76,
+    "characters": 3070,
+    "sha256": "51e4888e009db4537d148e0f6086be91e167c4cbb9cc0448471496fd8e46284b",
+    "preview": "字\n3. 伏笔前后呼应，不留悬空线；所有埋下的伏笔都必须在后续收回\n4. 只读必要上下文，不机械重复已有内容\n\n## 人物塑造铁律\n\n- 人设一致性：角色行为必须由\"过往经历 + 当前利益 + 性格底色\"共同驱动，永不无",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 74,
+    "fileRange": [
+      4261406,
+      4263467
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 162,
+    "characters": 2041,
+    "sha256": "998e3938e01acee7345be72fed2d445b338ce3224ceef308f4dfe015868d8e56",
+    "preview": "## Writing Craft Rules\n\n- **Emotion**: Externalize through action — never write \"he felt angry\", write \"he cru",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 75,
+    "fileRange": [
+      4263467,
+      4265142
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 183,
+    "characters": 649,
+    "sha256": "8d7bac15d95a2c23feef5b6b5a2b0d26cdc99903258ecb306bfe64b1d9dada0c",
+    "preview": "## 写作铁律\n\n- **情绪**：用动作外化，不写\"他感到愤怒\"，写\"他捏碎了茶杯，滚烫的茶水流过指缝\"\n- **盐溶于汤**：价值观通过行为传达，不喊口号\n- **配角**：有自己的算盘和反击，主角压服聪明人不是碾压",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 76,
+    "fileRange": [
+      4265142,
+      4266703
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 204,
+    "characters": 1547,
+    "sha256": "3ccccb0ea51474ba49d224e33614d240d941c4d5581c3fc98243f46a6f02a959",
+    "preview": "## Creative Constitution\n\nThese fourteen principles are your spine. Internalise them — never quote them, never",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 77,
+    "fileRange": [
+      4266703,
+      4268039
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 213,
+    "characters": 462,
+    "sha256": "e43298960c4a3d435fbbaa0a03b19e40786c3c3fedbdd516eb81cf720cb42047",
+    "preview": "## 创作宪法\n\n这十四条原则是你写作的脊梁。内化它们——绝不引用、绝不列表、绝不在正文里复述。它们的用途是帮你在\"两个都说得通的下一句\"之间做出选择。\n\nShow don't tell，用细节堆出真实，禁止用一行直白陈",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 78,
+    "fileRange": [
+      4268039,
+      4269321
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 222,
+    "characters": 1272,
+    "sha256": "8378c6276d70b819c59846825ad3f71182a8b6aee3310be61f9fd7a410dbc757",
+    "preview": "## Six Pillars of Immersion\n\nReader immersion rests on six pillars. Write to install all six inside the first ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 79,
+    "fileRange": [
+      4269321,
+      4270516
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 231,
+    "characters": 415,
+    "sha256": "f83563d24816ae08196746fe5ae34d049c9375b6662645ba52088908b3433448",
+    "preview": "## 代入感六支柱\n\n读者代入感靠六根支柱支撑。每一个场景的前几页都要把六根柱子立起来——静默地立，不要点名、不要报告。\n\n基础信息标签化：一百字内让读者知道谁在场、在哪儿、发生什么，读者脑里才能搭出这个房间。可视化熟悉",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 83,
+    "fileRange": [
+      4270581,
+      4272533
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 240,
+    "characters": 1936,
+    "sha256": "15f33aba09a912ba1f050f024f573d87b3b43eb76f77b65799ad36aa0efb0da4",
+    "preview": " of the opening three — your prose directly decides whether the reader stays. The Golden Three Chapters rule i",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 86,
+    "fileRange": [
+      4272607,
+      4274271
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 247,
+    "characters": 612,
+    "sha256": "f29acaa888036b1476245be9cf5ffd15f2bf92dd70278be3cd71da404a2410b5",
+    "preview": " 章——你写出的每一句话都直接决定读者是否留下来。黄金三章法则对你不是建议，是对句子的硬约束。第 1 章：主角出场 800 字以内必须触发主线冲突（追杀、死局、被夺权、穿越即危机），禁止长段背景铺垫，世界观要通过主角的行",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 93,
+    "fileRange": [
+      4277975,
+      4278388
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 331,
+    "characters": 407,
+    "sha256": "3832d5a8a3e6ac7e48c951f79a437923ea57c0cafc855ce737588c0a219c1949",
+    "preview": " chapters determine whether readers stay or leave. Before the paywall (ch6-8), every chapter must hook harder ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 97,
+    "fileRange": [
+      4278444,
+      4278935
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 341,
+    "characters": 191,
+    "sha256": "e69f63a8b190526d8a81be5981ff18aa007046231368549fcf3ec3e871e67c37",
+    "preview": "章决定读者是否追读。遵循以下强制规则：\n\n- 开篇不要从第一块砖头开始砌楼——从炸了一栋楼开始写\n- 禁止信息轰炸：世界观、力量体系等设定随剧情自然揭示\n- 每章聚焦 1 条故事线；**第 1-2 章有名有姓参与正面冲突",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 110,
+    "fileRange": [
+      4279112,
+      4279150
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 1192,
+    "characters": 36,
+    "sha256": "06cbac2a2bdaf59e60e179c7b9427bd3ae2cb3392c3a2391d79b1d62d88eda01",
+    "preview": "build_genre_rules.<locals>.<genexpr>",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 113,
+    "fileRange": [
+      4279176,
+      4279403
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 351,
+    "characters": 223,
+    "sha256": "2437b836893a765f983ca4b146702c2f405e0d62a86e84e3c3f211915b5efa21",
+    "preview": "## Narrative person (hard constraint)\nWrite this book entirely in FIRST person (the protagonist's inner viewpo",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 117,
+    "fileRange": [
+      4279745,
+      4280861
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 357,
+    "characters": 1104,
+    "sha256": "4dc1de3680f428df0474b0b720a4d49ab26cbc27911a7b4ca506f0e6dd526b52",
+    "preview": "## Prose execution (cross-theme failure modes)\n\n**Simile restraint.** Do not lean on \"like / as if / as though",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 118,
+    "fileRange": [
+      4280861,
+      4281876
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 366,
+    "characters": 363,
+    "sha256": "082d9d0be512a20950b54424b0c9dc8c9462117c6f6dc8154466adb137210029",
+    "preview": "## 文笔执行（跨题材通病纠正）\n\n**明喻节制。** 不要把\"像/仿佛/如同/像……一样\"当默认修辞反复用。每个场景明喻最多 1 处，且只在它真能点亮画面、比直写更准时才用。优先级永远是：精确的动词 > 具体的动作或感",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 161,
+    "fileRange": [
+      4283861,
+      4284837
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 375,
+    "characters": 488,
+    "sha256": "6a689c90c0c733a76ad0dea189d38341805f41e3be373b33bd462333cb98f21a",
+    "preview": "=== PRE_WRITE_CHECK ===\n（必须输出Markdown表格，全部检查项对齐 chapter_memo 七段，而不是卷纲）\n| 检查项 | 本章记录 | 备注 |\n|--------|---------",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 169,
+    "fileRange": [
+      4285128,
+      4285424
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 392,
+    "characters": 150,
+    "sha256": "43e9376602fdd340ec3fc3f338ee7e2cbd745f55845755db18672a19fc20f5bd",
+    "preview": "\n\n=== CHAPTER_TITLE ===\n(章节标题，不含\"第X章\"。标题必须与已有章节标题不同，不要重复使用相同或相似的标题；若提供了 recent title history 或高频标题词，必须主动避开重复词根",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 171,
+    "fileRange": [
+      4285444,
+      4285652
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 403,
+    "characters": 100,
+    "sha256": "c1e052336c94f86860866bd3a9b626650ee73b4089f187214fbbfa9adc88158b",
+    "preview": "字)\n\n【重要】本次只需输出以上三个区块（PRE_WRITE_CHECK、CHAPTER_TITLE、CHAPTER_CONTENT）。\n状态卡、伏笔池、摘要等追踪文件将由后续结算阶段处理，请勿输出。",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 172,
+    "fileRange": [
+      4285652,
+      4285999
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 411,
+    "characters": 203,
+    "sha256": "deca02fa98a0d708220f69947db80a8001d4b9037704be3f876ffeb25d3c480e",
+    "preview": "=== POST_SETTLEMENT ===\n（如有数值变动，必须输出Markdown表格）\n| 结算项 | 本章记录 | 备注 |\n|--------|----------|------|\n| 资源账本 | 期初X ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 173,
+    "fileRange": [
+      4285999,
+      4286200
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 422,
+    "characters": 121,
+    "sha256": "7f9532c80be250e5731f21635c5ab59b6d45a57f6579edab0da976a0f2a64b7e",
+    "preview": "=== POST_SETTLEMENT ===\n（如有伏笔变动，必须输出）\n| 结算项 | 本章记录 | 备注 |\n|--------|----------|------|\n| 伏笔变动 | 新增/回收/延后 Hook ",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 178,
+    "fileRange": [
+      4286397,
+      4286863
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 431,
+    "characters": 296,
+    "sha256": "43c2b7f49574b0034a9ba1973dc6bab56a4349c1196cf8f94a97e2d94c584d04",
+    "preview": "\n=== UPDATED_HOOKS ===\n(更新后的完整伏笔池，Markdown表格格式)\n\n=== CHAPTER_SUMMARY ===\n(本章摘要，Markdown表格格式，必须包含以下列)\n| 章节 | 标题",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 179,
+    "fileRange": [
+      4286863,
+      4287918
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 444,
+    "characters": 655,
+    "sha256": "6c082bf49132ad1d1055a0f837389b66a8fbc8637d439ce18fed178e19313e4f",
+    "preview": " |\n\n=== UPDATED_SUBPLOTS ===\n(更新后的完整支线进度板，Markdown表格格式)\n| 支线ID | 支线名 | 相关角色 | 起始章 | 最近活跃章 | 距今章数 | 状态 | 进度概述 |",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 180,
+    "fileRange": [
+      4287918,
+      4288027
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 474,
+    "characters": 107,
+    "sha256": "09cbd4f20b5ba1a9ae52653dead8d962ba2c073016fe3fb1b7ce51384bd98b69",
+    "preview": "| Current resource total | X | match the ledger |\n| This chapter's gain | +X (source) | write +0 if none |\n",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 181,
+    "fileRange": [
+      4288027,
+      4289029
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 481,
+    "characters": 1000,
+    "sha256": "da80ef80c1d184aef71465422eaa0405478a1d7ca8447ddf0030fa6deb450d71",
+    "preview": "=== PRE_WRITE_CHECK ===\n(Output a Markdown table. Every row aligns with the seven chapter_memo sections, not t",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 182,
+    "fileRange": [
+      4289029,
+      4289170
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 498,
+    "characters": 139,
+    "sha256": "18993906f9ae6a92e4e340eb5a87b511b23da3245315f8a660be0f7901a320d5",
+    "preview": "| Hooks to resolve | Real hook_id (write none if absent) | Match the hook pool |\n| This chapter's conflict | O",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 187,
+    "fileRange": [
+      4289282,
+      4289581
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 505,
+    "characters": 297,
+    "sha256": "82551cb96bce9ed9e740e47547d352567e4ca84820ae19862b296d889e6af4ce",
+    "preview": "=== CHAPTER_TITLE ===\n(Chapter title, without \"Chapter X\". It must differ from existing titles; do not reuse t",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 191,
+    "fileRange": [
+      4289656,
+      4289687
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 2005,
+    "characters": 29,
+    "sha256": "6ef0df7a4da00923f0a4b54f6b561aa75890c87b89edec1343de0a3dab656b81",
+    "preview": "build_english_pre_write_table",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 192,
+    "fileRange": [
+      4289687,
+      4289717
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 2014,
+    "characters": 28,
+    "sha256": "7f06836babea6016873e0b50e06b5465d4c9e6a3c20b2bb6163fa4497e14776c",
+    "preview": "build_english_content_blocks",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 193,
+    "fileRange": [
+      4289717,
+      4289919
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 514,
+    "characters": 200,
+    "sha256": "6d1241c2af41e82f9bf83a5b4203999be07959327bab4053f55d2e8630bda334",
+    "preview": "\n\n[Important] Output only the three blocks above (PRE_WRITE_CHECK, CHAPTER_TITLE, CHAPTER_CONTENT). State card",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 194,
+    "fileRange": [
+      4289919,
+      4290281
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 521,
+    "characters": 360,
+    "sha256": "4af6c26e28db707a618669290d5b4cd352d72b1d78bd26d514b5e30f2f6e9fcb",
+    "preview": "=== POST_SETTLEMENT ===\n(If any numerical change occurred, output a Markdown table.)\n| Item | This chapter | N",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 195,
+    "fileRange": [
+      4290281,
+      4290475
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 532,
+    "characters": 192,
+    "sha256": "86b11cdf4d5b476d14008cc6b56c9442aaced1c2f81014f02946ea9f45b08e10",
+    "preview": "=== POST_SETTLEMENT ===\n(If any hook changed, output this.)\n| Item | This chapter | Note |\n|------|-----------",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 199,
+    "fileRange": [
+      4290670,
+      4291163
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 541,
+    "characters": 491,
+    "sha256": "2e77e8f330fb942ab72599bb1f2cd9ad0eb3d2b47a9356ef8a4005a80ee32efc",
+    "preview": "\n=== UPDATED_HOOKS ===\n(The full updated hook pool, Markdown table.)\n\n=== CHAPTER_SUMMARY ===\n(Chapter summary",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 200,
+    "fileRange": [
+      4291163,
+      4292339
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 554,
+    "characters": 1174,
+    "sha256": "a72a81b663dced8c152487694a81d5d025b884d03860bfbbd01098a6e88162bd",
+    "preview": " |\n\n=== UPDATED_SUBPLOTS ===\n(The full updated subplot board, Markdown table.)\n| Subplot ID | Name | Character",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 241,
+    "fileRange": [
+      4293419,
+      4293447
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 594,
+    "characters": 26,
+    "sha256": "6b8199123cb77450ace877f6de7d7ccc60c5677af5db8e3c13ca1038e916c1d7",
+    "preview": "build_writer_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 247,
+    "fileRange": [
+      4293668,
+      4296253
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 599,
+    "characters": 1101,
+    "sha256": "9d56fba8e872cf7c9a5903e9c871e6fed0c69bd35cd6c119a9239fea12928207",
+    "preview": "## 去AI味：反例→正例对照\n\n以下对照表展示AI常犯的\"味道\"问题和修正方法。正文必须贴近正例风格。\n\n### 情绪描写\n| 反例（AI味） | 正例（人味） | 要点 |\n|---|---|---|\n| 他感到非常",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 248,
+    "fileRange": [
+      4296253,
+      4296277
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3205,
+    "characters": 22,
+    "sha256": "fac261cae1d7185b949e035b09190dc05549587c255f28f4c7a80b67b702ddf9",
+    "preview": "build_anti_ai_examples",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 249,
+    "fileRange": [
+      4296277,
+      4297635
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 641,
+    "characters": 524,
+    "sha256": "2686640487cc55bb9d03facad011710454d4435b9bb1a2d3d139834b04b6b11f",
+    "preview": "## 六步走人物心理分析\n\n每个重要角色在关键场景中的行为，必须经过以下六步推导：\n\n1. **当前处境**：角色此刻面临什么局面？手上有什么牌？\n2. **核心动机**：角色最想要什么？最害怕什么？\n3. **信息边界",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 250,
+    "fileRange": [
+      4297635,
+      4297670
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3223,
+    "characters": 33,
+    "sha256": "608081be545d2239cf4ddc3342cff8cf08d162e11ecb753b76b903d7ba5a8a7c",
+    "preview": "build_character_psychology_method",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 251,
+    "fileRange": [
+      4297670,
+      4298779
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 667,
+    "characters": 435,
+    "sha256": "6e4d3c37abdfa1536385450baf774e560a838d0be3aebe1260a77877426f32a6",
+    "preview": "## 配角设计方法论\n\n### 配角B面原则\n配角必须有反击，有自己的算盘。主角的强大在于压服聪明人，而不是碾压傻子。\n\n### 构建方法\n1. **动机绑定主线**：每个配角的行为动机必须与主线产生关联\n   - 反派",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 252,
+    "fileRange": [
+      4298779,
+      4298814
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3241,
+    "characters": 33,
+    "sha256": "3011afa3a0d4263c9cbbd62558094b447caf7e4a479a71e3cf5573a31192e17d",
+    "preview": "build_supporting_character_method",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 253,
+    "fileRange": [
+      4298814,
+      4299755
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 687,
+    "characters": 349,
+    "sha256": "cfb51cbfe51b45e011d81736989c9d2999babc17f6f34d3f8a2b65c88bdc4a4f",
+    "preview": "## 读者心理学框架\n\n写作时同步考虑读者的心理状态：\n\n- **期待管理**：在读者期待释放时，适当延迟以增强快感；在读者即将失去耐心时，立即给反馈\n- **信息落差**：让读者比角色多知道一点（制造紧张），或比角色少",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 254,
+    "fileRange": [
+      4299755,
+      4299787
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3259,
+    "characters": 30,
+    "sha256": "8b1c16a30e9c757ab1fadf37bd3be2abd050816dea98151fffd6af2b75d99a8e",
+    "preview": "build_reader_psychology_method",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 255,
+    "fileRange": [
+      4299787,
+      4301102
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 701,
+    "characters": 501,
+    "sha256": "73bc3713ee0a4528108661f5a81a7fe792fdcc325590858612fba625f3d086ae",
+    "preview": "## 情感节点设计\n\n关系发展（友情、爱情、从属）必须经过事件驱动的节点递进：\n\n1. **设计3-5个关键事件**：共同御敌、秘密分享、利益冲突、信任考验、牺牲/妥协\n2. **递进升温**：每个事件推进关系一个层级，",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 256,
+    "fileRange": [
+      4301102,
+      4301133
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3277,
+    "characters": 29,
+    "sha256": "b63045e9b62f7f212eac17e4475c75d3877abca67fc1029f77db39ba68125b53",
+    "preview": "build_emotional_pacing_method",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 257,
+    "fileRange": [
+      4301133,
+      4302482
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 720,
+    "characters": 515,
+    "sha256": "ee51aa751fc482b0ee37467ee5de73cd75df418e2afe032b6c17c85d242de47b",
+    "preview": "## 代入感技法\n\n- **自然信息交代**：角色身份/外貌/背景通过行动和对话带出，禁止\"资料卡式\"直接罗列\n- **画面代入法**：开场先给画面（动作、环境、声音），再给信息，让读者\"看到\"而非\"被告知\"\n- **共",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 258,
+    "fileRange": [
+      4302482,
+      4302510
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3295,
+    "characters": 26,
+    "sha256": "24640ad809007ce538127e5ddccf116e5451886351452d477e7e03c886de12d8",
+    "preview": "build_immersion_techniques",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 263,
+    "fileRange": [
+      4302676,
+      4302942
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--inkos--writer_prompts.md",
+    "line": 739,
+    "characters": 112,
+    "sha256": "f87359969b041dead71699e9eedea17a5db2488d1cbcae34bdb465a3e6d518cd",
+    "preview": "## 全员追踪\n\n本书启用全员追踪模式。每章结束时，POST_SETTLEMENT 必须额外包含：\n- 本章出场角色清单（名字 + 一句话状态变化）\n- 角色间关系变动（如有）\n- 未出场但被提及的角色（名字 + 提及原",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.inkos.writer_prompts",
+    "constant": 270,
+    "fileRange": [
+      4303199,
+      4303226
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/constants/novels--prompts--inkos--writer_prompts.json",
+    "line": 3848,
+    "characters": 25,
+    "sha256": "9a0db1c51def83468ed90892fb167b90f9a89c05c71ca1359120678c7ba2a394",
+    "preview": "build_pre_write_checklist",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.system_prompts",
+    "constant": 7,
+    "fileRange": [
+      4305069,
+      4305330
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--system_prompts.md",
+    "line": 5,
+    "characters": 179,
+    "sha256": "ddf60b557e9a6627e0fbc23808ea592fac51def68c00906e0a31223d275cee29",
+    "preview": "- propose_action：委托执行当前书重操作（write_next / write_batch / audit_chapter / revise_chapter / generate_cover）。write_",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.system_prompts",
+    "constant": 10,
+    "fileRange": [
+      4305419,
+      4305674
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--system_prompts.md",
+    "line": 11,
+    "characters": 253,
+    "sha256": "f8a585dd275799f97da4e17038135549170f28af248a71f0db880218d0e35fce",
+    "preview": "- propose_action: delegate active-book heavy operations (write_next / write_batch / audit_chapter / revise_cha",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.system_prompts",
+    "constant": 22,
+    "fileRange": [
+      4305831,
+      4305858
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--system_prompts.md",
+    "line": 17,
+    "characters": 25,
+    "sha256": "ea39a1fe8f0ad85e31e0ccbd7b577373856a6617e43c0d98bfa5b1c1fa3f147a",
+    "preview": "build_agent_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  },
+  {
+    "module": "novels.prompts.system_prompts",
+    "constant": 55,
+    "fileRange": [
+      4306597,
+      4306618
+    ],
+    "source": "docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--system_prompts.md",
+    "line": 37,
+    "characters": 19,
+    "sha256": "eaed74111cd6e62e8fe878c9e0d903f2d02d69e053dfbd4dc87b4feeef5ecec8",
+    "preview": "build_system_prompt",
+    "dynamicUse": "requires caller and builder evidence; not proven by literal alone"
+  }
+]

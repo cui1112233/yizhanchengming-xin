@@ -1,0 +1,48 @@
+{
+  "time": "2026-11-20T16:52:55.752964+08:00",
+  "scope": "document inventory and source traceability only; no runtime/model acceptance",
+  "checks": [
+    {
+      "check": "current_frontend_identity",
+      "passed": true
+    },
+    {
+      "check": "current_native_identity",
+      "passed": true
+    },
+    {
+      "check": "recovered_file_hashes",
+      "count": 23,
+      "passed": true
+    },
+    {
+      "check": "frontend_source_line_references",
+      "count": 1237,
+      "passed": true
+    },
+    {
+      "check": "all_controls_in_both_inventories",
+      "count": 440,
+      "passed": true
+    },
+    {
+      "check": "all_component_contracts",
+      "count": 23,
+      "passed": true
+    },
+    {
+      "check": "prompt_source_headers",
+      "count": 318,
+      "passed": true
+    },
+    {
+      "check": "ida_exports",
+      "count": 3,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "openGapGroups": 12,
+  "paidCalls": 0,
+  "targetCodeExecuted": false
+}

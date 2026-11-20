@@ -1,0 +1,335 @@
+{
+  "sourcePath": "F:/软件/洛水2026/洛水2026/dist/assets/index-DgTjggsH.js",
+  "sha256": "7c2520565126cf49615a968a6bceefc5cfcf3e032f9858a9570adeab546336a6",
+  "method": "Babel AST selection and formatting",
+  "runtimeEquivalence": "unverified",
+  "limitations": [
+    "Generated files are inspection-only fragments with unresolved external and obfuscated bindings.",
+    "Not original pre-build source; function names and decoder expressions are preserved.",
+    "Generated line numbers refer to recovered fragments, not original source."
+  ],
+  "components": [
+    {
+      "name": "NovelCreateIcon",
+      "file": "NovelCreateIcon.readable.js",
+      "originalUtf16Range": [
+        8506080,
+        8512308
+      ],
+      "originalUtf8Range": [
+        8763043,
+        8769271
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "2be65998791f00af1b77b2c69b8ff1a5bf53face684e1bc12eb92d0592724f71"
+    },
+    {
+      "name": "NovelStudioSidebar",
+      "file": "NovelStudioSidebar.readable.js",
+      "originalUtf16Range": [
+        8542215,
+        8550130
+      ],
+      "originalUtf8Range": [
+        8799214,
+        8807371
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "9c18f2fed68af50d9b513fcd9c9370f96b6b361ad7b849a492e28d8a5ff418b0"
+    },
+    {
+      "name": "NovelConfirmCard",
+      "file": "NovelConfirmCard.readable.js",
+      "originalUtf16Range": [
+        8550523,
+        8552978
+      ],
+      "originalUtf8Range": [
+        8807764,
+        8810429
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "b31b63a49ff35288edf2fab89b145611dcdeceb557bd7d67e6a516c2c9b17ad9"
+    },
+    {
+      "name": "NovelCoverPreview",
+      "file": "NovelCoverPreview.readable.js",
+      "originalUtf16Range": [
+        8573753,
+        8575641
+      ],
+      "originalUtf8Range": [
+        8831204,
+        8833108
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "e53aeaef80441a23ade1b41df219d9fdc2d5e98d55c9cc1e5c4a0b3d2c58fc7b"
+    },
+    {
+      "name": "NovelToolSteps",
+      "file": "NovelToolSteps.readable.js",
+      "originalUtf16Range": [
+        8619062,
+        8625267
+      ],
+      "originalUtf8Range": [
+        8876711,
+        8882984
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "b9fff331a5454865dd946500aae15ea63447bf613637f0918df68dd884913880"
+    },
+    {
+      "name": "NovelThinkingBlock",
+      "file": "NovelThinkingBlock.readable.js",
+      "originalUtf16Range": [
+        8625439,
+        8626316
+      ],
+      "originalUtf8Range": [
+        8883156,
+        8884057
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "38a525599d765b2edaba753a4c46af96d7cbda4332e2b8e7951b5650abce9484"
+    },
+    {
+      "name": "NovelStreamingIndicator",
+      "file": "NovelStreamingIndicator.readable.js",
+      "originalUtf16Range": [
+        8626359,
+        8626704
+      ],
+      "originalUtf8Range": [
+        8884100,
+        8884455
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "16a717fb61c15567079da1abbf45b098ce44f4dde11f755b663d2a22c441e071"
+    },
+    {
+      "name": "NovelQuickActions",
+      "file": "NovelQuickActions.readable.js",
+      "originalUtf16Range": [
+        8626774,
+        8627496
+      ],
+      "originalUtf8Range": [
+        8884525,
+        8885271
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "85a9257c134a4759e3cb6fce947e5d5a8c3d27049eb1c94a59012ab6037212b4"
+    },
+    {
+      "name": "NovelStudioChat",
+      "file": "NovelStudioChat.readable.js",
+      "originalUtf16Range": [
+        8629071,
+        8650803
+      ],
+      "originalUtf8Range": [
+        8886846,
+        8908888
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "51fdacdc6b113b35494270077376a06e056090800b0358607d1dda88ad23284a"
+    },
+    {
+      "name": "NovelPanelArtifactView",
+      "file": "NovelPanelArtifactView.readable.js",
+      "originalUtf16Range": [
+        8651068,
+        8652874
+      ],
+      "originalUtf8Range": [
+        8909153,
+        8910993
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "261b1e20575a37a6042ade6336e77b304f74248d14d334f4c84256eb840fc8a0"
+    },
+    {
+      "name": "NovelStudioBookPanel",
+      "file": "NovelStudioBookPanel.readable.js",
+      "originalUtf16Range": [
+        8683553,
+        8691226
+      ],
+      "originalUtf8Range": [
+        8941672,
+        8949539
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "51188e2d5a0f6293de371ddc98f6be4cc96b32f7e988e79bd3c05f008adc193e"
+    },
+    {
+      "name": "NovelStudioShortPanel",
+      "file": "NovelStudioShortPanel.readable.js",
+      "originalUtf16Range": [
+        8691913,
+        8697920
+      ],
+      "originalUtf8Range": [
+        8950226,
+        8956414
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "a9ed21ad6f8e734a776afdaa9888bdbd1b55664f16acd0f584f0cf7fb7dd8085"
+    },
+    {
+      "name": "NovelStylePanel",
+      "file": "NovelStylePanel.readable.js",
+      "originalUtf16Range": [
+        8698363,
+        8704788
+      ],
+      "originalUtf8Range": [
+        8956857,
+        8963817
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "dd26414007e8102269542588154d62333c28aafa030db67d9b1efc71f71cae5e"
+    },
+    {
+      "name": "NovelAgentSettings",
+      "file": "NovelAgentSettings.readable.js",
+      "originalUtf16Range": [
+        8744349,
+        8756515
+      ],
+      "originalUtf8Range": [
+        9003453,
+        9016689
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "e7e5b76ee59a26a294e55d98301beea0a95c5dd48f1a1834d5524f8094b78ad3"
+    },
+    {
+      "name": "NovelImportPage",
+      "file": "NovelImportPage.readable.js",
+      "originalUtf16Range": [
+        8809779,
+        8830298
+      ],
+      "originalUtf8Range": [
+        9070243,
+        9092731
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "03bf6417209734c8a3df4932b958932f2007d6949ca8c02fb5eb2cfb0b3ef0e3"
+    },
+    {
+      "name": "NovelImportModal",
+      "file": "NovelImportModal.readable.js",
+      "originalUtf16Range": [
+        8830352,
+        8831305
+      ],
+      "originalUtf8Range": [
+        9092785,
+        9093738
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "9d429c0f33b4786b33da0a55a2f310288c4d763d6e7f24b5a366a9fe5e0fb5ff"
+    },
+    {
+      "name": "NovelImitationShortDialog",
+      "file": "NovelImitationShortDialog.readable.js",
+      "originalUtf16Range": [
+        8832348,
+        8840980
+      ],
+      "originalUtf8Range": [
+        9094781,
+        9104376
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "6b0d791550053430d284b6be4f31e3f5554eba0e789b892e342da3b3f8175b78"
+    },
+    {
+      "name": "NovelBatchDialog",
+      "file": "NovelBatchDialog.readable.js",
+      "originalUtf16Range": [
+        8841139,
+        8844178
+      ],
+      "originalUtf8Range": [
+        9104535,
+        9107710
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "08118acd6c7465ccbdf853e4ba67ddd61921c8b613e994d02470d8870c70eed3"
+    },
+    {
+      "name": "NovelSchedulerPanel",
+      "file": "NovelSchedulerPanel.readable.js",
+      "originalUtf16Range": [
+        8844545,
+        8849386
+      ],
+      "originalUtf8Range": [
+        9108077,
+        9113114
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "922344e0d84b5245d2ebced6dc0798c6e3ec74a5de30234429f4cea798c9fc31"
+    },
+    {
+      "name": "NovelHooksPanel",
+      "file": "NovelHooksPanel.readable.js",
+      "originalUtf16Range": [
+        8849652,
+        8851209
+      ],
+      "originalUtf8Range": [
+        9113380,
+        9114999
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "0e498527ee940af7409ccdb376567aa895c2c9a04331930a4da40b399551870f"
+    },
+    {
+      "name": "NovelDashboard",
+      "file": "NovelDashboard.readable.js",
+      "originalUtf16Range": [
+        8851662,
+        8853325
+      ],
+      "originalUtf8Range": [
+        9115452,
+        9117201
+      ],
+      "originalLine": 41,
+      "recoveredSha256": "f713313ba854a9b2cdf7a571337ad203fd9ea47d23d6bb6dff40791c8775cd8e"
+    },
+    {
+      "name": "NovelCheckpointCard",
+      "file": "NovelCheckpointCard.readable.js",
+      "originalUtf16Range": [
+        9221037,
+        9221822
+      ],
+      "originalUtf8Range": [
+        9485935,
+        9486828
+      ],
+      "originalLine": 56,
+      "recoveredSha256": "50bc411dc383aa5c919570974fcc46396a514fd584ddbaa26d9e8fd5b11b1528"
+    },
+    {
+      "name": "NovelStudioPage",
+      "file": "NovelStudioPage.readable.js",
+      "originalUtf16Range": [
+        9248264,
+        9294153
+      ],
+      "originalUtf8Range": [
+        9513276,
+        9560647
+      ],
+      "originalLine": 56,
+      "recoveredSha256": "b789cdac45ec085fdb353a0ceadcaa94d54756069f4c2ba169a8f6a97fc2e6d3"
+    }
+  ]
+}

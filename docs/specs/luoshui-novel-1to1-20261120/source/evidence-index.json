@@ -1,0 +1,134 @@
+{
+  "frontend": {
+    "path": "F:/软件/洛水2026/洛水2026/dist/assets/index-DgTjggsH.js",
+    "sha256": "7c2520565126cf49615a968a6bceefc5cfcf3e032f9858a9570adeab546336a6"
+  },
+  "native": {
+    "path": "F:/软件/洛水2026/洛水2026/modules/novels.pyd",
+    "sha256": "b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d"
+  },
+  "limitations": [
+    "Recovered Vue render fragments, not original author source",
+    "Static evidence does not establish runtime or pixel equivalence",
+    "Old frontend 5278a6d1 is historical only"
+  ],
+  "constantModules": 95,
+  "recoveredFiles": [
+    {
+      "file": "source/frontend/NovelCreateIcon.readable.js",
+      "sha256": "2be65998791f00af1b77b2c69b8ff1a5bf53face684e1bc12eb92d0592724f71",
+      "lines": 254
+    },
+    {
+      "file": "source/frontend/NovelStudioSidebar.readable.js",
+      "sha256": "9c18f2fed68af50d9b513fcd9c9370f96b6b361ad7b849a492e28d8a5ff418b0",
+      "lines": 366
+    },
+    {
+      "file": "source/frontend/NovelConfirmCard.readable.js",
+      "sha256": "b31b63a49ff35288edf2fab89b145611dcdeceb557bd7d67e6a516c2c9b17ad9",
+      "lines": 104
+    },
+    {
+      "file": "source/frontend/NovelCoverPreview.readable.js",
+      "sha256": "e53aeaef80441a23ade1b41df219d9fdc2d5e98d55c9cc1e5c4a0b3d2c58fc7b",
+      "lines": 121
+    },
+    {
+      "file": "source/frontend/NovelToolSteps.readable.js",
+      "sha256": "b9fff331a5454865dd946500aae15ea63447bf613637f0918df68dd884913880",
+      "lines": 213
+    },
+    {
+      "file": "source/frontend/NovelThinkingBlock.readable.js",
+      "sha256": "38a525599d765b2edaba753a4c46af96d7cbda4332e2b8e7951b5650abce9484",
+      "lines": 51
+    },
+    {
+      "file": "source/frontend/NovelStreamingIndicator.readable.js",
+      "sha256": "16a717fb61c15567079da1abbf45b098ce44f4dde11f755b663d2a22c441e071",
+      "lines": 25
+    },
+    {
+      "file": "source/frontend/NovelQuickActions.readable.js",
+      "sha256": "85a9257c134a4759e3cb6fce947e5d5a8c3d27049eb1c94a59012ab6037212b4",
+      "lines": 50
+    },
+    {
+      "file": "source/frontend/NovelStudioChat.readable.js",
+      "sha256": "51fdacdc6b113b35494270077376a06e056090800b0358607d1dda88ad23284a",
+      "lines": 808
+    },
+    {
+      "file": "source/frontend/NovelPanelArtifactView.readable.js",
+      "sha256": "261b1e20575a37a6042ade6336e77b304f74248d14d334f4c84256eb840fc8a0",
+      "lines": 104
+    },
+    {
+      "file": "source/frontend/NovelStudioBookPanel.readable.js",
+      "sha256": "51188e2d5a0f6293de371ddc98f6be4cc96b32f7e988e79bd3c05f008adc193e",
+      "lines": 353
+    },
+    {
+      "file": "source/frontend/NovelStudioShortPanel.readable.js",
+      "sha256": "a9ed21ad6f8e734a776afdaa9888bdbd1b55664f16acd0f584f0cf7fb7dd8085",
+      "lines": 288
+    },
+    {
+      "file": "source/frontend/NovelStylePanel.readable.js",
+      "sha256": "dd26414007e8102269542588154d62333c28aafa030db67d9b1efc71f71cae5e",
+      "lines": 284
+    },
+    {
+      "file": "source/frontend/NovelAgentSettings.readable.js",
+      "sha256": "e7e5b76ee59a26a294e55d98301beea0a95c5dd48f1a1834d5524f8094b78ad3",
+      "lines": 479
+    },
+    {
+      "file": "source/frontend/NovelImportPage.readable.js",
+      "sha256": "03bf6417209734c8a3df4932b958932f2007d6949ca8c02fb5eb2cfb0b3ef0e3",
+      "lines": 829
+    },
+    {
+      "file": "source/frontend/NovelImportModal.readable.js",
+      "sha256": "9d429c0f33b4786b33da0a55a2f310288c4d763d6e7f24b5a366a9fe5e0fb5ff",
+      "lines": 63
+    },
+    {
+      "file": "source/frontend/NovelImitationShortDialog.readable.js",
+      "sha256": "6b0d791550053430d284b6be4f31e3f5554eba0e789b892e342da3b3f8175b78",
+      "lines": 344
+    },
+    {
+      "file": "source/frontend/NovelBatchDialog.readable.js",
+      "sha256": "08118acd6c7465ccbdf853e4ba67ddd61921c8b613e994d02470d8870c70eed3",
+      "lines": 160
+    },
+    {
+      "file": "source/frontend/NovelSchedulerPanel.readable.js",
+      "sha256": "922344e0d84b5245d2ebced6dc0798c6e3ec74a5de30234429f4cea798c9fc31",
+      "lines": 238
+    },
+    {
+      "file": "source/frontend/NovelHooksPanel.readable.js",
+      "sha256": "0e498527ee940af7409ccdb376567aa895c2c9a04331930a4da40b399551870f",
+      "lines": 63
+    },
+    {
+      "file": "source/frontend/NovelDashboard.readable.js",
+      "sha256": "f713313ba854a9b2cdf7a571337ad203fd9ea47d23d6bb6dff40791c8775cd8e",
+      "lines": 66
+    },
+    {
+      "file": "source/frontend/NovelCheckpointCard.readable.js",
+      "sha256": "50bc411dc383aa5c919570974fcc46396a514fd584ddbaa26d9e8fd5b11b1528",
+      "lines": 41
+    },
+    {
+      "file": "source/frontend/NovelStudioPage.readable.js",
+      "sha256": "b789cdac45ec085fdb353a0ceadcaa94d54756069f4c2ba169a8f6a97fc2e6d3",
+      "lines": 1743
+    }
+  ],
+  "sourceType": "shipped-text and native pseudocode; not author source repository"
+}

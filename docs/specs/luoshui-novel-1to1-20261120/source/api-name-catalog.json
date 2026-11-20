@@ -1,0 +1,416 @@
+[
+  {
+    "tag": "a",
+    "fileRange": [
+      3931242,
+      3931261
+    ],
+    "value": "novels_list_books",
+    "index": 347
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931330,
+      3931347
+    ],
+    "value": "novels_get_book",
+    "index": 350
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931422,
+      3931442
+    ],
+    "value": "novels_rename_book",
+    "index": 353
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931472,
+      3931492
+    ],
+    "value": "novels_delete_book",
+    "index": 355
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931597,
+      3931619
+    ],
+    "value": "novels_list_sessions",
+    "index": 358
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931694,
+      3931714
+    ],
+    "value": "novels_get_session",
+    "index": 361
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931785,
+      3931809
+    ],
+    "value": "novels_get_short_story",
+    "index": 364
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3931890,
+      3931920
+    ],
+    "value": "novels_read_short_story_file",
+    "index": 367
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932017,
+      3932047
+    ],
+    "value": "novels_save_short_story_file",
+    "index": 370
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932138,
+      3932174
+    ],
+    "value": "novels_confirm_pipeline_checkpoint",
+    "index": 373
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932281,
+      3932304
+    ],
+    "value": "novels_create_session",
+    "index": 376
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932388,
+      3932411
+    ],
+    "value": "novels_rename_session",
+    "index": 379
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932497,
+      3932523
+    ],
+    "value": "novels_bind_session_book",
+    "index": 382
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932559,
+      3932582
+    ],
+    "value": "novels_delete_session",
+    "index": 384
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932615,
+      3932647
+    ],
+    "value": "novels_update_session_messages",
+    "index": 386
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932689,
+      3932716
+    ],
+    "value": "novels_list_style_sources",
+    "index": 388
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932796,
+      3932822
+    ],
+    "value": "novels_get_style_profile",
+    "index": 391
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932858,
+      3932885
+    ],
+    "value": "novels_save_style_profile",
+    "index": 393
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932922,
+      3932951
+    ],
+    "value": "novels_delete_style_profile",
+    "index": 395
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3932990,
+      3933017
+    ],
+    "value": "novels_import_style_files",
+    "index": 397
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933054,
+      3933079
+    ],
+    "value": "novels_pick_style_files",
+    "index": 399
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933114,
+      3933137
+    ],
+    "value": "novels_init_imitation",
+    "index": 401
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933170,
+      3933198
+    ],
+    "value": "novels_run_imitation_short",
+    "index": 403
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933236,
+      3933256
+    ],
+    "value": "novels_init_fanfic",
+    "index": 405
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933286,
+      3933307
+    ],
+    "value": "novels_init_spinoff",
+    "index": 407
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933338,
+      3933362
+    ],
+    "value": "novels_import_chapters",
+    "index": 409
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933396,
+      3933423
+    ],
+    "value": "novels_get_agent_settings",
+    "index": 411
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933460,
+      3933488
+    ],
+    "value": "novels_save_agent_settings",
+    "index": 413
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933526,
+      3933547
+    ],
+    "value": "novels_send_message",
+    "index": 415
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933578,
+      3933601
+    ],
+    "value": "novels_confirm_action",
+    "index": 417
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933670,
+      3933695
+    ],
+    "value": "novels_cancel_operation",
+    "index": 420
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933791,
+      3933811
+    ],
+    "value": "novels_get_chapter",
+    "index": 423
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3933951,
+      3933972
+    ],
+    "value": "novels_save_chapter",
+    "index": 426
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934049,
+      3934073
+    ],
+    "value": "novels_read_story_file",
+    "index": 429
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934163,
+      3934187
+    ],
+    "value": "novels_save_story_file",
+    "index": 432
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934221,
+      3934244
+    ],
+    "value": "novels_get_book_rules",
+    "index": 434
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934342,
+      3934366
+    ],
+    "value": "novels_save_book_rules",
+    "index": 437
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934400,
+      3934419
+    ],
+    "value": "novels_write_next",
+    "index": 439
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934448,
+      3934468
+    ],
+    "value": "novels_write_batch",
+    "index": 441
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934550,
+      3934574
+    ],
+    "value": "novels_scheduler_start",
+    "index": 445
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934608,
+      3934631
+    ],
+    "value": "novels_scheduler_stop",
+    "index": 447
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934664,
+      3934688
+    ],
+    "value": "novels_scheduler_pause",
+    "index": 449
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934722,
+      3934747
+    ],
+    "value": "novels_scheduler_status",
+    "index": 451
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934782,
+      3934804
+    ],
+    "value": "novels_audit_chapter",
+    "index": 453
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934836,
+      3934859
+    ],
+    "value": "novels_revise_chapter",
+    "index": 455
+  },
+  {
+    "tag": "a",
+    "fileRange": [
+      3934944,
+      3934964
+    ],
+    "value": "novels_export_book",
+    "index": 459
+  }
+]
