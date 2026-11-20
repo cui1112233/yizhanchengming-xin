@@ -53,14 +53,32 @@ func registerNovelShortStoryRoutes(handle func(string, func(http.ResponseWriter,
 		}
 		writeJSON(w, 200, map[string]any{"story": out})
 	})
-	handle("POST /api/novel-creation/runs/{runID}/confirm-short-story", func(w http.ResponseWriter, r *http.Request, owner string) {
+	handle("PUT /api/novel-creation/projects/{projectID}/short-story/artifact", func(w http.ResponseWriter, r *http.Request, owner string) {
 		var in struct {
-			Version int `json:"version"`
+			Version int    `json:"version"`
+			Key     string `json:"key"`
+			Content string `json:"content"`
 		}
 		if !decodeLongImitation(w, r, &in) {
 			return
 		}
-		out, e := s.ConfirmShortStory(r.Context(), owner, r.PathValue("runID"), in.Version)
+		out, e := s.EditShortStoryArtifact(r.Context(), owner, r.PathValue("projectID"), in.Version, in.Key, in.Content)
+		if e != nil {
+			writeNovelCreationError(w, e)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"story": out})
+	})
+	handle("POST /api/novel-creation/runs/{runID}/confirm-short-story", func(w http.ResponseWriter, r *http.Request, owner string) {
+		var in struct {
+			Version       int    `json:"version"`
+			ModelID       string `json:"modelId,omitempty"`
+			ThinkingLevel string `json:"thinkingLevel,omitempty"`
+		}
+		if !decodeLongImitation(w, r, &in) {
+			return
+		}
+		out, e := s.ConfirmShortStoryWithModel(r.Context(), owner, r.PathValue("runID"), in.Version, in.ModelID, in.ThinkingLevel)
 		if e != nil {
 			writeNovelCreationError(w, e)
 			return

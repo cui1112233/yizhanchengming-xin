@@ -33,7 +33,7 @@ func TestNewShortImitationFreezesDedicatedProtocol(t *testing.T) {
 	}
 	var snap map[string]any
 	_ = json.Unmarshal(out.Run.PromptSnapshot, &snap)
-	if snap["short_imitation_version"] != float64(1) {
+	if snap["short_imitation_version"] != float64(2) {
 		t.Fatal("新仿写任务未冻结专用阶段协议")
 	}
 }

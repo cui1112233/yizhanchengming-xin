@@ -28,6 +28,10 @@ func TestShortStoryRealMySQLCheckpointAndReopen(t *testing.T) {
 	if e != nil || replay.Run.ID != out.Run.ID {
 		t.Fatal("SQL duplicate", e)
 	}
+	// Persist an old protocol task to prove v1 outline editing still works.
+	if _, e = db.Exec(`UPDATE novel_runs SET prompt_snapshot_json=JSON_SET(prompt_snapshot_json,'$.short_imitation_version',1) WHERE owner_username=? AND run_id=?`, owner, out.Run.ID); e != nil {
+		t.Fatal(e)
+	}
 	run, e := s.Run(ctx, owner, out.Run.ID)
 	if e != nil || run.Status != RunAwaitingConfirmation {
 		t.Fatal("SQL checkpoint", run.Status, e)

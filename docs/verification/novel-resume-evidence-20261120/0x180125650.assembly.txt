@@ -1,0 +1,145 @@
+0x180125650 4055                     push rbp
+0x180125652 57                       push rdi
+0x180125653 4155                     push r13
+0x180125655 4156                     push r14
+0x180125657 4883ec48                 sub rsp, 0x48
+0x18012565b 488b3dcee32800           mov rdi, qword ptr [rip + 0x28e3ce]
+0x180125662 4c8bea                   mov r13, rdx
+0x180125665 4d8b30                   mov r14, qword ptr [r8]
+0x180125668 488be9                   mov rbp, rcx
+0x18012566b 4885ff                   test rdi, rdi
+0x18012566e 742a                     je 0x18012569a
+0x180125670 48833f01                 cmp qword ptr [rdi], 1
+0x180125674 7f07                     jg 0x18012567d
+0x180125676 48837f1000               cmp qword ptr [rdi + 0x10], 0
+0x18012567b 7443                     je 0x1801256c0
+0x18012567d 4885ff                   test rdi, rdi
+0x180125680 7418                     je 0x18012569a
+0x180125682 833f00                   cmp dword ptr [rdi], 0
+0x180125685 7c13                     jl 0x18012569a
+0x180125687 48832f01                 sub qword ptr [rdi], 1
+0x18012568b 750d                     jne 0x18012569a
+0x18012568d 488b4708                 mov rax, qword ptr [rdi + 8]
+0x180125691 488bcf                   mov rcx, rdi
+0x180125694 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x180125698 ffd2                     call rdx
+0x18012569a 4c8b05d7502a00           mov r8, qword ptr [rip + 0x2a50d7]
+0x1801256a1 41b918000000             mov r9d, 0x18
+0x1801256a7 488b15a2e62800           mov rdx, qword ptr [rip + 0x28e6a2]
+0x1801256ae 488bcd                   mov rcx, rbp
+0x1801256b1 e85a762400               call 0x18036cd10
+0x1801256b6 488bf8                   mov rdi, rax
+0x1801256b9 48890570e32800           mov qword ptr [rip + 0x28e370], rax
+0x1801256c0 48895c2470               mov qword ptr [rsp + 0x70], rbx
+0x1801256c5 488bd7                   mov rdx, rdi
+0x1801256c8 488bcd                   mov rcx, rbp
+0x1801256cb 4889b42480000000         mov qword ptr [rsp + 0x80], rsi
+0x1801256d3 e828c6edff               call 0x180001d00
+0x1801256d8 498b85e8000000           mov rax, qword ptr [r13 + 0xe8]
+0x1801256df 4c8b4010                 mov r8, qword ptr [rax + 0x10]
+0x1801256e3 4d85c0                   test r8, r8
+0x1801256e6 7569                     jne 0x180125751
+0x1801256e8 488b0dc9e82800           mov rcx, qword ptr [rip + 0x28e8c9] ; novels.pipeline.pipeline_runner#21="self"
+0x1801256ef 8b4120                   mov eax, dword ptr [rcx + 0x20]
+0x1801256f2 488d5128                 lea rdx, [rcx + 0x28]
+0x1801256f6 83e060                   and eax, 0x60
+0x1801256f9 3c60                     cmp al, 0x60
+0x1801256fb 7404                     je 0x180125701
+0x1801256fd 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x180125701 488d0d58122700           lea rcx, [rip + 0x271258]
+0x180125708 ff1512b12600             call qword ptr [rip + 0x26b112]
+0x18012570e 488b15ebad2600           mov rdx, qword ptr [rip + 0x26adeb]
+0x180125715 488bcd                   mov rcx, rbp
+0x180125718 4c8bc0                   mov r8, rax
+0x18012571b 488bf0                   mov rsi, rax
+0x18012571e 488b12                   mov rdx, qword ptr [rdx]
+0x180125721 e84a102500               call 0x180376770
+0x180125726 833e00                   cmp dword ptr [rsi], 0
+0x180125729 488bd8                   mov rbx, rax
+0x18012572c 7c13                     jl 0x180125741
+0x18012572e 48832e01                 sub qword ptr [rsi], 1
+0x180125732 750d                     jne 0x180125741
+0x180125734 488b4608                 mov rax, qword ptr [rsi + 8]
+0x180125738 488bce                   mov rcx, rsi
+0x18012573b 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x18012573f ffd2                     call rdx
+0x180125741 488bd3                   mov rdx, rbx
+0x180125744 488bcd                   mov rcx, rbp
+0x180125747 e8847aeeff               call 0x18000d1d0
+0x18012574c e91f010000               jmp 0x180125870
+0x180125751 498b5008                 mov rdx, qword ptr [r8 + 8]
+0x180125755 488b0594fb2800           mov rax, qword ptr [rip + 0x28fb94] ; novels.pipeline.pipeline_runner#636="_ctx_for_short_fiction"
+0x18012575c 4c8b8a90000000           mov r9, qword ptr [rdx + 0x90]
+0x180125763 4d85c9                   test r9, r9
+0x180125766 7405                     je 0x18012576d
+0x180125768 488bd0                   mov rdx, rax
+0x18012576b eb20                     jmp 0x18012578d
+0x18012576d 8b4820                   mov ecx, dword ptr [rax + 0x20]
+0x180125770 4c8b4a40                 mov r9, qword ptr [rdx + 0x40]
+0x180125774 83e160                   and ecx, 0x60
+0x180125777 4d85c9                   test r9, r9
+0x18012577a 0f84bc000000             je 0x18012583c
+0x180125780 488d5028                 lea rdx, [rax + 0x28]
+0x180125784 83f960                   cmp ecx, 0x60
+0x180125787 7404                     je 0x18012578d
+0x180125789 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x18012578d 498bc8                   mov rcx, r8
+0x180125790 41ffd1                   call r9
+0x180125793 488bd8                   mov rbx, rax
+0x180125796 4885c0                   test rax, rax
+0x180125799 0f84c5000000             je 0x180125864
+0x18012579f 498b85e0000000           mov rax, qword ptr [r13 + 0xe0]
+0x1801257a6 488b4810                 mov rcx, qword ptr [rax + 0x10]
+0x1801257aa 4885c9                   test rcx, rcx
+0x1801257ad 7523                     jne 0x1801257d2
+0x1801257af 390b                     cmp dword ptr [rbx], ecx
+0x1801257b1 7c13                     jl 0x1801257c6
+0x1801257b3 48832b01                 sub qword ptr [rbx], 1
+0x1801257b7 750d                     jne 0x1801257c6
+0x1801257b9 488b4308                 mov rax, qword ptr [rbx + 8]
+0x1801257bd 488bcb                   mov rcx, rbx
+0x1801257c0 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x1801257c4 ffd2                     call rdx
+0x1801257c6 488b0dd3ea2800           mov rcx, qword ptr [rip + 0x28ead3] ; novels.pipeline.pipeline_runner#114="model"
+0x1801257cd e91dffffff               jmp 0x1801256ef
+0x1801257d2 48894c2430               mov qword ptr [rsp + 0x30], rcx
+0x1801257d7 4c8d442430               lea r8, [rsp + 0x30]
+0x1801257dc 488bcd                   mov rcx, rbp
+0x1801257df c7472894050000           mov dword ptr [rdi + 0x28], 0x594
+0x1801257e6 488bd3                   mov rdx, rbx
+0x1801257e9 4c89742438               mov qword ptr [rsp + 0x38], r14
+0x1801257ee e85d1f2500               call 0x180377750
+0x1801257f3 833b00                   cmp dword ptr [rbx], 0
+0x1801257f6 488bf0                   mov rsi, rax
+0x1801257f9 7c13                     jl 0x18012580e
+0x1801257fb 48832b01                 sub qword ptr [rbx], 1
+0x1801257ff 750d                     jne 0x18012580e
+0x180125801 488b4b08                 mov rcx, qword ptr [rbx + 8]
+0x180125805 488b5130                 mov rdx, qword ptr [rcx + 0x30]
+0x180125809 488bcb                   mov rcx, rbx
+0x18012580c ffd2                     call rdx
+0x18012580e 4885f6                   test rsi, rsi
+0x180125811 7451                     je 0x180125864
+0x180125813 488bcd                   mov rcx, rbp
+0x180125816 e865c5edff               call 0x180001d80
+0x18012581b 41833e00                 cmp dword ptr [r14], 0
+0x18012581f 7c13                     jl 0x180125834
+0x180125821 49832e01                 sub qword ptr [r14], 1
+0x180125825 750d                     jne 0x180125834
+0x180125827 498b4608                 mov rax, qword ptr [r14 + 8]
+0x18012582b 498bce                   mov rcx, r14
+0x18012582e 488b5030                 mov rdx, qword ptr [rax + 0x30]
+0x180125832 ffd2                     call rdx
+0x180125834 488bc6                   mov rax, rsi
+0x180125837 e97d010000               jmp 0x1801259b9
+0x18012583c 4c8d4828                 lea r9, [rax + 0x28]
+0x180125840 83f960                   cmp ecx, 0x60
+0x180125843 7404                     je 0x180125849
+0x180125845 4c8b4830                 mov r9, qword ptr [rax + 0x30]
+0x180125849 488b0da8ae2600           mov rcx, qword ptr [rip + 0x26aea8]
+0x180125850 4c8b4218                 mov r8, qword ptr [rdx + 0x18]
+0x180125854 488d1565182700           lea rdx, [rip + 0x271865]
+0x18012585b 488b09                   mov rcx, qword ptr [rcx]
+0x18012585e ff15e4af2600             call qword ptr [rip + 0x26afe4]
+0x180125864 488b5d60                 mov rbx, qword ptr [rbp + 0x60]
+0x180125868 48c7456000000000         mov qword ptr [rbp + 0x60], 0

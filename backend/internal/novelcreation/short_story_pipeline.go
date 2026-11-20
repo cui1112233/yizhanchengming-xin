@@ -112,7 +112,7 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	if e := json.Unmarshal(run.PromptSnapshot, &snap); e != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇快照损坏", e)
 	}
-	if snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 1 {
+	if snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 2 {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇审核快照版本无效，已停止生成", nil)
 	}
 	project, e := s.store.GetProject(ctx, owner, run.ProjectID)
@@ -245,6 +245,9 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		status = RunAwaitingConfirmation
 		eventType = "run.checkpoint"
 		message = "短篇大纲已保存，请修改或确认后继续"
+		if result.Checkpoint == "blueprint" {
+			message = "仿写创作蓝图已保存，请修改或确认后继续"
+		}
 		progress = 20
 	}
 	var out Run
@@ -262,7 +265,12 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 			return conflict()
 		}
 		result.Version = old.Version + 1
-		raw, _ := json.Marshal(map[string]any{"shortStoryId": result.ID, "shortOutline": result.Outline, "confirmationKind": "short_outline", "storyVersion": result.Version, "targetWordCount": result.Input.TargetWordCount, "targetChapters": result.Input.TargetChapters})
+		raw, _ := json.Marshal(map[string]any{"shortStoryId": result.ID, "shortOutline": result.Outline, "confirmationKind": func() string {
+			if result.Checkpoint == "blueprint" {
+				return "short_blueprint"
+			}
+			return "short_outline"
+		}(), "storyVersion": result.Version, "targetWordCount": result.Input.TargetWordCount, "targetChapters": result.Input.TargetChapters})
 		result.UpdatedAt = time.Now().UTC()
 		if er = putContent(ctx, tx, owner, run.ProjectID, shortStoryKind, "story", result.Status, time.Time{}, result); er != nil {
 			return er
@@ -306,12 +314,19 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 			return story, e
 		}
 	}
+	if in.ShortImitationVersion >= 2 && story.Input.Mode == "short_imitation" && !confirmed && (story.Input.PauseAfterOutline || (in.Agent != nil && in.Agent.PauseAfterBlueprint != nil && *in.Agent.PauseAfterBlueprint)) {
+		story.Status = "awaiting_confirmation"
+		story.Checkpoint = "blueprint"
+		return story, nil
+	}
+	blueprintConfirmed := in.ShortImitationVersion >= 2 && story.Checkpoint == "blueprint" && confirmed
+	story.Checkpoint = ""
 	brief := shortBrief(story)
 	outline := story.Outline
 	stage := func(label string, progress int, status RunStatus) error {
 		return p.emitStage(ctx, in, sink, status, label, progress)
 	}
-	if !confirmed {
+	if !confirmed || blueprintConfirmed {
 		var e error
 		if e := stage("拆解参考与生成短篇大纲", 5, RunPlanning); e != nil {
 			return story, e
@@ -362,7 +377,7 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 		outline = &v
 		story.Outline = outline
 		story.Title = v.Title
-		if story.Input.PauseAfterOutline || (in.ShortImitationVersion >= 1 && in.Agent != nil && in.Agent.PauseAfterBlueprint != nil && *in.Agent.PauseAfterBlueprint) {
+		if !(in.ShortImitationVersion >= 2 && story.Input.Mode == "short_imitation") && (story.Input.PauseAfterOutline || (in.ShortImitationVersion >= 1 && in.Agent != nil && in.Agent.PauseAfterBlueprint != nil && *in.Agent.PauseAfterBlueprint)) {
 			story.Status = "awaiting_confirmation"
 			return story, nil
 		}

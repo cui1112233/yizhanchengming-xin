@@ -126,11 +126,11 @@ func shortImitationArtifacts(story *ShortStory) {
 		}
 		for i := range story.Artifacts {
 			if story.Artifacts[i].Key == key {
-				story.Artifacts[i] = ShortArtifact{key, title, content}
+				story.Artifacts[i] = ShortArtifact{Key: key, Title: title, Content: content}
 				return
 			}
 		}
-		story.Artifacts = append(story.Artifacts, ShortArtifact{key, title, content})
+		story.Artifacts = append(story.Artifacts, ShortArtifact{Key: key, Title: title, Content: content})
 	}
 	upsert("imitation/deconstruction.md", "六维拆书报告", d.Deconstruction)
 	upsert("imitation/directions.md", "三个仿写方向", d.Directions)
@@ -353,7 +353,7 @@ func (p *Pipeline) finishShortImitation(ctx context.Context, in RunContext, sink
 	if e := saveShortStage(ctx, in, story); e != nil {
 		return e
 	}
-	if v.Rating != "可过审" {
+	if in.ShortImitationVersion < 2 && v.Rating != "可过审" {
 		return inputError("仿写编辑终审" + v.Rating + "，正文与意见已保存，请按修改清单处理：" + truncateRunes(strings.Join(v.Issues, "；"), 300))
 	}
 	return nil

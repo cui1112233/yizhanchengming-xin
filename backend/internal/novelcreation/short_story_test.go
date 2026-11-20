@@ -175,6 +175,14 @@ func TestShortStoryIndependentResultCheckpointEditAndReadback(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	// Freeze a pre-v2 task: old outline checkpoints remain editable and resumable.
+	var legacySnapshot map[string]any
+	_ = json.Unmarshal(out.Run.PromptSnapshot, &legacySnapshot)
+	legacySnapshot["short_imitation_version"] = 1
+	legacyRaw, _ := json.Marshal(legacySnapshot)
+	legacyRun := st.runs[memoryKey("alice", out.Run.ID)]
+	legacyRun.PromptSnapshot = legacyRaw
+	st.runs[memoryKey("alice", out.Run.ID)] = legacyRun
 	run, e := s.Run(ctx, "alice", out.Run.ID)
 	if e != nil || run.Status != RunAwaitingConfirmation {
 		t.Fatal("not checkpointed", run, e)
@@ -190,6 +198,9 @@ func TestShortStoryIndependentResultCheckpointEditAndReadback(t *testing.T) {
 	}
 	if _, e = s.EditShortStoryOutline(ctx, "alice", out.Project.ID, story.Version, *story.Outline); e == nil {
 		t.Fatal("stale edit accepted")
+	}
+	if _, e = s.ConfirmShortStoryWithModel(ctx, "alice", out.Run.ID, updated.Version, "different", "deep"); e == nil {
+		t.Fatal("legacy model freeze changed")
 	}
 	continued, e := s.ConfirmShortStory(ctx, "alice", out.Run.ID, updated.Version)
 	if e != nil {
