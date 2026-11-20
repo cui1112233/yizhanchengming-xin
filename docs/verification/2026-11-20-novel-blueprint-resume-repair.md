@@ -35,4 +35,13 @@
 - 独立MySQL8.4临时库验证两遍小说迁移、账号设置、蓝图编辑/重开/下游采用、成品读回、终审429重试及成功调用复用通过（158.58秒，19次固定回复模拟调用，零付费）。测试库和账号由运行器清理。
 - 独立静态审查未发现阻断问题。原始日志、请求和截图在_local-archive-20261028/novel-blueprint-repair-20261120/。
 
-本地构建及4001身份验证后补入；公网未部署。
+## 本地运行验收
+
+- 源码提交：`c34ef2e6`，仅提交本轮小说文件与证据，其他工作区改动保留。
+- React构建通过（3m19s），Go编译通过。准备embed资源的脚本保留了robocopy成功码1，外层第一次误判失败；已核对脚本完成标记、前端/嵌入index哈希及宠物资源存在后继续编译，没有把此非零码直接当成功跳过检查，也没有修改无关脚本。
+- 本地4001：PID12500，运行`_local-archive-20261028/novel-blueprint-c34ef2e6/qiantie-novel-blueprint.exe`；git_sha、runtime_manifest_sha均为c34ef2e6，health.ok=true，/novel-creation为200。
+- 实际返回的`NovelCreationPage-C1UnCqa5.js`内容与新构建完全一致；SHA256 `57ecc75875c2cff8d07df9c41b7cf63fba3cb9601514243daad038ba0319f4f4`。
+- 已在现有登录浏览器打开并刷新小说入口，DOM确认入口脚本`/assets/user-Bj7mg_zH.js`及创作要求输入框已加载。没有用业务账号生成新稿件来冒充免费验收。
+- 最后复跑全部TestShort及既有PDF解析测试通过（4.546s）；HTTP小说相关定向回归通过。
+- 本轮构建包含本工作区其他并行修改，但没有把它们混入本轮Git提交。因此本地运行是该提交加现有工作区内容，不声称干净检出的全站发布包。
+- 本地运行记录与精简日志见[验收附件](novel-blueprint-repair-20261120/)。公网未部署、未推送、付费请求0。

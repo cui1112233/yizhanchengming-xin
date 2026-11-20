@@ -1,0 +1,23 @@
+{
+  "health": {
+    "ok": true
+  },
+  "build": {
+    "bridge_hits": 0,
+    "bridge_paths": {},
+    "frontend_entry": "/assets/user-Bj7mg_zH.js",
+    "git_sha": "c34ef2e6",
+    "media_engine": {
+      "ffmpeg_path": "F:\\脚本测试\\一战晟铭-v88\\.tools\\ffmpeg\\ffmpeg.exe",
+      "ffmpeg_version": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+      "ffprobe_path": "F:\\脚本测试\\temp_20261022_01\\video-batch-studio\\tools\\ffmpeg-9.0.2-essentials_build\\bin\\ffprobe.exe",
+      "ffprobe_version": "ffprobe version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers",
+      "available": true
+    },
+    "runtime": "go",
+    "runtime_manifest_sha": "c34ef2e6",
+    "service": "go-api"
+  },
+  "pid": 12500,
+  "binary": "F:\\脚本测试\\一战晟铭-v88\\_local-archive-20261028\\novel-blueprint-c34ef2e6\\qiantie-novel-blueprint.exe"
+}

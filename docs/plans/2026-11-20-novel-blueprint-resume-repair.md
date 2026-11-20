@@ -9,7 +9,7 @@
 | 1 原版剩余链路取证 | 已完成（有限范围） | Writer、恢复模型和蓝图重读已确认，见docs/verification/novel-resume-evidence-20261120/FINDINGS.md；未扩大到独立长度整理 |
 | 2 蓝图确认与文件编辑 | 已完成 | 新协议2三步后暂停，保存重开与下游采用在领域及独立MySQL通过；保留旧协议 |
 | 3 生成与终审状态 | 已完成 | 新协议有效非通过报告completed，终态编辑标qualityStale；报告只读，旧协议规则保留 |
-| 4 页面与完整验证 | 进行中 | 6新浏览器+2旧场景、HTTP、领域/prompt/storage及MySQL通过；React构建及4001更新进行中 |
+| 4 页面与完整验证 | 已完成（限定本轮） | 6新浏览器+2旧场景、HTTP、领域/prompt/storage及独立MySQL通过；React/Go构建通过，4001与浏览器入口核验c34ef2e6。回执docs/verification/2026-11-20-novel-blueprint-resume-repair.md；不代表全软件像素/真实模型验收 |
 
 ## 接口与边界
 

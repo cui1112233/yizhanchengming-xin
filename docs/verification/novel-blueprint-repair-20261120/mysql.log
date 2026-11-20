@@ -1,0 +1,7 @@
+=== RUN   TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen
+    short_imitation_mysql_test.go:12: owned studio schema=novelparity202611174265d9d9bdfe MySQL=8.4.11 novel-only migration-pass=1
+    short_imitation_mysql_test.go:12: owned studio schema=novelparity202611174265d9d9bdfe MySQL=8.4.11 novel-only migration-pass=2
+    short_imitation_mysql_test.go:119: account defaults, checkpoint/reopen, completed artifacts, terminal429 retry and completed-call reuse verified in owned MySQL; 19 fake provider calls, zero paid requests
+--- PASS: TestShortImitationOwnedMySQLDefaultsCheckpointAndReopen (158.58s)
+PASS
+ok  	qiantie/backend/internal/novelcreation	159.854s
