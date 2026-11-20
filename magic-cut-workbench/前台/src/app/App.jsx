@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { HomePage } from '../features/home/HomePage.jsx'
 import { EditorPage } from '../features/editor/EditorPage.jsx'
 import { projectIDFromPath } from '../features/editor/editorModel.js'
+import { AccountLogin } from '../features/account-login/AccountLogin.jsx'
 import { loadSession } from '../shared/auth/session.js'
 import { WorkModeMenu } from '../shared/work-mode/WorkModeMenu.jsx'
 import './app.css'
@@ -62,7 +63,8 @@ export function App() {
               <span className="account-gate__mark">M</span>
               <h1>魔剪需要一战晟铭账号</h1>
               <p>{session.message}</p>
-              <Button type="primary" size="large" href={`${window.location.protocol}//${window.location.hostname}:4001/`}>返回一战晟铭</Button>
+              <AccountLogin onAuthenticated={account => setSession({ loading: false, authenticated: true, account, message: '' })} />
+              <Button type="link" href={`${window.location.protocol}//${window.location.hostname}:4001/`}>返回一战晟铭</Button>
             </div>
           </main>
         )}
