@@ -27,9 +27,9 @@
 
 | ID | 功能 | 原版源码证据 | 当前重写位置 | 状态 | 当前验证 | 仍缺什么 |
 |---|---|---|---|---|---|---|
-| MC-001 | 一战晟铭下拉进入魔剪 | 产品集成要求；重写入口约定 | `frontend/src/shared/layouts/WorkModeMenu.jsx`、`前台/src/shared/work-mode/` | 已完成 | 4001 与 4040 均可访问 | 合并生产版前再做一次完整登录跳转验收 |
-| MC-002 | 登录和账号会话 | `/login`、`login-Bq7tpph6.js` | `api/internal/authbridge/`、`前台/src/features/account-login/` | 部分完成 | Go/前端测试通过；4040 可直接登录 | 原版登录弹窗、错误状态和权限差异没有动态截图 |
-| MC-003 | 首页和工作流入口 | `/`、`/dashboard`、`Home-B-_BdFFe.js` | `前台/src/features/home/` | 部分完成 | 首页能打开 | 原版全部工作流卡片、筛选、近期工程状态未补齐 |
+| MC-001 | 一战晟铭下拉进入魔剪 | 产品集成要求；重写入口约定 | `frontend/src/shared/layouts/WorkModeMenu.jsx`、`前台/src/shared/work-mode/` | 已完成 | 4001 与 4040 均可访问 | 合并生产版前验收一次性会话交接、直接进入首页和返回 4001 |
+| MC-002 | 无独立登录页的账号会话 | 一战晟铭直接切换要求；4040 会话交接设计 | `api/internal/authbridge/`、`前台/src/features/account-login/` | 部分完成 | 会话桥和登录测试存在 | 当前 `App.jsx` 仍会显示魔剪账号密码表单；必须删除独立登录入口，失败时只允许提示从一战晟铭重新进入 |
+| MC-003 | 首页和工作流入口 | `/`、`/dashboard`、`Home-B-_BdFFe.js`；2026-11-20 用户 1920×1080 截图 | `前台/src/features/home/` | 部分完成 | 简化首页能打开 | 顶部栏、完整侧栏、三张主卡、工具卡、数据概览、横幅、近期工程状态及像素均未按原版逐项补齐 |
 | MC-004 | 新建工程 | 首页发布包与工程入口 | `api/internal/project/`、`前台/src/features/project-create/` | 已完成 | 接口、模型测试和 4040 流程已验证 | 后续需要补齐全部原版工程模板 |
 | MC-005 | 工程列表、最近工程、重新打开 | 首页发布包 | `api/internal/project/store.go`、`HomePage.jsx` | 部分完成 | 能保存和列出工程 | 排序、搜索、封面、删除、恢复等原版状态未补齐 |
 | MC-006 | 导入视频、图片、音频 | `/cut/:id` 和预加载文件通道 | `api/internal/material/`、`MaterialPanel.jsx` | 已完成 | 上传接口、存储、界面导入测试通过 | 多文件和文件夹批量导入仍未做 |
