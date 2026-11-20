@@ -21,6 +21,7 @@ import ChaptersPanel from './novel-creation/ChaptersPanel.jsx';
 import RunCard from './novel-creation/RunCard.jsx';
 import BlueprintEditor from './novel-creation/BlueprintEditor.jsx';
 import StudioChat from './novel-creation/StudioChat.jsx';
+import { isStudioMode, studioSelectionKey, studioCreationKey } from './novel-creation/studioModes.js';
 import ContinuationImportDialog from './novel-creation/ContinuationImportDialog.jsx';
 import useWorkspaceScope from './novel-creation/useWorkspaceScope.js';
 import { MODE_FIELDS, MODES, STATUS, TERMINAL, availableModel, draftKey, mergeSnapshot, modelOptions, readSaved, validRun } from './novel-creation/contracts.js';
@@ -85,7 +86,7 @@ export default function NovelCreationPage() {
     }
   }
   const request = (path, input, options = {}) => novelProjectRequest(projectId, path, input, { signal: scope.signal, ...options });
-  const studioView = !projectId && activeMode === 'long_original';
+  const studioView = !projectId && isStudioMode(activeMode);
   const modeName = MODES.find(([id]) => id === activeMode)?.[1] || '创作';
   useEffect(() => {
     if (!projectId) { setShortStoryData(null); return; }
@@ -107,6 +108,7 @@ export default function NovelCreationPage() {
     // to be selected. Keep that book accessible only through its own entry.
     setProjectId(''); setSessionId(''); setSnapshot(null); setShortStoryData(null);
     localStorage.setItem('novel:view:'+owner,'studio'); setActiveMode(id);
+    if(isStudioMode(id))setStudioSessionId(localStorage.getItem(studioSelectionKey(owner,id))||'');
     if (id === 'short_imitation') setShortDialog(id);
     if (id === 'continuation') setContinuationOpen(true);
   }
@@ -117,7 +119,7 @@ export default function NovelCreationPage() {
     return () => { window.removeEventListener('storage', check); clearInterval(timer); };
   }, []);
   useEffect(() => {
-    setLoading(true); setShortDialog(null); setShortStoryData(null); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false); setContinuationOpen(false); setLongImitationOpen(false); setProjectChapters(null); setSessionsLoadedKey(''); setStudioSessions([]); setStudioSessionId(localStorage.getItem('novel:studio:selected:'+owner)||'');
+    setLoading(true); setShortDialog(null); setShortStoryData(null); setProjectId(''); setSessionId(''); setSnapshot(null); setSessions([]); setModels([]); setTool(''); setImportOpen(false); setMemoOpen(false); setContinuationOpen(false); setLongImitationOpen(false); setProjectChapters(null); setSessionsLoadedKey(''); setStudioSessions([]); setStudioSessionId(localStorage.getItem(studioSelectionKey(owner,localStorage.getItem('novel:mode:'+owner)||'long_original'))||'');
     ownerScope.call(novelRequest('/studio-sessions',undefined,{signal:ownerScope.signal}),r=>setStudioSessions(r.sessions||[])).catch(()=>{});
     ownerScope.call(Promise.allSettled([novelRequest('/projects', undefined, { signal: ownerScope.signal }), listAvailableModels('text'), getProjectRetention(), getCurrentAccount(), getConfig()]), results => {
       if (results[0].status === 'fulfilled') { const items = results[0].value.projects || []; setProjects(items); const saved = localStorage.getItem('novel:project:' + owner); setProjectId(localStorage.getItem('novel:view:'+owner)==='studio'?'':items.some(p => p.id === saved) ? saved : items[0]?.id || ''); }
@@ -210,15 +212,15 @@ export default function NovelCreationPage() {
 
   async function createUnboundSession() {
     if (flight.current || !ownerScope.isCurrent()) return;
-    const token={};flight.current=token;const startedEpoch=currentView.current.studioEpoch;const cache='novel:studio:create-intent:'+owner;
+    const token={};flight.current=token;const startedEpoch=currentView.current.studioEpoch;const cache=studioCreationKey(owner,activeMode);
     try {
       let creation=readSaved(cache,null);
-      if(!creation){creation={idempotencyKey:crypto.randomUUID(),mode:'long_original'};localStorage.setItem(cache,JSON.stringify(creation));}
+      if(!creation){creation={idempotencyKey:crypto.randomUUID(),mode:activeMode};localStorage.setItem(cache,JSON.stringify(creation));}
       const result=await ownerScope.call(novelRequest('/studio-sessions',creation,{signal:ownerScope.signal}));
       if(!result?.session?.id)return;
       localStorage.removeItem(cache);setStudioSessions(old=>[result.session,...old.filter(x=>x.id!==result.session.id)]);
       if(currentView.current.owner===owner&&currentView.current.projectId===''&&currentView.current.studioEpoch===startedEpoch){
-        setStudioSessionId(result.session.id);localStorage.setItem('novel:studio:selected:'+owner,result.session.id);localStorage.setItem('novel:view:'+owner,'studio');setTool('');
+        setStudioSessionId(result.session.id);localStorage.setItem(studioSelectionKey(owner,result.session.mode||activeMode),result.session.id);localStorage.setItem('novel:view:'+owner,'studio');setTool('');
       }
       return result.session;
     } catch(e){if(ownerScope.isCurrent())message.error(e.message||'创作会话暂时无法创建，原编号已保留');}
@@ -226,7 +228,7 @@ export default function NovelCreationPage() {
   }
   async function createSession(explicit = true) {
     if (!scope.isCurrent()) return;
-    if (!projectId && activeMode==='long_original') return createUnboundSession();
+    if (!projectId && isStudioMode(activeMode)) return createUnboundSession();
     if (!projectId) { setProjectModal(true); return; }
     if (archived || flight.current === key + ':session') return;
     flight.current = key + ':session';
@@ -344,14 +346,14 @@ export default function NovelCreationPage() {
         <h3>开始创作</h3><div className="novel-creation-mode-tabs">{MODES.map(([id, name]) => { const Icon=creationIcons[id]; return <button type="button" className={(longImitationOpen ? id==='long_imitation' : activeMode === id) ? 'active' : ''} key={id} onClick={() => enterCreation(id)}><Icon size={15} aria-hidden="true"/><span>{name}</span></button>; })}</div>
         <div className="novel-sidebar-heading"><b>我的作品 {visibleProjects.length}</b><Button aria-label="新建作品" type="text" icon={<Plus size={16} />} onClick={() => setProjectModal(true)} /><Button aria-label="作品归档库" type="text" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)} /></div>
         <div className="novel-projects">{visibleProjects.map(p => <div key={p.id} className="novel-project"><button type="button" aria-label={`选择作品${p.title}`} className={projectId === p.id ? 'active' : ''} onClick={() => { localStorage.setItem('novel:view:'+owner,'book');setProjectId(p.id);const savedMode=localStorage.getItem(`novel:project-mode:${owner}:${p.id}`);if(savedMode)setActiveMode(savedMode);setTool(''); }}>{p.title}</button>{projectId === p.id && <div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'project', action: 'rename', title: p.title })}>重命名作品</Button><Button size="small" onClick={() => setManage({ type: 'project', action: 'archive' })}>归档作品</Button></div>}</div>)}</div>
-        {studioSessions.length>0&&<><div className="novel-session-heading">创作会话记录</div><div className="novel-sessions">{studioSessions.map(item=><div className="novel-session" key={item.id}><button type="button" className={studioView&&studioSessionId===item.id?'active':''} onClick={()=>{setActiveMode('long_original');setProjectId('');setStudioSessionId(item.id);setTool('');localStorage.setItem('novel:studio:selected:'+owner,item.id);localStorage.setItem('novel:view:'+owner,'studio');}}>{item.title}{item.projectId?' · 已建作品':''}</button></div>)}</div></>}
-        <div className="novel-session-heading">{studioView?'未关联作品的长篇原创会话':modeName+'会话'}</div><div className="novel-sessions">{sessions.filter(s => s.mode === activeMode).map(s => <div className="novel-session" key={s.id}><button type="button" disabled={!!s.archivedAt} className={sessionId === s.id ? 'active' : ''} onClick={() => { setSessionId(s.id); setTool(''); }}>{s.title}{s.archivedAt ? '（已归档）' : s.currentRunId ? ' · 有任务' : ''}</button><div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: 'rename', title: s.title })}>重命名会话</Button><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'archive' })}>{s.archivedAt ? '恢复会话' : '归档会话'}</Button></div></div>)}</div><Button onClick={() => createSession()} icon={<Plus size={14} />} disabled={archived}>新建会话</Button>
+        {studioSessions.some(item=>(item.mode||'long_original')===activeMode)&&<><div className="novel-session-heading">创作会话记录</div><div className="novel-sessions">{studioSessions.filter(item=>(item.mode||'long_original')===activeMode).map(item=><div className="novel-session" key={item.id}><button type="button" className={studioView&&studioSessionId===item.id?'active':''} onClick={()=>{setActiveMode(item.mode||'long_original');setProjectId('');setStudioSessionId(item.id);setTool('');localStorage.setItem(studioSelectionKey(owner,item.mode||'long_original'),item.id);localStorage.setItem('novel:view:'+owner,'studio');}}>{item.title}{item.projectId?' · 已建作品':''}</button></div>)}</div></>}
+        <div className="novel-session-heading">{studioView?'未关联作品的'+modeName+'会话':modeName+'会话'}</div><div className="novel-sessions">{sessions.filter(s => s.mode === activeMode).map(s => <div className="novel-session" key={s.id}><button type="button" disabled={!!s.archivedAt} className={sessionId === s.id ? 'active' : ''} onClick={() => { setSessionId(s.id); setTool(''); }}>{s.title}{s.archivedAt ? '（已归档）' : s.currentRunId ? ' · 有任务' : ''}</button><div className="novel-actions"><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: 'rename', title: s.title })}>重命名会话</Button><Button size="small" onClick={() => setManage({ type: 'session', id: s.id, action: s.archivedAt ? 'restore' : 'archive' })}>{s.archivedAt ? '恢复会话' : '归档会话'}</Button></div></div>)}</div><Button onClick={() => createSession()} icon={<Plus size={14} />} disabled={archived}>新建会话</Button>
         </div><nav className="novel-creation-toolbar" aria-label="创作工具">{TOOLS.map(([label, Icon]) => <Button key={label} type="text" className={tool === label ? 'active' : ''} icon={<Icon size={16} />} onClick={() => openTool(label)}>{label}</Button>)}</nav>
       </aside>
       {tool ? <section className="novel-creation-tool-workspace" aria-label={tool}>
         <header className="novel-chat-heading"><Button onClick={() => setTool('')}>返回对话</Button><b>{tool}</b></header>
         <div className="novel-tool-content" key={scopeKey + ':' + tool}>{tool === '定时写作' ? <SchedulerPanel key={projectReadKey} owner={owner} projectId={projectId} sessionId={sessionId} mode={activeMode} modelId={draft.modelId} models={models} ensureSession={() => createSession(false)} onOpenSession={openScheduledSession}/> : tool === 'Agent设置' ? <AgentPanel projectId={projectId} models={models} mode={activeMode} /> : !projectId ? <Empty description="请先选择作品后使用此工具" /> : tool === '写作风格' ? <MaterialsPanel {...materialsProps} styleMode /> : <div className="novel-panel"><p>统计已保存正文，失败次数不计为章节。</p>{dashboard ? <dl>{[['章节数', dashboard.chapterCount], ['总字数', dashboard.totalWords], ['任务总数', dashboard.runTotal], ['成功率', `${Number(dashboard.successRate ?? 0).toFixed(1)}%`]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : <Empty description="暂无统计" />}</div>}</div>
-      </section> : studioView ? <StudioChat key={`${owner}:${studioSessionId}`} owner={owner} sessionId={studioSessionId} models={models} onSessionSelected={id=>setStudioSessionId(id)} onSessionCreated={item=>setStudioSessions(old=>[item,...old.filter(x=>x.id!==item.id)])} onTransition={result=>{if(result.assistedAction){if(result.targetRoute==='imitation'){setLongImitationEntry(n=>n+1);setLongImitationOpen(true);}else if(result.targetRoute==='chapters')setContinuationOpen(true);return;}setProjects(old=>[result.project,...old.filter(x=>x.id!==result.project.id)]);localStorage.setItem('novel:view:'+owner,'book');localStorage.setItem('novel:project:'+owner,result.project.id);const mode=result.productionSession.mode;localStorage.setItem(`novel:session:${owner}:${result.project.id}:${mode}`,result.productionSession.id);localStorage.setItem(`novel:project-mode:${owner}:${result.project.id}`,mode);setProjectId(result.project.id);setActiveMode(mode);setSessionId(result.productionSession.id);if(result.story)setShortStoryData({key:`${owner}:${result.project.id}`,story:result.story});setTool('');setRefresh(v=>v+1);}}/> : <><section className="novel-creation-conversation">
+      </section> : studioView ? <StudioChat key={`${owner}:${activeMode}:${studioSessionId}`} owner={owner} mode={activeMode} sessionId={studioSessionId} models={models} onSessionSelected={id=>setStudioSessionId(id)} onSessionCreated={item=>setStudioSessions(old=>[item,...old.filter(x=>x.id!==item.id)])} onTransition={result=>{if(result.assistedAction){if(result.targetRoute==='imitation'){setLongImitationEntry(n=>n+1);setLongImitationOpen(true);}else if(result.targetRoute==='chapters')setContinuationOpen(true);return;}setProjects(old=>[result.project,...old.filter(x=>x.id!==result.project.id)]);localStorage.setItem('novel:view:'+owner,'book');localStorage.setItem('novel:project:'+owner,result.project.id);const mode=result.productionSession.mode;localStorage.setItem(`novel:session:${owner}:${result.project.id}:${mode}`,result.productionSession.id);localStorage.setItem(`novel:project-mode:${owner}:${result.project.id}`,mode);setProjectId(result.project.id);setActiveMode(mode);setSessionId(result.productionSession.id);if(result.story)setShortStoryData({key:`${owner}:${result.project.id}`,story:result.story});setTool('');setRefresh(v=>v+1);}}/> : <><section className="novel-creation-conversation">
         <header className="novel-chat-heading"><b>{currentSession?.title || modeName}</b>{connection && <button type="button" className="novel-connection" onClick={() => setRefresh(v => v + 1)}>{connection}</button>}</header>
         <div className="novel-creation-chat-scroll">{!snapshot?.messages?.length && !run && <div className="novel-creation-welcome"><p>告诉我你想写什么——题材、世界观、主角、核心冲突。</p></div>}
           {(snapshot?.messages || []).map((m, i) => <article key={m.id || i} className={`novel-creation-message ${m.role}`}><b>{m.role === 'user' ? '我' : '创作助手'}</b><p>{m.content}</p></article>)}

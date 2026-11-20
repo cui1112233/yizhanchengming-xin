@@ -6,12 +6,13 @@ import { availableModel, readSaved } from './contracts.js';
 import useWorkspaceScope from './useWorkspaceScope.js';
 import './StudioChat.css';
 import ComposerToolbar from './ComposerToolbar.jsx';
+import { studioDraftKey, studioSelectionKey } from './studioModes.js';
 
 const waiting = new Set(['prepared', 'may_have_sent', 'received']);
 const terminal = new Set(['completed', 'rejected', 'invalid_output']);
-const keyFor = (owner,id) => `novel:studio:${encodeURIComponent(owner)}:${encodeURIComponent(id||'new')}`;
-export default function StudioChat({owner,sessionId='',newSessionToken=0,models=[],onSessionSelected,onSessionCreated,onTransition}) {
- const scope=useWorkspaceScope(`${owner}:${sessionId}:${newSessionToken}`),key=keyFor(owner,sessionId);
+const keyFor = studioDraftKey;
+export default function StudioChat({owner,mode='long_original',sessionId='',newSessionToken=0,models=[],onSessionSelected,onSessionCreated,onTransition}) {
+ const scope=useWorkspaceScope(`${owner}:${mode}:${sessionId}:${newSessionToken}`),key=keyFor(owner,sessionId,mode);
  const [snapshot,setSnapshot]=useState(null),[localID,setLocalID]=useState(sessionId),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false);
  const [draftState,setDraftState]=useState(null),[revision,setRevision]=useState(0),[actionBusy,setActionBusy]=useState(false);
  const flight=useRef(null),composition=useRef(false);
@@ -31,8 +32,8 @@ export default function StudioChat({owner,sessionId='',newSessionToken=0,models=
   if(!next?.session?.id)throw Error('会话返回内容无效，请核对原请求');setSnapshot(next);setLocalID(next.session.id);
   if(pending&&next.turn?.idempotencyKey===pending.messageKey&&terminal.has(next.turn.state)) {clearIntent(pending);if(next.turn.state==='completed'){for(const alias of pending.aliases||[key])localStorage.removeItem(alias+':error');setError('');const cleared={...draft,content:''};setDraftState({key,value:cleared});for(const alias of pending.aliases||[key])localStorage.setItem(alias+':draft',JSON.stringify(cleared));}}
  }
- async function check(){const id=localID||intent?.sessionId||sessionId;if(!id)return;try{await scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(id)}`,undefined,{signal:scope.signal}),next=>{accept(next);setError('');localStorage.setItem('novel:studio:selected:'+owner,id);if(sessionId!==id)onSessionSelected?.(id);});}catch(e){if(scope.isCurrent())setError(e.message);}}
- useEffect(()=>{setSnapshot(null);setLocalID(sessionId);setError(readSaved(key+':error',''));setBusy(false);setActionBusy(false);flight.current=null;if(!sessionId)return;setLoading(true);scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(sessionId)}`,undefined,{signal:scope.signal}),next=>accept(next)).catch(e=>setError(e.message)).finally(()=>{if(scope.isCurrent())setLoading(false);});},[owner,sessionId,newSessionToken]);
+ async function check(){const id=localID||intent?.sessionId||sessionId;if(!id)return;try{await scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(id)}`,undefined,{signal:scope.signal}),next=>{accept(next);setError('');localStorage.setItem(studioSelectionKey(owner,mode),id);if(sessionId!==id)onSessionSelected?.(id);});}catch(e){if(scope.isCurrent())setError(e.message);}}
+ useEffect(()=>{setSnapshot(null);setLocalID(sessionId);setError(readSaved(key+':error',''));setBusy(false);setActionBusy(false);flight.current=null;if(!sessionId)return;setLoading(true);scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(sessionId)}`,undefined,{signal:scope.signal}),next=>accept(next)).catch(e=>setError(e.message)).finally(()=>{if(scope.isCurrent())setLoading(false);});},[owner,mode,sessionId,newSessionToken]);
  useEffect(()=>{if(!localID||(!intent&&!waiting.has(snapshot?.turn?.state)))return;let timer,disposed=false;
   async function poll(){try{const next=await scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(localID)}`,undefined,{signal:scope.signal}));if(!next||disposed)return;accept(next);if(!waiting.has(next.turn?.state)&&next.turn?.state)return;}catch(e){if(scope.isCurrent())setError(e.message);}if(scope.isCurrent()&&!disposed)timer=setTimeout(poll,2000);}
   timer=setTimeout(poll,1200);return()=>{disposed=true;clearTimeout(timer);};
@@ -43,18 +44,18 @@ export default function StudioChat({owner,sessionId='',newSessionToken=0,models=
   if(!draft.content.trim()){setError('请输入创作要求');return;}
   if(!availableModel(models,draft.modelId)){setError('请选择当前可用的文本模型');return;}
   const token={};flight.current=token;setBusy(true);setError('');localStorage.removeItem(key+':error');
-  let pending={creationKey:crypto.randomUUID(),messageKey:crypto.randomUUID(),sessionId:sessionId||localID,input:{content:draft.content.trim(),modelId:draft.modelId,thinkingLevel:draft.thinkingLevel,contextBudget:draft.contextBudget},aliases:[key]};
+  let pending={mode,creationKey:crypto.randomUUID(),messageKey:crypto.randomUUID(),sessionId:sessionId||localID,input:{content:draft.content.trim(),modelId:draft.modelId,thinkingLevel:draft.thinkingLevel,contextBudget:draft.contextBudget},aliases:[key]};
   try{
    localStorage.setItem(key+':intent',JSON.stringify(pending));setRevision(v=>v+1);
-   if(!pending.sessionId){const created=await scope.call(novelRequest('/studio-sessions',{idempotencyKey:pending.creationKey,mode:'long_original'},{signal:scope.signal}));if(!created)return;if(!created.session?.id)throw Error('创建会话返回无效，原编号已保留');pending=bindSession(pending,created.session.id);setLocalID(created.session.id);onSessionCreated?.(created.session);}
+   if(!pending.sessionId){const created=await scope.call(novelRequest('/studio-sessions',{idempotencyKey:pending.creationKey,mode:pending.mode||mode},{signal:scope.signal}));if(!created)return;if(!created.session?.id)throw Error('创建会话返回无效，原编号已保留');pending=bindSession(pending,created.session.id);setLocalID(created.session.id);onSessionCreated?.(created.session);}
    const next=await scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(pending.sessionId)}/messages`,{...pending.input,idempotencyKey:pending.messageKey},{signal:scope.signal}));if(!next)return;accept(next,pending);
   }catch(e){if(scope.isCurrent()){setError(e.message||'回复暂时无法读取，原请求已保留');rememberError(pending,e.message||'回复暂时无法读取，原请求已保留');if(e.status>=400&&e.status<500&&![408,409,429].includes(e.status))clearIntent(pending);}}
-  finally{if(flight.current===token)flight.current=null;if(scope.isCurrent()){setBusy(false);if(pending.sessionId){localStorage.setItem('novel:studio:selected:'+owner,pending.sessionId);onSessionSelected?.(pending.sessionId);}}}
+  finally{if(flight.current===token)flight.current=null;if(scope.isCurrent()){setBusy(false);if(pending.sessionId){localStorage.setItem(studioSelectionKey(owner,mode),pending.sessionId);onSessionSelected?.(pending.sessionId);}}}
  }
  async function recoverCreation(){
   if(!intent||intent.sessionId||flight.current)return;
   const token={};flight.current=token;setBusy(true);setError('');
-  try{const created=await scope.call(novelRequest('/studio-sessions',{idempotencyKey:intent.creationKey,mode:'long_original'},{signal:scope.signal}));if(!created?.session?.id)return;const pending=bindSession(intent,created.session.id);onSessionCreated?.(created.session);setLocalID(created.session.id);onSessionSelected?.(created.session.id);setError('原会话已核对。该消息尚未发给模型，请明确选择发送原消息。');}
+  try{const created=await scope.call(novelRequest('/studio-sessions',{idempotencyKey:intent.creationKey,mode:intent.mode||mode},{signal:scope.signal}));if(!created?.session?.id)return;const pending=bindSession(intent,created.session.id);onSessionCreated?.(created.session);setLocalID(created.session.id);onSessionSelected?.(created.session.id);setError('原会话已核对。该消息尚未发给模型，请明确选择发送原消息。');}
   catch(e){if(scope.isCurrent())setError(e.message);}finally{if(flight.current===token)flight.current=null;if(scope.isCurrent())setBusy(false);}
  }
  async function sendPrepared(){
@@ -66,8 +67,8 @@ export default function StudioChat({owner,sessionId='',newSessionToken=0,models=
  async function act(cancel=false){if(flight.current||actionBusy||!action?.id)return;const token={};flight.current=token;setActionBusy(true);setError('');try{const next=await scope.call(novelRequest(`/studio-sessions/${encodeURIComponent(localID)}/actions/${cancel?'cancel':'confirm'}`,cancel?{actionId:action.id}:{actionId:action.id,modelId:draft.modelId,thinkingLevel:draft.thinkingLevel},{signal:scope.signal}));if(!next)return;if(cancel)accept(next);else if(next.assistedAction&&['imitation','chapters'].includes(next.targetRoute)){setSnapshot(old=>({...old,pendingAction:{...old.pendingAction,status:'confirmed'}}));onTransition?.(next);}else if(next.project?.id&&next.productionSession?.id&&next.run?.id)onTransition?.(next);else throw Error('创建结果尚不完整，请核对同一动作');}catch(e){if(scope.isCurrent())setError(e.message);}finally{if(flight.current===token)flight.current=null;if(scope.isCurrent())setActionBusy(false);}}
  const unconfirmed=intent&&snapshot?.turn?.idempotencyKey!==intent.messageKey;
  const linked=!!snapshot?.session?.projectId||(action?.status==='confirmed'&&!isAssisted);
- return <section className="novel-creation-conversation novel-studio-chat" aria-label="建书前会话">
-  <header className="novel-chat-heading"><b>{snapshot?.session?.title||'长篇原创'}</b><span>创作对话</span></header>
+ return <section className="novel-creation-conversation novel-studio-chat" aria-label={mode==='short_original'?'短篇创作会话':'建书前会话'}>
+  <header className="novel-chat-heading"><b>{snapshot?.session?.title||(mode==='short_original'?'短篇原创':'长篇原创')}</b><span>创作对话</span></header>
   <div className="novel-creation-chat-scroll">
    {loading&&<Spin aria-label="读取创作会话"/>}
    {!snapshot?.messages?.length&&<div className="novel-creation-welcome"><p>告诉我你想写什么——题材、世界观、主角、核心冲突。</p></div>}

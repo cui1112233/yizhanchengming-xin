@@ -109,14 +109,17 @@ func (s *Service) CreateStudioSession(ctx context.Context, owner string, in Stud
 	if err = studioKey(in.IdempotencyKey); err != nil {
 		return
 	}
-	if in.Mode != "long_original" {
-		return out, inputError("此入口目前仅支持长篇原创会话")
+	if in.Mode != "long_original" && in.Mode != "short_original" {
+		return out, inputError("请选择长篇或短篇原创讨论")
 	}
 	if utf8.RuneCountInString(in.Title) > 255 {
 		return out, inputError("会话名称不能超过255字")
 	}
 	if in.Title == "" {
 		in.Title = "长篇原创讨论"
+		if in.Mode == "short_original" {
+			in.Title = "短篇原创讨论"
+		}
 	}
 	digest := fingerprint(in)
 	err = s.store.AtomicCreate(ctx, owner, func(tx Store) error {
@@ -192,6 +195,9 @@ func settleStudio(r *studioRecord) bool {
 			result.Action.StudioShortProposal = normalized
 		} else if studioAssistedRoute(result.Action.Type) == "" && (result.Action.Type != "create_book" || b.Title == "" || b.Genre == "" || utf8.RuneCountInString(b.Title) > 255 || utf8.RuneCountInString(b.Genre) > 96 || utf8.RuneCountInString(b.World) > 12000 || utf8.RuneCountInString(b.Protagonist) > 4000 || utf8.RuneCountInString(b.CoreConflict) > 4000 || b.TargetChapterWords < 800 || b.TargetChapterWords > 8000) {
 			e = errors.New("invalid action")
+		}
+		if r.Session.Mode == "short_original" && result.Action.Type == "create_book" {
+			e = errors.New("short discussion cannot create long book")
 		}
 	}
 	if e != nil {
