@@ -1,8 +1,11 @@
 # Magic Cut 1:1 功能与重写完整度报告
 
-> 报告日期：2026-11-20  
-> 报告类型：普通 Electron/JavaScript 逆向与重写核对（`flavor = null`）  
-> 目标版本：`1.5.3-rc.52.23`  
+> 报告日期：2026-11-20
+>
+> 报告类型：普通 Electron/JavaScript 逆向与重写核对（`flavor = null`）
+>
+> 目标版本：`1.5.3-rc.52.23`
+>
 > 长期台账：[parity/feature-ledger.md](parity/feature-ledger.md)
 
 ## 1. 执行摘要
