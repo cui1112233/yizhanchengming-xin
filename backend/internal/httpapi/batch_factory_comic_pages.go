@@ -1835,6 +1835,16 @@ func comicPromptPreviewDeveloper(ctx context.Context, owner string, accounts aut
 	return toString(authAccountPayload(account, profiles)["role"]) == "dev"
 }
 
+// comicPromptTextIsJSON 识别被截断 JSON 信封污染的提示词。正常提示词是
+// 中文描述，不会以 { 或 [ 开头。
+func comicPromptTextIsJSON(text string) bool {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	return trimmed[0] == '{' || trimmed[0] == '['
+}
+
 func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, files *localartifact.Store, localExecutors *localexecutor.Service, catalogStore novelfetchworkshop.Store, userConfig *UserConfigStore, presetCatalog *prompt.Catalog, accounts auth.Store, profiles *MemberProfileStore, director *batchfactoryv11.DirectorService, generationGate *comicPageGenerationGate, imageCache imagegenerationcache.Repository) {
 	registerComicSourceSegmentRoutes(mux, store, director)
 	comicStore, ok := store.(batchfactoryv11.ComicPageStore)
@@ -1843,6 +1853,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	}
 	const pages = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-pages"
 	const page = pages + "/{videoId}"
+	const repairPrompts = pages + "/repair-prompts"
 	const promptZip = pages + "/download-zip"
 	// images-zip 只打包每页主图；提示词与资产图仍走 download-zip。
 	const imagesZip = pages + "/images-zip"
@@ -2177,6 +2188,43 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"updated": updated})
+	})
+	mux.HandleFunc("POST "+repairPrompts, func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if director == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "漫画提示词服务未配置"})
+			return
+		}
+		pagesList, err := comicStore.ListComicPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		videoIDs := make([]string, 0)
+		for _, page := range pagesList {
+			// 只有被截断 JSON 污染过的页才重抽，正常页保持用户已接受的内容。
+			if comicPromptTextIsJSON(page.ComicPrompt) || comicPromptTextIsJSON(page.ImagePrompt) {
+				videoIDs = append(videoIDs, page.VideoID)
+			}
+		}
+		if len(videoIDs) == 0 {
+			writeJSON(w, http.StatusOK, map[string]any{"candidatePages": 0, "updated": 0, "failed": 0})
+			return
+		}
+		result, runErr := director.RunComicPromptExtractionForPages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), videoIDs)
+		payload := map[string]any{
+			"candidatePages": len(videoIDs),
+			"updated":        len(result.Updated),
+			"failed":         len(result.Failed),
+		}
+		if runErr != nil {
+			payload["error"] = runErr.Error()
+		}
+		writeJSON(w, http.StatusOK, payload)
 	})
 	mux.HandleFunc("POST "+page+"/generate", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)

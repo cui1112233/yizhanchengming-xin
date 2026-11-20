@@ -89,3 +89,69 @@ func TestPromptRecoveryOnlyCallsMissing(t *testing.T) {
 		}
 	}
 }
+
+func TestPromptExtractionOnlyTargetsRequestedPages(t *testing.T) {
+	ctx := WithComicPromptConcurrency(context.Background(), 1)
+	store := NewMemoryStore()
+	videos := make([]CreateVideoInput, 0, 3)
+	for index := 0; index < 3; index++ {
+		videos = append(videos, CreateVideoInput{
+			Label:       fmt.Sprintf("漫画页 %02d", index+1),
+			VideoPrompt: fmt.Sprintf("第 %d 页画面。", index+1),
+		})
+	}
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{
+		Title: "K", SourceText: "女主依次走过三个房间。", Videos: videos,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	config := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "整书漫画页提示词"}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": config}, ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	store.mu.Lock()
+	store.bookAssets["comic-asset"] = memoryOwned[BookAsset]{Owner: "alice", Value: BookAsset{ID: "comic-asset", BatchID: batch.ID, BookID: book.ID, Kind: "character", Name: "女主", Prompt: "漫画少女", Source: "comic"}}
+	store.mu.Unlock()
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 中间页已有正常提示词，重抽时必须原样保留。
+	keep := latest.Books[0].Videos[1]
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: keep.ID}, SettingsUpdate{
+		Patch:            SettingsPatch{"comicPrompt": rawSetting(t, "已确认导演说明"), "comicImagePrompt": rawSetting(t, "已确认图片词")},
+		ExpectedRevision: keep.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	values := make([]string, 0, 2)
+	for _, index := range []int{0, 2} {
+		video := latest.Books[0].Videos[index]
+		values = append(values, fmt.Sprintf(`{"pages":[{"video_id":%q,"screen_prompt":"重抽第 %d 页","image_prompt":"重抽出图 %d"}]}`, video.ID, index+1, index+1))
+	}
+	provider := &queuedDirectorProvider{values: values}
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtractionForPages(ctx, "alice", batch.ID, book.ID, []string{latest.Books[0].Videos[0].ID, latest.Books[0].Videos[2].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("provider calls=%d, want 2（未指定的页不得重抽）", len(provider.calls))
+	}
+	if len(result.Updated) != 2 || len(result.Failed) != 0 {
+		t.Fatalf("updated=%d failed=%d, want 2/0", len(result.Updated), len(result.Failed))
+	}
+	persisted, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := persisted.Books[0].Videos[1].ComicPrompt; got != "已确认导演说明" {
+		t.Fatalf("未指定的页被覆盖: %q", got)
+	}
+	if got := persisted.Books[0].Videos[0].ComicPrompt; got != "重抽第 1 页" {
+		t.Fatalf("指定页未重抽: %q", got)
+	}
+}

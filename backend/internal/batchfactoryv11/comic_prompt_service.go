@@ -451,7 +451,14 @@ func (s *DirectorService) RunMissingComicPromptExtraction(ctx context.Context, o
 	return s.runComicPromptExtraction(ctx, owner, batchID, bookID, true)
 }
 
-func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, batchID, bookID string, onlyMissing bool) (ComicPromptExtractionResult, error) {
+// RunComicPromptExtractionForPages re-extracts only the given pages. It is
+// used to repair pages whose stored prompt was polluted by a truncated JSON
+// envelope; completed sibling pages are left untouched.
+func (s *DirectorService) RunComicPromptExtractionForPages(ctx context.Context, owner, batchID, bookID string, videoIDs []string) (ComicPromptExtractionResult, error) {
+	return s.runComicPromptExtraction(ctx, owner, batchID, bookID, false, videoIDs...)
+}
+
+func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, batchID, bookID string, onlyMissing bool, onlyVideoIDs ...string) (ComicPromptExtractionResult, error) {
 	empty := ComicPromptExtractionResult{Updated: []Video{}}
 	if err := s.validate(); err != nil {
 		return empty, err
@@ -496,11 +503,26 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 		return empty, fmt.Errorf("%w: 当前书为视频生成模式", ErrConflict)
 	}
 	targets := book.Videos
-	if onlyMissing {
-		targets = missingComicPromptVideos(book.Videos, snapshot)
-		if len(targets) == 0 {
-			return empty, nil
+	if len(onlyVideoIDs) > 0 {
+		wanted := make(map[string]struct{}, len(onlyVideoIDs))
+		for _, id := range onlyVideoIDs {
+			if trimmed := strings.TrimSpace(id); trimmed != "" {
+				wanted[trimmed] = struct{}{}
+			}
 		}
+		filtered := make([]Video, 0, len(wanted))
+		for _, video := range book.Videos {
+			if _, ok := wanted[video.ID]; ok {
+				filtered = append(filtered, video)
+			}
+		}
+		targets = filtered
+	}
+	if onlyMissing {
+		targets = missingComicPromptVideos(targets, snapshot)
+	}
+	if len(targets) == 0 {
+		return empty, nil
 	}
 	// Book-level concurrency does not help when a batch contains one book.
 	// Keep one request per page, but process at most five pages in parallel so
