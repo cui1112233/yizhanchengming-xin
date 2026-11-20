@@ -9,7 +9,7 @@ function clipID() {
   return `clip_${crypto.randomUUID().replaceAll('-', '')}`
 }
 
-export function Timeline({ projectID, materialToInsert, onMaterialInserted, playheadMs = 0, onSeek, onSelectClip }) {
+export function Timeline({ projectID, materialToInsert, onMaterialInserted, playheadMs = 0, onSeek, onSelectClip, onTimelineChange }) {
   const [timeline, setTimeline] = useState(null)
   const [selectedClip, setSelectedClip] = useState('')
   const [undoStack, setUndoStack] = useState([])
@@ -24,6 +24,10 @@ export function Timeline({ projectID, materialToInsert, onMaterialInserted, play
       .then(payload => { setTimeline(payload.timeline); setSaveState('已保存') })
       .catch(error => setConflict(error.message || '时间线读取失败'))
   }, [projectID])
+
+  useEffect(() => {
+    if (timeline) onTimelineChange?.(timeline)
+  }, [timeline, onTimelineChange])
 
   const run = useCallback(command => {
     setTimeline(current => {

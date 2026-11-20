@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { ExportDialog } from '../export/ExportDialog.jsx'
 import { MaterialPanel } from '../materials/MaterialPanel.jsx'
 import { Player } from '../player/Player.jsx'
+import { videoClipsFromTimeline } from '../player/playerModel.js'
 import { Timeline } from '../timeline/Timeline.jsx'
 import { commandForShortcut } from './editorModel.js'
 
@@ -13,6 +14,8 @@ export function EditorPage({ projectID }) {
   const [exportOpen, setExportOpen] = useState(false)
   const [preview, setPreview] = useState(null)
   const [playheadMs, setPlayheadMs] = useState(0)
+  const [timelineSnapshot, setTimelineSnapshot] = useState(null)
+  const videoClips = videoClipsFromTimeline(timelineSnapshot)
   useEffect(() => {
     const onKeyDown = event => {
       const command = commandForShortcut(event)
@@ -33,7 +36,15 @@ export function EditorPage({ projectID }) {
       </header>
       <div className="editor-workspace">
         <MaterialPanel projectID={projectID} onInsert={setQueuedMaterial} />
-        <Player projectID={projectID} clip={preview?.clip} timelineDurationMs={preview?.timelineDurationMs || 0} playheadMs={playheadMs} onPlayheadChange={setPlayheadMs} />
+        <Player
+          projectID={projectID}
+          clip={preview?.clip}
+          clips={videoClips}
+          timelineDurationMs={timelineSnapshot?.durationMs || preview?.timelineDurationMs || 0}
+          playheadMs={playheadMs}
+          onPlayheadChange={setPlayheadMs}
+          onClipChange={clip => setPreview({ clip, timelineDurationMs: timelineSnapshot?.durationMs || 0 })}
+        />
         <aside className="editor-panel inspector-panel" aria-label="检查器">
           <header><b>属性</b></header>
           <div className="inspector-empty"><Settings2 size={28} /><p>选择一个素材或片段</p><small>这里会显示画面、音频和变速参数</small></div>
@@ -45,6 +56,7 @@ export function EditorPage({ projectID }) {
         onMaterialInserted={() => setQueuedMaterial(null)}
         playheadMs={playheadMs}
         onSeek={setPlayheadMs}
+        onTimelineChange={setTimelineSnapshot}
         onSelectClip={(clip, timelineDurationMs) => {
           setPreview({ clip, timelineDurationMs })
           setPlayheadMs(clip.startMs)

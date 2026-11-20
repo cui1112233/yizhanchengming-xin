@@ -32,3 +32,22 @@ export function formatTimecode(valueMs) {
   const seconds = totalSeconds % 60
   return [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':')
 }
+
+export function videoClipsFromTimeline(timeline) {
+  return (timeline?.tracks || [])
+    .filter(track => track.kind === 'video')
+    .flatMap(track => track.clips || [])
+    .filter(clip => clip?.id && clip?.materialId && Number(clip.durationMs) > 0)
+    .sort((left, right) => (Number(left.startMs) || 0) - (Number(right.startMs) || 0) || String(left.id).localeCompare(String(right.id)))
+}
+
+export function nextVideoClip(clips, currentClip) {
+  if (!currentClip) return null
+  const ordered = [...(clips || [])].sort((left, right) => (Number(left.startMs) || 0) - (Number(right.startMs) || 0) || String(left.id).localeCompare(String(right.id)))
+  const index = ordered.findIndex(clip => clip.id === currentClip.id)
+  return index >= 0 && index + 1 < ordered.length ? ordered[index + 1] : null
+}
+
+export function playbackInstanceKey(clip) {
+  return clip ? `${clip.id || 'clip'}:${clip.materialId || 'material'}` : 'empty-player'
+}

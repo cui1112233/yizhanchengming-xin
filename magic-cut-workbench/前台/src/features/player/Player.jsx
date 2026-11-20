@@ -2,11 +2,13 @@ import { Button } from 'antd'
 import { Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { formatTimecode, materialFileURL, mediaTimeFromPlayhead, playheadFromMediaTime } from './playerModel.js'
+import { formatTimecode, materialFileURL, mediaTimeFromPlayhead, nextVideoClip, playbackInstanceKey, playheadFromMediaTime } from './playerModel.js'
 
-export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0, onPlayheadChange }) {
+export function Player({ projectID, clip, clips = [], timelineDurationMs = 0, playheadMs = 0, onPlayheadChange, onClipChange }) {
   const canvasRef = useRef(null)
   const videoRef = useRef(null)
+  const autoContinueRef = useRef(false)
+  const advancingRef = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
   const [error, setError] = useState('')
@@ -14,6 +16,7 @@ export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0
   const clipEndMs = clip ? clip.startMs + clip.durationMs : 0
 
   useEffect(() => {
+    advancingRef.current = false
     setPlaying(false)
     setError('')
   }, [source])
@@ -29,6 +32,8 @@ export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0
     const video = videoRef.current
     if (!video || !clip) return
     video.pause()
+    autoContinueRef.current = false
+    advancingRef.current = false
     video.currentTime = mediaTimeFromPlayhead(clip, clip.startMs)
     setPlaying(false)
     onPlayheadChange?.(clip.startMs)
@@ -39,6 +44,7 @@ export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0
     if (!video || !clip) return
     if (!video.paused) {
       video.pause()
+      autoContinueRef.current = false
       setPlaying(false)
       return
     }
@@ -54,13 +60,45 @@ export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0
     }
   }
 
+  const finishClip = video => {
+    if (!clip || advancingRef.current) return
+    onPlayheadChange?.(clipEndMs)
+    const next = nextVideoClip(clips, clip)
+    if (!next) {
+      video.pause()
+      setPlaying(false)
+      return
+    }
+    advancingRef.current = true
+    autoContinueRef.current = true
+    video.pause()
+    setPlaying(false)
+    onClipChange?.(next)
+    onPlayheadChange?.(next.startMs)
+  }
+
   const updatePlayhead = event => {
     if (!clip) return
     const next = playheadFromMediaTime(clip, event.currentTarget.currentTime)
     onPlayheadChange?.(next)
     if (next >= clipEndMs) {
-      event.currentTarget.pause()
+      finishClip(event.currentTarget)
+    }
+  }
+
+  const loadSelectedClip = async event => {
+    const video = event.currentTarget
+    video.currentTime = mediaTimeFromPlayhead(clip, playheadMs)
+    video.playbackRate = Number(clip?.speed) || 1
+    if (!autoContinueRef.current) return
+    autoContinueRef.current = false
+    try {
+      await video.play()
+      setPlaying(true)
+      setError('')
+    } catch {
       setPlaying(false)
+      setError('下一片段已加载，请点击播放继续')
     }
   }
 
@@ -69,16 +107,17 @@ export function Player({ projectID, clip, timelineDurationMs = 0, playheadMs = 0
       <div className="editor-player__canvas" ref={canvasRef}>
         {source ? (
           <video
+            key={playbackInstanceKey(clip)}
             ref={videoRef}
             src={source}
             preload="metadata"
             playsInline
             muted={muted}
-            onLoadedMetadata={event => { event.currentTarget.currentTime = mediaTimeFromPlayhead(clip, playheadMs); event.currentTarget.playbackRate = Number(clip?.speed) || 1 }}
+            onLoadedMetadata={loadSelectedClip}
             onTimeUpdate={updatePlayhead}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
+            onEnded={event => finishClip(event.currentTarget)}
             onError={() => setError('素材无法播放，请确认文件仍在素材库中且编码受浏览器支持')}
             onClick={togglePlayback}
           />
