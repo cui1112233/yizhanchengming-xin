@@ -1,0 +1,6 @@
+前台/node_modules/
+前台/dist/
+前台/.npm-cache/
+api/data/
+!api/web/dist/
+!api/web/dist/**
