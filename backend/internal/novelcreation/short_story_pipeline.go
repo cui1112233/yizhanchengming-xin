@@ -36,10 +36,10 @@ func (p *Pipeline) shortCall(ctx context.Context, in RunContext, sink EventSink,
 		if e == nil {
 			*(target.(*shortReview)) = shortReview{Score: *checked.Score, Issues: *checked.Issues}
 		}
-		return e
+		return shortCallFailure(in, def.ID+key, e)
 	}
 	_, e := p.callJSON(ctx, in, sink, nil, modelCallSpec{definition: def, key: key, step: status, userPayload: payload, temperature: .65, maxTokens: tokens, validate: validate}, target)
-	return e
+	return shortCallFailure(in, def.ID+key, e)
 }
 func validShortText(v shortText, max int) error {
 	if strings.TrimSpace(v.Content) == "" || jsLength(v.Content) > max {
@@ -55,7 +55,12 @@ func validShortReview(v shortReview) error {
 }
 func shortBrief(story ShortStory) map[string]any {
 	in := story.Input
-	return map[string]any{"mode": in.Mode, "title": in.Title, "requirements": in.Requirements, "targetWordCount": in.TargetWordCount, "targetChapters": in.TargetChapters, "readerPreferences": in.ReaderPreferences, "supplementaryInfo": in.SupplementaryInfo, "inspirationTags": in.InspirationTags, "styles": story.Styles, "notes": story.Notes, "linkedContext": story.LinkedContext}
+	brief := map[string]any{"mode": in.Mode, "title": in.Title, "requirements": in.Requirements, "targetWordCount": in.TargetWordCount, "targetChapters": in.TargetChapters, "readerPreferences": in.ReaderPreferences, "supplementaryInfo": in.SupplementaryInfo, "inspirationTags": in.InspirationTags, "styles": story.Styles, "notes": story.Notes, "linkedContext": story.LinkedContext}
+	if story.Imitation != nil {
+		d := story.Imitation
+		brief["imitation"] = map[string]any{"deconstruction": d.Deconstruction, "selectedDirection": d.SelectedDirection, "blueprint": d.Blueprint, "scenes": d.Scenes, "eventMappings": d.EventMappings}
+	}
+	return brief
 }
 func (p *Pipeline) shortSource(ctx context.Context, in RunContext, sink EventSink, story ShortStory) (string, error) {
 	if story.Input.Mode != "short_imitation" {
@@ -96,17 +101,18 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		return s.finishWithError(ctx, owner, run, ErrModelUnavailable, "独立短篇执行器未配置", nil)
 	}
 	var snap struct {
-		ShortReviewVersion int                   `json:"short_review_version"`
-		SystemPrompts      *SystemPromptSnapshot `json:"system_prompts"`
-		Story              ShortStory            `json:"short_story"`
-		Confirmed          bool                  `json:"short_outline_confirmed"`
-		Settings           ProjectSettings       `json:"project_settings"`
-		RetryOfRunID       string                `json:"retry_of_run_id"`
+		ShortReviewVersion    int                   `json:"short_review_version"`
+		ShortImitationVersion int                   `json:"short_imitation_version"`
+		SystemPrompts         *SystemPromptSnapshot `json:"system_prompts"`
+		Story                 ShortStory            `json:"short_story"`
+		Confirmed             bool                  `json:"short_outline_confirmed"`
+		Settings              ProjectSettings       `json:"project_settings"`
+		RetryOfRunID          string                `json:"retry_of_run_id"`
 	}
 	if e := json.Unmarshal(run.PromptSnapshot, &snap); e != nil {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇快照损坏", e)
 	}
-	if snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 {
+	if snap.ShortReviewVersion < 0 || snap.ShortReviewVersion > 1 || snap.ShortImitationVersion < 0 || snap.ShortImitationVersion > 1 {
 		return s.finishWithError(ctx, owner, run, ErrPersistenceFailed, "短篇审核快照版本无效，已停止生成", nil)
 	}
 	project, e := s.store.GetProject(ctx, owner, run.ProjectID)
@@ -133,6 +139,32 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 			if !found || (latest.RunID != snap.RetryOfRunID && latest.RunID != run.ID) {
 				return conflict()
 			}
+			if snap.ShortImitationVersion >= 1 && len(execution.Calls) == 0 {
+				previous, ok, er := tx.GetExecution(ctx, owner, snap.RetryOfRunID)
+				if er != nil {
+					return er
+				}
+				if !ok {
+					return inputError("缺少原任务调用记录，已停止以避免重复生成")
+				}
+				source, er := tx.GetRun(ctx, owner, snap.RetryOfRunID)
+				if er != nil {
+					return er
+				}
+				execution.Calls = map[string]CallRecord{}
+				var failure struct {
+					Key string `json:"shortFailedCallKey"`
+				}
+				_ = json.Unmarshal(source.RuntimeSnapshot, &failure)
+				for key, call := range cloneExecution(previous).Calls {
+					// A completed transport can still contain invalid output. Explicit
+					// retry may rerun that failed logical stage, not successful stages.
+					failedStage := source.ErrorCode == ErrInvalidOutput && failure.Key != "" && (key == failure.Key || key == failure.Key+":repair")
+					if call.State == "completed" && !failedStage {
+						execution.Calls[key] = call
+					}
+				}
+			}
 			latest.RunID = run.ID
 			latest.Status = "queued"
 			latest.UpdatedAt = time.Now().UTC()
@@ -144,6 +176,36 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 	}
 	agent := NormalizeAgentSettings(snap.Settings.Agent, 2000)
 	in := RunContext{OwnerUsername: owner, Run: run, Project: project, Session: session, Runtime: s.runtime, Agent: &agent, SystemPrompts: snap.SystemPrompts, ShortReviewVersion: snap.ShortReviewVersion}
+	in.ShortImitationVersion = snap.ShortImitationVersion
+	if in.ShortImitationVersion >= 1 {
+		latest, er := s.GetShortStory(ctx, owner, run.ProjectID)
+		if er != nil {
+			return run, er
+		}
+		if latest.RunID != run.ID {
+			return run, conflict()
+		}
+		story = latest
+		in.SaveShortStage = func(ctx context.Context, partial ShortStory) error {
+			g, ok := s.store.(*guardedStore)
+			if !ok {
+				return leaseLost()
+			}
+			return guarded(ctx, g.Store, g.lease, func(tx Store, _ *Execution) error {
+				var old ShortStory
+				found, er := readContent(ctx, tx, owner, run.ProjectID, shortStoryKind, "story", &old)
+				if er != nil {
+					return er
+				}
+				if !found || old.RunID != run.ID {
+					return conflict()
+				}
+				partial.Version = old.Version + 1
+				partial.UpdatedAt = time.Now().UTC()
+				return putContent(ctx, tx, owner, run.ProjectID, shortStoryKind, "story", partial.Status, time.Time{}, partial)
+			})
+		}
+	}
 	sink := serviceEventSink{service: s, owner: owner}
 	result, e := p.buildShortStory(ctx, in, sink, story, snap.Confirmed)
 	if e != nil {
@@ -161,7 +223,12 @@ func (s *Service) runShortStory(ctx context.Context, owner string, run Run) (Run
 		if code == ErrRunCancelled || errors.Is(e, context.Canceled) {
 			status = RunCancelled
 		}
-		return s.finish(ctx, owner, run, status, code, message, nil, e)
+		var failed *shortCallError
+		var failureSnapshot json.RawMessage
+		if errors.As(e, &failed) {
+			failureSnapshot, _ = json.Marshal(map[string]string{"shortFailedCallKey": failed.key})
+		}
+		return s.finish(ctx, owner, run, status, code, message, failureSnapshot, e)
 	}
 	if e = p.checkCancelled(ctx, in); e != nil {
 		return s.finish(ctx, owner, run, RunCancelled, ErrRunCancelled, "短篇已取消", nil, e)
@@ -229,18 +296,35 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 	if in.ShortReviewVersion >= 1 && in.Agent == nil {
 		return story, inputError("短篇审核设置缺失，已停止生成")
 	}
+	if in.ShortImitationVersion >= 1 && story.Input.Mode == "short_imitation" && !confirmed {
+		if e := p.prepareShortImitation(ctx, in, sink, &story); e != nil {
+			return story, e
+		}
+	}
+	if in.ShortImitationVersion >= 1 && story.Input.Mode == "short_imitation" {
+		if e := validateSavedShortImitation(story.Imitation, story.Input.TargetWordCount); e != nil {
+			return story, e
+		}
+	}
 	brief := shortBrief(story)
 	outline := story.Outline
 	stage := func(label string, progress int, status RunStatus) error {
 		return p.emitStage(ctx, in, sink, status, label, progress)
 	}
 	if !confirmed {
+		var e error
 		if e := stage("拆解参考与生成短篇大纲", 5, RunPlanning); e != nil {
 			return story, e
 		}
-		source, e := p.shortSource(ctx, in, sink, story)
-		if e != nil {
-			return story, e
+		source := ""
+		if in.ShortImitationVersion >= 1 && story.Imitation != nil {
+			source = story.Imitation.Deconstruction
+		} else {
+			var er error
+			source, er = p.shortSource(ctx, in, sink, story)
+			if er != nil {
+				return story, er
+			}
 		}
 		v := ShortOutline{}
 		if e = p.shortCall(ctx, in, sink, prompt.ShortOutlinePrompt, "", RunPlanning, map[string]any{"creation": brief, "reference_analysis": source}, &v, func() error { return validateShortOutline(v, story.Input.TargetChapters) }, 16000); e != nil {
@@ -278,7 +362,7 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 		outline = &v
 		story.Outline = outline
 		story.Title = v.Title
-		if story.Input.PauseAfterOutline {
+		if story.Input.PauseAfterOutline || (in.ShortImitationVersion >= 1 && in.Agent != nil && in.Agent.PauseAfterBlueprint != nil && *in.Agent.PauseAfterBlueprint) {
 			story.Status = "awaiting_confirmation"
 			return story, nil
 		}
@@ -372,6 +456,11 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 		}
 		story.Chapters = append(story.Chapters, chapter)
 		completed = append(completed, c)
+		if in.ShortImitationVersion >= 1 {
+			if e := saveShortStage(ctx, in, &story); e != nil {
+				return story, e
+			}
+		}
 	}
 	if e := stage("打包短篇成品与推荐", 95, RunWriting); e != nil {
 		return story, e
@@ -387,6 +476,11 @@ func (p *Pipeline) buildShortStory(ctx context.Context, in RunContext, sink Even
 		story.Artifacts = append(story.Artifacts, ShortArtifact{Key: fmt.Sprintf("chapters/%03d.txt", c.Number), Title: c.Title, Content: c.Content})
 	}
 	story.Artifacts = append(story.Artifacts, ShortArtifact{Key: "recommendation.txt", Title: "推荐文案", Content: story.Recommendation})
+	if in.ShortImitationVersion >= 1 && story.Input.Mode == "short_imitation" {
+		if e := p.finishShortImitation(ctx, in, sink, &story); e != nil {
+			return story, e
+		}
+	}
 	story.Status = "completed"
 	return story, nil
 }

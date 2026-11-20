@@ -14,6 +14,8 @@ func TestShortStoryRealMySQLCheckpointAndReopen(t *testing.T) {
 	provider := &queuedPipelineProvider{responses: []string{`{"content":"参考写法分析"}`, `{"title":"雨夜","summary":"完整闭环","chapters":[{"number":1,"title":"追寻","summary":"真相揭晓"}]}`, `{"score":95,"issues":[]}`}}
 	body, _ := json.Marshal(shortText{Content: strings.Repeat("完整正文。", 200)})
 	provider.responses = append(provider.responses, string(body), `{"score":96,"issues":[]}`, `{"content":"真实推荐"}`)
+	provider.responses = append(imitationStageReplies()[:3], provider.responses[1:]...)
+	provider.responses = append(provider.responses, imitationStageReplies()[8])
 	s := NewService(NewMySQLStore(db), NewMemoryRuntime(), pipelineWithProvider(provider))
 	input := shortInput("sql-short")
 	input.TargetWordCount = 1000
@@ -50,7 +52,7 @@ func TestShortStoryRealMySQLCheckpointAndReopen(t *testing.T) {
 	}
 	final := NewService(NewMySQLStore(db), NewMemoryRuntime(), nil)
 	saved, e := final.GetShortStory(ctx, owner, out.Project.ID)
-	if e != nil || saved.Status != "completed" || len(saved.Artifacts) != 3 || len(saved.Chapters) != 1 || saved.Outline.Summary != "SQL人工编辑" {
+	if e != nil || saved.Status != "completed" || len(saved.Artifacts) != 8 || len(saved.Chapters) != 1 || saved.Outline.Summary != "SQL人工编辑" {
 		t.Fatal("SQL persisted independent output", e)
 	}
 	chapters, e := final.store.ListChapters(ctx, owner, out.Project.ID)

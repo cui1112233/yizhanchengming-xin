@@ -11,6 +11,7 @@ import (
 )
 
 type MemoryStore struct {
+	agentDefaults    map[string]AgentSettings
 	studios          map[string]json.RawMessage
 	submissions      map[string]submissionReceipt
 	contentRecords   map[string]ContentRecord
@@ -54,6 +55,7 @@ func NewMemoryStore() *MemoryStore {
 		chapterBundles:   make(map[string]ChapterBundle),
 		chapterVersions:  make(map[string]ChapterVersion),
 		settings:         make(map[string]ProjectSettings),
+		agentDefaults:    make(map[string]AgentSettings),
 		foundations:      make(map[string]Foundation),
 		materials:        make(map[string]Material),
 		notes:            make(map[string]ProjectNote),

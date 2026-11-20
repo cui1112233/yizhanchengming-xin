@@ -10,6 +10,7 @@ import (
 const shortStoryKind = "short_story"
 
 type ShortStoryInput struct {
+	SelectedDirection string                   `json:"selectedDirection,omitempty"`
 	IdempotencyKey    string                   `json:"idempotencyKey"`
 	Mode              string                   `json:"mode"`
 	ModelID           string                   `json:"modelId"`
@@ -48,25 +49,26 @@ type ShortArtifact struct {
 	Content string `json:"content"`
 }
 type ShortStory struct {
-	ID             string            `json:"storyId"`
-	ProjectID      string            `json:"projectId"`
-	SessionID      string            `json:"sessionId"`
-	RunID          string            `json:"runId"`
-	Version        int               `json:"version"`
-	Status         string            `json:"status"`
-	Title          string            `json:"title"`
-	Input          ShortStoryInput   `json:"input"`
-	Outline        *ShortOutline     `json:"outline"`
-	Chapters       []ShortChapter    `json:"chapters"`
-	Artifacts      []ShortArtifact   `json:"artifacts"`
-	Recommendation string            `json:"recommendation"`
-	Styles         []StyleProfile    `json:"styles"`
-	Notes          []ProjectNote     `json:"notes"`
-	LinkedContext  string            `json:"linkedContext,omitempty"`
-	OutlineAudit   json.RawMessage   `json:"outlineAudit,omitempty"`
-	ChapterAudits  []json.RawMessage `json:"chapterAudits"`
-	CreatedAt      time.Time         `json:"createdAt"`
-	UpdatedAt      time.Time         `json:"updatedAt"`
+	Imitation      *ShortImitationData `json:"imitation,omitempty"`
+	ID             string              `json:"storyId"`
+	ProjectID      string              `json:"projectId"`
+	SessionID      string              `json:"sessionId"`
+	RunID          string              `json:"runId"`
+	Version        int                 `json:"version"`
+	Status         string              `json:"status"`
+	Title          string              `json:"title"`
+	Input          ShortStoryInput     `json:"input"`
+	Outline        *ShortOutline       `json:"outline"`
+	Chapters       []ShortChapter      `json:"chapters"`
+	Artifacts      []ShortArtifact     `json:"artifacts"`
+	Recommendation string              `json:"recommendation"`
+	Styles         []StyleProfile      `json:"styles"`
+	Notes          []ProjectNote       `json:"notes"`
+	LinkedContext  string              `json:"linkedContext,omitempty"`
+	OutlineAudit   json.RawMessage     `json:"outlineAudit,omitempty"`
+	ChapterAudits  []json.RawMessage   `json:"chapterAudits"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	UpdatedAt      time.Time           `json:"updatedAt"`
 }
 type ShortStoryResult struct {
 	Project Project    `json:"project"`
@@ -95,6 +97,10 @@ func normalizeShortStory(in ShortStoryInput) (ShortStoryInput, error) {
 	}
 	in.Title = jsTrim(in.Title)
 	in.ReferenceText = jsTrim(in.ReferenceText)
+	in.SelectedDirection = jsTrim(in.SelectedDirection)
+	if jsLength(in.SelectedDirection) > 24000 {
+		return in, inputError("所选仿写方向超出上限")
+	}
 	in.Requirements = jsTrim(in.Requirements)
 	if in.Mode == "short_imitation" && jsNonspaceLength(in.ReferenceText) < 100 {
 		return in, inputError("参考原文至少需要100字（不计空白）")
@@ -192,6 +198,9 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 		if e != nil {
 			return e
 		}
+		if e = inheritAgentDefaults(ctx, tx, owner, p); e != nil {
+			return e
+		}
 		session, e := tx.CreateSession(ctx, owner, CreateSessionInput{ProjectID: p.ID, Mode: in.Mode, Title: title})
 		if e != nil {
 			return e
@@ -207,7 +216,11 @@ func (s *Service) StartShortStory(ctx context.Context, owner string, input Short
 		if e != nil {
 			return e
 		}
-		raw, _ := json.Marshal(map[string]any{"short_story": story, "project_settings": settings, "agent_contract_version": 1, "short_review_version": 1, "mode": in.Mode, "system_prompts": systemPrompts})
+		imitationVersion := 0
+		if in.Mode == "short_imitation" {
+			imitationVersion = 1
+		}
+		raw, _ := json.Marshal(map[string]any{"short_imitation_version": imitationVersion, "short_story": story, "project_settings": settings, "agent_contract_version": 1, "short_review_version": 1, "mode": in.Mode, "system_prompts": systemPrompts})
 		run, e := tx.CreateRun(ctx, owner, Run{ProjectID: p.ID, SessionID: session.ID, ModelID: in.ModelID, ThinkingLevel: in.ThinkingLevel, IdempotencyKey: "short:" + fingerprint([]string{owner, in.IdempotencyKey}), Status: RunQueued, PromptSnapshot: raw})
 		if e != nil {
 			return e

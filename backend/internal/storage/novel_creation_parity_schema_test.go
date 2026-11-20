@@ -4,7 +4,7 @@ import "testing"
 
 func TestNovelChapterImportReceiptMigrationIsAppendOnly(t *testing.T) {
 	ms := NovelCreationMigrations()
-	if ms[len(ms)-2].Version != 8800315 || ms[len(ms)-1].Version != 8800316 {
+	if ms[len(ms)-3].Version != 8800315 || ms[len(ms)-2].Version != 8800316 || ms[len(ms)-1].Version != 8800317 {
 		t.Fatal("chapter import receipt migration missing")
 	}
 	seen := map[int]bool{}

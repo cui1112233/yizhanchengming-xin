@@ -69,11 +69,13 @@ type RunContext struct {
 	Notes              []ProjectNote
 	KnowledgeMaterials []KnowledgeMaterial
 	// MaxRevisionRounds overrides the default audit-revision loop bound.
-	MaxRevisionRounds  int
-	Agent              *AgentSettings
-	ReviewCycleVersion int
-	SystemPrompts      *SystemPromptSnapshot
-	ShortReviewVersion int
+	MaxRevisionRounds     int
+	Agent                 *AgentSettings
+	ReviewCycleVersion    int
+	SystemPrompts         *SystemPromptSnapshot
+	ShortReviewVersion    int
+	ShortImitationVersion int
+	SaveShortStage        func(context.Context, ShortStory) error `json:"-"`
 }
 
 type Pipeline struct {
@@ -585,6 +587,13 @@ func (p *Pipeline) callJSON(ctx context.Context, input RunContext, sink EventSin
 			return nil, e
 		}
 	}
+	if input.ShortImitationVersion >= 1 && (spec.definition.ID == novelprompt.ShortBodyPrompt.ID || spec.definition.ID == novelprompt.ShortBodyRevision.ID) {
+		supplement, e := frozenSystemText(input, novelprompt.ShortImitationWritingID, novelprompt.ShortImitationWritingSystem)
+		if e != nil {
+			return nil, e
+		}
+		spec.definition.SystemPrompt += "\n\n" + supplement
+	}
 	if input.LongImitation != nil && spec.definition.ID != novelprompt.LongImitationRequirements.ID {
 		supplement, e := frozenSystemText(input, novelprompt.ImitationSupplementPresetID, novelprompt.LongImitationSystemSupplement)
 		if e != nil {
@@ -710,11 +719,11 @@ func (p *Pipeline) complete(ctx context.Context, input RunContext, sink EventSin
 			routeKey = "foundation-plan"
 		}
 		switch route {
-		case "short-source-analysis", "short-outline", "short-outline-revision":
+		case "short-source-analysis", "short-outline", "short-outline-revision", "short-imitation-deconstruction", "short-imitation-directions", "short-imitation-blueprint":
 			routeKey = "foundation-plan"
 		case "short-body":
 			routeKey = "chapter-draft"
-		case "short-review":
+		case "short-review", "short-imitation-editorial":
 			routeKey = "chapter-audit"
 		case "short-body-revision":
 			routeKey = "chapter-revision"

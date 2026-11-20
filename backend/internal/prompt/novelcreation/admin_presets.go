@@ -18,6 +18,11 @@ type AdminPrompt struct {
 // Runtime and administrator defaults share these definitions; no frontend copy.
 func AdminPrompts() []AdminPrompt {
 	return []AdminPrompt{
+		{ShortImitationDeconstruction.ID, "短篇仿写·六维拆书", "novel.short", ShortImitationDeconstruction},
+		{ShortImitationDirections.ID, "短篇仿写·三个方向", "novel.short", ShortImitationDirections},
+		{ShortImitationBlueprint.ID, "短篇仿写·创作蓝图", "novel.short", ShortImitationBlueprint},
+		{ShortImitationWritingID, "短篇仿写·写作附加约束", "novel.short", catalog.Definition{SystemPrompt: ShortImitationWritingSystem}},
+		{ShortImitationEditorial.ID, "短篇仿写·编辑终审", "novel.short", ShortImitationEditorial},
 		{FoundationPlan.ID, "长篇创作蓝图", "novel.long", FoundationPlan},
 		{ChapterPlan.ID, "章节规划", "novel.long", ChapterPlan},
 		{ChapterDraft.ID, "章节正文", "novel.long", ChapterDraft},

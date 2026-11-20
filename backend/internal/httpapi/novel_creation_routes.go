@@ -61,6 +61,32 @@ func RegisterNovelCreationRoutes(mux *http.ServeMux, auth BridgeAuth, service *n
 	registerNovelLongImitationRoutes(handle, service, starter)
 	registerNovelShortStoryRoutes(handle, service, starter)
 	registerNovelSchedulerAdapterRoutes(handle, service)
+	handle("GET /api/novel-creation/agent-settings", func(w http.ResponseWriter, req *http.Request, owner string) {
+		a, err := service.GetAgentDefaults(req.Context(), owner)
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"settings": map[string]any{"agent": a}, "reviewDimensionCatalog": novelprompt.ReviewDimensionCatalog()})
+	})
+	handle("PUT /api/novel-creation/agent-settings", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var in struct {
+			Agent *novelcreation.AgentSettings `json:"agent"`
+		}
+		if !decode(w, req, &in) {
+			return
+		}
+		if in.Agent == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请填写Agent设置"})
+			return
+		}
+		a, err := service.UpdateAgentDefaults(req.Context(), owner, *in.Agent)
+		if err != nil {
+			writeNovelCreationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"settings": map[string]any{"agent": a}})
+	})
 	handle("GET /api/novel-creation/modes", func(w http.ResponseWriter, _ *http.Request, _ string) {
 		modes := make([]map[string]any, 0, len(novelCreationModes))
 		for _, mode := range novelCreationModes {

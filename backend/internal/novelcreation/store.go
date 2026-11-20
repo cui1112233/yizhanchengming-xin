@@ -10,6 +10,8 @@ import (
 // Store is the durable boundary for the novel-creation domain. Production
 // implementations persist through MySQL; MemoryStore exists for unit tests.
 type Store interface {
+	GetAgentDefaults(context.Context, string) (AgentSettings, error)
+	PutAgentDefaults(context.Context, string, AgentSettings) (AgentSettings, error)
 	LongImitationStore
 	StudioStore
 	ChapterImportStore

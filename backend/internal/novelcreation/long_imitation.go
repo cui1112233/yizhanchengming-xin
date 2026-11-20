@@ -209,6 +209,9 @@ func (s *Service) StartLongImitation(ctx context.Context, owner string, input Lo
 		if e != nil {
 			return e
 		}
+		if e = inheritAgentDefaults(ctx, tx, owner, project); e != nil {
+			return e
+		}
 		if e = putContent(ctx, tx, owner, project.ID, longImitationKind, "creation", "frozen", time.Time{}, c); e != nil {
 			return e
 		}

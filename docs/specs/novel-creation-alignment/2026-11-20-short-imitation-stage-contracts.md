@@ -1,5 +1,7 @@
 # 短篇仿写阶段合同与缺口：2026-11-20
 
+实施更新：本轮已按此合同加入CM专用仿写阶段、账号默认继承、后台5项预设、阶段保存及重试保护。详情见 `docs/verification/2026-11-20-novel-workflow-repair.md`。下文“CM缺口”为9c9736bc排查时的历史状态，不代表修复后仍使用单一分析字符串；完整原版动态builder和真实模型验收仍待补证。
+
 状态：原版提示词常量、run和_produce执行函数已取证；helper细节、最终请求及运行输出仍未全部恢复。不是已实现声明。源 native SHA256 为 `b5b22086c64851e0e94fc70a509cddbaf4ec144ac5beedc64e3a9a8caa40e57d`。
 
 提示词来源：`docs/reverse-engineering/luoshui-novel-native-20261119/readable/novels--prompts--imitation_short.md`；每个 Constant 有原文件字节范围。完整 builder 的参数、条件拼接与模型最终请求仍需分别还原，不能拿常量列表冒充完整 system prompt。

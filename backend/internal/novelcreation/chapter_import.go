@@ -96,6 +96,9 @@ func (s *Service) ImportChapters(ctx context.Context, owner string, in ImportCha
 		} else {
 			out.Book, e = tx.CreateImportProject(ctx, owner, in.Title)
 			if e == nil {
+				e = inheritAgentDefaults(ctx, tx, owner, out.Book)
+			}
+			if e == nil {
 				out.Book, e = tx.LockImportProject(ctx, owner, out.Book.ID)
 			}
 		}

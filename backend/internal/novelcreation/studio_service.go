@@ -557,6 +557,9 @@ func (s *Service) ConfirmStudioAction(ctx context.Context, owner, id string, in 
 		if e != nil {
 			return e
 		}
+		if e = inheritAgentDefaults(ctx, tx, owner, project); e != nil {
+			return e
+		}
 		session, e := tx.CreateSession(ctx, owner, CreateSessionInput{ProjectID: project.ID, Mode: "long_original", Title: b.Title})
 		if e != nil {
 			return e

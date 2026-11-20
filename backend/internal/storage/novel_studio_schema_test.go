@@ -7,7 +7,12 @@ import (
 
 func TestNovelStudioMigrationIsSeparateOwnerScopedAndHasNoProjectRequirement(t *testing.T) {
 	ms := NovelCreationMigrations()
-	m := ms[len(ms)-1]
+	var m Migration
+	for _, v := range ms {
+		if v.Version == 8800316 {
+			m = v
+		}
+	}
 	if m.Version != 8800316 || m.CallbackChecksum != "v88-novel-studio-sessions-v1" {
 		t.Fatal("studio migration missing")
 	}

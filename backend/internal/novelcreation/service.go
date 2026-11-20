@@ -53,7 +53,17 @@ func (s *Service) CreateProject(ctx context.Context, owner string, input CreateP
 	if strings.TrimSpace(owner) == "" || input.Title == "" || input.Genre == "" || input.ModelID == "" {
 		return Project{}, &DomainError{Code: ErrInputRequired, Message: "作品名称、题材和文本模型不能为空"}
 	}
-	return s.store.CreateProject(ctx, strings.TrimSpace(owner), input)
+	owner = strings.TrimSpace(owner)
+	var project Project
+	err = s.store.AtomicCreate(ctx, owner, func(tx Store) error {
+		var e error
+		project, e = tx.CreateProject(ctx, owner, input)
+		if e != nil {
+			return e
+		}
+		return inheritAgentDefaults(ctx, tx, owner, project)
+	})
+	return project, err
 }
 
 func (s *Service) createSession(ctx context.Context, owner string, input CreateSessionInput) (Session, error) {

@@ -165,6 +165,8 @@ func TestShortStoryIndependentResultCheckpointEditAndReadback(t *testing.T) {
 		`{"score":96,"issues":[]}`,
 		`{"content":"一场雨夜揭开的真相。"}`,
 	}}
+	provider.responses = append(imitationStageReplies()[:3], provider.responses[1:]...)
+	provider.responses = append(provider.responses, imitationStageReplies()[8])
 	s := NewService(st, NewMemoryRuntime(), NewPipeline(func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) { return provider, nil }))
 	in := shortInput("flow")
 	in.PauseAfterOutline = true
@@ -231,6 +233,9 @@ func TestShortStoryTwentyThousandWordsKeepsOneChapterAndBoundedRequests(t *testi
 		}
 	}
 	provider.responses = append(provider.responses, `{"content":"雨夜中的追寻与真相。"}`)
+	provider.responses = append(imitationStageReplies()[:3], provider.responses[1:]...)
+	provider.responses[2] = imitationBlueprintReply(20000)
+	provider.responses = append(provider.responses, imitationStageReplies()[8])
 	s := NewService(st, NewMemoryRuntime(), NewPipeline(func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error) { return provider, nil }))
 	in := shortInput("twenty-thousand")
 	in.TargetWordCount = 20000
@@ -246,9 +251,15 @@ func TestShortStoryTwentyThousandWordsKeepsOneChapterAndBoundedRequests(t *testi
 	if e != nil || len(got.Chapters) != 1 || len([]rune(got.Chapters[0].Content)) < 20000 {
 		t.Fatal("lost selected chapter count or content", e)
 	}
-	for _, req := range provider.requests {
+	for index, req := range provider.requests {
 		b, _ := json.Marshal(req)
-		if len(b) > 60000 {
+		limit := 60000
+		// The dedicated final editorial review reads the complete saved manuscript;
+		// ordinary writing/continuity requests remain bounded independently.
+		if index == len(provider.requests)-1 {
+			limit = in.TargetWordCount*3 + 20000
+		}
+		if len(b) > limit {
 			t.Fatal("unbounded model request", len(b))
 		}
 	}

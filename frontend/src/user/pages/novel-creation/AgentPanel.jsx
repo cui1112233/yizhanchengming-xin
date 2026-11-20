@@ -1,6 +1,6 @@
 import { Button, Form, InputNumber, Select, Switch, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { novelProjectRequest } from '../../../shared/api/novelCreation.js';
+import { novelProjectRequest, novelRequest } from '../../../shared/api/novelCreation.js';
 import AgentRequirements from './AgentRequirements.jsx';
 import ReviewDimensions from './ReviewDimensions.jsx';
 import './AgentPanel.css';
@@ -11,9 +11,13 @@ export default function AgentPanel({ projectId, models, mode }) {
   const [form] = Form.useForm(); const [settings, setSettings] = useState(null); const [busy, setBusy] = useState(false);
   const [dimensionCatalog, setDimensionCatalog] = useState([]);
   const saving = useRef(false), pauseTouched = useRef(false);
-  const scope = useWorkspaceScope(projectId);
+  const [scopeKind, setScopeKind] = useState('account');
+  const projectScope = scopeKind === 'project' && !!projectId;
+  const scope = useWorkspaceScope(projectScope ? projectId : 'account-agent-defaults');
+  const request = (input, options) => projectScope ? novelProjectRequest(projectId, '/settings', input, options) : novelRequest('/agent-settings', input, options);
   useEffect(() => {
-    scope.call(novelProjectRequest(projectId, '/settings', undefined, { signal: scope.signal }), r => {
+    setSettings(null); form.resetFields();
+    scope.call(request(undefined, { signal: scope.signal }), r => {
       pauseTouched.current = false; setSettings(r.settings || {}); const a = r.settings?.agent || {};
       const catalog = Array.isArray(r.reviewDimensionCatalog) ? r.reviewDimensionCatalog : [];
       setDimensionCatalog(catalog);
@@ -23,7 +27,7 @@ export default function AgentPanel({ projectId, models, mode }) {
         thinkingLevel: a.thinkingLevel ?? 'standard', enableLengthNorm: a.enableLengthNorm ?? true,
         enablePostWrite: a.enablePostWrite ?? true, enableAiTells: a.enableAiTells ?? true, requireSecondaryConfirm: a.requireSecondaryConfirm ?? false, pauseAfterBlueprint: a.pauseAfterBlueprint ?? (mode ? ['long_original','long_imitation'].includes(mode) : true) });
     }).catch(e => message.error(e.message));
-  }, [projectId]);
+  }, [projectId, scopeKind]);
   async function save() {
     if (saving.current || !scope.isCurrent()) return;
     saving.current = true;
@@ -33,11 +37,13 @@ export default function AgentPanel({ projectId, models, mode }) {
       if (settings?.agent?.pauseAfterBlueprint == null && !pauseTouched.current) delete agent.pauseAfterBlueprint;
       if (Object.values(agent.modelRoutes || {}).some(id => id && !availableModel(models, id))) { message.warning('分步骤原模型已不可用，请重新选择或清空'); return; }
       setBusy(true);
-      await scope.call(novelProjectRequest(projectId, '/settings', { styleProfile: settings?.styleProfile || '', rules: settings?.rules || [], agent }, { method: 'PUT', signal: scope.signal }), r => { setSettings(r.settings); message.success('Agent设置已保存'); });
+      await scope.call(request(projectScope ? { styleProfile: settings?.styleProfile || '', rules: settings?.rules || [], agent } : {agent}, { method: 'PUT', signal: scope.signal }), r => { setSettings(r.settings); message.success('Agent设置已保存'); });
     } catch (e) { if (!e.errorFields) message.error(e.message); } finally { saving.current = false; if (scope.isCurrent()) setBusy(false); }
   }
   return <Form form={form} layout="vertical" className="novel-panel novel-agent-page" disabled={busy}>
     <div className="novel-agent-intro"><h2>Agent 设置</h2><p>为创作步骤指定自己的模型，设置审稿与写作要求。</p></div>
+    <div className="novel-agent-scope" role="group" aria-label="设置保存范围"><Button type={!projectScope ? 'primary' : 'default'} disabled={busy} onClick={()=>setScopeKind('account')}>账号默认</Button><Button type={projectScope ? 'primary' : 'default'} disabled={!projectId || busy} onClick={()=>setScopeKind('project')}>当前作品</Button></div>
+    <p>{projectScope ? '仅影响当前作品的新任务。' : '新作品会继承此设置；已有作品和历史任务保持原设置。'}</p>
     <section className="novel-agent-section"><h3>模型路由</h3><p>留空则使用本次对话选择的模型。这里仅列出当前已接通的创作步骤。</p>
       <div className="novel-agent-routes">{PHASES.filter(([key])=>!['post-write','ai-tells'].includes(key)).map(([key, label]) => <Form.Item key={key} name={['modelRoutes', key]} label={label}>
         <Select aria-label={`${label}模型`} allowClear placeholder="使用本次选中模型" options={modelOptions(models, settings?.agent?.modelRoutes?.[key])} />
@@ -59,10 +65,10 @@ export default function AgentPanel({ projectId, models, mode }) {
     <Form.Item name="reviewDimensionIds" noStyle><ReviewDimensions catalog={dimensionCatalog} disabled={busy || !settings} /></Form.Item>
     <AgentRequirements />
     <AgentRequirements writing />
-    <section className="novel-agent-section"><h3>当前作品设置</h3><div className="novel-form-grid">
+    {projectScope && <section className="novel-agent-section"><h3>当前作品设置</h3><div className="novel-form-grid">
       <Form.Item name="targetChapterWords" label="每章目标字数"><InputNumber aria-label="每章目标字数" min={800} max={10000} step={100} /></Form.Item>
       <Form.Item name="thinkingLevel" label="默认思考强度"><Select options={THINKING} /></Form.Item>
-    </div></section>
-    <footer className="novel-agent-footer"><span>保存到当前作品，下一次新任务生效；历史任务保留原设置。</span><Button type="primary" disabled={!settings} loading={busy} onClick={save}>保存Agent设置</Button></footer>
+    </div></section>}
+    <footer className="novel-agent-footer"><span>{projectScope ? '保存到当前作品，新任务生效。' : '保存到当前账号，新作品自动继承。'}</span><Button type="primary" disabled={!settings} loading={busy} onClick={save}>保存Agent设置</Button></footer>
   </Form>;
 }
