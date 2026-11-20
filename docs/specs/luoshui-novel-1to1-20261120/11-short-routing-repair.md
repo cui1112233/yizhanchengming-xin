@@ -18,7 +18,7 @@ Agent设置区分加载中、成功及失败；加载中不显示失败或0/0，
 - [x] 增加短篇提案、确认、重复、取消、越权及非法输入回归，先确认旧实现失败。
 - [x] 修改服务端协议、后端提示词、确认分流及前端导航；不新增模型通道。
 - [x] 修复Agent加载误报，验证慢加载、失败、重读及成功保存。
-- [ ] 定向回归与构建，登记运行状态及仍未核验的差异。
+- [x] 定向回归与构建，登记运行状态及仍未核验的差异。
 
 不运行原版、不消耗模型额度、不发布公网。历史18项前端失败尚未全部诊断，本次不得将其登记为已全部解决。
 
@@ -33,3 +33,19 @@ Agent设置区分加载中、成功及失败；加载中不显示失败或0/0，
 ## 尚未关闭
 
 write_next / audit_chapter / revise_chapter等其他Studio动作仍未接通。原版全部生产内部阶段、全部提示词消费、像素级还原及真实收费模型全程输出未完成。历史18项前端失败保持开放，不能把本次定向通过当作全站全流程通过。
+
+## 本地运行验收
+
+修复提交：`33e6dac1`。后端小说及prompt两包、HTTP小说入口、5项源合同测试通过；前端构建通过。新增程序链路测试用模拟模型依次走提案、大纲、大纲审稿、正文、正文审稿、推荐文案，得到已持久化正文及至少3个成品文件；重复运行不新增调用。这仍不替代真实模型及MySQL全流程验收。
+
+4001实际返回git_sha/runtime_manifest_sha=33e6dac1，入口`/assets/user-CScrVE-5.js`，小说页资源`NovelCreationPage-BGmnM6ye.js`。health=true；后台确有新预设ID且包含short_run。具体资源指纹见`../../verification/novel-contract-test-20261120/repair-runtime.json`。
+
+旧二进制文件被占用，复制替换没有成功，故未继续把旧文件标成新版；已恢复旧文件配套清单，改用已构建的新候选二进制在原4001运行：
+
+- 程序：`F:/脚本测试/一战晟铭-v88/.local-review/qiantie-novel-routing-candidate.exe`
+- 专用清单：`.local-review/novel-routing-runtime-manifest.json`
+- 进程：61220（仅为本次验收时的值）
+- SHA256：5826760B186629F0D2FF247EBB1C3934236F04C19C043EFAC02AB76461FF46BE
+- 重启方式：`scripts/start-local-go-review.ps1 -UseYcmMysql -SkipBuild -Detached -BinaryPath .local-review/qiantie-novel-routing-candidate.exe -ManifestPath .local-review/novel-routing-runtime-manifest.json`
+
+已通过CUA刷新实际登录页面并读取Agent设置：37项/29项选中，无目录失败提示。没有保存设置，没有恢复或重试旧任务；返回后仍暂停5%/0章。未通过真实模型在页面新建短篇，收费调用0；没有公网部署。

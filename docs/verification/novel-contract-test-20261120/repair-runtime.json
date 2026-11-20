@@ -1,0 +1,31 @@
+{
+  "verifiedAt": "2026-11-20T18:15:28.177063+08:00",
+  "runtime": {
+    "git_sha": "33e6dac1",
+    "frontend_entry": "/assets/user-CScrVE-5.js",
+    "runtime": "go",
+    "runtime_manifest_sha": "33e6dac1"
+  },
+  "health": {
+    "ok": true
+  },
+  "assets": {
+    "/assets/user-CScrVE-5.js": {
+      "bytes": 160445,
+      "sha256": "b693cc811ffa817d5a02b89a71e15fff4f654bab87affb1cdb43bdef49de2daa"
+    },
+    "/assets/NovelCreationPage-BGmnM6ye.js": {
+      "bytes": 151708,
+      "sha256": "c4ed7362a420d3bae1baa92254b8bdde189dcea3ee53e2806561a99e9bd1c494"
+    }
+  },
+  "v2PresetMatches": [
+    {
+      "id": "novel-creation.studio-planning-v2",
+      "name": "创作对话·长短篇动作分流",
+      "short_run_present": true
+    }
+  ],
+  "paidCalls": 0,
+  "ui": "Authenticated CUA: 37 review dimensions, 29 selected, no catalog error. Restored existing paused task at 5%, 0 chapters; no save/resume/generation."
+}
