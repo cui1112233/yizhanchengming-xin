@@ -576,8 +576,11 @@ func journalCompletePrepared(ctx context.Context, key string, p batchfactoryv11.
 	response, err := p.Complete(batchfactoryv11.WithSingleAttempt(ctx), request)
 	if err != nil {
 		var httpErr *batchfactoryv11.DirectorHTTPError
-		if errors.As(err, &httpErr) && (httpErr.StatusCode == 400 || httpErr.StatusCode == 401 || httpErr.StatusCode == 403 || httpErr.StatusCode == 404 || httpErr.StatusCode == 422 || httpErr.StatusCode == 429) {
+		if errors.As(err, &httpErr) && (httpErr.StatusCode == 400 || httpErr.StatusCode == 401 || httpErr.StatusCode == 403 || httpErr.StatusCode == 404 || httpErr.StatusCode == 422 || httpErr.StatusCode == 429 || explicitModelUnavailable(httpErr)) {
 			mapped := mapModelError(err)
+			if explicitModelUnavailable(httpErr) {
+				mapped = &DomainError{Code: ErrModelUnavailable, Message: "所选文本模型当前不可用，请检查模型配置或更换可用模型", Cause: err}
+			}
 			record.ErrorCode, record.ErrorMessage = domainFailure(mapped)
 			record.State = "rejected"
 			record.Response = httpErr.Body
@@ -598,6 +601,20 @@ func journalCompletePrepared(ctx context.Context, key string, p batchfactoryv11.
 		return "", err
 	}
 	return response, nil
+}
+
+// A structured model_not_found explicitly rejects the request before model
+// execution. A generic gateway 503 can still be ambiguous and must stay paused.
+func explicitModelUnavailable(err *batchfactoryv11.DirectorHTTPError) bool {
+	if err.StatusCode != 503 {
+		return false
+	}
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	return json.Unmarshal([]byte(err.Body), &body) == nil && body.Error.Code == "model_not_found"
 }
 
 func persistBundle(ctx context.Context, b ChapterBundle) error {

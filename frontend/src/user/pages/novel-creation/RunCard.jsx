@@ -1,17 +1,18 @@
 import { Button, Progress } from 'antd';
 import { PHASES, STATUS, TERMINAL, parseJSON, validRun } from './contracts.js';
+import { runProgress } from './runProgress.js';
 
 export default function RunCard({ snapshot, onAction, onBlueprint, busy }) {
   const run = validRun(snapshot?.run); if (!run) return null;
   const runtime = parseJSON(run.runtimeSnapshot), secondary = runtime.confirmationKind === 'next_model_call', shortCheckpoint = runtime.confirmationKind === 'short_outline';
   const shortRun = !!parseJSON(run.promptSnapshot).short_story || !!runtime.shortStoryId;
   const unknown = run.errorCode === 'novel_upstream_result_unknown';
-  const progress = Math.max(0, ...(snapshot.events || []).map(e => Number(e.progress) || 0));
+  const progress = runProgress(run, snapshot.events || []);
   const calls = Object.entries(runtime.modelCalls || {});
   const audit = !runtime.operation && ['succeeded', 'succeeded_with_warnings'].includes(run.status) && typeof runtime.finalAudit?.score === 'number' && Number.isFinite(runtime.finalAudit.score) ? runtime.finalAudit : null;
   const localEvent = [...(snapshot.events || [])].reverse().find(e=>e.type==='run.local_checks');
   const localChecks = runtime.localChecks || parseJSON(localEvent?.payload);
-  return <section className="novel-run" aria-label="当前任务"><b>{run.status === 'analyzing' ? '资料分析' : STATUS[run.status] || '处理中'}</b><span>{STATUS[snapshot.executionState] || ''}</span><Progress percent={progress} showInfo />
+  return <section className="novel-run" aria-label="当前任务"><b>{run.status === 'analyzing' ? '资料分析' : STATUS[run.status] || '处理中'}</b><span>{STATUS[snapshot.executionState] || ''}</span><Progress {...progress} showInfo />
     {unknown ? <p role="alert">上游结果待确认，已暂停自动重试。请核对原轮次；不会自动重新调用模型。</p> : run.errorMessage && <p role="alert">{run.errorMessage}</p>}
     {audit && <section aria-label="最终审核"><b>最终审核：{audit.score}分</b>{Array.isArray(audit.issues) && audit.issues.length > 0 && <><p>未解决问题：</p><ul>{audit.issues.map((issue, index) => <li key={issue.id || index}>{({ high: '严重', critical: '严重', medium: '一般', low: '轻微' })[issue.severity] || '提示'}：{typeof issue.description === 'string' ? issue.description : '请检查本章内容'}</li>)}</ul></>}</section>}
     {(localEvent || runtime.localChecks) && <details aria-label="本地文字检查"><summary>本地文字检查（不调用模型，不改正文）</summary>{localChecks.post_write && <><p>后写校验：{localChecks.post_write.passed?'未发现错误':'发现待处理问题'} · 正文{localChecks.post_write.stats?.total_chars}字</p><ul>{(localChecks.post_write.issues||[]).map((issue,i)=><li key={issue.rule_id||i}>{({error:'错误',warning:'提醒',info:'提示'})[issue.severity]||'提示'}：{issue.message}</li>)}</ul></>}{localChecks.cross_chapter_status==='not_checked_missing_full_text'&&<p>本次未检查跨章重复：未提供完整前章正文。</p>}{localChecks.expression_metrics&&<><p>{localChecks.expression_metrics.note}</p><p>段落数：{localChecks.expression_metrics.paragraph_count}</p><ul>{Object.entries(localChecks.expression_metrics.formula_phrase_counts||{}).map(([word,count])=><li key={word}>{word}：{count}次</li>)}</ul></>}</details>}
