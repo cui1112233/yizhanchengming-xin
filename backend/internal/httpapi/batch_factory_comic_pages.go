@@ -1052,6 +1052,11 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			input.GenerationError = comicPageCarryAutoRetryMarker(storedPage.GenerationError)
 		}
 	}
+	if strings.TrimSpace(input.ImagePrompt) == "" && batchfactoryv11.ComicPageLightPipeline(effective) {
+		// 轻量分镜版允许页面没有独立的 image prompt：回退用 screen_prompt
+		// 参与出图编译，避免「准备阶段判缺提示词、出图阶段拒绝」的死结。
+		input.ImagePrompt = input.ComicPrompt
+	}
 	if strings.TrimSpace(input.ImagePrompt) == "" {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: %s 缺少独立的图片提示词", batchfactoryv11.ErrConflict, selectedPage.Label)
 	}
@@ -1496,9 +1501,12 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		return true
 	}
 	work := make([]comicPageWorkItem, 0, len(continuation.Pending))
+	light := batchfactoryv11.ComicPageLightPipeline(effective)
 	for _, page := range continuation.Pending {
 		// 缺提示词的页只登记该页，不再中止整本；其余页照常出图。
-		if strings.TrimSpace(page.ComicPrompt) == "" || strings.TrimSpace(page.ComicImagePrompt) == "" {
+		// 轻量分镜版允许页面没有独立的 image prompt：出图编译会回退到
+		// screen_prompt 内容（comicPagePromptContent），不能按缺失拒绝。
+		if strings.TrimSpace(page.ComicPrompt) == "" || (!light && strings.TrimSpace(page.ComicImagePrompt) == "") {
 			message := fmt.Sprintf("%s 还没有漫画提示词", page.Label)
 			if strings.TrimSpace(page.ComicPrompt) != "" {
 				message = fmt.Sprintf("%s 缺少独立的图片提示词", page.Label)
@@ -2098,11 +2106,11 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 				}
 				break
 			}
-			if targetBook == nil || targetVideo == nil || strings.TrimSpace(targetVideo.ComicPrompt) == "" || strings.TrimSpace(targetVideo.ComicImagePrompt) == "" {
+			effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, targetBook.SettingsState.Patch)
+			if targetBook == nil || targetVideo == nil || strings.TrimSpace(targetVideo.ComicPrompt) == "" || (!batchfactoryv11.ComicPageLightPipeline(effective) && strings.TrimSpace(targetVideo.ComicImagePrompt) == "") {
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "请先提取当前分镜的漫画提示词"})
 				return
 			}
-			effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, targetBook.SettingsState.Patch)
 			_, err = comicStore.UpsertComicPage(r.Context(), owner, batch.ID, targetBook.ID, targetVideo.ID, batchfactoryv11.UpsertComicPageInput{
 				ComicPrompt: targetVideo.ComicPrompt, ImagePrompt: targetVideo.ComicImagePrompt,
 				ModelID: comicSettingString(effective, "imageModelId", ""), AspectRatio: batchfactoryv11.EffectiveImageAspectRatio(effective),

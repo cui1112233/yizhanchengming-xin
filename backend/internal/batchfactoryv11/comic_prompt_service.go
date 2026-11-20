@@ -741,7 +741,7 @@ func isDirectorContentPolicyError(err error) bool {
 }
 
 func missingComicPromptVideos(videos []Video, snapshot DirectorSnapshot) []Video {
-	light := aiReasoningPromptConfig(snapshot.Effective).Comic.ID == "batch-comic-page-light"
+	light := ComicPageLightPipeline(snapshot.Effective)
 	missing := make([]Video, 0, len(videos))
 	for _, video := range videos {
 		if strings.TrimSpace(video.ComicPrompt) == "" || (!light && strings.TrimSpace(video.ComicImagePrompt) == "") {

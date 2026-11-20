@@ -614,6 +614,38 @@ func TestComicPreparationActionRepairsOnlyMissingPagePrompts(t *testing.T) {
 	}
 }
 
+// 轻量分镜版允许页面只有 screen_prompt（image prompt 由出图编译回退到
+// screen_prompt）。准备阶段必须与补齐/出图同口径：全部页面有 screen_prompt
+// 时视为就绪，不能再判「缺提示词」触发空转补齐——2026-11-20 批量事故的
+// 根因就是准备阶段（不感知 light）与补齐阶段（感知 light）口径相反。
+func TestComicPreparationActionLightPipelineTreatsScreenPromptOnlyAsReady(t *testing.T) {
+	light := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true,"presetId":"batch-comic-page-light"}}`)}
+	book := batchfactoryv11.Book{
+		AssetRecords: []batchfactoryv11.BookAsset{{ID: "asset-1", Kind: "character", Name: "林晚", Source: "comic", Prompt: "人物"}},
+		Videos: []batchfactoryv11.Video{
+			{ID: "page-1", ComicPrompt: "第一页", ComicSourceSegment: &batchfactoryv11.ComicSourceSegment{SourceText: "第一段"}},
+			{ID: "page-2", ComicPrompt: "第二页", ComicSourceSegment: &batchfactoryv11.ComicSourceSegment{SourceText: "第二段"}},
+		},
+	}
+	if !comicBootstrapReady(book, light) {
+		t.Fatal("light pipeline book with only screen_prompt must be ready")
+	}
+	if got := selectComicPreparationAction(book, light); got != comicPreparationReady {
+		t.Fatalf("light pipeline preparation action = %q, want ready", got)
+	}
+	standard := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`)}
+	if comicBootstrapReady(book, standard) {
+		t.Fatal("non-light pipeline still requires image_prompt")
+	}
+	if got := selectComicPreparationAction(book, standard); got != comicPreparationMissingPrompts {
+		t.Fatalf("non-light pipeline preparation action = %q, want missing-page prompt recovery", got)
+	}
+	book.Videos[0].ComicPrompt = ""
+	if got := selectComicPreparationAction(book, light); got != comicPreparationMissingPrompts {
+		t.Fatalf("light pipeline missing screen prompt action = %q, want missing-page prompt recovery", got)
+	}
+}
+
 func TestComicPreparationActionRecoversAmbiguousComicAssetIdentity(t *testing.T) {
 	effective := batchfactoryv11.SettingsPatch{"aiPromptConfig": json.RawMessage(`{"comic":{"enabled":true}}`), "assetImagesEnabled": json.RawMessage("true")}
 	book := batchfactoryv11.Book{

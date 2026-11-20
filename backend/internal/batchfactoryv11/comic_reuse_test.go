@@ -16,13 +16,37 @@ func TestComicBootstrapCanReuseOnlyWhenSourceAndPagesAreComplete(t *testing.T) {
 			},
 		}},
 	}
-	if !comicBootstrapCanReuse(book, true) {
+	if !comicBootstrapCanReuse(book, true, SettingsPatch{}) {
 		t.Fatal("complete comic result should be reusable")
 	}
 
 	book.Videos[0].ComicSourceSegment.SourceDigest = sourceDigest("新正文")
-	if comicBootstrapCanReuse(book, true) {
+	if comicBootstrapCanReuse(book, true, SettingsPatch{}) {
 		t.Fatal("stale comic result must not be reused")
+	}
+}
+
+// 轻量分镜版允许页面没有独立的 image_prompt：完整 screen_prompt 的书必须
+// 可复用，不能每轮都触发整书 bootstrap 重跑。
+func TestComicBootstrapCanReuseLightPipelineWithoutImagePrompt(t *testing.T) {
+	book := Book{
+		SourceText:       "正文",
+		AssetRecords:     []BookAsset{{Source: "comic", Prompt: "角色提示"}},
+		DirectorRevision: &DirectorRevision{SourceDigest: sourceDigest("正文")},
+		Videos: []Video{{
+			ComicPrompt: "分镜提示词",
+			ComicSourceSegment: &ComicSourceSegment{
+				SourceText:   "正文",
+				SourceDigest: sourceDigest("正文"),
+			},
+		}},
+	}
+	light := SettingsPatch{"aiPromptConfig": []byte(`{"comic":{"presetId":"batch-comic-page-light"}}`)}
+	if !comicBootstrapCanReuse(book, true, light) {
+		t.Fatal("light pipeline book with only screen_prompt should be reusable")
+	}
+	if comicBootstrapCanReuse(book, true, SettingsPatch{}) {
+		t.Fatal("non-light pipeline still requires image_prompt")
 	}
 }
 

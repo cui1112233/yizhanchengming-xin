@@ -219,6 +219,19 @@ func aiReasoningPromptConfig(patch SettingsPatch) AIReasoningPromptConfig {
 	return config
 }
 
+// ComicPageLightPresetID 是轻量分镜管线的页面提示词预设 ID。
+const ComicPageLightPresetID = "batch-comic-page-light"
+
+// ComicPageLightPipeline 判断生效配置是否使用轻量分镜管线。轻量版允许页面
+// 只有 screen_prompt：模型可以不返回独立 image_prompt，出图编译会回退到
+// screen_prompt 内容（comicPagePromptContent 的既有回退行为）。所有「页面
+// 是否缺提示词」的判定必须统一走这里——2026-11-20 的批量事故就是四个判定
+// 口径不一致造成的死结：自动化准备阶段判缺提示词、补齐阶段（light 感知）
+// 认为不缺、出图阶段又因缺 image prompt 拒绝，整批无限循环。
+func ComicPageLightPipeline(patch SettingsPatch) bool {
+	return aiReasoningPromptConfig(patch).Comic.ID == ComicPageLightPresetID
+}
+
 // constraintPresetBodyResolver is wired by the HTTP layer to the published
 // preset catalog. Historical batches may carry constraint selections that only
 // saved the preset ID (before the HTTP save path froze bodies); resolving them

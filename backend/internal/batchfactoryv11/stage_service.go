@@ -512,7 +512,7 @@ func comicStageAlreadyComplete(book Book, stage BookStage, effective SettingsPat
 		if len(book.Videos) == 0 {
 			return false
 		}
-		light := aiReasoningPromptConfig(effective).Comic.ID == "batch-comic-page-light"
+		light := ComicPageLightPipeline(effective)
 		for _, video := range book.Videos {
 			if strings.TrimSpace(video.ComicPrompt) == "" || (!light && strings.TrimSpace(video.ComicImagePrompt) == "") {
 				return false

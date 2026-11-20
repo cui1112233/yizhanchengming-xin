@@ -104,12 +104,16 @@ func comicAssetStageCanReuse(book Book) bool {
 // comicBootstrapCanReuse keeps the normal comic extraction action idempotent.
 // A complete, current analysis is reused; a missing page, missing segment or
 // changed source falls through to the normal bootstrap request.
-func comicBootstrapCanReuse(book Book, requireAssets bool) bool {
+// 轻量分镜版允许页面没有独立的 image_prompt（出图时回退到 screen_prompt），
+// 复用判定必须与 missingComicPromptVideos / comicStageAlreadyComplete 同口径，
+// 否则整本已分析完的轻量书每轮都会触发一次昂贵的整书 bootstrap 重跑。
+func comicBootstrapCanReuse(book Book, requireAssets bool, effective SettingsPatch) bool {
 	if (requireAssets && !comicAssetStageCanReuse(book)) || len(book.Videos) == 0 {
 		return false
 	}
+	light := ComicPageLightPipeline(effective)
 	for _, video := range book.Videos {
-		if strings.TrimSpace(video.ComicPrompt) == "" || strings.TrimSpace(video.ComicImagePrompt) == "" || video.ComicSourceSegment == nil || strings.TrimSpace(video.ComicSourceSegment.SourceText) == "" || video.ComicSourceSegment.SourceDigest != sourceDigest(book.SourceText) {
+		if strings.TrimSpace(video.ComicPrompt) == "" || (!light && strings.TrimSpace(video.ComicImagePrompt) == "") || video.ComicSourceSegment == nil || strings.TrimSpace(video.ComicSourceSegment.SourceText) == "" || video.ComicSourceSegment.SourceDigest != sourceDigest(book.SourceText) {
 			return false
 		}
 	}
@@ -144,7 +148,7 @@ func parseComicBootstrapOutput(raw json.RawMessage, snapshot DirectorSnapshot, s
 		return DirectorResult{}, nil, nil, retryableModelOutputError(fmt.Errorf("漫画分页提示词数量不一致"))
 	}
 	boundaryIDs := make([]string, 0, len(envelope.Storyboard))
-	light := aiReasoningPromptConfig(snapshot.Effective).Comic.ID == "batch-comic-page-light"
+	light := ComicPageLightPipeline(snapshot.Effective)
 	pages := make([]comicPromptResult, 0, len(envelope.Storyboard))
 	for index, page := range envelope.Storyboard {
 		page.ScreenPrompt = strings.TrimSpace(page.ScreenPrompt)
@@ -221,7 +225,7 @@ func (s *DirectorService) RunComicBootstrap(ctx context.Context, owner, batchID,
 	if assetImages && !comicAssetStageCanReuse(book) {
 		return ComicBootstrapResult{}, fmt.Errorf("%w: 请先提取漫画资产", ErrConflict)
 	}
-	if comicBootstrapCanReuse(book, assetImages) {
+	if comicBootstrapCanReuse(book, assetImages, effective) {
 		revision := DirectorRevision{}
 		if book.DirectorRevision != nil {
 			revision = *book.DirectorRevision

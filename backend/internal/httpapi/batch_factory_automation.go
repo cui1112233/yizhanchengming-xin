@@ -1981,7 +1981,7 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 		"scheduleMode": scheduleMode, "scheduledAt": scheduledAt,
 		"concurrency": automationNumberValue(input["concurrency"], 1), "preset": map[string]any{"id": preset.ID, "name": preset.Name, "version": preset.Version},
 		"productionMode": productionMode,
-		"createdAt": c.now(), "updatedAt": c.now(),
+		"createdAt":      c.now(), "updatedAt": c.now(),
 		"counts": automationCounts(len(targetBooks), len(targetBooks), 0, 0), "books": map[string]any{},
 	}
 	if initialState == "running" {
@@ -2546,8 +2546,15 @@ func comicBootstrapReady(book batchfactoryv11.Book, effective batchfactoryv11.Se
 	if !comicAssetsReady(book) || len(book.Videos) == 0 {
 		return false
 	}
+	// 轻量分镜版允许页面没有独立的 image_prompt（出图编译回退到
+	// screen_prompt）；必须与 missingComicPromptVideos 同口径，否则准备阶段
+	// 永远判「缺提示词」，补齐阶段又是空转，出图阶段照样拒绝。
+	light := batchfactoryv11.ComicPageLightPipeline(effective)
 	for _, page := range book.Videos {
-		if page.ComicSourceSegment == nil || strings.TrimSpace(page.ComicSourceSegment.SourceText) == "" || strings.TrimSpace(page.ComicPrompt) == "" || strings.TrimSpace(page.ComicImagePrompt) == "" {
+		if page.ComicSourceSegment == nil || strings.TrimSpace(page.ComicSourceSegment.SourceText) == "" || strings.TrimSpace(page.ComicPrompt) == "" {
+			return false
+		}
+		if !light && strings.TrimSpace(page.ComicImagePrompt) == "" {
 			return false
 		}
 	}
