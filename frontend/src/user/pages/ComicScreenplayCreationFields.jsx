@@ -22,6 +22,17 @@ export function ComicDegreeCards({ value, onChange, compact = false }) {
   </div>;
 }
 
+// 洛水「新建剧本」资产解析程度是横排 4 段切换 + 一行说明，不是 V88 的大卡片。
+export function ComicDegreeSegments({ value, onChange, disabled = false }) {
+  const active = comicDegreeOptions.find(option => option.value === value) || comicDegreeOptions[0];
+  return <div className="comic-degree-segments-field">
+    <div className="degree-segments" role="group" aria-label="资产解析程度">
+      {comicDegreeOptions.map(option => <button type="button" key={option.value} disabled={disabled} aria-pressed={value === option.value} className={value === option.value ? 'is-active' : ''} onClick={() => onChange(option.value)}>{option.label}</button>)}
+    </div>
+    <small className="comic-degree-segments-hint">{active.description}；{active.detail}</small>
+  </div>;
+}
+
 function StylePreview({ src, name }) {
   const [image, setImage] = useState('');
   const [failed, setFailed] = useState(false);
@@ -79,7 +90,7 @@ export function ComicStylePicker({ value, onChange, styles = [], disabled = fals
   </>;
 }
 
-export function ComicCreativeFields({ value, onChange, library, loading, error, onRetry, onLibraryChange, disabled = false }) {
+export function ComicCreativeFields({ value, onChange, library, loading, error, onRetry, onLibraryChange, disabled = false, hideStyle = false }) {
   const [imageModels, setImageModels] = useState([]), [modelError, setModelError] = useState('');
   const [modelAttempt, setModelAttempt] = useState(0);
   useEffect(() => {
@@ -97,7 +108,7 @@ export function ComicCreativeFields({ value, onChange, library, loading, error, 
     {error ? <Alert type="error" showIcon message={error} action={<Button size="small" onClick={onRetry}>重新读取</Button>} /> : null}
     <Spin spinning={loading}>
       {creativePromptFields.map(({ field, purpose, label }) => <label key={field}><span>{label}</span><Select aria-label={label} disabled={disabled || loading || !!error} value={value[field] || undefined} placeholder={`请选择${label}`} options={creativePromptOptions(library.prompts, purpose, value[field])} onChange={id => onChange({ [field]: id })} /></label>)}
-      <label><span>选择风格</span><ComicStylePicker disabled={disabled || loading || !!error} value={value} styles={library.styles} onChange={onChange} onLibraryChange={onLibraryChange} /></label>
+      {!hideStyle ? <label><span>选择风格</span><ComicStylePicker disabled={disabled || loading || !!error} value={value} styles={library.styles} onChange={onChange} onLibraryChange={onLibraryChange} /></label> : null}
       <label><span>图片核心要求</span><Input.TextArea disabled={disabled} rows={2} value={value.image_core_instruction??''} placeholder="人物与场景图片共同遵守的补充要求" onChange={event => onChange({ image_core_instruction: event.target.value })} /></label>
       <label><span>图片生成模型</span><Select disabled={disabled} allowClear value={value.image_model_id || undefined} options={modelOptions(value.image_model_id)} placeholder="使用账号默认模型（可选）" onChange={id => onChange({ image_model_id: id || '' })} /></label>
       <label><span>图片编辑模型</span><Select disabled={disabled} allowClear value={value.image_edit_model_id || undefined} options={modelOptions(value.image_edit_model_id)} placeholder="使用账号默认模型（可选）" onChange={id => onChange({ image_edit_model_id: id || '' })} /></label>{modelError ? <Alert type="warning" showIcon message={modelError} action={<Button size="small" onClick={() => setModelAttempt(current => current + 1)}>重试模型列表</Button>} /> : null}

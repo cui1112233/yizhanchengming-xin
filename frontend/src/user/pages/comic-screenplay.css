@@ -256,3 +256,25 @@
 .comic-story-summary h2{display:flex;align-items:center;gap:8px;font-size:16px!important;font-weight:700!important;margin:0!important}
 .comic-story-summary h2 .comic-synopsis-generate{margin-left:auto}
 .comic-story-synopsis.is-empty{color:var(--text-tertiary);font-style:italic;margin:10px 0 0}
+
+/* 洛水「新建剧本」主表单对齐：模型行内提示词配置徽标、风格/比例并排、资产解析横排 4 段、高级配置折叠 */
+.comic-create-luoshui .comic-create-form>label{margin-bottom:16px}
+.comic-create-luoshui .comic-create-model-select .ant-select-selector{padding-right:8px}
+.comic-model-config-badge{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:3px 8px;border:1px solid color-mix(in srgb,var(--theme-primary) 40%,transparent);border-radius:999px;background:color-mix(in srgb,var(--theme-primary) 10%,transparent);color:var(--theme-primary);font-size:11px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer}
+.comic-model-config-badge b{font-weight:700}
+.comic-model-config-badge:hover{background:color-mix(in srgb,var(--theme-primary) 18%,transparent)}
+.comic-create-luoshui .comic-create-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.comic-create-luoshui .comic-create-row .style-picker-trigger{height:36px}
+.comic-degree-segments-field{display:flex;flex-direction:column;gap:8px}
+.comic-degree-segments-field .degree-segments{width:100%;border-radius:8px;justify-content:stretch}
+.comic-degree-segments-field .degree-segments button{flex:1;text-align:center;border-radius:6px}
+.comic-degree-segments-hint{color:var(--text-secondary);font-size:12px;line-height:1.5}
+.comic-source-input .comic-source-heading{margin-bottom:10px}
+.comic-create-luoshui .comic-source-input{border-top:0;padding-top:4px;margin-top:2px}
+.comic-advanced-config{margin-top:4px;border-top:1px solid var(--border-default);padding-top:12px}
+.comic-advanced-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;padding:6px 2px;border:0;background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer}
+.comic-advanced-toggle:hover{color:var(--text-primary)}
+.comic-advanced-toggle .is-open{transform:rotate(180deg)}
+.comic-advanced-body{padding:10px 2px 2px}
+.comic-advanced-body .comic-creative-fields{gap:12px}
+@media(max-width:640px){.comic-create-luoshui .comic-create-row{grid-template-columns:1fr}}

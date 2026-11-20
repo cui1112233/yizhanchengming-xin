@@ -65,6 +65,18 @@ export function creativePromptOptions(prompts, purpose, selectedId) {
   return options;
 }
 
+// 洛水「新建剧本」在模型行自动带好提示词配置（High 标签），用户无需逐项手选。
+// 这里按每个用途的第一个可用提示词自动补齐，保证折叠「提示词配置」后仍能直接创建。
+export function defaultCreativePrompts(library, draft) {
+  const patch = {};
+  for (const { field, purpose } of creativePromptFields) {
+    if (draft?.[field]) continue;
+    const first = creativePromptOptions(library?.prompts || [], purpose, '').find(option => !option.disabled);
+    if (first?.value) patch[field] = first.value;
+  }
+  return patch;
+}
+
 // 同一新建草稿只建立一个作品；配置保存失败后继续补存，不重复新建。
 export function createCreativeCreationFlow({ create, load, save }) {
   let project = null, pending = null;

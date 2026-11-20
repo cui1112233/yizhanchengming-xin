@@ -32,3 +32,35 @@ test('改名不改数据值：degree 的 value 仍是 master/master_real', () =>
   assert.match(fields, /value: 'master'/);
   assert.match(fields, /value: 'master_real'/);
 });
+
+test('新建漫剧主表单按洛水顺序：模型提示词配置徽标 → 风格/比例并排 → 资产解析横排 → 上传 → 高级折叠', () => {
+  const modal = page.slice(page.indexOf('title="新建漫剧"'));
+  const order = [
+    '作品名称 <i>*</i>',
+    'comic-model-config-badge',
+    'comic-create-row',
+    'comic-field-title">资产解析程度',
+    'ComicDegreeSegments',
+    'ComicSourceInput',
+    'comic-advanced-toggle',
+    'ComicCreativeFields hideStyle'
+  ];
+  let cursor = -1;
+  for (const token of order) {
+    const at = modal.indexOf(token, cursor + 1);
+    assert.ok(at > cursor, `字段顺序错位或未找到：${token}`);
+    cursor = at;
+  }
+  // 洛水主表单不含平铺的 4 个提示词：必须收进折叠区
+  const beforeAdvanced = modal.slice(0, modal.indexOf('comic-advanced-toggle'));
+  assert.doesNotMatch(beforeAdvanced, /剧本提示词|分镜提示词|角色设计提示词|场景设计提示词|图片核心要求/);
+});
+
+test('资产解析程度用洛水横排 4 段组件，默认提示词按用途自动补齐', () => {
+  assert.match(fields, /ComicDegreeSegments/);
+  assert.match(fields, /degree-segments/);
+  assert.match(page, /defaultCreativePrompts\(library, current\)/);
+  const creative = readFileSync(new URL('./comic-screenplay-creative.js', import.meta.url), 'utf8');
+  assert.match(creative, /export function defaultCreativePrompts/);
+  assert.match(creative, /for \(const \{ field, purpose \} of creativePromptFields\)/);
+});

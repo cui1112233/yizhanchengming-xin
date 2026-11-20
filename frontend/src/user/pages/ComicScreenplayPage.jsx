@@ -25,8 +25,8 @@ import { prepareStoryboardGenerationRequest, completeStoryboardGenerationRequest
 import { comicStages, comicStageLocation, comicNextState } from './comic-screenplay-stages.js';
 import ComicScreenplayFileTools from './ComicScreenplayFileTools.jsx';
 import { comicDraftPayload, createSourceImportGate } from './comic-screenplay-creation.js';
-import { ComicDegreeCards, ComicSourceInput, ComicStylePicker, ComicCreativeFields } from './ComicScreenplayCreationFields.jsx';
-import { applyCreativeConfigToProject, comicProjectStyleName, comicStoryboardEngine, comicWorkspaceStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, comicModelConfigPatchFields, creativePromptOptions, emptyCreativeConfig } from './comic-screenplay-creative.js';
+import { ComicDegreeCards, ComicDegreeSegments, ComicSourceInput, ComicStylePicker, ComicCreativeFields } from './ComicScreenplayCreationFields.jsx';
+import { applyCreativeConfigToProject, comicProjectStyleName, comicStoryboardEngine, comicWorkspaceStoryboardEngine, createCreativeCreationFlow, creativeConfigDraft, creativeCreationDraft, creativeConfigPayload, creativeModelConfigPayload, comicModelConfigPatchFields, creativePromptOptions, defaultCreativePrompts, emptyCreativeConfig } from './comic-screenplay-creative.js';
 import { parseComicScreenplayDraftSource } from '../../shared/api/comicScreenplay.js';
 import { getProjectRetention, indexRetention } from '../../shared/api/projectRetention.js';
 
@@ -121,6 +121,7 @@ export default function ComicScreenplayPage() {
   },[selectedId]);
 
   const [creative, setCreative] = useState(emptyCreativeConfig);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [creativeLibrary, setCreativeLibrary] = useState({ styles: [], prompts: [] });
   const [creativeLoading, setCreativeLoading] = useState(false);
   const [creativeError, setCreativeError] = useState('');
@@ -175,6 +176,11 @@ export default function ComicScreenplayPage() {
       const library = await loadComicCreativeLibrary();
       if (ticket !== creativeTicket.current) return;
       setCreativeLibrary(library);
+      // 洛水在模型行自动带好提示词配置；折叠高级配置时也要保证 4 项提示词已选，创建不会失败。
+      setCreative(current => {
+        const defaults = defaultCreativePrompts(library, current);
+        return Object.keys(defaults).length ? { ...current, ...defaults } : current;
+      });
     } catch (error) { if (ticket === creativeTicket.current) setCreativeError(error.message || '创作目录读取失败'); }
     finally { if (ticket === creativeTicket.current) setCreativeLoading(false); }
   }
@@ -185,6 +191,7 @@ export default function ComicScreenplayPage() {
     setCreateContent(''); setSourceMode('text'); setSourceFilename(''); setSourceParsing(false);
     setForm(current => ({ ...current, title: '', artStyle: '', selectedStyle: '', degree: 'master' }));
     setCreative(creativeCreationDraft()); setCreativeReady(true);
+    setAdvancedOpen(false);
     createdDraft.current = null; setCreatedDraftId('');
     creationFlow.current = createCreativeCreationFlow({ create: createComicScreenplay, load: loadComicCreativeConfig, save: saveComicCreativeConfig });
     setCreateOpen(true);
@@ -747,16 +754,21 @@ export default function ComicScreenplayPage() {
     <Modal title="最近创作历史" open={historyOpen} onCancel={() => setHistoryOpen(false)} footer={<Button onClick={() => setHistoryOpen(false)}>关闭</Button>}>
       <div className="screenplay-version-list">{projects.length ? [...projects].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).map(project => <button type="button" key={project.id} onClick={() => { setHistoryOpen(false); void openProject(project.id); }}><b>{project.title}</b><span>{prettyTime(project.updated_at)}</span></button>) : <Empty description="还没有创作记录" />}</div>
     </Modal>
-    <Modal className="screenplay-create-modal" width={760} title="新建漫剧" open={createOpen} closeIcon={<X size={20} />} onCancel={closeCreateDialog} maskClosable={!creating} closable={!creating} footer={<><Button disabled={creating} onClick={closeCreateDialog}>取消</Button><Button type="primary" icon={<FileText size={16} />} loading={creating} disabled={sourceParsing || creativeLoading || !!creativeError} onClick={submitCreate}>{createdDraftId ? '重试保存配置' : '创建作品'}</Button></>}>
+    <Modal className="screenplay-create-modal comic-create-luoshui" width={760} title="新建漫剧" open={createOpen} closeIcon={<X size={20} />} onCancel={closeCreateDialog} maskClosable={!creating} closable={!creating} footer={<><Button disabled={creating} onClick={closeCreateDialog}>取消</Button><Button type="primary" icon={<FileText size={16} />} loading={creating} disabled={sourceParsing || creativeLoading || !!creativeError} onClick={submitCreate}>{createdDraftId ? '重试保存配置' : '创建'}</Button></>}>
       {createdDraftId ? <Alert type="warning" showIcon message="作品已建立，创作配置尚未保存；重试会继续保存这一个作品。" /> : null}
       <div className="comic-create-form">
         <label><span>作品名称 <i>*</i></span><Input disabled={creating || !!createdDraftId} autoFocus value={form.title} maxLength={80} placeholder="请输入剧本名称" onChange={event => setForm(current => ({ ...current, title: event.target.value }))} /></label>
-        <label><span>选择模型</span><Select disabled={creating || !!createdDraftId} value={form.model || undefined} placeholder="请选择已配置的文本模型" onChange={model => setForm(current => ({ ...current, model }))} options={models.map(model => ({ value: model.id, label: model.displayName || model.name || model.id }))} /></label>
-        <ComicCreativeFields value={creative} onChange={patch => { setCreative(current => ({ ...current, ...patch })); if (patch.storyboard_prompt_id) setStoryboardEngine(current => comicStoryboardEngine(patch.storyboard_prompt_id, current)); }} library={creativeLibrary} loading={creativeLoading} error={creativeError} onRetry={readCreativeLibrary} onLibraryChange={readCreativeLibrary} disabled={creating} />
-        <p className="comic-style-caption">建议小说原文生成前往 Agent / Chat 功能，<a href="/agent/chat">查看链接</a></p>
-        <label><span>剧本比例</span><Select disabled={creating || !!createdDraftId} value={form.aspectRatio} options={ratioOptions} onChange={aspectRatio => setForm(current => ({ ...current, aspectRatio }))} /></label>
-        <fieldset disabled={creating || !!createdDraftId} style={{ border: 0, margin: 0, padding: 0 }}><div className="degree-field"><span className="comic-field-title">资产解析程度</span><ComicDegreeCards value={form.degree} onChange={degree => setForm(current => ({ ...current, degree }))} /></div>
-        <ComicSourceInput mode={sourceMode} onModeChange={mode => { cancelSourceImport(); setSourceMode(mode); }} content={createContent} onContentChange={text => { cancelSourceImport(); setCreateContent(text); }} filename={sourceFilename} parsing={sourceParsing} disabled={creating || !!createdDraftId} onFile={importDraftFile} onRemove={() => { cancelSourceImport(); setSourceFilename(''); }} /></fieldset>
+        <label><span>选择模型</span><Select className="comic-create-model-select" disabled={creating || !!createdDraftId} value={form.model || undefined} placeholder="请选择模型" onChange={model => setForm(current => ({ ...current, model }))} options={models.map(model => ({ value: model.id, label: model.displayName || model.name || model.id }))} suffixIcon={<span className="comic-model-config-badge" role="button" tabIndex={0} title="提示词配置" onClick={event => { event.stopPropagation(); setAdvancedOpen(value => !value); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.stopPropagation(); event.preventDefault(); setAdvancedOpen(value => !value); } }}>提示词配置 <b>High</b><OriginalIcon name="ChevronDownOutline" size={11} /></span>} /></label>
+        <div className="comic-create-row">
+          <label><span>选择风格</span><ComicStylePicker disabled={creativeLoading || !!creativeError || creating || !!createdDraftId} value={creative} styles={creativeLibrary.styles} onChange={patch => setCreative(current => ({ ...current, ...patch }))} onLibraryChange={readCreativeLibrary} /></label>
+          <label><span>剧本比例</span><Select disabled={creating || !!createdDraftId} value={form.aspectRatio} placeholder="请选择比例" options={ratioOptions} onChange={aspectRatio => setForm(current => ({ ...current, aspectRatio }))} /></label>
+        </div>
+        <div className="degree-field"><span className="comic-field-title">资产解析程度</span><ComicDegreeSegments disabled={creating || !!createdDraftId} value={form.degree} onChange={degree => setForm(current => ({ ...current, degree }))} /></div>
+        <fieldset disabled={creating || !!createdDraftId} style={{ border: 0, margin: 0, padding: 0 }}><ComicSourceInput mode={sourceMode} onModeChange={mode => { cancelSourceImport(); setSourceMode(mode); }} content={createContent} onContentChange={text => { cancelSourceImport(); setCreateContent(text); }} filename={sourceFilename} parsing={sourceParsing} disabled={creating || !!createdDraftId} onFile={importDraftFile} onRemove={() => { cancelSourceImport(); setSourceFilename(''); }} /></fieldset>
+        <div className="comic-advanced-config">
+          <button type="button" className="comic-advanced-toggle" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(value => !value)}><span>提示词与图片配置（高级）</span><ChevronDown className={advancedOpen ? 'is-open' : ''} size={14} /></button>
+          {advancedOpen ? <div className="comic-advanced-body"><ComicCreativeFields hideStyle value={creative} onChange={patch => { setCreative(current => ({ ...current, ...patch })); if (patch.storyboard_prompt_id) setStoryboardEngine(current => comicStoryboardEngine(patch.storyboard_prompt_id, current)); }} library={creativeLibrary} loading={creativeLoading} error={creativeError} onRetry={readCreativeLibrary} onLibraryChange={readCreativeLibrary} disabled={creating} /><p className="comic-style-caption">建议小说原文生成前往 Agent / Chat 功能，<a href="/agent/chat">查看链接</a></p></div> : null}
+        </div>
       </div>
     </Modal>
     <WorkspaceArchivePanel open={archiveOpen} modules={['comic_screenplay']} onClose={() => setArchiveOpen(false)} onChanged={refreshProjects} />
