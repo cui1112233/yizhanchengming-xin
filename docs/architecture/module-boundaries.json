@@ -13,5 +13,6 @@
     "前台/src/service",
     "后台/src/service"
   ],
+  "migrationBaseline": [],
   "goModulePrefix": "qiantie/"
 }

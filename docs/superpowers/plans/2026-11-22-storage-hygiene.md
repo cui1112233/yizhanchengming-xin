@@ -46,12 +46,12 @@
 - Consumes: repository root, `-Apply`, `-KeepPreviousBinary`.
 - Produces: JSON report with candidate paths, bytes, action, and reason.
 
-- [ ] Write a Pester-free PowerShell test that creates a temporary repository fixture containing `target/`, old `qiantie-*.exe`, current binary, previous binary, and a source file.
-- [ ] Run the test and verify it fails because the command does not exist.
-- [ ] Implement report-only default; only `-Apply` removes whitelist-matched build outputs.
-- [ ] Verify current/previous executables and source files remain unchanged.
-- [ ] Run the fixture test and `git diff --check`.
-- [ ] Commit the script and test.
+- [x] Write a Pester-free PowerShell test that creates a temporary repository fixture containing `target/`, old `qiantie-*.exe`, current binary, previous binary, and a source file.
+- [x] Run the test and verify it fails because the command does not exist.
+- [x] Implement report-only default; only `-Apply` removes whitelist-matched build outputs.
+- [x] Verify current/previous executables and source files remain unchanged.
+- [x] Run the fixture test and `git diff --check`.
+- [x] Commit the script and test.
 
 ### Task 3: Add production disk reporting
 

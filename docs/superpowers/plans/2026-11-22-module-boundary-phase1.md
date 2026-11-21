@@ -30,12 +30,12 @@
 - Consumes: Go imports and JavaScript imports under declared module roots.
 - Produces: non-zero exit with source file, forbidden import, and owning module.
 
-- [ ] Write a fixture test with `module-a` importing `module-b/internal` and verify failure.
-- [ ] Write a fixture where both modules import `service/media` and verify success.
-- [ ] Implement import parsing for Go, JS, and JSX literals.
-- [ ] Add an explicit migration baseline for current violations; new violations fail immediately.
-- [ ] Run the fixture tests and repository scan.
-- [ ] Commit.
+- [x] Write a fixture test with `module-a` importing `module-b/internal` and verify failure.
+- [x] Write a fixture where both modules import `service/media` and verify success.
+- [x] Implement import parsing for Go, JS, and JSX literals.
+- [x] Add an explicit migration baseline for current violations; new violations fail immediately.
+- [x] Run the fixture tests and repository scan.
+- [x] Commit.
 
 ### Task 2: Create the Novel Fetch frontend module entry
 
@@ -49,12 +49,12 @@
 - Consumes: Novel Fetch service client and application-shell auth context.
 - Produces: default `NovelFetchModule` route component for `/novel-fetch`.
 
-- [ ] Write a route test proving `/novel-fetch` resolves through the module entry.
-- [ ] Verify it fails while the shell imports the legacy page directly.
-- [ ] Add the module entry as a temporary adapter around the existing page.
-- [ ] Change only the shell import; preserve rendered behavior.
-- [ ] Run Novel Fetch focused tests and frontend build.
-- [ ] Commit.
+- [x] Write a route test proving `/novel-fetch` resolves through the module entry.
+- [x] Verify it fails while the shell imports the legacy page directly.
+- [x] Add the module entry as a temporary adapter around the existing page.
+- [x] Change only the shell import; preserve rendered behavior.
+- [x] Run the dedicated module-entry tests and frontend build.
+- [x] Commit.
 
 ### Task 3: Move Novel Fetch API clients into shared service
 
