@@ -1,5 +1,5 @@
 const preloaders = {
-  '/novel-fetch': () => import('./pages/NovelFetchPage'),
+  '/novel-fetch': () => import('../modules/novel-fetch'),
   '/novel-creation': () => import('./pages/NovelCreationPage'),
   '/batch-factory': () => import('./pages/BatchFactoryPageV30'),
   '/plugins': () => import('./pages/PluginCenterPage'),

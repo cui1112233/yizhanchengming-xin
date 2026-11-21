@@ -10,7 +10,7 @@ export function preloadRoute(href) {
   return preloadWorkbenchRoute(href);
 }
 
-const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
+const loadNovelFetchPage = () => import('../modules/novel-fetch');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
 const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ default: module.AgentPageV2 })));

@@ -26,7 +26,7 @@ test('workbench pages keep their asynchronous loading boundaries', async () => {
 test('novel fetch uses the complete React workbench as its public entry', async () => {
   const app = await fs.readFile(appPath, 'utf8');
   const novelFetch = await fs.readFile(new URL('./pages/NovelFetchPage.jsx', import.meta.url), 'utf8');
-  assert.match(app, /const loadNovelFetchPage = \(\) => import\('\.\/pages\/NovelFetchPage'\)/);
+  assert.match(app, /const loadNovelFetchPage = \(\) => import\('\.\.\/modules\/novel-fetch'\)/);
   assert.match(app, /'\/novel-fetch-react': NovelFetchPage/);
   assert.match(novelFetch, /export function NovelFetchPage/);
   assert.match(novelFetch, /return <LegacyNovelFetchPage \/>/);
