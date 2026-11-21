@@ -2,11 +2,21 @@ package prompt
 
 import "strings"
 
-// videoVisualSafetyReplacer is the backend-owned last-resort rewrite used only
-// after a video provider rejects a prompt and the text rewrite channel is
-// temporarily unavailable. Keep structural labels, names and timing intact;
-// replace only visual actions/details that commonly trigger moderation.
+// videoVisualSafetyReplacer is the backend-owned deterministic rewrite used
+// after a video provider rejects a prompt. Keep structural labels, names and
+// timing intact; replace only visual actions/details and negative safety rules
+// that commonly trigger moderation themselves.
 var videoVisualSafetyReplacer = strings.NewReplacer(
+	"禁止出现与国家、党徽、企业有关的logo", "画面不出现任何可识别的标识",
+	"禁止出现与国家、党徽、企业有关logo", "画面不出现任何可识别的标识",
+	"禁止漏胸、乳沟擦边镜头", "人物均为成年人，衣着完整得体，镜头保持日常健康表达",
+	"人物年龄未注明", "人物均为成年人",
+	"年龄未注明", "成年人",
+	"漏胸", "衣着完整",
+	"乳沟", "领口得体",
+	"擦边镜头", "日常健康镜头",
+	"擦边", "日常健康表达",
+	"党徽", "可识别标识",
 	"掐住脖子", "逼近对峙",
 	"边缘破损不齐", "边缘保持整齐",
 	"破损纸页", "整齐纸页",
