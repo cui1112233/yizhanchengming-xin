@@ -1,6 +1,7 @@
 #!/bin/sh
 # 清理生产版本文件，避免每次发布都无限堆积 174MB 的旧二进制。
-# 保留规则：当前软链版本 + runtime-release.json 记录的回滚版本 + 最近 N 个历史版本。
+# 保留规则：当前版本 + runtime-release.json 记录的回滚版本 + 最近 N 个历史版本。
+# 同时支持版本软链和生产当前使用的“直接文件替换”布局。
 # 用法：sh prune-qiantie-releases.sh [额外保留历史版本数，默认 1]
 #      QIANTIE_RELEASE_ROOT=/opt/www/qiantie
 set -eu
@@ -13,11 +14,14 @@ case "$KEEP_PREV" in
 esac
 
 LINK="$ROOT/qiantie"
-if [ ! -L "$LINK" ]; then
-  echo "未找到版本软链：$LINK" >&2
+if [ -L "$LINK" ]; then
+  CURRENT=$(readlink -f "$LINK")
+elif [ -f "$LINK" ]; then
+  CURRENT=$LINK
+else
+  echo "未找到当前版本：$LINK" >&2
   exit 1
 fi
-CURRENT=$(readlink -f "$LINK")
 if [ -z "$CURRENT" ] || [ ! -f "$CURRENT" ]; then
   echo "无法解析当前版本：$CURRENT" >&2
   exit 1
@@ -42,7 +46,7 @@ KEEP="$CURRENT"
 $ROLLBACK"
 
 # 按修改时间保留最近 N 个历史版本；当前版本不重复计数。
-EXTRA=$(ls -1t "$ROOT"/qiantie-* 2>/dev/null | while read -r f; do
+EXTRA=$(ls -1t "$ROOT"/qiantie-* "$ROOT"/qiantie.rollback-* 2>/dev/null | while read -r f; do
   [ -f "$f" ] || continue
   [ "$f" = "$CURRENT" ] && continue
   echo "$f"
@@ -54,7 +58,7 @@ fi
 
 deleted=0
 freed=0
-for f in "$ROOT"/qiantie-*; do
+for f in "$ROOT"/qiantie-* "$ROOT"/qiantie.rollback-*; do
   [ -f "$f" ] || continue
   case "
 $KEEP
