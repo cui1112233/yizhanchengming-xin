@@ -1,0 +1,64 @@
+{
+  "verifiedAt": "2026-11-21T07:51:55.365Z",
+  "cdpEndpoint": "http://127.0.0.1:9226",
+  "application": {
+    "folder": "F:/软件/洛水2026/洛水2026",
+    "windowTitle": "洛水 v2.9.4",
+    "pythonPid": 52684,
+    "webviewPid": 51408
+  },
+  "listener": {
+    "address": "127.0.0.1",
+    "port": 9226
+  },
+  "target": {
+    "target_id": "919F04A96F6227CB32B941C9CA71CEFA",
+    "type": "page",
+    "title": "分镜编辑器",
+    "url": "http://127.0.0.1:21331/index.html",
+    "origin": "http://127.0.0.1:21331",
+    "attached": null
+  },
+  "browser": {
+    "product": "Edg/158.0.4370.33",
+    "protocol_version": "1.3",
+    "revision": "537.36 (@56b8f691820060b6e15f702165117f203442943f)",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0",
+    "js_version": "15.8.13.3"
+  },
+  "domNodes": 190,
+  "accessibilityNodes": 87,
+  "resources": [
+    {
+      "resource_key": "res_a8929d08f7fc171486976b914ea18630d35a4ff07b24a6a6529676ec4d97debf",
+      "url": "http://127.0.0.1:21331/assets/index-DgTjggsH.js",
+      "origin": "http://127.0.0.1:21331",
+      "type": "Script",
+      "mime_type": "text/javascript",
+      "content_size": 17281059
+    },
+    {
+      "resource_key": "res_bb6175f0648d204f1141e11e6d3be4c1e40ee65950e18a5cb1a4488b9896af76",
+      "url": "http://127.0.0.1:21331/assets/index-CVcgNnrd.css",
+      "origin": "http://127.0.0.1:21331",
+      "type": "Stylesheet",
+      "mime_type": "text/css",
+      "content_size": 1898877
+    }
+  ],
+  "reaEvidenceIds": [
+    "ev_86ccd1cf3c69b83dd733f50af03c8531ed846432ba00ca237e5b153970a2ad65",
+    "ev_5ce727fb301ad375576df26b0b323fda17b4a8093dfd24a3b53105843b7e6daa"
+  ],
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "Observation starts when REA attaches; prior network and console activity is unavailable.",
+    "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+    "Source maps are reported only as declarative URLs and are not fetched.",
+    "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+    "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+    "Browser host platform and architecture were not observed."
+  ],
+  "mode": "Application-owned Python runs unmodified original run.py; pywebview REMOTE_DEBUGGING_PORT setting; no page JavaScript injected; no generation or work mutation",
+  "originalRunSHA256": "919E2B9CC91AC356E5598A42F7254250EBE4392F4BEF0A04A0DE1FD70D18DE0F"
+}
