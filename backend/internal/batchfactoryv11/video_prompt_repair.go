@@ -312,7 +312,7 @@ func (s *BookStageService) rewriteRejectedVideoPrompt(ctx context.Context, owner
 		// outages, use the backend-owned deterministic safety rewrite so video
 		// production can continue without repeatedly hitting the same 5xx.
 		if errors.Is(err, ErrUpstream) {
-			if fallback := promptcatalog.VideoVisualSafetyFallback(sourcePrompt); fallback != "" && fallback != strings.TrimSpace(sourcePrompt) {
+			if fallback := promptcatalog.VideoVisualSafetyFallback(sourcePrompt); fallback != "" {
 				log.Printf("batch-factory: video prompt rewrite channel unavailable, used deterministic safety fallback owner=%s book=%s", owner, bookID)
 				return fallback, nil
 			}

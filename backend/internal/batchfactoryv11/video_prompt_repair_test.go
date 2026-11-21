@@ -34,7 +34,7 @@ func TestRewriteRejectedVideoPromptDoesNotMisreportProviderFailureAsFormatError(
 	provider := &repairRecordingProvider{err: providerErr}
 	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}}
 
-	_, err = service.rewriteRejectedVideoPrompt(ctx, "alice", batch.ID, batch.Books[0].ID, "人物站在桌前。", "内容不符合平台规范")
+	_, err = service.rewriteRejectedVideoPrompt(ctx, "alice", batch.ID, batch.Books[0].ID, "", "内容不符合平台规范")
 	if err == nil {
 		t.Fatal("want the provider failure")
 	}
@@ -51,6 +51,14 @@ func TestRewriteRejectedVideoPromptDoesNotMisreportProviderFailureAsFormatError(
 	}
 	if strings.Contains(fallback, "撕毁") || strings.Contains(fallback, "破损证件") {
 		t.Fatalf("unsafe fallback=%q", fallback)
+	}
+
+	secondPass, err := service.rewriteRejectedVideoPrompt(ctx, "alice", batch.ID, batch.Books[0].ID, fallback, "内容不符合平台规范")
+	if err != nil {
+		t.Fatalf("an already sanitized prompt must remain usable while the text channel is down: %v", err)
+	}
+	if secondPass != fallback {
+		t.Fatalf("second fallback=%q, want stable prompt %q", secondPass, fallback)
 	}
 }
 
