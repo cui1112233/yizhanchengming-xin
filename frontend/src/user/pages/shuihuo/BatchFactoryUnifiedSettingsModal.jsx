@@ -25,6 +25,7 @@ import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { batchFactoryProductionModeVisibility, batchFactoryShouldLoadPublishEnvironment } from './batchFactoryProductionMode';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts';
 import { loadBatchFactoryPresetCatalog } from './batchFactoryPresetCatalog';
+import { reconcileSyncedWebsiteProfiles, websiteProfileOrganization } from './batchFactoryWebsiteProfiles';
 
 // Start this tiny directory request as soon as the Batch Factory page chunk is
 // evaluated. Large batches can otherwise fill the browser connection queue
@@ -70,18 +71,6 @@ const SMART_UNIFIED_PRESET_ID = 'script-constraint-prefix-smart-unified';
 const presetValue = preset => preset ? { presetId: preset.id, presetName: preset.name || preset.id, presetSlot: preset.slot || '', presetVersion: preset.version || 1, constraintCategory: preset.constraintCategory || (preset.id === SMART_UNIFIED_PRESET_ID ? 'prefix' : '') } : { presetId: '', presetName: '', presetSlot: '', presetVersion: null, constraintCategory: '' };
 const TARGET_ADMIN_URL = 'http://two.121w.com/tttadmin/index.php';
 const N8_MATERIAL_ALBUM_URL = 'https://n8-view.hnqingyuwen.top/#/material/album';
-const websiteProfileOrganization = profile => {
-  const advanced = profile?.advanced || profile?.config_data || {};
-  return profile?.organization
-    || profile?.organization_id
-    || profile?.organizationId
-    || profile?.org_id
-    || advanced?.organization_id
-    || advanced?.organizationId
-    || advanced?.organization
-    || advanced?.org_id
-    || '';
-};
 // 批量测书旧版浏览器登录器仍返回“目标站登录会话”。它与当前直连
 // 登录器的两个名称表达的是同一份账号级会话，不能因此把已验证会话
 // 误判为未登录。
@@ -326,7 +315,9 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
     setSyncing('profiles');
     try {
       const result = await syncWebSubmitConfigs({ persist: false });
-      patch({ publishSettings: { ...publish, websiteProfiles: Array.isArray(result?.groups) ? result.groups : [] } });
+      const reconciled = reconcileSyncedWebsiteProfiles(publish, result?.groups);
+      patch({ publishSettings: reconciled.publishSettings });
+      if (reconciled.selectionExpired) message.warning('原网站配置档已不在当前账号，请重新选择同步后的配置档');
     } catch (error) {
       if (credentialFailure(error)) markPublishSessionExpired(error);
       message.error(apiErrorMessage(error, '同步网站配置档失败'));
