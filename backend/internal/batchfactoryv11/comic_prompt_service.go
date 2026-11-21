@@ -158,6 +158,9 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 	if strings.TrimSpace(config.Comic.Style.Body) != "" {
 		pagePreset = stripLegacyComicStyle(pagePreset)
 	}
+	if illustratedText {
+		pagePreset = normalizeIllustratedTextInstructions(pagePreset)
+	}
 	previousPage, nextPage := "", ""
 	if pageIndex > 0 {
 		previousPage = comicPageSourceText(videos[pageIndex-1])
@@ -212,6 +215,12 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 		return PromptContract{}, err
 	}
 	return PromptContract{SystemPrompt: strings.Join(parts, "\n\n"), UserPrompt: string(payload), Temperature: 0.25, MaxTokens: 4800}, nil
+}
+
+func normalizeIllustratedTextInstructions(value string) string {
+	value = strings.ReplaceAll(value, "画面内不出现任何文字", "插画区域内不得出现额外文字")
+	value = strings.ReplaceAll(value, "成图不绘制任何文字", "插画区域内不得出现额外文字")
+	return value
 }
 
 func expandRecoveredComicPreset(body string, book Book, localContext string, withDescriptions bool) string {
@@ -826,7 +835,9 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 			return nil, fmt.Errorf("%w: 漫画提示词为空", ErrInvalid)
 		}
 		legacy.VideoID = videos[0].ID
-		return map[string]comicPromptResult{legacy.VideoID: legacy}, nil
+		results := map[string]comicPromptResult{legacy.VideoID: legacy}
+		finalizeIllustratedTextPromptResults(results, videos, snapshot)
+		return results, nil
 	}
 	var envelope struct {
 		Pages []comicPromptResult `json:"pages"`
@@ -878,7 +889,9 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 		if matched.ScreenPrompt == "" || (!light && matched.ImagePrompt == "") {
 			return nil, fmt.Errorf("%w: 漫画提示词为空", ErrInvalid)
 		}
-		return map[string]comicPromptResult{targetID: *matched}, nil
+		results := map[string]comicPromptResult{targetID: *matched}
+		finalizeIllustratedTextPromptResults(results, videos, snapshot)
+		return results, nil
 	}
 	if len(videos) > 1 {
 		wanted := make(map[string]struct{}, len(videos))
@@ -902,9 +915,27 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 		if len(results) != len(videos) {
 			return nil, newComicPageCountError(videos, normalizedPages)
 		}
+		finalizeIllustratedTextPromptResults(results, videos, snapshot)
 		return results, nil
 	}
 	return nil, newComicPageCountError(videos, normalizedPages)
+}
+
+// finalizeIllustratedTextPromptResults makes the literal page text a backend
+// guarantee. The text model may describe the layout but must not be trusted to
+// copy current_page into image_prompt correctly.
+func finalizeIllustratedTextPromptResults(results map[string]comicPromptResult, videos []Video, snapshot DirectorSnapshot) {
+	if !ComicPageIllustratedTextPreset(snapshot.Effective) {
+		return
+	}
+	for _, video := range videos {
+		result, ok := results[video.ID]
+		if !ok {
+			continue
+		}
+		result.ImagePrompt, _ = AppendComicPageLiteralText(result.ImagePrompt, comicPageSourceText(video))
+		results[video.ID] = result
+	}
 }
 
 // comicPageCountError 保留期望/实际/缺失/多出的明细，让日志和界面可以直接

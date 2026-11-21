@@ -776,6 +776,62 @@ func TestComicPagePromptPreviewReturnsTheExactCompletePromptWithoutGenerating(t 
 	}
 }
 
+func TestComicPagePromptPreviewIncludesIllustratedCurrentPageLiteralText(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	source := "闺蜜好到什么都要和我用同款。\n我们一同怀孕，她主动搬到我家。"
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{
+			Title: "第一本", SourceText: source,
+			Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一页"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
+		Patch: batchfactoryv11.SettingsPatch{
+			"productionMode": comicTestRaw(t, "comic"),
+			"aiPromptConfig": comicTestRaw(t, map[string]any{"comic": map[string]any{
+				"enabled":  true,
+				"presetId": batchfactoryv11.ComicPageIllustratedTextPresetID,
+				"style":    map[string]any{"presetId": "test-style", "body": "柔和韩系条漫画风"},
+			}}),
+		}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&batchfactoryv11.DirectorService{Store: store}).RunComicSourceSegmentation(ctx, "alice", batch.ID, batch.Books[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	batch, err = store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, video := batch.Books[0], batch.Books[0].Videos[0]
+	accounts := &governanceAuthStore{accounts: map[string]auth.Account{"alice": {Username: "alice", Active: true, IsOwner: true}}}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store, AuthStore: accounts, MemberProfileStore: NewMemberProfileStore(t.TempDir())})
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + book.ID + "/comic-pages/" + video.ID + "/prompt-preview"
+	preview := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, map[string]any{
+		"comicPrompt": "上半留白，下半插画",
+		"imagePrompt": "上半文字区，但成图不绘制任何文字；下半插画",
+	})
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", preview.Code, preview.Body.String())
+	}
+	result := decodeBody[struct {
+		CompiledPrompt string `json:"compiledPrompt"`
+	}](t, preview)
+	if !strings.Contains(result.CompiledPrompt, source) {
+		t.Fatalf("界面最终提示词必须显示真正送去出图的 current_page 原文:\n%s", result.CompiledPrompt)
+	}
+	if !strings.Contains(result.CompiledPrompt, "前文任何禁止文字或不显示文字的要求全部作废") {
+		t.Fatalf("界面最终提示词必须显示禁字覆盖规则:\n%s", result.CompiledPrompt)
+	}
+}
+
 func TestComicPagePromptPreviewRejectsNonDeveloperAccounts(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()

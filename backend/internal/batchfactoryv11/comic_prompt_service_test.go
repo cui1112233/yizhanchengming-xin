@@ -1130,6 +1130,35 @@ func TestParseComicBookPromptResultsAutoFillsMissingVideoIDForSinglePage(t *test
 	}
 }
 
+func TestParseComicBookPromptResultsInjectsIllustratedPageSourceWhenModelOmitsIt(t *testing.T) {
+	source := "闺蜜好到什么都要和我用同款。\n我们一同怀孕，她主动搬到我家。"
+	videos := []Video{{
+		ID:                 "video-1",
+		Label:              "漫画页 01",
+		ComicSourceSegment: &ComicSourceSegment{SourceText: source},
+	}}
+	snapshot := DirectorSnapshot{Effective: SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+			"enabled":  true,
+			"presetId": ComicPageIllustratedTextPresetID,
+		}}),
+	}}
+	completion := `{"pages":[{"video_id":"video-1","screen_prompt":"上半留白，下半插画","image_prompt":"上半文字区，但成图不绘制任何文字；下半插画"}]}`
+
+	results, err := parseComicBookPromptResults(completion, videos, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imagePrompt := results["video-1"].ImagePrompt
+	if !strings.Contains(imagePrompt, source) {
+		t.Fatalf("图文版提示词必须由后端逐字补入 current_page 原文:\n%s", imagePrompt)
+	}
+	if !strings.Contains(imagePrompt, "前文任何禁止文字或不显示文字的要求全部作废") {
+		t.Fatalf("图文版提示词必须明确覆盖模型返回的禁字命令:\n%s", imagePrompt)
+	}
+}
+
 func TestParseComicBookPromptResultsAcceptsAlignedPagesAndIgnoresExtras(t *testing.T) {
 	videos := []Video{{ID: "video-1", Label: "漫画页 01"}, {ID: "video-2", Label: "漫画页 02"}}
 	completion := `{"pages":[

@@ -2076,9 +2076,10 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
+		compiledPrompt, _ := comicPageFinalImagePrompt(contract.Prompt, effective, *targetVideo)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"comicPrompt": input.ComicPrompt, "imagePrompt": input.ImagePrompt,
-			"compiledPrompt": contract.Prompt, "referenceImageUrls": contract.ReferenceImageURLs,
+			"compiledPrompt": compiledPrompt, "referenceImageUrls": contract.ReferenceImageURLs,
 			"referenceImages": comicReferenceImageResponses(effective, *targetBook, contract.ReferenceImageURLs, input.ReferenceImageURLs),
 			"stylePresetId":   contract.StylePresetID, "snapshotHash": contract.SnapshotHash,
 		})
@@ -3201,6 +3202,7 @@ func planComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comicS
 				compiled = "完整提示词暂不可生成：" + contractErr.Error()
 			} else {
 				compiled = contract.Prompt
+				compiled, _ = comicPageFinalImagePrompt(compiled, effective, video)
 			}
 		}
 		label := safeComicZipPart(video.Label)

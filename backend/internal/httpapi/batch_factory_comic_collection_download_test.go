@@ -196,6 +196,65 @@ func TestComicZipStreamWritesIncrementally(t *testing.T) {
 	}
 }
 
+func TestComicPromptZipShowsSameLiteralSourceUsedForIllustratedGeneration(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	source := "闺蜜好到什么都要和我用同款。\n我们一同怀孕，她主动搬到我家。"
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{
+			Title:      "测试书",
+			SourceText: source,
+			Videos:     []batchfactoryv11.CreateVideoInput{{Label: "漫画页 01"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := batchfactoryv11.SettingsPatch{
+		"productionMode": comicTestRaw(t, "comic"),
+		"aiPromptConfig": comicTestRaw(t, map[string]any{"comic": map[string]any{
+			"enabled":  true,
+			"presetId": batchfactoryv11.ComicPageIllustratedTextPresetID,
+			"style": map[string]any{
+				"presetId": "test-style",
+				"body":     "柔和韩系条漫画风",
+			},
+		}}),
+	}
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
+		Patch: settings, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&batchfactoryv11.DirectorService{Store: store}).RunComicSourceSegmentation(ctx, "alice", batch.ID, batch.Books[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, video := latest.Books[0], latest.Books[0].Videos[0]
+	if _, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, batchfactoryv11.UpsertComicPageInput{
+		ComicPrompt: "上半留白，下半插画",
+		ImagePrompt: "上半文字区，但成图不绘制任何文字；下半插画",
+		Status:      "ready",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := planComicPromptZip(ctx, store, store, nil, nil, "alice", batch.ID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plan.markdown, source) {
+		t.Fatalf("导出的最终完整出图提示词必须包含真正送去出图的 current_page 原文:\n%s", plan.markdown)
+	}
+	if !strings.Contains(plan.markdown, "前文任何禁止文字或不显示文字的要求全部作废") {
+		t.Fatalf("导出预览必须展示禁字覆盖规则:\n%s", plan.markdown)
+	}
+}
+
 func createDownloadableComicCollection(t *testing.T, store *batchfactoryv11.MemoryStore, files *localartifact.Store, batch batchfactoryv11.Batch) batchfactoryv11.ComicCollection {
 	t.Helper()
 	pngBytes, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII=")

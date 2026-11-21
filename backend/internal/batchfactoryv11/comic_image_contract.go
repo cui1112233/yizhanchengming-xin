@@ -49,8 +49,11 @@ func AppendComicPageLiteralText(prompt, sourceText string) (string, bool) {
 	if strings.TrimSpace(sourceText) == "" {
 		return prompt, false
 	}
-	if strings.Contains(prompt, sourceText) {
+	if strings.Contains(prompt, comicPageLiteralTextHeader) && strings.Contains(prompt, sourceText) {
 		return prompt, false
+	}
+	if strings.Contains(prompt, sourceText) {
+		return prompt + "\n\n" + comicPageLiteralTextHeader, true
 	}
 	return prompt + ComicPageLiteralTextBlock(sourceText), true
 }
