@@ -1,0 +1,173 @@
+- complementary:
+  - button "收起导航" [expanded]:
+  - button "选择工作模式":
+    - img "一战晟铭"
+    - generic: 一战晟铭
+  - navigation:
+    - link "首页":
+      - /url: /
+      - generic: 首页
+    - link "私人定制":
+      - /url: /script
+      - generic: 私人定制
+    - link "批量测书":
+      - /url: /novel-fetch
+      - generic: 批量测书
+    - link "小说创作":
+      - /url: /novel-creation
+      - generic: 小说创作
+    - link "水货生产":
+      - /url: /batch-factory
+      - generic: 水货生产
+    - link "漫剧创作":
+      - /url: /comic-screenplay
+      - generic: 漫剧创作
+    - link "CM 画布":
+      - /url: /agent
+      - generic: CM 画布
+    - link "配音":
+      - /url: /tts
+      - generic: 配音
+    - link "AI-CUT":
+      - /url: /ai-cut
+      - generic: AI-CUT
+    - link "插件":
+      - /url: /plugins
+      - generic: 插件
+  - link "设置":
+    - /url: /settings
+    - generic: 设置
+  - button "进入个人中心":
+  - generic "choushiyiguai"
+  - button "退出登录":
+    - generic: 退出
+- main:
+  - main:
+    - complementary:
+      - heading "开始创作" [level=3]
+      - button "长篇原创":
+        - generic: 长篇原创
+      - button "短篇原创":
+        - generic: 短篇原创
+      - button "仿写长篇":
+        - generic: 仿写长篇
+      - button "仿写短篇" [active]:
+        - generic: 仿写短篇
+      - button "番外创作":
+        - generic: 番外创作
+      - button "续写创作":
+        - generic: 续写创作
+      - generic: 我的作品 3
+      - button "新建作品":
+      - button "作品归档库":
+      - button "选择作品链路实测-1120-anti2": 链路实测-1120-anti2
+      - button "选择作品链路实测-1120-渡口来信": 链路实测-1120-渡口来信
+      - button "选择作品本地检查验收 · 不调用模型": 本地检查验收 · 不调用模型
+      - generic: 仿写短篇会话
+      - button "新建会话":
+        - generic: 新建会话
+      - navigation "创作工具":
+        - button "写作风格":
+          - generic: 写作风格
+        - button "导入素材":
+          - generic: 导入素材
+        - button "Agent设置":
+          - generic: Agent设置
+        - button "定时写作":
+          - generic: 定时写作
+        - button "数据看板":
+          - generic: 数据看板
+        - button "备忘录":
+          - generic: 备忘录
+    - generic: 仿写短篇
+    - paragraph: 告诉我你想写什么——题材、世界观、主角、核心冲突。
+    - textbox "创作要求":
+      - /placeholder: 输入创作要求（Enter发送，Shift+Enter换行）
+    - generic "创作文本模型":
+      - combobox "创作文本模型"
+      - generic "[aistudio]gemini-3.8-flash"
+    - button "调整思考要求":
+    - button "开始创作":
+- button "和 小家伙 聊天":
+- button "小家伙 宠物，idle"
+- dialog "仿写短篇 参考原文风格，一键生成知乎盐选风短篇小说":
+  - button "Close":
+    - generic "Close":
+      - img "close":
+  - heading "仿写短篇" [level=2]
+  - paragraph: 参考原文风格，一键生成知乎盐选风短篇小说
+  - paragraph: 采用整篇写作，章节不全时最多补写3次。完整第一稿保存后进行文字审稿，并尝试一次第二稿；第二稿不完整时保留第一稿。
+  - generic: 暂定标题（可选）
+  - textbox "暂定标题（可选）":
+    - /placeholder: 留空则自动生成
+  - generic: 参考原文 *
+  - generic: 0 字
+  - textbox "参考原文":
+    - /placeholder: 粘贴参考小说全文（至少100字），或上传txt / docx自动填入
+  - generic: 粘贴或上传要仿写的参考原文，系统将自动拆解情绪曲线与核心价值观
+  - generic: 上传参考文件（可选）
+  - button "＋ 选择文件（docx / txt）":
+    - generic: ＋ 选择文件（docx / txt）
+  - generic: 目标字数
+  - spinbutton "目标字数": "13000"
+  - button "1.0万"
+  - button "1.1万"
+  - button "1.2万"
+  - button "1.3万"
+  - button "1.5万"
+  - button "2.0万"
+  - generic: 可自由填写字数（字），也可点选常用字数
+  - generic: 读者偏好
+  - textbox "读者偏好":
+    - /placeholder: 填写读者偏好，如：轻松搞笑、甜宠治愈
+  - button "轻松搞笑"
+  - button "热血爽文"
+  - button "智斗权谋"
+  - button "悬疑惊悚"
+  - button "甜宠治愈"
+  - generic: 可自由填写，点选标签会自动追加
+  - generic: 目标章节
+  - spinbutton "目标章节": "1"
+  - generic: 默认1章，可按需调整
+  - generic: 补充信息（可选）
+  - textbox "补充信息（可选）":
+    - /placeholder: 人设、情节走向、必须出现的桥段、禁忌点等
+  - generic: 灵感标签（可选）
+  - button "女频"
+  - button "男频"
+  - button "丧尸"
+  - button "萌娃"
+  - button "萌宠穿越"
+  - button "通古今"
+  - button "直播"
+  - button "历史"
+  - button "系统"
+  - button "修仙"
+  - button "搞笑"
+  - button "重生"
+  - button "穿越"
+  - button "都市"
+  - button "校园"
+  - button "豪门"
+  - button "职场"
+  - button "追妻火葬场"
+  - button "大女主"
+  - button "虐恋"
+  - button "BE"
+  - button "HE"
+  - generic: 文风设置（多选）
+  - generic: 暂无可用文风
+  - generic: 关联备忘录（可选）
+  - generic "关联备忘录（可选）":
+    - combobox "关联备忘录（可选）"
+    - generic: 选择备忘录作为参考素材
+  - generic: 关联存档（可选）
+  - generic "关联存档（可选）":
+    - combobox "关联存档（可选）"
+    - generic: 关联已有作品
+  - checkbox "大纲生成后暂停，确认内容再继续"
+  - generic: 大纲生成后暂停，确认内容再继续
+  - button "取 消":
+    - generic: 取 消
+  - button "开始仿写" [disabled]:
+    - generic: 开始仿写

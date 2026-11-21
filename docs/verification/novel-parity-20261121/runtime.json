@@ -1,0 +1,10 @@
+{
+  "verifiedAt": "2026-11-21T09:20:17.7014246Z",
+  "codeCommit": "d8eda3bf",
+  "manifestCommit": "d8eda3bf",
+  "frontendEntry": "/assets/user-B4zKc2KL.js",
+  "health": true,
+  "processId": 35040,
+  "paidModelRequestsThisRound": 0,
+  "scope": "UI and isolated provider tests, not real-generation parity"
+}

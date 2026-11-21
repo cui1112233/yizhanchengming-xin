@@ -1,0 +1,337 @@
+- complementary:
+  - button "收起导航" [expanded]:
+  - button "选择工作模式":
+    - img "一战晟铭"
+    - generic: 一战晟铭
+  - navigation:
+    - link "首页":
+      - /url: /
+      - generic: 首页
+    - link "私人定制":
+      - /url: /script
+      - generic: 私人定制
+    - link "批量测书":
+      - /url: /novel-fetch
+      - generic: 批量测书
+    - link "小说创作":
+      - /url: /novel-creation
+      - generic: 小说创作
+    - link "水货生产":
+      - /url: /batch-factory
+      - generic: 水货生产
+    - link "漫剧创作":
+      - /url: /comic-screenplay
+      - generic: 漫剧创作
+    - link "CM 画布":
+      - /url: /agent
+      - generic: CM 画布
+    - link "配音":
+      - /url: /tts
+      - generic: 配音
+    - link "AI-CUT":
+      - /url: /ai-cut
+      - generic: AI-CUT
+    - link "插件":
+      - /url: /plugins
+      - generic: 插件
+  - link "设置":
+    - /url: /settings
+    - generic: 设置
+  - button "进入个人中心":
+  - generic "choushiyiguai"
+  - button "退出登录":
+    - generic: 退出
+- main:
+  - main:
+    - complementary:
+      - heading "开始创作" [level=3]
+      - button "长篇原创":
+        - generic: 长篇原创
+      - button "短篇原创":
+        - generic: 短篇原创
+      - button "仿写长篇":
+        - generic: 仿写长篇
+      - button "仿写短篇":
+        - generic: 仿写短篇
+      - button "番外创作":
+        - generic: 番外创作
+      - button "续写创作":
+        - generic: 续写创作
+      - generic: 我的作品 3
+      - button "新建作品":
+      - button "作品归档库":
+      - button "选择作品链路实测-1120-anti2": 链路实测-1120-anti2
+      - button "选择作品链路实测-1120-渡口来信": 链路实测-1120-渡口来信
+      - button "选择作品本地检查验收 · 不调用模型": 本地检查验收 · 不调用模型
+      - generic: 续写创作会话
+      - button "新建会话":
+        - generic: 新建会话
+      - navigation "创作工具":
+        - button "写作风格":
+          - generic: 写作风格
+        - button "导入素材":
+          - generic: 导入素材
+        - button "Agent设置" [active]:
+          - generic: Agent设置
+        - button "定时写作":
+          - generic: 定时写作
+        - button "数据看板":
+          - generic: 数据看板
+        - button "备忘录":
+          - generic: 备忘录
+    - region "Agent设置":
+      - button "返回对话":
+        - generic: 返回对话
+      - generic: Agent设置
+      - heading "Agent 设置" [level=2]
+      - paragraph: 为创作步骤指定自己的模型，设置审稿与写作要求。
+      - group "设置保存范围":
+        - button "账号默认":
+          - generic: 账号默认
+        - button "当前作品" [disabled]:
+          - generic: 当前作品
+      - paragraph: 新作品会继承此设置；已有作品和历史任务保持原设置。
+      - heading "模型路由" [level=3]
+      - paragraph: 留空则使用本次对话选择的模型。这里仅列出当前已接通的创作步骤。
+      - generic "基础设定"
+      - generic "基础设定模型":
+        - combobox "基础设定模型"
+        - generic: 使用本次选中模型
+      - generic "章节计划"
+      - generic "章节计划模型":
+        - combobox "章节计划模型"
+        - generic: 使用本次选中模型
+      - generic "正文写作"
+      - generic "正文写作模型":
+        - combobox "正文写作模型"
+        - generic: 使用本次选中模型
+      - generic "长度整理"
+      - generic "长度整理模型":
+        - combobox "长度整理模型"
+        - generic: 使用本次选中模型
+      - generic "章节审核"
+      - generic "章节审核模型":
+        - combobox "章节审核模型"
+        - generic: 使用本次选中模型
+      - generic "章节修订"
+      - generic "章节修订模型":
+        - combobox "章节修订模型"
+        - generic: 使用本次选中模型
+      - generic "事实结算"
+      - generic "事实结算模型":
+        - combobox "事实结算模型"
+        - generic: 使用本次选中模型
+      - generic "记忆索引"
+      - generic "记忆索引模型":
+        - combobox "记忆索引模型"
+        - generic: 使用本次选中模型
+      - heading "写章审稿循环" [level=3]
+      - paragraph: 写章后自动审稿。未达通过分将尝试修订，并保留审核结果较好的版本。
+      - paragraph: 通过分、修订轮数和字数整理用于长篇和历史短篇任务。新建短篇仿写采用整篇写作、文字审稿和一次第二稿，不按通过分反复修订；分步骤模型、审稿维度和自定义要求继续生效。
+      - generic "最多修订轮数"
+      - button "Increase Value":
+        - img "up":
+      - button "Decrease Value":
+        - img "down":
+      - spinbutton "最多修订轮数": "3"
+      - generic "审核通过分"
+      - button "Increase Value":
+        - img "up":
+      - button "Decrease Value":
+        - img "down":
+      - spinbutton "审核通过分": "80"
+      - generic "基础温度"
+      - button "Increase Value":
+        - img "up":
+      - button "Decrease Value":
+        - img "down":
+      - spinbutton "基础温度": "0.65"
+      - generic "修订温度增量"
+      - button "Increase Value":
+        - img "up":
+      - button "Decrease Value":
+        - img "down":
+      - spinbutton "修订温度增量": "0.15"
+      - generic "字数偏离超过45%时整理（调用模型）"
+      - switch "字数偏离超过45%时整理（调用模型）" [checked]
+      - generic "后写校验（本地，不改正文）"
+      - switch "后写校验（本地，不改正文）" [checked]
+      - generic "表达指标（本地统计，供人工判断）"
+      - switch "表达指标（本地统计，供人工判断）" [checked]
+      - generic "大纲/蓝图生成后暂停"
+      - switch "大纲/蓝图生成后暂停"
+      - paragraph: 后写校验与表达指标不调用模型。表达指标尚未验证与原版AI味算法一致。
+      - paragraph: 大纲、蓝图或基础设定生成后暂停，可修改已保存内容后继续。旧作品未明确设置时保留原有暂停规则。
+      - heading "模型调用确认" [level=3]
+      - generic "每次后续模型调用前确认"
+      - switch "每次后续模型调用前确认"
+      - paragraph: 此项保留旧设置的逐次调用保护，与上面的内容暂停分别生效。
+      - heading "审稿维度（37 项）" [level=3]
+      - paragraph: 勾选后即参与审稿；维度说明为内置文案，不可改字，但可自由开关。当前已选 29 / 37 项。
+      - button "全选":
+        - generic: 全选
+      - button "全不选":
+        - generic: 全不选
+      - checkbox "审稿维度1 OOC检查" [checked]
+      - generic: "1."
+      - strong: OOC检查
+      - generic: 角色言行是否偏离已建立的性格底色与行为模式。
+      - checkbox "审稿维度2 时间线检查" [checked]
+      - generic: "2."
+      - strong: 时间线检查
+      - generic: 事件顺序、时间跨度与前后章节是否矛盾。
+      - checkbox "审稿维度3 设定冲突" [checked]
+      - generic: "3."
+      - strong: 设定冲突
+      - generic: 世界观、规则、设定是否与前文或设定文档冲突。
+      - checkbox "审稿维度4 战力崩坏" [checked]
+      - generic: "4."
+      - strong: 战力崩坏
+      - generic: 战力、能力层级是否无理由暴涨或崩坏。
+      - checkbox "审稿维度5 数值检查" [checked]
+      - generic: "5."
+      - strong: 数值检查
+      - generic: 数值、等级、资源等量化设定是否前后一致。
+      - checkbox "审稿维度6 伏笔检查" [checked]
+      - generic: "6."
+      - strong: 伏笔检查
+      - generic: 伏笔是否按节奏回收，是否存在长期悬空或逻辑硬伤。
+      - checkbox "审稿维度7 节奏检查" [checked]
+      - generic: "7."
+      - strong: 节奏检查
+      - generic: 本章是否有推进、冲突、钩子与情绪起伏，避免空转注水。
+      - checkbox "审稿维度8 文风检查" [checked]
+      - generic: "8."
+      - strong: 文风检查
+      - generic: 叙述口吻、修辞密度是否与全书文风指南一致。
+      - checkbox "审稿维度9 信息越界" [checked]
+      - generic: "9."
+      - strong: 信息越界
+      - generic: 角色是否获知超出其信息边界的知识。
+      - checkbox "审稿维度10 词汇疲劳" [checked]
+      - generic: "10."
+      - strong: 词汇疲劳
+      - generic: 高疲劳词与 AI 标记词是否过密重复。
+      - checkbox "审稿维度11 利益链断裂" [checked]
+      - generic: "11."
+      - strong: 利益链断裂
+      - generic: 角色动机与利益链是否断裂或不合理。
+      - checkbox "审稿维度12 年代考据" [checked]
+      - generic: "12."
+      - strong: 年代考据
+      - generic: 时代背景、器物、称谓是否符合考据约束。
+      - checkbox "审稿维度13 配角降智" [checked]
+      - generic: "13."
+      - strong: 配角降智
+      - generic: 配角是否无故降智以衬托主角。
+      - checkbox "审稿维度14 配角工具人化" [checked]
+      - generic: "14."
+      - strong: 配角工具人化
+      - generic: 配角是否沦为只为主角服务的工具人。
+      - checkbox "审稿维度15 爽点虚化" [checked]
+      - generic: "15."
+      - strong: 爽点虚化
+      - generic: 爽点是否虚化，情绪缺口与兑现是否到位。
+      - checkbox "审稿维度16 台词失真" [checked]
+      - generic: "16."
+      - strong: 台词失真
+      - generic: 台词是否符合人物身份、语境与口语习惯。
+      - checkbox "审稿维度17 流水账" [checked]
+      - generic: "17."
+      - strong: 流水账
+      - generic: 是否陷入只记事件、缺少戏剧张力的流水账。
+      - checkbox "审稿维度18 知识库污染" [checked]
+      - generic: "18."
+      - strong: 知识库污染
+      - generic: 是否混入与本书无关的知识库或外部设定污染。
+      - checkbox "审稿维度19 视角一致性" [checked]
+      - generic: "19."
+      - strong: 视角一致性
+      - generic: 视角切换是否有过渡，是否与设定视角一致。
+      - checkbox "审稿维度20 段落等长" [checked]
+      - generic: "20."
+      - strong: 段落等长
+      - generic: 段落长度是否过于均匀，缺乏节奏变化。
+      - checkbox "审稿维度21 套话密度" [checked]
+      - generic: "21."
+      - strong: 套话密度
+      - generic: 陈词滥调、模板化表达是否过密。
+      - checkbox "审稿维度22 公式化转折" [checked]
+      - generic: "22."
+      - strong: 公式化转折
+      - generic: 转折是否公式化、可预测。
+      - checkbox "审稿维度23 列表式结构" [checked]
+      - generic: "23."
+      - strong: 列表式结构
+      - generic: 正文是否呈现列表式、条目化结构。
+      - checkbox "审稿维度24 支线停滞" [checked]
+      - generic: "24."
+      - strong: 支线停滞
+      - generic: 支线是否长期停滞或只被重复提及无推进。
+      - checkbox "审稿维度25 弧线平坦" [checked]
+      - generic: "25."
+      - strong: 弧线平坦
+      - generic: 主要角色情绪弧线是否长期平坦无变化。
+      - checkbox "审稿维度26 节奏单调" [checked]
+      - generic: "26."
+      - strong: 节奏单调
+      - generic: 近期章节类型是否单调，高潮与释放是否缺席。
+      - checkbox "审稿维度27 敏感词检查" [checked]
+      - generic: "27."
+      - strong: 敏感词检查
+      - generic: 是否触及需规避的敏感内容。
+      - checkbox "审稿维度28 正传事件冲突"
+      - generic: "28."
+      - strong: 正传事件冲突
+      - generic: 番外事件是否与正传正典约束矛盾。
+      - checkbox "审稿维度29 未来信息泄露"
+      - generic: "29."
+      - strong: 未来信息泄露
+      - generic: 是否泄露分歧点之后才应揭示的未来信息。
+      - checkbox "审稿维度30 世界规则跨书一致性"
+      - generic: "30."
+      - strong: 世界规则跨书一致性
+      - generic: 番外是否违反正传世界规则（力量、地理、阵营）。
+      - checkbox "审稿维度31 番外伏笔隔离"
+      - generic: "31."
+      - strong: 番外伏笔隔离
+      - generic: 番外是否越权回收正传伏笔。
+      - checkbox "审稿维度32 读者期待管理" [checked]
+      - generic: "32."
+      - strong: 读者期待管理
+      - generic: 章尾是否重燃好奇，读者期待是否在累积或被满足。
+      - checkbox "审稿维度33 章节备忘偏离" [checked]
+      - generic: "33."
+      - strong: 章节备忘偏离
+      - generic: 成稿是否兑现本章 memo 中的目标与段落要求。
+      - checkbox "审稿维度34 角色还原度"
+      - generic: "34."
+      - strong: 角色还原度
+      - generic: 角色语癖、行为是否与同人正典档案一致。
+      - checkbox "审稿维度35 世界规则遵守"
+      - generic: "35."
+      - strong: 世界规则遵守
+      - generic: 是否违反同人正典中的世界规则。
+      - checkbox "审稿维度36 关系动态"
+      - generic: "36."
+      - strong: 关系动态
+      - generic: 角色关系互动是否合理、符合档案或发展逻辑。
+      - checkbox "审稿维度37 正典事件一致性"
+      - generic: "37."
+      - strong: 正典事件一致性
+      - generic: 是否与同人正典关键事件时间线矛盾。
+      - heading "自定义补充审稿提示词" [level=3]
+      - paragraph: 勾选后用于章节审稿与修订，补充你关心的检查要求。
+      - button "新增补充审稿":
+        - generic: 新增补充审稿
+      - generic: 暂无自定义项，可点击「新增补充审稿」添加。
+      - heading "自定义写作提示词" [level=3]
+      - paragraph: 勾选后用于对应模式的正文写作与修订。
+      - button "新增写作要求":
+        - generic: 新增写作要求
+      - generic: 暂无自定义写作提示词。
+      - generic: 保存到当前账号，新作品自动继承。
+      - button "保存Agent设置":
+        - generic: 保存Agent设置
+- button "和 小家伙 聊天":
+- button "小家伙 宠物，idle"

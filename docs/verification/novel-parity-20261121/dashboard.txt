@@ -1,0 +1,89 @@
+- complementary:
+  - button "收起导航" [expanded]:
+  - button "选择工作模式":
+    - img "一战晟铭"
+    - generic: 一战晟铭
+  - navigation:
+    - link "首页":
+      - /url: /
+      - generic: 首页
+    - link "私人定制":
+      - /url: /script
+      - generic: 私人定制
+    - link "批量测书":
+      - /url: /novel-fetch
+      - generic: 批量测书
+    - link "小说创作":
+      - /url: /novel-creation
+      - generic: 小说创作
+    - link "水货生产":
+      - /url: /batch-factory
+      - generic: 水货生产
+    - link "漫剧创作":
+      - /url: /comic-screenplay
+      - generic: 漫剧创作
+    - link "CM 画布":
+      - /url: /agent
+      - generic: CM 画布
+    - link "配音":
+      - /url: /tts
+      - generic: 配音
+    - link "AI-CUT":
+      - /url: /ai-cut
+      - generic: AI-CUT
+    - link "插件":
+      - /url: /plugins
+      - generic: 插件
+  - link "设置":
+    - /url: /settings
+    - generic: 设置
+  - button "进入个人中心":
+  - generic "choushiyiguai"
+  - button "退出登录":
+    - generic: 退出
+- main:
+  - main:
+    - complementary:
+      - heading "开始创作" [level=3]
+      - button "长篇原创":
+        - generic: 长篇原创
+      - button "短篇原创":
+        - generic: 短篇原创
+      - button "仿写长篇":
+        - generic: 仿写长篇
+      - button "仿写短篇":
+        - generic: 仿写短篇
+      - button "番外创作":
+        - generic: 番外创作
+      - button "续写创作":
+        - generic: 续写创作
+      - generic: 我的作品 3
+      - button "新建作品":
+      - button "作品归档库":
+      - button "选择作品链路实测-1120-anti2": 链路实测-1120-anti2
+      - button "选择作品链路实测-1120-渡口来信": 链路实测-1120-渡口来信
+      - button "选择作品本地检查验收 · 不调用模型": 本地检查验收 · 不调用模型
+      - generic: 续写创作会话
+      - button "新建会话":
+        - generic: 新建会话
+      - navigation "创作工具":
+        - button "写作风格":
+          - generic: 写作风格
+        - button "导入素材":
+          - generic: 导入素材
+        - button "Agent设置":
+          - generic: Agent设置
+        - button "定时写作":
+          - generic: 定时写作
+        - button "数据看板" [active]:
+          - generic: 数据看板
+        - button "备忘录":
+          - generic: 备忘录
+    - region "数据看板":
+      - button "返回对话":
+        - generic: 返回对话
+      - generic: 数据看板
+      - img "No data"
+      - generic: 请先选择作品后使用此工具
+- button "和 小家伙 聊天":
+- button "小家伙 宠物，idle"

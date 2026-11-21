@@ -1,0 +1,165 @@
+- complementary:
+  - button "收起导航" [expanded]:
+  - button "选择工作模式":
+    - img "一战晟铭"
+    - generic: 一战晟铭
+  - navigation:
+    - link "首页":
+      - /url: /
+      - generic: 首页
+    - link "私人定制":
+      - /url: /script
+      - generic: 私人定制
+    - link "批量测书":
+      - /url: /novel-fetch
+      - generic: 批量测书
+    - link "小说创作":
+      - /url: /novel-creation
+      - generic: 小说创作
+    - link "水货生产":
+      - /url: /batch-factory
+      - generic: 水货生产
+    - link "漫剧创作":
+      - /url: /comic-screenplay
+      - generic: 漫剧创作
+    - link "CM 画布":
+      - /url: /agent
+      - generic: CM 画布
+    - link "配音":
+      - /url: /tts
+      - generic: 配音
+    - link "AI-CUT":
+      - /url: /ai-cut
+      - generic: AI-CUT
+    - link "插件":
+      - /url: /plugins
+      - generic: 插件
+  - link "设置":
+    - /url: /settings
+    - generic: 设置
+  - button "进入个人中心":
+  - generic "choushiyiguai"
+  - button "退出登录":
+    - generic: 退出
+- main:
+  - main:
+    - complementary:
+      - heading "开始创作" [level=3]
+      - button "长篇原创":
+        - generic: 长篇原创
+      - button "短篇原创":
+        - generic: 短篇原创
+      - button "仿写长篇" [active]:
+        - generic: 仿写长篇
+      - button "仿写短篇":
+        - generic: 仿写短篇
+      - button "番外创作":
+        - generic: 番外创作
+      - button "续写创作":
+        - generic: 续写创作
+      - generic: 我的作品 3
+      - button "新建作品":
+      - button "作品归档库":
+      - button "选择作品链路实测-1120-anti2": 链路实测-1120-anti2
+      - button "选择作品链路实测-1120-渡口来信": 链路实测-1120-渡口来信
+      - button "选择作品本地检查验收 · 不调用模型": 本地检查验收 · 不调用模型
+      - generic: 未关联作品的短篇原创会话
+      - button "新建会话":
+        - generic: 新建会话
+      - navigation "创作工具":
+        - button "写作风格":
+          - generic: 写作风格
+        - button "导入素材":
+          - generic: 导入素材
+        - button "Agent设置":
+          - generic: Agent设置
+        - button "定时写作":
+          - generic: 定时写作
+        - button "数据看板":
+          - generic: 数据看板
+        - button "备忘录":
+          - generic: 备忘录
+    - region "短篇创作会话":
+      - generic: 短篇原创
+      - generic: 创作对话
+      - paragraph: 告诉我你想写什么——题材、世界观、主角、核心冲突。
+      - textbox "创作要求":
+        - /placeholder: 输入指令… Enter 发送，Shift+Enter 换行
+      - generic "创作文本模型":
+        - combobox "创作文本模型"
+        - generic "[aistudio]gemini-3.8-flash"
+      - button "调整思考要求":
+      - button "调整上下文设置":
+      - button "发送":
+- button "和 小家伙 聊天":
+- button "小家伙 宠物，idle"
+- dialog "仿写创作 参考原文风格，创作全新原创故事":
+  - button "Close":
+    - generic "Close":
+      - img "close":
+  - heading "仿写创作" [level=2]
+  - paragraph: 参考原文风格，创作全新原创故事
+  - generic: 暂定标题（可选）
+  - textbox "暂定标题（可选）":
+    - /placeholder: 留空则自动生成
+  - generic: 参考原文 *
+  - generic: 0 字
+  - textbox "参考原文":
+    - /placeholder: 粘贴参考小说全文（至少 100 字），或上传 txt / docx 自动填入
+  - generic: 粘贴或上传要仿写的参考原文，提交后拆解情绪曲线与核心价值观
+  - generic: 上传参考文件（可选）
+  - button "选择文件（docx / txt）":
+    - generic: 选择文件（docx / txt）
+  - generic: 最多 8 个文件，每个不超过 20 MiB；参考内容合计最多 200 万字元。
+  - generic: 每章字数
+  - spinbutton "每章字数": "5000"
+  - button "3000"
+  - button "4000"
+  - button "5000" [pressed]
+  - button "6000"
+  - button "8000"
+  - button "1万"
+  - generic: 可自由填写每章字数，也可点选常用字数
+  - generic: 目标章节数
+  - spinbutton "目标章节数": "100"
+  - button "50"
+  - button "100" [pressed]
+  - button "150"
+  - button "200"
+  - button "300"
+  - generic: 长篇默认 100 章，可按需调整
+  - generic: 读者偏好
+  - textbox "读者偏好":
+    - /placeholder: 填写题材偏好，如：玄幻、都市
+  - button "玄幻"
+  - button "都市"
+  - button "仙侠"
+  - button "科幻"
+  - button "历史"
+  - button "悬疑"
+  - button "言情"
+  - button "武侠"
+  - button "奇幻"
+  - button "灵异"
+  - button "末世"
+  - button "系统"
+  - generic: 可自由填写，点选标签会自动追加
+  - generic: 原创故事想法（可选）
+  - textbox "原创故事想法（可选）":
+    - /placeholder: 剧情、主角、核心冲突（原创剧情）
+  - generic: 仿写方向（可选）
+  - textbox "仿写方向（可选）":
+    - /placeholder: 留空则默认采用拆书后的方向一；可填“方向二：…”
+  - generic: 补充信息（可选）
+  - textbox "补充信息（可选）":
+    - /placeholder: 填写额外要求，如人设、情节走向、必须出现的桥段、禁忌点等
+  - generic: 文风设置（多选）
+  - generic: 暂无可用文风
+  - generic: 关联备忘录（可选）
+  - generic "关联备忘录（可选）":
+    - combobox "关联备忘录（可选）"
+    - generic: 选择备忘录作为参考素材
+  - button "取 消":
+    - generic: 取 消
+  - button "创建作品":
+    - generic: 创建作品
