@@ -5504,6 +5504,18 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 			}
 		}
 	}
+	// 状态页面通常会先清理删除书籍留下的旧账本，但重试接口不能依赖前端
+	// 的请求顺序。直接重试时也先按当前批次清掉幽灵书并持久化，避免它
+	// 继续占用异常计数，或反复提示“批次中已不存在这些书”。
+	if prefetchedBatchOK {
+		changedIDs := map[string]struct{}{}
+		if pruneDeletedAutomationBooks(&state, owner, batchID, prefetchedBatch, c.now(), changedIDs) {
+			if err := c.saveJobsLocked(state, changedIDs); err != nil {
+				c.mu.Unlock()
+				return nil, err
+			}
+		}
+	}
 	// 重试只调度未成功的书：已完成/已发布、正在执行、等待定时提交或等待人工
 	// 确认的书都不进入新一轮 run。显式传了 bookIds 时先与 job 跟踪的书取交集。
 	selected := selectRetryableAutomationBooks(books, set, currentSourceBookIDs)

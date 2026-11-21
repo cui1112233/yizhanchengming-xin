@@ -69,6 +69,7 @@ func automationConcurrencyBudgetLine(job map[string]any) string {
 type FileAutomationStatusReader struct {
 	path       string
 	stateStore AutomationStateStore
+	batchStore batchfactoryv11.Store
 }
 
 // Path exposes the shared persistence location to the native Go coordinator.
@@ -91,6 +92,12 @@ func (r *FileAutomationStatusReader) SetStateStore(store AutomationStateStore) {
 	}
 }
 
+func (r *FileAutomationStatusReader) SetBatchStore(store batchfactoryv11.Store) {
+	if r != nil {
+		r.batchStore = store
+	}
+}
+
 func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]any, error) {
 	idle := map[string]any{"state": "idle", "counts": idleAutomationCounts()}
 	if r == nil {
@@ -110,7 +117,17 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		return nil, err
 	}
 	changedIDs := map[string]struct{}{}
-	repaired := normalizeAlreadyUploadedAutomationStateInto(&state, changedIDs)
+	repaired := false
+	if r.batchStore != nil {
+		if batch, readErr := r.batchStore.GetBatch(context.Background(), owner, batchID); readErr == nil {
+			if pruneDeletedAutomationBooks(&state, owner, batchID, batch, time.Now(), changedIDs) {
+				repaired = true
+			}
+		}
+	}
+	if normalizeAlreadyUploadedAutomationStateInto(&state, changedIDs) {
+		repaired = true
+	}
 	if repairStaleRunningAutomationBooksInto(&state, time.Now(), changedIDs) {
 		repaired = true
 	}
@@ -158,6 +175,45 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		return publicAutomationJob(matched[0]), nil
 	}
 	return idle, nil
+}
+
+// pruneDeletedAutomationBooks keeps the persisted automation ledger aligned
+// with the batch itself. A deleted book must not remain as a ghost failure in
+// the batch counters or be offered for retry.
+func pruneDeletedAutomationBooks(state *automationStateFile, owner, batchID string, batch batchfactoryv11.Batch, now time.Time, changedIDs map[string]struct{}) bool {
+	if state == nil {
+		return false
+	}
+	existing := make(map[string]struct{}, len(batch.Books))
+	for _, book := range batch.Books {
+		existing[book.ID] = struct{}{}
+	}
+	changed := false
+	for jobID, job := range state.Jobs {
+		if automationStringValue(job["owner"], "") != owner || automationStringValue(job["batchId"], "") != batchID {
+			continue
+		}
+		books, _ := job["books"].(map[string]any)
+		removed := false
+		for bookID := range books {
+			if _, ok := existing[bookID]; ok {
+				continue
+			}
+			delete(books, bookID)
+			removed = true
+		}
+		if !removed {
+			continue
+		}
+		normalizeAutomationJobCounts(job, books)
+		job["updatedAt"] = now
+		if automationStringValue(job["state"], "") == "completed" {
+			job["completedAt"] = now
+		}
+		markAutomationJobChanged(changedIDs, jobID)
+		changed = true
+	}
+	return changed
 }
 
 // automationStaleBookTimeout 是“任务已终止但书仍显示执行中”的判定阈值。

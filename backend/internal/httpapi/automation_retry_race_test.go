@@ -58,9 +58,8 @@ func TestRetryBuildsPublicResponseBeforeWorkerMutatesJob(t *testing.T) {
 	}
 }
 
-// 回归：批次里的书已被删除、job 仍保留失败账本时，重试必须在改动状态前
-// 返回冲突。旧实现会先把 job 改成 running 再发现批次里没有可执行的书，
-// 留下一个没有执行协程的假 running，只能等 2 分钟后的僵尸回收器改判失败。
+// 回归：批次里的书已被删除、job 仍保留失败账本时，重试入口也要清掉
+// 幽灵书，不能继续把它保留为异常，更不能留下假 running。
 func TestRetryRejectsDeletedBatchBookWithoutFakeRunning(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
@@ -92,13 +91,12 @@ func TestRetryRejectsDeletedBatchBookWithoutFakeRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	job := loaded.Jobs["job-1"]
-	if automationStringValue(job["state"], "") != "failed" {
-		t.Fatalf("job state = %v, want failed（不得留下假 running）", job["state"])
+	if automationStringValue(job["state"], "") != "completed" {
+		t.Fatalf("job state = %v, want completed（不得留下幽灵异常或假 running）", job["state"])
 	}
 	books, _ := job["books"].(map[string]any)
-	entry, _ := books["book-gone"].(map[string]any)
-	if automationStringValue(entry["status"], "") != "failed" {
-		t.Fatalf("book status = %v, want failed", entry["status"])
+	if _, ok := books["book-gone"]; ok {
+		t.Fatalf("deleted book remained in automation ledger: %#v", books)
 	}
 }
 

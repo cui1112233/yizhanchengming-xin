@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,50 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
+
+func TestFileAutomationStatusReaderPrunesDeletedBatchBooks(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "测试批次",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "仍在批次里的书"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "automation.json")
+	raw := fmt.Sprintf(`{"version":1,"jobs":{"job-1":{"owner":"alice","batchId":%q,"id":"job-1","state":"failed","counts":{"total":2,"ready":1,"failed":1},"books":{%q:{"bookId":%q,"title":"仍在批次里的书","status":"completed","stage":"published"},"book-deleted":{"bookId":"book-deleted","title":"已删除的书","status":"failed","stage":"fetch_original"}}}}}`, batch.ID, batch.Books[0].ID, batch.Books[0].ID)
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	reader := NewFileAutomationStatusReader(path)
+	reader.SetBatchStore(store)
+	status, err := reader.Status("alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	books, ok := status["books"].([]any)
+	if !ok || len(books) != 1 {
+		t.Fatalf("books=%#v, want only the existing book", status["books"])
+	}
+	counts, _ := status["counts"].(map[string]any)
+	if got := automationNumberValue(counts["total"], -1); got != 1 {
+		t.Fatalf("total=%v, want 1", counts["total"])
+	}
+	if got := fmt.Sprint(counts["failed"]); got != "0" {
+		t.Fatalf("failed=%v, want 0", counts["failed"])
+	}
+	if status["state"] != "completed" {
+		t.Fatalf("state=%v, want completed", status["state"])
+	}
+	persisted, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(persisted), "book-deleted") {
+		t.Fatalf("deleted book remained persisted: %s", persisted)
+	}
+}
 
 func TestFileAutomationStatusReaderMatchesNodePublicShape(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "automation.json")

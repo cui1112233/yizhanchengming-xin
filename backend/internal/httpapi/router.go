@@ -204,6 +204,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetAutomationStateStore(options.AutomationStateStore)
 		if options.AutomationStatusReader != nil {
 			options.AutomationStatusReader.SetStateStore(options.AutomationStateStore)
+			options.AutomationStatusReader.SetBatchStore(options.Store)
 		}
 		// Keep injected coordinators on the router's prompt catalog too.
 		options.AutomationCoordinator.promptCatalog = options.PresetCatalog
