@@ -646,6 +646,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	// 批量测书删除历史文档时正文会转入可回收状态；这里每天兜底清理一次，
 	// 避免 TOS 对象和正文行长期无人回收。
 	startNovelFetchBodyCleanup(ctx, novelFetchStore)
+	// 批量测书任务本身也按账号的「作品保留时长」清理：只删终态任务和运行
+	// 记录，正文仍先转 releasable 再延迟回收，避免误删后无法恢复。
+	startNovelFetchTaskCleanup(ctx, novelFetchStore, retentionDays)
 	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
 	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。
 	automationPresetStore, err := httpapi.NewMySQLAutomationPresetStore(db, cfg.AutomationPresetPath, time.Now)
@@ -786,6 +789,51 @@ func videoManagementTargetBaseURL() string {
 		return "https://two.121w.com"
 	}
 	return raw
+}
+
+// startNovelFetchTaskCleanup 按账号「作品保留时长」清理到期的终态测书任务。
+// 等待重试/排队/处理中等未结束任务不在清理范围，避免把仍需人工处理的
+// 问题任务删掉；单轮最多清理固定数量，剩余任务由下一次巡检继续。
+func startNovelFetchTaskCleanup(ctx context.Context, store *novelfetchworkshop.MySQLStore, retentionDays func(string) int) {
+	if store == nil || retentionDays == nil {
+		return
+	}
+	const batchLimit = 200
+	const maxBatchesPerOwner = 20
+	go func() {
+		// 启动后尽快补跑一次，避免升级/重启把已到期任务又拖一天。
+		timer := time.NewTimer(time.Minute)
+		defer timer.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				owners, err := store.ListDocumentOwners(ctx)
+				if err != nil {
+					log.Printf("novel fetch task cleanup: list owners failed: %v", err)
+				}
+				now := time.Now().UTC()
+				for _, owner := range owners {
+					days := retentionDays(owner)
+					for batch := 0; batch < maxBatchesPerOwner && ctx.Err() == nil; batch++ {
+						result, cleanupErr := store.CleanupExpiredTasks(ctx, owner, now, days, batchLimit)
+						if cleanupErr != nil {
+							log.Printf("novel fetch task cleanup failed owner=%s: %v", owner, cleanupErr)
+							break
+						}
+						if result.Deleted > 0 || result.RunsDeleted > 0 {
+							log.Printf("novel fetch task cleanup owner=%s deleted_tasks=%d deleted_runs=%d", owner, result.Deleted, result.RunsDeleted)
+						}
+						if result.Deleted < batchLimit {
+							break
+						}
+					}
+				}
+				timer.Reset(6 * time.Hour)
+			}
+		}
+	}()
 }
 
 // startNovelFetchBodyCleanup 定时兜底回收批量测书的过期正文。
