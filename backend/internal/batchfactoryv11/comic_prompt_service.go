@@ -79,7 +79,7 @@ const comicPageStructureLock = "【漫画页面结构约束】成图为{{image_a
 // comicIllustratedTextStructureLock 是「CM·文字插画版」专用的版式锁：单页
 // 图文卡，上半文字区逐字排版、下半插画，不分格、不画气泡。它替代分格漫画
 // 的 comicPageStructureLock，否则模型会被强制回多格漫画。
-const comicIllustratedTextStructureLock = "【单页图文卡结构约束】成图为{{image_aspect_ratio}}{{image_orientation}}的中文单页图文卡：上半部分是文字区，按原文逐字排版，手写感楷体、深墨色、行距舒展；下半部分是插画区，画本页人物、动作、场景、光影与机位。两区自然过渡，留白充分；不画分格线、不做海报式拼贴、不出现对白气泡，画面内不出现任何文字、标题、页码、水印或签名。具体线稿、上色、材质、人物比例和渲染方式只听所选画风预设，不得固定为其他画风。"
+const comicIllustratedTextStructureLock = "【单页图文卡结构约束】成图为{{image_aspect_ratio}}{{image_orientation}}的中文单页图文卡：上半部分是文字区，按原文逐字排版，手写感楷体、深墨色、行距舒展；下半部分是插画区，画本页人物、动作、场景、光影与机位。两区自然过渡，留白充分；不画分格线、不做海报式拼贴、不出现对白气泡。除上半原文文字区外，插画区不得出现额外文字、标题、页码、水印或签名。具体线稿、上色、材质、人物比例和渲染方式只听所选画风预设，不得固定为其他画风。"
 
 func comicPromptTextForAspect(value, aspectRatio string) string {
 	orientation := ImageAspectRatioOrientation(aspectRatio)
@@ -143,7 +143,7 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 		comicAssetIdentityRule,
 	}
 	if illustratedText {
-		parts = append(parts, "本页必须生成一张完整"+aspectRatio+"单页图文卡：上半为文字区、下半为插画区，两区自然过渡；不画分格线、不出现对白气泡、画面内不出现任何文字。禁止后期拼图。")
+		parts = append(parts, "本页必须生成一张完整"+aspectRatio+"单页图文卡：上半为文字区，按 current_page 原文逐字排版；下半为插画区，两区自然过渡。不画分格线、不出现对白气泡；除上半原文文字区外，插画区不得出现额外文字。禁止后期拼图。")
 	} else {
 		parts = append(parts, "本页必须生成一张完整"+aspectRatio+ImageAspectRatioOrientation(aspectRatio)+"漫画页，直接包含分格、角色、场景、动作、表情、旁白框、对话气泡及必须出现的中文文案。禁止后期拼图或另行叠字。")
 	}

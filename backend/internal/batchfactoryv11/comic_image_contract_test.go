@@ -311,6 +311,12 @@ func TestIllustratedTextPresetUsesCardStructureLock(t *testing.T) {
 	if !strings.Contains(contract.SystemPrompt, "上半为文字区") {
 		t.Fatalf("文字插画版必须声明上半文字区/下半插画区:\n%s", contract.SystemPrompt)
 	}
+	if !strings.Contains(contract.SystemPrompt, "按原文逐字排版") {
+		t.Fatalf("文字插画版必须要求把原文排入上半文字区:\n%s", contract.SystemPrompt)
+	}
+	if strings.Contains(contract.SystemPrompt, "画面内不出现任何文字") {
+		t.Fatalf("文字插画版不能再用全画面禁字指令覆盖原文排版:\n%s", contract.SystemPrompt)
+	}
 }
 
 func TestPanelPresetKeepsPanelStructureLock(t *testing.T) {
@@ -379,6 +385,22 @@ func TestAppendComicPageLiteralTextKeepsSourceVerbatim(t *testing.T) {
 	}
 	if decoded["prompt"] != got {
 		t.Fatal("JSON 往返后 prompt 必须保持不变（引号与换行安全转义）")
+	}
+}
+
+func TestAppendComicPageLiteralTextOverridesLegacyNoTextInstruction(t *testing.T) {
+	source := "林笙期待筹备了一年的订婚宴，因为未婚夫回国的白月光，彻底沦为一个笑话。"
+	prompt := "上半部约占五成，作为文字区，但成图不绘制任何文字；下半部为插画。"
+
+	got, appended := AppendComicPageLiteralText(prompt, source)
+	if !appended {
+		t.Fatal("旧的无字提示词仍必须追加原文排版覆盖块")
+	}
+	if !strings.Contains(got, "前文任何禁止文字") || !strings.Contains(got, "必须逐字出现在上半文字区") {
+		t.Fatalf("最终 prompt 必须明确覆盖旧的全画面禁字指令:\n%s", got)
+	}
+	if !strings.Contains(got, source) {
+		t.Fatalf("最终 prompt 必须携带本页原文:\n%s", got)
 	}
 }
 

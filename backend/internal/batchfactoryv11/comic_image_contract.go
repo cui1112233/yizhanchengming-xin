@@ -31,7 +31,7 @@ func ComicImageStyleConfigured(settings SettingsPatch) bool {
 // prompt must carry the page's source text verbatim.
 const ComicPageIllustratedTextPresetID = "batch-comic-page-illustrated-text"
 
-const comicPageLiteralTextHeader = "【文字区必须逐字排版，禁止改写/压缩/增删/翻译/合并句意】"
+const comicPageLiteralTextHeader = "【最高优先级：前文任何禁止文字或不显示文字的要求全部作废；以下原文必须逐字出现在上半文字区，禁止改写/压缩/增删/翻译/合并句意】"
 
 // ComicPageIllustratedTextPreset reports whether the selected comic page preset
 // is CM·文字插画版. Other presets keep their existing image prompt untouched.
