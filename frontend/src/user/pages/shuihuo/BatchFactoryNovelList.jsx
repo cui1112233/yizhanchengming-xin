@@ -5017,51 +5017,20 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       message.info('请先在小说列表中勾选要立即执行的小说。');
       return;
     }
-    if (batchProductionMode === 'comic') {
-      try {
-        const presets = automationPresets.length ? automationPresets : await loadAutomationPresets();
-        const activePresetID = automationActive ? String(automationStatus?.preset?.id || '').trim() : '';
-        const presetID = activePresetID || automationPresetID || presets[0]?.id || '';
-        if (!presetID) {
-          message.warning('请先在自动生产中选择一个漫画预设。');
-          return;
-        }
-        setAutomationPresetID(presetID);
-        setAutomationBookScope('selected');
-        await runAutomationAction('start', { immediate: true, bookIds: selectedBookIds, presetId: presetID });
-      } catch (error) {
-        message.error(error?.message || '启动已选漫画任务失败');
-      }
-      return;
-    }
-    setActionBusy('selected-production');
-    const operationRequestID = requestID('bf11-selected-production');
-    const failedTitles = [];
     try {
-      for (const book of selectedBooks) {
-        const settings = effectiveBookSettings(batch, book);
-        const provider = videoProviderForModel(settings.videoModelId, settings.videoProvider);
-        try {
-          if (provider === YIZHANSHENGMING_EXECUTOR_PROVIDER) showLocalExecutorSubmittingToast();
-          await runBookStage(batch.id, book.id, 'video', {
-            mode: 'missing',
-            provider,
-            videoModelId: settings.videoModelId,
-            requestId: operationRequestID
-          });
-        } catch (error) {
-          failedTitles.push(book.title || `小说 ${book.bookId || book.id}`);
-        }
+      const presets = automationPresets.length ? automationPresets : await loadAutomationPresets();
+      const activePresetID = automationActive ? String(automationStatus?.preset?.id || '').trim() : '';
+      const presetID = activePresetID || automationPresetID || automationPresetsForMode(presets, batchProductionMode)[0]?.id || '';
+      if (!presetID) {
+        message.warning(`请先在自动生产中选择一个${batchProductionMode === 'comic' ? '漫画' : '视频'}预设。`);
+        return;
       }
-      setActiveProductionRequestID(operationRequestID);
-      await Promise.all([refreshBatch(), loadRuntimeStatus({ quiet: true })]);
-      const completed = selectedBooks.length - failedTitles.length;
-      if (failedTitles.length) {
-        message.warning(`已提交 ${completed}/${selectedBooks.length} 本；未提交：${failedTitles.join('、')}`);
-      } else {
-        message.success(`已立即提交选中的 ${selectedBooks.length} 本小说视频任务。`);
-      }
-    } catch (error) { message.error(error?.message || '提交已选小说的视频任务失败'); } finally { setActionBusy(''); }
+      setAutomationPresetID(presetID);
+      setAutomationBookScope('selected');
+      await runAutomationAction('start', { immediate: true, bookIds: selectedBookIds, presetId: presetID });
+    } catch (error) {
+      message.error(error?.message || '启动已选自动生产任务失败');
+    }
   }
   function mergePayload(prefix, book = null, speed = 1, overrides = {}) {
     const settings = normalizeAudioSourceSettings(book ? effectiveBookSettings(batch, book) : (batch?.settingsState?.patch || {}));

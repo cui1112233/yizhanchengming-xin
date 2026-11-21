@@ -6,16 +6,20 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8');
+const selectedProductionSource = source.slice(
+  source.indexOf('async function runSelectedProduction()'),
+  source.indexOf('function mergePayload(', source.indexOf('async function runSelectedProduction()'))
+);
 
-test('video bulk actions can immediately run only the books selected in the novel list', () => {
-  assert.match(source, /async function runSelectedProduction\(\)/);
-  assert.match(source, /const selectedBooks = books\.filter\(book => selectedBookIds\.includes\(book\.id\)\);/);
-  assert.match(source, /for \(const book of selectedBooks\)[\s\S]*?await runBookStage\(batch\.id, book\.id, 'video'/);
+test('video immediate selected execution starts the complete automation pipeline instead of only the video stage', () => {
+  assert.match(selectedProductionSource, /setAutomationBookScope\('selected'\)/);
+  assert.match(selectedProductionSource, /runAutomationAction\('start', \{ immediate: true, bookIds: selectedBookIds, presetId: presetID \}\)/);
+  assert.doesNotMatch(selectedProductionSource, /runBookStage\(batch\.id, book\.id, 'video'/);
   assert.match(source, /const batchMenuItems = batchProductionMode === 'comic'[\s\S]*?: \[[\s\S]*?key: 'selected-production'[\s\S]*?批量生成视频/);
 });
 
 test('selected immediate execution remains available when the video capability reports a configuration problem', () => {
-  assert.match(source, /key: 'selected-production', label: `立即执行已选（\$\{selectedBookIds\.length\}）`, disabled: !selectedBookIds\.length/);
+  assert.match(source, /key: 'selected-production', label: automationActive \? `排队执行已选（\$\{selectedBookIds\.length\}）` : `立即执行已选（\$\{selectedBookIds\.length\}）`, disabled: !selectedBookIds\.length/);
   assert.doesNotMatch(source, /key: 'selected-production',[\s\S]*?disabled: !productionCapability\.available \|\| !selectedBookIds\.length/);
 });
 
