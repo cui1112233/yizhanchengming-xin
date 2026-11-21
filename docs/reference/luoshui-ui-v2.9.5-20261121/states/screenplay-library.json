@@ -1,0 +1,284 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n剧本创作\n\n管理和创建您的剧本作品\n\n创建剧本\n个人作品\n团队作品\n搜索作品...\n按时间降序\n新版\n旧版\n\n艳阳高照，京市一中的操场上欢呼呐喊声连成一片，篮球场上的比赛已经到了最后关头，场边围观的人也在不断呐喊加油…… 看台上，几个青春靓丽的女生坐在一起，穿着白衬衣的少年站在旁边。 坐在少年旁边的是一个格外漂亮的少女，亚麻色长马尾微卷着搭在肩上，皮肤白皙，五官极其精致。 她的容貌就像最漂亮纯洁的天使，可脸上的笑容却十分邪恶，抬手把打开包装的冰淇淋径直砸到少年身上，神情娇纵。 “都化掉了，要让我怎么吃？” 巧克力外皮的冰淇淋被砸到少年胸口，顺着衣服往下滑，白衬衫顿时一片狼藉。 少年侧脸精致的像是从漫画里走出一般，低垂着眼，鸦黑的眼睫在眼睑投下一片阴影，沉默而冷郁。 他看着身上的一片狼藉，没有开口，只是\n\n1212\n\n2026/11/14 01:38",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1750,
+        "y": 84.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "创建剧本",
+      "disabled": false,
+      "rect": {
+        "x": 1780,
+        "y": 81,
+        "width": 108,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "",
+      "label": "个人作品",
+      "disabled": false,
+      "rect": {
+        "x": 40,
+        "y": 140,
+        "width": 56,
+        "height": 41
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "",
+      "label": "团队作品",
+      "disabled": false,
+      "rect": {
+        "x": 132,
+        "y": 140,
+        "width": 56,
+        "height": 41
+      }
+    },
+    {
+      "index": 16,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索作品...",
+      "disabled": false,
+      "rect": {
+        "x": 1364,
+        "y": 153,
+        "width": 120,
+        "height": 28
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "",
+      "label": "按时间降序",
+      "disabled": false,
+      "rect": {
+        "x": 1526,
+        "y": 153,
+        "width": 130,
+        "height": 28
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1668,
+        "y": 151,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新版",
+      "disabled": false,
+      "rect": {
+        "x": 1714,
+        "y": 149.5,
+        "width": 85,
+        "height": 35
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旧版",
+      "disabled": false,
+      "rect": {
+        "x": 1801,
+        "y": 149.5,
+        "width": 85,
+        "height": 35
+      }
+    }
+  ]
+}

@@ -1,0 +1,401 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "Agent代理\n新对话\n自动任务\n0\nAgent 技能\n52\n助手\n💬\n新增助手\n💬\n默认助手\n新对话\n11 天\nAgent\nChat\nChat 对话\n选择现有作品\nAI记忆\n核心指令\n氛围版-gemini-3.1\n洛水氛围版\n提示词",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent代理",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新对话",
+      "disabled": false,
+      "rect": {
+        "x": 18,
+        "y": 62,
+        "width": 184,
+        "height": 30
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 208,
+        "y": 62,
+        "width": 30,
+        "height": 30
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "自动任务0",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 100,
+        "width": 224,
+        "height": 35.5
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent 技能52",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 137.5,
+        "width": 224,
+        "height": 35.5
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多",
+      "disabled": false,
+      "rect": {
+        "x": 170,
+        "y": 268.5,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新会话",
+      "disabled": false,
+      "rect": {
+        "x": 204,
+        "y": 268.5,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "置顶",
+      "disabled": false,
+      "rect": {
+        "x": 186,
+        "y": 309.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 210,
+        "y": 309.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 964.671875,
+        "y": 62,
+        "width": 78.796875,
+        "height": 30
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Chat",
+      "disabled": false,
+      "rect": {
+        "x": 1045.46875,
+        "y": 62,
+        "width": 70.53125,
+        "height": 30
+      }
+    },
+    {
+      "index": 21,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "输入消息，/effort 设置思考强度… (Enter 发送，Shift+Enter 换行)",
+      "disabled": false,
+      "rect": {
+        "x": 585,
+        "y": 868,
+        "width": 998,
+        "height": 101
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 593,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开思考",
+      "disabled": false,
+      "rect": {
+        "x": 1058.984375,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1170.984375,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1210.984375,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1250.984375,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1299.984375,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1348.984375,
+        "y": 981,
+        "width": 36,
+        "height": 36
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": true,
+      "rect": {
+        "x": 1539,
+        "y": 983,
+        "width": 36,
+        "height": 36
+      }
+    }
+  ]
+}

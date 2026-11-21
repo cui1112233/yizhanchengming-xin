@@ -1,0 +1,635 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n返回\n插件市场\nAI-分段\nAI-分段\n已授权\n\n剪映导出成片 + 读取草稿主轨道片段边界切割\n\n仅支持剪映 11.6 及以下版本，更多版本请查看飞书文档\n\n按剪映主轨道\n按剪映文本轨道\nAI分段\n\n点击选择剪映已导出的成片\n\n请先在剪映里导出带字幕/特效的成片（建议 30 帧），再拿到这里切\n\n选择\n选择剪映草稿\n刷新\n\n草稿列表来自全局设置里的剪映导出路径；只用来读主轨道片段时长\n\n点击选择输出文件夹\n\n切割后的视频将保存到此目录\n\n选择\n参数设置\n前\n集，每集\n分\n秒\n（共 45 秒）\n后续各集时长\n分\n秒\n（共 45 秒）\n开始编号\n只改导出的视频文件名。第一集填 1；这一集已经切过 1–100，下一集就填 101\n分辨率\n1080p\n帧率\n30 帧\n\n时长只多不少。剪映主轨道模式先自己导出成片，再按片段交界切，不会从片段中间切开。\n\n开始分段\n处理日志\n暂无日志\n剪映导出路径未设置或不存在，请在设置中配置正确的路径",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "首页",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 64,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 3,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "小说创作",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 101,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 4,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 138,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 5,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "音色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 175,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 6,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "漫剧解说1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 212,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 7,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "短剧工作室0",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 270,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 8,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "剧本创作1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 307,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 9,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "momo画布2",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 344,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 10,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "绘画",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 381,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 11,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "AI-CUT",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 441,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 12,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 501,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 13,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "插件",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 538,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "社区186",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 575,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "我的资产",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 612,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 16,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "反馈",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 649,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "在线客服",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 686,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "返回",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 72,
+        "width": 72,
+        "height": 33.5
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "插件市场",
+      "disabled": false,
+      "rect": {
+        "x": 368,
+        "y": 78.25,
+        "width": 56,
+        "height": 21
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1825.203125,
+        "y": 157.296875,
+        "width": 34,
+        "height": 34
+      }
+    },
+    {
+      "index": 30,
+      "tag": "A",
+      "role": "",
+      "label": "飞书文档",
+      "disabled": false,
+      "rect": {
+        "x": 553.390625,
+        "y": 212.296875,
+        "width": 48,
+        "height": 16
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "按剪映主轨道",
+      "disabled": false,
+      "rect": {
+        "x": 308.796875,
+        "y": 244.296875,
+        "width": 104,
+        "height": 28
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "按剪映文本轨道",
+      "disabled": false,
+      "rect": {
+        "x": 420.796875,
+        "y": 244.296875,
+        "width": 118,
+        "height": 28
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI分段",
+      "disabled": false,
+      "rect": {
+        "x": 546.796875,
+        "y": 244.296875,
+        "width": 60.765625,
+        "height": 28
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选择",
+      "disabled": false,
+      "rect": {
+        "x": 810.796875,
+        "y": 316.296875,
+        "width": 48,
+        "height": 28
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "刷新",
+      "disabled": false,
+      "rect": {
+        "x": 804.796875,
+        "y": 404.296875,
+        "width": 56,
+        "height": 22
+      }
+    },
+    {
+      "index": 36,
+      "tag": "DIV",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 324.796875,
+        "y": 434.296875,
+        "width": 536,
+        "height": 34
+      }
+    },
+    {
+      "index": 37,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 324.796875,
+        "y": 440.796875,
+        "width": 536,
+        "height": 21
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选择",
+      "disabled": false,
+      "rect": {
+        "x": 810.796875,
+        "y": 552.296875,
+        "width": 48,
+        "height": 28
+      }
+    },
+    {
+      "index": 39,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 334.796875,
+        "y": 692.296875,
+        "width": 516,
+        "height": 28
+      }
+    },
+    {
+      "index": 40,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 390.796875,
+        "y": 724.296875,
+        "width": 54,
+        "height": 28
+      }
+    },
+    {
+      "index": 41,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 490.796875,
+        "y": 724.296875,
+        "width": 54,
+        "height": 28
+      }
+    },
+    {
+      "index": 42,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 414.796875,
+        "y": 760.296875,
+        "width": 54,
+        "height": 28
+      }
+    },
+    {
+      "index": 43,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 514.796875,
+        "y": 760.296875,
+        "width": 54,
+        "height": 28
+      }
+    },
+    {
+      "index": 44,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 390.796875,
+        "y": 800.296875,
+        "width": 78,
+        "height": 28
+      }
+    },
+    {
+      "index": 45,
+      "tag": "DIV",
+      "role": "",
+      "label": "1080p",
+      "disabled": false,
+      "rect": {
+        "x": 372.796875,
+        "y": 860.296875,
+        "width": 112,
+        "height": 28
+      }
+    },
+    {
+      "index": 46,
+      "tag": "DIV",
+      "role": "",
+      "label": "30 帧",
+      "disabled": false,
+      "rect": {
+        "x": 532.796875,
+        "y": 860.296875,
+        "width": 112,
+        "height": 28
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "开始分段",
+      "disabled": true,
+      "rect": {
+        "x": 308.796875,
+        "y": 944.296875,
+        "width": 568,
+        "height": 34
+      }
+    }
+  ]
+}

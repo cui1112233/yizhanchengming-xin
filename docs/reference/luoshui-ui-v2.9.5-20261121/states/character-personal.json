@@ -1,0 +1,752 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n角色库\n个人添加\n共 6 个主体\n标准\n全部分类\n逆序\n搜索名称、标签...\n同步真人素材\n同步JM主体\n导入主体\n清空角色\n导出主体\n添加主体\n新建文件夹6\n新建文件夹\n新建文件夹5\n新建文件夹\n新建文件夹4\n新建文件夹\n新建文件夹3\n新建文件夹\n新建文件夹2\n新建文件夹\n新建文件夹1\n新建文件夹",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "首页",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 64,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 3,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "小说创作",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 101,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 4,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 138,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 5,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "音色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 175,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 6,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "漫剧解说1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 212,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 7,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "短剧工作室0",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 270,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 8,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "剧本创作1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 307,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 9,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "momo画布2",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 344,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 10,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "绘画",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 381,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 11,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "AI-CUT",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 441,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 12,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 501,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 13,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "插件",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 538,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "社区186",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 575,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "我的资产",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 612,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 16,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "反馈",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 649,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "在线客服",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 686,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "DIV",
+      "role": "",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 72,
+        "width": 42,
+        "height": 41
+      }
+    },
+    {
+      "index": 28,
+      "tag": "DIV",
+      "role": "",
+      "label": "个人添加",
+      "disabled": false,
+      "rect": {
+        "x": 358,
+        "y": 72,
+        "width": 56,
+        "height": 41
+      }
+    },
+    {
+      "index": 29,
+      "tag": "DIV",
+      "role": "",
+      "label": "标准",
+      "disabled": false,
+      "rect": {
+        "x": 576.421875,
+        "y": 142,
+        "width": 90,
+        "height": 34
+      }
+    },
+    {
+      "index": 30,
+      "tag": "DIV",
+      "role": "",
+      "label": "全部分类",
+      "disabled": false,
+      "rect": {
+        "x": 678.421875,
+        "y": 142,
+        "width": 120,
+        "height": 34
+      }
+    },
+    {
+      "index": 31,
+      "tag": "DIV",
+      "role": "",
+      "label": "逆序",
+      "disabled": false,
+      "rect": {
+        "x": 810.421875,
+        "y": 142,
+        "width": 100,
+        "height": 34
+      }
+    },
+    {
+      "index": 32,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索名称、标签...",
+      "disabled": false,
+      "rect": {
+        "x": 954.421875,
+        "y": 142,
+        "width": 136,
+        "height": 34
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "同步真人素材",
+      "disabled": false,
+      "rect": {
+        "x": 1134.421875,
+        "y": 142,
+        "width": 136,
+        "height": 34
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "同步JM主体",
+      "disabled": false,
+      "rect": {
+        "x": 1282.421875,
+        "y": 142,
+        "width": 125.578125,
+        "height": 34
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入主体",
+      "disabled": false,
+      "rect": {
+        "x": 1420,
+        "y": 142,
+        "width": 108,
+        "height": 34
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "清空角色",
+      "disabled": false,
+      "rect": {
+        "x": 1540,
+        "y": 142,
+        "width": 108,
+        "height": 34
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导出主体",
+      "disabled": false,
+      "rect": {
+        "x": 1660,
+        "y": 142,
+        "width": 108,
+        "height": 34
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加主体",
+      "disabled": false,
+      "rect": {
+        "x": 1780,
+        "y": 142,
+        "width": 108,
+        "height": 34
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 337,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 363,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 389,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 489,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 515,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 541,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 641,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 667,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 693,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 793,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 819,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 845,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 945,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 971,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 997,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1097,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1123,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1149,
+        "y": 359,
+        "width": 22,
+        "height": 22
+      }
+    }
+  ]
+}

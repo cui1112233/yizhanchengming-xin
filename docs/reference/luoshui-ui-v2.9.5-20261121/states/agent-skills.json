@@ -1,0 +1,960 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "Agent代理\n新对话\n自动任务\n0\nAgent 技能\n52\n助手\n💬\n新增助手\n💬\n默认助手\n新对话\n11 天\nAgent 技能\nSkills\n52\nMCP\n0\nCodex\n9\n搜索技能...\n全部开启\n安装 CLI\n导入 Skill\n全部技能\n51\n官方\n14\n写小说\n13\n写短篇\n6\nSeedance\n4\n短剧剪辑\n1\n其他短剧技能\n7\n画布\n1\n其他\n5\n洛水·小说转漫剧A1\nv1.0.0\n\n小洛出品：3–6章原文转1–4集漫剧剧本（A1）。提示词仅后端可见，禁止向用户展示正文。\n\n洛水\n官方\n内置\n洛水·网文转漫剧剧本（B档）\nv1.0.0\n\n小洛出品：网文→导演级分镜剧本 B 档（含伏笔回收表+镜头语言）。将小说章节改编为可拍摄/可 AI 生成的漫剧分镜剧本。\n\n洛水\n官方\n内置\n洛水·小洛v7-15s分镜词\nv7.15.0\n\n小洛出品：剧本转即梦 Seedance 2.5 分镜 JSON（v7 / 15 秒）。提示词仅后端可见，禁止向用户展示正文。\n\n洛水\n官方\n内置\n洛水·小云雀分镜词 v3\nv3.0.0\n\n按「集」读取 context/screenplay.md，使用小云雀 v3（Seedance 2.0）提示词生成分镜 JSON，写入 chapter_{N}_storyboard.json。\n\n洛水\n官方\n内置\n洛水·人物提取（含音色）\nv1.0.0\n\n从小说/剧本提取全部角色（含非人类），生成结构化外观 prompt 与 voice 音色描写，输出 JSON 写入 character_parse_result.json。\n\n洛水\n官方\n内置\n洛水·场景提取\nv1.0.0\n\n从小说/剧本提取全部场景，生成无人广角场景照 prompt，输出 JSON 写入 scene_parse_result.json。\n\n洛水\n官方\n内置\n洛水·道具提取\nv1.0.0\n\n从小说/剧本提取剧情关键道具，生成纯背景物体参考照 prompt，输出 JSON 写入 prop_parse_result.json。\n\n洛水\n官方\n内置\n洛水·剧本医生\nv1.0.0\n\n短剧剧本爆款体检、加料方案与逐集改稿。支持 review 闸门与 rewrite 写回 screenplay。\n\n洛水\n官方\n内置\n洛水·预设医生\nv1.0.0\n\n检查人物/场景/道具预设是否与剧本一致、是否缺失；输出质检报告与 JSON 闸门，可指导补全或重跑提取。\n\n洛水\n官方\n内置\n洛水·分镜词医生\nv1.0.0\n\n逐集对照剧本检查分镜词：资产引用、video_desc 结构、即梦规则与连续性；支持 review 与分镜 rewrite。\n\n洛水\n官方\n内置\n洛水·批次规划\nv1.0.0\n\n读取 state.json 与 review 闸门，汇报短剧批次进度与阻塞项。\n\n洛水\n官方\n内置\n洛水·批次执行\nv1.0.0\n\n按 state.json 当前步执行单步生产（对齐编排器 8 步流程）。\n\n洛水\n官方\n内置\n洛水·爆款复刻（视频→剧本）\nv1.0.0\n\n爆款复刻：把短剧爆款视频（≤10分钟/集）逐场逐拍还原成专业拍摄级剧本，支持单视频与视频文件夹批量并发处理，失败自动重试，最终整合为一份完整剧本 md。用于拉片、拆解爆款、仿写参考。\n\n洛水\n官方\n内置\n画布\nv1.0.0\n\n在当前画布项目中读取素材，并调用已安装技能与软件内置工具。\n\n洛水\n官方\n内置\nstory-setup-环境部署\nv1.2.10\n\n网文写作工具集基础设施部署与检查。为 Claude Code / OpenCode / Codex / Google Antigravity / ZCode / OpenClaw / Reasonix 提供内置适配；Web AI / 通用 Agent 可走 skills + AGENTS.md 文件模式。触发方式：/story-setup、$story-setup、「准备写书」「帮我搭一下环境」「配置写作项目」「检查写作环境」。\n\nstory-setup\n写小说\n卸载\nstory-short-analyze-短篇拆文\nv3.1.0\n\n短篇网文拆文。拆解爆款短篇小说（番茄短篇 / 故事会 / 知乎盐选 / 追妻 / 世情 / 重生 / 虐渣等通俗题材）的故事核、结构、情感线、反转设计、写作手法、共鸣层次。单一全量拆解管道：跑完 Stage 2-6 产出完整拆文报告，落盘到 拆文库/{书名}/，下游 story-short-write 同时读拆文报告 + 情节节点 + 写作手法 + 原文 + _meta.json 写下一篇。触发方式：/story-short-analyze、/短篇拆文、「拆短篇」「拆这篇短文」「短篇拆文」「精细拆解短篇」「8000 字短篇拆解」「番茄短篇拆文」「故事会拆解」「盐言故事拆解」「分析这篇短篇」——均进入同一管道。\n\nstory-short-analyze\n写短篇\n卸载\nstory-short-scan-短篇扫榜\nv1.0.0\n\n短篇网文扫榜。分析知乎盐言、七猫、黑岩、点众等平台热门短篇数据，捕捉风口题材。触发方式：/story-short-scan、/短篇扫榜、「短篇什么火」「知乎故事排行」。\n\nstory-short-scan\n写短篇\n卸载\nstory-short-write-短篇小说\nv1.0.0\n\n短篇网文写作。辅助短篇小说创作，从构思到成稿，聚焦情绪拉扯与节奏把控。触发方式：/story-short-write、/写短篇、「帮我写一篇短篇」「写个盐言故事」。\n\nstory-short-write\n写短篇\n卸载\nbrowser-cdp-浏览器抓取\nv1.0.0\n\nUse this skill when you need to control a Chrome browser via CDP (Chrome DevTools Protocol) to reuse existing login sessions. Covers: launching Chrome in debug mode, opening URLs, waiting for page load, evaluating JavaScript, taking snapshots, and extracting auth tokens. Trigger phrases: browser automation, CDP, agent-browser, 浏览器操作, 操作浏览器, Chrome CDP, 复用登录态, extract token from browser.\n\nbrowser-cdp\n其他\n卸载\nstory-网文工具箱\nv1.0.0\n\n网络小说工具箱主入口。根据用户需求自动路由到对应 skill，并可管理作者习惯、启动本地 Dashboard。触发方式：/story、$story、/story dashboard、/网文、「我想写小说」「记住我的写作习惯」「打开工作台」「检查更新」。\n\nstory\n写小说\n卸载\nstory-cover-封面生成\nv1.0.0\n\n小说封面生成。根据书名、作者名自动分析题材风格，调用 GPT-Image-2 生成含标题和署名的专业级网文封面；Codex CLI 优先使用内置 ImageGen，无需单独 API Key。触发方式：/story-cover、/封面、「帮我做个封面」「生成封面图」「做个小说封面」「封面设计」。\n\nstory-cover\n写小说\n卸载\nstory-deslop-去AI味\nv1.0.0\n\n网文去AI味。检测并清除文本中的AI写作痕迹，让文字回归自然、非模板化。触发方式：/story-deslop、/去AI味、「去AI味」「这篇太AI了」「网文去AI味」。\n\nstory-deslop\n写小说\n卸载\nstory-import-导入小说\nv1.0.0\n\n逆向导入已有小说。将已写好的小说（半成品或完本）反向解析为标准项目目录结构，兼容 story-long-write / story-short-write 后续写作流程；内部复用 story-long-analyze / story-short-analyze 的拆解管道，按篇幅自动分流。触发方式：/story-import、「导入小说」「反向解析」「导入」「把我的书导进来」。\n\nstory-import\n写小说\n卸载\nstory-long-analyze-长篇拆文\nv1.0.0\n\n长篇网文拆文。深度拆解爆款长篇小说的黄金三章、人设架构、爽点设计、节奏控制。单一深度拆解管道：跑完黄金三章（Stage 1）后产出快速预览报告并询问是否继续全量拆解，确认后从 Stage 2 续跑逐章摘要、聚合分析、设定关系、汇总报告，全程产物落盘 拆文库/{书名}/。触发方式：/story-long-analyze、/长篇拆文、「帮我拆这本书」「拆这本书」「分析黄金三章」「深度拆解」「完整拆解」「系统拆解」或提供小说文本文件路径——全部进入同一管道。\n\nstory-long-analyze\n写小说\n卸载\nstory-long-scan-长篇扫榜\nv1.0.0\n\n长篇网文扫榜。分析起点、番茄、晋江等平台排行榜数据，提炼市场趋势与热门题材。触发方式：/story-long-scan、/长篇扫榜、「长篇什么火」「起点排行」。\n\nstory-long-scan\n写小说\n卸载\nstory-long-write-长篇小说\nv1.0.0\n\n长篇网文写作。从大纲到正文，辅助长篇网络小说的创作，包括世界观、人物、情节线管理。触发方式：/story-long-write、/写长篇、「帮我开书」「写大纲」「日更」「续写」「继续写」「修改第X章」「回炉」「重写第X章」。\n\nstory-long-write\n写小说\n卸载\nstory-review-审稿\nv1.1.1\n\n多视角对抗式审查。full/lean 模式在已部署 reviewer agents 时并行 spawn；缺失/异常 agents 或 spawn 失败时自动降级 solo，参考文件不可读时使用内置 rubric fallback。触发方式：/story-review、/审查、「审查一下」「帮我审一下」。\n\nstory-review\n写小说\n卸载\n长短篇文风-建立知识库\nv1.0.0\n\n小说知识库全流程拆书分析技能：上传TXT小说 → 统计分析 + AI味检测 + 12维度文风分析 + 6类知识提取 + 简介生成 + 深度节奏诊断 + 6维度人味分析。覆盖长篇和短篇小说的文风建模、角色设定提取、情节结构拆解、写作方法论提炼，最终形成可供仿写参考的完整知识库。\n\n长短篇文风-建立知识库\n写短篇\n卸载\n【小洛】完整Skill + Seedance 2.0 的完整 AI 视频制作流程\nv1.0.0\n\n故事/小说→剧本→素材清单(C/S/P)→Seedance 2.0分集分镜→视频延长串联。Agent里说「小洛 Seedance 全流程」即可。\n\nxiaoluo-seedance-pipeline\nSeedance\n卸载\n小云雀 Skills\nv1.0.0\n\n小云雀（Pippit.ai）端到端 Skill：AI 创意生成与编辑、成片下载、海外社媒视频发布与定时调度、任务管理与数据分析。适用于从提示词或参考图/视频素材生成视频、本地下载、TikTok/Facebook 主页/Instagram 排期发布、发布任务增删改查或效果分析；也适用于创作或发布场景的 Access Key 配置。\n\nxiaoyunque-skills\n其他\n卸载\nlibtv-cli\nv1.0.0\n\n>-\n\nlibtv-cli\n其他\n卸载\n情绪导演_Skill_V2.1\nv1.0.0\n\n---\n\n情绪导演_skill_v21\n其他\n卸载\ndreamina-cli\nv1.0.0\n\nUse when an agent needs Dreamina（即梦） login, sessions, task history, or image/video generation through the dreamina CLI.\n\ndreamina-cli\nSeedance\n卸载\nAI影视自动化工作流｜竖屏短剧·中长剧·长剧·电影 IP改编\nv1.1.0\n\n已有小说（番茄/起点 txt）改编影视：评估→策划→分集拍摄剧本。支持竖屏、24集中长剧、拉片、电影。在 Agent 里说「帮我把小说改成竖屏短剧」即可，详见使用指南。\n\nscreen-film-workflow\n短剧剪辑\n卸载\n小说改短剧结构化剧本\nv1.0.0\n\n根据小说章节内容、专家分析结果和改编方案，生成适合国内短剧演绎的结构化文字剧本。适用于小说改短剧、短剧开场设计、剧集节拍清单、爆点前置、3个高压场景开场方案对比、严格 JSON 剧本输出等任务。\n\nhf-novel-to-drama-script\n写小说\n卸载\n和AI一起写小说-题材选择 — 仙侠、都市、悬疑、历史……说你脑子里想的那个就行\nv1.0.0\n\n和 AI 协作写长篇网文（洛水版）。题材可选仙侠、都市、悬疑、历史等；从设定到归档。当用户说帮我写小说、写网文、连载时使用。\n\nai-novel-genre\n写小说\n卸载\nAI小说长篇原创-让 AI 为你写一部完整的中文小说\nv1.0.0\n\n---\n\nai小说长篇原创-让-ai-为你写一部完整的中文小说\n写小说\n卸载\n【小云雀丧尸清道夫同款-seedance 2.0 skills提示词】\nv1.0.0\n\n故事/剧本/分镜草稿 → Seedance 2.0 标准视频提示词，同款小云雀丧尸清道夫影视级风格。支持一镜到底与多机位分镜。\n\nmx-shell_prompts_v15\nSeedance\n卸载\n某乎仿写改编skills\nv1.0.0\n\n某乎盐选风短篇拆书仿写：上传参考小说，拆情绪内核后仿写新篇（约1–1.3万字）。追妻火葬场/大女主/重生/甜宠等。说仿写、拆书、二创时使用。\n\nzhihu-fiction-rewrite\n写短篇\n卸载\ndirector-desk\nv1.0.0\n\n使用导演台工具编辑白模预演，或生成可导入的 .director 工程。适用于布景、走位、运镜和预演检查；纯分镜文案或图像生成不使用。\n\ndirector-desk\n其他\n卸载\n即梦官网 API 视频生成\nv1.0.0\n\n使用即梦/Seedance 2.0 官网 API（火山引擎 Ark）根据提示词和参考图片生成视频。 用户在对话框附带图片 + 提示词，即可一键生成视频。 在 Agent 里说「即梦 API」「Seedance API」「生成 sd 视频」即可触发。 注意：这是即梦官网 API 渠道，不是 CLI 渠道。\n\nseedance-video-api\nSeedance\n卸载\nshuhao-character-refs（角色参考图）\nv1.0.0\n\n给任何故事里的角色真出参考图（小说改编、自己原创的故事、单独设计一个角色都行，不需要小说原文）： 一段话描述角色，拆成分层字段、补全后确认， 先出一张正面全身锚点，其余视图（大头照、90° 侧面、背面、细节、45° 大头照）都只参考这张锚点， 按需分档出图。每张图带标识、可单独重出，重出后自动标出哪些图过期。 支持 Qwen Image（ComfyUI）、codex 内置出图、OpenAI Images API（GPT Image 2）和自定义命令，主图与派生图可以使用不同模型。 产出 asset.json + 一组 PNG + 双击就能开的报告。零依赖。 只要提示词、不出图的话使用 novel-characters。 Use when asked to 出角色图、做角色参考图、给我的角色出图、定妆照、真出三视图、character reference images。\n\nshuhao-character-refs\n其他短剧技能\n卸载\nshuhao-novel-art（美术设定集）\nv2.0.0\n\n给 AI 短剧出美术设定集（场景 + 叙事道具）：场景的设计意图、一致性锚点、光照时段变体、 空景提示词；道具的戏剧功能、状态变体、尺度参照、白底无手提示词。 产出 art.json + Markdown + 单页评审报告（含导出 JSON）。 为 AI 生成而设计，不是实拍——环境和道具都是生成资产，交付的是让它们跨集长一样的一致性方案； 10 道质量门全部由脚本确定性检查（锚点 3–5、无人无手、白底可抠、尺度短语、提示词英文……）。 有 novel-outline 的 outline.json 就用 seed 预填场景清单与出现集。 零依赖、零 API key、不出图——交付的是提示词，出图在下游。 Use when asked to 场景设定、出场景、环境设定集、场景一致性、scene bibles for AI short drama。\n\nshuhao-novel-art\n其他短剧技能\n卸载\nshuhao-novel-characters（角色设定集）\nv1.0.0\n\n从小说或短故事里拆出角色表、人物画像、形象提示词、音色提示词， 其中形象提示词含一张角色设定图的完整版面指令（左半身像 + 右全身三视图 + 细节条）， 产出 JSON + Markdown + 可交互的 report.html。 报告语言可指定（--lang），默认中文，任意语言都支持；零依赖、零 API key、不出图。 Use when asked to 拆小说角色、分析人物、生成角色卡、character sheets from a novel。\n\nshuhao-novel-characters\n其他短剧技能\n卸载\nshuhao-novel-outline（短剧改编大纲）\nv2.0.0\n\n把一本小说改编成短剧大纲五件套：改编说明、人物表、爽点表、分集梗概、资产清单， 产出 outline.json + Markdown + 单页评审报告（KPI 带、关键决策、爽点时间轴、调度矩阵、场景概览、质量门）。 14 道质量门全部由脚本确定性检查（角色分档上限、主场景上限随集数动态、爽点间隔≤3集、每集钩子悬念必填……），不靠模型自觉； 支持体检模式：贴一份现成大纲进来，只跑质量门给诊断。 零依赖、零 API key，用当前会话额度。 Use when asked to 改编大纲、短剧大纲、拆大纲、小说转短剧、adaptation outline。\n\nshuhao-novel-outline\n其他短剧技能\n卸载\nshuhao-novel-script（剧本）\nv2.0.0\n\n给 AI 短剧写剧本：把 novel-outline 的分集梗概落成结构化的场次 + 节拍流（动作节拍与台词行交替）， 台词逐句带说话人与语气，时长逐集按语速确定性折算。产出 script.json + Markdown + 单页评审报告 （时长仪表 / 分集剧本 / 场次总表 / 按角色聚合的台词本，含导出 JSON）。 剧本管戏，分镜管拍——本 skill 不分镜头、无镜号、不写生成提示词，那些是下一层分镜 skill 的活。 10 道质量门全部由脚本确定性检查（每集时长 ±15%、单句 ≤35 字、说话人合法、钩子悬念落纸、 钩子具象前 3 拍内兑现（hookBeat 认领冷开场）、每场至少一个动作节拍、爽点认领、 角色/场景/光照/道具对账上游……）。 有 outline.json 就用 seed 预填每集骨架；给 --art 连光照状态一起对账。 零依赖、零 API key，用当前会话额度。 Use when asked to 写剧本、出剧本、台词、场次、写戏、screenwriting for AI short drama。\n\nshuhao-novel-script\n其他短剧技能\n卸载\nshuhao-novel-storyboard（分镜）\nv2.0.0\n\n给 AI 短剧出分镜：三层结构——段（一次视频生成，≤15 秒）→ 分镜（段内 2–5 秒的剪切，认领剧本节拍） → 分镜图（每切一张关键帧：主分镜图钉 0.00 秒，子分镜图钉各自切点）。 每段自带一条 MiniMax H3 视频提示词（官方口径默认英文、逐镜换行，promptLang 可切中文）：对齐指令和 [Shot k] 切点时刻由分镜结构推导、逐字对账，台词逐字进 <d> 块（写法规范已内化为 references/h3-prompt.md，不依赖外部 skill）。 产出 storyboard.json + Markdown + 单页评审报告（分镜节奏带 / 分集分镜表 / 生成批次单 / 配音对齐单，含导出 JSON）。不出图——交付的是每格的画面提示词和它该挂哪些参考图。 18 道质量门全部由脚本确定性检查（第 18 道 shot-recipe 可选：挂上 shot-recipes 卡库才查，不挂就明说跳过）； export 一键导出 H3 投产包（每段提示词 + 按 Picture 序的分镜图清单）。零依赖、零 API key，用当前会话额度。 Use when asked to 分镜、出分镜、镜头表、切镜、storyboard for AI short drama。\n\nshuhao-novel-storyboard\n其他短剧技能\n卸载\n小云雀短剧创作技能包\nv1.0.0\n\n通过小云雀 CLI 调用短剧 Agent，完成从剧本到视频产物的短剧创作流程。支持原创剧本、续写改写、剧情扩展与分集创作，上传和解析参考剧本，确认当前剧本并分析，规划短剧风格，生成角色与场景图片，再生成故事版、片段视频并合成完整视频。支持多轮创作确认、会话续接、进度查询，以及 AI 剧本大纲、AI 分集正文、jpg 图片和 mp4 视频保留产物的获取与交付。用户要求创作短剧、解析剧本、设计故事版或分镜、制作短剧视频，或查询和获取小云雀短剧任务产物时使用。用户要求独立图片、视频、音频或画布素材创作时，需在当前短剧会话完成剧本解析后再由服务端处理，不强制继续进入后续主流程阶段。\n\nxyq-short-drama-skill\n其他短剧技能\n卸载\n小云雀媒体创作技能包\nv1.0.0\n\n使用小云雀 pippit-tool-cli 生成或编辑图片、生成视频、超分和擦字幕，查询结果并交付媒体；操作小云雀个人或团队 Canvas 画布、节点、布局、连线、角色/场景、生成提示词、3D 导演台与多轨草稿；查询积分及管理授权。用户提到小云雀、xyq 并需要这些操作时使用。\n\nxyq-skill\n画布\n卸载\n【InkOS开源故事创作AI-Agent系统-支持短篇、长篇，同人，仿写创作，番外创作，续写创作，文风设置】\nv1.0.0\n\n【InkOS开源故事创作AI-Agent系统】支持短篇、长篇、同人（canon/au/ooc/cp）、仿写拆书、番外、续写、文风设置、角色与世界观管理、33维质量审计与去AI味。用户说写小说、写故事、同人、番外、续写、仿写、拆书时使用。\n\n【InkOS开源故事创作AI-Agent系统-支持短篇、长篇，同人，仿写创作，番外创作，续写创作，文风设置】\n写短篇\n卸载\n小说性转\nv1.0.0\n\n小说性别转换技能：上传TXT/粘贴小说原文 → 自动提取人物与性别词汇 → 推荐性转名字(用户确认) → 执行全文性别转换 → 质量审查。支持女频转男频、男频转女频，自动处理代词、称谓、外貌描写、行为动作等性别相关内容的转换。\n\n小说性转\n写小说\n卸载\n如何使用： ① 安装 CLI（如即梦 / LibTV）→ ② 导入 Skill 文件夹（含 SKILL.md，或一次选择整个工具包）→ ③ 在卡片上开启 Skill → ④ 在 Agent 输入框输入 / 选用（仅显示已开启的技能）。 也可将 Skill 包文件夹放入 data/agent/skills/installed，或在工作区 skills/{id}/ 放置项目级覆盖；亦可点击「导入 Skill」选择文件夹。工具包（如 oh-story-claudecode）选外层文件夹即可一次导入全部。",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent代理",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新对话",
+      "disabled": false,
+      "rect": {
+        "x": 18,
+        "y": 62,
+        "width": 184,
+        "height": 30
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 208,
+        "y": 62,
+        "width": 30,
+        "height": 30
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "自动任务0",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 100,
+        "width": 224,
+        "height": 35.5
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent 技能52",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 137.5,
+        "width": 224,
+        "height": 35.5
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多",
+      "disabled": false,
+      "rect": {
+        "x": 170,
+        "y": 268.5,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新会话",
+      "disabled": false,
+      "rect": {
+        "x": 204,
+        "y": 268.5,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "置顶",
+      "disabled": false,
+      "rect": {
+        "x": 186,
+        "y": 309.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 210,
+        "y": 309.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1846,
+        "y": 74,
+        "width": 34,
+        "height": 34
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Skills 52",
+      "disabled": false,
+      "rect": {
+        "x": 284,
+        "y": 134,
+        "width": 95.3125,
+        "height": 37
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "MCP 0",
+      "disabled": false,
+      "rect": {
+        "x": 387.3125,
+        "y": 134,
+        "width": 86.5,
+        "height": 37
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Codex 9",
+      "disabled": false,
+      "rect": {
+        "x": 481.8125,
+        "y": 134,
+        "width": 96.65625,
+        "height": 37
+      }
+    },
+    {
+      "index": 23,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索技能...",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 191,
+        "width": 296,
+        "height": 34
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部开启",
+      "disabled": false,
+      "rect": {
+        "x": 1544.765625,
+        "y": 191,
+        "width": 108,
+        "height": 34
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "安装 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1660.765625,
+        "y": 191,
+        "width": 102.828125,
+        "height": 34
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入 Skill",
+      "disabled": false,
+      "rect": {
+        "x": 1771.59375,
+        "y": 191,
+        "width": 108.40625,
+        "height": 34
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部技能 51",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 245,
+        "width": 93.578125,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "官方 14",
+      "disabled": false,
+      "rect": {
+        "x": 377.578125,
+        "y": 245,
+        "width": 68.796875,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "写小说 13",
+      "disabled": false,
+      "rect": {
+        "x": 450.375,
+        "y": 245,
+        "width": 81.078125,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "写短篇 6",
+      "disabled": false,
+      "rect": {
+        "x": 535.453125,
+        "y": 245,
+        "width": 77.09375,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance 4",
+      "disabled": false,
+      "rect": {
+        "x": 616.546875,
+        "y": 245,
+        "width": 93.734375,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧剪辑 1",
+      "disabled": false,
+      "rect": {
+        "x": 714.28125,
+        "y": 245,
+        "width": 88.03125,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "其他短剧技能 7",
+      "disabled": false,
+      "rect": {
+        "x": 806.3125,
+        "y": 245,
+        "width": 114.375,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "画布 1",
+      "disabled": false,
+      "rect": {
+        "x": 924.6875,
+        "y": 245,
+        "width": 63.03125,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "其他 5",
+      "disabled": false,
+      "rect": {
+        "x": 991.71875,
+        "y": 245,
+        "width": 64.5625,
+        "height": 30.75
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1249.578125,
+        "y": 1080.109375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1696.828125,
+        "y": 1080.109375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 468.203125,
+        "y": 1280.5,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 875.40625,
+        "y": 1280.5,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1245.046875,
+        "y": 1280.5,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1618.640625,
+        "y": 1280.5,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 441.078125,
+        "y": 1480.890625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 851.765625,
+        "y": 1480.890625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1256.734375,
+        "y": 1480.890625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1693.515625,
+        "y": 1480.890625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 464.890625,
+        "y": 1681.28125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 872.109375,
+        "y": 1681.28125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1254.84375,
+        "y": 1681.28125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1715.828125,
+        "y": 1681.28125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 535.75,
+        "y": 1881.671875,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 867.171875,
+        "y": 1881.671875,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1217.671875,
+        "y": 1881.671875,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1677.421875,
+        "y": 1881.671875,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 460.140625,
+        "y": 2082.0625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 909.046875,
+        "y": 2082.0625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1322.765625,
+        "y": 2082.0625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1671.046875,
+        "y": 2082.0625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 299,
+        "y": 2282.453125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 916.078125,
+        "y": 2282.453125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1298.890625,
+        "y": 2282.453125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 61,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1652.8125,
+        "y": 2282.453125,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 62,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 498.890625,
+        "y": 2482.84375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 931.875,
+        "y": 2482.84375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 64,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1311.28125,
+        "y": 2482.84375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 65,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1755.46875,
+        "y": 2482.84375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 66,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 526.046875,
+        "y": 2683.234375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 67,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 921.859375,
+        "y": 2683.234375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 68,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1355.609375,
+        "y": 2683.234375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 69,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1738.265625,
+        "y": 2683.234375,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 70,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 413.953125,
+        "y": 2931.625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 71,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 755,
+        "y": 2931.625,
+        "width": 58,
+        "height": 26
+      }
+    },
+    {
+      "index": 72,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卸载 Skill 与关联 CLI",
+      "disabled": false,
+      "rect": {
+        "x": 1235,
+        "y": 2931.625,
+        "width": 58,
+        "height": 26
+      }
+    }
+  ]
+}

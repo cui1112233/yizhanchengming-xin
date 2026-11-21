@@ -1,0 +1,908 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\nAI 推理分析\n1212\ndoubao-seed-evolving-latest-version\n官方\n模型配置\n3D国漫1\nAgent\n1\n剧本\n2\n资产\n3\n分镜\n资产图片在视频生成过程中可以继续生成与更新，无需在当前阶段全部完成，可随时回到此处补充或重新生成。\n人物\n4\n场景\n2\n道具\n0\n3D导演台\n0\nAI音色\n0\n总计\n4\n去画布编辑\n搜索名称/描述/提示词...\n新增角色\n资产分析\n批量生成\n编辑\n暖暖\n设定京市一中的漂亮女学生，被同伴称唤暖暖，容貌如天使却性情娇纵任性，因冰淇淋融化当众将其砸到身旁少年身上，是这场霸凌行为的主导者。\n白衬衣少年\n设定京市一中的男生，被暖暖花钱雇来跑腿买冰淇淋，因冰淇淋融化被当众砸在身上却沉默不辩解，性格冷郁隐忍，侧脸精致如漫画人物。\n卷发少女同伴群像\n设定暖暖身边的几名女同学，坐在看台上，见冰淇淋砸到少年身上后先是一愣，随即露出幸灾乐祸的神情并纷纷开口附和、指责少年，是依附暖暖的小群体。\n操场围观人群\n设定艳阳下聚集在京市一中操场篮球场边的学生群体，比赛进入最后关头时连成一片欢呼呐喊，构成热闹的校园赛场背景人群。\n资产设定已确认\n已确定，可以进入分镜\n下一步\n→",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 460.5625,
+        "y": 115,
+        "width": 57,
+        "height": 28
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "人物4",
+      "disabled": false,
+      "rect": {
+        "x": 69,
+        "y": 264.5,
+        "width": 102,
+        "height": 38
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "场景2",
+      "disabled": false,
+      "rect": {
+        "x": 175,
+        "y": 264.5,
+        "width": 102,
+        "height": 38
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "道具0",
+      "disabled": false,
+      "rect": {
+        "x": 281,
+        "y": 264.5,
+        "width": 102,
+        "height": 38
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "3D导演台0",
+      "disabled": false,
+      "rect": {
+        "x": 387,
+        "y": 264.5,
+        "width": 131.546875,
+        "height": 38
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI音色0",
+      "disabled": false,
+      "rect": {
+        "x": 522.546875,
+        "y": 264.5,
+        "width": 114.53125,
+        "height": 38
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去画布编辑",
+      "disabled": false,
+      "rect": {
+        "x": 730.53125,
+        "y": 269.5,
+        "width": 114,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索名称/描述/提示词...",
+      "disabled": false,
+      "rect": {
+        "x": 876.53125,
+        "y": 269.5,
+        "width": 122,
+        "height": 28
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新增角色",
+      "disabled": false,
+      "rect": {
+        "x": 1451,
+        "y": 269.5,
+        "width": 100,
+        "height": 28
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产分析",
+      "disabled": false,
+      "rect": {
+        "x": 1563,
+        "y": 269.5,
+        "width": 100,
+        "height": 28
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量生成",
+      "disabled": false,
+      "rect": {
+        "x": 1675,
+        "y": 269.5,
+        "width": 100,
+        "height": 28
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "编辑",
+      "disabled": false,
+      "rect": {
+        "x": 1787,
+        "y": 269.5,
+        "width": 72,
+        "height": 28
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 95.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 118.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 141.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 164.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 187.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 210.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 233.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 256.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 279.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 302.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 325.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 396.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 419.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 442.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 465.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 488.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 511.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 534.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 557.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 580.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 603.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 626.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 696.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 719.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 742.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 765.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 788.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 811.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 834.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 857.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 880.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 903.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 926.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 997.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 1020.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 1043.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 1066.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 61,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 1089.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 62,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 1112.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 1135.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 64,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 1158.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 65,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 1181.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 66,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 1204.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 67,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 1227.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 68,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "下一步 →",
+      "disabled": false,
+      "rect": {
+        "x": 989.28125,
+        "y": 987.5,
+        "width": 84.21875,
+        "height": 31
+      }
+    }
+  ]
+}

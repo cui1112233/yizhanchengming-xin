@@ -1,0 +1,1441 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n23\n导出\nAI-CUT Agent\n就绪\n今天想怎么剪？\n\n直接描述剪辑目标，Agent 会自己调用工具改时间线。也可以在 SKILLS 里选「技能创作器」，把流程写成可复用技能。\n\n粗剪成片\n按剧本把这一集粗剪出来，删掉重复和废镜头\n识别字幕\n识别全片字幕，并对照剧本纠正错字\n去口误停顿\n删掉口误、语气词和超过 1 秒的停顿\n配背景音乐\n根据情绪给高潮段落配一段合适的背景音乐\n\nAI-CUT 才更新，可能存在部分问题，请前期以测试为主。\n\nAgent\ngemini-3.1-pro-preview-小鱼漫漫\n我的素材\n转场\n文字稿\n音频\n视觉\n字幕\nSKILLS\n字幕轨道\nT1\n新建\n预览中显示字幕\n样式外观\n字\n黑描边\n字\n简洁白字\n字\n黑底白字\n字\n影院白字\n字\n黑白堆叠\n字\n黄字大标题\n字\n霓虹大写\n字\n灰调衬线\n字\n清爽高亮\n字\n短视频撞色\n字\n故事黄高亮\n字\n粗描边\n字\n绿底堆叠\n\n黑底白字：整句黑底条，经典字幕 · 可拖到预览画面任意位置新建并编辑字幕\n\n显示节奏\n按句/短语\n逐词高亮\n\n一次显示一句话，适合纪录片口播\n\n字幕动效\n无动效\n淡入上浮\n弹性入场\n逐词弹出\n卡拉 OK 脉冲\n\n动效按时间线帧计算，预览与导出保持一致。\n\n手动字幕（1 车道）\n收起\n手动字幕\n新建车道\n删除车道\n开始\ns\n时长\ns\n取播放头\n添加字幕\n双语第二行（可选）\n展开\n逐句编辑\n展开\n预览\n1×\n00:08.00 / 00:08.00\n100%\n16:9\n9:16\n1:1\n4:3\n3:4\n留边\n裁切\n00:08.00\n00.00\n02.00\n04.00\n06.00\n08.00\n10.00\n12.00\n14.00\n16.00\n18.00\n20.00\n22.00\n24.00\n26.00\n28.00\n30.00\n32.00\n34.00\n36.00\n38.00\n40.00\n42.00\n44.00\nTI\n字幕1\n视频1\n00:02.00\nprobe_clip.mp4\n音频1",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "返回工程列表",
+      "disabled": false,
+      "rect": {
+        "x": 1670,
+        "y": 54,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "点击改名",
+      "disabled": false,
+      "rect": {
+        "x": 956.59375,
+        "y": 59,
+        "width": 14.8125,
+        "height": 18
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "撤销",
+      "disabled": true,
+      "rect": {
+        "x": 1698,
+        "y": 54,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "重做",
+      "disabled": true,
+      "rect": {
+        "x": 1728,
+        "y": 54,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "编辑快捷键",
+      "disabled": false,
+      "rect": {
+        "x": 1758,
+        "y": 54,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导出",
+      "disabled": false,
+      "rect": {
+        "x": 1796,
+        "y": 54,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent 运行检查器",
+      "disabled": false,
+      "rect": {
+        "x": 263,
+        "y": 101.5,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "清空对话",
+      "disabled": true,
+      "rect": {
+        "x": 295,
+        "y": 101.5,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起",
+      "disabled": false,
+      "rect": {
+        "x": 327,
+        "y": 101.5,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "粗剪成片按剧本把这一集粗剪出来，删掉重复和废镜头",
+      "disabled": false,
+      "rect": {
+        "x": 30,
+        "y": 461.125,
+        "width": 156.5,
+        "height": 108.1875
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "识别字幕识别全片字幕，并对照剧本纠正错字",
+      "disabled": false,
+      "rect": {
+        "x": 194.5,
+        "y": 461.125,
+        "width": 156.5,
+        "height": 108.1875
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去口误停顿删掉口误、语气词和超过 1 秒的停顿",
+      "disabled": false,
+      "rect": {
+        "x": 30,
+        "y": 577.3125,
+        "width": 156.5,
+        "height": 108.1875
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "配背景音乐根据情绪给高潮段落配一段合适的背景音乐",
+      "disabled": false,
+      "rect": {
+        "x": 194.5,
+        "y": 577.3125,
+        "width": 156.5,
+        "height": 108.1875
+      }
+    },
+    {
+      "index": 25,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "描述这一集要怎么剪… (Enter 发送，Shift+Enter 换行)",
+      "disabled": false,
+      "rect": {
+        "x": 39,
+        "y": 918.5625,
+        "width": 303,
+        "height": 60.421875
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 39,
+        "y": 991.984375,
+        "width": 87.203125,
+        "height": 26
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "当前模型：gemini-3.1-pro-preview-小鱼漫漫（点击切换）",
+      "disabled": false,
+      "rect": {
+        "x": 130.203125,
+        "y": 991.984375,
+        "width": 149.46875,
+        "height": 26
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "设置",
+      "disabled": false,
+      "rect": {
+        "x": 283.671875,
+        "y": 990.984375,
+        "width": 18.328125,
+        "height": 28
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "发送",
+      "disabled": true,
+      "rect": {
+        "x": 310,
+        "y": 988.984375,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "我的素材",
+      "disabled": false,
+      "rect": {
+        "x": 384,
+        "y": 102,
+        "width": 75.90625,
+        "height": 26
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "转场",
+      "disabled": false,
+      "rect": {
+        "x": 461.90625,
+        "y": 102,
+        "width": 51.4375,
+        "height": 26
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "文字稿",
+      "disabled": false,
+      "rect": {
+        "x": 515.34375,
+        "y": 102,
+        "width": 63.671875,
+        "height": 26
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "音频",
+      "disabled": false,
+      "rect": {
+        "x": 581.015625,
+        "y": 102,
+        "width": 51.4375,
+        "height": 26
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "视觉",
+      "disabled": false,
+      "rect": {
+        "x": 634.453125,
+        "y": 102,
+        "width": 51.421875,
+        "height": 26
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "字幕",
+      "disabled": false,
+      "rect": {
+        "x": 687.875,
+        "y": 102,
+        "width": 51.421875,
+        "height": 26
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "SKILLS",
+      "disabled": false,
+      "rect": {
+        "x": 741.296875,
+        "y": 102,
+        "width": 65.703125,
+        "height": 26
+      }
+    },
+    {
+      "index": 37,
+      "tag": "SELECT",
+      "role": "",
+      "label": "T1",
+      "disabled": false,
+      "rect": {
+        "x": 437,
+        "y": 148.5,
+        "width": 315,
+        "height": 19
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建",
+      "disabled": false,
+      "rect": {
+        "x": 758,
+        "y": 145,
+        "width": 42,
+        "height": 26
+      }
+    },
+    {
+      "index": 39,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 181.5,
+        "width": 13,
+        "height": 13
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "白字黑边，粗细按剪映 40",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 233.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "白字无底，适合口播",
+      "disabled": false,
+      "rect": {
+        "x": 524,
+        "y": 233.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "整句黑底条，经典字幕",
+      "disabled": false,
+      "rect": {
+        "x": 665,
+        "y": 233.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "轻阴影，像正片字幕",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 294.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "黑字白底，堆叠两行",
+      "disabled": false,
+      "rect": {
+        "x": 524,
+        "y": 294.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "超大字 + 黄高亮",
+      "disabled": false,
+      "rect": {
+        "x": 665,
+        "y": 294.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全大写 + 彩边光",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 355.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "灰字，偏设计感",
+      "disabled": false,
+      "rect": {
+        "x": 524,
+        "y": 355.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "青底高亮当前词",
+      "disabled": false,
+      "rect": {
+        "x": 665,
+        "y": 355.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "粉红高亮，适合竖屏",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 416.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "白字 + 黄高亮",
+      "disabled": false,
+      "rect": {
+        "x": 524,
+        "y": 416.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "强描边，远看也清晰",
+      "disabled": false,
+      "rect": {
+        "x": 665,
+        "y": 416.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "绿色高亮、可堆叠",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 477.5,
+        "width": 135,
+        "height": 55
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "按句/短语",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 604.9375,
+        "width": 206.5,
+        "height": 26
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "逐词高亮",
+      "disabled": false,
+      "rect": {
+        "x": 593.5,
+        "y": 604.9375,
+        "width": 206.5,
+        "height": 26
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "无动效",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 703.375,
+        "width": 80.1875,
+        "height": 26
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "淡入上浮",
+      "disabled": false,
+      "rect": {
+        "x": 467.1875,
+        "y": 703.375,
+        "width": 80.203125,
+        "height": 26
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "弹性入场",
+      "disabled": false,
+      "rect": {
+        "x": 551.390625,
+        "y": 703.375,
+        "width": 80.203125,
+        "height": 26
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "逐词弹出",
+      "disabled": false,
+      "rect": {
+        "x": 635.59375,
+        "y": 703.375,
+        "width": 80.203125,
+        "height": 26
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卡拉 OK 脉冲",
+      "disabled": false,
+      "rect": {
+        "x": 719.796875,
+        "y": 703.375,
+        "width": 80.203125,
+        "height": 26
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "手动字幕（1 车道）收起",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 782.3125,
+        "width": 417,
+        "height": 32
+      }
+    },
+    {
+      "index": 61,
+      "tag": "SELECT",
+      "role": "",
+      "label": "手动字幕",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 817.8125,
+        "width": 273,
+        "height": 19
+      }
+    },
+    {
+      "index": 62,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建车道",
+      "disabled": false,
+      "rect": {
+        "x": 662,
+        "y": 814.3125,
+        "width": 66,
+        "height": 26
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除车道",
+      "disabled": false,
+      "rect": {
+        "x": 734,
+        "y": 814.3125,
+        "width": 66,
+        "height": 26
+      }
+    },
+    {
+      "index": 64,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "输入字幕文字",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 848.3125,
+        "width": 417,
+        "height": 56
+      }
+    },
+    {
+      "index": 65,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 409,
+        "y": 912.3125,
+        "width": 64,
+        "height": 26
+      }
+    },
+    {
+      "index": 66,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 514.09375,
+        "y": 912.3125,
+        "width": 64,
+        "height": 26
+      }
+    },
+    {
+      "index": 67,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "取播放头",
+      "disabled": false,
+      "rect": {
+        "x": 593.1875,
+        "y": 914.8125,
+        "width": 56,
+        "height": 21
+      }
+    },
+    {
+      "index": 68,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加字幕",
+      "disabled": true,
+      "rect": {
+        "x": 655.1875,
+        "y": 914.8125,
+        "width": 56,
+        "height": 21
+      }
+    },
+    {
+      "index": 69,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "双语第二行（可选）展开",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 965.3125,
+        "width": 417,
+        "height": 32
+      }
+    },
+    {
+      "index": 70,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "逐句编辑展开",
+      "disabled": false,
+      "rect": {
+        "x": 383,
+        "y": 1014.3125,
+        "width": 417,
+        "height": 32
+      }
+    },
+    {
+      "index": 71,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建轨道",
+      "disabled": false,
+      "rect": {
+        "x": 379,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 72,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选择 (A)",
+      "disabled": false,
+      "rect": {
+        "x": 407,
+        "y": 610.953125,
+        "width": 37,
+        "height": 26
+      }
+    },
+    {
+      "index": 73,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "撤销 (Ctrl + Z)",
+      "disabled": true,
+      "rect": {
+        "x": 459,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 74,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "重做 (Ctrl + Shift + Z)",
+      "disabled": true,
+      "rect": {
+        "x": 487,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 75,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "分割 (Ctrl + B)",
+      "disabled": false,
+      "rect": {
+        "x": 528,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 76,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "向左裁剪：藏起播放头左侧，边可以再拖出来",
+      "disabled": false,
+      "rect": {
+        "x": 556,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 77,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "向右裁剪：藏起播放头右侧，边可以再拖出来",
+      "disabled": false,
+      "rect": {
+        "x": 584,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 78,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除 (Backspace)",
+      "disabled": true,
+      "rect": {
+        "x": 612,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 79,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标记 (M)",
+      "disabled": false,
+      "rect": {
+        "x": 653,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 80,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记",
+      "disabled": false,
+      "rect": {
+        "x": 681,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 81,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "变速",
+      "disabled": false,
+      "rect": {
+        "x": 971.65625,
+        "y": 611.953125,
+        "width": 63.609375,
+        "height": 24
+      }
+    },
+    {
+      "index": 82,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1043.265625,
+        "y": 609.953125,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 83,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "主轨磁吸：只收紧视频轨道上的缝隙",
+      "disabled": false,
+      "rect": {
+        "x": 1473.859375,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 84,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "自动吸附 (N)",
+      "disabled": false,
+      "rect": {
+        "x": 1501.859375,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 85,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "联动：移动、切分、删除视频时，同一时间的音频和字幕跟着走",
+      "disabled": false,
+      "rect": {
+        "x": 1529.859375,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 86,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "适配视图 (Shift + Z)",
+      "disabled": false,
+      "rect": {
+        "x": 1570.859375,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 87,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "缩小 (Ctrl + -)",
+      "disabled": false,
+      "rect": {
+        "x": 1598.859375,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 88,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1630.859375,
+        "y": 621.953125,
+        "width": 96,
+        "height": 4
+      }
+    },
+    {
+      "index": 89,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "放大 (Ctrl + =)",
+      "disabled": false,
+      "rect": {
+        "x": 1732.859375,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 90,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量超分",
+      "disabled": false,
+      "rect": {
+        "x": 1805,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 91,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量消除字幕",
+      "disabled": false,
+      "rect": {
+        "x": 1833,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 92,
+      "tag": "SELECT",
+      "role": "",
+      "label": "16:99:161:14:33:4留边裁切",
+      "disabled": false,
+      "rect": {
+        "x": 1861,
+        "y": 611.953125,
+        "width": 15,
+        "height": 24
+      }
+    },
+    {
+      "index": 93,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全屏预览",
+      "disabled": false,
+      "rect": {
+        "x": 1878,
+        "y": 610.953125,
+        "width": 26,
+        "height": 26
+      }
+    },
+    {
+      "index": 94,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "自动更新",
+      "disabled": false,
+      "rect": {
+        "x": 462,
+        "y": 687.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 95,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "字幕样式",
+      "disabled": false,
+      "rect": {
+        "x": 482,
+        "y": 687.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 96,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全选此轨道",
+      "disabled": false,
+      "rect": {
+        "x": 502,
+        "y": 687.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 97,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除轨道",
+      "disabled": false,
+      "rect": {
+        "x": 522,
+        "y": 687.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 98,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "锁定轨道",
+      "disabled": false,
+      "rect": {
+        "x": 546,
+        "y": 687.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 99,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "隐藏轨道",
+      "disabled": false,
+      "rect": {
+        "x": 566,
+        "y": 687.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 100,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全选此轨道",
+      "disabled": false,
+      "rect": {
+        "x": 502,
+        "y": 743.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 101,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除轨道",
+      "disabled": false,
+      "rect": {
+        "x": 522,
+        "y": 743.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 102,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "锁定轨道",
+      "disabled": false,
+      "rect": {
+        "x": 546,
+        "y": 743.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 103,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "隐藏轨道",
+      "disabled": false,
+      "rect": {
+        "x": 566,
+        "y": 743.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 104,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "静音轨道",
+      "disabled": false,
+      "rect": {
+        "x": 586,
+        "y": 743.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 105,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全选此轨道",
+      "disabled": false,
+      "rect": {
+        "x": 502,
+        "y": 799.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 106,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除轨道",
+      "disabled": false,
+      "rect": {
+        "x": 522,
+        "y": 799.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 107,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "锁定轨道",
+      "disabled": false,
+      "rect": {
+        "x": 546,
+        "y": 799.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 108,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "隐藏轨道",
+      "disabled": false,
+      "rect": {
+        "x": 566,
+        "y": 799.953125,
+        "width": 20,
+        "height": 20
+      }
+    },
+    {
+      "index": 109,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "静音轨道",
+      "disabled": false,
+      "rect": {
+        "x": 586,
+        "y": 799.953125,
+        "width": 20,
+        "height": 20
+      }
+    }
+  ]
+}

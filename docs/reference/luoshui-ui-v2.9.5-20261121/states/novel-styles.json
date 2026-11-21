@@ -1,0 +1,453 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n开始创作\n长篇原创\n短篇原创\n仿写长篇\n仿写短篇\n番外创作\n续写创作\n我的作品\n0\n还没有作品\n会话记录\n当前分类暂无会话，点击下方新建\n新建会话\n写作风格\n导入素材\nAgent 设置\n定时写作\n数据看板\n备忘录\n← 返回对话\n写作风格\n\n在此管理写作风格知识库：新建名称、粘贴参考文本，或导入 txt / md / docx 等文件（可多选）。\n\n新建风格\n风格名称\n例如：金庸武侠、知乎盐选、某作者口语风\n参考文本（可粘贴）\n直接粘贴样章、段落或写作要求……\n文风指南（可选，留空则保存时自动分析）\n可手写可执行的文风规则；不填则根据参考文本自动生成\n导入文件\n保存\n已有风格\n还没有风格。请在上方新建并保存。\n已选 0 项用于对话参考\n应用",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "长篇原创",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 96.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短篇原创",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 96.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "仿写长篇",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 167.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "仿写短篇",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 167.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "番外创作",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 238.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "续写创作",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 238.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "我的作品0",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 325.5,
+        "width": 231,
+        "height": 36.5
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "会话记录",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 418,
+        "width": 235,
+        "height": 36.5
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建会话",
+      "disabled": false,
+      "rect": {
+        "x": 32,
+        "y": 494.5,
+        "width": 231,
+        "height": 34
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "写作风格",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 555.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入素材",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 596.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent 设置",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 637.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "定时写作",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 678.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "数据看板",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 719.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "备忘录",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 760.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "← 返回对话",
+      "disabled": false,
+      "rect": {
+        "x": 300,
+        "y": 69,
+        "width": 66.78125,
+        "height": 19.5
+      }
+    },
+    {
+      "index": 28,
+      "tag": "INPUT",
+      "role": "",
+      "label": "例如：金庸武侠、知乎盐选、某作者口语风",
+      "disabled": false,
+      "rect": {
+        "x": 307,
+        "y": 244.796875,
+        "width": 1574,
+        "height": 34
+      }
+    },
+    {
+      "index": 29,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "直接粘贴样章、段落或写作要求……",
+      "disabled": false,
+      "rect": {
+        "x": 307,
+        "y": 316.296875,
+        "width": 1574,
+        "height": 147.390625
+      }
+    },
+    {
+      "index": 30,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "可手写可执行的文风规则；不填则根据参考文本自动生成",
+      "disabled": false,
+      "rect": {
+        "x": 307,
+        "y": 501.1875,
+        "width": 1574,
+        "height": 80.1875
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入文件",
+      "disabled": false,
+      "rect": {
+        "x": 1743,
+        "y": 593.375,
+        "width": 84,
+        "height": 34
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存",
+      "disabled": false,
+      "rect": {
+        "x": 1837,
+        "y": 593.375,
+        "width": 56,
+        "height": 34
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "应用",
+      "disabled": false,
+      "rect": {
+        "x": 1832,
+        "y": 994,
+        "width": 56,
+        "height": 34
+      }
+    }
+  ]
+}

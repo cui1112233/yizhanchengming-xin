@@ -1,0 +1,752 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n11 步学会做短剧\n半个小时，\n做出第一条短剧。\n\n只需要11步学会使用软件、写剧本、出资产、分镜、导出剪辑、自动配bgm、自动分段视频等功能\n\n从第 1 步开始\n11 步教程 · 已完成 0 步\n写剧本\n导入原文再改一版\n出资产\n人物、场景、道具\n出视频\n剪辑、配乐、上剧\n跟着这 11 步做\n和飞书教程 1 的顺序一致\n01\n基础设置\n02\n下载小说\n03\n写剧本\n04\n人物资产\n05\n分镜脚本\n06\n导入创作\n07\n批量制作\n08\n制作视频\n09\n剪辑配乐\n10\n分段上剧\n11\n上传短剧\n11 步，一步一张卡片\n\n每一步都保留飞书教程里的说法，配图也是文档里的原图。\n\n搜索步骤，例如：分镜、剪映、BGM\n全部 11\n准备 2\n剧本与资产 4\n制作视频 2\n剪辑上剧 3\n01\nSTEP 01 · 准备\n01\n/ 11\n目录和接口已保存\n基础设置\n\n保存目录、剪映目录和 API\n\n3 项要做\n开始学习\n02\nSTEP 02 · 准备\n02\n/ 11\n可导入的小说文件\n下载小说\n\n先准备小说原文\n\n1 项要做\n开始学习\n03\nSTEP 03 · 剧本与资产\n03\n/ 11\n改过的剧本\n导入小说原文写剧本\n\n导入原文，生成并修改剧本\n\n3 项要做\n开始学习\n04\nSTEP 04 · 剧本与资产\n04\n/ 11\n人物、场景、道具图\n人物资产分析和生成\n\n推理人物、场景、道具并出图\n\n3 项要做\n开始学习\n05\nSTEP 05 · 剧本与资产\n05\n/ 11\n分镜脚本\n出分镜脚本\n\n规划小节并生成分镜词\n\n10 项要做\n开始学习\n06\nSTEP 06 · 剧本与资产\n06\n/ 11\n剧本创作里的分镜\n导入剧本创作\n\n把剧本导入创作页\n\n1 项要做\n开始学习\n07\nSTEP 07 · 制作视频\n07\n/ 11\n合并后的视频编辑页\n剧本创作视频编辑页面\n\n全选后进入视频编辑\n\n1 项要做\n开始学习\n08\nSTEP 08 · 制作视频\n08\n/ 11\n可导出到剪映的视频\n开始制作视频\n\n选引擎、加前缀、批量出视频\n\n6 项要做\n开始学习\n09\nSTEP 09 · 剪辑上剧\n09\n/ 11\n带背景音乐的成片\n剪映视频剪辑和自动配 BGM\n\n剪映精剪，再用插件配乐\n\n1 项要做\n开始学习\n10\nSTEP 10 · 剪辑上剧\n10\n/ 11\n按集切开的视频\n导出视频分段上剧\n\n把成片按集分段\n\n1 项要做\n开始学习\n11\nSTEP 11 · 剪辑上剧\n11\n/ 11\n已提交的短剧\n上传短剧\n\n按教程把成片传上去\n\n1 项要做\n开始学习\n按飞书「教程1」的 11 步整理，配图来自同一篇文档。\n打开飞书教程",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "首页",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 64,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 3,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "小说创作",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 101,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 4,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 138,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 5,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "音色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 175,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 6,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "漫剧解说1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 212,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 7,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "短剧工作室0",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 270,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 8,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "剧本创作1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 307,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 9,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "momo画布2",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 344,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 10,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "绘画",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 381,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 11,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "AI-CUT",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 441,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 12,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 501,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 13,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "插件",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 538,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "社区186",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 575,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "我的资产",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 612,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 16,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "反馈",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 649,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "在线客服",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 686,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从第 1 步开始",
+      "disabled": false,
+      "rect": {
+        "x": 503,
+        "y": 289.234375,
+        "width": 153.3125,
+        "height": 40
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "01基础设置",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 410.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "02下载小说",
+      "disabled": false,
+      "rect": {
+        "x": 777.25,
+        "y": 410.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "03写剧本",
+      "disabled": false,
+      "rect": {
+        "x": 1084.5,
+        "y": 410.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "04人物资产",
+      "disabled": false,
+      "rect": {
+        "x": 1391.75,
+        "y": 410.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "05分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 465.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "06导入创作",
+      "disabled": false,
+      "rect": {
+        "x": 777.25,
+        "y": 465.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "07批量制作",
+      "disabled": false,
+      "rect": {
+        "x": 1084.5,
+        "y": 465.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "08制作视频",
+      "disabled": false,
+      "rect": {
+        "x": 1391.75,
+        "y": 465.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "09剪辑配乐",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 520.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "10分段上剧",
+      "disabled": false,
+      "rect": {
+        "x": 777.25,
+        "y": 520.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "11上传短剧",
+      "disabled": false,
+      "rect": {
+        "x": 1084.5,
+        "y": 520.234375,
+        "width": 298.25,
+        "height": 46
+      }
+    },
+    {
+      "index": 39,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索教程",
+      "disabled": false,
+      "rect": {
+        "x": 1438,
+        "y": 603.921875,
+        "width": 220,
+        "height": 34
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部 11",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 669.625,
+        "width": 71.078125,
+        "height": 36
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "准备 2",
+      "disabled": false,
+      "rect": {
+        "x": 549.078125,
+        "y": 669.625,
+        "width": 65.6875,
+        "height": 36
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剧本与资产 4",
+      "disabled": false,
+      "rect": {
+        "x": 622.765625,
+        "y": 669.625,
+        "width": 101.6875,
+        "height": 36
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "制作视频 2",
+      "disabled": false,
+      "rect": {
+        "x": 732.453125,
+        "y": 669.625,
+        "width": 89.6875,
+        "height": 36
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剪辑上剧 3",
+      "disabled": false,
+      "rect": {
+        "x": 830.140625,
+        "y": 669.625,
+        "width": 89.6875,
+        "height": 36
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 1 步：基础设置",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 727.625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 2 步：下载小说",
+      "disabled": false,
+      "rect": {
+        "x": 780,
+        "y": 727.625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 3 步：导入小说原文写剧本",
+      "disabled": false,
+      "rect": {
+        "x": 1090,
+        "y": 727.625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 4 步：人物资产分析和生成",
+      "disabled": false,
+      "rect": {
+        "x": 1400,
+        "y": 727.625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 5 步：出分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 1069.515625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 6 步：导入剧本创作",
+      "disabled": false,
+      "rect": {
+        "x": 780,
+        "y": 1069.515625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 7 步：剧本创作视频编辑页面",
+      "disabled": false,
+      "rect": {
+        "x": 1090,
+        "y": 1069.515625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 8 步：开始制作视频",
+      "disabled": false,
+      "rect": {
+        "x": 1400,
+        "y": 1069.515625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 9 步：剪映视频剪辑和自动配 BGM",
+      "disabled": false,
+      "rect": {
+        "x": 470,
+        "y": 1411.40625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 10 步：导出视频分段上剧",
+      "disabled": false,
+      "rect": {
+        "x": 780,
+        "y": 1411.40625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "学习第 11 步：上传短剧",
+      "disabled": false,
+      "rect": {
+        "x": 1090,
+        "y": 1411.40625,
+        "width": 290,
+        "height": 321.890625
+      }
+    },
+    {
+      "index": 56,
+      "tag": "A",
+      "role": "",
+      "label": "打开飞书教程",
+      "disabled": false,
+      "rect": {
+        "x": 1607,
+        "y": 1786.296875,
+        "width": 83,
+        "height": 19.796875
+      }
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+[
+  {
+    "id": "plugin-01",
+    "name": "资产参考",
+    "entry": "去使用资产参考NEW文生图/多图参考快速出图",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-02",
+    "name": "角色修改",
+    "entry": "去使用角色修改批量修改角色名称属性",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-03",
+    "name": "封面生成",
+    "entry": "去使用封面生成AI智能生成精美封面图",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-04",
+    "name": "角色三视图",
+    "entry": "去使用角色三视图一键生成人物三视图",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-05",
+    "name": "AI-分段",
+    "entry": "去使用AI-分段NEW按主轨道 / 文本轨道 / AI对照剧本分集切割",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-06",
+    "name": "AI-CUT插件版",
+    "entry": "去使用AI-CUT插件版NEWAI-CUT草稿插件版",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-07",
+    "name": "AI-Shot",
+    "entry": "去使用AI-ShotNEW按剧本和字幕从成片里抽宣传高光，只在片段交界下刀",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-08",
+    "name": "AI-Upscale",
+    "entry": "去使用AI-UpscaleNEW批量超分视频。支持火山、云端、Picsart CLI 和本地显卡",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-09",
+    "name": "AI-Split",
+    "entry": "去使用AI-SplitNEW按画面变化切开剪映主轨道上的每个视频",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-10",
+    "name": "分镜大师",
+    "entry": "去使用分镜大师智能生成分镜脚本",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-11",
+    "name": "草稿合并",
+    "entry": "去使用草稿合并多选剪映草稿按顺序合成一份",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-12",
+    "name": "剪映关键帧",
+    "entry": "去使用剪映关键帧为剪映草稿添加关键帧动画",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-13",
+    "name": "AI-Subtitle",
+    "entry": "去使用AI-SubtitleNEW对照剧本修正剪映语音识别错别字",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-14",
+    "name": "AI-Filler",
+    "entry": "去使用AI-FillerNEW对照剧本删掉单独成行的呵、嗯、啊、哼、哈哈、哦哦、呵呵",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-15",
+    "name": "AI-双语字幕",
+    "entry": "去使用AI-双语字幕NEW把剪映字幕译成另一种语言，新建一条位置更高的字幕轨",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-16",
+    "name": "AI-BGM",
+    "entry": "去使用AI-BGMNEW按剧本和字幕从曲库选乐，写入剪映同一条 BGM 轨",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-17",
+    "name": "字幕对轴",
+    "entry": "去使用字幕对轴字幕时间轴对齐调整",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-18",
+    "name": "声音克隆",
+    "entry": "去使用声音克隆AI克隆个性化音色",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-19",
+    "name": "字幕合并",
+    "entry": "去使用字幕合并多条字幕智能合并处理",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-20",
+    "name": "音色设计",
+    "entry": "去使用音色设计AI智能设计角色音色",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-21",
+    "name": "小说转剧",
+    "entry": "去使用小说转剧中长篇·纯对话版",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-22",
+    "name": "AI改文",
+    "entry": "去使用AI改文智能改写文本，优化表达",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-23",
+    "name": "爆款开头",
+    "entry": "去使用爆款开头生成吸引人的开头文案",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-24",
+    "name": "女频性转",
+    "entry": "去使用女频性转女频小说性别转换改写",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "id": "plugin-25",
+    "name": "格式化文本",
+    "entry": "去使用格式化文本文本格式整理与规范化",
+    "status": "captured",
+    "note": "仅进入界面，未运行处理"
+  },
+  {
+    "entry": "去使用长篇拆书长篇小说智能拆分章节",
+    "status": "unresolved",
+    "note": "已尝试进入；原版宿主窗口最小化，CDP截图超时/不可用；恢复WebView边界与再次采集仍失败，未伪造截图。"
+  },
+  {
+    "entry": "去使用世界观构建小说世界观设定",
+    "status": "unresolved",
+    "note": "已尝试进入；原版宿主窗口最小化，CDP截图超时/不可用；恢复WebView边界与再次采集仍失败，未伪造截图。"
+  },
+  {
+    "entry": "去使用文档合并按章节规则批量合并TXT",
+    "status": "unresolved",
+    "note": "已尝试进入；原版宿主窗口最小化，CDP截图超时/不可用；恢复WebView边界与再次采集仍失败，未伪造截图。"
+  },
+  {
+    "entry": "去使用书名生成智能生成吸引人的书名",
+    "status": "unresolved",
+    "note": "已尝试进入；原版宿主窗口最小化，CDP截图超时/不可用；恢复WebView边界与再次采集仍失败，未伪造截图。"
+  }
+]

@@ -1,0 +1,518 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n开始创作\n长篇原创\n短篇原创\n仿写长篇\n仿写短篇\n番外创作\n续写创作\n我的作品\n0\n还没有作品\n会话记录\n当前分类暂无会话，点击下方新建\n新建会话\n写作风格\n导入素材\nAgent 设置\n定时写作\n数据看板\n备忘录\n← 返回\n定时写作\n← 返回\n自动写作调度器\n状态：\n已停止\n写作间隔（分钟）\n每日上限\n连续失败暂停阈值\n启动调度器",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "长篇原创",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 96.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短篇原创",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 96.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "仿写长篇",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 167.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "仿写短篇",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 167.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "番外创作",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 238.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "续写创作",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 238.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "我的作品0",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 325.5,
+        "width": 231,
+        "height": 36.5
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "会话记录",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 418,
+        "width": 235,
+        "height": 36.5
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建会话",
+      "disabled": false,
+      "rect": {
+        "x": 32,
+        "y": 494.5,
+        "width": 231,
+        "height": 34
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "写作风格",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 555.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入素材",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 596.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent 设置",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 637.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "定时写作",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 678.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "数据看板",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 719.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "备忘录",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 760.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "← 返回",
+      "disabled": false,
+      "rect": {
+        "x": 292,
+        "y": 60,
+        "width": 52.78125,
+        "height": 23.5
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "← 返回",
+      "disabled": false,
+      "rect": {
+        "x": 308,
+        "y": 129.5,
+        "width": 40.78125,
+        "height": 19.5
+      }
+    },
+    {
+      "index": 29,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 318,
+        "y": 256.5,
+        "width": 1514,
+        "height": 28
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1836,
+        "y": 261.5,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1854,
+        "y": 261.5,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 32,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 318,
+        "y": 322,
+        "width": 1514,
+        "height": 28
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1836,
+        "y": 327,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1854,
+        "y": 327,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 35,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 318,
+        "y": 387.5,
+        "width": 1514,
+        "height": 28
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1836,
+        "y": 392.5,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1854,
+        "y": 392.5,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "启动调度器",
+      "disabled": false,
+      "rect": {
+        "x": 308,
+        "y": 427.5,
+        "width": 1572,
+        "height": 34
+      }
+    }
+  ]
+}

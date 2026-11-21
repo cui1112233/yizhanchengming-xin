@@ -1,0 +1,596 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n提交反馈\n请勿发送违规、不合法的信息，违者封号处理。请合理使用该功能。\n全部反馈\n37\n我的反馈\n0\n消息提醒\n全部状态\n最新发布\n推理模型下拉框，加一个“最近使用”的分栏 或者 自带上一次的记忆，不用老是切换。\n待处理\n\n推理模型下拉框，加一个“最近使用”的分栏 或者 自带上一次的记忆，不用老是切换。\n\n啊啊啊666\n·\n功能建议\n·\n2026-11-13 15:59\n-\n2\n19\n资产分析没有衍生角色了\n待处理\n\n之前一部剧人物资产分析不同剧情会有不同的角色穿着，现在没有了，从头到尾都一个角色\n\nz6896377\n·\n问题反馈\n·\n2026-11-11 17:17\n-\n4\n30\n合并创作合并不了\n待处理\n\n剧本创作批量制作合并不了\n\n568834204@qq.com\n·\n问题反馈\n·\n2026-11-09 10:57\n-\n1\n32\n剧本创作里，分镜词找不到V9了\n待处理\n\n剧本创作里，分镜词找不到V9了\n\n1589255977@qq.com\n·\n问题反馈\n·\n2026-11-07 10:40\n-\n0\n34\n识别不了剪映草稿是怎么回事\n待处理\n\n对照剧本识别剪映错别字，识别不了剪映草稿，是不能用了吗\n\n445255921@qq.com\n·\n问题反馈\n·\n2026-11-05 22:32\n-\n1\n28\n真人写实前缀-出资产等\n待处理\n\n真人前缀出资产 超写实新中式影视游戏角色定妆设定集风格，超写实国风影视级角色定妆照，真人写实，真人质感、photorealistic, hyper realistic\n\n无人知晓\n·\n其他\n·\n2026-11-01 17:26\n-\n0\n51\n作品-批量生成分镜词教程2\n已解决\n\n我们详细说一下ai分镜词的内容， 这里不讨论agent流程。 主要是使用ai分镜按钮去批量生分镜词的流程 作品-剧本-AI分镜【请务必选择规划小节、选择更小小节，如果是sd2.5 请选择2.5 专项】-----规划是检查资产、规划多少分镜小节的内容。 1--每一集都有对应的规划--然后选择这个规划文件去【开始分镜】按钮就可以了。可以多集批量\n\n+2\n无人知晓\n·\n功能建议\n·\n2026-10-30 14:15\n-\n0\n73\n如何批量生成分镜词？-使用agent-作品-agent\n已解决\n\n如何批量生成分镜词【比如20集剧本-生成20个集分镜词】---建议使用agent批量或者每5集的跑 至于规划或者不规划，这个看自己，我一般是不规划 逻辑是 第一集剧本---生成规划文件（主要是规划小节-多少小节，资产是否齐全，是否需要补人物、场景、道具）--规划之后开始写分镜词（默认是读取AI分镜按钮里面的下拉框选择）-可以提前选好，也可以告诉agen\n\n无人知晓\n·\n其他\n·\n2026-10-30 13:10\n-\n0\n42\n如何批量自动生成剧本【推荐写剧本opus5.5 ，glm5.3、gemini 4】\n已解决\n\n如何批量自动生成剧本， 打开作品-导入小说原文 默认是3集生成1集剧本内容【大约4000字左右】。 在小说界面，打开agent 输入生成5集剧本，软件自动执行 【推荐写剧本opus5.5 ，glm5.3、gemini 4】\n\n无人知晓\n·\n其他\n·\n2026-10-30 12:13\n-\n0\n32\nAIbgm插件读取剪映草稿失败\n已解决\n\nAIBGM插件读取剪映草稿失败\n\n1589255977@qq.com\n·\n问题反馈\n·\n2026-10-30 12:01\n-\n2\n34\n洛水软件如何多开？\n已解决\n\n1、复制安装包解压到不同的文件夹 2、基础数据保存目录不要设置同一个位置\n\n无人知晓\n·\n其他\n·\n2026-10-28 16:15\n-\n0\n18\n3d默认前缀和风格，也可以是前缀和风格一起\n待处理\n\n3d前缀指令：国产 3D 风，3D 动漫 CG，游戏 CG，OC 渲染质感，皮肤细腻，材质与细节丰富，质感高级。，皮肤质感，皮肤细腻，背景：白色背景，全身像，视觉冲击力，光影交错， 材质，细节复杂，质感细腻、高细节，3D动漫CGOC染质感，\n\n无人知晓\n·\n功能建议\n·\n2026-10-28 12:15\n-\n0\n40\n作品-模型配置-核心指令-3d\n待处理\n\n1--常见的3d人物核心，3D渲染，CG动画风格，游戏原画，国风3D动漫，二次元 2--常见的场景，3D渲染，CG动画风格，游戏原画，国风3D动漫，二次元，广角镜头\n\n无人知晓\n·\n其他\n·\n2026-10-28 11:47\n-\n0\n30\n遇到分镜错误的问题 ？\n已解决\n\n这种错误一般是资产里面有点的存在，比如王云·睡衣这种，不允许这种存在，可以是王云-睡衣\n\n无人知晓\n·\n其他\n·\n2026-10-28 09:56\n-\n0\n22\n新版大师3D推理发型衣服穿着好丑好丑\n待处理\n\n人物穿着风格不统一，发型发色设计很难看，衣服穿搭不符合剧情\n\n+2\n568834204@qq.com\n·\n问题反馈\n·\n2026-10-26 23:44\n-\n1\n52\n1\n2\n提交反馈\n\n以 choushiyiguai1（choushiyiguai1）的身份发布\n\n功能建议\n问题反馈\n体验优化\n其他\n标题：一句话概括你的反馈\n0 / 50\n详细描述：操作步骤、期望效果、实际表现…\n0 / 2000\nCtrl + V 直接粘贴截图，或拖拽 / 点击选择图片\n0/9\n \n我已知悉：请勿发送违规、不合法的信息，违者封号处理。请合理使用该功能。\n取消\n发布",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "首页",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 64,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 3,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "小说创作",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 101,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 4,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 138,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 5,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "音色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 175,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 6,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "漫剧解说1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 212,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 7,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "短剧工作室0",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 270,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 8,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "剧本创作1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 307,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 9,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "momo画布2",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 344,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 10,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "绘画",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 381,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 11,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "AI-CUT",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 441,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 12,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 501,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 13,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "插件",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 538,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "社区186",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 575,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "我的资产",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 612,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 16,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "反馈",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 649,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "在线客服",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 686,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索反馈标题、内容或用户…",
+      "disabled": false,
+      "rect": {
+        "x": 670,
+        "y": 82.5,
+        "width": 681,
+        "height": 21
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1374,
+        "y": 72,
+        "width": 42,
+        "height": 42
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "提交反馈",
+      "disabled": false,
+      "rect": {
+        "x": 1424,
+        "y": 72,
+        "width": 108,
+        "height": 42
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部反馈37",
+      "disabled": false,
+      "rect": {
+        "x": 628,
+        "y": 162,
+        "width": 75.109375,
+        "height": 41
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "我的反馈0",
+      "disabled": false,
+      "rect": {
+        "x": 725.109375,
+        "y": 162,
+        "width": 68.46875,
+        "height": 41
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息提醒",
+      "disabled": false,
+      "rect": {
+        "x": 815.578125,
+        "y": 162,
+        "width": 100,
+        "height": 41
+      }
+    },
+    {
+      "index": 33,
+      "tag": "DIV",
+      "role": "",
+      "label": "全部状态",
+      "disabled": false,
+      "rect": {
+        "x": 1308,
+        "y": 164.5,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 34,
+      "tag": "DIV",
+      "role": "",
+      "label": "最新发布",
+      "disabled": false,
+      "rect": {
+        "x": 1424,
+        "y": 164.5,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1228,
+        "y": 271.296875,
+        "width": 30,
+        "height": 30
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "功能建议",
+      "disabled": false,
+      "rect": {
+        "x": 662,
+        "y": 339.546875,
+        "width": 143,
+        "height": 68.75
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "问题反馈",
+      "disabled": false,
+      "rect": {
+        "x": 813,
+        "y": 339.546875,
+        "width": 143,
+        "height": 68.75
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "体验优化",
+      "disabled": false,
+      "rect": {
+        "x": 964,
+        "y": 339.546875,
+        "width": 143,
+        "height": 68.75
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "其他",
+      "disabled": false,
+      "rect": {
+        "x": 1115,
+        "y": 339.546875,
+        "width": 143,
+        "height": 68.75
+      }
+    },
+    {
+      "index": 40,
+      "tag": "INPUT",
+      "role": "",
+      "label": "标题：一句话概括你的反馈",
+      "disabled": false,
+      "rect": {
+        "x": 674,
+        "y": 420.296875,
+        "width": 533.59375,
+        "height": 34
+      }
+    },
+    {
+      "index": 41,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "详细描述：操作步骤、期望效果、实际表现…",
+      "disabled": false,
+      "rect": {
+        "x": 674,
+        "y": 466.296875,
+        "width": 568,
+        "height": 147.390625
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Ctrl + V 直接粘贴截图，或拖拽 / 点击选择图片0/9",
+      "disabled": false,
+      "rect": {
+        "x": 673,
+        "y": 636.6875,
+        "width": 574,
+        "height": 72
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "取消",
+      "disabled": false,
+      "rect": {
+        "x": 1138,
+        "y": 750.6875,
+        "width": 56,
+        "height": 34
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "发布",
+      "disabled": true,
+      "rect": {
+        "x": 1202,
+        "y": 750.6875,
+        "width": 56,
+        "height": 34
+      }
+    }
+  ]
+}

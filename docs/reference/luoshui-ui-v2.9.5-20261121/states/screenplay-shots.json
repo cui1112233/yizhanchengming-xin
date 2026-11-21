@@ -1,0 +1,349 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\nAI 推理分析\n1212\ndoubao-seed-evolving-latest-version\n官方\n模型配置\n3D国漫1\nAgent\n1\n剧本\n2\n资产\n3\n分镜\n\n新增模型强度：便宜的模型建议全部开启 Max 思考强度。\n\n使用须知\n\nCodex：请先在 Skills 中验证后再使用\n空氧模型：请注意网络环境\n官方模型：请查看教程申请认证 / 官方充值；部分官方模型还需开通对应模型功能才可使用\nOpenRouter：请注意网络环境\n可关闭，关闭后不再显示\n\n温馨提示：请注意剧本格式。正常格式是：\n\n第1集\n1-1 场景1\n1-2 场景2\n1-3 场景3\n……\n\n注意：如果识别不到标识，软件无法批量并发，只能把第一集全部发出去；即梦的每一小节字数都在 2000 到 6000 左右，AI 无法回复完成，会导致提示 AI 返回 JSON 无效。\n\n可关闭，关闭后不再显示\n分镜\n共 1 集 · 已生成 1 集 · 3 个分镜 · 总时长 37秒\n分镜词\n前缀\n预设补充\n上下文\n规划设置\n标准\n导入\n批量\n检查\n失败\nEPISODE\n01\n已生成\n第1章\n角色 4\n·\n场景 1\n·\n分镜 3\n·\n时长 37秒\n·\n字数 394\n文字梳理：艳阳高照，京市一中的操场上欢呼呐喊声连成一片，篮球场上的比赛已经到了最后关头，场边围观的人也在不断呐喊加油…… 看台上，几个青春靓丽的女生坐在一起，穿着白衬衣的少年站在旁边。 坐在少年旁边的是一个格外漂亮的少女，亚麻色长马尾微卷着搭在肩上，皮肤白皙，五官极其精致。 她的容貌就像最漂亮纯洁的天使，可脸上的笑容却十分邪恶，…\n重新生成\n编辑\n导入\n查看剧本\n查看规划\n查看脚本\n资产补充\n删除",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 460.5625,
+        "y": 115,
+        "width": 57,
+        "height": 28
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭后不再显示",
+      "disabled": false,
+      "rect": {
+        "x": 1578.5,
+        "y": 199,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭后不再显示",
+      "disabled": false,
+      "rect": {
+        "x": 1578.5,
+        "y": 378,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量导入：一次选择多集 JSON 分镜脚本并自动匹配集数",
+      "disabled": false,
+      "rect": {
+        "x": 1325.5,
+        "y": 581,
+        "width": 68,
+        "height": 30
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量",
+      "disabled": false,
+      "rect": {
+        "x": 1401.5,
+        "y": 581,
+        "width": 68,
+        "height": 30
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "重新生成",
+      "disabled": false,
+      "rect": {
+        "x": 457.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "编辑",
+      "disabled": false,
+      "rect": {
+        "x": 573.5,
+        "y": 802.875,
+        "width": 80,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入分镜：从文件导入该集的分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 661.5,
+        "y": 802.875,
+        "width": 80,
+        "height": 28
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "显示当前分集的剧本内容",
+      "disabled": false,
+      "rect": {
+        "x": 749.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "显示已写入的分镜规划；没有时也可打开空规划",
+      "disabled": false,
+      "rect": {
+        "x": 865.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除规划（不影响已生成的分镜）",
+      "disabled": false,
+      "rect": {
+        "x": 981.5,
+        "y": 802.875,
+        "width": 46,
+        "height": 28
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "显示已生成的分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 1035.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用本集剧本推理缺失的人物/场景/道具，确认后再写入资产库",
+      "disabled": false,
+      "rect": {
+        "x": 1151.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除该集对应的视频数据库（DB）",
+      "disabled": false,
+      "rect": {
+        "x": 1267.5,
+        "y": 802.875,
+        "width": 80,
+        "height": 28
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "capturedDate": "2026-11-21",
+  "observedWindowVersion": "2.9.5",
+  "originalDirectory": "F:\\软件\\洛水2026\\洛水2026",
+  "cdp": "http://127.0.0.1:9226",
+  "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+  "url": "http://127.0.0.1:20073/index.html",
+  "reaTargetListEvidence": "ev_302ae0f6724bd0c8efeecf0ed63b283710c6c9975c39271e96e2efcabbbd4e48",
+  "artifactHashes": [
+    {
+      "Path": "F:\\软件\\洛水2026\\洛水2026\\run.py",
+      "Hash": "919E2B9CC91AC356E5598A42F7254250EBE4392F4BEF0A04A0DE1FD70D18DE0F"
+    },
+    {
+      "Path": "F:\\软件\\洛水2026\\洛水2026\\modules\\main.pyd",
+      "Hash": "48E1FAF854FE9B2D3192A131C8D555804AAD740CEC61D0457F401E72E76CDC69"
+    }
+  ],
+  "limitations": "页面采集证明UI状态存在，不证明业务链路或生成结果通过。"
+}

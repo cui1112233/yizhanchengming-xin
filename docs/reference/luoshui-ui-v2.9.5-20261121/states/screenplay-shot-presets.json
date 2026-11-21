@@ -1,0 +1,908 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\nAI 推理分析\n1212\ndoubao-seed-evolving-latest-version\n官方\n模型配置\n3D国漫1\nAgent\n1\n剧本\n2\n资产\n3\n分镜\n\n新增模型强度：便宜的模型建议全部开启 Max 思考强度。\n\n使用须知\n\nCodex：请先在 Skills 中验证后再使用\n空氧模型：请注意网络环境\n官方模型：请查看教程申请认证 / 官方充值；部分官方模型还需开通对应模型功能才可使用\nOpenRouter：请注意网络环境\n可关闭，关闭后不再显示\n\n温馨提示：请注意剧本格式。正常格式是：\n\n第1集\n1-1 场景1\n1-2 场景2\n1-3 场景3\n……\n\n注意：如果识别不到标识，软件无法批量并发，只能把第一集全部发出去；即梦的每一小节字数都在 2000 到 6000 左右，AI 无法回复完成，会导致提示 AI 返回 JSON 无效。\n\n可关闭，关闭后不再显示\n分镜\n共 1 集 · 已生成 1 集 · 3 个分镜 · 总时长 37秒\n分镜词\n前缀\n预设补充\n上下文\n规划设置\n标准\n导入\n批量\n检查\n失败\nEPISODE\n01\n已生成\n第1章\n角色 4\n·\n场景 1\n·\n分镜 3\n·\n时长 37秒\n·\n字数 394\n文字梳理：艳阳高照，京市一中的操场上欢呼呐喊声连成一片，篮球场上的比赛已经到了最后关头，场边围观的人也在不断呐喊加油…… 看台上，几个青春靓丽的女生坐在一起，穿着白衬衣的少年站在旁边。 坐在少年旁边的是一个格外漂亮的少女，亚麻色长马尾微卷着搭在肩上，皮肤白皙，五官极其精致。 她的容貌就像最漂亮纯洁的天使，可脸上的笑容却十分邪恶，…\n重新生成\n编辑\n导入\n查看剧本\n查看规划\n查看脚本\n资产补充\n删除\n选择分镜词\n41\n搜索分镜词...\n收藏\n0\n点击右侧星标，收藏常用分镜词\n最近使用\n0\n选择分镜词后会出现在这里\n全部 · 按时间\n41\n小洛V9分镜-15s\n11-14 02:18\n小洛V9分镜-30s\n11-10 15:08\n小洛sd2.0 分镜词\n11-09 11:39\n小琳终极sd分镜词\n11-09 11:39\n小角sd2.0分镜词-固定15秒时长\n11-09 11:39\n小洛sd2.0位置承接升级版-5-17\n11-09 11:39\n小洛分镜词v1-5-24\n11-09 11:39\n小洛分镜词v2-竖屏-5-26\n11-09 11:39\n春晓分镜词-5-27\n11-09 11:39\n小云雀v2-6-13\n11-09 11:39\n小云雀v3\n11-09 11:39\n小云雀v4\n11-09 11:39\n小洛v3\n11-09 11:39\n小洛v4\n11-09 11:39\n修仙搞笑文\n11-09 11:39\n小洛sd2.0位置承接导演升级版-7-30\n11-09 11:39\n小洛v5优化台词-8-8\n11-09 11:39\n小洛v6-sd2.5-支持最长30s推理-8-9\n11-09 11:39\n小洛v5专属提示词（导演节奏、优先15s、爽文节奏）\n11-09 11:39\n【只适合3D漫剧夸张抽象表情、搞怪分镜！！！】最近流行抽象表情夸张抽象表情库 · 短剧专用版\n11-09 11:39\n小洛v6-优化节奏15s版-8-15【注意剧本小节字数-推荐libtv出视频】-请勿固定15s出视频\n11-09 11:39\n小洛v7-15s版-913最新版脚本\n11-09 11:39\n小洛v7-SD2.5专属版-30s-913最新版脚本\n11-09 11:39\n小云雀分镜词\n03-22 15:05\nsora2-文生视频-需绑定sora人物角色@内容\n03-19 17:25\nVIDU-仙侠多参文生视频-不要生图\n03-18 22:24\nSeedance 2.0-10秒推理\n03-17 18:43\ngrok-6宫格-15秒分镜词\n03-16 12:48\ngrok-4宫格-10秒分镜词\n03-16 12:29\nSeedance2.0 专业版-优化台词-3月16日\n03-15 21:43\nSeedance2.0小白版-15秒(九宫格/真人/动漫)\n03-15 21:18\nSeedance2.0-横屏九宫格/真人(9-16)-15秒-3月16日\n03-15 21:17\nSeedance2.0-横屏九宫格/真人(16-9)-15秒-3月16日\n03-15 21:16\nVidu-Q3多参分镜词\n03-09 23:29\n4宫格拆分爆款分镜词\n03-09 23:27\nvidu分镜词\n03-06 14:24\nSeedance 2.0专业版\n03-06 14:24\nsora2-15秒\n03-06 14:22\n剧本分镜-通用\n03-04 21:01\n剧本分镜-6宫格\n03-04 20:41\n剧本分镜-4宫格\n03-04 18:21",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 460.5625,
+        "y": 115,
+        "width": 57,
+        "height": 28
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭后不再显示",
+      "disabled": false,
+      "rect": {
+        "x": 1578.5,
+        "y": 199,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭后不再显示",
+      "disabled": false,
+      "rect": {
+        "x": 1578.5,
+        "y": 378,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量导入：一次选择多集 JSON 分镜脚本并自动匹配集数",
+      "disabled": false,
+      "rect": {
+        "x": 1325.5,
+        "y": 581,
+        "width": 68,
+        "height": 30
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量",
+      "disabled": false,
+      "rect": {
+        "x": 1401.5,
+        "y": 581,
+        "width": 68,
+        "height": 30
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "重新生成",
+      "disabled": false,
+      "rect": {
+        "x": 457.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "编辑",
+      "disabled": false,
+      "rect": {
+        "x": 573.5,
+        "y": 802.875,
+        "width": 80,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入分镜：从文件导入该集的分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 661.5,
+        "y": 802.875,
+        "width": 80,
+        "height": 28
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "显示当前分集的剧本内容",
+      "disabled": false,
+      "rect": {
+        "x": 749.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "显示已写入的分镜规划；没有时也可打开空规划",
+      "disabled": false,
+      "rect": {
+        "x": 865.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除规划（不影响已生成的分镜）",
+      "disabled": false,
+      "rect": {
+        "x": 981.5,
+        "y": 802.875,
+        "width": 46,
+        "height": 28
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "显示已生成的分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 1035.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用本集剧本推理缺失的人物/场景/道具，确认后再写入资产库",
+      "disabled": false,
+      "rect": {
+        "x": 1151.5,
+        "y": 802.875,
+        "width": 108,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除该集对应的视频数据库（DB）",
+      "disabled": false,
+      "rect": {
+        "x": 1267.5,
+        "y": 802.875,
+        "width": 80,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索分镜词...",
+      "disabled": false,
+      "rect": {
+        "x": 864.9375,
+        "y": 235,
+        "width": 262,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1342,
+        "y": 235,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛V9分镜-15s11-14 02:18",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 316.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛V9分镜-30s11-10 15:08",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 372.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛sd2.0 分镜词11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 428.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小琳终极sd分镜词11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 484.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小角sd2.0分镜词-固定15秒时长11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 540.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛sd2.0位置承接升级版-5-1711-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 596.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛分镜词v1-5-2411-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 652.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛分镜词v2-竖屏-5-2611-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 708.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "春晓分镜词-5-2711-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 764.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小云雀v2-6-1311-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 820.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小云雀v311-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 876.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小云雀v411-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 932.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v311-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 988.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v411-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1044.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "修仙搞笑文11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1100.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛sd2.0位置承接导演升级版-7-3011-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1156.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v5优化台词-8-811-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1212.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v6-sd2.5-支持最长30s推理-8-911-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1268.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v5专属提示词（导演节奏、优先15s、爽文节奏）11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1324.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "【只适合3D漫剧夸张抽象表情、搞怪分镜！！！】最近流行抽象表情夸张抽象表情库 · 短剧专用版11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1380.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v6-优化节奏15s版-8-15【注意剧本小节字数-推荐libtv出视频】-请勿固定15s出视频11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1436.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v7-15s版-913最新版脚本11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1492.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小洛v7-SD2.5专属版-30s-913最新版脚本11-09 11:39",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1548.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小云雀分镜词03-22 15:05",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1604.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "sora2-文生视频-需绑定sora人物角色@内容03-19 17:25",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1660.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "VIDU-仙侠多参文生视频-不要生图03-18 22:24",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1716.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance 2.0-10秒推理03-17 18:43",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1772.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "grok-6宫格-15秒分镜词03-16 12:48",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1828.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "grok-4宫格-10秒分镜词03-16 12:29",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1884.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance2.0 专业版-优化台词-3月16日03-15 21:43",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1940.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance2.0小白版-15秒(九宫格/真人/动漫) 03-15 21:18",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 1996.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance2.0-横屏九宫格/真人(9-16)-15秒-3月16日03-15 21:17",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2052.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance2.0-横屏九宫格/真人(16-9)-15秒-3月16日03-15 21:16",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2108.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 61,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Vidu-Q3多参分镜词03-09 23:29",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2164.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 62,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "4宫格拆分爆款分镜词03-09 23:27",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2220.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "vidu分镜词03-06 14:24",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2276.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 64,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Seedance 2.0专业版03-06 14:24",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2332.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 65,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "sora2-15秒03-06 14:22",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2388.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 66,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剧本分镜-通用03-04 21:01",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2444.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 67,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剧本分镜-6宫格03-04 20:41",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2500.5,
+        "width": 548,
+        "height": 48
+      }
+    },
+    {
+      "index": 68,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剧本分镜-4宫格03-04 18:21",
+      "disabled": false,
+      "rect": {
+        "x": 826,
+        "y": 2556.5,
+        "width": 548,
+        "height": 48
+      }
+    }
+  ]
+}

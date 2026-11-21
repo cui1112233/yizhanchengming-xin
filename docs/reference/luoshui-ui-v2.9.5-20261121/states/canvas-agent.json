@@ -1,0 +1,1311 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n京市一中操场\n2\n暖暖\n9 × 16\n多机位九宫格\n光影控制\n妆容调整\n表情调节\n人物质感\n角色三视图\n镜头控制\n旋转\n高清\n白衬衣少年\n9 × 16\n多机位九宫格\n光影控制\n妆容调整\n表情调节\n人物质感\n角色三视图\n镜头控制\n旋转\n高清\n卷发少女同伴群像\n9 × 16\n多机位九宫格\n光影控制\n妆容调整\n表情调节\n人物质感\n角色三视图\n镜头控制\n旋转\n高清\n操场围观人群\n9 × 16\n多机位九宫格\n光影控制\n妆容调整\n表情调节\n人物质感\n角色三视图\n镜头控制\n旋转\n高清\n京市一中操场-篮球场\n16 × 9\n全景图\n多机位九宫格\n光影控制\n镜头控制\n旋转\n高清\n京市一中操场-看台\n16 × 9\n全景图\n多机位九宫格\n光影控制\n镜头控制\n旋转\n高清\n画布\n文件\n资产管理\n54%\nAgent\n新对话\n\n你好，我是画布助手\n\n从一个想法开始\n\n聊聊你的故事、画面或镜头，让我们一起把想法落到画布上。\n\n搭建创作画布\n把创意串成清晰的节点流程\n梳理故事分镜\n拆解故事，安排画面与镜头\n生成图片素材\n为角色和场景寻找视觉方向\n\n点击填入提示，也可以直接输入，或粘贴图片、视频。",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 1180.09130859375,
+        "y": 89.11351776123047,
+        "width": 11.9447021484375,
+        "height": 11.944740295410156
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 851.06787109375,
+        "y": 895.3837890625,
+        "width": 11.9447021484375,
+        "height": 11.94476318359375
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "预设图生图",
+      "disabled": false,
+      "rect": {
+        "x": 569.5519409179688,
+        "y": 878.0095825195312,
+        "width": 56.466064453125,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "光影控制",
+      "disabled": false,
+      "rect": {
+        "x": 627.1038818359375,
+        "y": 878.0095825195312,
+        "width": 44.52130126953125,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "妆容调整",
+      "disabled": false,
+      "rect": {
+        "x": 672.7110595703125,
+        "y": 878.0095825195312,
+        "width": 44.5213623046875,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "表情调节",
+      "disabled": false,
+      "rect": {
+        "x": 718.3182983398438,
+        "y": 878.0095825195312,
+        "width": 44.52130126953125,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "人物质感",
+      "disabled": false,
+      "rect": {
+        "x": 763.9254760742188,
+        "y": 878.0095825195312,
+        "width": 44.5213623046875,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "角色三视图",
+      "disabled": false,
+      "rect": {
+        "x": 809.53271484375,
+        "y": 878.0095825195312,
+        "width": 50.49365234375,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "镜头控制",
+      "disabled": false,
+      "rect": {
+        "x": 861.1123046875,
+        "y": 878.0095825195312,
+        "width": 44.52130126953125,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旋转",
+      "disabled": false,
+      "rect": {
+        "x": 906.719482421875,
+        "y": 878.0095825195312,
+        "width": 32.5765380859375,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "高清",
+      "disabled": false,
+      "rect": {
+        "x": 940.3819580078125,
+        "y": 878.0095825195312,
+        "width": 32.5765380859375,
+        "height": 14.65948486328125
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 851.06787109375,
+        "y": 89.11351776123047,
+        "width": 11.9447021484375,
+        "height": 11.944740295410156
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "预设图生图",
+      "disabled": false,
+      "rect": {
+        "x": 569.5519409179688,
+        "y": 71.73934173583984,
+        "width": 56.466064453125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "光影控制",
+      "disabled": false,
+      "rect": {
+        "x": 627.1038818359375,
+        "y": 71.73934173583984,
+        "width": 44.52130126953125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "妆容调整",
+      "disabled": false,
+      "rect": {
+        "x": 672.7110595703125,
+        "y": 71.73934173583984,
+        "width": 44.5213623046875,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "表情调节",
+      "disabled": false,
+      "rect": {
+        "x": 718.3182983398438,
+        "y": 71.73934173583984,
+        "width": 44.52130126953125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "人物质感",
+      "disabled": false,
+      "rect": {
+        "x": 763.9254760742188,
+        "y": 71.73934173583984,
+        "width": 44.5213623046875,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "角色三视图",
+      "disabled": false,
+      "rect": {
+        "x": 809.53271484375,
+        "y": 71.73934173583984,
+        "width": 50.49365234375,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "镜头控制",
+      "disabled": false,
+      "rect": {
+        "x": 861.1123046875,
+        "y": 71.73934173583984,
+        "width": 44.52130126953125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旋转",
+      "disabled": false,
+      "rect": {
+        "x": 906.719482421875,
+        "y": 71.73934173583984,
+        "width": 32.5765380859375,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "高清",
+      "disabled": false,
+      "rect": {
+        "x": 940.3819580078125,
+        "y": 71.73934173583984,
+        "width": 32.5765380859375,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 851.06787109375,
+        "y": 626.6270141601562,
+        "width": 11.9447021484375,
+        "height": 11.94476318359375
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "预设图生图",
+      "disabled": false,
+      "rect": {
+        "x": 569.5519409179688,
+        "y": 609.2528686523438,
+        "width": 56.466064453125,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "光影控制",
+      "disabled": false,
+      "rect": {
+        "x": 627.1038818359375,
+        "y": 609.2528686523438,
+        "width": 44.52130126953125,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "妆容调整",
+      "disabled": false,
+      "rect": {
+        "x": 672.7110595703125,
+        "y": 609.2528686523438,
+        "width": 44.5213623046875,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "表情调节",
+      "disabled": false,
+      "rect": {
+        "x": 718.3182983398438,
+        "y": 609.2528686523438,
+        "width": 44.52130126953125,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "人物质感",
+      "disabled": false,
+      "rect": {
+        "x": 763.9254760742188,
+        "y": 609.2528686523438,
+        "width": 44.5213623046875,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "角色三视图",
+      "disabled": false,
+      "rect": {
+        "x": 809.53271484375,
+        "y": 609.2528686523438,
+        "width": 50.49365234375,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "镜头控制",
+      "disabled": false,
+      "rect": {
+        "x": 861.1123046875,
+        "y": 609.2528686523438,
+        "width": 44.52130126953125,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旋转",
+      "disabled": false,
+      "rect": {
+        "x": 906.719482421875,
+        "y": 609.2528686523438,
+        "width": 32.5765380859375,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "高清",
+      "disabled": false,
+      "rect": {
+        "x": 940.3819580078125,
+        "y": 609.2528686523438,
+        "width": 32.5765380859375,
+        "height": 14.659423828125
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 851.06787109375,
+        "y": 357.8702697753906,
+        "width": 11.9447021484375,
+        "height": 11.944732666015625
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "预设图生图",
+      "disabled": false,
+      "rect": {
+        "x": 569.5519409179688,
+        "y": 340.49609375,
+        "width": 56.466064453125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "光影控制",
+      "disabled": false,
+      "rect": {
+        "x": 627.1038818359375,
+        "y": 340.49609375,
+        "width": 44.52130126953125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "妆容调整",
+      "disabled": false,
+      "rect": {
+        "x": 672.7110595703125,
+        "y": 340.49609375,
+        "width": 44.5213623046875,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "表情调节",
+      "disabled": false,
+      "rect": {
+        "x": 718.3182983398438,
+        "y": 340.49609375,
+        "width": 44.52130126953125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "人物质感",
+      "disabled": false,
+      "rect": {
+        "x": 763.9254760742188,
+        "y": 340.49609375,
+        "width": 44.5213623046875,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "角色三视图",
+      "disabled": false,
+      "rect": {
+        "x": 809.53271484375,
+        "y": 340.49609375,
+        "width": 50.49365234375,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "镜头控制",
+      "disabled": false,
+      "rect": {
+        "x": 861.1123046875,
+        "y": 340.49609375,
+        "width": 44.52130126953125,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旋转",
+      "disabled": false,
+      "rect": {
+        "x": 906.719482421875,
+        "y": 340.49609375,
+        "width": 32.5765380859375,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "高清",
+      "disabled": false,
+      "rect": {
+        "x": 940.3819580078125,
+        "y": 340.49609375,
+        "width": 32.5765380859375,
+        "height": 14.659454345703125
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 1219.18310546875,
+        "y": 137.97837829589844,
+        "width": 11.94482421875,
+        "height": 11.944747924804688
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "720全景图",
+      "disabled": false,
+      "rect": {
+        "x": 1012.0504150390625,
+        "y": 120.60420227050781,
+        "width": 38.5489501953125,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "预设图生图",
+      "disabled": false,
+      "rect": {
+        "x": 1051.685302734375,
+        "y": 120.60420227050781,
+        "width": 56.466064453125,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "光影控制",
+      "disabled": false,
+      "rect": {
+        "x": 1109.2371826171875,
+        "y": 120.60420227050781,
+        "width": 44.5213623046875,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "镜头控制",
+      "disabled": false,
+      "rect": {
+        "x": 1154.844482421875,
+        "y": 120.60420227050781,
+        "width": 44.521240234375,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旋转",
+      "disabled": false,
+      "rect": {
+        "x": 1200.45166015625,
+        "y": 120.60420227050781,
+        "width": 32.5765380859375,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "高清",
+      "disabled": false,
+      "rect": {
+        "x": 1234.114013671875,
+        "y": 120.60420227050781,
+        "width": 32.57666015625,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加标签",
+      "disabled": false,
+      "rect": {
+        "x": 1083.4473876953125,
+        "y": 137.97837829589844,
+        "width": 11.9447021484375,
+        "height": 11.944747924804688
+      }
+    },
+    {
+      "index": 61,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "720全景图",
+      "disabled": false,
+      "rect": {
+        "x": 876.314697265625,
+        "y": 120.60420227050781,
+        "width": 38.5489501953125,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 62,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "预设图生图",
+      "disabled": false,
+      "rect": {
+        "x": 915.9495239257812,
+        "y": 120.60420227050781,
+        "width": 56.466064453125,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "光影控制",
+      "disabled": false,
+      "rect": {
+        "x": 973.50146484375,
+        "y": 120.60420227050781,
+        "width": 44.5213623046875,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 64,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "镜头控制",
+      "disabled": false,
+      "rect": {
+        "x": 1019.108642578125,
+        "y": 120.60420227050781,
+        "width": 44.5213623046875,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 65,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "旋转",
+      "disabled": false,
+      "rect": {
+        "x": 1064.7158203125,
+        "y": 120.60420227050781,
+        "width": 32.57666015625,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 66,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "高清",
+      "disabled": false,
+      "rect": {
+        "x": 1098.37841796875,
+        "y": 120.60420227050781,
+        "width": 32.5765380859375,
+        "height": 14.659469604492188
+      }
+    },
+    {
+      "index": 67,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "返回作品列表",
+      "disabled": false,
+      "rect": {
+        "x": 34,
+        "y": 66,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 68,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "画布",
+      "disabled": false,
+      "rect": {
+        "x": 77,
+        "y": 71,
+        "width": 60,
+        "height": 22
+      }
+    },
+    {
+      "index": 69,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "文件",
+      "disabled": false,
+      "rect": {
+        "x": 139,
+        "y": 71,
+        "width": 60,
+        "height": 22
+      }
+    },
+    {
+      "index": 70,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产管理",
+      "disabled": false,
+      "rect": {
+        "x": 48,
+        "y": 991,
+        "width": 84,
+        "height": 22
+      }
+    },
+    {
+      "index": 71,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选择全部视频卡片",
+      "disabled": false,
+      "rect": {
+        "x": 143,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 72,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "缩小",
+      "disabled": false,
+      "rect": {
+        "x": 176,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 73,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "放大",
+      "disabled": false,
+      "rect": {
+        "x": 240,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 74,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "适应屏幕大小",
+      "disabled": false,
+      "rect": {
+        "x": 265,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 75,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "搜索画布",
+      "disabled": false,
+      "rect": {
+        "x": 298,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 76,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "整理画布",
+      "disabled": false,
+      "rect": {
+        "x": 323,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 77,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选中模式",
+      "disabled": false,
+      "rect": {
+        "x": 823.8515625,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 78,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动画布模式",
+      "disabled": false,
+      "rect": {
+        "x": 859.8515625,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 79,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 895.8515625,
+        "y": 979,
+        "width": 50.296875,
+        "height": 29
+      }
+    },
+    {
+      "index": 80,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "撤销",
+      "disabled": false,
+      "rect": {
+        "x": 967.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 81,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "历史记录",
+      "disabled": false,
+      "rect": {
+        "x": 1003.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 82,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产库",
+      "disabled": false,
+      "rect": {
+        "x": 1039.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 83,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "快捷键",
+      "disabled": false,
+      "rect": {
+        "x": 1075.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 84,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建对话",
+      "disabled": false,
+      "rect": {
+        "x": 1741,
+        "y": 283,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 85,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "历史对话",
+      "disabled": false,
+      "rect": {
+        "x": 1771,
+        "y": 283,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 86,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "模型设置",
+      "disabled": false,
+      "rect": {
+        "x": 1801,
+        "y": 283,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 87,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "停靠到右侧",
+      "disabled": false,
+      "rect": {
+        "x": 1831,
+        "y": 283,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 88,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1861,
+        "y": 283,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 89,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "搭建创作画布把创意串成清晰的节点流程",
+      "disabled": false,
+      "rect": {
+        "x": 1503,
+        "y": 452.296875,
+        "width": 374,
+        "height": 69
+      }
+    },
+    {
+      "index": 90,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "梳理故事分镜拆解故事，安排画面与镜头",
+      "disabled": false,
+      "rect": {
+        "x": 1503,
+        "y": 531.296875,
+        "width": 374,
+        "height": 69
+      }
+    },
+    {
+      "index": 91,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "生成图片素材为角色和场景寻找视觉方向",
+      "disabled": false,
+      "rect": {
+        "x": 1503,
+        "y": 610.296875,
+        "width": 374,
+        "height": 69
+      }
+    },
+    {
+      "index": 92,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "输入消息，@ 提及节点输出或全局素材...",
+      "disabled": false,
+      "rect": {
+        "x": 1496,
+        "y": 902.40625,
+        "width": 388,
+        "height": 65.59375
+      }
+    },
+    {
+      "index": 93,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "提及节点或素材",
+      "disabled": false,
+      "rect": {
+        "x": 1506,
+        "y": 975,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 94,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "技能",
+      "disabled": false,
+      "rect": {
+        "x": 1540,
+        "y": 975,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 95,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 1574,
+        "y": 975,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 96,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "添加选中的画布图片",
+      "disabled": false,
+      "rect": {
+        "x": 1608,
+        "y": 975,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 97,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传附件 (TXT/DOCX)",
+      "disabled": false,
+      "rect": {
+        "x": 1642,
+        "y": 975,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 98,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选择风格",
+      "disabled": false,
+      "rect": {
+        "x": 1676,
+        "y": 975,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 99,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": true,
+      "rect": {
+        "x": 1840,
+        "y": 974,
+        "width": 34,
+        "height": 34
+      }
+    }
+  ]
+}

@@ -1,0 +1,817 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n插件市场\n搜索插件名称或功能\n全部\n图像与角色\n剪辑与镜头\n字幕与声音\n剧本与写作\n图像与角色\n去使用\n资产参考\nNEW\n文生图/多图参考快速出图\n去使用\n角色修改\n批量修改角色名称属性\n去使用\n封面生成\nAI智能生成精美封面图\n去使用\n角色三视图\n一键生成人物三视图\n剪辑与镜头\n去使用\nAI-分段\nNEW\n按主轨道 / 文本轨道 / AI对照剧本分集切割\n去使用\nAI-CUT插件版\nNEW\nAI-CUT草稿插件版\n去使用\nAI-Shot\nNEW\n按剧本和字幕从成片里抽宣传高光，只在片段交界下刀\n去使用\nAI-Upscale\nNEW\n批量超分视频。支持火山、云端、Picsart CLI 和本地显卡\n去使用\nAI-Split\nNEW\n按画面变化切开剪映主轨道上的每个视频\n去使用\n分镜大师\n智能生成分镜脚本\n去使用\n草稿合并\n多选剪映草稿按顺序合成一份\n去使用\n剪映关键帧\n为剪映草稿添加关键帧动画\n字幕与声音\n去使用\nAI-Subtitle\nNEW\n对照剧本修正剪映语音识别错别字\n去使用\nAI-Filler\nNEW\n对照剧本删掉单独成行的呵、嗯、啊、哼、哈哈、哦哦、呵呵\n去使用\nAI-双语字幕\nNEW\n把剪映字幕译成另一种语言，新建一条位置更高的字幕轨\n去使用\nAI-BGM\nNEW\n按剧本和字幕从曲库选乐，写入剪映同一条 BGM 轨\n去使用\n字幕对轴\n字幕时间轴对齐调整\n去使用\n声音克隆\nAI克隆个性化音色\n去使用\n字幕合并\n多条字幕智能合并处理\n去使用\n音色设计\nAI智能设计角色音色\n剧本与写作\n去使用\n小说转剧\n中长篇·纯对话版\n去使用\nAI改文\n智能改写文本，优化表达\n去使用\n爆款开头\n生成吸引人的开头文案\n去使用\n女频性转\n女频小说性别转换改写\n去使用\n格式化文本\n文本格式整理与规范化\n去使用\n长篇拆书\n长篇小说智能拆分章节\n去使用\n世界观\n构建小说世界观设定\n去使用\n文档合并\n按章节规则批量合并TXT\n去使用\n书名生成\n智能生成吸引人的书名",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "首页",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 64,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 3,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "小说创作",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 101,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 4,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 138,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 5,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "音色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 175,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 6,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "漫剧解说1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 212,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 7,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "短剧工作室0",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 270,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 8,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "剧本创作1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 307,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 9,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "momo画布2",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 344,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 10,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "绘画",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 381,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 11,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "AI-CUT",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 441,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 12,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 501,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 13,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "插件",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 538,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "社区186",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 575,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "我的资产",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 612,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 16,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "反馈",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 649,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "在线客服",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 686,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索插件名称或功能",
+      "disabled": false,
+      "rect": {
+        "x": 1593,
+        "y": 97.1875,
+        "width": 255,
+        "height": 38
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 169.1875,
+        "width": 58,
+        "height": 34.84375
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "图像与角色",
+      "disabled": false,
+      "rect": {
+        "x": 345,
+        "y": 169.1875,
+        "width": 97,
+        "height": 34.84375
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剪辑与镜头",
+      "disabled": false,
+      "rect": {
+        "x": 449,
+        "y": 169.1875,
+        "width": 97,
+        "height": 34.84375
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "字幕与声音",
+      "disabled": false,
+      "rect": {
+        "x": 553,
+        "y": 169.1875,
+        "width": 97,
+        "height": 34.84375
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剧本与写作",
+      "disabled": false,
+      "rect": {
+        "x": 657,
+        "y": 169.1875,
+        "width": 97,
+        "height": 34.84375
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用资产参考NEW文生图/多图参考快速出图",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 276.21875,
+        "width": 189.21875,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用角色修改批量修改角色名称属性",
+      "disabled": false,
+      "rect": {
+        "x": 481.53125,
+        "y": 276.21875,
+        "width": 189.234375,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用封面生成AI智能生成精美封面图",
+      "disabled": false,
+      "rect": {
+        "x": 683.078125,
+        "y": 276.21875,
+        "width": 189.21875,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用角色三视图一键生成人物三视图",
+      "disabled": false,
+      "rect": {
+        "x": 884.609375,
+        "y": 276.21875,
+        "width": 189.234375,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-分段NEW按主轨道 / 文本轨道 / AI对照剧本分集切割",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 524.53125,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-CUT插件版NEWAI-CUT草稿插件版",
+      "disabled": false,
+      "rect": {
+        "x": 481.53125,
+        "y": 524.53125,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-ShotNEW按剧本和字幕从成片里抽宣传高光，只在片段交界下刀",
+      "disabled": false,
+      "rect": {
+        "x": 683.078125,
+        "y": 524.53125,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-UpscaleNEW批量超分视频。支持火山、云端、Picsart CLI 和本地显卡",
+      "disabled": false,
+      "rect": {
+        "x": 884.609375,
+        "y": 524.53125,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-SplitNEW按画面变化切开剪映主轨道上的每个视频",
+      "disabled": false,
+      "rect": {
+        "x": 1086.15625,
+        "y": 524.53125,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用分镜大师智能生成分镜脚本",
+      "disabled": false,
+      "rect": {
+        "x": 1287.6875,
+        "y": 524.53125,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用草稿合并多选剪映草稿按顺序合成一份",
+      "disabled": false,
+      "rect": {
+        "x": 1489.234375,
+        "y": 524.53125,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用剪映关键帧为剪映草稿添加关键帧动画",
+      "disabled": false,
+      "rect": {
+        "x": 1690.765625,
+        "y": 524.53125,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-SubtitleNEW对照剧本修正剪映语音识别错别字",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 790.234375,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-FillerNEW对照剧本删掉单独成行的呵、嗯、啊、哼、哈哈、哦哦、呵呵",
+      "disabled": false,
+      "rect": {
+        "x": 481.53125,
+        "y": 790.234375,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-双语字幕NEW把剪映字幕译成另一种语言，新建一条位置更高的字幕轨",
+      "disabled": false,
+      "rect": {
+        "x": 683.078125,
+        "y": 790.234375,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI-BGMNEW按剧本和字幕从曲库选乐，写入剪映同一条 BGM 轨",
+      "disabled": false,
+      "rect": {
+        "x": 884.609375,
+        "y": 790.234375,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用字幕对轴字幕时间轴对齐调整",
+      "disabled": false,
+      "rect": {
+        "x": 1086.15625,
+        "y": 790.234375,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用声音克隆AI克隆个性化音色",
+      "disabled": false,
+      "rect": {
+        "x": 1287.6875,
+        "y": 790.234375,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用字幕合并多条字幕智能合并处理",
+      "disabled": false,
+      "rect": {
+        "x": 1489.234375,
+        "y": 790.234375,
+        "width": 189.21875,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用音色设计AI智能设计角色音色",
+      "disabled": false,
+      "rect": {
+        "x": 1690.765625,
+        "y": 790.234375,
+        "width": 189.234375,
+        "height": 184.71875
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用小说转剧中长篇·纯对话版",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 1055.9375,
+        "width": 189.21875,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用AI改文智能改写文本，优化表达",
+      "disabled": false,
+      "rect": {
+        "x": 481.53125,
+        "y": 1055.9375,
+        "width": 189.234375,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用爆款开头生成吸引人的开头文案",
+      "disabled": false,
+      "rect": {
+        "x": 683.078125,
+        "y": 1055.9375,
+        "width": 189.21875,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用女频性转女频小说性别转换改写",
+      "disabled": false,
+      "rect": {
+        "x": 884.609375,
+        "y": 1055.9375,
+        "width": 189.234375,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用格式化文本文本格式整理与规范化",
+      "disabled": false,
+      "rect": {
+        "x": 1086.15625,
+        "y": 1055.9375,
+        "width": 189.21875,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用长篇拆书长篇小说智能拆分章节",
+      "disabled": false,
+      "rect": {
+        "x": 1287.6875,
+        "y": 1055.9375,
+        "width": 189.234375,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用世界观构建小说世界观设定",
+      "disabled": false,
+      "rect": {
+        "x": 1489.234375,
+        "y": 1055.9375,
+        "width": 189.21875,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用文档合并按章节规则批量合并TXT",
+      "disabled": false,
+      "rect": {
+        "x": 1690.765625,
+        "y": 1055.9375,
+        "width": 189.234375,
+        "height": 167.328125
+      }
+    },
+    {
+      "index": 61,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去使用书名生成智能生成吸引人的书名",
+      "disabled": false,
+      "rect": {
+        "x": 280,
+        "y": 1235.578125,
+        "width": 189.21875,
+        "height": 167.3125
+      }
+    }
+  ]
+}

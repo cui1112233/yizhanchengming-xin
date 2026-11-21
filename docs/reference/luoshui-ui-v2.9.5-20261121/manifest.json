@@ -1,0 +1,2042 @@
+[
+  {
+    "id": "home",
+    "title": "首页",
+    "group": "通用",
+    "entry": "程序启动→首页",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:13:19.082Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/home.png",
+    "state": "states/home.json",
+    "sha256": "398e088d9351667285939277f8cb7153f6b7b374302a024f91ef549c777a07f6",
+    "controls": 109,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-home",
+    "title": "小说创作·长篇原创",
+    "group": "小说创作",
+    "entry": "左侧→小说创作",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:13:43.714Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-home.png",
+    "state": "states/novel-home.json",
+    "sha256": "36a406c014586d9abb41fa2f0ac842bd4010dc6046b2446b62213f34f509c603",
+    "controls": 32,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-short",
+    "title": "小说创作·短篇原创",
+    "group": "小说创作",
+    "entry": "小说创作→短篇原创",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:13:57.913Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-short.png",
+    "state": "states/novel-short.json",
+    "sha256": "5cd13a334853be56b89ca39fedc8b7b54e4a7cc8d67cd5f4d81581d439394b56",
+    "controls": 32,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-long-imitation",
+    "title": "仿写长篇·完整参数表单",
+    "group": "小说创作",
+    "entry": "小说创作→仿写长篇",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:14:26.188Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-long-imitation.png",
+    "state": "states/novel-long-imitation.json",
+    "sha256": "f501cbf96648a6331da3ed3a888fe1008b3c1261d0e42aac3b41e1d1bd4475a2",
+    "controls": 67,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-short-imitation",
+    "title": "仿写短篇·参数表单",
+    "group": "小说创作",
+    "entry": "小说创作→仿写短篇",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:14:28.703Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-short-imitation.png",
+    "state": "states/novel-short-imitation.json",
+    "sha256": "a00b2d44bd6472eb5d7c1f244b3a13c9b860c44865268d605a7c4c96d2a07e05",
+    "controls": 75,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-spinoff",
+    "title": "番外创作·正传与类型",
+    "group": "小说创作",
+    "entry": "小说创作→番外创作",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:14:39.884Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-spinoff.png",
+    "state": "states/novel-spinoff.json",
+    "sha256": "3ba0829e7340aae516daf2faee769a5896295be557ff452191fa5f91e3f44648",
+    "controls": 38,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-spinoff-types",
+    "title": "番外创作·四种类型",
+    "group": "小说创作",
+    "entry": "番外表单→番外类型",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:15:31.012Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-spinoff-types.png",
+    "state": "states/novel-spinoff-types.json",
+    "sha256": "b640ed350d2fd531297b290889f6ef5788ba984564cf3c0298b006f818b7b9c2",
+    "controls": 40,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-continuation",
+    "title": "续写创作·导入章节",
+    "group": "小说创作",
+    "entry": "小说创作→续写创作",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:15:47.246Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-continuation.png",
+    "state": "states/novel-continuation.json",
+    "sha256": "d5c70b6d314523fcc7fb69296a2e874253e0d413822977bacaf6f29b77dc5e7f",
+    "controls": 38,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-styles",
+    "title": "写作风格",
+    "group": "小说创作",
+    "entry": "小说创作→写作风格",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:15:59.375Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-styles.png",
+    "state": "states/novel-styles.json",
+    "sha256": "6dc46c3689d4b4aa8e808a84c69282968f7a969cf4d8d0e6b6006ee73f22bbf3",
+    "controls": 34,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-import",
+    "title": "导入素材·默认仿写页",
+    "group": "小说创作",
+    "entry": "小说创作→导入素材",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:16:11.485Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-import.png",
+    "state": "states/novel-import.json",
+    "sha256": "41f0e5217ef6a92107927a7d9fdc275f83561d025a1e2f0d8acdfe7e53ba7fb8",
+    "controls": 68,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-agent",
+    "title": "Agent设置·模型路由与控制",
+    "group": "小说创作",
+    "entry": "小说创作→Agent设置",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:16:53.970Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-agent.png",
+    "state": "states/novel-agent.json",
+    "sha256": "7214307f9a2cc382cd9ff2655c2f760e6dfe20c5523df730b99e402098b8fbcc",
+    "controls": 107,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-agent-review",
+    "title": "Agent设置·37项审稿维度（上）",
+    "group": "小说创作",
+    "entry": "Agent设置→下滚审稿维度",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:17:09.319Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-agent-review.png",
+    "state": "states/novel-agent-review.json",
+    "sha256": "3055e078aff6bb2cd10b942bcabfebe1bccfc68445a3d637e263897a835a040f",
+    "controls": 107,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-agent-review-bottom",
+    "title": "Agent设置·37项审稿维度（下）",
+    "group": "小说创作",
+    "entry": "Agent设置→审稿维度内滚到底",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:17:12.149Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-agent-review-bottom.png",
+    "state": "states/novel-agent-review-bottom.json",
+    "sha256": "6a4125bc05f201aacfba6e05a4e4aac605f782c20d25673ec08f12328ac9e651",
+    "controls": 107,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-agent-prompts",
+    "title": "Agent设置·自定义审稿与写作提示词",
+    "group": "小说创作",
+    "entry": "Agent设置→底部",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:17:15.067Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-agent-prompts.png",
+    "state": "states/novel-agent-prompts.json",
+    "sha256": "2f03d58ed3b6d26dbec4af6fda0d8dfeefd6d222e0416694bce18db27700c213",
+    "controls": 107,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-scheduler",
+    "title": "定时写作",
+    "group": "小说创作",
+    "entry": "小说创作→定时写作",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:17:18.943Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-scheduler.png",
+    "state": "states/novel-scheduler.json",
+    "sha256": "c46e80dedd95e8bf781a43bcde395b4c5c17e04531214c27b8e4b9fa63ea8a4b",
+    "controls": 39,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-dashboard",
+    "title": "数据看板",
+    "group": "小说创作",
+    "entry": "小说创作→数据看板",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:17:30.914Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-dashboard.png",
+    "state": "states/novel-dashboard.json",
+    "sha256": "c86c92775c1c9282de69f9116fbb3298fd7eb0b21c56100f14be9b205e516bae",
+    "controls": 31,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "novel-memo",
+    "title": "备忘录",
+    "group": "小说创作",
+    "entry": "小说创作→备忘录",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:17:33.857Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/novel-memo.png",
+    "state": "states/novel-memo.json",
+    "sha256": "8607fa4ce339adcfcf4c8d58a06ba6d5b0daeb63282614d4763419346506ddae",
+    "controls": 33,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "character-library",
+    "title": "角色库",
+    "group": "资产与工具",
+    "entry": "左侧→角色库",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:18:07.219Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/character-library.png",
+    "state": "states/character-library.json",
+    "sha256": "475b5c33098c18f75549725c6fff1948735781fe640b70fd167fc9cee5a3c5c9",
+    "controls": 57,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "character-personal",
+    "title": "个人添加入口（未观察到切换）",
+    "group": "资产与工具",
+    "entry": "角色库→个人添加",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:18:22.986Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/character-personal.png",
+    "state": "states/character-personal.json",
+    "sha256": "475b5c33098c18f75549725c6fff1948735781fe640b70fd167fc9cee5a3c5c9",
+    "controls": 57,
+    "status": "no-visible-transition",
+    "businessVerified": false
+  },
+  {
+    "id": "voice-library",
+    "title": "音色库",
+    "group": "资产与工具",
+    "entry": "左侧→音色库",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:18:26.743Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/voice-library.png",
+    "state": "states/voice-library.json",
+    "sha256": "f8f31e8d38eff6a8e9225efa8cb8950da53b4a2e4bf304cfdffb481573522007",
+    "controls": 38,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "voice-create",
+    "title": "音色库·添加表单（未提交）",
+    "group": "资产与工具",
+    "entry": "音色库→添加音色",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:18:43.753Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/voice-create.png",
+    "state": "states/voice-create.json",
+    "sha256": "d247aeb021f8e99ccad16db62a47d111fbbe6ff6b1d037b03b7881c4f8cb9122",
+    "controls": 46,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "commentary-library",
+    "title": "漫剧解说·作品列表",
+    "group": "漫剧与剧本",
+    "entry": "左侧→漫剧解说",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:18:57.749Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/commentary-library.png",
+    "state": "states/commentary-library.json",
+    "sha256": "becceba652c5d1e9f201917cb9e9163e1478093f0685fe4a0400c6d391548348",
+    "controls": 18,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "commentary-create",
+    "title": "漫剧解说·创建表单",
+    "group": "漫剧与剧本",
+    "entry": "漫剧解说→创建漫剧",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:19:26.715Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/commentary-create.png",
+    "state": "states/commentary-create.json",
+    "sha256": "c36995a1d93aa52ac057a4d00ac949d6dd4b642c5d8054e187445d4b8042208f",
+    "controls": 22,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "studio-library",
+    "title": "短剧工作室·作品库",
+    "group": "漫剧与剧本",
+    "entry": "左侧→短剧工作室",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:19:44.298Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/studio-library.png",
+    "state": "states/studio-library.json",
+    "sha256": "7efbb3b1b0c90ae463288e2fc6e6b07085bc7dad1ef55074e54a5a99c4833c5c",
+    "controls": 23,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-library",
+    "title": "剧本创作·项目列表",
+    "group": "漫剧与剧本",
+    "entry": "左侧→剧本创作",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:20:03.784Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-library.png",
+    "state": "states/screenplay-library.json",
+    "sha256": "29f8bbeed9f43845260927a682f1136888b22bdcb9c83321beddc414853bc8dd",
+    "controls": 21,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-script",
+    "title": "剧本创作·剧本步骤",
+    "group": "漫剧与剧本",
+    "entry": "剧本列表→1212",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:20:28.886Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-script.png",
+    "state": "states/screenplay-script.json",
+    "sha256": "cd7237780c46b6b265ad9a711cb0aab2a502d56cd39bc8ba20042ea77ed4871e",
+    "controls": 19,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-assets",
+    "title": "剧本创作·资产步骤",
+    "group": "漫剧与剧本",
+    "entry": "剧本步骤→下一步（未分析）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:20:52.384Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-assets.png",
+    "state": "states/screenplay-assets.json",
+    "sha256": "6f932f183283104e01e7a72e2e9f8e9b1f8794e43fcaefe057b0351390cbed59",
+    "controls": 69,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-models",
+    "title": "剧本创作·模型配置",
+    "group": "漫剧与剧本",
+    "entry": "剧本创作→模型配置",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:21:07.486Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-models.png",
+    "state": "states/screenplay-models.json",
+    "sha256": "91bb8aa2203400a9852d03456447a119138da0269930a01f49d98f09e0c77aeb",
+    "controls": 128,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-scenes",
+    "title": "资产·场景",
+    "group": "漫剧与剧本",
+    "entry": "资产→场景",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:21:28.249Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-scenes.png",
+    "state": "states/screenplay-scenes.json",
+    "sha256": "7232b6a587fdb0f10199b41fbdda57ed28a89360d076ad1bfb0b82051632a367",
+    "controls": 47,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-props",
+    "title": "资产·道具空状态",
+    "group": "漫剧与剧本",
+    "entry": "资产→道具",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:21:31.717Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-props.png",
+    "state": "states/screenplay-props.json",
+    "sha256": "5eaa3233aef259cff5b325f3a3a83419d4aeaede1a024bb94a1cc433faeb06df",
+    "controls": 25,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-director",
+    "title": "资产·3D导演台",
+    "group": "漫剧与剧本",
+    "entry": "资产→3D导演台",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:21:34.765Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-director.png",
+    "state": "states/screenplay-director.json",
+    "sha256": "5e2fe90b8dee9c3f6ccd711c0dbd52f30e7ec4d07142dd88d6f5c2d8fe646f88",
+    "controls": 20,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-voices",
+    "title": "资产·AI音色",
+    "group": "漫剧与剧本",
+    "entry": "资产→AI音色",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:21:38.028Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-voices.png",
+    "state": "states/screenplay-voices.json",
+    "sha256": "eec0de73204bfaa52eff2f336b6f41a1081097c433de617b22e76f8cbf97a918",
+    "controls": 20,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-shots",
+    "title": "剧本创作·分镜步骤",
+    "group": "漫剧与剧本",
+    "entry": "剧本创作→分镜",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:21:42.266Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-shots.png",
+    "state": "states/screenplay-shots.json",
+    "sha256": "2d198125f3f3f2c33ab8686a4f80ec425b71269005550c179c4029245a40f19b",
+    "controls": 26,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-shot-presets",
+    "title": "选择分镜词·完整列表",
+    "group": "漫剧与剧本",
+    "entry": "分镜→分镜词",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:22:20.364Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-shot-presets.png",
+    "state": "states/screenplay-shot-presets.json",
+    "sha256": "8a72683c2b24d562a1f16207daf3542ef126c9d545d7af88e70e9c9dc80baa79",
+    "controls": 69,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-shot-script",
+    "title": "分镜·查看已生成脚本",
+    "group": "漫剧与剧本",
+    "entry": "分镜→查看脚本",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:22:50.749Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-shot-script.png",
+    "state": "states/screenplay-shot-script.json",
+    "sha256": "8ff9d09f22526273f43f4d443b29ed15aa83046f593d15ffee1feafae539eea3",
+    "controls": 26,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "screenplay-shot-editor",
+    "title": "分镜编辑器·现有项目",
+    "group": "漫剧与剧本",
+    "entry": "分镜→编辑（已加载3个分镜）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:23:23.292Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/screenplay-shot-editor.png",
+    "state": "states/screenplay-shot-editor.json",
+    "sha256": "150ee11edbc5e409718fb6581cbf97604761b6951ee4e4ddaf44b8704cf345c7",
+    "controls": 88,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "canvas-library",
+    "title": "momo画布·项目列表",
+    "group": "画布与剪辑",
+    "entry": "左侧→momo画布",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:23:46.612Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/canvas-library.png",
+    "state": "states/canvas-library.json",
+    "sha256": "bf8db9c9ad68f01bd3f4b410605b3c6fa8f4559bf86f56d6061435dd417f219f",
+    "controls": 16,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "canvas-editor",
+    "title": "momo画布·节点编辑器",
+    "group": "画布与剪辑",
+    "entry": "画布列表→1212",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:24:01.487Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/canvas-editor.png",
+    "state": "states/canvas-editor.json",
+    "sha256": "1c5497c0b017343cb1b788620ced3c3807149f38de2795a7965cc095ab945cce",
+    "controls": 84,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "canvas-agent",
+    "title": "画布·Agent面板",
+    "group": "画布与剪辑",
+    "entry": "画布→Agent",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:24:17.574Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/canvas-agent.png",
+    "state": "states/canvas-agent.json",
+    "sha256": "22e56f50b3bbf6c6965f6a20f1a18ff1d2dcc7b3c92ff6867329a2d24607998c",
+    "controls": 100,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "canvas-file-menu",
+    "title": "画布·文件页",
+    "group": "画布与剪辑",
+    "entry": "画布→文件",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:24:34.047Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/canvas-file-menu.png",
+    "state": "states/canvas-file-menu.json",
+    "sha256": "899646de8c59f81c89ec8896045d569626f40fb07c6168c878702a2f66623ba8",
+    "controls": 36,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "canvas-assets",
+    "title": "画布·资产管理",
+    "group": "画布与剪辑",
+    "entry": "画布→资产管理",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:25:07.225Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/canvas-assets.png",
+    "state": "states/canvas-assets.json",
+    "sha256": "056353b03f7d9d5853aaac74c5e21fbeb727403a41ff326f4738121a2d46b926",
+    "controls": 55,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "drawing",
+    "title": "绘画·对话创作",
+    "group": "画布与剪辑",
+    "entry": "左侧→绘画",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:25:35.429Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/drawing.png",
+    "state": "states/drawing.json",
+    "sha256": "5292b5ba2c56775c7fd96b93aad39efe384fedc12e6b6bbbe84913c7287427d1",
+    "controls": 20,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "drawing-options",
+    "title": "绘画·尺寸与数量选项",
+    "group": "画布与剪辑",
+    "entry": "绘画→尺寸/数量（只查看）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:25:53.853Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/drawing-options.png",
+    "state": "states/drawing-options.json",
+    "sha256": "2cdd69b659d6f4d1e6e862bb37a7429946692e63449412c801cad721e7b4a85b",
+    "controls": 36,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "drawing-presets",
+    "title": "绘画·提示词列表",
+    "group": "画布与剪辑",
+    "entry": "绘画→提示词",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:26:12.143Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/drawing-presets.png",
+    "state": "states/drawing-presets.json",
+    "sha256": "639561d40aa438a05d39fecf6c266250988297ac737033aa4bca42a9b03c62d9",
+    "controls": 29,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-library",
+    "title": "AI-CUT·工程列表",
+    "group": "画布与剪辑",
+    "entry": "左侧→AI-CUT",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:26:19.316Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-library.png",
+    "state": "states/aicut-library.json",
+    "sha256": "06f8327d7a0888b27bd8dae6e7722ae0e3a8068211f2a6778233667cdec5d6e5",
+    "controls": 17,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-editor",
+    "title": "AI-CUT·剪辑工作台",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT工程列表→23",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:26:40.728Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-editor.png",
+    "state": "states/aicut-editor.json",
+    "sha256": "94139ed4061d12958045d190c2ad9eb178d35f1f22e44bbd64a9caab314d2f22",
+    "controls": 87,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-transitions",
+    "title": "AI-CUT·转场",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→转场",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:27:03.216Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-transitions.png",
+    "state": "states/aicut-transitions.json",
+    "sha256": "d37fb77a605442b4a80cc5735c0844d34ba667880a68b028a78546341b1e9a77",
+    "controls": 78,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-transcript",
+    "title": "AI-CUT·文字稿",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→文字稿",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:27:11.366Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-transcript.png",
+    "state": "states/aicut-transcript.json",
+    "sha256": "d46edc0bb8d145dcd2aff1ba0ab9adce9363e4f728c89355a5f05119636d678a",
+    "controls": 87,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-audio",
+    "title": "AI-CUT·音频",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→音频",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:27:20.450Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-audio.png",
+    "state": "states/aicut-audio.json",
+    "sha256": "3fbfae3dba729cb84b6d073a5034c8832a2ea1ff92bcbcedbcc5c23dd5990c0d",
+    "controls": 85,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-visual",
+    "title": "AI-CUT·视觉效果",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→视觉",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:27:25.965Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-visual.png",
+    "state": "states/aicut-visual.json",
+    "sha256": "3da6a76e14dff35b45049767d43864158c9fd1e1b2695c208c889a6de97c7a55",
+    "controls": 78,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-subtitles",
+    "title": "AI-CUT·字幕",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→字幕",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:27:32.282Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-subtitles.png",
+    "state": "states/aicut-subtitles.json",
+    "sha256": "88ed0174bbdb628c7f6fed7ce7f363db4dbe6c6cb666f52f3bc9c4d41d79b879",
+    "controls": 110,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-skills",
+    "title": "AI-CUT·Skills",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→SKILLS",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:27:39.764Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-skills.png",
+    "state": "states/aicut-skills.json",
+    "sha256": "3771fd40b381997b0545b50d87dc845e27e8f834f05b34a0e133aaf64b30d858",
+    "controls": 79,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-agent-settings",
+    "title": "AI-CUT·Agent设置",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT Agent→设置",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:28:57.071Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-agent-settings.png",
+    "state": "states/aicut-agent-settings.json",
+    "sha256": "abcf2d9c8f66522e3d3c7cbb0740c043b7b9a549442515b35a2b5270d88dafff",
+    "controls": 145,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "aicut-inspector",
+    "title": "AI-CUT·Agent运行检查器",
+    "group": "画布与剪辑",
+    "entry": "AI-CUT→Agent运行检查器",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:29:37.453Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/aicut-inspector.png",
+    "state": "states/aicut-inspector.json",
+    "sha256": "7918886a31e624cb2508d057250399ffe81edaa732a4ae1a01c88ce2c720cfce",
+    "controls": 80,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugins",
+    "title": "插件中心",
+    "group": "资产与工具",
+    "entry": "左侧→插件",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:30:05.255Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugins.png",
+    "state": "states/plugins.json",
+    "sha256": "b3f3aabbe5061ee37b989f362cf033a914a4ce17179ad48d406d9cf42fdae6f3",
+    "controls": 62,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "my-assets",
+    "title": "我的资产",
+    "group": "资产与工具",
+    "entry": "左侧→我的资产",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:30:34.868Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/my-assets.png",
+    "state": "states/my-assets.json",
+    "sha256": "c720c5a7ce99e6d40c15ff729e20a20bc20bd662dcd84be39ae2df3b347b6f2d",
+    "controls": 28,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "feedback",
+    "title": "反馈列表",
+    "group": "通用",
+    "entry": "左侧→反馈",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:30:52.488Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/feedback.png",
+    "state": "states/feedback.json",
+    "sha256": "3967234f534cbb83e7d4ac9e1a65bdd51e25cd0d8abe299f57c1020d4ba8bb10",
+    "controls": 35,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "feedback-form",
+    "title": "反馈·提交表单（未提交）",
+    "group": "通用",
+    "entry": "反馈→提交反馈（仅打开表单）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:31:09.478Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/feedback-form.png",
+    "state": "states/feedback-form.json",
+    "sha256": "bd1633f51c82d6bb2a9ced867f61663fc4882ba7843c13605edbb34eae6eca28",
+    "controls": 45,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "support",
+    "title": "在线客服",
+    "group": "通用",
+    "entry": "左侧→在线客服",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:31:26.907Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/support.png",
+    "state": "states/support.json",
+    "sha256": "a7297fa781a957864264b2ceb085d852c32e5e061fdcbb7f207ae85652f729ba",
+    "controls": 36,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "tutorial",
+    "title": "教程入口",
+    "group": "通用",
+    "entry": "左侧→教程",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:31:54.802Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/tutorial.png",
+    "state": "states/tutorial.json",
+    "sha256": "f4c1f59a165e744be4882e22c12e0f7d9bb46b403b69de19336b351d86d63775",
+    "controls": 57,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "community",
+    "title": "社区",
+    "group": "通用",
+    "entry": "左侧→社区",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:32:16.603Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/community.png",
+    "state": "states/community.json",
+    "sha256": "ccb99e1f7a7a8ff2ba21bae8f0fed81f272598cad4add976a0ce41db58838216",
+    "controls": 57,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings",
+    "title": "全局设置·首屏",
+    "group": "通用",
+    "entry": "顶栏→全局设置",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:32:24.584Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings.png",
+    "state": "states/settings.json",
+    "sha256": "f30f4c729a19bee4d7472b7168a1eef54ca709475b29d762361f5f643c5ceca3",
+    "controls": 93,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-basic",
+    "title": "全局设置·基础设置",
+    "group": "设置",
+    "entry": "全局设置→基础设置",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:32:50.457Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-basic.png",
+    "state": "states/settings-basic.json",
+    "sha256": "d0ee098c55fb1c5d26977743c7b539703ed7be6d828a096552e8961b193eb236",
+    "controls": 83,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-api",
+    "title": "全局设置·API接口（密钥遮挡）",
+    "group": "设置",
+    "entry": "全局设置→API接口",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:32:58.486Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-api.png",
+    "state": "states/settings-api.json",
+    "sha256": "95547e1210b0d267d73485de22a38f17b4b0bd0f30d687c01854cb6c29034753",
+    "controls": 94,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-novel",
+    "title": "全局设置·小说规则",
+    "group": "设置",
+    "entry": "全局设置→小说规则",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:33:05.135Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-novel.png",
+    "state": "states/settings-novel.json",
+    "sha256": "9e1d86a6d2bd328dbd8a79fe9a82edf7edf28bacdad0e174bbdf5b253837f9ed",
+    "controls": 70,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-voice",
+    "title": "全局设置·配音设置",
+    "group": "设置",
+    "entry": "全局设置→配音设置",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:33:10.899Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-voice.png",
+    "state": "states/settings-voice.json",
+    "sha256": "b3175d1de2d1b4e9b439682e2d51f3516a4d1c2a7e8a8b5e68ef4c831542565e",
+    "controls": 76,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-comfyui",
+    "title": "全局设置·Comfyui",
+    "group": "设置",
+    "entry": "全局设置→Comfyui",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:33:17.887Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-comfyui.png",
+    "state": "states/settings-comfyui.json",
+    "sha256": "2533c9dce5842930f8ee6e877acbb1f74fe805137729fafce8adc391e75a50ee",
+    "controls": 76,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-environment",
+    "title": "全局设置·环境监测",
+    "group": "设置",
+    "entry": "全局设置→环境监测（未安装）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:33:26.610Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-environment.png",
+    "state": "states/settings-environment.json",
+    "sha256": "79591a7c82650df16eae2acbbdc942aecf4056e48d321122bf8d6f37087f4483",
+    "controls": 71,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "settings-backup",
+    "title": "全局设置·数据备份",
+    "group": "设置",
+    "entry": "全局设置→数据备份（未执行）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:33:34.830Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/settings-backup.png",
+    "state": "states/settings-backup.json",
+    "sha256": "6c3911cb0bd0aa2255694d0696234f80c16e92541e22f24aa5f4a7b4604e8c9b",
+    "controls": 71,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "notifications",
+    "title": "消息中心",
+    "group": "通用",
+    "entry": "顶栏→消息中心",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:34:12.549Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/notifications.png",
+    "state": "states/notifications.json",
+    "sha256": "5e55ca79eb76ab3c6653e0e8371872db460da076ec30c40479dfa13c0b30dd7e",
+    "controls": 57,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "agreement",
+    "title": "用户协议·只读",
+    "group": "通用",
+    "entry": "顶栏→用户协议（未接受）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:34:47.435Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/agreement.png",
+    "state": "states/agreement.json",
+    "sha256": "784d8592dbb12e7bd0bac5cb6a16a9b44219780aa78e859f283052cc52221bc4",
+    "controls": 59,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "groups",
+    "title": "社群入口",
+    "group": "通用",
+    "entry": "顶栏→社群（仅查看）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:34:52.197Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/groups.png",
+    "state": "states/groups.json",
+    "sha256": "dc68b075e54ca66b17a8f9789a1923eabcc03217dfdb4449d7481a09dc4e7302",
+    "controls": 57,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "workspace-switch",
+    "title": "工作模式切换",
+    "group": "通用",
+    "entry": "左上角→工作模式",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:35:00.549Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/workspace-switch.png",
+    "state": "states/workspace-switch.json",
+    "sha256": "38cbb3885c5dc0be448e6b0e0a9a0667cc21d3696dd32b5effb1fc59e57c8286",
+    "controls": 59,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "agent-workspace",
+    "title": "Agent代理·工作区",
+    "group": "Agent代理",
+    "entry": "工作模式→Agent代理",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:35:22.787Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/agent-workspace.png",
+    "state": "states/agent-workspace.json",
+    "sha256": "0fd31ce6675c984d49f4ec62bb653e22db2eb18d785e7608c1ec884ea8967224",
+    "controls": 30,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "agent-tasks",
+    "title": "Agent代理·自动任务",
+    "group": "Agent代理",
+    "entry": "Agent代理→自动任务（未启动）",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:35:39.490Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/agent-tasks.png",
+    "state": "states/agent-tasks.json",
+    "sha256": "6337aee47772546a7be7363e7d948b5f075297b037a236a8ee88a14c578588b1",
+    "controls": 21,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "agent-skills",
+    "title": "Agent代理·技能管理",
+    "group": "Agent代理",
+    "entry": "Agent代理→Agent技能",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:35:59.804Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/agent-skills.png",
+    "state": "states/agent-skills.json",
+    "sha256": "1019788f6ddcd4549a3bd8d284551ac7009d2eae834414c826d066a621ea0357",
+    "controls": 73,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "agent-more",
+    "title": "Agent代理·更多工具菜单",
+    "group": "Agent代理",
+    "entry": "Agent代理→更多",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:36:05.429Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/agent-more.png",
+    "state": "states/agent-more.json",
+    "sha256": "481af54d0d9c539b7ea0ad484d19cc27b96913e8b3c8e7f62e858b573225a0e3",
+    "controls": 73,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-01",
+    "title": "资产参考·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用资产参考NEW文生图/多图参考快速出图",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:42:21.100Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-01.png",
+    "state": "states/plugin-01.json",
+    "sha256": "61cf30820268dc404e09ccc994685764321f193c9a1885ae31a460a273da9d66",
+    "controls": 47,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-02",
+    "title": "角色修改·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用角色修改批量修改角色名称属性",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:42:36.932Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-02.png",
+    "state": "states/plugin-02.json",
+    "sha256": "64832cbfbb08eda5079915f215b51d5de7db98d7089ddefe54f7b87c850a540b",
+    "controls": 40,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-03",
+    "title": "封面生成·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用封面生成AI智能生成精美封面图",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:42:51.363Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-03.png",
+    "state": "states/plugin-03.json",
+    "sha256": "301ca3ce735daffa8d36859152bb4fbd23bd8f01236540e55e634c20bb94f343",
+    "controls": 43,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-04",
+    "title": "角色三视图·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用角色三视图一键生成人物三视图",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:43:05.024Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-04.png",
+    "state": "states/plugin-04.json",
+    "sha256": "983c428e59f3adad89d8536f4f48d89d16827f101b945b6044c0f71508180740",
+    "controls": 34,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-05",
+    "title": "AI-分段·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-分段NEW按主轨道 / 文本轨道 / AI对照剧本分集切割",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:43:15.231Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-05.png",
+    "state": "states/plugin-05.json",
+    "sha256": "ee7eab9379440e9dc551747053b28211d74f761e71e1527f71bbef060610556e",
+    "controls": 48,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-06",
+    "title": "AI-CUT插件版·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-CUT插件版NEWAI-CUT草稿插件版",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:43:30.023Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-06.png",
+    "state": "states/plugin-06.json",
+    "sha256": "2891e4724b433e6bcb5e68f68e5c35d105c6f6088456b33ce49cfdd5ce408940",
+    "controls": 45,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-07",
+    "title": "AI-Shot·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-ShotNEW按剧本和字幕从成片里抽宣传高光，只在片段交界下刀",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:43:43.903Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-07.png",
+    "state": "states/plugin-07.json",
+    "sha256": "bd6a8285449633150c59db249adf95dd284f8e376717726d54882c70845ae20c",
+    "controls": 48,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-08",
+    "title": "AI-Upscale·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-UpscaleNEW批量超分视频。支持火山、云端、Picsart CLI 和本地显卡",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:43:59.408Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-08.png",
+    "state": "states/plugin-08.json",
+    "sha256": "b3263185b60ff14b164f705fb0174b36a4f504af8a945a2d0ee4d3f74cd45310",
+    "controls": 37,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-09",
+    "title": "AI-Split·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-SplitNEW按画面变化切开剪映主轨道上的每个视频",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:44:11.498Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-09.png",
+    "state": "states/plugin-09.json",
+    "sha256": "3bba60df5f822db6f0417af4897588661bf0da5dc7aa61b0ca228066687e2191",
+    "controls": 44,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-10",
+    "title": "分镜大师·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用分镜大师智能生成分镜脚本",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:44:28.215Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-10.png",
+    "state": "states/plugin-10.json",
+    "sha256": "91848c21f99bdf4227360b59a049a90d69c13043ba25d59da438ae07a8c69bbe",
+    "controls": 40,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-11",
+    "title": "草稿合并·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用草稿合并多选剪映草稿按顺序合成一份",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:44:38.320Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-11.png",
+    "state": "states/plugin-11.json",
+    "sha256": "d48b2ba325802d6fbdffe48bbab1c66f344cb6d67a15a86bdeb547aba95b15a6",
+    "controls": 34,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-12",
+    "title": "剪映关键帧·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用剪映关键帧为剪映草稿添加关键帧动画",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:44:55.128Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-12.png",
+    "state": "states/plugin-12.json",
+    "sha256": "99c47698c21377f0b306af0b9c708a720604885d75f0abaec9fecbc273950cbc",
+    "controls": 52,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-13",
+    "title": "AI-Subtitle·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-SubtitleNEW对照剧本修正剪映语音识别错别字",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:45:06.782Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-13.png",
+    "state": "states/plugin-13.json",
+    "sha256": "1444f77062c117b9b1702781f76c762147b837fa7bcd9a5a0a47cdf440ac6840",
+    "controls": 43,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-14",
+    "title": "AI-Filler·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-FillerNEW对照剧本删掉单独成行的呵、嗯、啊、哼、哈哈、哦哦、呵呵",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:45:23.246Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-14.png",
+    "state": "states/plugin-14.json",
+    "sha256": "977de75a239798b7edcd02c50270d63938d99eca77ce3322246d76373061ba90",
+    "controls": 43,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-15",
+    "title": "AI-双语字幕·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-双语字幕NEW把剪映字幕译成另一种语言，新建一条位置更高的字幕轨",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:45:37.993Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-15.png",
+    "state": "states/plugin-15.json",
+    "sha256": "a9dfe19e3e5d41dce0af4d7369d7810d362e70e89f4b45b109c965bdae870c5f",
+    "controls": 45,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-16",
+    "title": "AI-BGM·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI-BGMNEW按剧本和字幕从曲库选乐，写入剪映同一条 BGM 轨",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:46:01.356Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-16.png",
+    "state": "states/plugin-16.json",
+    "sha256": "4ed05f916395efbb33cc7d9a234a9e162cd883773f944ca05e9c5ee3a4586722",
+    "controls": 45,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-17",
+    "title": "字幕对轴·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用字幕对轴字幕时间轴对齐调整",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:46:18.184Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-17.png",
+    "state": "states/plugin-17.json",
+    "sha256": "4fd87fdab82b292bbb6677393b3e3473f2623fc9d025f808eb6c4c6791dce36e",
+    "controls": 34,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-18",
+    "title": "声音克隆·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用声音克隆AI克隆个性化音色",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:46:35.258Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-18.png",
+    "state": "states/plugin-18.json",
+    "sha256": "89c1e7bf614b631c4aac7b9474ecfd230ea3224f57f59d309b58824c250e41b2",
+    "controls": 37,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-19",
+    "title": "字幕合并·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用字幕合并多条字幕智能合并处理",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:46:54.615Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-19.png",
+    "state": "states/plugin-19.json",
+    "sha256": "5db1bf0da4df70ae5916ae55912521116b85cfc13dc533a3a449a75e5756fe96",
+    "controls": 34,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-20",
+    "title": "音色设计·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用音色设计AI智能设计角色音色",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:47:10.344Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-20.png",
+    "state": "states/plugin-20.json",
+    "sha256": "903ca8d196c453ae9002cd54c4a014199b1e2c3d0cc9e7a3115a5b7ba56b489e",
+    "controls": 39,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-21",
+    "title": "小说转剧·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用小说转剧中长篇·纯对话版",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:47:28.181Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-21.png",
+    "state": "states/plugin-21.json",
+    "sha256": "98bd36674bb8ecbe1af710e891ec787f99ca128bdc2219aa798cf258dbfa197e",
+    "controls": 40,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-22",
+    "title": "AI改文·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用AI改文智能改写文本，优化表达",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:47:47.633Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-22.png",
+    "state": "states/plugin-22.json",
+    "sha256": "8246fb065932e740e67c20bc2487c094afc3eff86aa92c2a5cc5bb958e065871",
+    "controls": 39,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-23",
+    "title": "爆款开头·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用爆款开头生成吸引人的开头文案",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:48:08.522Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-23.png",
+    "state": "states/plugin-23.json",
+    "sha256": "486f8b43b699cbf626641f29c315dada617af1a74525bcec835a37255d7e1358",
+    "controls": 40,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-24",
+    "title": "女频性转·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用女频性转女频小说性别转换改写",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:48:23.496Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-24.png",
+    "state": "states/plugin-24.json",
+    "sha256": "20dde61cf665de597309f3f96d04cf19abb13b5e4683fc4501c76ebfc4902892",
+    "controls": 29,
+    "status": "captured",
+    "businessVerified": false
+  },
+  {
+    "id": "plugin-25",
+    "title": "格式化文本·插件页面",
+    "group": "插件详情",
+    "entry": "插件中心→去使用格式化文本文本格式整理与规范化",
+    "version": "2.9.5",
+    "capturedAt": "2026-11-21T08:48:41.571Z",
+    "targetId": "25C7B8744D7D33AB4DCBF3F55FFA3547",
+    "url": "http://127.0.0.1:20073/index.html",
+    "viewport": {
+      "width": 1920,
+      "height": 1050
+    },
+    "screenshot": "screenshots/plugin-25.png",
+    "state": "states/plugin-25.json",
+    "sha256": "accd1795e187506786a962e97e62d2df3608a58113f2f5dac0de4d94f109b6f0",
+    "controls": 41,
+    "status": "captured",
+    "businessVerified": false
+  }
+]

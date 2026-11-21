@@ -1,0 +1,726 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n文件\n\n还没有文件。可以上传文本，或让助手把小说、分镜写进项目。\n\n图片\n导入\n暖暖\n图片\n白衬衣少年\n图片\n卷发少女同伴群像\n图片\n操场围观人群\n图片\n京市一中操场-篮球场\n图片\n京市一中操场-看台\n图片\n视频\n\n画布上还没有视频。\n\n画布\n文件\n资产管理\n54%\nAgent\n资产管理\n加载作品资产\n全部\n▾\n已定稿\n需修改\n重点\n备选\n人物\n场景\n道具\n未标记\n拖动左侧手柄可调整显示顺序（按作品永久保存）\n暖暖\n白衬衣少年\n卷发少女同伴群像\n操场围观人群\n京市一中操场-篮球场\n京市一中操场-看台\n共 6 节点",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入",
+      "disabled": false,
+      "rect": {
+        "x": 1029,
+        "y": 118,
+        "width": 42,
+        "height": 27.5
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "暖暖图片",
+      "disabled": false,
+      "rect": {
+        "x": 268,
+        "y": 161.5,
+        "width": 803,
+        "height": 53.796875
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "白衬衣少年图片",
+      "disabled": false,
+      "rect": {
+        "x": 268,
+        "y": 229.296875,
+        "width": 803,
+        "height": 53.796875
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "卷发少女同伴群像图片",
+      "disabled": false,
+      "rect": {
+        "x": 268,
+        "y": 297.09375,
+        "width": 803,
+        "height": 53.796875
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "操场围观人群图片",
+      "disabled": false,
+      "rect": {
+        "x": 268,
+        "y": 364.890625,
+        "width": 803,
+        "height": 53.796875
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "京市一中操场-篮球场图片",
+      "disabled": false,
+      "rect": {
+        "x": 268,
+        "y": 432.6875,
+        "width": 803,
+        "height": 53.796875
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "京市一中操场-看台图片",
+      "disabled": false,
+      "rect": {
+        "x": 268,
+        "y": 500.484375,
+        "width": 803,
+        "height": 53.796875
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "返回作品列表",
+      "disabled": false,
+      "rect": {
+        "x": 314,
+        "y": 66,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "画布",
+      "disabled": false,
+      "rect": {
+        "x": 357,
+        "y": 71,
+        "width": 60,
+        "height": 22
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "文件",
+      "disabled": false,
+      "rect": {
+        "x": 419,
+        "y": 71,
+        "width": 60,
+        "height": 22
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产管理",
+      "disabled": false,
+      "rect": {
+        "x": 48,
+        "y": 991,
+        "width": 84,
+        "height": 22
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选择全部视频卡片",
+      "disabled": false,
+      "rect": {
+        "x": 143,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "缩小",
+      "disabled": false,
+      "rect": {
+        "x": 176,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "放大",
+      "disabled": false,
+      "rect": {
+        "x": 240,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "适应屏幕大小",
+      "disabled": false,
+      "rect": {
+        "x": 265,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "搜索画布",
+      "disabled": false,
+      "rect": {
+        "x": 298,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "整理画布",
+      "disabled": false,
+      "rect": {
+        "x": 323,
+        "y": 991,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "选中模式",
+      "disabled": false,
+      "rect": {
+        "x": 823.8515625,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动画布模式",
+      "disabled": false,
+      "rect": {
+        "x": 859.8515625,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 895.8515625,
+        "y": 980,
+        "width": 50.296875,
+        "height": 29
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "撤销",
+      "disabled": false,
+      "rect": {
+        "x": 967.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "历史记录",
+      "disabled": false,
+      "rect": {
+        "x": 1003.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产库",
+      "disabled": false,
+      "rect": {
+        "x": 1039.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "快捷键",
+      "disabled": false,
+      "rect": {
+        "x": 1075.1484375,
+        "y": 980,
+        "width": 29,
+        "height": 29
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 253,
+        "y": 62,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "加载作品资产",
+      "disabled": false,
+      "rect": {
+        "x": 30,
+        "y": 100,
+        "width": 251,
+        "height": 32
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "按时间降序并保存顺序",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 142,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部 ▾",
+      "disabled": false,
+      "rect": {
+        "x": 62,
+        "y": 142,
+        "width": 54.359375,
+        "height": 28
+      }
+    },
+    {
+      "index": 40,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索节点...",
+      "disabled": false,
+      "rect": {
+        "x": 151.359375,
+        "y": 147,
+        "width": 122.640625,
+        "height": 18
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：已定稿",
+      "disabled": false,
+      "rect": {
+        "x": 30,
+        "y": 178,
+        "width": 70,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：需修改",
+      "disabled": false,
+      "rect": {
+        "x": 106,
+        "y": 178,
+        "width": 70,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：重点",
+      "disabled": false,
+      "rect": {
+        "x": 182,
+        "y": 178,
+        "width": 59,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：备选",
+      "disabled": false,
+      "rect": {
+        "x": 30,
+        "y": 210.5,
+        "width": 59,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：人物",
+      "disabled": false,
+      "rect": {
+        "x": 95,
+        "y": 210.5,
+        "width": 59,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：场景",
+      "disabled": false,
+      "rect": {
+        "x": 160,
+        "y": 210.5,
+        "width": 59,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选标签：道具",
+      "disabled": false,
+      "rect": {
+        "x": 30,
+        "y": 243,
+        "width": 59,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "筛选未标记的节点",
+      "disabled": false,
+      "rect": {
+        "x": 95,
+        "y": 243,
+        "width": 55,
+        "height": 26.5
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动排序",
+      "disabled": false,
+      "rect": {
+        "x": 29,
+        "y": 313,
+        "width": 22,
+        "height": 28
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动排序",
+      "disabled": false,
+      "rect": {
+        "x": 29,
+        "y": 355,
+        "width": 22,
+        "height": 28
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动排序",
+      "disabled": false,
+      "rect": {
+        "x": 29,
+        "y": 397,
+        "width": 22,
+        "height": 28
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动排序",
+      "disabled": false,
+      "rect": {
+        "x": 29,
+        "y": 439,
+        "width": 22,
+        "height": 28
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动排序",
+      "disabled": false,
+      "rect": {
+        "x": 29,
+        "y": 481,
+        "width": 22,
+        "height": 28
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "拖动排序",
+      "disabled": false,
+      "rect": {
+        "x": 29,
+        "y": 523,
+        "width": 22,
+        "height": 28
+      }
+    }
+  ]
+}

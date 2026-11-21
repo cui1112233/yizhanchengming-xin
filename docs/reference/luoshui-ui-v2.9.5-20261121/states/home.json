@@ -1,0 +1,1428 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n短剧Agent\nv2026-11-20 · 短剧创作工作站\n每一帧，\n都值得被导演\n\n短剧 · 漫剧 · 小说，一站式创作\n\n下午好，choushiyiguai1 创作者。今天也一起把想法变成作品。\n通知\n\n使用软件前请查看软件协议\n\n购买软件请联系微信：bylx109\n\n软件使用教程：https://my.feishu.cn/wiki/PQwNw6v4rivBeXk4Ayzc31Thnwc\n\n服务器版本 v2.9.5\n0\n作品\n1\n剧本创作\n2\n画布\n11月创作\n活跃 2 天\n· 2 次\n少\n多\n小说创作\n大纲 · 章节 · 审稿 Agent\n剧本创作\n分镜 · 出图 · 导演台预演\nmomo画布\n节点画布与画布助手\n短剧工作室\n全部作品 · 一处管理\nAI-CUT\n剪辑工作台 · 时间轴\nAI 工具箱\n封面 · BGM · 超分\n11月20日 · 亮点\n全局设置 · B.AI 推理渠道\n\n新增 B.AI 推理渠道（api.b.ai）：全局设置 → 语言模型中填写 B.AI API Key 即可启用，走 OpenAI chat/…\n\n更新记录\n\n每个版本的新功能、改进和修复\n\n11/20\n2026-11-20\n11月20日\nB.AI\n推理渠道\nVidu CLI\n参考生视频\n剧本创作\n画布\n11/18\n2026-11-18\n11月18日\n绘画\n出图\n参考图\n作品资产\n预设提示词\n11/14\n2026-11-14\n11月14日\n模型上新\nGemini 4\n洛水\n小鱼漫漫\nOpenRouter\nSeedream 5.5\nSeedance 2.5 Flash\n即梦\n即梦画布\n火山\n资产生图\n封面生成\n渠道4\nSD视频包\n10/29\n2026-10-29\n10月29日\n剧本创作\n分镜合并\n推荐时长\n片段重拍\n超长视频\n10/25\n2026-10-25\n10月25日\n资产分析\n大师模式\n大师模式-3D\n写实\n人物设计\n颜值定位\n出现集数\n剧本创作\n10/24\n2026-10-24\n10月24日\n模型上新\nKimi\nK3.1 Pro\n官方\n洛水\n小鱼漫漫\n小云雀\nCLI\n出图\nSkill\n小说转剧\n分镜词\n10/20\n2026-10-20\n10月20日\nSD视频包\n渠道1\n渠道18\nSeedance 2.5\n模型上新\n参考图\n剧本创作\n即梦画布 CLI\nDreamina Canvas\n并发\nLibTV\nVidu\nHappy Horse\nKling\n10/18\n2026-10-18\n10月18日\n剧本创作\n画布\n可灵\nCLI\nDreamina Canvas\n视频引擎\n10/08\n2026-10-08\n10月8日\n剧本创作\n洛水出图包\nGRSAI\nnano-banana-2.1\n资产生图\n封面生成\nAI 工具箱\n10/01\n2026-10-01\n10月1日\n技能\n短剧\n智能粗剪\n剧本\n画布\n导演台\n站位\n白模视频\n09/30\n2026-09-30\n9月30日\nCodex\n模型上新\nAI Chat\nAgent\n剧本\n作品\nAI-CUT\nAI 工具箱\n资产分析\n智能分割\n字幕\n资产\n09/29\n2026-09-29\n9月29日\n小鱼漫漫\nOpenRouter\nClaude\n官方模型\n通义千问\n阿里云\nAI Chat\nAI-CUT\n视频理解\n模型上新\nAPI 模型\n09/28\n2026-09-28\nPicsart CLI · 剧本引擎 / 超级画布 / 视频超分\n剧本创作\n剧本引擎\n超级画布\n出图\n视频\n视频超分\nPicsart CLI\ngen-ai\nSeedance\nWan\nGPT Image\nSeedream\nQwen\nTopaz\nByteDance\nFlux\n09/25\n2026-09-25\nAI-CUT 剪辑工作台\nAI-CUT\n剪辑\n时间轴\n字幕\n转写\n智能分割\nAgent\n短剧\n09/25\n2026-09-25\nAI-Shot 短剧宣传高光\nAI工具箱\nAI-Shot\n短剧\n草稿\n高光\n宣传\nffmpeg\n09/23\n2026-09-23\n即梦画布 CLI · 剧本出图出视频 · 资产管理 · 超级画布 · AI-BGM\n剧本创作\n视频引擎\n生图\n即梦画布\nCLI\n资产管理\n资产生成\n超级画布\n白模视频\nAI工具箱\nAI-BGM\n草稿\nBGM\n09/22\n2026-09-22\nMagnific-API · Sunra-API · AI工具箱快速生图 · GPT-6 Sol · Claude Opus 5.5\n剧本创作\n超级画布\n视频引擎\nMagnific-API\nSunra-API\nSeedance\nAI工具箱\n快速生图\nNEW\n瀑布流\n参考库\n资产库\ngpt-image2\n生图\n模型上新\n小鱼漫漫\n洛水\n智慧版\n奇想版\ngpt-6-sol\nclaude-opus-5-5\nAPI 模型\n09/19\n2026-09-19\n作品库剧本文稿对比 · 台词对照分析\n作品库\n剧本\n文稿对比\n原文\n绑定\nAI分析\n台词对照\nAI分镜\n09/17\n2026-09-17\nAgent 联网搜索 · 浏览器后台运行 · 选择现有作品 · 剧本创作资产分析 · 分镜顶栏文案缩短 · 分镜脚本查找替换 · 作品封面读资产\nAgent\n联网搜索\nweb_search\nweb_fetch\nTavily\n浏览器\n无头\n隐藏窗口\n作品库\n选择现有作品\n剧本创作\n资产\n资产分析\n新增\n覆盖\n分镜\n顶栏\n查找替换\n封面\n09/16\n2026-09-16\n解说洛水出图包全量 · GRSAI gpt-image · MiniMax H3(GRSAI) · 洛水内部 Skill · 规划小节密度\n剧本创作\n解说\nMiniMax H3\nGRSAI\ngpt-image-2\ngpt-image-2.5\nminimax-h3\n视频引擎\n生图\n分镜\n洛水出图包\n解说资产\nnano-banana-pro\nAgent\nSkill\n小说转漫剧A1\n小洛v7-15s\n分镜词\n分镜规划\n规划小节\n密度\n作品库\nAI分镜\n09/14\n2026-09-14\n剧本创作 davinci-api · OpenArt CLI · 小鱼漫漫 deepseek-v4.1-flash · 作品 Agent 调用写小说 Skill\n剧本创作\ndavinci-api\nOpenArt CLI\n小鱼漫漫\n模型上新\nAPI 模型\ndeepseek-v4.1-flash\nSkill\n写小说\n作品库 Agent\n09/09\n2026-09-09\n洛水 / GRSAI gpt-image-2.5 · 小鱼漫漫出图 · 作品库 Agent\n洛水出图包\nGRSAI\ngpt-image-2.5\ngpt-image-2.5-sunburst\ngpt-image-2.5-flare\n出图\n小鱼漫漫\n文生图\n图生图\n豆包5.0\ngpt-image-2\nqwen-image-2.0\nNano Banana 2\n剧本创作\n作品库\nAI工具箱\n封面\nAgent\nAI分镜\n分镜规划\nQueryRunner\n子代理\n覆盖率\n续跑\n快捷口令\n并行工具\n09/07\n2026-09-07\n洛水出图包 · 分镜播放速度 · Buzzy · NamiFusion · 爱奇艺-纳逗Pro CLI · AutoDL-ComfyUI\n剧本创作\n作品库\n洛水出图包\nnano-banana-pro\n生图\n改图\n模型配置\n播放器\n倍速\n连播\n剧本引擎\nBuzzy\nNamiFusion\nMCP\nOAuth\nSeedance 2.5\n即梦\n视频模型\n超级画布\n爱奇艺\n纳逗Pro\nnadoupro-cli\nH3\nAutoDL\nAutoDL-ComfyUI\nComfyUI\n解说引擎\n离线下载\n09/05\n2026-09-05\n自定义 SD视频包 · 白模视频 · MiniMax-H3-Max · GPT-6 Astra\n剧本创作\nSD视频包\n自定义渠道\n字段映射\n导入配置\n白模视频\nLibTV\nSeedance 2.5\n视频模型\nMiniMax-H3-Max\n模型上新\n小鱼漫漫\n洛水\n智慧版\nOpenRouter\nqwen3.8-max-0902\nGPT-6 Astra\nAPI 模型\n播放器\n自动连播\n位置参考\n站位\n换装\n09/02\n2026-09-02\n剧本创作 Agent · 资产完整检查、增删改与图生图\n剧本创作\nAgent\n资产\n完整检查\n人物\n场景\n道具\n重生人设\n图生图\n@资产\n图片预览\n09/01\n2026-09-01\n作品库 AI 分镜：规划与生成拆开 · 剧本创作 Agent 资产读写与批量生图\n作品库\nAI分镜\n分镜规划\n规划小节\n继续分镜\n继续追问\n检查脚本\n分镜脚本\nAgent\n子代理\n子会话\n作品文件\n覆盖率\n剧本创作\n资产\n资产生图\n人物\n场景\n道具\n08/31\n2026-08-31\n空氧模型恢复 · 小云雀-国际版 · ComfyUI MiniMax H3\n空氧\n智能自动\n余额\n剧本引擎\n小云雀\n小云雀-国际版\nPippit\n生图\n生视频\nAccess Key\n超级画布\nComfyUI\nMiniMax H3\n多图参考\n08/30\n2026-08-30\n快速剪辑 · GLM-5.3-Flash 上架 · 官方 / OpenRouter / 小鱼漫漫模型同步\nAI工具箱\n快速剪辑\n空镜\n草稿\n智能镜头分割\n模型上新\nGLM-5.3-Flash\n智谱官方\nOpenRouter\n小鱼漫漫\nAPI 模型\n08/26\n2026-08-26\n解说引擎 Higgsfield / LibTV · LibTV Wan 3.0 · 渠道4 Wan 3.0\n解说引擎\n剧本引擎\nHiggsfield CLI\nLibTV\nWan 3.0\n出图\n视频\nSD视频包\n渠道4\n08/25\n2026-08-25\n剧本创作 · TopView API · 人物站位\n剧本创作\n剧本引擎\nTopView API\nSeedance\n离线下载\n资产\n站位\n08/23\n2026-08-23\n工具箱 · 字幕纠错 · AI分段 · wan3.0-video\nAI工具箱\n字幕纠错\n视频分段\nAI分段\n草稿\n错别字\n语音识别\n剧本引擎\n万相3.0\nwan3.0-video\n阿里云官方\n多参\n08/18\n2026-08-18\n分镜换装 · NeoWoW 剧本引擎 · 字幕切视频\n换装\nNeoWoW\n剧本引擎\n画布\n全能视频\n生图\n资产生图\nMiniMax H3\nSeedance\n视频分段\n字幕切视频\n草稿文本轨道\n草稿合并\n08/14\n2026-08-14\nRunningHub Seedance 2.5 · Mini\nRunningHub\nSeedance 2.5\nSeedance 2.0 Mini\n剧本引擎\n超级画布\n视频\n参考视频\n多模态\n模型上新\n08/13\n2026-08-13\nFlova CLI 全量接入 · Grok 视频包 1.5 · 洛水 MiniMax H3 视频包\nFlova CLI\n剧本引擎\n超级画布\n出图\n视频\nSeedance 2.5\nLibTV\nGrok视频包\n多参\n模型上新\n洛水出图包\n封面\n人设\nMiniMax H3\n洛水视频包\n08/09\n2026-08-09\n渠道1 xingmiao-2.5 · SD 视频包渠道5/7 · 渠道4 · Higgsfield CLI 重生修复\nSD视频包\n渠道1\n渠道5\n渠道7\n渠道4\nSeedance 2.5\n模型上新\nHiggsfield CLI\n修复\n08/08\n2026-08-08\n超级画布体验优化 · 角色设计 · LibTV / 官方·即梦CLI·小云雀 Seedance 2.5 · 渠道4 · 火山限时优惠\n超级画布\n资产管理\n导航图\n体验优化\n历史资产\n角色设计\n人物质感\n剧本创作\n作品资产\nSeedance 2.5\nLibTV\n限时优惠\n08/07\n2026-08-07\nSD 视频包渠道12/14 · 海螺 H3 · RunningHub MiniMax-H3 · LibTV 下载修复\n视频模型\nSD视频包\n渠道12\n渠道14\nSeedance\n海螺 H3\n渠道4\n渠道8\nRunningHub\nMiniMax-H3\nLibTV\n剧本创作\n超级画布\n离线下载\n修复\n08/05\n2026-08-05\n豆包视觉 · Qwen3.8 Max · 火山超分/去字幕\n官方模型\n豆包\n通义千问\n视频理解\nAI Chat\n模型上新\n火山\n超分\n去字幕\nMediaKit\n08/03\n2026-08-03\n火山引擎 Seedream · 渠道4 Seedance 官方模型\n图片模型\n火山引擎\nSeedream\n资产生图\n分镜生图\n封面生成\n渠道4\nSeedance\n视频模型\n08/01\n2026-08-01\nSeedance 2.5 · Codex 5.6/5.5 · MiniMax-H3\n视频模型\nSeedance 2.5\n即梦 CLI\n小云雀\nCodex\nMiniMax-H3\n剧本创作\n作品集\n分镜\n07/31\n2026-07-31\n国内官方 / OpenRouter / 洛水渠道模型上新\n渠道说明\n云雾\n空氧\n国内官方\n小米MiMo\nOpenRouter\n洛水\n智慧版\n奇想版\n氛围版\n模型上新\n07/25\n2026-07-25\n模型上新：claude-opus-5 & 剧本引擎上架 Higgsfield CLI\n模型上新\n剧本引擎\nHiggsfield CLI\n出图\n视频\n07/22\n2026-07-22\n作品库增强：AI 分镜、资产库、导入创作与剧本阅读体验\n作品库\nAI分镜\n资产\n分镜脚本\n导入创作\n版本择优\n剧本编辑\n模型上新\n渠道11\nSeedance\nSD视频包\n07/21\n2026-07-21\n新增作品库：导入并保存小说 / 剧本章节正文\n作品库\n导入\n小说\n剧本\n聊天附件\n07/20\n2026-07-20\n即梦 CLI Seedream 5.0 Pro & 官方 Seedance 2.0 mini & 渠道8/10 / SD 视频包 / HappyHorse / 渠道模型上新\n模型上新\n即梦CLI\n资产生图\nSeedance\n渠道8\n渠道10\nMuseAI\nSD视频包\nHappyHorse\n渠道4\n渠道5\n07/18\n2026-07-18\n剧本资产补充 / 分镜体验优化 & 渠道5全能模型\n剧本\n资产补充\n性能优化\n视频生成\n渠道5\n模型上新\n07/15\n2026-07-15\nLibTV 全量图/视频模型 & 模型上新（DeepSeek V4 Pro）\n重大更新\nLibTV\n模型上新\n视频生成\n07/10\n2026-07-10\n模型上架（GPT-5.6 全系列变体 / GPT-5.5 / GPT-5.4 档位 / Grok-4.5）& 剧本人物/场景/道具推理优化\n模型上新\n剧本\n人物\n场景\n道具\n推理优化\n07/02\n2026-07-02\nMoA 多模型协作 & 模型上新（Claude Sonnet 5 / GPT-Image-2 / Grok 视频 / Claude Fable 5）\n重大更新\nMoA\n多模型协作\n模型上新\n生图\n视频生成\n06/27\n2026-06-27\n爆款短剧复刻 & 视频剧本反推 & 附件预览升级 & 提示词/模型记忆\nAI创作\n爆款复刻\n视频理解\n提示词\n体验优化\n06/25\n2026-06-25\n剧本人物 / 场景 / 道具推理提示词 V4 升级\n重大更新\n剧本\n人物\n场景\n道具\n模型上新\n06/23\n2026-06-23\nAI 记忆系统提示词优化\nChat\nAI记忆\n06/22\n2026-06-22\n小说长篇仿写全面增强 & Chat 上下文智能压缩\n重大更新\n写小说\n长篇仿写\nChat\n上下文优化\n06/21\n2026-06-21\nAI 记忆与写小说全面升级\n重大更新\nChat\nAI记忆\n写小说\n全自动写作\n06/20\n2026-06-20\nSkills Agent 工具调用与短剧编排能力升级\n重大更新\nSkills\nAgent\n短剧编排\n模型上新\n06/18\n2026-06-18\n全面进化：Agent 工具化架构升级\n重大更新\n新功能\n优化\n06/10\n2026-06-10\n超级画布 & 视频引擎扩展\n新功能\n优化\n05/28\n2026-05-28\nAI 小说系统 & Skills 技能市场\n新功能\n05/15\n2026-05-15\nAI 工具箱 & 知识库升级\n新功能\n优化\n04/30\n2026-04-30\n剧本创作 & 漫剧解说\n新功能\n04/10\n2026-04-10\n基础版本：角色库 & 音色库 & 提示词社区\n新功能\n购买须知\n购买须知！联系群主购买\n教程\n购买\n软件教程\n洛水漫剧 / 写小说 / 画布 / Skills 技能教程\n教程\n飞书文档",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 178,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "收起侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 200,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "首页",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 64,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 3,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "小说创作",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 101,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 4,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "角色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 138,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 5,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "音色库",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 175,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 6,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "漫剧解说1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 212,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 7,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "短剧工作室0",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 270,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 8,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "剧本创作1",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 307,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 9,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "momo画布2",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 344,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 10,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "绘画",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 381,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 11,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "AI-CUT",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 441,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 12,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 501,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 13,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "插件",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 538,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 14,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "社区186",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 575,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 15,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "我的资产",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 612,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 16,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "反馈",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 649,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 17,
+      "tag": "DIV",
+      "role": "menuitem",
+      "label": "在线客服",
+      "disabled": false,
+      "rect": {
+        "x": 8,
+        "y": 686,
+        "width": 240,
+        "height": 34
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 27,
+      "tag": "A",
+      "role": "",
+      "label": "https://my.feishu.cn/wiki/PQwNw6v4rivBeXk4Ayzc31Thnwc",
+      "disabled": false,
+      "rect": {
+        "x": 1200.296875,
+        "y": 182.5,
+        "width": 324.671875,
+        "height": 16
+      }
+    },
+    {
+      "index": 28,
+      "tag": "DIV",
+      "role": "button",
+      "label": "0作品",
+      "disabled": false,
+      "rect": {
+        "x": 1113.796875,
+        "y": 284.671875,
+        "width": 99.21875,
+        "height": 32.828125
+      }
+    },
+    {
+      "index": 29,
+      "tag": "DIV",
+      "role": "button",
+      "label": "1剧本创作",
+      "disabled": false,
+      "rect": {
+        "x": 1224.59375,
+        "y": 284.671875,
+        "width": 99.234375,
+        "height": 32.828125
+      }
+    },
+    {
+      "index": 30,
+      "tag": "DIV",
+      "role": "button",
+      "label": "2画布",
+      "disabled": false,
+      "rect": {
+        "x": 1335.40625,
+        "y": 284.671875,
+        "width": 99.21875,
+        "height": 32.828125
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小说创作大纲 · 章节 · 审稿 Agent",
+      "disabled": false,
+      "rect": {
+        "x": 1477.3125,
+        "y": 259.75,
+        "width": 370.6875,
+        "height": 231.59375
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "剧本创作分镜 · 出图 · 导演台预演",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 507.09375,
+        "width": 759.125,
+        "height": 231.59375
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "momo画布节点画布与画布助手",
+      "disabled": false,
+      "rect": {
+        "x": 1088.875,
+        "y": 509.09375,
+        "width": 370.6875,
+        "height": 231.59375
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧工作室全部作品 · 一处管理",
+      "disabled": false,
+      "rect": {
+        "x": 1477.3125,
+        "y": 509.09375,
+        "width": 370.6875,
+        "height": 231.59375
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI-CUT剪辑工作台 · 时间轴",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 758.4375,
+        "width": 370.6875,
+        "height": 231.59375
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI 工具箱封面 · BGM · 超分",
+      "disabled": false,
+      "rect": {
+        "x": 700.4375,
+        "y": 758.4375,
+        "width": 370.6875,
+        "height": 231.59375
+      }
+    },
+    {
+      "index": 37,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "11/202026-11-2011月20日B.AI推理渠道Vidu CLI参考生视频剧本创作画布",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1098.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 38,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "11/182026-11-1811月18日绘画出图参考图作品资产预设提示词",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1208.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 39,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "11/142026-11-1411月14日模型上新Gemini 4洛水小鱼漫漫OpenRouterSeedream 5.5Seedance 2.5 Flash即梦即梦画布火山资产生图封面生成渠道4SD视频包",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1319.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 40,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/292026-10-2910月29日剧本创作分镜合并推荐时长片段重拍超长视频",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1429.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 41,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/252026-10-2510月25日资产分析大师模式大师模式-3D写实人物设计颜值定位出现集数剧本创作",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1540.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 42,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/242026-10-2410月24日模型上新KimiK3.1 Pro官方洛水小鱼漫漫小云雀CLI出图Skill小说转剧分镜词",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1650.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 43,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/202026-10-2010月20日SD视频包渠道1渠道18Seedance 2.5模型上新参考图剧本创作即梦画布 CLIDreamina Canvas并发LibTVViduHappy HorseKling",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1761.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 44,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/182026-10-1810月18日剧本创作画布可灵CLIDreamina Canvas视频引擎",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1871.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 45,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/082026-10-0810月8日剧本创作洛水出图包GRSAInano-banana-2.1资产生图封面生成AI 工具箱",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 1982.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 46,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "10/012026-10-0110月1日技能短剧智能粗剪剧本画布导演台站位白模视频",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2092.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 47,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/302026-09-309月30日Codex模型上新AI ChatAgent剧本作品AI-CUTAI 工具箱资产分析智能分割字幕资产",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2203.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 48,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/292026-09-299月29日小鱼漫漫OpenRouterClaude官方模型通义千问阿里云AI ChatAI-CUT视频理解模型上新API 模型",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2313.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 49,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/282026-09-28Picsart CLI · 剧本引擎 / 超级画布 / 视频超分剧本创作剧本引擎超级画布出图视频视频超分Picsart CLIgen-aiSeedanceWanGPT ImageSeedreamQwenTopazByteDanceFlux",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2424.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 50,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/252026-09-25AI-CUT 剪辑工作台AI-CUT剪辑时间轴字幕转写智能分割Agent短剧",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2534.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 51,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/252026-09-25AI-Shot 短剧宣传高光AI工具箱AI-Shot短剧草稿高光宣传ffmpeg",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2645.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 52,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/232026-09-23即梦画布 CLI · 剧本出图出视频 · 资产管理 · 超级画布 · AI-BGM剧本创作视频引擎生图即梦画布CLI资产管理资产生成超级画布白模视频AI工具箱AI-BGM草稿BGM",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2755.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 53,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/222026-09-22Magnific-API · Sunra-API · AI工具箱快速生图 · GPT-6 Sol · Claude Opus 5.5剧本创作超级画布视频引擎Magnific-APISunra-APISeedanceAI工具箱快速生图NEW瀑布流参考库资产库gpt-ima",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 2866.03125,
+        "width": 1536,
+        "height": 133
+      }
+    },
+    {
+      "index": 54,
+      "tag": "A",
+      "role": "",
+      "label": "sunra.ai",
+      "disabled": false,
+      "rect": {
+        "x": 708.96875,
+        "y": 3157.6875,
+        "width": 45.640625,
+        "height": 18
+      }
+    },
+    {
+      "index": 55,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/192026-09-19作品库剧本文稿对比 · 台词对照分析作品库剧本文稿对比原文绑定AI分析台词对照AI分镜",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3003.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 56,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/172026-09-17Agent 联网搜索 · 浏览器后台运行 · 选择现有作品 · 剧本创作资产分析 · 分镜顶栏文案缩短 · 分镜脚本查找替换 · 作品封面读资产Agent联网搜索web_searchweb_fetchTavily浏览器无头隐藏窗口作品库选择现有作品剧本创作资产资产分析新",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3113.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 57,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/162026-09-16解说洛水出图包全量 · GRSAI gpt-image · MiniMax H3(GRSAI) · 洛水内部 Skill · 规划小节密度剧本创作解说MiniMax H3GRSAIgpt-image-2gpt-image-2.5minimax-h3视频引擎生图分镜洛水出",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3224.03125,
+        "width": 1536,
+        "height": 133
+      }
+    },
+    {
+      "index": 58,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/142026-09-14剧本创作 davinci-api · OpenArt CLI · 小鱼漫漫 deepseek-v4.1-flash · 作品 Agent 调用写小说 Skill剧本创作davinci-apiOpenArt CLI小鱼漫漫模型上新API 模型deepseek-v4.1-f",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3361.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 59,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/092026-09-09洛水 / GRSAI gpt-image-2.5 · 小鱼漫漫出图 · 作品库 Agent洛水出图包GRSAIgpt-image-2.5gpt-image-2.5-sunburstgpt-image-2.5-flare出图小鱼漫漫文生图图生图豆包5.0gpt-image",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3471.53125,
+        "width": 1536,
+        "height": 133
+      }
+    },
+    {
+      "index": 60,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/072026-09-07洛水出图包 · 分镜播放速度 · Buzzy · NamiFusion · 爱奇艺-纳逗Pro CLI · AutoDL-ComfyUI剧本创作作品库洛水出图包nano-banana-pro生图改图模型配置播放器倍速连播剧本引擎BuzzyNamiFusionMCPOAu",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3608.53125,
+        "width": 1536,
+        "height": 133
+      }
+    },
+    {
+      "index": 61,
+      "tag": "A",
+      "role": "",
+      "label": "https://www.buzzy.now/mcp",
+      "disabled": false,
+      "rect": {
+        "x": 543,
+        "y": 4098.46875,
+        "width": 169.71875,
+        "height": 18
+      }
+    },
+    {
+      "index": 62,
+      "tag": "A",
+      "role": "",
+      "label": "https://www.namifusion.com/api-keys",
+      "disabled": false,
+      "rect": {
+        "x": 547.3125,
+        "y": 4258.046875,
+        "width": 225.390625,
+        "height": 18
+      }
+    },
+    {
+      "index": 63,
+      "tag": "A",
+      "role": "",
+      "label": "https://nadoupro.iqiyi.com/",
+      "disabled": false,
+      "rect": {
+        "x": 556.5,
+        "y": 4441.453125,
+        "width": 163.640625,
+        "height": 18
+      }
+    },
+    {
+      "index": 64,
+      "tag": "A",
+      "role": "",
+      "label": "autodl.art",
+      "disabled": false,
+      "rect": {
+        "x": 798.34375,
+        "y": 4723.59375,
+        "width": 57.28125,
+        "height": 18
+      }
+    },
+    {
+      "index": 65,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/052026-09-05自定义 SD视频包 · 白模视频 · MiniMax-H3-Max · GPT-6 Astra剧本创作SD视频包自定义渠道字段映射导入配置白模视频LibTVSeedance 2.5视频模型MiniMax-H3-Max模型上新小鱼漫漫洛水智慧版OpenRouterqwen",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3745.53125,
+        "width": 1536,
+        "height": 133
+      }
+    },
+    {
+      "index": 66,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/022026-09-02剧本创作 Agent · 资产完整检查、增删改与图生图剧本创作Agent资产完整检查人物场景道具重生人设图生图@资产图片预览",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3882.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 67,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "09/012026-09-01作品库 AI 分镜：规划与生成拆开 · 剧本创作 Agent 资产读写与批量生图作品库AI分镜分镜规划规划小节继续分镜继续追问检查脚本分镜脚本Agent子代理子会话作品文件覆盖率剧本创作资产资产生图人物场景道具",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 3993.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 68,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/312026-08-31空氧模型恢复 · 小云雀-国际版 · ComfyUI MiniMax H3空氧智能自动余额剧本引擎小云雀小云雀-国际版Pippit生图生视频Access Key超级画布ComfyUIMiniMax H3多图参考",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4103.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 69,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/302026-08-30快速剪辑 · GLM-5.3-Flash 上架 · 官方 / OpenRouter / 小鱼漫漫模型同步AI工具箱快速剪辑空镜草稿智能镜头分割模型上新GLM-5.3-Flash智谱官方OpenRouter小鱼漫漫API 模型",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4214.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 70,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/262026-08-26解说引擎 Higgsfield / LibTV · LibTV Wan 3.0 · 渠道4 Wan 3.0解说引擎剧本引擎Higgsfield CLILibTVWan 3.0出图视频SD视频包渠道4",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4324.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 71,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/252026-08-25剧本创作 · TopView API · 人物站位剧本创作剧本引擎TopView APISeedance离线下载资产站位",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4435.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 72,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/232026-08-23工具箱 · 字幕纠错 · AI分段 · wan3.0-videoAI工具箱字幕纠错视频分段AI分段草稿错别字语音识别剧本引擎万相3.0wan3.0-video阿里云官方多参",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4545.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 73,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/182026-08-18分镜换装 · NeoWoW 剧本引擎 · 字幕切视频换装NeoWoW剧本引擎画布全能视频生图资产生图MiniMax H3Seedance视频分段字幕切视频草稿文本轨道草稿合并",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4656.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 74,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/142026-08-14RunningHub Seedance 2.5 · MiniRunningHubSeedance 2.5Seedance 2.0 Mini剧本引擎超级画布视频参考视频多模态模型上新",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4766.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 75,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/132026-08-13Flova CLI 全量接入 · Grok 视频包 1.5 · 洛水 MiniMax H3 视频包Flova CLI剧本引擎超级画布出图视频Seedance 2.5LibTVGrok视频包多参模型上新洛水出图包封面人设MiniMax H3洛水视频包",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4877.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 76,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/092026-08-09渠道1 xingmiao-2.5 · SD 视频包渠道5/7 · 渠道4 · Higgsfield CLI 重生修复SD视频包渠道1渠道5渠道7渠道4Seedance 2.5模型上新Higgsfield CLI修复",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 4987.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 77,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/082026-08-08超级画布体验优化 · 角色设计 · LibTV / 官方·即梦CLI·小云雀 Seedance 2.5 · 渠道4 · 火山限时优惠超级画布资产管理导航图体验优化历史资产角色设计人物质感剧本创作作品资产Seedance 2.5LibTV限时优惠",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5098.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 78,
+      "tag": "A",
+      "role": "",
+      "label": "https://www.volcengine.com/activity/seedance2",
+      "disabled": false,
+      "rect": {
+        "x": 556.5,
+        "y": 7208.1875,
+        "width": 284.5,
+        "height": 18
+      }
+    },
+    {
+      "index": 79,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/072026-08-07SD 视频包渠道12/14 · 海螺 H3 · RunningHub MiniMax-H3 · LibTV 下载修复视频模型SD视频包渠道12渠道14Seedance海螺 H3渠道4渠道8RunningHubMiniMax-H3LibTV剧本创作超级画布离线下载修复",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5208.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 80,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/052026-08-05豆包视觉 · Qwen3.8 Max · 火山超分/去字幕官方模型豆包通义千问视频理解AI Chat模型上新火山超分去字幕MediaKit",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5319.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 81,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/032026-08-03火山引擎 Seedream · 渠道4 Seedance 官方模型图片模型火山引擎Seedream资产生图分镜生图封面生成渠道4Seedance视频模型",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5429.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 82,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "08/012026-08-01Seedance 2.5 · Codex 5.6/5.5 · MiniMax-H3视频模型Seedance 2.5即梦 CLI小云雀CodexMiniMax-H3剧本创作作品集分镜",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5540.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 83,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/312026-07-31国内官方 / OpenRouter / 洛水渠道模型上新渠道说明云雾空氧国内官方小米MiMoOpenRouter洛水智慧版奇想版氛围版模型上新",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5650.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 84,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/252026-07-25模型上新：claude-opus-5 & 剧本引擎上架 Higgsfield CLI模型上新剧本引擎Higgsfield CLI出图视频",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5761.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 85,
+      "tag": "A",
+      "role": "",
+      "label": "https://higgsfield.ai/cli",
+      "disabled": false,
+      "rect": {
+        "x": 556.5,
+        "y": 5995.96875,
+        "width": 133.3125,
+        "height": 18
+      }
+    },
+    {
+      "index": 86,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/222026-07-22作品库增强：AI 分镜、资产库、导入创作与剧本阅读体验作品库AI分镜资产分镜脚本导入创作版本择优剧本编辑模型上新渠道11SeedanceSD视频包",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5871.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 87,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/212026-07-21新增作品库：导入并保存小说 / 剧本章节正文作品库导入小说剧本聊天附件",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 5982.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 88,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/202026-07-20即梦 CLI Seedream 5.0 Pro & 官方 Seedance 2.0 mini & 渠道8/10 / SD 视频包 / HappyHorse / 渠道模型上新模型上新即梦CLI资产生图Seedance渠道8渠道10MuseAISD视频包HappyHorse",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6092.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 89,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/182026-07-18剧本资产补充 / 分镜体验优化 & 渠道5全能模型剧本资产补充性能优化视频生成渠道5模型上新",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6203.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 90,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/152026-07-15LibTV 全量图/视频模型 & 模型上新（DeepSeek V4 Pro）重大更新LibTV模型上新视频生成",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6313.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 91,
+      "tag": "A",
+      "role": "",
+      "label": "https://www.liblib.tv/cli",
+      "disabled": false,
+      "rect": {
+        "x": 756.9375,
+        "y": 6479.75,
+        "width": 137.0625,
+        "height": 18
+      }
+    },
+    {
+      "index": 92,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/102026-07-10模型上架（GPT-5.6 全系列变体 / GPT-5.5 / GPT-5.4 档位 / Grok-4.5）& 剧本人物/场景/道具推理优化模型上新剧本人物场景道具推理优化",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6424.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 93,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "07/022026-07-02MoA 多模型协作 & 模型上新（Claude Sonnet 5 / GPT-Image-2 / Grok 视频 / Claude Fable 5）重大更新MoA多模型协作模型上新生图视频生成",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6534.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 94,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/272026-06-27爆款短剧复刻 & 视频剧本反推 & 附件预览升级 & 提示词/模型记忆AI创作爆款复刻视频理解提示词体验优化",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6645.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 95,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/252026-06-25剧本人物 / 场景 / 道具推理提示词 V4 升级重大更新剧本人物场景道具模型上新",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6755.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 96,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/232026-06-23AI 记忆系统提示词优化ChatAI记忆",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6866.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 97,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/222026-06-22小说长篇仿写全面增强 & Chat 上下文智能压缩重大更新写小说长篇仿写Chat上下文优化",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 6976.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 98,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/212026-06-21AI 记忆与写小说全面升级重大更新ChatAI记忆写小说全自动写作",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7087.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 99,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/202026-06-20Skills Agent 工具调用与短剧编排能力升级重大更新SkillsAgent短剧编排模型上新",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7197.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 100,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/182026-06-18全面进化：Agent 工具化架构升级重大更新新功能优化",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7308.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 101,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "06/102026-06-10超级画布 & 视频引擎扩展新功能优化",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7418.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 102,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "05/282026-05-28AI 小说系统 & Skills 技能市场新功能",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7529.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 103,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "05/152026-05-15AI 工具箱 & 知识库升级新功能优化",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7639.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 104,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "04/302026-04-30剧本创作 & 漫剧解说新功能",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7750.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 105,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "04/102026-04-10基础版本：角色库 & 音色库 & 提示词社区新功能",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7860.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 106,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "购买须知购买须知！联系群主购买教程购买",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 7971.03125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 107,
+      "tag": "SUMMARY",
+      "role": "",
+      "label": "软件教程洛水漫剧 / 写小说 / 画布 / Skills 技能教程教程飞书文档",
+      "disabled": false,
+      "rect": {
+        "x": 312,
+        "y": 8081.53125,
+        "width": 1536,
+        "height": 106.5
+      }
+    },
+    {
+      "index": 108,
+      "tag": "A",
+      "role": "",
+      "label": "打开飞书文档",
+      "disabled": false,
+      "rect": {
+        "x": 1712,
+        "y": 8298.328125,
+        "width": 78,
+        "height": 19.5
+      }
+    }
+  ]
+}

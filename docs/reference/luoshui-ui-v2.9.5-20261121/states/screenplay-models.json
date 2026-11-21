@@ -1,0 +1,1675 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\nAI 推理分析\n1212\ndoubao-seed-evolving-latest-version\n官方\n模型配置\n3D国漫1\nAgent\n1\n剧本\n2\n资产\n3\n分镜\n资产图片在视频生成过程中可以继续生成与更新，无需在当前阶段全部完成，可随时回到此处补充或重新生成。\n人物\n4\n场景\n2\n道具\n0\n3D导演台\n0\nAI音色\n0\n总计\n4\n去画布编辑\n搜索名称/描述/提示词...\n新增角色\n资产分析\n批量生成\n编辑\n暖暖\n设定京市一中的漂亮女学生，被同伴称唤暖暖，容貌如天使却性情娇纵任性，因冰淇淋融化当众将其砸到身旁少年身上，是这场霸凌行为的主导者。\n白衬衣少年\n设定京市一中的男生，被暖暖花钱雇来跑腿买冰淇淋，因冰淇淋融化被当众砸在身上却沉默不辩解，性格冷郁隐忍，侧脸精致如漫画人物。\n卷发少女同伴群像\n设定暖暖身边的几名女同学，坐在看台上，见冰淇淋砸到少年身上后先是一愣，随即露出幸灾乐祸的神情并纷纷开口附和、指责少年，是依附暖暖的小群体。\n操场围观人群\n设定艳阳下聚集在京市一中操场篮球场边的学生群体，比赛进入最后关头时连成一片欢呼呐喊，构成热闹的校园赛场背景人群。\n资产设定已确认\n已确定，可以进入分镜\n下一步\n→\n模型配置\n剧本与资产策略\n控制剧本比例和资产解析类型\n剧本比例\n9:16\n16:9\n1:1\n3:4\n4:3\n2:3\n3:2\n21:9\n4:5\n5:4\n出图分辨率\n1K\n2K\n4K\n资产类型\n通用\n海外\n\n通用：角色/场景/道具解析走通用提示词。 剧本比例与出图分辨率会永久保存到配置 JSON，下次打开默认沿用；默认分辨率 2K。\n\n图像与音色模型\n配置生图、改图和音色设计模型\n生图模型\n全部\n洛水出图包\n小鱼漫漫\nGRSAI渠道\ngeeknow\nHiggsfield\nFlova\n小云雀\nCodex\n火山\n即梦CLI\n即梦画布\nNeoWoW\nLibTV\n其他\nnano-banana-pro-出图包\n改图模型\n全部\n洛水出图包\n小鱼漫漫\nGRSAI渠道\ngeeknow\nHiggsfield\nFlova\n小云雀\nCodex\n火山\n即梦CLI\n即梦画布\nNeoWoW\nLibTV\n其他\nnano-banana-pro-出图包\n生图核心指令\n\n叠加到生图/改图提示词最前面，人物 / 场景 / 道具共用；可改可删\n\n资产处理\n\n仅用于「资产处理」图生图，不会自动叠加到普通生图。内容会永久保存。\n\n音色设计模型\nMinimax\n出图模板与显示\n选择角色/场景出图模板和界面显示\n角色出图\n角色设定四宫格图\n\n人设设计：使用提示词社区「角色设定四宫格图」作为角色生图模板\n\n场景出图\n场景四视图\n\n场景设计：使用提示词社区「场景四视图」作为场景生图模板\n\n显示原文\n取消\n保存",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent",
+      "disabled": false,
+      "rect": {
+        "x": 460.5625,
+        "y": 115,
+        "width": 57,
+        "height": 28
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "人物4",
+      "disabled": false,
+      "rect": {
+        "x": 69,
+        "y": 264.5,
+        "width": 102,
+        "height": 38
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "场景2",
+      "disabled": false,
+      "rect": {
+        "x": 175,
+        "y": 264.5,
+        "width": 102,
+        "height": 38
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "道具0",
+      "disabled": false,
+      "rect": {
+        "x": 281,
+        "y": 264.5,
+        "width": 102,
+        "height": 38
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "3D导演台0",
+      "disabled": false,
+      "rect": {
+        "x": 387,
+        "y": 264.5,
+        "width": 131.546875,
+        "height": 38
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI音色0",
+      "disabled": false,
+      "rect": {
+        "x": 522.546875,
+        "y": 264.5,
+        "width": 114.53125,
+        "height": 38
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "去画布编辑",
+      "disabled": false,
+      "rect": {
+        "x": 730.53125,
+        "y": 269.5,
+        "width": 114,
+        "height": 28
+      }
+    },
+    {
+      "index": 19,
+      "tag": "INPUT",
+      "role": "",
+      "label": "搜索名称/描述/提示词...",
+      "disabled": false,
+      "rect": {
+        "x": 876.53125,
+        "y": 269.5,
+        "width": 122,
+        "height": 28
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新增角色",
+      "disabled": false,
+      "rect": {
+        "x": 1451,
+        "y": 269.5,
+        "width": 100,
+        "height": 28
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产分析",
+      "disabled": false,
+      "rect": {
+        "x": 1563,
+        "y": 269.5,
+        "width": 100,
+        "height": 28
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "批量生成",
+      "disabled": false,
+      "rect": {
+        "x": 1675,
+        "y": 269.5,
+        "width": 100,
+        "height": 28
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "编辑",
+      "disabled": false,
+      "rect": {
+        "x": 1787,
+        "y": 269.5,
+        "width": 72,
+        "height": 28
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 95.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 118.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 141.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 164.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 28,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 187.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 29,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 210.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 233.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 31,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 256.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 32,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 279.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 302.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 34,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 325.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 35,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 396.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 419.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 37,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 442.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 38,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 465.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 488.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 40,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 511.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 41,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 534.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 557.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 43,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 580.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 44,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 603.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 626.328125,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 46,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 696.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 47,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 719.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 742.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 49,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 765.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 50,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 788.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 811.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 52,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 834.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 53,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 857.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 880.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 55,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 903.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 56,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 926.984375,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 997.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 58,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "AI生图",
+      "disabled": false,
+      "rect": {
+        "x": 1020.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 59,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "资产处理",
+      "disabled": true,
+      "rect": {
+        "x": 1043.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "局部修改",
+      "disabled": true,
+      "rect": {
+        "x": 1066.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 61,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "从库中选择",
+      "disabled": false,
+      "rect": {
+        "x": 1089.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 62,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "上传图片",
+      "disabled": false,
+      "rect": {
+        "x": 1112.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "本地上传",
+      "disabled": false,
+      "rect": {
+        "x": 1135.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 64,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "复制图片",
+      "disabled": false,
+      "rect": {
+        "x": 1158.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 65,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存图片",
+      "disabled": false,
+      "rect": {
+        "x": 1181.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 66,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "标记卡片",
+      "disabled": false,
+      "rect": {
+        "x": 1204.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 67,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "更多操作",
+      "disabled": false,
+      "rect": {
+        "x": 1227.65625,
+        "y": 326.5,
+        "width": 22,
+        "height": 22
+      }
+    },
+    {
+      "index": 68,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "下一步 →",
+      "disabled": false,
+      "rect": {
+        "x": 989.28125,
+        "y": 988.5,
+        "width": 84.21875,
+        "height": 31
+      }
+    },
+    {
+      "index": 69,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "close",
+      "disabled": false,
+      "rect": {
+        "x": 1506,
+        "y": 24.390625,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 70,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "9:16（竖屏）",
+      "disabled": false,
+      "rect": {
+        "x": 417,
+        "y": 194.1875,
+        "width": 69.703125,
+        "height": 58
+      }
+    },
+    {
+      "index": 71,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "16:9（横屏）",
+      "disabled": false,
+      "rect": {
+        "x": 490.703125,
+        "y": 194.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 72,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "1:1（方形）",
+      "disabled": false,
+      "rect": {
+        "x": 564.421875,
+        "y": 194.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 73,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "3:4",
+      "disabled": false,
+      "rect": {
+        "x": 638.140625,
+        "y": 194.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 74,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "4:3",
+      "disabled": false,
+      "rect": {
+        "x": 711.859375,
+        "y": 194.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 75,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "2:3",
+      "disabled": false,
+      "rect": {
+        "x": 417,
+        "y": 256.1875,
+        "width": 69.703125,
+        "height": 58
+      }
+    },
+    {
+      "index": 76,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "3:2",
+      "disabled": false,
+      "rect": {
+        "x": 490.703125,
+        "y": 256.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 77,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "21:9",
+      "disabled": false,
+      "rect": {
+        "x": 564.421875,
+        "y": 256.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 78,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "4:5",
+      "disabled": false,
+      "rect": {
+        "x": 638.140625,
+        "y": 256.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 79,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "5:4",
+      "disabled": false,
+      "rect": {
+        "x": 711.859375,
+        "y": 256.1875,
+        "width": 69.71875,
+        "height": 58
+      }
+    },
+    {
+      "index": 80,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "1K",
+      "disabled": false,
+      "rect": {
+        "x": 415,
+        "y": 360.578125,
+        "width": 121.515625,
+        "height": 26
+      }
+    },
+    {
+      "index": 81,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "2K",
+      "disabled": false,
+      "rect": {
+        "x": 538.515625,
+        "y": 360.578125,
+        "width": 121.53125,
+        "height": 26
+      }
+    },
+    {
+      "index": 82,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "4K",
+      "disabled": false,
+      "rect": {
+        "x": 662.046875,
+        "y": 360.578125,
+        "width": 121.53125,
+        "height": 26
+      }
+    },
+    {
+      "index": 83,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "通用",
+      "disabled": false,
+      "rect": {
+        "x": 415,
+        "y": 430.96875,
+        "width": 183.28125,
+        "height": 26
+      }
+    },
+    {
+      "index": 84,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "海外",
+      "disabled": false,
+      "rect": {
+        "x": 600.28125,
+        "y": 430.96875,
+        "width": 183.296875,
+        "height": 26
+      }
+    },
+    {
+      "index": 85,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 190.1875,
+        "width": 40,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 86,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "洛水出图包",
+      "disabled": false,
+      "rect": {
+        "x": 879.578125,
+        "y": 190.1875,
+        "width": 73,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 87,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小鱼漫漫",
+      "disabled": false,
+      "rect": {
+        "x": 956.578125,
+        "y": 190.1875,
+        "width": 62,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 88,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "GRSAI渠道",
+      "disabled": false,
+      "rect": {
+        "x": 1022.578125,
+        "y": 190.1875,
+        "width": 70,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 89,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "geeknow",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 214.6875,
+        "width": 62.078125,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 90,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Higgsfield",
+      "disabled": false,
+      "rect": {
+        "x": 901.65625,
+        "y": 214.6875,
+        "width": 67.109375,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 91,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Flova",
+      "disabled": false,
+      "rect": {
+        "x": 972.765625,
+        "y": 214.6875,
+        "width": 43.359375,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 92,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小云雀",
+      "disabled": false,
+      "rect": {
+        "x": 1020.125,
+        "y": 214.6875,
+        "width": 51,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 93,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Codex",
+      "disabled": false,
+      "rect": {
+        "x": 1075.125,
+        "y": 214.6875,
+        "width": 48.546875,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 94,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "火山",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 239.1875,
+        "width": 40,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 95,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "即梦CLI",
+      "disabled": false,
+      "rect": {
+        "x": 879.578125,
+        "y": 239.1875,
+        "width": 54.921875,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 96,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "即梦画布",
+      "disabled": false,
+      "rect": {
+        "x": 938.5,
+        "y": 239.1875,
+        "width": 62,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 97,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "NeoWoW",
+      "disabled": false,
+      "rect": {
+        "x": 1004.5,
+        "y": 239.1875,
+        "width": 65,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 98,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "LibTV",
+      "disabled": false,
+      "rect": {
+        "x": 1073.5,
+        "y": 239.1875,
+        "width": 45.140625,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 99,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "其他",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 263.6875,
+        "width": 40,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 100,
+      "tag": "DIV",
+      "role": "",
+      "label": "nano-banana-pro-出图包",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 290.1875,
+        "width": 319.546875,
+        "height": 28
+      }
+    },
+    {
+      "index": 101,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 293.6875,
+        "width": 319.546875,
+        "height": 21
+      }
+    },
+    {
+      "index": 102,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全部",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 362.578125,
+        "width": 40,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 103,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "洛水出图包",
+      "disabled": false,
+      "rect": {
+        "x": 879.578125,
+        "y": 362.578125,
+        "width": 73,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 104,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小鱼漫漫",
+      "disabled": false,
+      "rect": {
+        "x": 956.578125,
+        "y": 362.578125,
+        "width": 62,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 105,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "GRSAI渠道",
+      "disabled": false,
+      "rect": {
+        "x": 1022.578125,
+        "y": 362.578125,
+        "width": 70,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 106,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "geeknow",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 387.078125,
+        "width": 62.078125,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 107,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Higgsfield",
+      "disabled": false,
+      "rect": {
+        "x": 901.65625,
+        "y": 387.078125,
+        "width": 67.109375,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 108,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Flova",
+      "disabled": false,
+      "rect": {
+        "x": 972.765625,
+        "y": 387.078125,
+        "width": 43.359375,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 109,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "小云雀",
+      "disabled": false,
+      "rect": {
+        "x": 1020.125,
+        "y": 387.078125,
+        "width": 51,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 110,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Codex",
+      "disabled": false,
+      "rect": {
+        "x": 1075.125,
+        "y": 387.078125,
+        "width": 48.546875,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 111,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "火山",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 411.578125,
+        "width": 40,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 112,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "即梦CLI",
+      "disabled": false,
+      "rect": {
+        "x": 879.578125,
+        "y": 411.578125,
+        "width": 54.921875,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 113,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "即梦画布",
+      "disabled": false,
+      "rect": {
+        "x": 938.5,
+        "y": 411.578125,
+        "width": 62,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 114,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "NeoWoW",
+      "disabled": false,
+      "rect": {
+        "x": 1004.5,
+        "y": 411.578125,
+        "width": 65,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 115,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "LibTV",
+      "disabled": false,
+      "rect": {
+        "x": 1073.5,
+        "y": 411.578125,
+        "width": 45.140625,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 116,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "其他",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 436.078125,
+        "width": 40,
+        "height": 20.5
+      }
+    },
+    {
+      "index": 117,
+      "tag": "DIV",
+      "role": "",
+      "label": "nano-banana-pro-出图包",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 462.578125,
+        "width": 319.546875,
+        "height": 28
+      }
+    },
+    {
+      "index": 118,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 466.078125,
+        "width": 319.546875,
+        "height": 21
+      }
+    },
+    {
+      "index": 119,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "可自定义；清空即不叠加（默认已填三视图渲染指令）",
+      "disabled": false,
+      "rect": {
+        "x": 845.578125,
+        "y": 534.96875,
+        "width": 299.546875,
+        "height": 141.34375
+      }
+    },
+    {
+      "index": 120,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "用户自己填写资产处理提示词，保存后用于角色编辑/批量图生图",
+      "disabled": false,
+      "rect": {
+        "x": 845.578125,
+        "y": 768.09375,
+        "width": 299.546875,
+        "height": 141.390625
+      }
+    },
+    {
+      "index": 121,
+      "tag": "DIV",
+      "role": "",
+      "label": "Minimax",
+      "disabled": false,
+      "rect": {
+        "x": 835.578125,
+        "y": 1001.265625,
+        "width": 319.546875,
+        "height": 28
+      }
+    },
+    {
+      "index": 122,
+      "tag": "DIV",
+      "role": "",
+      "label": "角色设定四宫格图",
+      "disabled": false,
+      "rect": {
+        "x": 1205.125,
+        "y": 190.1875,
+        "width": 301.859375,
+        "height": 28
+      }
+    },
+    {
+      "index": 123,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1205.125,
+        "y": 193.6875,
+        "width": 301.859375,
+        "height": 21
+      }
+    },
+    {
+      "index": 124,
+      "tag": "DIV",
+      "role": "",
+      "label": "场景四视图",
+      "disabled": false,
+      "rect": {
+        "x": 1205.125,
+        "y": 308.578125,
+        "width": 301.859375,
+        "height": 28
+      }
+    },
+    {
+      "index": 125,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1205.125,
+        "y": 312.078125,
+        "width": 301.859375,
+        "height": 21
+      }
+    },
+    {
+      "index": 126,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "取消",
+      "disabled": false,
+      "rect": {
+        "x": 1396,
+        "y": 1087.265625,
+        "width": 56,
+        "height": 34
+      }
+    },
+    {
+      "index": 127,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存",
+      "disabled": false,
+      "rect": {
+        "x": 1460,
+        "y": 1087.265625,
+        "width": 64,
+        "height": 34
+      }
+    }
+  ]
+}

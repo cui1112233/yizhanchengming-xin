@@ -1,0 +1,1402 @@
+{
+  "url": "http://127.0.0.1:20073/index.html",
+  "title": "分镜编辑器",
+  "viewport": {
+    "width": 1920,
+    "height": 1050
+  },
+  "text": "短剧创作\n首页\n小说创作\n角色库\n音色库\n漫剧解说\n1\n内容创作\n短剧工作室\n0\n剧本创作\n1\nmomo画布\n2\n绘画\nAI剪辑视频\nAI-CUT\n社区与服务\n教程\n插件\n社区\n186\n我的资产\n反馈\n在线客服\n开始创作\n长篇原创\n短篇原创\n仿写长篇\n仿写短篇\n番外创作\n续写创作\n我的作品\n0\n还没有作品\n会话记录\n当前分类暂无会话，点击下方新建\n新建会话\n写作风格\n导入素材\nAgent 设置\n定时写作\n数据看板\n备忘录\n← 返回对话\nAgent 设置\n\n为各节点指定模型路由（如写作用好模型、审稿用便宜模型）。审稿维度与自定义提示词会注入审稿节点。\n\n模型路由\n\n留空则使用对话区当前选择的默认模型。封面配图使用出图模型，与对话 LLM 无关。 Codex 出图需先在技能页开启 Codex 渠道并完成验证。\n\n对话助手\n跟随对话默认模型\nHigh\n章节规划\n跟随对话默认模型\nHigh\n上下文编排\n跟随对话默认模型\nHigh\n创建作品 / 设定生成\n跟随对话默认模型\nHigh\n章节写作\n跟随对话默认模型\nHigh\n真相沉淀\n跟随对话默认模型\nHigh\n真相校验\n跟随对话默认模型\nHigh\n卷级压缩\n跟随对话默认模型\nHigh\n审稿\n跟随对话默认模型\nHigh\n章节修订\n跟随对话默认模型\nHigh\n短篇生成\n跟随对话默认模型\nHigh\n互动世界\n跟随对话默认模型\nHigh\n互动·行动解析\n跟随对话默认模型\nHigh\n互动·世界推演\n跟随对话默认模型\nHigh\n互动·场景叙事\n跟随对话默认模型\nHigh\n互动·状态提取\n跟随对话默认模型\nHigh\n封面配图\n默认（gemini-3.1-flash-image-preview）\n写章审稿循环\n\n写下一章时自动审稿-修订循环。未达通过分将尝试修订，修订后仍可能回退到更高分版本。\n\n最大修订轮次\n通过分数\n升温步长\n基础温度\n字数归一化\n草稿字数偏离目标 >45% 时自动扩写/压缩\n后写校验\n确定性规则检查（零 LLM 开销）\nAI 味检测\n段落等长/套话密度/公式化转折（零 LLM 开销）\n生产二次确认\n大纲/蓝图/基础设定生成后暂停，可在右侧修改文件后再继续\n审稿维度（37 项）\n\n勾选后即参与审稿；维度说明为内置文案，不可改字，但可自由开关。当前已选 29 / 37 项。\n\n全选\n全不选\n \n1.\nOOC检查\n\n角色言行是否偏离已建立的性格底色与行为模式。\n\n \n2.\n时间线检查\n\n事件顺序、时间跨度与前后章节是否矛盾。\n\n \n3.\n设定冲突\n\n世界观、规则、设定是否与前文或设定文档冲突。\n\n \n4.\n战力崩坏\n\n战力、能力层级是否无理由暴涨或崩坏。\n\n \n5.\n数值检查\n\n数值、等级、资源等量化设定是否前后一致。\n\n \n6.\n伏笔检查\n\n伏笔是否按节奏回收，是否存在长期悬空或逻辑硬伤。\n\n \n7.\n节奏检查\n\n本章是否有推进、冲突、钩子与情绪起伏，避免空转注水。\n\n \n8.\n文风检查\n\n叙述口吻、修辞密度是否与全书文风指南一致。\n\n \n9.\n信息越界\n\n角色是否获知超出其信息边界的知识。\n\n \n10.\n词汇疲劳\n\n高疲劳词与 AI 标记词是否过密重复。\n\n \n11.\n利益链断裂\n\n角色动机与利益链是否断裂或不合理。\n\n \n12.\n年代考据\n\n时代背景、器物、称谓是否符合考据约束。\n\n \n13.\n配角降智\n\n配角是否无故降智以衬托主角。\n\n \n14.\n配角工具人化\n\n配角是否沦为只为主角服务的工具人。\n\n \n15.\n爽点虚化\n\n爽点是否虚化，情绪缺口与兑现是否到位。\n\n \n16.\n台词失真\n\n台词是否符合人物身份、语境与口语习惯。\n\n \n17.\n流水账\n\n是否陷入只记事件、缺少戏剧张力的流水账。\n\n \n18.\n知识库污染\n\n是否混入与本书无关的知识库或外部设定污染。\n\n \n19.\n视角一致性\n\n视角切换是否有过渡，是否与设定视角一致。\n\n \n20.\n段落等长\n\n段落长度是否过于均匀，缺乏节奏变化。\n\n \n21.\n套话密度\n\n陈词滥调、模板化表达是否过密。\n\n \n22.\n公式化转折\n\n转折是否公式化、可预测。\n\n \n23.\n列表式结构\n\n正文是否呈现列表式、条目化结构。\n\n \n24.\n支线停滞\n\n支线是否长期停滞或只被重复提及无推进。\n\n \n25.\n弧线平坦\n\n主要角色情绪弧线是否长期平坦无变化。\n\n \n26.\n节奏单调\n\n近期章节类型是否单调，高潮与释放是否缺席。\n\n \n27.\n敏感词检查\n\n是否触及需规避的敏感内容。\n\n \n28.\n正传事件冲突\n\n番外事件是否与正传正典约束矛盾。\n\n \n29.\n未来信息泄露\n\n是否泄露分歧点之后才应揭示的未来信息。\n\n \n30.\n世界规则跨书一致性\n\n番外是否违反正传世界规则（力量、地理、阵营）。\n\n \n31.\n番外伏笔隔离\n\n番外是否越权回收正传伏笔。\n\n \n32.\n读者期待管理\n\n章尾是否重燃好奇，读者期待是否在累积或被满足。\n\n \n33.\n章节备忘偏离\n\n成稿是否兑现本章 memo 中的目标与段落要求。\n\n \n34.\n角色还原度\n\n角色语癖、行为是否与同人正典档案一致。\n\n \n35.\n世界规则遵守\n\n是否违反同人正典中的世界规则。\n\n \n36.\n关系动态\n\n角色关系互动是否合理、符合档案或发展逻辑。\n\n \n37.\n正典事件一致性\n\n是否与同人正典关键事件时间线矛盾。\n\n自定义审稿\n\n勾选后会在审稿时追加到维度列表之后，可自由编写补充要求。\n\n+ 新增\n暂无自定义项，可点击「新增」添加。\n自定义写作提示词\n\n针对不同写作模式的自定义要求。勾选后会注入到对应写作 Agent 的系统提示中。\n\n+ 新增\n \n长篇正文\n删除\n## 推荐格式\n叙事视角：第三人称限制视角（主角视角为主，关键章节可切换）\n段落节奏：动作场景短段落（50-80字），心理描写中段落（80-150字），环境渲染长段落（150-250字）\n对话比例：正文 60% / 对话 40%，避免连续超过5轮纯对话\n章尾钩子：每章结尾必须留悬念或情绪张力，禁止总结式收尾\n感官描写：每个重要场景至少调动3种感官（视/听/嗅/触/味）\n节奏控制：每3章至少1个小高潮，每卷末大高潮\n禁止事项：禁止上帝视角剧透、禁止角色突然降智、禁止无铺垫的巧合\n \n短篇小说\n删除\n## 推荐格式\n结构：起（10%）- 承（30%）- 转（40%）- 合（20%），转折点必须在 60-70% 位置\n开头：前200字必须建立冲突或悬念，禁止环境描写式开头\n人物：主要人物不超过3个，每人至少1个鲜明特征（口头禅/习惯动作/外貌标记）\n伏笔：至少埋1条伏笔，在结尾前回收，制造'原来如此'的感觉\n结尾：反转型/余韵型/开放型三选一，禁止说教式总结\n情绪曲线：整篇维持一条主情绪线，允许1次情绪反转\n字数控制：严格遵守目标字数，误差不超过10%\n \n仿写创作\n删除\n## 推荐格式\n文风模仿：句式长度、标点习惯、修辞手法必须贴近原作者风格\n词汇偏好：使用原作者高频词汇和表达习惯，避免原作中从不出现的词\n叙事节奏：段落长度分布模仿原作，对话/描写/叙事比例保持一致\n情感基调：维持原作的情感底色（冷峻/温暖/戏谑/沉郁等）\n人称与视角：严格遵循原作的人称和叙事视角\n主题延续：内容可原创，但主题气质和价值观倾向与原作一致\n禁止事项：禁止出现原作中不存在的网络用语或时代错位表达\n设置保存在本地数据目录，永久生效。\n保存设置",
+  "controls": [
+    {
+      "index": 0,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短剧创作",
+      "disabled": false,
+      "rect": {
+        "x": 16,
+        "y": 12,
+        "width": 22,
+        "height": 40
+      }
+    },
+    {
+      "index": 1,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 44,
+        "y": 12,
+        "width": 40,
+        "height": 40
+      }
+    },
+    {
+      "index": 2,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "展开侧边栏",
+      "disabled": false,
+      "rect": {
+        "x": 24,
+        "y": 14,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "index": 3,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "用户协议",
+      "disabled": false,
+      "rect": {
+        "x": 1544,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 4,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "检查更新",
+      "disabled": false,
+      "rect": {
+        "x": 1579,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 5,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "消息中心",
+      "disabled": false,
+      "rect": {
+        "x": 1614,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 6,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "社群",
+      "disabled": false,
+      "rect": {
+        "x": 1684,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 7,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "教程",
+      "disabled": false,
+      "rect": {
+        "x": 1719,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 8,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全局设置",
+      "disabled": false,
+      "rect": {
+        "x": 1754,
+        "y": 12,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "index": 9,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "最小化",
+      "disabled": false,
+      "rect": {
+        "x": 1798,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 10,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "还原",
+      "disabled": false,
+      "rect": {
+        "x": 1835,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 11,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "关闭",
+      "disabled": false,
+      "rect": {
+        "x": 1872,
+        "y": 14,
+        "width": 36,
+        "height": 28
+      }
+    },
+    {
+      "index": 12,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "长篇原创",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 96.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 13,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "短篇原创",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 96.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 14,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "仿写长篇",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 167.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 15,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "仿写短篇",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 167.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 16,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "番外创作",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 238.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 17,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "续写创作",
+      "disabled": false,
+      "rect": {
+        "x": 146.5,
+        "y": 238.5,
+        "width": 116.5,
+        "height": 69
+      }
+    },
+    {
+      "index": 18,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "我的作品0",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 325.5,
+        "width": 231,
+        "height": 36.5
+      }
+    },
+    {
+      "index": 19,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "会话记录",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 418,
+        "width": 235,
+        "height": 36.5
+      }
+    },
+    {
+      "index": 20,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "新建会话",
+      "disabled": false,
+      "rect": {
+        "x": 32,
+        "y": 494.5,
+        "width": 231,
+        "height": 34
+      }
+    },
+    {
+      "index": 21,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "写作风格",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 555.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 22,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "导入素材",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 596.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 23,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "Agent 设置",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 637.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 24,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "定时写作",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 678.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 25,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "数据看板",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 719.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 26,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "备忘录",
+      "disabled": false,
+      "rect": {
+        "x": 28,
+        "y": 760.5,
+        "width": 235,
+        "height": 41
+      }
+    },
+    {
+      "index": 27,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "← 返回对话",
+      "disabled": false,
+      "rect": {
+        "x": 300,
+        "y": 69,
+        "width": 66.78125,
+        "height": 19.5
+      }
+    },
+    {
+      "index": 28,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 243.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 29,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 246.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 30,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 246.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 31,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 281.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 32,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 284.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 33,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 284.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 34,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 319.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 35,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 322.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 36,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 322.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 37,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 357.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 38,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 360.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 39,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 360.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 40,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 395.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 41,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 398.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 42,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 398.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 43,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 433.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 44,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 436.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 45,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 436.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 46,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 471.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 47,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 474.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 48,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 474.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 49,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 509.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 50,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 512.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 51,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 512.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 52,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 547.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 53,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 550.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 54,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 550.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 55,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 585.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 56,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 588.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 57,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 588.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 58,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 623.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 59,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 626.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 60,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 626.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 61,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 661.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 62,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 664.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 63,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 664.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 64,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 699.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 65,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 702.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 66,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 702.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 67,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 737.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 68,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 740.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 69,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 740.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 70,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 775.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 71,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 778.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 72,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 778.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 73,
+      "tag": "DIV",
+      "role": "",
+      "label": "跟随对话默认模型High",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 813.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 74,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 816.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 75,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "的思考强度：High",
+      "disabled": false,
+      "rect": {
+        "x": 730,
+        "y": 816.296875,
+        "width": 51,
+        "height": 22
+      }
+    },
+    {
+      "index": 76,
+      "tag": "DIV",
+      "role": "",
+      "label": "默认（gemini-3.1-flash-image-preview）",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 851.296875,
+        "width": 360,
+        "height": 28
+      }
+    },
+    {
+      "index": 77,
+      "tag": "INPUT",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 447,
+        "y": 854.796875,
+        "width": 360,
+        "height": 21
+      }
+    },
+    {
+      "index": 78,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 305,
+        "y": 1020.796875,
+        "width": 332.5,
+        "height": 28
+      }
+    },
+    {
+      "index": 79,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 641.5,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 80,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 659.5,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 81,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 707.5,
+        "y": 1020.796875,
+        "width": 332.5,
+        "height": 28
+      }
+    },
+    {
+      "index": 82,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1044,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 83,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1062,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 84,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 1110,
+        "y": 1020.796875,
+        "width": 332.5,
+        "height": 28
+      }
+    },
+    {
+      "index": 85,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1446.5,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 86,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1464.5,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 87,
+      "tag": "INPUT",
+      "role": "",
+      "label": "Please Input",
+      "disabled": false,
+      "rect": {
+        "x": 1512.5,
+        "y": 1020.796875,
+        "width": 332.5,
+        "height": 28
+      }
+    },
+    {
+      "index": 88,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1849,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 89,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "",
+      "disabled": false,
+      "rect": {
+        "x": 1867,
+        "y": 1025.796875,
+        "width": 18,
+        "height": 18
+      }
+    },
+    {
+      "index": 90,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全选",
+      "disabled": false,
+      "rect": {
+        "x": 1805,
+        "y": 1241.796875,
+        "width": 36,
+        "height": 22
+      }
+    },
+    {
+      "index": 91,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "全不选",
+      "disabled": false,
+      "rect": {
+        "x": 1845,
+        "y": 1241.796875,
+        "width": 48,
+        "height": 22
+      }
+    },
+    {
+      "index": 92,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "+ 新增",
+      "disabled": false,
+      "rect": {
+        "x": 1831.578125,
+        "y": 1777.796875,
+        "width": 61.421875,
+        "height": 28
+      }
+    },
+    {
+      "index": 93,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "+ 新增",
+      "disabled": false,
+      "rect": {
+        "x": 1831.578125,
+        "y": 1929.296875,
+        "width": 61.421875,
+        "height": 28
+      }
+    },
+    {
+      "index": 94,
+      "tag": "INPUT",
+      "role": "",
+      "label": "提示词标题",
+      "disabled": false,
+      "rect": {
+        "x": 342,
+        "y": 2002.296875,
+        "width": 1368,
+        "height": 28
+      }
+    },
+    {
+      "index": 95,
+      "tag": "DIV",
+      "role": "",
+      "label": "长篇正文",
+      "disabled": false,
+      "rect": {
+        "x": 1728,
+        "y": 2002.296875,
+        "width": 120,
+        "height": 28
+      }
+    },
+    {
+      "index": 96,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 1856,
+        "y": 2007.296875,
+        "width": 24,
+        "height": 18
+      }
+    },
+    {
+      "index": 97,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "## 推荐格式 叙事视角：第三人称限制视角（主角视角为主，关键章节可切换） 段落节奏：动作场景短段落（50-80字），心理描写中段落（80-150字），环境渲染长段落（150-250字） 对话比例：正文 60% / 对话 40%，避免连续超过5轮纯对话 章尾钩子：每章结尾必须留悬念或情绪张力，禁止总",
+      "disabled": false,
+      "rect": {
+        "x": 320,
+        "y": 2038.296875,
+        "width": 1548,
+        "height": 80.1875
+      }
+    },
+    {
+      "index": 98,
+      "tag": "INPUT",
+      "role": "",
+      "label": "提示词标题",
+      "disabled": false,
+      "rect": {
+        "x": 342,
+        "y": 2154.484375,
+        "width": 1368,
+        "height": 28
+      }
+    },
+    {
+      "index": 99,
+      "tag": "DIV",
+      "role": "",
+      "label": "短篇小说",
+      "disabled": false,
+      "rect": {
+        "x": 1728,
+        "y": 2154.484375,
+        "width": 120,
+        "height": 28
+      }
+    },
+    {
+      "index": 100,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 1856,
+        "y": 2159.484375,
+        "width": 24,
+        "height": 18
+      }
+    },
+    {
+      "index": 101,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "## 推荐格式 结构：起（10%）- 承（30%）- 转（40%）- 合（20%），转折点必须在 60-70% 位置 开头：前200字必须建立冲突或悬念，禁止环境描写式开头 人物：主要人物不超过3个，每人至少1个鲜明特征（口头禅/习惯动作/外貌标记） 伏笔：至少埋1条伏笔，在结尾前回收，制造'原来如",
+      "disabled": false,
+      "rect": {
+        "x": 320,
+        "y": 2190.484375,
+        "width": 1548,
+        "height": 80.1875
+      }
+    },
+    {
+      "index": 102,
+      "tag": "INPUT",
+      "role": "",
+      "label": "提示词标题",
+      "disabled": false,
+      "rect": {
+        "x": 342,
+        "y": 2306.671875,
+        "width": 1368,
+        "height": 28
+      }
+    },
+    {
+      "index": 103,
+      "tag": "DIV",
+      "role": "",
+      "label": "仿写创作",
+      "disabled": false,
+      "rect": {
+        "x": 1728,
+        "y": 2306.671875,
+        "width": 120,
+        "height": 28
+      }
+    },
+    {
+      "index": 104,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "删除",
+      "disabled": false,
+      "rect": {
+        "x": 1856,
+        "y": 2311.671875,
+        "width": 24,
+        "height": 18
+      }
+    },
+    {
+      "index": 105,
+      "tag": "TEXTAREA",
+      "role": "",
+      "label": "## 推荐格式 文风模仿：句式长度、标点习惯、修辞手法必须贴近原作者风格 词汇偏好：使用原作者高频词汇和表达习惯，避免原作中从不出现的词 叙事节奏：段落长度分布模仿原作，对话/描写/叙事比例保持一致 情感基调：维持原作的情感底色（冷峻/温暖/戏谑/沉郁等） 人称与视角：严格遵循原作的人称和叙事视角 ",
+      "disabled": false,
+      "rect": {
+        "x": 320,
+        "y": 2342.671875,
+        "width": 1548,
+        "height": 80.1875
+      }
+    },
+    {
+      "index": 106,
+      "tag": "BUTTON",
+      "role": "",
+      "label": "保存设置",
+      "disabled": false,
+      "rect": {
+        "x": 1804,
+        "y": 994,
+        "width": 84,
+        "height": 34
+      }
+    }
+  ]
+}
