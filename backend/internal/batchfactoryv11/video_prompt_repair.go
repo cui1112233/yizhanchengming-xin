@@ -9,6 +9,8 @@ import (
 	"log"
 	"strconv"
 	"strings"
+
+	promptcatalog "qiantie/backend/internal/prompt"
 )
 
 // videoPromptRepairMaxRounds 与漫画页的自动去敏保持一致：每个视频、每个换
@@ -290,7 +292,7 @@ func (s *BookStageService) RepairRejectedVideoPrompts(ctx context.Context, owner
 	return repaired, nil
 }
 
-func (s *BookStageService) rewriteRejectedVideoPrompt(ctx context.Context, owner, batchID, bookID, prompt, rejection string) (string, error) {
+func (s *BookStageService) rewriteRejectedVideoPrompt(ctx context.Context, owner, batchID, bookID, sourcePrompt, rejection string) (string, error) {
 	director, err := s.directorForBookTextModel(ctx, owner, batchID, bookID)
 	if err != nil {
 		return "", err
@@ -300,12 +302,22 @@ func (s *BookStageService) rewriteRejectedVideoPrompt(ctx context.Context, owner
 	}
 	completion, err := director.Provider.Complete(ctx, TextCompletionRequest{
 		SystemPrompt: videoPromptRepairSystemPrompt,
-		UserPrompt:   videoPromptRepairUserPrompt(prompt, rejection),
+		UserPrompt:   videoPromptRepairUserPrompt(sourcePrompt, rejection),
 		Temperature:  0.2,
 		MaxTokens:    4096,
 	})
 	if err != nil {
-		return "", retryableModelOutputError(err)
+		// A provider/network error means there was no model output to parse. Do
+		// not misreport it as an output-format error. For retryable channel
+		// outages, use the backend-owned deterministic safety rewrite so video
+		// production can continue without repeatedly hitting the same 5xx.
+		if errors.Is(err, ErrUpstream) {
+			if fallback := promptcatalog.VideoVisualSafetyFallback(sourcePrompt); fallback != "" && fallback != strings.TrimSpace(sourcePrompt) {
+				log.Printf("batch-factory: video prompt rewrite channel unavailable, used deterministic safety fallback owner=%s book=%s", owner, bookID)
+				return fallback, nil
+			}
+		}
+		return "", fmt.Errorf("视频提示词自动去敏失败：%w", err)
 	}
 	rewritten := sanitizeRepairedVideoPrompt(completion)
 	if rewritten == "" {

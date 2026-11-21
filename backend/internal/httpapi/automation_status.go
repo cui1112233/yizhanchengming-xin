@@ -742,6 +742,10 @@ func automationFailureCategory(status, message, errText, publishError string) (s
 	switch {
 	case strings.Contains(lower, "IMAGE_BILLED_NOT_RETRIEVED") || (strings.Contains(text, "已生成") && strings.Contains(text, "需人工处理")):
 		return "billed_not_retrieved", "已计费未取回（重试会再扣一次图费）"
+	case strings.Contains(text, "内容审核") || strings.Contains(text, "内容不符合平台规范"):
+		return "content_policy", "内容审核拒绝（需调整提示词或参考图）"
+	case strings.Contains(text, "文本模型通道暂时不可用") || strings.Contains(text, "文本模型请求没有完成") || strings.Contains(text, "文本模型通道连接失败"):
+		return "text_model_upstream", "文本模型通道异常（可直接重试）"
 	case strings.Contains(lower, "TIMEOUT") || strings.Contains(lower, "DEADLINE") || strings.Contains(text, "超时") || strings.Contains(text, "没有任何进展"):
 		return "upstream_timeout", "上游超时（可直接重试）"
 	case strings.Contains(text, "没有同名作品") || strings.Contains(text, "漫画合集"):

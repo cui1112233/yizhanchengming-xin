@@ -446,6 +446,8 @@ func TestAutomationFailureCategoryClassifiesKnownReasons(t *testing.T) {
 		{"missing work", "failed", "漫画合集里没有同名作品《半生离恨》，请先创建作品", "external_work_missing"},
 		{"missing config", "failed", "图片模型或图片生成服务未配置", "config_missing"},
 		{"audio config", "failed", "当前组织的“现代悬疑”分类没有可用音频", "config_missing"},
+		{"video content policy", "failed", "视频提示词被内容审核拒绝，自动去敏改写 2 轮后仍未通过", "content_policy"},
+		{"text channel outage", "failed", "视频提示词自动去敏失败：文本模型通道暂时不可用，请稍后重试", "text_model_upstream"},
 	}
 	for _, tc := range cases {
 		got, _ := automationFailureCategory(tc.status, tc.message, "", "")

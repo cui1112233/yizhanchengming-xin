@@ -4,17 +4,54 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
 type repairRecordingProvider struct {
 	calls int
 	reply string
+	err   error
 }
 
 func (p *repairRecordingProvider) Complete(context.Context, TextCompletionRequest) (string, error) {
 	p.calls++
-	return p.reply, nil
+	return p.reply, p.err
+}
+
+func TestRewriteRejectedVideoPromptDoesNotMisreportProviderFailureAsFormatError(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "b", Books: []CreateBookInput{{
+		Title:      "book",
+		SourceText: "正文",
+		Videos:     []CreateVideoInput{{Label: "VIDEO01", VideoPrompt: "人物站在桌前。"}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	providerErr := &DirectorHTTPError{StatusCode: 502, Model: "gpt-test", Body: `{"error":{"message":"upstream unavailable"}}`}
+	provider := &repairRecordingProvider{err: providerErr}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}}
+
+	_, err = service.rewriteRejectedVideoPrompt(ctx, "alice", batch.ID, batch.Books[0].ID, "人物站在桌前。", "内容不符合平台规范")
+	if err == nil {
+		t.Fatal("want the provider failure")
+	}
+	if strings.Contains(err.Error(), "文本模型输出不符合当前格式要求") {
+		t.Fatalf("provider failure was misreported as a format error: %v", err)
+	}
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("provider failure must preserve ErrUpstream, got %v", err)
+	}
+
+	fallback, err := service.rewriteRejectedVideoPrompt(ctx, "alice", batch.ID, batch.Books[0].ID, "林倩当众撕毁身份证和户口本，破损证件留在桌面。", "内容不符合平台规范")
+	if err != nil {
+		t.Fatalf("transient channel outage must use deterministic safety fallback: %v", err)
+	}
+	if strings.Contains(fallback, "撕毁") || strings.Contains(fallback, "破损证件") {
+		t.Fatalf("unsafe fallback=%q", fallback)
+	}
 }
 
 func TestRepairRejectedVideoPromptRewritesWithinBudget(t *testing.T) {
