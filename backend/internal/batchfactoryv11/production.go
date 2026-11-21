@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	promptcatalog "qiantie/backend/internal/prompt"
 )
 
 type ProductionState string
@@ -149,6 +151,18 @@ type ProductionOptions struct {
 	// opt-in switch, because a text-only rerun has not been confirmed against
 	// every provider yet.
 	StripReferenceImages bool
+	// SanitizeVisualSafety applies the backend-owned deterministic rewrite to
+	// the fully compiled provider prompt. Repairing only the storyboard body is
+	// insufficient because asset descriptions are prepended during compilation
+	// and can reintroduce the exact wording that moderation rejected.
+	SanitizeVisualSafety bool
+}
+
+func sanitizeVideoPromptForModerationRetry(prompt FinalPrompt) FinalPrompt {
+	prompt.DisplayPrompt = promptcatalog.VideoVisualSafetyFallback(prompt.DisplayPrompt)
+	prompt.BaseSetupPrompt = promptcatalog.VideoVisualSafetyFallback(prompt.BaseSetupPrompt)
+	prompt.CompiledPrompt = promptcatalog.VideoVisualSafetyFallback(prompt.CompiledPrompt)
+	return prompt
 }
 
 type h3CompilationPromptResolver interface {
@@ -656,6 +670,9 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		}
 		if options.StripReferenceImages {
 			prompt = stripReferenceImagesFromPrompt(prompt)
+		}
+		if options.SanitizeVisualSafety {
+			prompt = sanitizeVideoPromptForModerationRetry(prompt)
 		}
 		selectedModel := rawString(prompt.EffectiveSettings.Values, "videoModelId", "")
 		if !VideoModelMatchesProviderModel(selectedModel, model.ID, provider) {

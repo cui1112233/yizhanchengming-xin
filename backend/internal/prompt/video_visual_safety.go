@@ -9,6 +9,8 @@ import "strings"
 var videoVisualSafetyReplacer = strings.NewReplacer(
 	"掐住脖子", "逼近对峙",
 	"边缘破损不齐", "边缘保持整齐",
+	"破损纸页", "整齐纸页",
+	"破损页面", "整齐页面",
 	"证件整体被撕毁", "证件已被收起",
 	"破损证件", "被收起的证件",
 	"撕毁动作", "收起动作",

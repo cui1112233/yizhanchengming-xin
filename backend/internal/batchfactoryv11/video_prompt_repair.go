@@ -19,9 +19,10 @@ import (
 const videoPromptRepairMaxRounds = 2
 
 const (
-	videoPromptRepairCountsKey  = "videoPromptRepairCounts"
-	videoPromptRepairMarkersKey = "videoPromptRepairMarkers"
-	openingVariantPromptsKey    = "openingVariantPrompts"
+	videoPromptRepairCountsKey         = "videoPromptRepairCounts"
+	videoPromptRepairMarkersKey        = "videoPromptRepairMarkers"
+	videoPromptCompiledSafetyCountsKey = "videoPromptCompiledSafetyCounts"
+	openingVariantPromptsKey           = "openingVariantPrompts"
 )
 
 // ErrVideoPromptRepairExhausted 表示自动去敏轮次已用完。调用方不得再用原
@@ -92,8 +93,12 @@ func videoPromptOverrideFor(video Video, variantIndex int) (string, bool) {
 }
 
 func videoPromptRepairCounts(video Video) map[string]int {
+	return videoPromptIntegerMap(video, videoPromptRepairCountsKey)
+}
+
+func videoPromptIntegerMap(video Video, key string) map[string]int {
 	counts := map[string]int{}
-	raw, ok := video.SettingsState.Patch[videoPromptRepairCountsKey]
+	raw, ok := video.SettingsState.Patch[key]
 	if !ok || len(raw) == 0 {
 		return counts
 	}
@@ -221,6 +226,25 @@ func (s *BookStageService) RepairRejectedVideoPrompts(ctx context.Context, owner
 			}
 			if marker := videoPromptRepairMarkers(video)[indexKey]; marker != "" && marker != promptDigest(current) {
 				log.Printf("batch-factory: video prompt manually edited, allowing resubmit owner=%s book=%s video=%s variant=%d", owner, bookID, video.ID, task.OpeningVariantIndex)
+				continue
+			}
+			// Older runs sanitized only the variant/storyboard body. Compilation
+			// then prepended the original asset setup and reintroduced words such
+			// as "撕毁" and "破损". Grant exactly one migration retry for prompts
+			// that already carry our deterministic "收起" replacement; the caller
+			// will sanitize the fully compiled provider prompt this time.
+			compiledSafetyCounts := videoPromptIntegerMap(video, videoPromptCompiledSafetyCountsKey)
+			if compiledSafetyCounts[indexKey] == 0 && strings.Contains(current, "收起") {
+				compiledSafetyCounts[indexKey] = 1
+				encoded, marshalErr := json.Marshal(compiledSafetyCounts)
+				if marshalErr != nil {
+					return repaired, fmt.Errorf("%w: 保存完整提示词安全重试次数失败", ErrInvalid)
+				}
+				if _, saveErr := s.Store.SaveSettings(ctx, owner, ScopeRef{Kind: ScopeVideo, BatchID: batchID, BookID: bookID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{videoPromptCompiledSafetyCountsKey: encoded}, ExpectedRevision: video.Revision}); saveErr != nil {
+					return repaired, saveErr
+				}
+				repaired = true
+				log.Printf("batch-factory: allowing one full compiled video safety retry owner=%s book=%s video=%s variant=%d", owner, bookID, video.ID, task.OpeningVariantIndex)
 				continue
 			}
 			exhausted = true

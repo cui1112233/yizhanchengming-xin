@@ -463,7 +463,8 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	case BookStageVideo:
 		// 被内容审核拒绝的视频先用文本模型去敏改写，再重新编译提交；与漫画页
 		// 一致，每个视频/换开头变体最多自动改写一次，用尽后转人工。
-		if _, repairErr := s.RepairRejectedVideoPrompts(ctx, owner, batchID, bookID, videoID); repairErr != nil {
+		repairedPrompt, repairErr := s.RepairRejectedVideoPrompts(ctx, owner, batchID, bookID, videoID)
+		if repairErr != nil {
 			err = repairErr
 			break
 		}
@@ -474,13 +475,13 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		}
 		if mode == StageModeMissing {
 			var job ProductionJob
-			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{VideoID: videoID, CompilationID: frozenCompilationID, StripReferenceImages: stripReferenceImages})
+			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{VideoID: videoID, CompilationID: frozenCompilationID, StripReferenceImages: stripReferenceImages, SanitizeVisualSafety: repairedPrompt})
 			if err == nil {
 				err = immediateVideoProviderFailure(job)
 			}
 		} else {
 			var job ProductionJob
-			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{Force: true, VideoID: videoID, CompilationID: frozenCompilationID, StripReferenceImages: stripReferenceImages})
+			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{Force: true, VideoID: videoID, CompilationID: frozenCompilationID, StripReferenceImages: stripReferenceImages, SanitizeVisualSafety: repairedPrompt})
 			if err == nil {
 				err = immediateVideoProviderFailure(job)
 			}

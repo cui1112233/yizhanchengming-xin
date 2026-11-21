@@ -176,6 +176,28 @@ func TestProductionSubmitsExactlyThePromptItPersisted(t *testing.T) {
 	}
 }
 
+func TestSanitizeVideoPromptForModerationRetryCoversCompiledAssetSetup(t *testing.T) {
+	original := FinalPrompt{
+		DisplayPrompt:   "林倩参与撕毁登记材料，桌上摆着破损证件。",
+		BaseSetupPrompt: "道具是已被撕毁、边缘破损不齐的身份证。",
+		CompiledPrompt:  "【基础设定】证件整体被撕毁，破损纸页清晰可见。\n【镜头】林倩收起材料。",
+	}
+
+	safe := sanitizeVideoPromptForModerationRetry(original)
+	for name, value := range map[string]string{
+		"display":  safe.DisplayPrompt,
+		"setup":    safe.BaseSetupPrompt,
+		"compiled": safe.CompiledPrompt,
+	} {
+		if strings.Contains(value, "撕毁") || strings.Contains(value, "破损") {
+			t.Fatalf("%s prompt still contains rejected asset wording: %q", name, value)
+		}
+	}
+	if !strings.Contains(safe.CompiledPrompt, "收起") {
+		t.Fatalf("compiled prompt lost the safe replacement: %q", safe.CompiledPrompt)
+	}
+}
+
 func TestFixedSingleProductionOnlySubmitsVideoOne(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", true)
 	provider := &queuedDirectorProvider{values: []string{twoDirectorVideosJSON(t)}}

@@ -138,6 +138,48 @@ func TestRepairRejectedVideoPromptRewritesWithinBudget(t *testing.T) {
 	}
 }
 
+func TestRepairRejectedVideoPromptAllowsOneCompiledSafetyMigrationRetry(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "b", Books: []CreateBookInput{{
+		Title: "book", SourceText: "正文", Videos: []CreateVideoInput{{Label: "VIDEO01", VideoPrompt: "原提示词"}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, video := batch.Books[0], batch.Books[0].Videos[0]
+	overrides, _ := json.Marshal(map[string]string{"1": "人物把证件收起，保持克制。"})
+	counts, _ := json.Marshal(map[string]int{"1": videoPromptRepairMaxRounds})
+	markers, _ := json.Marshal(map[string]string{"1": promptDigest("人物把证件收起，保持克制。")})
+	_, err = store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{
+		Patch: SettingsPatch{openingVariantPromptsKey: overrides, videoPromptRepairCountsKey: counts, videoPromptRepairMarkersKey: markers}, ExpectedRevision: video.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedBatch, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	video = updatedBatch.Books[0].Videos[0]
+	repository, err := (&ProductionService{Store: store}).repository()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.CreateProductionJob(ctx, ProductionJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "failed", DirectorRevisionID: "director", Tasks: []ProductionTask{{
+		VideoID: video.ID, OpeningVariantIndex: 1, Status: ProductionFailed, ErrorMessage: "内容审核拒绝",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	service := &BookStageService{Store: store, Production: &ProductionService{Store: store}}
+	if repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, video.ID); err != nil || !repaired {
+		t.Fatalf("migration repair=%v err=%v, want one full-compiled retry", repaired, err)
+	}
+	if repaired, err := service.RepairRejectedVideoPrompts(ctx, "alice", batch.ID, book.ID, video.ID); repaired || !errors.Is(err, ErrVideoPromptRepairExhausted) {
+		t.Fatalf("second migration repair=%v err=%v, want exhausted", repaired, err)
+	}
+}
+
 func TestRepairRejectedOpeningVariantUsesVariantOverride(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()
