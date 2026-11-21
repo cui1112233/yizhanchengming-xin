@@ -5019,8 +5019,13 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     }
     try {
       const presets = automationPresets.length ? automationPresets : await loadAutomationPresets();
+      const modePresets = automationPresetsForMode(presets, batchProductionMode);
       const activePresetID = automationActive ? String(automationStatus?.preset?.id || '').trim() : '';
-      const presetID = activePresetID || automationPresetID || automationPresetsForMode(presets, batchProductionMode)[0]?.id || '';
+      const selectedPresetID = String(automationPresetID || '').trim();
+      const presetID = (modePresets.some(item => String(item.id) === activePresetID) && activePresetID)
+        || (modePresets.some(item => String(item.id) === selectedPresetID) && selectedPresetID)
+        || modePresets[0]?.id
+        || '';
       if (!presetID) {
         message.warning(`请先在自动生产中选择一个${batchProductionMode === 'comic' ? '漫画' : '视频'}预设。`);
         return;

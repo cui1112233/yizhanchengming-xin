@@ -18,6 +18,12 @@ test('video immediate selected execution starts the complete automation pipeline
   assert.match(source, /const batchMenuItems = batchProductionMode === 'comic'[\s\S]*?: \[[\s\S]*?key: 'selected-production'[\s\S]*?批量生成视频/);
 });
 
+test('selected execution ignores an active preset from the other production mode', () => {
+  assert.match(selectedProductionSource, /const modePresets = automationPresetsForMode\(presets, batchProductionMode\)/);
+  assert.match(selectedProductionSource, /modePresets\.some\(item => String\(item\.id\) === activePresetID\)/);
+  assert.match(selectedProductionSource, /modePresets\.some\(item => String\(item\.id\) === selectedPresetID\)/);
+});
+
 test('selected immediate execution remains available when the video capability reports a configuration problem', () => {
   assert.match(source, /key: 'selected-production', label: automationActive \? `排队执行已选（\$\{selectedBookIds\.length\}）` : `立即执行已选（\$\{selectedBookIds\.length\}）`, disabled: !selectedBookIds\.length/);
   assert.doesNotMatch(source, /key: 'selected-production',[\s\S]*?disabled: !productionCapability\.available \|\| !selectedBookIds\.length/);
