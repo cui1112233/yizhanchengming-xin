@@ -183,6 +183,12 @@ test('unified settings save closes the dialog before audio measurement and promp
   assert.match(novelList, /重试后台处理/);
 });
 
+test('deleting a book clears its completed background processing error', () => {
+  const remove = novelList.match(/async function deleteBook\(book\) \{[\s\S]*?\n  \}/)?.[0] || '';
+  assert.ok(remove.length, 'deleteBook not found');
+  assert.match(remove, /setBackgroundSettingsTask\(current => clearDeletedBookBackgroundTask\(current, book\)\)/);
+});
+
 test('batch factory video dropdowns opt into the FanKe model expansion', () => {
   assert.match(unifiedModal, /modelOptionsForProvider\(models, 'video', value\.videoProvider, value\.videoModelId, \{ expandFanKeModels: true \}\)/);
   assert.match(bookModal, /modelOptionsForProvider\(models, 'video', effectiveVideoProvider, effectiveVideoModelId, \{ expandFanKeModels: true \}\)/);

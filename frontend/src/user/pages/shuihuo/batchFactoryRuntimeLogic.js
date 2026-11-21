@@ -17,23 +17,40 @@ export function resolveBookEditableContent(book, productionMode) {
   return resolveBookProductionText(book);
 }
 
-function stableHash(input) {
+function audioFingerprintHash(input) {
   let hash = 0x811c9dc5;
   for (let index = 0; index < input.length; index += 1) {
     hash ^= input.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return (hash >>> 0).toString(16);
 }
 
 export function audioDurationFingerprint(book, tts = {}) {
-  return stableHash(JSON.stringify({
-    text: resolveBookProductionText(book),
-    voice: normalizedText(tts.voice),
-    style: normalizedText(tts.style),
-    speed: Number(tts.speed ?? 1),
-    pitch: Number(tts.pitch ?? 0)
-  }));
+  const payload = JSON.stringify([
+    String(resolveBookProductionText(book) || ''),
+    String(tts.voice || ''),
+    String(tts.style || ''),
+    Number(tts.speed || 0),
+    Number(tts.pitch || 0)
+  ]);
+  return `a1-${audioFingerprintHash(payload)}-${payload.length}`;
+}
+
+export function clearDeletedBookBackgroundTask(current, book) {
+  if (!current) return current;
+  const title = normalizedText(book?.title);
+  if (!title) return current;
+  const errors = Array.isArray(current.errors) ? current.errors : [];
+  const remainingErrors = errors.filter(error => !String(error || '').startsWith(`${title}：`));
+  const removedCount = errors.length - remainingErrors.length;
+  if (!removedCount) return current;
+  if (!current.running && remainingErrors.length === 0) return null;
+  return {
+    ...current,
+    errors: remainingErrors,
+    failed: Math.max(0, Number(current.failed || 0) - removedCount)
+  };
 }
 
 export function batchMediaCounts(books = [], productionStatus = {}, mergeStatus = {}) {

@@ -160,7 +160,7 @@ import { assetsForProductionMode } from './batchFactoryAssetMode';
 import { comicPageErrorMessage, comicPageGenerationPayload, comicPromptForImageAspect, generateComicPageWithConflict, runComicPagePool } from './batchFactoryComicMode';
 import { batchFactoryShouldPrepareAudio, batchFactoryShouldRecompileVideoPrompts } from './batchFactoryProductionMode';
 import { ComicSourceContent } from './ComicSourceContent.jsx';
-import { batchMediaCounts as runtimeBatchMediaCounts, batchFactoryNovelCopyText, bookVideoVersions, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
+import { batchMediaCounts as runtimeBatchMediaCounts, batchFactoryNovelCopyText, bookVideoVersions, clearDeletedBookBackgroundTask, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { downloadProductionContent } from './batchFactoryContentDownload.js';
 import { realVideoDurationSeconds, formatDurationSeconds } from './batchFactoryVideoMeta';
 import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
@@ -4133,6 +4133,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       await deleteBatchFactoryBook(batch.id, book.id);
       setViewingBook(null);
       setSelectedBookIds(current => current.filter(id => id !== book.id));
+      setBackgroundSettingsTask(current => clearDeletedBookBackgroundTask(current, book));
       await refreshBatch();
       message.success('已删除当前小说及其本地生产记录；121 内容未受影响');
     } catch (error) { message.error(error?.message || '删除小说失败'); }

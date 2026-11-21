@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { batchMediaCounts, bookVideoVersions, resolveBookEditableContent, resolveBookProductionText } from './batchFactoryRuntimeLogic.js';
+import { audioDurationFingerprint, batchMediaCounts, bookVideoVersions, clearDeletedBookBackgroundTask, resolveBookEditableContent, resolveBookProductionText } from './batchFactoryRuntimeLogic.js';
+
+function backgroundAudioFingerprint(input, tts = {}) {
+  const payload = JSON.stringify([String(input || ''), String(tts.voice || ''), String(tts.style || ''), Number(tts.speed || 0), Number(tts.pitch || 0)]);
+  let hash = 2166136261;
+  for (let index = 0; index < payload.length; index += 1) {
+    hash ^= payload.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `a1-${(hash >>> 0).toString(16)}-${payload.length}`;
+}
 
 test('resolves working production text before the configured source preview', () => {
   assert.equal(resolveBookProductionText({
@@ -12,6 +22,32 @@ test('resolves working production text before the configured source preview', ()
     sourceText: '第一行\n第二行\n第三行',
     sourceMetadata: { contentRangeLines: 2 }
   }), '第一行\n第二行');
+});
+
+test('single-book audio stale check uses the same fingerprint as background measurement', () => {
+  const book = {
+    sourceText: '第一行\n第二行\n第三行',
+    sourceMetadata: { contentRangeLines: 2 }
+  };
+  const tts = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.7, pitch: 10 };
+  const input = resolveBookProductionText(book);
+
+  assert.equal(audioDurationFingerprint(book, tts), backgroundAudioFingerprint(input, tts));
+});
+
+test('clears only the deleted book from a completed background error', () => {
+  const task = {
+    running: false,
+    failed: 2,
+    errors: ['已删除：当前书没有可用于配音的生产内容', '仍保留：图片模型未配置']
+  };
+
+  assert.deepEqual(clearDeletedBookBackgroundTask(task, { title: '已删除' }), {
+    running: false,
+    failed: 1,
+    errors: ['仍保留：图片模型未配置']
+  });
+  assert.equal(clearDeletedBookBackgroundTask({ running: false, failed: 1, errors: task.errors.slice(0, 1) }, { title: '已删除' }), null);
 });
 
 test('comic editing uses the complete captured source instead of the video line range', () => {
