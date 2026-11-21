@@ -1,0 +1,17 @@
+{
+  "moduleRoots": [
+    "api/modules",
+    "frontend/src/modules",
+    "前台/src/modules",
+    "后台/src/modules"
+  ],
+  "sharedRoots": [
+    "api/service",
+    "api/platform",
+    "api/prompt",
+    "frontend/src/service",
+    "前台/src/service",
+    "后台/src/service"
+  ],
+  "goModulePrefix": "qiantie/"
+}
