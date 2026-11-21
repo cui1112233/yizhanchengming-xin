@@ -54,16 +54,17 @@ export default function SpinoffDialog({ owner, open, viewKey, projects, models, 
       if (!result.book?.id || !result.session?.id || !result.run?.id) throw Error('创建结果不完整，请恢复原创建核对结果');
       // Saving remains real after closing the form. Update facts without taking over newer navigation.
       onPersisted(result); message.success('番外作品已创建，正在整理正传正典与番外设定');
-      if (view.current !== submittedView || !view.current.open) return;
       localStorage.removeItem(storageKey + ':intent'); localStorage.removeItem(storageKey + ':draft');
       setIntent(null); setDraft({ ...emptyDraft });
+      if (view.current !== submittedView || !view.current.open) return;
       onCreated(result);
     } catch (e) {
-      if (!scope.isCurrent() || view.current !== submittedView || !view.current.open) return;
+      if (!scope.isCurrent()) return;
       // Only definite rejection unlocks editing. Unknown results keep the original key/input.
       if (e.status >= 400 && e.status < 500 && ![408, 409, 429].includes(e.status)) {
         localStorage.removeItem(storageKey + ':intent'); setIntent(null);
       }
+      if (view.current !== submittedView || !view.current.open) return;
       setError(e.message || '创建结果暂未确认，请恢复原创建');
     } finally { flight.current = false; if (scope.isCurrent()) setBusy(false); }
   }
