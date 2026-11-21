@@ -147,7 +147,7 @@ func (c *BatchAutomationCoordinator) Preflight(ctx context.Context, owner, batch
 	// 全局执行器缺失属于整批不可执行，单独列出，避免每本书重复同一条原因。
 	result.BatchIssues = append(result.BatchIssues, c.automationGlobalPreflightIssues(ctx, owner, batch, runMode)...)
 
-	completedBooks := automationCompletedBookIDs(state, owner, batchID)
+	completedBooks := automationCompletedBookIDs(state, owner, batchID, result.ProductionMode)
 	for _, book := range books {
 		// 已完成（含已发布）的书在真正执行时会被直接跳过。预检先标出来，
 		// 否则按钮会显示“立即执行（15 本）”，让人以为要整批重做。
@@ -271,12 +271,16 @@ func automationPeekActiveJob(state automationStateFile, owner, batchID string) *
 // automationCompletedBookIDs 返回该批次最近一个任务里已完成（含已发布）的书。
 // 执行环节本来就会跳过这些书，预检也必须把它们排除在“本次会执行”的计数之外，
 // 否则面板会显示“立即执行（15 本）”，让用户以为整批要重做。
-func automationCompletedBookIDs(state automationStateFile, owner, batchID string) map[string]bool {
+func automationCompletedBookIDs(state automationStateFile, owner, batchID, productionMode string) map[string]bool {
 	completed := map[string]bool{}
 	var picked map[string]any
 	var pickedUpdated time.Time
 	for _, job := range state.Jobs {
 		if job == nil || automationStringValue(job["owner"], "") != owner || automationStringValue(job["batchId"], "") != batchID {
+			continue
+		}
+		jobMode := strings.TrimSpace(automationStringValue(job["productionMode"], ""))
+		if jobMode != "" && productionMode != "" && jobMode != productionMode {
 			continue
 		}
 		updated := automationStoredJobTime(job["updatedAt"])

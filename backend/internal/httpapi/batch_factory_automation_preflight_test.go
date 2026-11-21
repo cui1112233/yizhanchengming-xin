@@ -154,6 +154,34 @@ func TestAutomationPreflightPassesComicBatchAndWritesNothing(t *testing.T) {
 	}
 }
 
+func TestAutomationPreflightDoesNotTreatCompletedComicAsCompletedVideo(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch := preflightComicBatch(t, store, 1, 0)
+	batch = savePreflightBatchSettings(t, store, batch, preflightComicSettingsPatch(t, "整本漫画页规则", "提取漫画资产"))
+	stateStore := &memoryAutomationStateStore{found: true, state: automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"comic-job": {
+			"id": "comic-job", "owner": "alice", "batchId": batch.ID,
+			"state": "completed", "productionMode": "comic", "updatedAt": "2026-11-21T04:56:37Z",
+			"books": map[string]any{
+				batch.Books[0].ID: map[string]any{"bookId": batch.Books[0].ID, "status": "completed", "stage": "published"},
+			},
+		},
+	}}}
+	coordinator := preflightCoordinator(t, store, preflightReadyStages(store))
+	coordinator.SetAutomationStateStore(stateStore)
+
+	result, err := coordinator.Preflight(ctx, "alice", batch.ID, map[string]any{
+		"runMode": "storyboard_only", "productionMode": "video", "bookIds": []string{batch.Books[0].ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Summary.Skipped != 0 || len(result.RunnableBookIDs) != 1 || result.RunnableBookIDs[0] != batch.Books[0].ID {
+		t.Fatalf("comic completion leaked into video preflight: summary=%#v runnable=%v books=%#v", result.Summary, result.RunnableBookIDs, result.Books)
+	}
+}
+
 func TestAutomationPreflightPeekActiveJobWritesNothing(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
