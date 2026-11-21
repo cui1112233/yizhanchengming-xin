@@ -480,7 +480,11 @@ func syncTargetConfigProfiles(req *http.Request, store novelfetchworkshop.Store,
 		} else if gender == "2" {
 			gender = "女"
 		}
-		groups = append(groups, map[string]any{"id": "121-" + id, "name": firstText(source["config_name"], "121 配置档 "+id), "enabled": true, "source": "121", "config_id": id, "is_default": targetNumber(source["is_default"]) == 1, "platform_id": firstText(data["platform_id"], source["platform_id"]), "gender": strings.ReplaceAll(gender, "频", ""), "style": firstText(data["style_name"], source["style_name"], data["style"]), "advanced": data})
+		profile := map[string]any{"id": "121-" + id, "name": firstText(source["config_name"], "121 配置档 "+id), "enabled": true, "source": "121", "config_id": id, "is_default": targetNumber(source["is_default"]) == 1, "platform_id": firstText(data["platform_id"], source["platform_id"]), "gender": strings.ReplaceAll(gender, "频", ""), "style": firstText(data["style_name"], source["style_name"], data["style"]), "advanced": data}
+		if organization := targetProfileOrganization(data, source); organization != "" {
+			profile["organization"] = organization
+		}
+		groups = append(groups, profile)
 	}
 	web["upload_profiles"] = append(local, groups...)
 	app["web_submit"] = web

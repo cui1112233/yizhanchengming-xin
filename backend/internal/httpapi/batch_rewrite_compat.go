@@ -632,7 +632,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				gender = "女"
 			}
 			profile := map[string]any{"id": "121-" + id, "name": firstText(source["config_name"], "121 配置档 "+id), "enabled": true, "source": "121", "config_id": id, "is_default": targetNumber(source["is_default"]) == 1, "platform_id": firstText(data["platform_id"], source["platform_id"]), "gender": strings.ReplaceAll(gender, "频", ""), "style": firstText(data["style_name"], source["style_name"], data["style"]), "advanced": data}
-			organization := firstText(data["organization_id"], data["organizationId"], data["organization"], data["org_id"], data["orgId"], source["organization_id"], source["organizationId"], source["organization"], source["org_id"], source["orgId"])
+			organization := targetProfileOrganization(data, source)
 			if organization != "" {
 				profile["organization"] = organization
 			}
@@ -1025,6 +1025,25 @@ func firstText(values ...any) string {
 	for _, value := range values {
 		if text := strings.TrimSpace(toString(value)); text != "" {
 			return text
+		}
+	}
+	return ""
+}
+
+// targetProfileOrganization keeps the organization selected in the target
+// site's configuration profile. That API returns the ID as either a JSON
+// string or a JSON number, depending on the profile version.
+func targetProfileOrganization(data, source map[string]any) string {
+	values := []any{
+		data["organization_id"], data["organizationId"], data["organization"], data["org_id"], data["orgId"],
+		source["organization_id"], source["organizationId"], source["organization"], source["org_id"], source["orgId"],
+	}
+	for _, value := range values {
+		switch value.(type) {
+		case string, json.Number, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			if text := strings.TrimSpace(fmt.Sprint(value)); text != "" {
+				return text
+			}
 		}
 	}
 	return ""
