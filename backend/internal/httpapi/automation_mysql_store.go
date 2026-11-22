@@ -33,6 +33,13 @@ type AutomationJobSaver interface {
 	SaveJobs(context.Context, map[string]map[string]any) error
 }
 
+// AutomationJobReader is the narrow read side used by the unified execution
+// kernel. It avoids loading every historical job for one execution request.
+type AutomationJobReader interface {
+	FindActiveJob(context.Context, string, string) (map[string]any, bool, error)
+	FindJob(context.Context, string) (map[string]any, bool, error)
+}
+
 type mysqlAutomationStateStore struct {
 	db *sql.DB
 }
@@ -133,6 +140,39 @@ func (s *mysqlAutomationStateStore) loadJobsByID(ctx context.Context, jobs map[s
 
 func (s *mysqlAutomationStateStore) Save(ctx context.Context, state automationStateFile) error {
 	return s.SaveJobs(ctx, state.Jobs)
+}
+
+func (s *mysqlAutomationStateStore) FindActiveJob(ctx context.Context, owner, batchID string) (map[string]any, bool, error) {
+	return s.findOneJob(ctx, `SELECT id, job_json FROM batch_automation_jobs WHERE owner_username = ? AND batch_id = ? AND state IN ('running','paused','retry_wait','scheduled','queued','pending') ORDER BY updated_at DESC LIMIT 1`, owner, batchID)
+}
+
+func (s *mysqlAutomationStateStore) FindJob(ctx context.Context, jobID string) (map[string]any, bool, error) {
+	return s.findOneJob(ctx, `SELECT id, job_json FROM batch_automation_jobs WHERE id = ? LIMIT 1`, jobID)
+}
+
+func (s *mysqlAutomationStateStore) findOneJob(ctx context.Context, query string, args ...any) (map[string]any, bool, error) {
+	if s == nil || s.db == nil {
+		return nil, false, nil
+	}
+	var id string
+	var raw []byte
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&id, &raw); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("read automation job: %w", err)
+	}
+	var job map[string]any
+	if err := json.Unmarshal(raw, &job); err != nil {
+		return nil, false, fmt.Errorf("decode automation job %s: %w", id, err)
+	}
+	if job == nil {
+		job = map[string]any{}
+	}
+	if strings.TrimSpace(automationStringValue(job["id"], "")) == "" {
+		job["id"] = id
+	}
+	return job, true, nil
 }
 
 // SaveJobs upserts only the jobs that actually changed. Callers must pass the

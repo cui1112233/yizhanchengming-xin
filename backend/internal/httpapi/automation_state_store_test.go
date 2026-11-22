@@ -49,6 +49,25 @@ func TestMySQLAutomationStateStoreLoadsAndSavesJobs(t *testing.T) {
 	}
 }
 
+func TestMySQLAutomationStateStoreFindActiveJobScopesOwnerAndBatch(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLAutomationStateStore(db).(*mysqlAutomationStateStore)
+	mock.ExpectQuery("SELECT id, job_json FROM batch_automation_jobs WHERE owner_username = \\? AND batch_id = \\? AND state IN").
+		WithArgs("alice", "batch-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "job_json"}).AddRow("job-1", `{"id":"job-1","state":"running"}`))
+	job, found, err := store.FindActiveJob(context.Background(), "alice", "batch-1")
+	if err != nil || !found || job["id"] != "job-1" {
+		t.Fatalf("job=%#v found=%v err=%v", job, found, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func (s *memoryAutomationStateStore) Load(context.Context) (automationStateFile, bool, error) {
 	s.loads++
 	return s.state, s.found, nil
