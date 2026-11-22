@@ -664,7 +664,7 @@ func TestWebSubmitForceResubmitsConfirmedVersion(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	connector := &cloneSubmissionEvidenceSpy{}
+	connector := &cloneSubmissionEvidenceSpy{bookReceiptIDs: []string{"initial-ai1-receipt"}}
 	request := webSubmitRequest{TaskIDs: []string{"777777"}, Versions: []string{"ai1"}, Force: true}
 	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, request, nil, connector)
 	if err != nil || connector.submitCalls != 0 || connector.cloneSource != "initial-ai1-receipt" || result.Success != 1 {
@@ -686,7 +686,10 @@ func TestWebSubmitForceWithoutNewCloneReceiptStaysPending(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			ctx := context.Background()
 			store, usersDir, doc := newSubmissionEvidenceTask(t)
-			connector := &cloneSubmissionEvidenceSpy{receipt: &videomanagementconnector.Submission{ID: scenario.id, Status: "submitted"}}
+			connector := &cloneSubmissionEvidenceSpy{
+				receipt:        &videomanagementconnector.Submission{ID: scenario.id, Status: "submitted"},
+				bookReceiptIDs: []string{"first-ai1-receipt"},
+			}
 			request := webSubmitRequest{TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "force-missing-proof", Force: true}
 			result, err := executeWebSubmit(ctx, "tester", usersDir, store, request, nil, connector)
 			if err != nil || len(result.Results) != 1 || result.Success != 0 || result.Failed != 1 || connector.cloneCalls != 1 || connector.submitCalls != 0 {
@@ -735,7 +738,10 @@ func TestWebSubmitForceRejectsHistoricalCloneReceiptsAcrossVersions(t *testing.T
 			if err := store.PutDocument(ctx, "tester", doc); err != nil {
 				t.Fatal(err)
 			}
-			connector := &cloneSubmissionEvidenceSpy{receipt: &videomanagementconnector.Submission{ID: scenario.returned, Status: "submitted"}}
+			connector := &cloneSubmissionEvidenceSpy{
+				receipt:        &videomanagementconnector.Submission{ID: scenario.returned, Status: "submitted"},
+				bookReceiptIDs: []string{"latest-ai1-receipt", "first-ai1-receipt", "first-ai2-receipt"},
+			}
 			result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
 				TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "forced-ai1", Force: true,
 			}, nil, connector)
@@ -751,6 +757,89 @@ func TestWebSubmitForceRejectsHistoricalCloneReceiptsAcrossVersions(t *testing.T
 			}
 		})
 	}
+}
+
+func TestWebSubmitForceChecksRemoteReceiptsBeforeCloning(t *testing.T) {
+	for _, scenario := range []struct {
+		name, returned string
+		success        int
+		unavailable    bool
+	}{
+		{name: "remote_only_old_receipt", returned: "receipt-r1"},
+		{name: "new_receipt", returned: "receipt-r3", success: 1},
+		{name: "history_unavailable", returned: "receipt-r3", unavailable: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, usersDir, doc := newSubmissionEvidenceTask(t)
+			mapOrEmpty(mapOrEmpty(doc.Logs[0])["remote_receipt"])["submission_id"] = "receipt-r2"
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			connector := &pagedCloneReceiptSpy{
+				cloneSubmissionEvidenceSpy: cloneSubmissionEvidenceSpy{receipt: &videomanagementconnector.Submission{ID: scenario.returned, Status: "submitted"}},
+				pages:                      [][]string{{"receipt-r2"}, {"receipt-r1"}}, unavailable: scenario.unavailable,
+			}
+			request := webSubmitRequest{TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "force-with-history", Force: true}
+			result, err := executeWebSubmit(ctx, "tester", usersDir, store, request, nil, connector)
+			if err != nil || result.Success != scenario.success || len(result.Results) != 1 || connector.submitCalls != 0 {
+				t.Fatalf("force did not use remote history: result=%+v connector=%+v error=%v", result, connector, err)
+			}
+			row := mapOrEmpty(result.Results[0])
+			if scenario.unavailable {
+				if connector.cloneCalls != 0 || len(connector.bookPages) != 2 || row["code"] != "WEB_SUBMIT_RESUBMISSION_HISTORY_UNAVAILABLE" {
+					t.Fatalf("incomplete remote history did not block cloning: result=%+v connector=%+v", result, connector)
+				}
+				return
+			}
+			if len(connector.bookPages) != 2 || connector.bookPages[0] != 1 || connector.bookPages[1] != 2 || connector.cloneCalls != 1 || connector.cloneSource != "receipt-r2" {
+				t.Fatalf("remote listing was not frozen before copying: %+v", connector)
+			}
+			if scenario.success == 0 {
+				if row["status"] != "pending_confirmation" {
+					t.Fatalf("remote-only historical receipt was confirmed: %+v", row)
+				}
+				connector.readback = &videomanagementconnector.Submission{ID: "receipt-r1", ReadbackRaw: map[string]any{
+					"bookid": doc.BookID, "version_id": "ai1", "operation_id": request.OperationID,
+				}}
+				result, err = executeWebSubmit(ctx, "tester", usersDir, store, request, nil, connector)
+				if err != nil || result.Success != 0 || connector.cloneCalls != 1 {
+					t.Fatalf("retry accepted a frozen historical receipt or cloned twice: result=%+v connector=%+v error=%v", result, connector, err)
+				}
+			}
+		})
+	}
+}
+
+type pagedCloneReceiptSpy struct {
+	cloneSubmissionEvidenceSpy
+	pages       [][]string
+	bookPages   []int
+	unavailable bool
+	readback    *videomanagementconnector.Submission
+}
+
+func (c *pagedCloneReceiptSpy) GetBook(_ context.Context, _ videomanagementconnector.Session, bookID string, page, _ int) (any, error) {
+	c.bookPages = append(c.bookPages, page)
+	if (c.unavailable && page > 1) || c.cloneCalls > 0 || page > len(c.pages) {
+		return nil, errors.New("remote history unavailable before clone")
+	}
+	total := 0
+	for _, ids := range c.pages {
+		total += len(ids)
+	}
+	rows := []any{}
+	for _, id := range c.pages[page-1] {
+		rows = append(rows, map[string]any{"bookid": bookID, "id": id})
+	}
+	return map[string]any{"success": true, "total": total, "data": rows}, nil
+}
+
+func (c *pagedCloneReceiptSpy) GetSubmission(ctx context.Context, session videomanagementconnector.Session, bookID string) (videomanagementconnector.Submission, error) {
+	if c.readback != nil {
+		return *c.readback, nil
+	}
+	return c.recordingSubmitConnector.GetSubmission(ctx, session, bookID)
 }
 
 func TestWebSubmitUsesSourceBookIDForUpload(t *testing.T) {

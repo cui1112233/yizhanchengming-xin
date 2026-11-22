@@ -166,10 +166,34 @@ func TestSubmitReadbackRejectsExplicitOperationMismatchDespiteMatchingEvidence(t
 	}
 }
 
+func TestSubmitReadbackSharedOperationCanUseUniqueVersionFingerprint(t *testing.T) {
+	for _, scenario := range []struct {
+		name, ai1Fingerprint, receiptFingerprint string
+		want                                     bool
+	}{
+		{name: "unique", ai1Fingerprint: "ai1-body-digest", receiptFingerprint: "ai2-body-digest", want: true},
+		{name: "shared", ai1Fingerprint: "ai2-body-digest", receiptFingerprint: "ai2-body-digest"},
+		{name: "missing", ai1Fingerprint: "ai1-body-digest"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			doc := novelfetchworkshop.Document{Meta: map[string]any{"siteSubmitAttempts": map[string]any{
+				"ai1": map[string]any{"operation_id": "shared-operation", "content_sha256": scenario.ai1Fingerprint},
+				"ai2": map[string]any{"operation_id": "shared-operation", "content_sha256": "ai2-body-digest"},
+			}}}
+			receipt := videomanagementconnector.Submission{ID: "candidate-receipt", ReadbackRaw: map[string]any{
+				"bookid": "12345678901", "operation_id": "shared-operation", "content_sha256": scenario.receiptFingerprint,
+			}}
+			if got := workshopPendingReadbackMatches(receipt, doc, "12345678901", "ai2"); got != scenario.want {
+				t.Fatalf("shared operation attribution = %v, want %v", got, scenario.want)
+			}
+		})
+	}
+}
+
 func TestWebSubmitForceAuditsOperationAndPriorReceipt(t *testing.T) {
 	ctx := context.Background()
 	store, usersDir, doc := newSubmissionEvidenceTask(t)
-	connector := &cloneSubmissionEvidenceSpy{}
+	connector := &cloneSubmissionEvidenceSpy{bookReceiptIDs: []string{"first-ai1-receipt"}}
 	result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
 		TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "force-operation", Force: true,
 	}, nil, connector)
@@ -263,10 +287,21 @@ func TestWebSubmitForceDoesNotGuessPriorVersionFromHistoricalListing(t *testing.
 
 type cloneSubmissionEvidenceSpy struct {
 	recordingSubmitConnector
-	cloneSource string
-	content     string
-	cloneCalls  int
-	receipt     *videomanagementconnector.Submission
+	cloneSource    string
+	content        string
+	cloneCalls     int
+	receipt        *videomanagementconnector.Submission
+	bookReceiptIDs []string
+}
+
+func (c *cloneSubmissionEvidenceSpy) GetBook(_ context.Context, _ videomanagementconnector.Session, bookID string, page, _ int) (any, error) {
+	rows := []any{}
+	if page == 1 {
+		for _, id := range c.bookReceiptIDs {
+			rows = append(rows, map[string]any{"bookid": bookID, "id": id})
+		}
+	}
+	return map[string]any{"success": true, "total": len(c.bookReceiptIDs), "data": rows}, nil
 }
 
 func (c *cloneSubmissionEvidenceSpy) CloneSubmission(_ context.Context, _ videomanagementconnector.Session, source string, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {

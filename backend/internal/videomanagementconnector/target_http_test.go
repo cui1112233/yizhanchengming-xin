@@ -110,6 +110,33 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 	}
 }
 
+func TestTargetHTTPBookReadbackPreservesLongIdentifiers(t *testing.T) {
+	const bookID, receiptID = "2100242549395006289", "9100242549395006293"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Query().Get("bookid") != bookID {
+			t.Errorf("unexpected book readback: %s %s", r.Method, r.URL)
+		}
+		_, _ = fmt.Fprintf(w, `{"success":true,"total":1,"data":[{"bookid":%s,"id":%s}]}`, bookID, receiptID)
+	}))
+	defer server.Close()
+	ctx := context.Background()
+	service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+	session := Session{Cookie: "sid=fixture"}
+	raw, err := service.GetBook(ctx, session, bookID, 1, 100)
+	value, ok := raw.(map[string]any)
+	if err != nil || !ok {
+		t.Fatalf("book listing = %#v, err = %v", raw, err)
+	}
+	rows := arrayOfMaps(value["data"])
+	if len(rows) != 1 || fmt.Sprint(rows[0]["bookid"]) != bookID || fmt.Sprint(rows[0]["id"]) != receiptID {
+		t.Errorf("listing changed book/receipt IDs: %+v", rows)
+	}
+	receipt, err := service.GetSubmission(ctx, session, bookID)
+	if err != nil || receipt.ID != receiptID {
+		t.Errorf("readback changed receipt ID: %+v %v", receipt, err)
+	}
+}
+
 func TestTargetHTTPServiceCloneSubmissionUsesRemoteCloneContract(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tttadmin/api/zbooklist_clone.php" {
@@ -135,7 +162,7 @@ func TestTargetHTTPServiceCloneSubmissionUsesRemoteCloneContract(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":true,"id":296900}`))
+		_, _ = w.Write([]byte(`{"success":true,"id":9100242549395006293}`))
 	}))
 	defer server.Close()
 
@@ -156,7 +183,7 @@ func TestTargetHTTPServiceCloneSubmissionUsesRemoteCloneContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.ID != "296900" || result.Status != "submitted" {
+	if result.ID != "9100242549395006293" || result.Status != "submitted" {
 		t.Fatalf("result = %#v", result)
 	}
 }

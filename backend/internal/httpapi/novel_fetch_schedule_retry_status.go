@@ -9,6 +9,15 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
+func novelFetchActiveGenerationQueueState(meta map[string]any) string {
+	status := strings.ToLower(firstText(meta["queueState"], meta["queue_state"]))
+	switch status {
+	case "queued", "running", "processing", "ai_processing", "waiting_retry":
+		return status
+	}
+	return ""
+}
+
 // A deferred fetch is retried by automation under a new process job. That job
 // does not own the original schedule ID. Reconcile the original schedule from
 // its own books instead of redispatching it or leaving its card waiting forever.
@@ -89,7 +98,10 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		if item["auto_submit"] == false {
 			switch status {
 			case "completed", "submitted", "upload_pending", "pending_upload", "pending_verification", "pending_confirmation":
+				queueState := novelFetchActiveGenerationQueueState(meta)
 				switch {
+				case queueState != "":
+					status = queueState
 				case manualHold || strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "failed"):
 					status = "failed"
 				case novelFetchVersionsGenerated(ctx, store, owner, document, versions):

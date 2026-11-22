@@ -127,6 +127,68 @@ func TestDeferredGenerateOnlySchedulePreservesCurrentWorkWithOldProse(t *testing
 	}
 }
 
+func TestDeferredGenerateOnlyScheduleUsesActiveQueueStateOverStaleCompletion(t *testing.T) {
+	for _, previous := range []string{"completed", "upload_pending"} {
+		t.Run(previous, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &uniqueRecordingNovelFetchQueue{}
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+				"status": previous, "queueState": "running", "aiStatus": "done",
+			}, Versions: map[string]any{"ai1": "第一版旧正文", "ai2": "第二版旧正文"}}
+			saveSubmissionEvidenceSchedule(t, store, doc, false)
+			now := time.Now()
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+				t.Fatal(err)
+			}
+			if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "running" || len(queue.jobs) != 0 {
+				t.Fatalf("stale completion masked the active queue state: row=%+v jobs=%+v", row, queue.jobs)
+			}
+			doc.Meta["status"], doc.Meta["queueState"] = "upload_pending", "upload_pending"
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(time.Minute)); err != nil {
+				t.Fatal(err)
+			}
+			if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "completed" || len(queue.jobs) != 0 {
+				t.Fatalf("stale upload state after generation did not settle: row=%+v jobs=%+v", row, queue.jobs)
+			}
+		})
+	}
+}
+
+func TestDueGenerateOnlyScheduleDoesNotSkipAnActiveBookWithOldProse(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+		"status": "completed", "queueState": "running", "aiStatus": "done", "scheduleId": "evidence-schedule",
+	}, Versions: map[string]any{"ai1": "第一版旧正文", "ai2": "第二版旧正文"}}
+	item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+	now := time.Now()
+	item["status"], item["pending_book_ids"], item["retry_tracking"] = "scheduled", nil, false
+	item["tasks_prepared"], item["run_at"] = true, now.Add(-time.Minute).Format(time.RFC3339Nano)
+	cfg, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg["novel_fetch_schedules"] = []any{item}
+	if err := store.PutConfig(ctx, "tester", cfg); err != nil {
+		t.Fatal(err)
+	}
+	active := novelfetchworkshop.ProcessJob{ID: "active-generation", Owner: "tester", PlatformID: "2", BookIDs: []string{doc.BookID}}
+	if queued, _, err := queue.EnqueueUniqueBooks(ctx, active, time.Hour); err != nil || !queued {
+		t.Fatalf("could not set up active generation: %v", err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "running" || len(queue.jobs) != 1 {
+		t.Fatalf("initial dispatch hid or duplicated active generation: row=%+v jobs=%+v", row, queue.jobs)
+	}
+}
+
 func TestDeferredScheduleTracksAutomaticFailureUntilManualBudgetExhaustion(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()

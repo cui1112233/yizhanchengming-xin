@@ -54,7 +54,7 @@ func (err *webSubmitRequestError) Error() string { return err.Message }
 // matching book alone cannot confirm the current send attempt.
 func submissionMatchesAttempt(receipt videomanagementconnector.Submission, expectedID, startedAt string) bool {
 	record := mapOrEmpty(receipt.ReadbackRaw)
-	bookID := firstText(record["bookid"])
+	bookID := workshopRemoteRecordID(record["bookid"])
 	if bookID == "" {
 		return strings.TrimSpace(receipt.ID) != ""
 	} // Other connectors return an explicit confirmed receipt.
@@ -438,6 +438,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					}
 					submit := targets[0].Submit
 					cloneSource := ""
+					var precloneReceiptIDs []string
 					if containsVersion(done, version) {
 						priorReceipt := priorWorkshopSubmitReceipt(doc, version)
 						audit := map[string]any{
@@ -446,16 +447,24 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						}
 						doc.Logs = append(doc.Logs, audit)
 						if request.Force {
-							cloner, canClone := targets[0].(cloneSubmissionService)
-							if !canClone || priorReceipt == "" {
-								message := "重新提交需要目标站支持复制提交并提供该版本的已确认回执"
+							blockForce := func(code, reason, message string) {
 								audit["status"], audit["error"] = "waiting_configuration", message
-								row["error"], row["code"] = message, "WEB_SUBMIT_RESUBMISSION_UNAVAILABLE"
+								row["error"], row["code"] = message, code
 								result.Results = append(result.Results, row)
 								result.Failed++
-								manifestItem(bookID, version, "failed", "resubmission_unavailable", message)
+								manifestItem(bookID, version, "failed", reason, message)
+							}
+							cloner, canClone := targets[0].(cloneSubmissionService)
+							if !canClone || priorReceipt == "" {
+								blockForce("WEB_SUBMIT_RESUBMISSION_UNAVAILABLE", "resubmission_unavailable", "重新提交需要目标站支持复制提交并提供该版本的已确认回执")
 								continue
 							}
+							historicalIDs, historyErr := workshopPrecloneReceiptIDs(ctx, targets[0], targetSession, uploadBookID, priorReceipt)
+							if historyErr != nil {
+								blockForce("WEB_SUBMIT_RESUBMISSION_HISTORY_UNAVAILABLE", "resubmission_history_unavailable", "无法可靠核对该书的历史回执，未发起重新提交")
+								continue
+							}
+							precloneReceiptIDs = historicalIDs
 							cloneSource = priorReceipt
 							submit = func(ctx context.Context, session videomanagementconnector.Session, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
 								return cloner.CloneSubmission(ctx, session, cloneSource, input)
@@ -464,7 +473,11 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					}
 					contentHash := sha256.Sum256([]byte(content.Content))
 					attempts := mapOrEmpty(meta["siteSubmitAttempts"])
-					attempts[version] = map[string]any{"operation_id": operationID, "content_sha256": hex.EncodeToString(contentHash[:]), "started_at": time.Now().UTC().Format(time.RFC3339Nano)}
+					attemptEvidence := map[string]any{"operation_id": operationID, "content_sha256": hex.EncodeToString(contentHash[:]), "started_at": time.Now().UTC().Format(time.RFC3339Nano)}
+					if cloneSource != "" {
+						attemptEvidence["preclone_receipt_ids"] = precloneReceiptIDs
+					}
+					attempts[version] = attemptEvidence
 					meta["siteSubmitAttempts"] = attempts
 					// 上传前先写入 executing，崩溃后可以识别“已派发但结果未知”，
 					// 下一次提交只会回读确认，不会重复上传。
@@ -503,6 +516,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						finish(err)
 						return
 					}
+					returnedReceiptID := strings.TrimSpace(submission.ID)
+					if cloneSource != "" && (seenString(precloneReceiptIDs, returnedReceiptID) || workshopHasConfirmedReceipt(doc, returnedReceiptID)) {
+						returnedReceiptID = ""
+					}
 					if submitErr != nil {
 						if errors.Is(submitErr, videomanagementconnector.ErrSiteContractChanged) {
 							uncertainVersion("接口结构变化，提交结果待回读确认；不会重复上传", uploadBookID)
@@ -529,10 +546,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 							finish(&webSubmitRequestError{Status: http.StatusConflict, Message: workshopLoginRequiredMessage, Code: "UPLOAD_LOGIN_REQUIRED"})
 							return
 						}
-						uncertainVersion("提交结果不确定，等待目标站回读确认", firstText(submission.ID, uploadBookID))
+						uncertainVersion("提交结果不确定，等待目标站回读确认", firstText(returnedReceiptID, uploadBookID))
 						continue
 					}
-					if id := strings.TrimSpace(submission.ID); cloneSource != "" && (id == "" || workshopHasConfirmedReceipt(doc, id)) {
+					if cloneSource != "" && returnedReceiptID == "" {
 						row["code"] = "WEB_SUBMIT_RESUBMISSION_RECEIPT_UNCONFIRMED"
 						uncertainVersion("重新提交尚未返回新的回执编号，等待核对；不会重复上传", uploadBookID)
 						continue

@@ -108,7 +108,7 @@ func TestAuditRound2OneBusyBookDoesNotAbandonOtherScheduledBook(t *testing.T) {
 		t.Fatalf("pending ownership lost: %+v %+v", row, doc.Meta)
 	}
 	// Completing the free child cannot complete a parent with a busy book.
-	doc.Meta["status"] = "completed"
+	doc.Meta["status"], doc.Meta["queueState"] = "completed", "completed"
 	doc.Versions = map[string]any{"ai1": "第二本结果"}
 	store.PutDocument(ctx, "tester", doc)
 	queue.Ack(ctx, free)
@@ -129,7 +129,8 @@ func TestAuditRound2OneBusyBookDoesNotAbandonOtherScheduledBook(t *testing.T) {
 		t.Fatalf("deferred book not resumed: %+v %v", remaining, err)
 	}
 	first, _ := store.GetDocument(ctx, "tester", "12345678901")
-	first.Meta["status"], first.Versions = "completed", map[string]any{"ai1": "第一本结果"}
+	first.Meta["status"], first.Meta["queueState"] = "completed", "completed"
+	first.Versions = map[string]any{"ai1": "第一本结果"}
 	store.PutDocument(ctx, "tester", first)
 	queue.Ack(ctx, remaining)
 	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", due.Add(4*time.Second)); err != nil {

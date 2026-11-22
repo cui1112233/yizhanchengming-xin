@@ -187,10 +187,21 @@ func (s *TargetHTTPService) GetBook(ctx context.Context, session Session, bookID
 		return nil, fmt.Errorf("target site book readback returned HTTP %d", response.StatusCode)
 	}
 	var value any
-	if json.Unmarshal(raw, &value) != nil {
+	if decodeTargetRecordJSON(raw, &value) != nil {
 		value = string(raw)
 	}
 	return value, nil
+}
+
+// A target response can represent a book or receipt ID with a JSON integer.
+// Keep the digits intact so a write response can be compared to the listing.
+func decodeTargetRecordJSON(raw []byte, value any) error {
+	if !json.Valid(raw) {
+		return fmt.Errorf("invalid target record JSON")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	return decoder.Decode(value)
 }
 
 // CheckSession 是会话状态的唯一判定入口：同时校验 HTTP 状态码和响应正文。
@@ -421,7 +432,7 @@ func (s *TargetHTTPService) CloneSubmission(ctx context.Context, session Session
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
 	var result map[string]any
-	decodeErr := json.Unmarshal(raw, &result)
+	decodeErr := decodeTargetRecordJSON(raw, &result)
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || targetResponseSessionExpired(raw, result) {
 		return Submission{}, ErrSessionExpired
 	}
@@ -519,7 +530,7 @@ func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, 
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
 	var result map[string]any
-	_ = json.Unmarshal(raw, &result)
+	_ = decodeTargetRecordJSON(raw, &result)
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || targetResponseSessionExpired(raw, result) {
 		return Submission{}, ErrSessionExpired
 	}

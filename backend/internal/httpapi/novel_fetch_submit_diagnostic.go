@@ -2,7 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,15 +82,72 @@ func workshopHasConfirmedReceipt(doc novelfetchworkshop.Document, id string) boo
 	return false
 }
 
+func workshopRemoteRecordID(value any) string {
+	switch value.(type) {
+	case string, json.Number:
+		return strings.TrimSpace(fmt.Sprint(value))
+	default:
+		return ""
+	}
+}
+
+func workshopPrecloneReceiptIDs(ctx context.Context, target videomanagementconnector.Service, session videomanagementconnector.Session, bookID, sourceID string) ([]string, error) {
+	reader, ok := target.(videomanagementconnector.BookReadbackService)
+	if !ok {
+		return nil, fmt.Errorf("连接器不支持按页读取历史回执")
+	}
+	const pageSize, maxPages = 100, 50
+	ids := []string{}
+	seen := map[string]bool{}
+	total := 0
+	for page := 1; page <= maxPages; page++ {
+		raw, err := reader.GetBook(ctx, session, bookID, page, pageSize)
+		if err != nil {
+			return nil, err
+		}
+		payload := mapOrEmpty(raw)
+		rows, _ := payload["data"].([]any)
+		count, countErr := strconv.Atoi(strings.TrimSpace(fmt.Sprint(payload["total"])))
+		if payload["success"] != true || countErr != nil || count < 1 || count > pageSize*maxPages || len(rows) == 0 || len(rows) > pageSize {
+			return nil, fmt.Errorf("视频管理系统未返回完整历史回执清单")
+		}
+		if page == 1 {
+			total = count
+		}
+		if count != total || len(ids)+len(rows) > total {
+			return nil, fmt.Errorf("读取历史回执期间清单发生变化")
+		}
+		for _, row := range rows {
+			record := mapOrEmpty(row)
+			id := workshopRemoteRecordID(record["id"])
+			if id == "" || workshopRemoteRecordID(record["bookid"]) != bookID || seen[id] {
+				return nil, fmt.Errorf("历史回执中包含重复或无法确认归属的记录")
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+		if len(ids) == total {
+			if !seen[sourceID] {
+				return nil, fmt.Errorf("历史回执清单中没有本版本的原回执")
+			}
+			return ids, nil
+		}
+	}
+	return nil, fmt.Errorf("历史回执页数过多，未能完整核对")
+}
+
 func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission, doc novelfetchworkshop.Document, bookID, version string) bool {
 	record := mapOrEmpty(receipt.ReadbackRaw)
-	recordBook := firstText(record["bookid"])
+	recordBook := workshopRemoteRecordID(record["bookid"])
 	id := strings.TrimSpace(receipt.ID)
 	if id == "" || (recordBook != "" && recordBook != bookID) || workshopHasConfirmedReceipt(doc, id) {
 		return false
 	}
 	attempts := mapOrEmpty(doc.Meta["siteSubmitAttempts"])
 	attempt := mapOrEmpty(attempts[version])
+	if containsVersion(attempt["preclone_receipt_ids"], id) {
+		return false
+	}
 	remoteOperation, savedOperation := firstText(record["operation_id"]), firstText(attempt["operation_id"])
 	hasOperationEvidence := remoteOperation != "" && savedOperation != ""
 	if hasOperationEvidence && remoteOperation != savedOperation {
@@ -121,8 +180,8 @@ func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission,
 		}
 		return true
 	}
-	if hasOperationEvidence {
-		return matchesEvidence("operation_id", func(received, saved string) bool { return received == saved })
+	if hasOperationEvidence && matchesEvidence("operation_id", func(received, saved string) bool { return received == saved }) {
+		return true
 	}
 	if !matchesEvidence("content_sha256", strings.EqualFold) {
 		return false

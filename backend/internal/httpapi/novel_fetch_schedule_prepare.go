@@ -160,6 +160,9 @@ func scheduleBookSkipReason(ctx context.Context, store novelfetchworkshop.Store,
 	if novelFetchStopped(status) || meta["manualOnly"] == true || meta["manual_only"] == true || meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) {
 		return "任务已停止或需要人工处理，请先明确重试"
 	}
+	if item["auto_submit"] == false && novelFetchActiveGenerationQueueState(meta) != "" {
+		return "已有任务正在执行，不重复启动"
+	}
 	if meta["scheduledHold"] == true && firstText(meta["scheduleId"], meta["schedule_id"]) != firstText(item["id"]) {
 		return "已由其他定时任务安排，不重复占用"
 	}
