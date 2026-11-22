@@ -42,6 +42,7 @@ const (
 	StageReconciling    StageStatus = "reconciling"
 	StageRetryWait      StageStatus = "retry_wait"
 	StageTerminalFailed StageStatus = "terminal_failed"
+	StageSkipped        StageStatus = "skipped"
 	StageCancelled      StageStatus = "cancelled"
 )
 
@@ -132,7 +133,7 @@ func (s ExecutionStatus) ValidateTransition(to ExecutionStatus) error {
 func (s BookStatus) CanTransition(to BookStatus) bool {
 	switch s {
 	case BookPending:
-		return to == BookRunning
+		return to == BookRunning || to == BookCancelled
 	case BookRunning:
 		return to == BookWaitingExternal || to == BookCompleted || to == BookRetryWait ||
 			to == BookNeedsAttention || to == BookCancelled
@@ -155,9 +156,9 @@ func (s BookStatus) ValidateTransition(to BookStatus) error {
 func (s StageStatus) CanTransition(to StageStatus) bool {
 	switch s {
 	case StagePending:
-		return to == StageQueued
+		return to == StageQueued || to == StageSkipped || to == StageCancelled
 	case StageQueued:
-		return to == StageRunning
+		return to == StageRunning || to == StageSkipped || to == StageCancelled
 	case StageRunning:
 		return to == StageSucceeded || to == StageReconciling || to == StageRetryWait ||
 			to == StageTerminalFailed || to == StageCancelled

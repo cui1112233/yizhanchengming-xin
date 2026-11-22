@@ -39,6 +39,7 @@ func TestBookTransition(t *testing.T) {
 		want bool
 	}{
 		{BookPending, BookRunning, true},
+		{BookPending, BookCancelled, true},
 		{BookRunning, BookWaitingExternal, true},
 		{BookRunning, BookCompleted, true},
 		{BookRunning, BookRetryWait, true},
@@ -77,7 +78,11 @@ func TestStageTransition(t *testing.T) {
 		want bool
 	}{
 		{StagePending, StageQueued, true},
+		{StagePending, StageCancelled, true},
+		{StagePending, "skipped", true},
 		{StageQueued, StageRunning, true},
+		{StageQueued, StageCancelled, true},
+		{StageQueued, "skipped", true},
 		{StageRunning, StageSucceeded, true},
 		{StageRunning, StageReconciling, true},
 		{StageRunning, StageRetryWait, true},
@@ -98,6 +103,9 @@ func TestStageTransition(t *testing.T) {
 		{StageSucceeded, StageRunning, false},
 		{StageTerminalFailed, StageRunning, false},
 		{StageCancelled, StageRunning, false},
+		{StageSkipped, StageRunning, false},
+		{StageSkipped, StageQueued, false},
+		{StageRunning, StageSkipped, false},
 		{StageRunning, StageRunning, false},
 		{StageRunning, "unknown", false},
 		{"", StageRunning, false},
