@@ -2,6 +2,7 @@ import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.j
 import { normalizeGiantMaterialId } from '../giantMaterialTest.js';
 import { availableGiantMaterialBooks, buildGiantMaterialPlaceholderIntakes, findRegisteredGiantMaterialBook, giantMaterialBookKey, selectGiantMaterialBook } from './batchFactoryGiantMaterialImport.js';
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
+import { ensureBatchExecution, getBatchExecution, executionViewModel } from '../../../modules/batch-factory/index.js';
 import { h3PromptEditRequest } from './h3PromptEditing.js';
 import { batchAccessErrorMessage } from './batchFactoryBatchAccessNotice.js';
 import { readStoryboardPromptEditableText, storyboardPromptTextForSave } from './storyboardPromptEditor.js';
@@ -5037,9 +5038,63 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
       setAutomationPresetID(presetID);
       setAutomationBookScope('selected');
-      await runAutomationAction('start', { immediate: true, bookIds: selectedBookIds, presetId: presetID });
+      setActionBusy('selected-production');
+      const preflightResponse = await preflightBatchAutomation(batch.id, {
+        presetId: presetID,
+        runMode: automationRunMode,
+        productionMode: batchProductionMode,
+        bookIds: selectedBookIds,
+        queueIfActive: automationActive
+      });
+      const preflight = resultData(preflightResponse, 'preflight') || {};
+      const preflightBooks = Array.isArray(preflight.books) ? preflight.books : [];
+      const runnableBookIds = preflightBooks.length
+        ? preflightBooks.filter(book => book?.passed === true).map(book => String(book.bookId || book.id || '')).filter(Boolean)
+        : [...selectedBookIds];
+      const blockedBooks = preflightBooks.filter(book => book?.passed !== true);
+      if (blockedBooks.length) {
+        message.warning(`有 ${blockedBooks.length} 本未通过预检，本次只执行其余 ${runnableBookIds.length} 本：${blockedBooks.map(book => book.title || book.bookId || book.id).join('、')}`);
+      }
+      if (!runnableBookIds.length) {
+        message.error('所选小说均未通过执行前检查，没有可提交的小说。');
+        return;
+      }
+      const clientRequestId = globalThis.crypto?.randomUUID
+        ? crypto.randomUUID()
+        : requestID('batch-execution');
+      const effectiveExecutionConfig = {
+        presetId: presetID,
+        runMode: automationRunMode,
+        productionMode: batchProductionMode,
+        bookTitles: Object.fromEntries(selectedBooks.map(book => [book.id, book.title || book.bookId || book.id]))
+      };
+      const ensured = await ensureBatchExecution(batch.id, {
+        bookIds: runnableBookIds,
+        mode: batchProductionMode,
+        target: 'published_confirmed',
+        clientRequestId,
+        config: effectiveExecutionConfig
+      });
+      const executionId = String(ensured?.executionId || '');
+      if (!executionId) throw new Error('统一执行入口没有返回执行编号');
+      message.success(ensured?.created ? `已创建统一执行任务 ${executionId}` : `已复用统一执行任务 ${executionId}`);
+      void (async () => {
+        for (let attempt = 0; attempt < 240; attempt += 1) {
+          const execution = await getBatchExecution(executionId);
+          const view = executionViewModel(execution);
+          if (['completed', 'needs_attention', 'cancelled'].includes(view.status)) {
+            await loadRuntimeStatus({ quiet: true });
+            message[view.status === 'completed' ? 'success' : view.status === 'cancelled' ? 'info' : 'warning'](`统一执行任务：${view.label}`);
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        message.warning('统一执行任务仍在后台运行，可在任务/日志中继续查看。');
+      })().catch(error => message.warning(error?.message || '读取统一执行状态失败'));
     } catch (error) {
       message.error(error?.message || '启动已选自动生产任务失败');
+    } finally {
+      setActionBusy('');
     }
   }
   function mergePayload(prefix, book = null, speed = 1, overrides = {}) {

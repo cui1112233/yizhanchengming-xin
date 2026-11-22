@@ -13,7 +13,8 @@ const selectedProductionSource = source.slice(
 
 test('video immediate selected execution starts the complete automation pipeline instead of only the video stage', () => {
   assert.match(selectedProductionSource, /setAutomationBookScope\('selected'\)/);
-  assert.match(selectedProductionSource, /runAutomationAction\('start', \{ immediate: true, bookIds: selectedBookIds, presetId: presetID \}\)/);
+  assert.match(selectedProductionSource, /ensureBatchExecution\(batch\.id,/);
+  assert.doesNotMatch(selectedProductionSource, /runAutomationAction\('start'/);
   assert.doesNotMatch(selectedProductionSource, /runBookStage\(batch\.id, book\.id, 'video'/);
   assert.match(source, /const batchMenuItems = batchProductionMode === 'comic'[\s\S]*?: \[[\s\S]*?key: 'selected-production'[\s\S]*?批量生成视频/);
 });
