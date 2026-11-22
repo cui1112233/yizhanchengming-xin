@@ -361,17 +361,6 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	job.Attempts++
 	startedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	progress := []any{workshopProgressItem("info", "任务开始", "", "")}
-	pendingOriginalFailures, checkpointErr := readNovelFetchPersistenceCheckpoint(job)
-	if checkpointErr != nil {
-		message := "原文抓取状态恢复记录无效"
-		log.Printf("novel fetch: invalid persistence checkpoint for job %s: %v", job.ID, checkpointErr)
-		_ = updateWorkshopRun(worker.store, job, "waiting_retry", message, startedAt, false)
-		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "waiting_retry", "queue_state": "queued", "error": message, "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts})
-		if err := worker.queue.Fail(ctx, job, true); err != nil {
-			log.Printf("novel fetch: retain invalid checkpoint for job %s: %v", job.ID, err)
-		}
-		return
-	}
 	activeBookIDs := make([]string, 0, len(job.BookIDs))
 	for _, bookID := range job.BookIDs {
 		if !worker.bookCancelled(ctx, job.Owner, bookID) {
@@ -383,6 +372,12 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, "stopped", "")
 		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "stopped", "queue_state": "stopped", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": []any{}, "progress": []any{}})
 		_ = worker.queue.Ack(ctx, job)
+		return
+	}
+	pendingOriginalFailures, checkpointErr := readNovelFetchPersistenceCheckpoint(job)
+	if checkpointErr != nil {
+		log.Printf("novel fetch: invalid persistence checkpoint for job %s", job.ID)
+		worker.isolateInvalidOriginalCheckpoint(ctx, job, activeBookIDs, startedAt)
 		return
 	}
 	activeJob := job
@@ -637,6 +632,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				return
 			}
 			retryJob.LastError = novelFetchPersistenceCheckpointPrefix + string(payload)
+			worker.requeueNovelFetchCheckpoint(ctx, retryJob)
+			return
 		}
 		if err := worker.queue.Fail(ctx, retryJob, retryEnabled); err != nil {
 			log.Printf("novel fetch: update queue for job %s: %v", job.ID, err)
@@ -672,6 +669,58 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	}
 	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": finalStatus, "queue_state": finalStatus, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "result": result, "steps": progress, "progress": progress})
 	_ = worker.queue.Ack(ctx, job)
+}
+
+const novelFetchInvalidCheckpointReason = "原文抓取状态恢复记录无效，请检查后手动重试"
+
+func (worker *workshopProcessWorker) isolateInvalidOriginalCheckpoint(ctx context.Context, job novelfetchworkshop.ProcessJob, activeBookIDs []string, startedAt string) {
+	now := time.Now().UTC()
+	saveFailed := false
+	for _, bookID := range activeBookIDs {
+		document, err := worker.store.GetDocument(ctx, job.Owner, bookID)
+		if err == nil {
+			meta := document.Meta
+			if meta["status"] == "failed" && meta["manualOnly"] == true && meta["error"] == novelFetchInvalidCheckpointReason {
+				continue
+			}
+			if meta == nil {
+				meta = map[string]any{}
+				document.Meta = meta
+			}
+			delete(meta, "originalFetchLastError")
+			markNovelFetchOriginalManual(&document, "failed", novelFetchInvalidCheckpointReason, now)
+			err = worker.store.PutDocument(ctx, job.Owner, document)
+		}
+		if err != nil {
+			saveFailed = true
+			log.Printf("novel fetch: isolate invalid checkpoint for book %s: %v", bookID, err)
+		}
+	}
+
+	status, queueState, message := "failed", "failed", novelFetchInvalidCheckpointReason
+	if saveFailed {
+		status, queueState = "waiting_retry", "queued"
+		message = "损坏的原文抓取状态记录未能隔离，等待重试保存"
+		// Keep the original scope. Shrinking it might accidentally make a
+		// checkpoint with a missing book pass validation on its next claim.
+		worker.requeueNovelFetchCheckpoint(ctx, job)
+	} else {
+		if err := worker.queue.Ack(ctx, job); err != nil {
+			log.Printf("novel fetch: acknowledge isolated checkpoint for job %s: %v", job.ID, err)
+		}
+		_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, status, message)
+	}
+	_ = updateWorkshopRun(worker.store, job, status, message, startedAt, !saveFailed)
+	worker.registry.put(job.Owner, job.ID, map[string]any{
+		"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "error": message,
+		"started_at": startedAt, "updated_at": now.Format(time.RFC3339Nano), "attempts": job.Attempts,
+	})
+}
+
+func (worker *workshopProcessWorker) requeueNovelFetchCheckpoint(ctx context.Context, job novelfetchworkshop.ProcessJob) {
+	if err := worker.queue.Fail(ctx, job, true); err != nil {
+		log.Printf("novel fetch: requeue persistence checkpoint for job %s: %v", job.ID, err)
+	}
 }
 
 func workshopProgressItem(level, message, bookID, bookName string) map[string]any {

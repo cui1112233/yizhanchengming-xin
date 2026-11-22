@@ -1642,43 +1642,128 @@ func TestNovelFetchWorkerExecutesFiveScheduledOriginalRetries(t *testing.T) {
 	}
 }
 
-func TestNovelFetchWorkerDoesNotRefetchWithCorruptPersistenceCheckpoint(t *testing.T) {
+func TestNovelFetchWorkerIsolatesCorruptPersistenceCheckpoint(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		writeFails bool
+		cancelled  bool
+	}{
+		{name: "isolates before normal job"},
+		{name: "requeues failed isolation", writeFails: true},
+		{name: "checks cancellation first", cancelled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			var store novelfetchworkshop.Store = novelfetchworkshop.NewMemoryStore()
+			if tc.writeFails {
+				store = &originalFetchStateWriteFailureStore{Store: store, status: "failed"}
+			}
+			queue := novelfetchworkshop.NewMemoryQueue()
+			const owner, corruptBookID, normalBookID = "tester", "22345678901", "22345678902"
+			for _, bookID := range []string{corruptBookID, normalBookID} {
+				if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"status": "processing", "platformId": "2"}}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.cancelled {
+				if err := queue.CancelBooks(ctx, owner, []string{corruptBookID}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var corruptCalls, normalCalls atomic.Int32
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get("bookid") == corruptBookID {
+					corruptCalls.Add(1)
+					http.Error(w, "unexpected fetch", http.StatusNotFound)
+					return
+				}
+				normalCalls.Add(1)
+				_, _ = w.Write([]byte(`{"code":200,"data":"正常的小说原文","bookinfo":{"category":"男频","genre":"都市"}}`))
+			}))
+			defer upstream.Close()
+			registry := newWorkshopProcessRegistry()
+			worker := &workshopProcessWorker{store: store, queue: queue, registry: registry,
+				fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
+			corrupt := novelfetchworkshop.ProcessJob{ID: "corrupt-checkpoint", Owner: owner, BatchID: "batch-corrupt",
+				BookIDs: []string{corruptBookID}, PlatformID: "2",
+				LastError: `persistence_checkpoint:{"type":"original_fetch","version":1,"marker":"dummy-secret-for-test"}`}
+			normal := novelfetchworkshop.ProcessJob{ID: "normal-job", Owner: owner, BatchID: "batch-normal",
+				BookIDs: []string{normalBookID}, PlatformID: "2"}
+			for _, job := range []novelfetchworkshop.ProcessJob{corrupt, normal} {
+				if queued, _, err := queue.EnqueueUniqueBooks(ctx, job, time.Hour); err != nil || !queued {
+					t.Fatalf("enqueue %s: queued=%t err=%v", job.ID, queued, err)
+				}
+			}
+			for _, wantID := range []string{corrupt.ID, normal.ID} {
+				job, err := queue.Claim(ctx, 20*time.Millisecond)
+				if err != nil || job.ID != wantID {
+					t.Fatalf("claimed %s, want %s, err=%v", job.ID, wantID, err)
+				}
+				worker.process(ctx, job)
+			}
+			if tc.writeFails {
+				job, err := queue.Claim(ctx, 20*time.Millisecond)
+				if err != nil || job.ID != corrupt.ID || job.LastError != corrupt.LastError {
+					t.Fatalf("failed isolation lost the original queue payload: job=%#v err=%v", job, err)
+				}
+				worker.process(ctx, job)
+			}
+			if corruptCalls.Load() != 0 || normalCalls.Load() != 1 {
+				t.Fatalf("upstream calls corrupt=%d normal=%d, want 0 and 1", corruptCalls.Load(), normalCalls.Load())
+			}
+			document, err := store.GetDocument(ctx, owner, corruptBookID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot, _ := registry.get(owner, corrupt.ID)
+			if tc.cancelled {
+				if snapshot["status"] != "stopped" || document.Meta["manualOnly"] == true {
+					t.Fatalf("cancelled book was quarantined: snapshot=%#v meta=%#v", snapshot, document.Meta)
+				}
+			} else {
+				reason := firstText(document.Meta["error"])
+				if document.Meta["status"] != "failed" || document.Meta["queueState"] != "failed" || document.Meta["manualOnly"] != true ||
+					document.Meta["manualOriginalFetchRequired"] != true || !strings.Contains(reason, "原文抓取状态恢复记录无效") ||
+					strings.Contains(reason, "dummy-secret-for-test") || snapshot["status"] != "failed" {
+					t.Fatalf("malformed checkpoint not isolated: meta=%#v snapshot=%#v", document.Meta, snapshot)
+				}
+			}
+			if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("isolated or cancelled checkpoint remained active: %v", err)
+			}
+		})
+	}
+}
+
+type redisOwnedStaleRecoveryQueue struct {
+	staleRecoveryRecordingQueue
+}
+
+func (*redisOwnedStaleRecoveryQueue) ProcessJobExists(context.Context, string) (bool, error) {
+	return true, nil
+}
+
+func TestNovelFetchRecoveryLeavesRedisOwnedCheckpointToWorker(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
-	queue := novelfetchworkshop.NewMemoryQueue()
-	const owner, bookID = "tester", "22345678901"
-	if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{
-		BookID: bookID, Meta: map[string]any{"status": "processing", "platformId": "2"},
-	}); err != nil {
+	const owner, bookID = "tester", "book-with-checkpoint"
+	if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{
+		"status": "processing", "queueState": "processing", "currentProcessJobId": "checkpoint-job",
+	}}); err != nil {
 		t.Fatal(err)
 	}
-	var calls atomic.Int32
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		calls.Add(1)
-		http.Error(w, "fetch refused", http.StatusNotFound)
-	}))
-	defer upstream.Close()
-	registry := newWorkshopProcessRegistry()
-	worker := &workshopProcessWorker{store: store, queue: queue, registry: registry,
-		fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
-	job := novelfetchworkshop.ProcessJob{ID: "corrupt-checkpoint", Owner: owner, BatchID: "batch-corrupt", BookIDs: []string{bookID},
-		PlatformID: "2", LastError: `persistence_checkpoint:{"type":"original_fetch","version":1,"failures":`}
-	if queued, _, err := queue.EnqueueUniqueBooks(ctx, job, time.Hour); err != nil || !queued {
-		t.Fatalf("enqueue failed: queued=%t err=%v", queued, err)
-	}
-	job, err := queue.Claim(ctx, 20*time.Millisecond)
+	document, err := store.GetDocument(ctx, owner, bookID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	worker.process(ctx, job)
-
-	snapshot, _ := registry.get(owner, job.ID)
-	if calls.Load() != 0 || !strings.Contains(firstText(snapshot["error"]), "原文抓取状态恢复记录无效") {
-		t.Fatalf("corrupt checkpoint produced %d HTTP requests, snapshot=%#v", calls.Load(), snapshot)
+	queue := &redisOwnedStaleRecoveryQueue{}
+	recoverStaleNovelFetchTasks(ctx, store, owner, nil, []novelfetchworkshop.Document{document}, time.Now().Add(time.Hour), queue)
+	current, err := store.GetDocument(ctx, owner, bookID)
+	if err != nil {
+		t.Fatal(err)
 	}
-	job.ID = "duplicate-job"
-	if conflicts, err := queue.ConflictingBookIDs(ctx, job); err != nil || conflicts[bookID] != "corrupt-checkpoint" {
-		t.Fatalf("corrupt checkpoint lost queue ownership: conflicts=%#v err=%v", conflicts, err)
+	if current.Meta["status"] != "processing" || novelFetchDocumentHasLogEvent(current, "process_recovered") {
+		t.Fatalf("MySQL recovery replaced a checkpoint still owned by Redis: meta=%#v", current.Meta)
 	}
 }
 

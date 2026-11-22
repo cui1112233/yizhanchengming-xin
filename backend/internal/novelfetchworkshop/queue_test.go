@@ -2,7 +2,7 @@ package novelfetchworkshop
 
 import (
 	"context"
-	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -158,20 +158,22 @@ func TestRedisQueueAckReleasesOnlyBookLocksOwnedByCompletedJob(t *testing.T) {
 	}
 }
 
-func TestRedisQueueRecoversStaleJobAndItsOwnedBookLocksAtomically(t *testing.T) {
-	job := ProcessJob{ID: "job-stale", Owner: "tester", BatchID: "batch-stale", PlatformID: "2", BookIDs: []string{"book-a", "book-b"}, DedupeKey: "books:tester:2"}
-	body, err := json.Marshal(job)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fake := &fakeRedisQueueDo{responses: []any{string(body), "1"}}
+func TestRedisQueueRecoversStaleJobWithoutReleasingOwnedBookLocks(t *testing.T) {
+	fake := &fakeRedisQueueDo{responses: []any{"1"}}
 	queue := NewRedisQueueWithDo("qiantie:test:novel", fake.Do)
-	recovered, err := queue.RecoverStaleJob(context.Background(), job.ID)
+	const jobID = "job-stale"
+	recovered, err := queue.RecoverStaleJob(context.Background(), jobID)
 	if err != nil || !recovered {
 		t.Fatalf("recovered=%v err=%v", recovered, err)
 	}
-	if len(fake.commands) != 2 || fake.commands[1][0] != "EVAL" || fake.commands[1][2] != "6" || !strings.Contains(fake.commands[1][1], "LREM") {
-		t.Fatalf("stale job and its book locks were not recovered atomically: %v", fake.commands)
+	if len(fake.commands) != 1 || fake.commands[0][0] != "EVAL" || fake.commands[0][2] != "4" {
+		t.Fatalf("stale job recovery must use one EVAL with job, lease and list keys: %v", fake.commands)
+	}
+	args := fake.commands[0]
+	want := []string{queue.jobKey(jobID), queue.leaseKey(jobID), queue.processingKey(), queue.pendingKey(), jobID}
+	if !slices.Equal(args[3:], want) || strings.Contains(args[1], "'DEL', KEYS[1]") ||
+		!strings.Contains(args[1], "'LPUSH', KEYS[4]") {
+		t.Fatalf("stale job lost its payload or book ownership: %v", args)
 	}
 }
 

@@ -369,6 +369,20 @@ func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.S
 				if _, recoverErr := recoveryQueue.RecoverStaleJob(ctx, staleJobID); recoverErr != nil {
 					continue
 				}
+				if checker, ok := queues[0].(interface {
+					ProcessJobExists(context.Context, string) (bool, error)
+				}); ok {
+					exists, checkErr := checker.ProcessJobExists(ctx, staleJobID)
+					if checkErr != nil || exists {
+						continue
+					}
+					// A worker may have saved the verdict and released the job
+					// since this scan read the document.
+					latest, readErr := store.GetDocument(ctx, owner, document.BookID)
+					if readErr != nil || latest.UpdatedAt != document.UpdatedAt {
+						continue
+					}
+				}
 			}
 		}
 		if document.Meta == nil {
