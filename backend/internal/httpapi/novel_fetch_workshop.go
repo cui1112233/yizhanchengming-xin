@@ -697,24 +697,30 @@ func (worker *workshopProcessWorker) isolateInvalidOriginalCheckpoint(ctx contex
 		}
 	}
 
-	status, queueState, message := "failed", "failed", novelFetchInvalidCheckpointReason
+	status, queueState, level := "failed", "failed", "error"
+	message := novelFetchInvalidCheckpointReason
 	if saveFailed {
-		status, queueState = "waiting_retry", "queued"
+		status, queueState, level = "waiting_retry", "queued", "warning"
 		message = "损坏的原文抓取状态记录未能隔离，等待重试保存"
-		// Keep the original scope. Shrinking it might accidentally make a
-		// checkpoint with a missing book pass validation on its next claim.
-		worker.requeueNovelFetchCheckpoint(ctx, job)
 	} else {
-		if err := worker.queue.Ack(ctx, job); err != nil {
-			log.Printf("novel fetch: acknowledge isolated checkpoint for job %s: %v", job.ID, err)
-		}
 		_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, status, message)
 	}
 	_ = updateWorkshopRun(worker.store, job, status, message, startedAt, !saveFailed)
+	progress := []any{workshopProgressItem(level, message, "", "")}
 	worker.registry.put(job.Owner, job.ID, map[string]any{
 		"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "error": message,
 		"started_at": startedAt, "updated_at": now.Format(time.RFC3339Nano), "attempts": job.Attempts,
+		"steps": progress, "progress": progress,
 	})
+	if saveFailed {
+		// A new worker may run as soon as the task is requeued. Keep the
+		// original book scope so the invalid checkpoint still fails validation.
+		worker.requeueNovelFetchCheckpoint(ctx, job)
+		return
+	}
+	if err := worker.queue.Ack(ctx, job); err != nil {
+		log.Printf("novel fetch: acknowledge isolated checkpoint for job %s: %v", job.ID, err)
+	}
 }
 
 func (worker *workshopProcessWorker) requeueNovelFetchCheckpoint(ctx context.Context, job novelfetchworkshop.ProcessJob) {

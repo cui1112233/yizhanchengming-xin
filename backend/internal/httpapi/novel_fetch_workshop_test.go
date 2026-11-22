@@ -1735,6 +1735,90 @@ func TestNovelFetchWorkerIsolatesCorruptPersistenceCheckpoint(t *testing.T) {
 	}
 }
 
+type checkpointHandoffQueue struct {
+	*novelfetchworkshop.MemoryQueue
+	afterRequeue func()
+}
+
+func (queue *checkpointHandoffQueue) Fail(ctx context.Context, job novelfetchworkshop.ProcessJob, retry bool) error {
+	err := queue.MemoryQueue.Fail(ctx, job, retry)
+	if err == nil && retry {
+		queue.afterRequeue()
+	}
+	return err
+}
+
+func TestNovelFetchWorkerDoesNotOverwriteCorruptCheckpointAfterHandoff(t *testing.T) {
+	ctx := context.Background()
+	store := &originalFetchStateWriteFailureStore{Store: novelfetchworkshop.NewMemoryStore(), status: "failed"}
+	queue := &checkpointHandoffQueue{MemoryQueue: novelfetchworkshop.NewMemoryQueue()}
+	registry := newWorkshopProcessRegistry()
+	first := &workshopProcessWorker{store: store, queue: queue, registry: registry}
+	second := &workshopProcessWorker{store: store, queue: queue.MemoryQueue, registry: registry}
+	const owner, bookID, batchID, jobID = "tester", "22345678901", "batch-checkpoint-handoff", "job-checkpoint-handoff"
+
+	if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{
+		BookID: bookID, Meta: map[string]any{"status": "processing", "platformId": "2"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	job := novelfetchworkshop.ProcessJob{
+		ID: jobID, Owner: owner, BatchID: batchID, BookIDs: []string{bookID}, PlatformID: "2",
+		LastError: `persistence_checkpoint:{"type":"original_fetch","version":1,"failures":`,
+	}
+	if queued, _, err := queue.EnqueueUniqueBooks(ctx, job, time.Hour); err != nil || !queued {
+		t.Fatalf("enqueue failed: queued=%t err=%v", queued, err)
+	}
+	job, err := queue.Claim(ctx, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handoff := false
+	queue.afterRequeue = func() {
+		handoff = true
+		runs, err := store.ListRuns(ctx, owner, batchID)
+		if err != nil || len(runs) != 1 || runs[0].Status != "waiting_retry" {
+			t.Errorf("run was not marked waiting_retry before handoff: runs=%#v err=%v", runs, err)
+		}
+		snapshot, _ := registry.get(owner, jobID)
+		progress, _ := json.Marshal(snapshot["progress"])
+		if snapshot["status"] != "waiting_retry" || snapshot["queue_state"] != "queued" ||
+			!bytes.Contains(progress, []byte("等待重试保存")) {
+			t.Errorf("waiting status and progress were not published before handoff: snapshot=%#v", snapshot)
+		}
+		retried, err := queue.Claim(ctx, time.Second)
+		if err != nil || retried.ID != jobID {
+			t.Fatalf("second worker could not claim retried job: id=%s err=%v", retried.ID, err)
+		}
+		// Force the next worker to finish before the first worker's Fail returns.
+		second.process(ctx, retried)
+	}
+	first.process(ctx, job)
+	if !handoff || !store.failed {
+		t.Fatal("the first worker never handed off the failed isolation write")
+	}
+	document, err := store.GetDocument(ctx, owner, bookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Meta["status"] != "failed" || document.Meta["manualOnly"] != true ||
+		document.Meta["manualOriginalFetchRequired"] != true {
+		t.Errorf("document did not stay in terminal manual failure: meta=%#v", document.Meta)
+	}
+	runs, err := store.ListRuns(ctx, owner, batchID)
+	if err != nil || len(runs) != 1 || runs[0].Status != "failed" || runs[0].FinishedAt == "" {
+		t.Errorf("old worker overwrote the terminal run after handoff: runs=%#v err=%v", runs, err)
+	}
+	snapshot, _ := registry.get(owner, jobID)
+	if snapshot["status"] != "failed" || snapshot["queue_state"] != "failed" {
+		t.Errorf("old worker overwrote terminal progress after handoff: snapshot=%#v", snapshot)
+	}
+	if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+		t.Errorf("terminal checkpoint remained in queue: %v", err)
+	}
+}
+
 type redisOwnedStaleRecoveryQueue struct {
 	staleRecoveryRecordingQueue
 }
