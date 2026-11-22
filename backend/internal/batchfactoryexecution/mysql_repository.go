@@ -247,6 +247,59 @@ func (r *MySQLRepository) AppendOutbox(ctx context.Context, event OutboxEvent) e
 	return err
 }
 
+func (r *MySQLRepository) Claim(ctx context.Context, limit int, now time.Time) (events []OutboxEvent, err error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	rows, err := tx.QueryContext(ctx, `SELECT id, aggregate_type, aggregate_id, event_type, payload_json, available_at, claimed_at, delivered_at, attempts, COALESCE(last_error,''), created_at FROM batch_execution_outbox WHERE delivered_at IS NULL AND available_at <= ? AND (claimed_at IS NULL OR claimed_at < ?) ORDER BY available_at, id LIMIT ? FOR UPDATE SKIP LOCKED`, now, now.Add(-time.Minute), limit)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var event OutboxEvent
+		var payload []byte
+		if err = rows.Scan(&event.ID, &event.AggregateType, &event.AggregateID, &event.EventType, &payload, &event.AvailableAt, &event.ClaimedAt, &event.DeliveredAt, &event.Attempts, &event.LastError, &event.CreatedAt); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		event.PayloadJSON = payload
+		events = append(events, event)
+	}
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
+	for index := range events {
+		if _, err = tx.ExecContext(ctx, `UPDATE batch_execution_outbox SET claimed_at = ?, attempts = attempts + 1 WHERE id = ? AND delivered_at IS NULL`, now, events[index].ID); err != nil {
+			return nil, err
+		}
+		claimed := now
+		events[index].ClaimedAt = &claimed
+		events[index].Attempts++
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func (r *MySQLRepository) MarkDelivered(ctx context.Context, id string, at time.Time) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE batch_execution_outbox SET delivered_at = ?, claimed_at = NULL, last_error = NULL WHERE id = ? AND delivered_at IS NULL`, at, id)
+	return err
+}
+func (r *MySQLRepository) MarkFailed(ctx context.Context, id, message string, next time.Time) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE batch_execution_outbox SET claimed_at = NULL, available_at = ?, last_error = ? WHERE id = ? AND delivered_at IS NULL`, next, message, id)
+	return err
+}
+
 func nullableText(value string) any {
 	if strings.TrimSpace(value) == "" {
 		return nil
