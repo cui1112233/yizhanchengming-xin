@@ -55,6 +55,9 @@ type partialRetryRedis struct {
 func (r *partialRetryRedis) do(_ context.Context, args ...string) (any, error) {
 	switch args[0] {
 	case "SET":
+		if slices.Contains(args[3:], "NX") && r.values[args[1]] != "" {
+			return nil, nil
+		}
 		r.values[args[1]] = args[2]
 		return "OK", nil
 	case "GET":
@@ -93,18 +96,37 @@ func (r *partialRetryRedis) do(_ context.Context, args ...string) (any, error) {
 		keys := args[3 : 3+count]
 		id := args[3+count]
 		switch args[1] {
+		case confirmClaimScript:
+			if r.values[keys[1]] != args[4+count] {
+				return nil, nil
+			}
+			if r.values[keys[0]] != args[5+count] || !slices.Contains(r.lists[keys[2]], id) {
+				delete(r.values, keys[1])
+				return nil, nil
+			}
+			return "OK", nil
 		case retryProcessingJobScript:
+			if r.values[keys[1]] != args[4+count] {
+				return int64(0), nil
+			}
 			if r.values[keys[0]] == "" || !slices.Contains(r.lists[keys[2]], id) {
 				return int64(0), nil
 			}
 			for _, key := range keys[2:4] {
 				r.lists[key] = slices.DeleteFunc(r.lists[key], func(entry string) bool { return entry == id })
 			}
-			r.values[keys[0]] = args[4+count]
+			r.values[keys[0]] = args[5+count]
 			r.lists[keys[3]] = append([]string{id}, r.lists[keys[3]]...)
 			delete(r.values, keys[1])
 			keys = keys[4:]
-		case releaseUniqueBooksScript:
+		case ackProcessingJobScript:
+			if r.values[keys[1]] != args[4+count] || !slices.Contains(r.lists[keys[2]], id) {
+				return int64(0), nil
+			}
+			r.lists[keys[2]] = slices.DeleteFunc(r.lists[keys[2]], func(entry string) bool { return entry == id })
+			delete(r.values, keys[0])
+			delete(r.values, keys[1])
+			keys = keys[3:]
 		default:
 			return nil, fmt.Errorf("unexpected script")
 		}

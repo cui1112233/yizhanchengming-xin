@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -76,4 +78,42 @@ func (f *fakeRedisDo) Do(_ context.Context, args ...string) (any, error) {
 		return value, nil
 	}
 	return "OK", nil
+}
+
+// Exercise the transport deadline with a Redis reply arriving after the
+// default ten-second I/O timeout but inside the requested blocking wait.
+func TestRedisBlockingClaimWaitsForLateReply(t *testing.T) {
+	if testing.Short() {
+		t.Skip("exercises the real ten-second socket deadline")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 16*time.Second)
+	defer cancel()
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		if _, err := readRESP(bufio.NewReader(conn)); err != nil {
+			return
+		}
+		select {
+		case <-time.After(11 * time.Second):
+			_, _ = io.WriteString(conn, "$3\r\njob\r\n")
+		case <-ctx.Done():
+		}
+	}()
+	store, err := NewRedisStore("redis://"+ln.Addr().String(), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := store.Do(ctx, "BRPOPLPUSH", "pending", "processing", "30")
+	if err != nil || value != "job" {
+		t.Fatalf("blocking claim was cut short: value=%v err=%v", value, err)
+	}
 }

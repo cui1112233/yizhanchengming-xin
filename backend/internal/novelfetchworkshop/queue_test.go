@@ -98,10 +98,11 @@ func TestRedisQueueUsesPendingProcessingAndLeaseKeys(t *testing.T) {
 	if err != nil || claimed.ID != job.ID {
 		t.Fatalf("claimed=%+v err=%v commands=%v", claimed, err, fake.commands)
 	}
+	fake.responses = []any{int64(1)}
 	if err := queue.Ack(context.Background(), claimed); err != nil {
 		t.Fatal(err)
 	}
-	if !fake.hasCommand("BRPOPLPUSH") || !fake.hasCommand("SET") || !fake.hasCommand("LREM") || !fake.hasCommand("DEL") {
+	if !fake.hasCommand("BRPOPLPUSH") || !fake.hasCommand("SET") || !fake.hasCommand("EVAL") || fake.hasCommand("LREM") || fake.hasCommand("DEL") {
 		t.Fatalf("redis queue contract missing command: %v", fake.commands)
 	}
 }
@@ -149,11 +150,12 @@ func TestRedisQueueAckReleasesOnlyBookLocksOwnedByCompletedJob(t *testing.T) {
 	if queued, _, err := queue.EnqueueUniqueBooks(context.Background(), job, time.Hour); err != nil || !queued {
 		t.Fatalf("enqueue books queued=%v err=%v", queued, err)
 	}
+	job.LeaseToken = "token"
 	job.DedupeKey = "books:tester:2"
 	if err := queue.Ack(context.Background(), job); err != nil {
 		t.Fatal(err)
 	}
-	if len(fake.commands) != 4 || fake.commands[3][0] != "EVAL" || !strings.Contains(fake.commands[3][1], "== ARGV[1]") {
+	if len(fake.commands) != 2 || fake.commands[1][0] != "EVAL" || !strings.Contains(fake.commands[1][1], "== ARGV[1]") {
 		t.Fatalf("ack did not compare-and-delete the completed job's book locks: %v", fake.commands)
 	}
 }

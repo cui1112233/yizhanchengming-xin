@@ -330,6 +330,7 @@ func newNovelFetchOriginalCheckpointFailure(fetchErr error, now time.Time) *nove
 }
 
 type workshopProcessWorker struct {
+	leaseHeartbeat         time.Duration
 	store                  novelfetchworkshop.Store
 	queue                  novelfetchworkshop.ProcessQueue
 	registry               *workshopProcessRegistry
@@ -345,7 +346,9 @@ func (worker *workshopProcessWorker) run(ctx context.Context) {
 		if err != nil {
 			continue
 		}
-		worker.process(ctx, job)
+		if err := worker.process(ctx, job); err != nil && ctx.Err() == nil {
+			log.Printf("novel fetch: process job %s: %v", job.ID, err)
+		}
 		if strings.HasPrefix(job.LastError, novelFetchPersistenceCheckpointPrefix) {
 			// Avoid spinning the queue while document storage is unavailable.
 			select {
@@ -357,7 +360,46 @@ func (worker *workshopProcessWorker) run(ctx context.Context) {
 	}
 }
 
-func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetchworkshop.ProcessJob) {
+func (worker workshopProcessWorker) process(parent context.Context, job novelfetchworkshop.ProcessJob) error {
+	leases, _ := worker.queue.(novelfetchworkshop.ProcessLeaseQueue)
+	work, stop := startWorkshopProcessLease(parent, leases, job, worker.leaseHeartbeat)
+	defer stop()
+	ctx, cancel := context.WithCancelCause(work)
+	defer cancel(nil)
+	checkOwnership := func() error {
+		if err := context.Cause(ctx); err != nil {
+			return err
+		}
+		if leases == nil {
+			return nil
+		}
+		owned, err := leases.OwnsLease(ctx, job)
+		if err == nil && !owned {
+			err = novelfetchworkshop.ErrProcessLeaseLost
+		}
+		if err != nil {
+			cancel(err)
+		}
+		return context.Cause(ctx)
+	}
+	if leases != nil {
+		worker.store = workshopProcessLeaseStore{Store: worker.store, checkOwnership: checkOwnership}
+	}
+	finish := func(job novelfetchworkshop.ProcessJob, action workshopQueueAction) error {
+		if err := context.Cause(ctx); err != nil {
+			return err
+		}
+		if err := stop(); err != nil {
+			return err
+		}
+		if action == ackWorkshopJob {
+			return worker.queue.Ack(parent, job)
+		}
+		return worker.queue.Fail(parent, job, action == retryWorkshopJob)
+	}
+	if err := context.Cause(ctx); err != nil {
+		return err
+	}
 	job.Attempts++
 	startedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	progress := []any{workshopProgressItem("info", "任务开始", "", "")}
@@ -368,21 +410,23 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		}
 	}
 	if len(activeBookIDs) == 0 {
-		_ = updateWorkshopRun(worker.store, job, "stopped", "任务已停止", startedAt, true)
+		_ = updateWorkshopRunContext(ctx, worker.store, job, "stopped", "任务已停止", startedAt, true)
 		_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, "stopped", "")
 		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "stopped", "queue_state": "stopped", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": []any{}, "progress": []any{}})
-		_ = worker.queue.Ack(ctx, job)
-		return
+		return finish(job, ackWorkshopJob)
 	}
 	pendingOriginalFailures, checkpointErr := readNovelFetchPersistenceCheckpoint(job)
 	if checkpointErr != nil {
 		log.Printf("novel fetch: invalid persistence checkpoint for job %s", job.ID)
-		worker.isolateInvalidOriginalCheckpoint(ctx, job, activeBookIDs, startedAt)
-		return
+		saveFailed := worker.isolateInvalidOriginalCheckpoint(ctx, job, activeBookIDs, startedAt)
+		if saveFailed {
+			return finish(job, retryWorkshopJob)
+		}
+		return finish(job, ackWorkshopJob)
 	}
 	activeJob := job
 	activeJob.BookIDs = activeBookIDs
-	_ = updateWorkshopRun(worker.store, job, "running", "", startedAt, false)
+	_ = updateWorkshopRunContext(ctx, worker.store, job, "running", "", startedAt, false)
 	_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, "running", "")
 	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts, "steps": progress, "progress": progress})
 	retry := job.Attempts < 3
@@ -409,6 +453,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	semaphore := make(chan struct{}, concurrency)
 	results := make(chan bookProcessResult, len(activeBookIDs))
 	var processing sync.WaitGroup
+	defer processing.Wait()
 	for _, bookID := range activeBookIDs {
 		if failure := pendingOriginalFailures[bookID]; failure != nil {
 			results <- bookProcessResult{bookID: bookID, originalFailure: failure}
@@ -443,6 +488,9 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		close(results)
 	}()
 	for result := range results {
+		if err := context.Cause(ctx); err != nil {
+			return err
+		}
 		bookID, bookName := result.bookID, result.bookName
 		if result.err != nil || result.originalFailure != nil {
 			failedBookIDs = append(failedBookIDs, bookID)
@@ -513,6 +561,9 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		progress = append(progress, workshopProgressItem("success", "处理完成", bookID, bookName))
 		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
 		if job.AutoSubmit && worker.autoSubmit != nil && !worker.bookCancelled(ctx, job.Owner, bookID) {
+			if err := checkOwnership(); err != nil {
+				return err
+			}
 			bookJob := job
 			bookJob.BookIDs = []string{bookID}
 			if document, err := worker.store.GetDocument(ctx, job.Owner, bookID); err == nil {
@@ -532,7 +583,14 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, bookID, "auto_submit_started", "本书处理完成，开始提交到视频管理系统")
 			progress = append(progress, workshopProgressItem("processing", "本书开始上传", bookID, bookName))
 			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "running", "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
-			if err := worker.autoSubmit(ctx, bookJob); err != nil {
+			if err := checkOwnership(); err != nil {
+				return err
+			}
+			submitErr := worker.autoSubmit(ctx, bookJob)
+			if err := context.Cause(ctx); err != nil {
+				return err
+			}
+			if err := submitErr; err != nil {
 				uploadFailures = append(uploadFailures, bookID+"："+err.Error())
 				failedBookIDs = append(failedBookIDs, bookID)
 				failureMessages = append(failureMessages, bookID+"：上传未完成："+err.Error())
@@ -555,6 +613,9 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		}
 	}
 
+	if err := context.Cause(ctx); err != nil {
+		return err
+	}
 	finishedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	if len(failedBookIDs) > 0 {
 		errorMessage := strings.Join(failureMessages, "；")
@@ -568,14 +629,13 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		if deferredOriginalFetchRetry && len(originalSaveRetries) == 0 {
 			status = "waiting_retry"
 			queueState = "waiting_retry"
-			_ = updateWorkshopRun(worker.store, job, status, errorMessage, startedAt, true)
+			_ = updateWorkshopRunContext(ctx, worker.store, job, status, errorMessage, startedAt, true)
 			_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, status, errorMessage)
 			documents, _ := worker.store.ListDocuments(ctx, job.Owner)
 			result := map[string]any{"batch_id": job.BatchID, "current_batch_id": job.BatchID, "tasks": documents, "completed": completed, "failed": len(failedBookIDs), "failed_book_ids": failedBookIDs}
 			progress = append(progress, workshopProgressItem("warning", "原文未抓到，等待下次自动抓取", "", ""))
 			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "error": errorMessage, "result": result, "steps": progress, "progress": progress})
-			_ = worker.queue.Fail(ctx, job, false)
-			return
+			return finish(job, failWorkshopJob)
 		}
 		if len(retryBookIDs) > 0 {
 			status = "waiting_retry"
@@ -592,7 +652,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			queueState = blockedUploadState
 		}
 		retryEnabled := len(retryBookIDs) > 0
-		_ = updateWorkshopRun(worker.store, job, status, errorMessage, startedAt, !retryEnabled)
+		_ = updateWorkshopRunContext(ctx, worker.store, job, status, errorMessage, startedAt, !retryEnabled)
 		if !retryEnabled {
 			_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, status, errorMessage)
 		}
@@ -628,17 +688,15 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				Type: novelFetchPersistenceCheckpointType, Version: novelFetchPersistenceCheckpointVersion, Failures: originalSaveRetries,
 			})
 			if err != nil {
-				log.Printf("novel fetch: encode persistence checkpoint for job %s: %v", job.ID, err)
-				return
+				return fmt.Errorf("encode persistence checkpoint for job %s: %w", job.ID, err)
 			}
 			retryJob.LastError = novelFetchPersistenceCheckpointPrefix + string(payload)
-			worker.requeueNovelFetchCheckpoint(ctx, retryJob)
-			return
+			return finish(retryJob, retryWorkshopJob)
 		}
-		if err := worker.queue.Fail(ctx, retryJob, retryEnabled); err != nil {
-			log.Printf("novel fetch: update queue for job %s: %v", job.ID, err)
+		if retryEnabled {
+			return finish(retryJob, retryWorkshopJob)
 		}
-		return
+		return finish(retryJob, failWorkshopJob)
 	}
 
 	documents, _ := worker.store.ListDocuments(ctx, job.Owner)
@@ -657,9 +715,9 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	}
 	if scheduleStatus == "upload_pending" {
 		finalStatus = "upload_pending"
-		_ = updateWorkshopRun(worker.store, job, finalStatus, scheduleMessage, startedAt, false)
+		_ = updateWorkshopRunContext(ctx, worker.store, job, finalStatus, scheduleMessage, startedAt, false)
 	} else {
-		_ = updateWorkshopRun(worker.store, job, finalStatus, "", startedAt, true)
+		_ = updateWorkshopRunContext(ctx, worker.store, job, finalStatus, "", startedAt, true)
 	}
 	_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, scheduleStatus, scheduleMessage)
 	if finalStatus == "done" {
@@ -668,12 +726,12 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		progress = append(progress, workshopProgressItem("warning", "内容处理完成，等待自动上传重试", "", ""))
 	}
 	worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": finalStatus, "queue_state": finalStatus, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "result": result, "steps": progress, "progress": progress})
-	_ = worker.queue.Ack(ctx, job)
+	return finish(job, ackWorkshopJob)
 }
 
 const novelFetchInvalidCheckpointReason = "原文抓取状态恢复记录无效，请检查后手动重试"
 
-func (worker *workshopProcessWorker) isolateInvalidOriginalCheckpoint(ctx context.Context, job novelfetchworkshop.ProcessJob, activeBookIDs []string, startedAt string) {
+func (worker *workshopProcessWorker) isolateInvalidOriginalCheckpoint(ctx context.Context, job novelfetchworkshop.ProcessJob, activeBookIDs []string, startedAt string) bool {
 	now := time.Now().UTC()
 	saveFailed := false
 	for _, bookID := range activeBookIDs {
@@ -705,28 +763,14 @@ func (worker *workshopProcessWorker) isolateInvalidOriginalCheckpoint(ctx contex
 	} else {
 		_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, status, message)
 	}
-	_ = updateWorkshopRun(worker.store, job, status, message, startedAt, !saveFailed)
+	_ = updateWorkshopRunContext(ctx, worker.store, job, status, message, startedAt, !saveFailed)
 	progress := []any{workshopProgressItem(level, message, "", "")}
 	worker.registry.put(job.Owner, job.ID, map[string]any{
 		"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "error": message,
 		"started_at": startedAt, "updated_at": now.Format(time.RFC3339Nano), "attempts": job.Attempts,
 		"steps": progress, "progress": progress,
 	})
-	if saveFailed {
-		// A new worker may run as soon as the task is requeued. Keep the
-		// original book scope so the invalid checkpoint still fails validation.
-		worker.requeueNovelFetchCheckpoint(ctx, job)
-		return
-	}
-	if err := worker.queue.Ack(ctx, job); err != nil {
-		log.Printf("novel fetch: acknowledge isolated checkpoint for job %s: %v", job.ID, err)
-	}
-}
-
-func (worker *workshopProcessWorker) requeueNovelFetchCheckpoint(ctx context.Context, job novelfetchworkshop.ProcessJob) {
-	if err := worker.queue.Fail(ctx, job, true); err != nil {
-		log.Printf("novel fetch: requeue persistence checkpoint for job %s: %v", job.ID, err)
-	}
+	return saveFailed
 }
 
 func workshopProgressItem(level, message, bookID, bookName string) map[string]any {
@@ -1098,11 +1142,18 @@ func novelFetchLogStageStatus(event string) (string, string) {
 }
 
 func updateWorkshopRun(store novelfetchworkshop.Store, job novelfetchworkshop.ProcessJob, status, message, startedAt string, finished bool) error {
+	return updateWorkshopRunContext(context.Background(), store, job, status, message, startedAt, finished)
+}
+
+func updateWorkshopRunContext(ctx context.Context, store novelfetchworkshop.Store, job novelfetchworkshop.ProcessJob, status, message, startedAt string, finished bool) error {
+	if err := context.Cause(ctx); err != nil {
+		return err
+	}
 	record := novelfetchworkshop.RunRecord{RunID: job.ID, BookID: job.BatchID, Stage: "novel_fetch_process", Status: status, Attempts: job.Attempts, TextModelID: job.TextModelID, ModelID: "novel-fetch-workshop", ModelDisplayName: "小说获取完整流程", ErrorMessage: message, StartedAt: startedAt}
 	if finished {
 		record.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	}
-	return store.PutRun(context.Background(), job.Owner, record)
+	return store.PutRun(ctx, job.Owner, record)
 }
 
 func updateNovelFetchScheduleRuntimeStatus(ctx context.Context, store novelfetchworkshop.Store, owner, scheduleID, status, message string) error {

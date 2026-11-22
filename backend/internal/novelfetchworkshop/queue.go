@@ -12,6 +12,7 @@ import (
 var ErrQueueEmpty = errors.New("novel fetch queue is empty")
 
 type ProcessJob struct {
+	LeaseToken         string            `json:"-"`
 	ID                 string            `json:"id"`
 	Owner              string            `json:"owner"`
 	BatchID            string            `json:"batchId"`

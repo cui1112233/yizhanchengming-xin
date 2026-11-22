@@ -228,6 +228,17 @@ func (c *redisClient) do(ctx context.Context, args ...string) (any, error) {
 	if err := writeRESP(conn, args...); err != nil {
 		return nil, fmt.Errorf("redis request failed")
 	}
+	// A blocking claim may legitimately be silent longer than the normal
+	// command timeout. Extend only this read, after auth and request writes.
+	if len(args) == 4 && strings.EqualFold(args[0], "BRPOPLPUSH") {
+		if wait, parseErr := time.ParseDuration(args[3] + "s"); parseErr == nil && wait >= 10*time.Second {
+			readDeadline := time.Now().Add(wait).Add(2 * time.Second)
+			if limit, ok := ctx.Deadline(); ok && limit.Before(readDeadline) {
+				readDeadline = limit
+			}
+			_ = conn.SetReadDeadline(readDeadline)
+		}
+	}
 	value, err := readRESP(reader)
 	if err != nil {
 		return nil, err
