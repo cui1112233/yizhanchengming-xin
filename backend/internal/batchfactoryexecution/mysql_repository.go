@@ -221,8 +221,8 @@ func (r *MySQLRepository) AttachLegacyJob(ctx context.Context, owner, executionI
 	return nil
 }
 
-func (r *MySQLRepository) UpdateBookStatus(ctx context.Context, owner, executionBookID string, status BookStatus, failure Failure) error {
-	result, err := r.db.ExecContext(ctx, `UPDATE batch_execution_books eb JOIN batch_executions e ON e.id = eb.execution_id SET eb.status = ?, eb.failure_code = ?, eb.failure_message = ?, eb.updated_at = ? WHERE e.owner_username = ? AND eb.id = ?`, status, nullableText(failure.Code), nullableText(failure.Message), r.now().UTC(), owner, executionBookID)
+func (r *MySQLRepository) UpdateBookStatus(ctx context.Context, owner, bookID string, status BookStatus, failure Failure) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE batch_execution_books eb JOIN batch_executions e ON e.id = eb.execution_id SET eb.status = ?, eb.failure_code = ?, eb.failure_message = ?, eb.updated_at = ? WHERE e.owner_username = ? AND eb.book_id = ? AND e.status IN ('planned','running','needs_attention')`, status, nullableText(failure.Code), nullableText(failure.Message), r.now().UTC(), owner, bookID)
 	if err != nil {
 		return err
 	}
