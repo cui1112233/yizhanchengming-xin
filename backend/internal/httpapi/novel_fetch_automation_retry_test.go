@@ -250,9 +250,9 @@ func TestTransientOriginalFetchPersistsBackoff(t *testing.T) {
 		override int
 		delays   []time.Duration
 	}{
-		{name: "typed", fetchErr: &novelfetchworkshop.UpstreamError{Class: novelfetchworkshop.UpstreamFailureTransient, HTTPStatus: 502}, delays: []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute}},
-		{name: "untyped", fetchErr: errors.New("connection reset"), delays: []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute}},
-		{name: "configured override", fetchErr: errors.New("connection reset"), override: 2, delays: []time.Duration{2 * time.Minute, 2 * time.Minute, 2 * time.Minute, 2 * time.Minute}},
+		{name: "typed", fetchErr: &novelfetchworkshop.UpstreamError{Class: novelfetchworkshop.UpstreamFailureTransient, HTTPStatus: 502}, delays: []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}},
+		{name: "untyped", fetchErr: errors.New("connection reset"), delays: []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}},
+		{name: "configured override", fetchErr: errors.New("connection reset"), override: 2, delays: []time.Duration{2 * time.Minute, 2 * time.Minute, 2 * time.Minute, 2 * time.Minute, 2 * time.Minute}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -290,13 +290,13 @@ func TestTransientOriginalFetchPersistsBackoff(t *testing.T) {
 	}
 }
 
-func TestTransientOriginalFetchStopsOnFifthFailure(t *testing.T) {
+func TestTransientOriginalFetchStopsOnSixthFailure(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()
 	now := time.Date(2026, 11, 23, 3, 0, 0, 0, time.UTC)
 	meta := map[string]any{
 		"status":                     "processing",
-		"originalFetchRetryAttempts": 4,
+		"originalFetchRetryAttempts": 5,
 		"originalFetchNextRetryAt":   now.Format(time.RFC3339Nano),
 		"automationNextRetryAt":      now.Format(time.RFC3339Nano),
 	}
@@ -314,8 +314,8 @@ func TestTransientOriginalFetchStopsOnFifthFailure(t *testing.T) {
 	}
 	meta = document.Meta
 	if meta["status"] != "failed" || meta["queueState"] != "failed" || meta["manualOnly"] != true ||
-		meta["manualOriginalFetchRequired"] != true || intValue(meta["originalFetchRetryAttempts"]) != 5 {
-		t.Fatalf("meta=%#v, want manual hold after fifth failed attempt", meta)
+		meta["manualOriginalFetchRequired"] != true || intValue(meta["originalFetchRetryAttempts"]) != 6 {
+		t.Fatalf("meta=%#v, want manual hold after sixth failed attempt", meta)
 	}
 	for _, key := range []string{"originalFetchNextRetryAt", "automationNextRetryAt", "next_retry_at", "retry_schedule"} {
 		if _, ok := meta[key]; ok {

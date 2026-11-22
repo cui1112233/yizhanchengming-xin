@@ -74,7 +74,7 @@ func novelFetchOriginalRetryDelay(settings map[string]any, attempt int) time.Dur
 	return delays[min(max(attempt, 1), len(delays))-1]
 }
 
-const novelFetchOriginalFetchMaxAttempts = 5
+const novelFetchOriginalFetchMaxRetries = 5
 const novelFetchOriginalConfigurationMessage = "原文获取配置不可用，请检查配置后手动重试"
 
 // novelFetchAIManualRetryRequired 判断错误是否属于模型确定性失败。参考实现
@@ -122,37 +122,56 @@ func markNovelFetchAIManualRetry(ctx context.Context, store novelfetchworkshop.S
 	return store.PutDocument(ctx, owner, document)
 }
 
+type novelFetchOriginalFailure struct {
+	Class   novelfetchworkshop.UpstreamFailureClass `json:"class"`
+	Message string                                  `json:"message"`
+	At      time.Time                               `json:"at"`
+}
+
 func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, fetchErr error, now time.Time) error {
+	class, _ := novelfetchworkshop.ClassifyUpstreamFailure(fetchErr)
+	message := ""
+	if fetchErr != nil {
+		message = strings.TrimSpace(fetchErr.Error())
+	}
+	_, err := saveNovelFetchOriginalFailure(ctx, store, owner, bookID, "", novelFetchOriginalFailure{Class: class, Message: message, At: now})
+	return err
+}
+
+func saveNovelFetchOriginalFailure(ctx context.Context, store novelfetchworkshop.Store, owner, bookID, jobID string, failure novelFetchOriginalFailure) (string, error) {
 	document, err := store.GetDocument(ctx, owner, bookID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if document.Meta == nil {
 		document.Meta = map[string]any{}
 	}
 	meta := document.Meta
+	if jobID != "" {
+		if meta["originalFetchFailureJobId"] == jobID {
+			return firstText(meta["status"]), nil
+		}
+		// A write can commit even if the worker received an error.
+		meta["originalFetchFailureJobId"] = jobID
+	}
 	attempts := intValue(meta["originalFetchRetryAttempts"]) + 1
 	meta["originalFetchRetryAttempts"] = attempts
-	message := ""
-	if fetchErr != nil {
-		message = strings.TrimSpace(fetchErr.Error())
-	}
+	now, message := failure.At, failure.Message
 	meta["originalFetchLastError"] = message
 
-	class, _ := novelfetchworkshop.ClassifyUpstreamFailure(fetchErr)
-	switch class {
+	switch failure.Class {
 	case novelfetchworkshop.UpstreamFailurePermanent:
 		markNovelFetchOriginalManual(&document, "failed", "原文来源无效，请检查书籍来源后手动重试", now)
 	case novelfetchworkshop.UpstreamFailureConfiguration:
 		markNovelFetchOriginalManual(&document, "waiting_configuration", novelFetchOriginalConfigurationMessage, now)
 	default:
-		if attempts >= novelFetchOriginalFetchMaxAttempts {
+		if attempts > novelFetchOriginalFetchMaxRetries {
 			markNovelFetchOriginalManual(&document, "failed", "原文连续获取失败已停止自动重试，请检查书籍来源是否有效后手动重试", now)
 			break
 		}
 		settings, err := store.GetConfig(ctx, owner)
 		if err != nil {
-			return err
+			return "", err
 		}
 		next := now.Add(novelFetchOriginalRetryDelay(settings, attempts)).UTC().Format(time.RFC3339Nano)
 		meta["status"] = "waiting_retry"
@@ -171,7 +190,7 @@ func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworks
 		meta["retry_schedule"] = schedule
 		refreshNovelFetchTaskRetrySummary(meta)
 	}
-	return store.PutDocument(ctx, owner, document)
+	return firstText(meta["status"]), store.PutDocument(ctx, owner, document)
 }
 
 func markNovelFetchOriginalManual(document *novelfetchworkshop.Document, status, reason string, now time.Time) {
@@ -200,7 +219,7 @@ func clearNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchwork
 	if document.Meta == nil {
 		return nil
 	}
-	for _, key := range []string{"originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError"} {
+	for _, key := range []string{"originalFetchRetryAttempts", "originalFetchNextRetryAt", "originalFetchLastError", "originalFetchFailureJobId"} {
 		delete(document.Meta, key)
 	}
 	clearNovelFetchTaskRetry(document.Meta, "")

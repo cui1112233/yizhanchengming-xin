@@ -1483,6 +1483,205 @@ func TestNovelFetchWorkerHoldsNonRetryableOriginalFetchFailures(t *testing.T) {
 	}
 }
 
+type originalFetchStateWriteFailureStore struct {
+	novelfetchworkshop.Store
+	status            string
+	commitBeforeError bool
+	failed            bool
+}
+
+func (s *originalFetchStateWriteFailureStore) PutDocument(ctx context.Context, owner string, document novelfetchworkshop.Document) error {
+	if !s.failed && document.Meta["status"] == s.status && document.Meta["manualOnly"] == true {
+		s.failed = true
+		if s.commitBeforeError {
+			if err := s.Store.PutDocument(ctx, owner, document); err != nil {
+				return err
+			}
+		}
+		return errors.New("simulated document persistence failure")
+	}
+	return s.Store.PutDocument(ctx, owner, document)
+}
+
+func TestNovelFetchWorkerRetriesSavingOriginalFailureWithoutRefetch(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		responseStatus    int
+		want              string
+		commitBeforeError bool
+	}{
+		{name: "permanent", responseStatus: http.StatusNotFound, want: "failed"},
+		{name: "configuration", responseStatus: http.StatusForbidden, want: "waiting_configuration"},
+		{name: "write committed before error", responseStatus: http.StatusNotFound, want: "failed", commitBeforeError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			store := &originalFetchStateWriteFailureStore{Store: novelfetchworkshop.NewMemoryStore(), status: tc.want, commitBeforeError: tc.commitBeforeError}
+			queue := novelfetchworkshop.NewMemoryQueue()
+			const owner, bookID, jobID = "tester", "22345678901", "job-save-original-failure"
+			if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"platformId": "2", "currentProcessJobId": jobID}}); err != nil {
+				t.Fatal(err)
+			}
+			var calls atomic.Int32
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				http.Error(w, "fetch refused", tc.responseStatus)
+			}))
+			defer upstream.Close()
+			registry := newWorkshopProcessRegistry()
+			fetcher := &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}
+			worker := &workshopProcessWorker{store: store, queue: queue, registry: registry, fetcher: fetcher}
+			job := novelfetchworkshop.ProcessJob{ID: jobID, Owner: owner, BatchID: "batch-save-original-failure", BookIDs: []string{bookID}, PlatformID: "2", MaxTxt: 4000, Attempts: 2}
+			if queued, _, err := queue.EnqueueUniqueBooks(ctx, job, time.Hour); err != nil || !queued {
+				t.Fatalf("enqueue failed: queued=%t err=%v", queued, err)
+			}
+			job, err := queue.Claim(ctx, 20*time.Millisecond)
+			if err != nil {
+				t.Fatal(err)
+			}
+			worker.process(ctx, job)
+
+			snapshot, _ := registry.get(owner, jobID)
+			if !store.failed || snapshot["status"] != "waiting_retry" || snapshot["queue_state"] != "queued" ||
+				!strings.Contains(firstText(snapshot["error"]), "保存原文抓取状态失败") {
+				t.Errorf("state write failure should report a queued save retry: snapshot=%#v", snapshot)
+			}
+			job, err = queue.Claim(ctx, 20*time.Millisecond)
+			if err != nil || job.ID != jobID {
+				t.Fatalf("state write failure dropped the job: id=%s err=%v", job.ID, err)
+			}
+
+			// Redis serializes the job. A new worker must recover from the payload alone.
+			payload, err := json.Marshal(job)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var restoredJob novelfetchworkshop.ProcessJob
+			if err := json.Unmarshal(payload, &restoredJob); err != nil {
+				t.Fatal(err)
+			}
+			worker = &workshopProcessWorker{store: store, queue: queue, registry: registry, fetcher: fetcher}
+			worker.process(ctx, restoredJob)
+			document, err := store.GetDocument(ctx, owner, bookID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls.Load() != 1 || document.Meta["status"] != tc.want || document.Meta["manualOnly"] != true ||
+				intValue(document.Meta["originalFetchRetryAttempts"]) != 1 {
+				t.Fatalf("calls=%d meta=%#v, want one fetch and one saved %s verdict", calls.Load(), document.Meta, tc.want)
+			}
+			snapshot, _ = registry.get(owner, jobID)
+			if snapshot["status"] != tc.want || snapshot["queue_state"] != tc.want {
+				t.Fatalf("worker did not report saved %s verdict: %#v", tc.want, snapshot)
+			}
+			if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("saved verdict left a queue retry: %v", err)
+			}
+		})
+	}
+}
+
+func TestNovelFetchWorkerExecutesFiveScheduledOriginalRetries(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	const owner, bookID = "tester", "22345678901"
+	if err := store.PutConfig(ctx, owner, map[string]any{"fetch": map[string]any{"retries": 0}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"platformId": "2"}}); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		http.Error(w, "try later", http.StatusBadGateway)
+	}))
+	defer upstream.Close()
+	worker := &workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry(), fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
+	job := novelfetchworkshop.ProcessJob{ID: "initial-original-fetch", Owner: owner, BatchID: "batch-original-fetch", BookIDs: []string{bookID}, PlatformID: "2", MaxTxt: 4000}
+	if err := queue.Enqueue(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	delays := []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}
+	for run := 0; run <= len(delays); run++ {
+		job, err := queue.Claim(ctx, 20*time.Millisecond)
+		if err != nil {
+			t.Fatalf("fetch %d did not reach the queue: %v", run+1, err)
+		}
+		started := time.Now()
+		worker.process(ctx, job)
+		finished := time.Now()
+		document, err := store.GetDocument(ctx, owner, bookID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if calls.Load() != int32(run+1) || intValue(document.Meta["originalFetchRetryAttempts"]) != run+1 {
+			t.Fatalf("fetch %d: calls=%d meta=%#v", run+1, calls.Load(), document.Meta)
+		}
+		if run == len(delays) {
+			if document.Meta["status"] != "failed" || document.Meta["manualOnly"] != true ||
+				document.Meta["originalFetchNextRetryAt"] != nil {
+				t.Fatalf("all five automatic retries failed, want manual hold: meta=%#v", document.Meta)
+			}
+			if next, err := dispatchNovelFetchAutomationOwner(ctx, store, queue, owner, finished.Add(24*time.Hour)); err != nil || next != nil {
+				t.Fatalf("exhausted original fetch was redispatched: job=%#v err=%v", next, err)
+			}
+			break
+		}
+		deadline, err := time.Parse(time.RFC3339Nano, firstText(document.Meta["originalFetchNextRetryAt"]))
+		if document.Meta["status"] != "waiting_retry" || err != nil || deadline.Before(started.Add(delays[run])) || deadline.After(finished.Add(delays[run])) {
+			t.Fatalf("fetch %d: meta=%#v, want retry scheduled after %s", run+1, document.Meta, delays[run])
+		}
+		if next, err := dispatchNovelFetchAutomationOwner(ctx, store, queue, owner, deadline.Add(-time.Second)); err != nil || next != nil {
+			t.Fatalf("fetch %d redispatched before deadline: job=%#v err=%v", run+1, next, err)
+		}
+		if next, err := dispatchNovelFetchAutomationOwner(ctx, store, queue, owner, deadline); err != nil || next == nil {
+			t.Fatalf("fetch %d not redispatched at deadline: job=%#v err=%v", run+1, next, err)
+		}
+	}
+}
+
+func TestNovelFetchWorkerDoesNotRefetchWithCorruptPersistenceCheckpoint(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	const owner, bookID = "tester", "22345678901"
+	if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{
+		BookID: bookID, Meta: map[string]any{"status": "processing", "platformId": "2"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		http.Error(w, "fetch refused", http.StatusNotFound)
+	}))
+	defer upstream.Close()
+	registry := newWorkshopProcessRegistry()
+	worker := &workshopProcessWorker{store: store, queue: queue, registry: registry,
+		fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
+	job := novelfetchworkshop.ProcessJob{ID: "corrupt-checkpoint", Owner: owner, BatchID: "batch-corrupt", BookIDs: []string{bookID},
+		PlatformID: "2", LastError: `persistence_checkpoint:{"type":"original_fetch","version":1,"failures":`}
+	if queued, _, err := queue.EnqueueUniqueBooks(ctx, job, time.Hour); err != nil || !queued {
+		t.Fatalf("enqueue failed: queued=%t err=%v", queued, err)
+	}
+	job, err := queue.Claim(ctx, 20*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker.process(ctx, job)
+
+	snapshot, _ := registry.get(owner, job.ID)
+	if calls.Load() != 0 || !strings.Contains(firstText(snapshot["error"]), "原文抓取状态恢复记录无效") {
+		t.Fatalf("corrupt checkpoint produced %d HTTP requests, snapshot=%#v", calls.Load(), snapshot)
+	}
+	job.ID = "duplicate-job"
+	if conflicts, err := queue.ConflictingBookIDs(ctx, job); err != nil || conflicts[bookID] != "corrupt-checkpoint" {
+		t.Fatalf("corrupt checkpoint lost queue ownership: conflicts=%#v err=%v", conflicts, err)
+	}
+}
+
 func TestWorkshopProcessWorkerDefersOriginalFetchFailureBeforeAutoRetry(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	queue := novelfetchworkshop.NewMemoryQueue()

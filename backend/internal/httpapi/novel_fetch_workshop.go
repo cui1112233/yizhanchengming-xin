@@ -266,6 +266,69 @@ func (r *workshopProcessRegistry) latest(owner string, limit int) []map[string]a
 	return items
 }
 
+const (
+	novelFetchPersistenceCheckpointPrefix  = "persistence_checkpoint:"
+	novelFetchPersistenceCheckpointType    = "original_fetch"
+	novelFetchPersistenceCheckpointVersion = 1
+)
+
+type novelFetchPersistenceCheckpoint struct {
+	Type    string `json:"type"`
+	Version int    `json:"version"`
+	// A null entry is a book that still needs ordinary pipeline processing.
+	Failures map[string]*novelFetchOriginalFailure `json:"failures"`
+}
+
+func readNovelFetchPersistenceCheckpoint(job novelfetchworkshop.ProcessJob) (map[string]*novelFetchOriginalFailure, error) {
+	payload, ok := strings.CutPrefix(job.LastError, novelFetchPersistenceCheckpointPrefix)
+	if !ok {
+		return nil, nil
+	}
+	var checkpoint novelFetchPersistenceCheckpoint
+	decoder := json.NewDecoder(strings.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&checkpoint); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload[decoder.InputOffset():]) != "" || checkpoint.Type != novelFetchPersistenceCheckpointType ||
+		checkpoint.Version != novelFetchPersistenceCheckpointVersion || len(checkpoint.Failures) != len(job.BookIDs) {
+		return nil, errors.New("invalid original fetch checkpoint envelope")
+	}
+	pending := 0
+	for _, bookID := range job.BookIDs {
+		failure, exists := checkpoint.Failures[bookID]
+		if !exists {
+			return nil, errors.New("original fetch checkpoint is missing a queued book")
+		}
+		if failure == nil {
+			continue
+		}
+		switch failure.Class {
+		case "", novelfetchworkshop.UpstreamFailurePermanent, novelfetchworkshop.UpstreamFailureConfiguration, novelfetchworkshop.UpstreamFailureTransient:
+		default:
+			return nil, errors.New("invalid original fetch checkpoint failure class")
+		}
+		if failure.At.IsZero() || strings.TrimSpace(failure.Message) == "" {
+			return nil, errors.New("incomplete original fetch checkpoint failure")
+		}
+		pending++
+	}
+	if pending == 0 {
+		return nil, errors.New("original fetch checkpoint is missing pending failures")
+	}
+	return checkpoint.Failures, nil
+}
+
+func newNovelFetchOriginalCheckpointFailure(fetchErr error, now time.Time) *novelFetchOriginalFailure {
+	failure := &novelFetchOriginalFailure{At: now, Message: errNovelFetchOriginalFetch.Error()}
+	var upstream *novelfetchworkshop.UpstreamError
+	if errors.As(fetchErr, &upstream) {
+		failure.Class = upstream.Class
+		failure.Message += ": " + upstream.Error()
+	}
+	return failure
+}
+
 type workshopProcessWorker struct {
 	store                  novelfetchworkshop.Store
 	queue                  novelfetchworkshop.ProcessQueue
@@ -283,6 +346,14 @@ func (worker *workshopProcessWorker) run(ctx context.Context) {
 			continue
 		}
 		worker.process(ctx, job)
+		if strings.HasPrefix(job.LastError, novelFetchPersistenceCheckpointPrefix) {
+			// Avoid spinning the queue while document storage is unavailable.
+			select {
+			case <-time.After(time.Second):
+			case <-ctx.Done():
+				return
+			}
+		}
 	}
 }
 
@@ -290,6 +361,17 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	job.Attempts++
 	startedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	progress := []any{workshopProgressItem("info", "任务开始", "", "")}
+	pendingOriginalFailures, checkpointErr := readNovelFetchPersistenceCheckpoint(job)
+	if checkpointErr != nil {
+		message := "原文抓取状态恢复记录无效"
+		log.Printf("novel fetch: invalid persistence checkpoint for job %s: %v", job.ID, checkpointErr)
+		_ = updateWorkshopRun(worker.store, job, "waiting_retry", message, startedAt, false)
+		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": "waiting_retry", "queue_state": "queued", "error": message, "started_at": startedAt, "updated_at": startedAt, "attempts": job.Attempts})
+		if err := worker.queue.Fail(ctx, job, true); err != nil {
+			log.Printf("novel fetch: retain invalid checkpoint for job %s: %v", job.ID, err)
+		}
+		return
+	}
 	activeBookIDs := make([]string, 0, len(job.BookIDs))
 	for _, bookID := range job.BookIDs {
 		if !worker.bookCancelled(ctx, job.Owner, bookID) {
@@ -314,6 +396,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	retryBookIDs := make([]string, 0)
 	classificationPendingCount := 0
 	originalFetchConfigurationCount := 0
+	originalSaveRetries := map[string]*novelFetchOriginalFailure{}
 	failureMessages := make([]string, 0)
 	stopped := false
 	completed := 0
@@ -321,16 +404,21 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	loginBlockedCount := 0
 	blockedUploadState := "waiting_login"
 	type bookProcessResult struct {
-		bookID   string
-		bookName string
-		err      error
-		stopped  bool
+		bookID          string
+		bookName        string
+		err             error
+		stopped         bool
+		originalFailure *novelFetchOriginalFailure
 	}
 	concurrency := novelFetchConfiguredConcurrency(ctx, worker.store, job.Owner, len(activeBookIDs))
 	semaphore := make(chan struct{}, concurrency)
 	results := make(chan bookProcessResult, len(activeBookIDs))
 	var processing sync.WaitGroup
 	for _, bookID := range activeBookIDs {
+		if failure := pendingOriginalFailures[bookID]; failure != nil {
+			results <- bookProcessResult{bookID: bookID, originalFailure: failure}
+			continue
+		}
 		bookName := ""
 		if document, err := worker.store.GetDocument(ctx, job.Owner, bookID); err == nil {
 			bookName = firstText(document.BookInfo.WorkTitle, document.Meta["bookName"], document.Meta["book_name"])
@@ -361,9 +449,12 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	}()
 	for result := range results {
 		bookID, bookName := result.bookID, result.bookName
-		if result.err != nil {
+		if result.err != nil || result.originalFailure != nil {
 			failedBookIDs = append(failedBookIDs, bookID)
-			failureMessages = append(failureMessages, bookID+"："+result.err.Error())
+			message := ""
+			if result.err != nil {
+				message = result.err.Error()
+			}
 			status := "failed"
 			if errors.Is(result.err, novelfetchworkshop.ErrRewriteValidation) {
 				_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, "failed", result.err.Error())
@@ -372,11 +463,21 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				status = "waiting_classification"
 				// 记录分类阶段的等待状态，确认分类后由重试队列统一清理。
 				_ = scheduleNovelFetchDocumentRetry(ctx, worker.store, job.Owner, bookID, novelFetchRetryStageClassify, result.err, time.Now().UTC())
-			} else if errors.Is(result.err, errNovelFetchOriginalFetch) {
-				if markErr := markNovelFetchOriginalFetchRetry(ctx, worker.store, job.Owner, bookID, result.err, time.Now().UTC()); markErr != nil {
+			} else if result.originalFailure != nil || errors.Is(result.err, errNovelFetchOriginalFetch) {
+				failure := result.originalFailure
+				if failure == nil {
+					failure = newNovelFetchOriginalCheckpointFailure(result.err, time.Now().UTC())
+				}
+				message = failure.Message
+				persistedStatus, markErr := saveNovelFetchOriginalFailure(ctx, worker.store, job.Owner, bookID, job.ID, *failure)
+				if markErr != nil {
 					log.Printf("novel fetch: save original fetch failure for %s: %v", bookID, markErr)
-				} else if document, getErr := worker.store.GetDocument(ctx, job.Owner, bookID); getErr == nil {
-					status = firstText(document.Meta["status"], status)
+					originalSaveRetries[bookID] = failure
+					retryBookIDs = append(retryBookIDs, bookID)
+					status = "waiting_retry"
+					message = "保存原文抓取状态失败，等待重试保存"
+				} else {
+					status = persistedStatus
 					switch status {
 					case "waiting_retry":
 						deferredOriginalFetchRetry = true
@@ -401,7 +502,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				_ = scheduleNovelFetchDocumentRetry(ctx, worker.store, job.Owner, bookID, novelFetchRetryStageForError(result.err), result.err, time.Now().UTC())
 				_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
 			}
-			progress = append(progress, workshopProgressItem("error", "处理失败："+result.err.Error(), bookID, bookName))
+			failureMessages = append(failureMessages, bookID+"："+message)
+			progress = append(progress, workshopProgressItem("error", "处理失败："+message, bookID, bookName))
 			worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": "running", "started_at": startedAt, "updated_at": time.Now().UTC().Format(time.RFC3339Nano), "attempts": job.Attempts, "steps": progress, "progress": progress})
 			continue
 		}
@@ -468,7 +570,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			status = "waiting_classification"
 			queueState = "waiting_classification"
 		}
-		if deferredOriginalFetchRetry {
+		if deferredOriginalFetchRetry && len(originalSaveRetries) == 0 {
 			status = "waiting_retry"
 			queueState = "waiting_retry"
 			_ = updateWorkshopRun(worker.store, job, status, errorMessage, startedAt, true)
@@ -480,7 +582,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			_ = worker.queue.Fail(ctx, job, false)
 			return
 		}
-		if retry && len(retryBookIDs) > 0 {
+		if len(retryBookIDs) > 0 {
 			status = "waiting_retry"
 			queueState = "queued"
 		}
@@ -494,7 +596,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			status = blockedUploadState
 			queueState = blockedUploadState
 		}
-		retryEnabled := retry && len(retryBookIDs) > 0
+		retryEnabled := len(retryBookIDs) > 0
 		_ = updateWorkshopRun(worker.store, job, status, errorMessage, startedAt, !retryEnabled)
 		if !retryEnabled {
 			_ = updateNovelFetchScheduleRuntimeStatus(ctx, worker.store, job.Owner, job.ScheduleID, status, errorMessage)
@@ -502,7 +604,9 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		documents, _ := worker.store.ListDocuments(ctx, job.Owner)
 		result := map[string]any{"batch_id": job.BatchID, "current_batch_id": job.BatchID, "tasks": documents, "completed": completed, "failed": len(failedBookIDs), "failed_book_ids": failedBookIDs}
 		progressMessage := "本轮结束，失败任务等待重试"
-		if status == "waiting_classification" {
+		if len(originalSaveRetries) > 0 {
+			progressMessage = "原文抓取结果等待重新保存"
+		} else if status == "waiting_classification" {
 			progressMessage = "改文已暂停，等待确认分类后重试"
 		} else if status == "waiting_login" {
 			progressMessage = workshopLoginRequiredMessage
@@ -519,7 +623,24 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		worker.registry.put(job.Owner, job.ID, map[string]any{"id": job.ID, "batch_id": job.BatchID, "status": status, "queue_state": queueState, "started_at": startedAt, "updated_at": finishedAt, "attempts": job.Attempts, "error": errorMessage, "result": result, "steps": progress, "progress": progress})
 		retryJob := job
 		retryJob.BookIDs = retryBookIDs
-		_ = worker.queue.Fail(ctx, retryJob, retryEnabled)
+		if len(originalSaveRetries) > 0 {
+			for _, bookID := range retryBookIDs {
+				if _, saving := originalSaveRetries[bookID]; !saving {
+					originalSaveRetries[bookID] = nil
+				}
+			}
+			payload, err := json.Marshal(novelFetchPersistenceCheckpoint{
+				Type: novelFetchPersistenceCheckpointType, Version: novelFetchPersistenceCheckpointVersion, Failures: originalSaveRetries,
+			})
+			if err != nil {
+				log.Printf("novel fetch: encode persistence checkpoint for job %s: %v", job.ID, err)
+				return
+			}
+			retryJob.LastError = novelFetchPersistenceCheckpointPrefix + string(payload)
+		}
+		if err := worker.queue.Fail(ctx, retryJob, retryEnabled); err != nil {
+			log.Printf("novel fetch: update queue for job %s: %v", job.ID, err)
+		}
 		return
 	}
 
