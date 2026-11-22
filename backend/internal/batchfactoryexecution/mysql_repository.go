@@ -167,7 +167,10 @@ func (r *MySQLRepository) Ensure(ctx context.Context, record EnsureRecord) (resu
 	var frozenConfig map[string]any
 	_ = json.Unmarshal(record.ConfigJSON, &frozenConfig)
 	payload, _ := json.Marshal(map[string]any{"executionId": executionID, "owner": record.Owner, "batchId": record.BatchID, "bookIds": result.QueuedBooks, "mode": record.Mode, "target": record.Target, "clientRequestId": record.ClientRequestID, "config": frozenConfig})
-	if _, err = tx.ExecContext(ctx, `INSERT INTO batch_execution_outbox (id, aggregate_type, aggregate_id, event_type, payload_json, available_at, claimed_at, delivered_at, attempts, last_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.newID("outbox"), "execution", executionID, "execution.ensure", payload, now, nil, nil, 0, nil, now); err != nil {
+	// go-sql-driver/mysql sends []byte as a binary string. MySQL rejects a
+	// binary parameter passed into a JSON column (error 3144), so JSON payloads
+	// must cross the driver boundary as explicit UTF-8 text.
+	if _, err = tx.ExecContext(ctx, `INSERT INTO batch_execution_outbox (id, aggregate_type, aggregate_id, event_type, payload_json, available_at, claimed_at, delivered_at, attempts, last_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.newID("outbox"), "execution", executionID, "execution.ensure", string(payload), now, nil, nil, 0, nil, now); err != nil {
 		return result, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -257,7 +260,7 @@ func (r *MySQLRepository) AppendOutbox(ctx context.Context, event OutboxEvent) e
 	if event.CreatedAt.IsZero() {
 		event.CreatedAt = r.now().UTC()
 	}
-	_, err := r.db.ExecContext(ctx, `INSERT INTO batch_execution_outbox (id, aggregate_type, aggregate_id, event_type, payload_json, available_at, claimed_at, delivered_at, attempts, last_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, event.ID, event.AggregateType, event.AggregateID, event.EventType, event.PayloadJSON, event.AvailableAt, event.ClaimedAt, event.DeliveredAt, event.Attempts, nullableText(event.LastError), event.CreatedAt)
+	_, err := r.db.ExecContext(ctx, `INSERT INTO batch_execution_outbox (id, aggregate_type, aggregate_id, event_type, payload_json, available_at, claimed_at, delivered_at, attempts, last_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, event.ID, event.AggregateType, event.AggregateID, event.EventType, string(event.PayloadJSON), event.AvailableAt, event.ClaimedAt, event.DeliveredAt, event.Attempts, nullableText(event.LastError), event.CreatedAt)
 	return err
 }
 

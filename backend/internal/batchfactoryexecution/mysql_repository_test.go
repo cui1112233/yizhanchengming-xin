@@ -41,7 +41,7 @@ func TestMySQLRepositoryEnsureCreatesExecutionAtomically(t *testing.T) {
 		WithArgs("execution-book-1", "execution-1", "book-1", "Book One", "pending", nil, nil, nil, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec("INSERT INTO batch_execution_outbox").
-		WithArgs("outbox-1", "execution", "execution-1", "execution.ensure", sqlmock.AnyArg(), sqlmock.AnyArg(), nil, nil, 0, nil, sqlmock.AnyArg()).
+		WithArgs("outbox-1", "execution", "execution-1", "execution.ensure", `{"batchId":"batch-1","bookIds":["book-1"],"clientRequestId":"request-1","config":{"mode":"video"},"executionId":"execution-1","mode":"video","owner":"alice","target":"published_confirmed"}`, sqlmock.AnyArg(), nil, nil, 0, nil, sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
