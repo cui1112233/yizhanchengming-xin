@@ -64,17 +64,35 @@ func workshopVerifiedSubmitReceipt(entry map[string]any) string {
 	return firstText(receipt["submission_id"])
 }
 
+func workshopHasConfirmedReceipt(doc novelfetchworkshop.Document, id string) bool {
+	for _, raw := range doc.Logs {
+		if workshopVerifiedSubmitReceipt(mapOrEmpty(raw)) == id {
+			return true
+		}
+	}
+	for _, raw := range arrayOrEmpty(doc.Meta["websiteSubmitHistory"]) {
+		entry := mapOrEmpty(raw)
+		receipt := mapOrEmpty(entry["remote_receipt"])
+		if entry["status"] == "submitted" && receipt["verified"] == true && firstText(receipt["submission_id"]) == id {
+			return true
+		}
+	}
+	return false
+}
+
 func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission, doc novelfetchworkshop.Document, bookID, version string) bool {
 	record := mapOrEmpty(receipt.ReadbackRaw)
 	recordBook := firstText(record["bookid"])
 	id := strings.TrimSpace(receipt.ID)
-	if id == "" || (recordBook != "" && recordBook != bookID) {
+	if id == "" || (recordBook != "" && recordBook != bookID) || workshopHasConfirmedReceipt(doc, id) {
 		return false
 	}
-	for _, raw := range doc.Logs {
-		if workshopVerifiedSubmitReceipt(mapOrEmpty(raw)) == id {
-			return false // A receipt already confirmed another attempt.
-		}
+	attempts := mapOrEmpty(doc.Meta["siteSubmitAttempts"])
+	attempt := mapOrEmpty(attempts[version])
+	remoteOperation, savedOperation := firstText(record["operation_id"]), firstText(attempt["operation_id"])
+	hasOperationEvidence := remoteOperation != "" && savedOperation != ""
+	if hasOperationEvidence && remoteOperation != savedOperation {
+		return false
 	}
 	pending := mapOrEmpty(doc.Meta["siteSubmitPendingConfirmation"])
 	if expected := firstText(pending[version]); expected != "" && expected != bookID {
@@ -89,10 +107,9 @@ func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission,
 	if recordVersion != "" && recordVersion != version {
 		return false
 	}
-	attempts := mapOrEmpty(doc.Meta["siteSubmitAttempts"])
 	matchesEvidence := func(key string, compare func(string, string) bool) bool {
 		value := firstText(record[key])
-		if value == "" || !compare(value, firstText(mapOrEmpty(attempts[version])[key])) {
+		if value == "" || !compare(value, firstText(attempt[key])) {
 			return false
 		}
 		if recordVersion == "" {
@@ -104,15 +121,14 @@ func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission,
 		}
 		return true
 	}
-	if matchesEvidence("operation_id", func(received, saved string) bool { return received == saved }) {
-		return true
+	if hasOperationEvidence {
+		return matchesEvidence("operation_id", func(received, saved string) bool { return received == saved })
 	}
 	if !matchesEvidence("content_sha256", strings.EqualFold) {
 		return false
 	}
 	// If the connector supplies a creation time, stale content cannot prove
 	// that a new attempt using the same body was received.
-	attempt := mapOrEmpty(attempts[version])
 	return firstText(record["addtime"]) == "" || submissionMatchesAttempt(receipt, bookID, firstText(attempt["started_at"]))
 }
 

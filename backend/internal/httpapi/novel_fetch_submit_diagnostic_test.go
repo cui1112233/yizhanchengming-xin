@@ -148,6 +148,24 @@ func TestSubmitReadbackOperationMustIdentifyOneVersion(t *testing.T) {
 	}
 }
 
+func TestSubmitReadbackRejectsExplicitOperationMismatchDespiteMatchingEvidence(t *testing.T) {
+	for _, pendingID := range []string{"12345678901", "candidate-receipt"} {
+		t.Run(pendingID, func(t *testing.T) {
+			fingerprint := "current-ai2-fingerprint"
+			doc := novelfetchworkshop.Document{Meta: map[string]any{
+				"siteSubmitPendingConfirmation": map[string]any{"ai2": pendingID},
+				"siteSubmitAttempts":            map[string]any{"ai2": map[string]any{"operation_id": "operation-b", "content_sha256": fingerprint}},
+			}}
+			receipt := videomanagementconnector.Submission{ID: "candidate-receipt", ReadbackRaw: map[string]any{
+				"bookid": "12345678901", "version_id": "ai2", "operation_id": "operation-a", "content_sha256": fingerprint,
+			}}
+			if workshopPendingReadbackMatches(receipt, doc, "12345678901", "ai2") {
+				t.Fatal("a conflicting operation identifier was overridden by weaker evidence")
+			}
+		})
+	}
+}
+
 func TestWebSubmitForceAuditsOperationAndPriorReceipt(t *testing.T) {
 	ctx := context.Background()
 	store, usersDir, doc := newSubmissionEvidenceTask(t)

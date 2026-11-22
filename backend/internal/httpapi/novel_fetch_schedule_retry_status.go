@@ -85,12 +85,16 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 				pendingChanged = true
 			}
 		}
-		if status != "stopped" && item["auto_submit"] == false {
-			if novelFetchVersionsGenerated(ctx, store, owner, document, versions) {
-				status = "completed"
-			} else {
-				switch status {
-				case "completed", "upload_pending", "pending_verification", "pending_confirmation":
+		manualHold := meta["manualOnly"] == true || meta["manual_only"] == true || meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta)
+		if item["auto_submit"] == false {
+			switch status {
+			case "completed", "submitted", "upload_pending", "pending_upload", "pending_verification", "pending_confirmation":
+				switch {
+				case manualHold || strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "failed"):
+					status = "failed"
+				case novelFetchVersionsGenerated(ctx, store, owner, document, versions):
+					status = "completed"
+				default:
 					status = "waiting_retry"
 				}
 			}
@@ -103,7 +107,7 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		case "input_ready", "":
 			status = "waiting_retry"
 		}
-		if status == "failed" && novelFetchAutomationEnabled(settings) && meta["manualOnly"] != true && meta["manual_only"] != true && meta["rewriteValidationHold"] != true && !novelFetchRetryScheduleHasManualHold(meta) {
+		if status == "failed" && novelFetchAutomationEnabled(settings) && !manualHold {
 			status = "waiting_retry"
 		}
 		states[status]++

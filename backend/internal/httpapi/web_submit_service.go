@@ -532,7 +532,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						uncertainVersion("提交结果不确定，等待目标站回读确认", firstText(submission.ID, uploadBookID))
 						continue
 					}
-					if id := strings.TrimSpace(submission.ID); cloneSource != "" && (id == "" || id == cloneSource) {
+					if id := strings.TrimSpace(submission.ID); cloneSource != "" && (id == "" || workshopHasConfirmedReceipt(doc, id)) {
 						row["code"] = "WEB_SUBMIT_RESUBMISSION_RECEIPT_UNCONFIRMED"
 						uncertainVersion("重新提交尚未返回新的回执编号，等待核对；不会重复上传", uploadBookID)
 						continue

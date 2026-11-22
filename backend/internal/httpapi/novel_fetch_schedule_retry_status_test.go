@@ -69,7 +69,7 @@ func TestDeferredScheduleDoesNotUseAnotherOwnersCompletedBook(t *testing.T) {
 }
 
 func TestDeferredGenerateOnlyScheduleCompletesAcrossStaleUploadStates(t *testing.T) {
-	for _, status := range []string{"upload_pending", "pending_verification", "pending_confirmation"} {
+	for _, status := range []string{"upload_pending", "pending_upload", "pending_verification", "pending_confirmation", "submitted"} {
 		t.Run(status, func(t *testing.T) {
 			ctx := context.Background()
 			store := novelfetchworkshop.NewMemoryStore()
@@ -88,6 +88,40 @@ func TestDeferredGenerateOnlyScheduleCompletesAcrossStaleUploadStates(t *testing
 			}
 			if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "completed" || len(queue.jobs) != 0 {
 				t.Fatalf("old upload state kept a generate-only schedule open: row=%+v jobs=%+v", row, queue.jobs)
+			}
+		})
+	}
+}
+
+func TestDeferredGenerateOnlySchedulePreservesCurrentWorkWithOldProse(t *testing.T) {
+	for _, scenario := range []struct {
+		name, status, aiStatus, want string
+		manual, held                 bool
+	}{
+		{name: "failed with validation hold", status: "failed", want: "failed", held: true},
+		{name: "manual hold over stale upload", status: "upload_pending", want: "failed", manual: true},
+		{name: "failed ai stage over stale upload", status: "upload_pending", aiStatus: "failed", want: "failed"},
+		{name: "processing", status: "processing", want: "running"},
+		{name: "waiting retry", status: "waiting_retry", want: "waiting_retry"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+				"status": scenario.status, "siteSubmitStatus": "pending_confirmation",
+				"manualOnly": scenario.manual, "rewriteValidationHold": scenario.held, "aiStatus": scenario.aiStatus,
+			}, Versions: map[string]any{"ai1": "第一版旧正文", "ai2": "第二版旧正文"}}
+			item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+			item["pending_book_ids"] = nil
+			if err := saveNovelFetchScheduleItem(ctx, store, "tester", item); err != nil {
+				t.Fatal(err)
+			}
+			queue := &uniqueRecordingNovelFetchQueue{}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != scenario.want || len(queue.jobs) != 0 {
+				t.Fatalf("old prose overrode current work: row=%+v want=%s jobs=%+v", row, scenario.want, queue.jobs)
 			}
 		})
 	}

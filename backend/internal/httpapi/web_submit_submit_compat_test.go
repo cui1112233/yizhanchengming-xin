@@ -713,6 +713,46 @@ func TestWebSubmitForceWithoutNewCloneReceiptStaysPending(t *testing.T) {
 	}
 }
 
+func TestWebSubmitForceRejectsHistoricalCloneReceiptsAcrossVersions(t *testing.T) {
+	for _, scenario := range []struct{ name, returned string }{
+		{"ai1_history", "first-ai1-receipt"},
+		{"ai2_history", "first-ai2-receipt"},
+		{"imported_history", "imported-receipt"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, usersDir, doc := newSubmissionEvidenceTask(t)
+			doc.Meta["siteSubmitDoneVersions"] = []string{"ai1", "ai2"}
+			doc.Logs = append(doc.Logs,
+				map[string]any{"event": "site_submit", "status": "submitted", "version": "ai1",
+					"remote_receipt": map[string]any{"verified": true, "submission_id": "latest-ai1-receipt"}},
+				map[string]any{"event": "site_submit", "status": "submitted", "version": "ai2",
+					"remote_receipt": map[string]any{"verified": true, "submission_id": "first-ai2-receipt"}},
+			)
+			doc.Meta["websiteSubmitHistory"] = []any{map[string]any{"status": "submitted",
+				"remote_receipt": map[string]any{"verified": true, "submission_id": "imported-receipt"}},
+			}
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			connector := &cloneSubmissionEvidenceSpy{receipt: &videomanagementconnector.Submission{ID: scenario.returned, Status: "submitted"}}
+			result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
+				TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "forced-ai1", Force: true,
+			}, nil, connector)
+			if err != nil || len(result.Results) != 1 || result.Success != 0 || result.Failed != 1 || connector.cloneCalls != 1 || connector.cloneSource != "latest-ai1-receipt" {
+				t.Fatalf("clone returning %s was accepted as a new ai1 receipt: result=%+v connector=%+v error=%v", scenario.returned, result, connector, err)
+			}
+			if row := mapOrEmpty(result.Results[0]); row["status"] != "pending_confirmation" || row["code"] != "WEB_SUBMIT_RESUBMISSION_RECEIPT_UNCONFIRMED" {
+				t.Fatalf("historical clone receipt was not kept pending: %+v", row)
+			}
+			saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+			if err != nil || priorWorkshopSubmitReceipt(saved, "ai1") != "latest-ai1-receipt" || priorWorkshopSubmitReceipt(saved, "ai2") != "first-ai2-receipt" {
+				t.Fatalf("clone changed an existing confirmation: logs=%+v error=%v", saved.Logs, err)
+			}
+		})
+	}
+}
+
 func TestWebSubmitUsesSourceBookIDForUpload(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
