@@ -87,16 +87,24 @@ func upstreamBodyLooksLikeErrorPage(text string) bool {
 func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, maxTxt int) (FetchResult, error) {
 	bookID = strings.TrimSpace(bookID)
 	platformID = strings.TrimSpace(platformID)
+	failure := func(class UpstreamFailureClass, message string, cause error) *UpstreamError {
+		return &UpstreamError{
+			Class:     class,
+			Operation: "fetch",
+			Message:   fmt.Sprintf("%s（bookid=%s platform=%s）", message, bookID, platformID),
+			Cause:     cause,
+		}
+	}
 	if bookID == "" || platformID == "" {
-		return FetchResult{}, fmt.Errorf("121 upstream 参数不完整：缺少书号或书城 ID（bookid=%q platform=%q）", bookID, platformID)
+		return FetchResult{}, failure(UpstreamFailurePermanent, "参数不完整：缺少书号或书城 ID", nil)
 	}
 	endpoint := strings.TrimSpace(f.Endpoint)
 	if endpoint == "" {
 		endpoint = DefaultUpstreamEndpoint
 	}
 	parsed, err := url.Parse(endpoint)
-	if err != nil {
-		return FetchResult{}, fmt.Errorf("121 upstream endpoint invalid: %w", err)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return FetchResult{}, failure(UpstreamFailureConfiguration, "endpoint invalid", nil)
 	}
 	query := parsed.Query()
 	query.Set("bookid", bookID)
@@ -110,7 +118,7 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
-		return FetchResult{}, fmt.Errorf("121 upstream request creation failed: %w", err)
+		return FetchResult{}, failure(UpstreamFailureConfiguration, "request creation failed", nil)
 	}
 	client := f.Client
 	if client == nil {
@@ -119,28 +127,57 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 	response, err := client.Do(request)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return FetchResult{}, fmt.Errorf("121 upstream request timed out: %w", context.DeadlineExceeded)
+			return FetchResult{}, failure(UpstreamFailureTransient, "request timed out", context.DeadlineExceeded)
 		}
-		return FetchResult{}, fmt.Errorf("121 upstream request failed: %w", err)
+		// The client wrapper includes the full request URL and its query parameters.
+		if urlErr, ok := err.(*url.Error); ok {
+			err = urlErr.Err
+		}
+		return FetchResult{}, failure(UpstreamFailureTransient, "request failed", err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return FetchResult{}, fmt.Errorf("121 upstream HTTP status %d", response.StatusCode)
+	status := response.StatusCode
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		class := UpstreamFailurePermanent
+		switch {
+		case status == http.StatusUnauthorized || status == http.StatusForbidden:
+			class = UpstreamFailureConfiguration
+		case status == http.StatusRequestTimeout || status == http.StatusTooManyRequests ||
+			(status >= http.StatusInternalServerError && status < 600):
+			class = UpstreamFailureTransient
+		}
+		fetchErr := failure(class, "request rejected", nil)
+		fetchErr.HTTPStatus = status
+		return FetchResult{}, fetchErr
 	}
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if err != nil {
-		return FetchResult{}, fmt.Errorf("121 upstream response read failed: %w", err)
+		return FetchResult{}, failure(UpstreamFailureTransient, "response read failed", err)
 	}
 	payload, err := decodeUpstreamPayload(body)
 	if err != nil {
-		return FetchResult{}, fmt.Errorf("121 upstream returned invalid JSON: %w", err)
+		return FetchResult{}, failure(UpstreamFailureTransient, "returned invalid JSON", nil)
+	}
+	if payload.Code == 0 {
+		return FetchResult{}, failure(UpstreamFailureTransient, "上游响应缺少业务状态", nil)
 	}
 	if payload.Code != http.StatusOK {
-		return FetchResult{}, fmt.Errorf("121 upstream business error %d: %s（bookid=%s platform=%s）", payload.Code, strings.TrimSpace(payload.Message), bookID, platformID)
+		message := "上游返回业务错误"
+		// Preserve known messages used by callers without echoing arbitrary upstream text.
+		switch text := strings.TrimSpace(payload.Message); text {
+		case "获取书籍信息失败", "参数不完整", "无权访问":
+			message = text
+		}
+		fetchErr := failure(UpstreamFailurePermanent, message, nil)
+		fetchErr.BusinessCode = payload.Code
+		return FetchResult{}, fetchErr
 	}
 	if upstreamBodyLooksLikeErrorPage(payload.Data) {
-		return FetchResult{}, fmt.Errorf("121 upstream 返回的是错误页面而不是正文（bookid=%s platform=%s），请稍后重试", bookID, platformID)
+		return FetchResult{}, failure(UpstreamFailureTransient, "上游返回错误页面，请稍后重试", nil)
+	}
+	if strings.TrimSpace(payload.Data) == "" {
+		return FetchResult{}, failure(UpstreamFailureTransient, "上游返回的正文为空，请稍后重试", nil)
 	}
 	return FetchResult{Code: payload.Code, Message: payload.Message, OriginalRaw: payload.Data, BookInfo: payload.BookInfo}, nil
 }

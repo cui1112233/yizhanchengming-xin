@@ -222,14 +222,23 @@ func TestUpstreamFetchRejectsHTTP500WithoutBody(t *testing.T) {
 }
 
 func TestUpstreamFetchRejectsNetworkFailureWithoutBody(t *testing.T) {
+	const secret = "example-query-secret"
 	transport := roundTripperFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("network failure")
 	})
 	client := &http.Client{Transport: transport}
 
-	result, err := (UpstreamFetcher{Client: client, Endpoint: "http://upstream.invalid"}).Fetch(context.Background(), "book-123", "15", 4000)
+	result, err := (UpstreamFetcher{Client: client, Endpoint: "http://upstream.invalid?token=" + secret}).Fetch(context.Background(), "book-123", "15", 4000)
 	if err == nil || !strings.Contains(err.Error(), "request failed") || result.OriginalRaw != "" {
 		t.Fatalf("result = %#v, err = %v; want request failed error without body", result, err)
+	}
+	if class, ok := ClassifyUpstreamFailure(err); !ok || class != UpstreamFailureTransient {
+		t.Fatalf("got error %v, want a transient request failure", err)
+	}
+	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
+		if strings.Contains(cause.Error(), secret) {
+			t.Fatalf("error chain exposed the endpoint token: %v", cause)
+		}
 	}
 }
 
@@ -243,6 +252,9 @@ func TestUpstreamFetchReturnsTimeoutErrorWithoutBody(t *testing.T) {
 	result, err := (UpstreamFetcher{Client: client, Endpoint: "http://upstream.invalid"}).Fetch(context.Background(), "book-123", "15", 4000)
 	if !errors.Is(err, context.DeadlineExceeded) || result.OriginalRaw != "" {
 		t.Fatalf("result = %#v, err = %v; want timeout without body", result, err)
+	}
+	if class, ok := ClassifyUpstreamFailure(err); !ok || class != UpstreamFailureTransient {
+		t.Fatalf("got error %v, want a transient timeout", err)
 	}
 }
 
@@ -261,9 +273,26 @@ func TestUpstreamFetchRejectsMissingParametersWithoutRequest(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "参数不完整") || result.OriginalRaw != "" {
 			t.Fatalf("params=%v result=%#v err=%v; want local incomplete-params error", params, result, err)
 		}
+		if class, ok := ClassifyUpstreamFailure(err); !ok || class != UpstreamFailurePermanent {
+			t.Fatalf("got error %v, want a permanent input failure", err)
+		}
 	}
 	if called {
 		t.Fatal("upstream must not be called when bookid/platform is empty")
+	}
+}
+
+func TestUpstreamFetchClassifiesInvalidEndpoint(t *testing.T) {
+	const secret = "example-query-secret"
+	fetcher := UpstreamFetcher{Endpoint: "https://upstream.invalid/%zz?token=" + secret}
+	_, err := fetcher.Fetch(context.Background(), "book-123", "15", 0)
+	if class, ok := ClassifyUpstreamFailure(err); !ok || class != UpstreamFailureConfiguration {
+		t.Fatalf("got error %v, want a configuration failure", err)
+	}
+	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
+		if strings.Contains(cause.Error(), secret) {
+			t.Fatalf("error chain exposed the endpoint token: %v", cause)
+		}
 	}
 }
 
@@ -283,6 +312,70 @@ func TestUpstreamFetchBusinessErrorIncludesRequestParameters(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %q, want to contain %q", err.Error(), want)
 		}
+	}
+}
+
+func TestUpstreamFetchClassifiesResponseFailures(t *testing.T) {
+	const secret = "example-secret-never-log"
+	tests := []struct {
+		name         string
+		httpStatus   int
+		body         string
+		class        UpstreamFailureClass
+		businessCode int
+	}{
+		{name: "HTTP 400", httpStatus: http.StatusBadRequest, body: secret, class: UpstreamFailurePermanent},
+		{name: "HTTP 404", httpStatus: http.StatusNotFound, class: UpstreamFailurePermanent},
+		{name: "HTTP 401", httpStatus: http.StatusUnauthorized, class: UpstreamFailureConfiguration},
+		{name: "HTTP 403", httpStatus: http.StatusForbidden, class: UpstreamFailureConfiguration},
+		{name: "HTTP 408", httpStatus: http.StatusRequestTimeout, class: UpstreamFailureTransient},
+		{name: "HTTP 429", httpStatus: http.StatusTooManyRequests, class: UpstreamFailureTransient},
+		{name: "HTTP 503", httpStatus: http.StatusServiceUnavailable, class: UpstreamFailureTransient},
+		{name: "business 400", body: `{"code":400,"msg":"token=` + secret + `","data":"错误内容"}`, class: UpstreamFailurePermanent, businessCode: 400},
+		{name: "invalid JSON", body: `{"token":"` + secret + `"`, class: UpstreamFailureTransient},
+		{name: "HTML response", body: `<!DOCTYPE html><html>` + secret + `</html>`, class: UpstreamFailureTransient},
+		{name: "HTML in data", body: `{"code":200,"data":"<html>` + secret + `</html>"}`, class: UpstreamFailureTransient},
+		{name: "empty response", class: UpstreamFailureTransient},
+		{name: "empty data", body: `{"code":200,"data":" "}`, class: UpstreamFailureTransient},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if tt.httpStatus != 0 {
+					w.WriteHeader(tt.httpStatus)
+				}
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer server.Close()
+
+			result, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "15", 0)
+			var upstreamErr *UpstreamError
+			if !errors.As(err, &upstreamErr) {
+				t.Fatalf("got result %+v and error %v, want *UpstreamError", result, err)
+			}
+			if upstreamErr.Class != tt.class || upstreamErr.HTTPStatus != tt.httpStatus || upstreamErr.BusinessCode != tt.businessCode {
+				t.Fatalf("got %+v, want class %q, HTTP status %d, business code %d", upstreamErr, tt.class, tt.httpStatus, tt.businessCode)
+			}
+			if result.OriginalRaw != "" || !strings.Contains(err.Error(), "bookid=book-123") || !strings.Contains(err.Error(), "platform=15") {
+				t.Fatalf("got result %+v and error %v, want an empty result and request IDs in the error", result, err)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Fatalf("error exposed the response secret: %v", err)
+			}
+		})
+	}
+}
+
+func TestUpstreamFetchClassifiesReadFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		_, _ = w.Write([]byte(`{"code":200,"data":"正文"}`))
+	}))
+	defer server.Close()
+
+	_, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "15", 0)
+	if class, ok := ClassifyUpstreamFailure(err); !ok || class != UpstreamFailureTransient {
+		t.Fatalf("got error %v, want a transient read failure", err)
 	}
 }
 
