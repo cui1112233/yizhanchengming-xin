@@ -15,6 +15,7 @@ import (
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/aicut"
 	"qiantie/backend/internal/auth"
+	"qiantie/backend/internal/batchfactoryexecution"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/ffmpegbin"
@@ -90,6 +91,7 @@ type RouterOptions struct {
 	AutomationStatusReader          *FileAutomationStatusReader
 	AutomationStateStore            AutomationStateStore
 	AutomationCoordinator           *BatchAutomationCoordinator
+	BatchExecutionService           *batchfactoryexecution.Service
 	PersonalPromptStore             *prompt.PersonalStore
 	ScriptHistoryStore              *ScriptHistoryStore
 	MemberProfileStore              *MemberProfileStore
@@ -240,6 +242,9 @@ func NewRouter(options RouterOptions) http.Handler {
 			resumeAutomationOnBoot(coordinator)
 			coordinator.StartScheduledDispatcher()
 		}()
+	}
+	if options.BatchExecutionService != nil && options.BatchExecutionService.Legacy == nil {
+		options.BatchExecutionService.Legacy = newBatchExecutionLegacyGateway(options.AutomationCoordinator, options.AutomationStateStore)
 	}
 	// 生产任务心跳超时兜底：启动时清理历史遗留的 running/queued，
 	// 避免服务中断后父任务永久停在“制作中”。阈值取 30 分钟。
@@ -460,6 +465,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.AutomationCoordinator != nil {
 		registerBatchAutomationRoutes(v12, auth, options.AutomationCoordinator, "v12")
 	}
+	registerBatchExecutionRoutes(v12, auth, options.BatchExecutionService)
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
 	var videoProviderRegistry batchfactoryv11.VideoProviderRegistry
 	if options.Production != nil {

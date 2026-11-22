@@ -68,5 +68,6 @@ type Repository interface {
 	ListBookTimeline(context.Context, string, string, string) ([]TimelineEvent, error)
 	AttachLegacyJob(context.Context, string, string, string) error
 	UpdateBookStatus(context.Context, string, string, BookStatus, Failure) error
+	UpdateExecutionStatus(context.Context, string, string, ExecutionStatus) error
 	AppendOutbox(context.Context, OutboxEvent) error
 }

@@ -2,6 +2,7 @@ package batchfactoryexecution
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -168,6 +169,126 @@ func (s *Service) EnsureExecution(ctx context.Context, command EnsureCommand) (E
 		}
 	}
 	return response, nil
+}
+
+func (s *Service) GetExecution(ctx context.Context, owner, executionID string) (Execution, error) {
+	if s == nil || s.Repository == nil {
+		return Execution{}, fmt.Errorf("execution service unavailable")
+	}
+	return s.Repository.Get(ctx, strings.TrimSpace(owner), strings.TrimSpace(executionID))
+}
+
+func (s *Service) Timeline(ctx context.Context, owner, executionID, bookID string) ([]TimelineEvent, error) {
+	if s == nil || s.Repository == nil {
+		return nil, fmt.Errorf("execution service unavailable")
+	}
+	return s.Repository.ListBookTimeline(ctx, strings.TrimSpace(owner), strings.TrimSpace(executionID), strings.TrimSpace(bookID))
+}
+
+func (s *Service) Cancel(ctx context.Context, owner, executionID string) (Execution, error) {
+	execution, err := s.GetExecution(ctx, owner, executionID)
+	if err != nil {
+		return Execution{}, err
+	}
+	if execution.Status == ExecutionCompleted || execution.Status == ExecutionCancelled {
+		return execution, nil
+	}
+	if err = s.Repository.UpdateExecutionStatus(ctx, owner, executionID, ExecutionCancelled); err != nil {
+		return Execution{}, err
+	}
+	execution.Status = ExecutionCancelled
+	return execution, nil
+}
+
+func (s *Service) Reconcile(ctx context.Context, owner, executionID string) (Execution, error) {
+	execution, err := s.GetExecution(ctx, owner, executionID)
+	if err != nil {
+		return Execution{}, err
+	}
+	if s.Legacy == nil || strings.TrimSpace(execution.LegacyJobID) == "" {
+		return execution, nil
+	}
+	legacy, found, err := s.Legacy.Read(ctx, owner, execution.LegacyJobID)
+	if err != nil {
+		return Execution{}, err
+	}
+	if !found {
+		return execution, nil
+	}
+	projected := ProjectLegacyTask(legacy)
+	needsAttention := false
+	for id, book := range projected {
+		if book.Status == BookNeedsAttention {
+			needsAttention = true
+		}
+		if err := s.Repository.UpdateBookStatus(ctx, owner, id, book.Status, Failure{Code: book.FailureCode, Message: book.FailureMessage}); err != nil && !errors.Is(err, ErrNotFound) {
+			return Execution{}, err
+		}
+	}
+	// A legacy "completed" state is not enough to claim published_confirmed;
+	// publication receipts are reconciled separately. Keep it running unless a
+	// visible legacy failure requires attention.
+	status := ExecutionRunning
+	if needsAttention || (!LegacyTaskActive(legacy.State) && strings.ToLower(strings.TrimSpace(legacy.State)) != "completed") {
+		status = ExecutionNeedsAttention
+	}
+	if execution.Status != status {
+		if err := s.Repository.UpdateExecutionStatus(ctx, owner, executionID, status); err != nil {
+			return Execution{}, err
+		}
+		execution.Status = status
+	}
+	return execution, nil
+}
+
+func (s *Service) DispatchOutboxEvent(ctx context.Context, event OutboxEvent) error {
+	if event.EventType != "execution.ensure" {
+		return nil
+	}
+	var payload struct {
+		ExecutionID     string         `json:"executionId"`
+		Owner           string         `json:"owner"`
+		BatchID         string         `json:"batchId"`
+		BookIDs         []string       `json:"bookIds"`
+		Mode            string         `json:"mode"`
+		Target          string         `json:"target"`
+		ClientRequestID string         `json:"clientRequestId"`
+		Config          map[string]any `json:"config"`
+	}
+	if err := json.Unmarshal(event.PayloadJSON, &payload); err != nil {
+		return fmt.Errorf("decode execution outbox event: %w", err)
+	}
+	if s.Legacy == nil {
+		return fmt.Errorf("legacy execution gateway unavailable")
+	}
+	execution, found, err := s.Repository.GetByClientRequest(ctx, payload.Owner, payload.BatchID, payload.ClientRequestID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrNotFound
+	}
+	if strings.TrimSpace(execution.LegacyJobID) != "" {
+		return nil
+	}
+	active, hasActive, err := s.Legacy.PeekActive(ctx, payload.Owner, payload.BatchID)
+	if err != nil {
+		return err
+	}
+	if hasActive {
+		return s.Repository.AttachLegacyJob(ctx, payload.Owner, execution.ID, active.JobID)
+	}
+	if len(payload.BookIDs) == 0 {
+		return nil
+	}
+	legacy, err := s.Legacy.Start(ctx, payload.Owner, payload.BatchID, LegacyStartInput{BookIDs: payload.BookIDs, Mode: payload.Mode, Target: payload.Target, Config: payload.Config, ClientRequestID: payload.ClientRequestID})
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(legacy.JobID) == "" {
+		return fmt.Errorf("legacy start returned no job id")
+	}
+	return s.Repository.AttachLegacyJob(ctx, payload.Owner, execution.ID, legacy.JobID)
 }
 
 func containsString(values []string, expected string) bool {

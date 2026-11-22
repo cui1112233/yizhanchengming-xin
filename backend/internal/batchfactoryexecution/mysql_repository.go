@@ -164,7 +164,9 @@ func (r *MySQLRepository) Ensure(ctx context.Context, record EnsureRecord) (resu
 		}
 		result.QueuedBooks = append(result.QueuedBooks, bookID)
 	}
-	payload, _ := json.Marshal(map[string]any{"executionId": executionID, "bookIds": result.QueuedBooks})
+	var frozenConfig map[string]any
+	_ = json.Unmarshal(record.ConfigJSON, &frozenConfig)
+	payload, _ := json.Marshal(map[string]any{"executionId": executionID, "owner": record.Owner, "batchId": record.BatchID, "bookIds": result.QueuedBooks, "mode": record.Mode, "target": record.Target, "clientRequestId": record.ClientRequestID, "config": frozenConfig})
 	if _, err = tx.ExecContext(ctx, `INSERT INTO batch_execution_outbox (id, aggregate_type, aggregate_id, event_type, payload_json, available_at, claimed_at, delivered_at, attempts, last_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.newID("outbox"), "execution", executionID, "execution.ensure", payload, now, nil, nil, 0, nil, now); err != nil {
 		return result, err
 	}
@@ -223,6 +225,18 @@ func (r *MySQLRepository) AttachLegacyJob(ctx context.Context, owner, executionI
 
 func (r *MySQLRepository) UpdateBookStatus(ctx context.Context, owner, bookID string, status BookStatus, failure Failure) error {
 	result, err := r.db.ExecContext(ctx, `UPDATE batch_execution_books eb JOIN batch_executions e ON e.id = eb.execution_id SET eb.status = ?, eb.failure_code = ?, eb.failure_message = ?, eb.updated_at = ? WHERE e.owner_username = ? AND eb.book_id = ? AND e.status IN ('planned','running','needs_attention')`, status, nullableText(failure.Code), nullableText(failure.Message), r.now().UTC(), owner, bookID)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *MySQLRepository) UpdateExecutionStatus(ctx context.Context, owner, executionID string, status ExecutionStatus) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE batch_executions SET status = ?, updated_at = ? WHERE owner_username = ? AND id = ?`, status, r.now().UTC(), owner, executionID)
 	if err != nil {
 		return err
 	}

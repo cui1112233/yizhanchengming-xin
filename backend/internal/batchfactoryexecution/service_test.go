@@ -55,6 +55,9 @@ func (r *memoryExecutionRepository) UpdateBookStatus(_ context.Context, owner, b
 	r.updates[owner+"/"+bookID] = status
 	return nil
 }
+func (r *memoryExecutionRepository) UpdateExecutionStatus(context.Context, string, string, ExecutionStatus) error {
+	return nil
+}
 func (r *memoryExecutionRepository) AppendOutbox(context.Context, OutboxEvent) error { return nil }
 
 type fakeLegacyGateway struct {

@@ -50,16 +50,16 @@ const (
 type PublicationStatus string
 
 type Execution struct {
-	ID              string
-	OwnerUsername   string
-	BatchID         string
-	Mode            string
-	Target          string
-	ClientRequestID string
-	Status          ExecutionStatus
-	LegacyJobID     string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID              string          `json:"id"`
+	OwnerUsername   string          `json:"-"`
+	BatchID         string          `json:"batchId"`
+	Mode            string          `json:"mode"`
+	Target          string          `json:"target"`
+	ClientRequestID string          `json:"clientRequestId"`
+	Status          ExecutionStatus `json:"status"`
+	LegacyJobID     string          `json:"legacyJobId,omitempty"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	UpdatedAt       time.Time       `json:"updatedAt"`
 }
 
 type Book struct {
