@@ -2,10 +2,16 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
 	"net/http"
-	"qiantie/backend/internal/novelfetchworkshop"
+	"slices"
 	"testing"
 	"time"
+
+	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 // Regression replay: no real database, provider or upload service.
@@ -251,4 +257,223 @@ func TestWorkflowUnknownSubmissionRemainsVerification(t *testing.T) {
 	if row["status"] != "pending_verification" {
 		t.Fatalf("unknown outcome lost verification state: %+v", row)
 	}
+}
+
+func TestScheduleUnknownSubmissionReconcilesWithoutUploadJob(t *testing.T) {
+	for _, status := range []string{"pending_verification", "pending_confirmation"} {
+		t.Run(status, func(t *testing.T) {
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &uniqueRecordingNovelFetchQueue{}
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+				"status": "completed", "siteSubmitStatus": status, "siteSubmitDoneVersions": []string{"ai1"},
+				"siteSubmitPendingConfirmation": map[string]any{"ai2": "pending-ai2"},
+			}}
+			item := saveSubmissionEvidenceSchedule(t, store, doc, true)
+			ctx := context.Background()
+			for i := 0; i < 2; i++ {
+				if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+					t.Fatal(err)
+				}
+				if got := storedSubmissionEvidenceSchedule(t, store)["status"]; got != "pending_verification" {
+					t.Errorf("schedule status = %v, want pending_verification", got)
+				}
+			}
+			if len(queue.jobs) != 0 {
+				t.Fatalf("unknown submission enqueued an upload job: %+v", queue.jobs)
+			}
+			// The existing readback path can later confirm the missing version.
+			doc.Meta["siteSubmitStatus"] = "submitted"
+			doc.Meta["siteSubmitDoneVersions"] = []string{"ai1", "ai2"}
+			delete(doc.Meta, "siteSubmitPendingConfirmation")
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if got := storedSubmissionEvidenceSchedule(t, store)["status"]; got != "completed" || len(queue.jobs) != 0 {
+				t.Fatalf("schedule %s status = %v, jobs = %+v", item["id"], got, queue.jobs)
+			}
+		})
+	}
+}
+
+func TestDueScheduleUnknownSubmissionReadsBackMatchingAttempt(t *testing.T) {
+	ctx := context.Background()
+	store, usersDir, doc := newSubmissionEvidenceTask(t)
+	queue := &uniqueRecordingNovelFetchQueue{}
+	doc.Meta["schedule_id"] = "evidence-schedule"
+	doc.Meta["status"] = "upload_pending"
+	doc.Meta["siteSubmitStatus"] = "pending_verification"
+	doc.Meta["siteSubmitPendingConfirmation"] = map[string]any{"ai2": doc.BookID}
+	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte("第二版完整正文")))
+	doc.Meta["siteSubmitAttempts"] = map[string]any{"ai2": map[string]any{"started_at": "2026-11-13T04:44:11Z", "content_sha256": fingerprint}}
+	now := time.Now()
+	item := saveSubmissionEvidenceSchedule(t, store, doc, true)
+	item["status"], item["pending_book_ids"] = "scheduled", nil
+	item["tasks_prepared"], item["run_at"] = true, now.Add(-time.Minute).Format(time.RFC3339Nano)
+	cfg, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg["novel_fetch_schedules"] = []any{item}
+	if err := store.PutConfig(ctx, "tester", cfg); err != nil {
+		t.Fatal(err)
+	}
+	connector := &scheduleSubmissionReadbackSpy{receipt: videomanagementconnector.Submission{
+		ID: "first-ai1-receipt", Status: "submitted", ReadbackRaw: map[string]any{"bookid": doc.BookID, "addtime": "2026-11-10 23:54:40"},
+	}}
+	readback := newNovelFetchScheduleReadback(store, queue, usersDir, connector)
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now, readback); err != nil {
+		t.Fatal(err)
+	}
+	if status := storedSubmissionEvidenceSchedule(t, store)["status"]; status != "pending_verification" || connector.readbackCalls != 1 || connector.submitCalls != 0 || len(queue.jobs) != 0 {
+		t.Fatalf("old receipt settled a new version or started upload: status=%v readbacks=%d uploads=%d jobs=%v", status, connector.readbackCalls, connector.submitCalls, queue.jobs)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(time.Second), readback); err != nil || connector.readbackCalls != 1 {
+		t.Fatalf("pending readback ignored retry interval: calls=%d error=%v", connector.readbackCalls, err)
+	}
+	connector.receipt = videomanagementconnector.Submission{ID: "new-ai2-receipt", Status: "submitted", ReadbackRaw: map[string]any{"bookid": doc.BookID, "addtime": "2026-11-13 12:45:35"}}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(time.Minute), readback); err != nil {
+		t.Fatal(err)
+	}
+	if status := storedSubmissionEvidenceSchedule(t, store)["status"]; status != "pending_verification" || connector.readbackCalls != 2 {
+		t.Fatalf("a book listing without a version receipt settled ai2: status=%v readbacks=%d", status, connector.readbackCalls)
+	}
+	mapOrEmpty(connector.receipt.ReadbackRaw)["content_sha256"] = fingerprint
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(2*time.Minute), readback); err != nil {
+		t.Fatal(err)
+	}
+	if status := storedSubmissionEvidenceSchedule(t, store)["status"]; status != "completed" || connector.readbackCalls != 3 || connector.submitCalls != 0 || len(queue.jobs) != 0 {
+		t.Fatalf("matching readback did not settle schedule: status=%v readbacks=%d uploads=%d jobs=%v", status, connector.readbackCalls, connector.submitCalls, queue.jobs)
+	}
+	saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+	if err != nil || !novelFetchVersionsSubmitted(saved, []string{"ai1", "ai2"}) || priorWorkshopSubmitReceipt(saved, "ai2") != "new-ai2-receipt" {
+		t.Fatalf("missing confirmed receipt for ai2: %+v %v", saved, err)
+	}
+}
+
+type scheduleSubmissionReadbackSpy struct {
+	recordingSubmitConnector
+	receipt       videomanagementconnector.Submission
+	readbackCalls int
+}
+
+func (c *scheduleSubmissionReadbackSpy) GetSubmission(context.Context, videomanagementconnector.Session, string) (videomanagementconnector.Submission, error) {
+	c.readbackCalls++
+	return c.receipt, nil
+}
+
+func TestSchedulePartialSubmissionQueuesOnlyMissingVersion(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+		"status": "failed", "siteSubmitStatus": "pending_upload",
+		"siteSubmitDoneVersions": []string{"ai1"}, "siteSubmitFailedVersions": []string{"ai2"},
+	}}
+	saveSubmissionEvidenceSchedule(t, store, doc, true)
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.jobs) != 1 || !queue.jobs[0].AutoSubmit || !slices.Equal(queue.jobs[0].SelectedVersions, []string{"ai2"}) {
+		t.Fatalf("expected one upload job for ai2 only, got %+v", queue.jobs)
+	}
+	if got := scheduleStringSlice(storedSubmissionEvidenceSchedule(t, store)["selected_versions"]); !slices.Equal(got, []string{"ai1", "ai2"}) {
+		t.Fatalf("schedule lost original version selection: %v", got)
+	}
+}
+
+func TestWorkshopUploadPartialSubmissionReusesTheSavedFingerprint(t *testing.T) {
+	ctx := context.Background()
+	store, _, doc := newSubmissionEvidenceTask(t)
+	doc.Meta["autoSubmitReadyVersions"] = []string{"ai1", "ai2"}
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	worker := &workshopProcessWorker{store: store, resolveRewriteProvider: func(context.Context, string) (novelfetchworkshop.RewriteProvider, error) {
+		return nil, errors.New("模型不应在上传重试时启用")
+	}}
+	job := novelfetchworkshop.ProcessJob{Owner: "tester", BookIDs: []string{doc.BookID}, SelectedVersions: []string{"ai2"}, AutoSubmit: true, SensitiveAIEnabled: true}
+	if err := worker.execute(ctx, job); err != nil {
+		t.Fatalf("narrower upload retry discarded a matching readiness fingerprint: %v", err)
+	}
+}
+
+func TestScheduleGenerateOnlyCompletionDoesNotRequireReceipt(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+		"status": "completed", "processSnapshot": map[string]any{"auto_submit": false, "selected_versions": []string{"ai1", "ai2"}},
+	}, Versions: map[string]any{"ai1": "第一版正文", "ai2": "第二版正文"}}
+	saveSubmissionEvidenceSchedule(t, store, doc, false)
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := storedSubmissionEvidenceSchedule(t, store)["status"]; got != "completed" || len(queue.jobs) != 0 {
+		t.Fatalf("generate-only status = %v, jobs = %+v", got, queue.jobs)
+	}
+}
+
+func TestScheduleCancelPreservesExistingAndCrossOwnerBooks(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	const existingID, createdID = "12345678901", "12345678902"
+	for _, row := range []struct{ owner, id string }{{"tester", existingID}, {"other", createdID}} {
+		if err := store.PutDocument(ctx, row.owner, novelfetchworkshop.Document{BookID: row.id, Original: "保留原文"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	item := createPreparedSchedule(t, store, map[string]any{
+		"input_text": existingID + " 既有书\n" + createdID + " 新建书", "auto_submit": false,
+		"selected_versions": []string{"ai1", "ai2"}, "run_at": time.Now().Add(time.Hour).Format(time.RFC3339Nano),
+	})
+	if !slices.Equal(scheduleStringSlice(item["created_ids"]), []string{createdID}) {
+		t.Fatalf("expected just one schedule-created book, got %v", item["created_ids"])
+	}
+	response := scheduleControlRequest(store, queue, "tester", http.MethodPost, "/api/novel-fetch-workshop/schedules/"+firstText(item["id"])+"/cancel")
+	if response.Code != http.StatusOK {
+		t.Fatalf("cancel: %d %s", response.Code, response.Body.String())
+	}
+	if _, err := store.GetDocument(ctx, "tester", createdID); !errors.Is(err, novelfetchworkshop.ErrNotFound) {
+		t.Fatalf("schedule-created book remains: %v", err)
+	}
+	for _, row := range []struct{ owner, id string }{{"tester", existingID}, {"other", createdID}} {
+		if doc, err := store.GetDocument(ctx, row.owner, row.id); err != nil || doc.Original != "保留原文" {
+			t.Fatalf("book %s/%s changed after cancellation: %+v %v", row.owner, row.id, doc, err)
+		}
+	}
+}
+
+func saveSubmissionEvidenceSchedule(t *testing.T, store novelfetchworkshop.Store, doc novelfetchworkshop.Document, autoSubmit bool) map[string]any {
+	t.Helper()
+	ctx := context.Background()
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	item := map[string]any{
+		"id": "evidence-schedule", "job_id": "evidence-job", "batch_id": "evidence-batch",
+		"status": "waiting_retry", "retry_tracking": true, "book_ids": []string{doc.BookID},
+		"pending_book_ids": []string{doc.BookID}, "selected_versions": []string{"ai1", "ai2"}, "auto_submit": autoSubmit,
+	}
+	cfg, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg["novel_fetch_schedules"] = []any{item}
+	if err := store.PutConfig(ctx, "tester", cfg); err != nil {
+		t.Fatal(err)
+	}
+	return item
+}
+
+func storedSubmissionEvidenceSchedule(t *testing.T, store novelfetchworkshop.Store) map[string]any {
+	t.Helper()
+	cfg, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return mapOrEmpty(arrayOrEmpty(cfg["novel_fetch_schedules"])[0])
 }

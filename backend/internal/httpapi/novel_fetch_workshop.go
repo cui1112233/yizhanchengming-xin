@@ -817,9 +817,20 @@ func (worker *workshopProcessWorker) bookCancelled(ctx context.Context, owner, b
 func (worker *workshopProcessWorker) execute(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
 	ctx = novelfetchworkshop.WithProcessTextModel(ctx, job.TextModelID)
 	if job.AutoSubmit && len(job.BookIDs) == 1 {
-		if document, err := worker.store.GetDocument(ctx, job.Owner, job.BookIDs[0]); err == nil && document.Meta["autoSubmitReady"] == true && firstText(document.Meta["autoSubmitReadyFingerprint"]) == novelFetchUploadReadyFingerprint(ctx, worker.store, job.Owner, document, job.SelectedVersions) {
-			_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, job.BookIDs[0], "upload_resume", "正文已完成，跳过原文和改文生成，仅继续上传")
-			return nil
+		if document, err := worker.store.GetDocument(ctx, job.Owner, job.BookIDs[0]); err == nil && document.Meta["autoSubmitReady"] == true {
+			versions := job.SelectedVersions
+			saved := scheduleStringSlice(document.Meta["autoSubmitReadyVersions"])
+			coversRetry := len(saved) > 0 && len(versions) > 0
+			for _, version := range versions {
+				coversRetry = coversRetry && seenString(saved, version)
+			}
+			if coversRetry {
+				versions = saved
+			}
+			if firstText(document.Meta["autoSubmitReadyFingerprint"]) == novelFetchUploadReadyFingerprint(ctx, worker.store, job.Owner, document, versions) {
+				_ = appendWorkshopTaskLog(ctx, worker.store, job.Owner, job.BookIDs[0], "upload_resume", "正文已完成，跳过原文和改文生成，仅继续上传")
+				return nil
+			}
 		}
 	}
 	var sensitiveProvider novelfetchworkshop.RewriteProvider
@@ -1202,7 +1213,7 @@ const (
 	novelFetchScheduleRecoveryTimeout  = 30 * time.Second
 )
 
-func runNovelFetchScheduleDispatcher(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owners novelfetchworkshop.ConfigOwnerLister, registry *workshopProcessRegistry, recoverUpload ...func(context.Context, string)) {
+func runNovelFetchScheduleDispatcher(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owners novelfetchworkshop.ConfigOwnerLister, registry *workshopProcessRegistry, recoverUpload func(context.Context, string), readback novelFetchScheduleReadback) {
 	dispatchSchedules := func() {
 		ownerNames, err := owners.ListConfigOwners(ctx)
 		if err != nil {
@@ -1210,7 +1221,7 @@ func runNovelFetchScheduleDispatcher(ctx context.Context, store novelfetchworksh
 		}
 		now := time.Now()
 		for _, owner := range ownerNames {
-			_ = dispatchDueNovelFetchSchedules(ctx, store, queue, owner, now)
+			_ = dispatchDueNovelFetchSchedules(ctx, store, queue, owner, now, readback)
 		}
 	}
 	dispatchAutomation := func() {
@@ -1220,8 +1231,8 @@ func runNovelFetchScheduleDispatcher(ctx context.Context, store novelfetchworksh
 		}
 		now := time.Now()
 		for _, owner := range ownerNames {
-			if len(recoverUpload) > 0 && recoverUpload[0] != nil {
-				recoverUpload[0](ctx, owner)
+			if recoverUpload != nil {
+				recoverUpload(ctx, owner)
 			}
 			job, dispatchErr := dispatchNovelFetchAutomationOwner(ctx, store, queue, owner, now)
 			if dispatchErr != nil || job == nil {
@@ -1252,7 +1263,11 @@ func runNovelFetchScheduleDispatcher(ctx context.Context, store novelfetchworksh
 	}
 }
 
-func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, now time.Time) error {
+func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, now time.Time, readbacks ...novelFetchScheduleReadback) error {
+	var readback novelFetchScheduleReadback
+	if len(readbacks) > 0 {
+		readback = readbacks[0]
+	}
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
 		return err
@@ -1266,13 +1281,13 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		status := strings.ToLower(strings.TrimSpace(firstText(item["status"])))
 		if len(scheduleStringSlice(item["pending_book_ids"])) > 0 && !novelFetchStopped(status) {
 			if enabled, explicit := mapOrEmpty(settings[novelFetchAutomationConfigKey])["enabled"].(bool); !explicit || enabled {
-				if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, now); err != nil {
+				if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, settings, now, readback); err != nil {
 					return err
 				}
 			}
 			continue
 		}
-		if handled, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
+		if handled, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now, readback); err != nil {
 			return err
 		} else if handled {
 			continue
@@ -1440,6 +1455,20 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		if dispatchErr == nil && recovering {
 			dispatchErr = ensureScheduleRecoveryDocuments(ctx, store, owner, item)
 		}
+		if dispatchErr == nil && job.AutoSubmit {
+			var split bool
+			split, dispatchErr = novelFetchScheduleNeedsVersionDispatch(ctx, store, job)
+			if dispatchErr == nil && split {
+				item["pending_book_ids"], item["partial_dispatch"] = bookIDs, true
+				if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
+					return err
+				}
+				if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, settings, now, readback); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		if dispatchErr == nil {
 			dispatchErr = novelFetchSnapshotBeforeQueue(ctx, store, job)
 		}
@@ -1467,7 +1496,7 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 					if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
 						return err
 					}
-					if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, now); err != nil {
+					if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, settings, now, readback); err != nil {
 						return err
 					}
 					continue
@@ -2579,7 +2608,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if owners, ok := store.(novelfetchworkshop.ConfigOwnerLister); ok {
 			go runNovelFetchScheduleDispatcher(context.Background(), store, queue, owners, registry, func(ctx context.Context, owner string) {
 				recoverWorkshopSubmitAccount(ctx, store, queue, owner, usersDir, uploadTarget)
-			})
+			}, newNovelFetchScheduleReadback(store, queue, usersDir, uploadTarget))
 		}
 	}
 	mux.HandleFunc("POST /api/novel-fetch-workshop/automation/start", func(w http.ResponseWriter, req *http.Request) {

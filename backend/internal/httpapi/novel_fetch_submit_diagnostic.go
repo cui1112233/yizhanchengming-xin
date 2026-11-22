@@ -21,6 +21,72 @@ func recordWorkshopSubmitBlocked(ctx context.Context, store novelfetchworkshop.S
 	}
 }
 
+func novelFetchSubmissionNeedsReadback(meta map[string]any, version string) bool {
+	pending := mapOrEmpty(meta["siteSubmitPendingConfirmation"])
+	if _, found := pending[version]; found || containsVersion(meta["siteSubmitExecutingVersions"], version) {
+		return true
+	}
+	if len(pending) != 0 || len(anyStrings(meta["siteSubmitExecutingVersions"])) != 0 {
+		return false
+	}
+	switch strings.ToLower(firstText(meta["siteSubmitStatus"], meta["site_submit_status"])) {
+	case "pending_verification", "pending_confirmation", "unknown":
+		failed := anyStrings(firstConfiguredValue(meta["siteSubmitFailedVersions"], meta["site_submit_failed_versions"]))
+		if len(failed) != 0 {
+			return containsVersion(failed, version)
+		}
+		done := anyStrings(firstConfiguredValue(meta["siteSubmitDoneVersions"], meta["site_submit_done_versions"]))
+		return !containsVersion(done, version)
+	}
+	return false
+}
+
+func priorWorkshopSubmitReceipt(document novelfetchworkshop.Document, version string) string {
+	bookID, _ := webSubmitSourceBookID(document.Meta, document.BookID)
+	for i := len(document.Logs) - 1; i >= 0; i-- {
+		entry := mapOrEmpty(document.Logs[i])
+		if id := workshopVerifiedSubmitReceipt(entry, bookID); entry["version"] == version && id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+func workshopVerifiedSubmitReceipt(entry map[string]any, bookID string) string {
+	if entry["event"] != "site_submit" || entry["status"] != "submitted" {
+		return ""
+	}
+	receipt := mapOrEmpty(repairHistoricalSubmitReceipt(entry, bookID)["remote_receipt"])
+	if receipt["verified"] != true {
+		return ""
+	}
+	return firstText(receipt["submission_id"])
+}
+
+func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission, doc novelfetchworkshop.Document, bookID, version string) bool {
+	record := mapOrEmpty(receipt.ReadbackRaw)
+	recordBook := firstText(record["bookid"])
+	if receipt.ID == "" || (recordBook != "" && recordBook != bookID) {
+		return false
+	}
+	for _, raw := range doc.Logs {
+		if workshopVerifiedSubmitReceipt(mapOrEmpty(raw), bookID) == receipt.ID {
+			return false // A receipt already confirmed another attempt.
+		}
+	}
+	if expected := firstText(mapOrEmpty(doc.Meta["siteSubmitPendingConfirmation"])[version]); expected != "" && expected != bookID {
+		return receipt.ID == expected
+	}
+	if recordBook == "" {
+		// A connector can return an explicitly confirmed receipt, without a book listing.
+		return receipt.Status == "submitted"
+	}
+	attempt := mapOrEmpty(mapOrEmpty(doc.Meta["siteSubmitAttempts"])[version])
+	fingerprint := firstText(attempt["content_sha256"])
+	return fingerprint != "" && strings.EqualFold(firstText(record["content_sha256"]), fingerprint) &&
+		submissionMatchesAttempt(receipt, bookID, firstText(attempt["started_at"]))
+}
+
 // Read the same durable events that submission workers write. Metadata-only
 // history belongs to imported tasks and is retained as a fallback.
 func workshopSubmitDiagnostic(document novelfetchworkshop.Document) map[string]any {

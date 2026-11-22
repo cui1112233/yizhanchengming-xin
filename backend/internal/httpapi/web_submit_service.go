@@ -226,6 +226,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				if hasSiteBookID && !request.Force {
 					confirmedHashes = webSubmitConfirmedContentHashes(ctx, store, owner, bookID, done)
 				}
+				readbackVersions := map[string]bool{}
+				for _, version := range versions {
+					readbackVersions[version] = novelFetchSubmissionNeedsReadback(meta, version)
+				}
 				deferredStatus := ""
 				for _, version := range versions {
 					if err := checkWorkshopLease(ctx); err != nil {
@@ -314,7 +318,8 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "submitted", "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": true, "remote_receipt": map[string]any{"verified": true, "submission_id": firstText(confirmed.ID, submission.ID), "upload_success_count": 1, "remote_record": confirmed.ReadbackRaw}})
 						manifestItem(bookID, version, "submitted", "confirmed_receipt", "")
 					}
-					if skipSubmitted && !request.Force && containsVersion(done, version) {
+					needsReadback := readbackVersions[version]
+					if skipSubmitted && !request.Force && !needsReadback && containsVersion(done, version) {
 						row["status"] = "skipped"
 						row["reason"] = "confirmed_result"
 						row["error"] = "该版本已确认提交"
@@ -323,14 +328,6 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						continue
 					}
 					targetSession := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
-					_, needsReadback := mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version]
-					if !needsReadback {
-						// executing 表示上次上传已派发但没有留下结果；只能回读，不能重复上传。
-						needsReadback = containsVersion(anyStrings(meta["siteSubmitExecutingVersions"]), version)
-					}
-					if !needsReadback && len(mapOrEmpty(meta["siteSubmitPendingConfirmation"])) == 0 {
-						needsReadback = strings.EqualFold(firstText(meta["siteSubmitStatus"], meta["site_submit_status"]), "pending_confirmation") && containsVersion(anyStrings(meta["siteSubmitFailedVersions"]), version)
-					}
 					if request.ReadbackOnly && !needsReadback {
 						row["error"] = "该版本没有待核对的提交记录"
 						result.Results = append(result.Results, row)
@@ -339,7 +336,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					}
 					if needsReadback {
 						if len(targets) == 0 || targets[0] == nil {
-							failedVersion("视频管理系统 Go 连接器未执行回读确认", false)
+							uncertainVersion("视频管理系统 Go 连接器未执行回读确认", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version]))
 							continue
 						}
 						confirmed, readbackErr := targets[0].GetSubmission(ctx, targetSession, uploadBookID)
@@ -351,14 +348,9 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 							}
 							continue
 						}
-						attempt := mapOrEmpty(mapOrEmpty(meta["siteSubmitAttempts"])[version])
-						if !submissionMatchesAttempt(confirmed, firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], uploadBookID), firstText(attempt["started_at"])) {
-							// 与批量原文改文系统源码对齐：目标站已存在该书的提交记录
-							// 即视为已提交；时间戳和回执号只作为证据，不再阻塞任务。
-							if strings.TrimSpace(firstText(confirmed.ID, mapOrEmpty(confirmed.ReadbackRaw)["bookid"])) == "" {
-								uncertainVersion("只查到旧记录，尚未确认本次提交；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], uploadBookID))
-								continue
-							}
+						if !workshopPendingReadbackMatches(confirmed, doc, uploadBookID, version) {
+							uncertainVersion("尚未查到能确认本版本的提交记录；不会重复上传", firstText(mapOrEmpty(meta["siteSubmitPendingConfirmation"])[version], uploadBookID))
+							continue
 						}
 						recordSuccess(confirmed, confirmed)
 						continue
@@ -437,6 +429,30 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						failedVersion("视频管理系统 Go 连接器未执行上传", false)
 						continue
 					}
+					submit := targets[0].Submit
+					if containsVersion(done, version) {
+						priorReceipt := priorWorkshopSubmitReceipt(doc, version)
+						audit := map[string]any{
+							"event": "site_submit_resubmission", "operation_id": operationID, "version": version, "force": request.Force,
+							"skip_submitted": skipSubmitted, "prior_receipt_id": priorReceipt, "time": time.Now().UTC().Format(time.RFC3339Nano),
+						}
+						doc.Logs = append(doc.Logs, audit)
+						if request.Force {
+							cloner, canClone := targets[0].(cloneSubmissionService)
+							if !canClone || priorReceipt == "" {
+								message := "重新提交需要目标站支持复制提交并提供该版本的已确认回执"
+								audit["status"], audit["error"] = "waiting_configuration", message
+								row["error"] = message
+								result.Results = append(result.Results, row)
+								result.Failed++
+								manifestItem(bookID, version, "failed", "resubmission_unavailable", message)
+								continue
+							}
+							submit = func(ctx context.Context, session videomanagementconnector.Session, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+								return cloner.CloneSubmission(ctx, session, priorReceipt, input)
+							}
+						}
+					}
 					contentHash := sha256.Sum256([]byte(content.Content))
 					attempts := mapOrEmpty(meta["siteSubmitAttempts"])
 					attempts[version] = map[string]any{"operation_id": operationID, "content_sha256": hex.EncodeToString(contentHash[:]), "started_at": time.Now().UTC().Format(time.RFC3339Nano)}
@@ -464,7 +480,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 							finish(err)
 							return
 						}
-						submission, submitErr = targets[0].Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: uploadBookID, Filename: uploadBookID + ".txt", Content: []byte(content.Content), FormFields: fields})
+						submission, submitErr = submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: uploadBookID, Filename: uploadBookID + ".txt", Content: []byte(content.Content), FormFields: fields})
 						if submitErr == nil {
 							break
 						}
@@ -504,16 +520,18 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 							finish(&webSubmitRequestError{Status: http.StatusConflict, Message: workshopLoginRequiredMessage, Code: "UPLOAD_LOGIN_REQUIRED"})
 							return
 						}
-						uncertainVersion("提交结果不确定，等待目标站回读确认", bookID)
+						uncertainVersion("提交结果不确定，等待目标站回读确认", firstText(submission.ID, uploadBookID))
 						continue
 					}
 					// 与批量原文改文系统源码对齐：上传接口返回成功即视为已提交；
 					// 回读只用来补充证据，回读失败或只有旧记录都不再阻塞任务。
 					confirmed := submission
-					if readback, readbackErr := targets[0].GetSubmission(ctx, targetSession, uploadBookID); readbackErr == nil {
+					if readback, readbackErr := targets[0].GetSubmission(ctx, targetSession, uploadBookID); readbackErr == nil &&
+						((submission.ID != "" && readback.ID == submission.ID) || (submission.ID == "" && workshopPendingReadbackMatches(readback, doc, uploadBookID, version))) {
 						confirmed = readback
 					} else if errors.Is(readbackErr, videomanagementconnector.ErrSiteContractChanged) {
 						clearExecuting()
+						pendingReceipts[version] = firstText(submission.ID, uploadBookID)
 						manifestItem(bookID, version, "unknown", "site_contract_changed", "接口结构变化，提交结果待回读确认")
 						finish(blockContract())
 						return

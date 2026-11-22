@@ -648,7 +648,9 @@ func TestWebSubmitForceResubmitsConfirmedVersion(t *testing.T) {
 	}
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "777777", Gender: "女频", Meta: map[string]any{
 		"style": "现代悬疑", "platformId": "1", "siteSubmitDoneVersions": []any{"ai1"},
-	}}); err != nil {
+	}, Logs: []any{map[string]any{"event": "site_submit", "version": "ai1", "status": "submitted", "remote_receipt": map[string]any{
+		"verified": true, "submission_id": "initial-ai1-receipt",
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.PutBody(context.Background(), "tester", novelfetchworkshop.BodyRecord{BookID: "777777", BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1"}, Content: "满足字数的正文"}); err != nil {
@@ -661,16 +663,17 @@ func TestWebSubmitForceResubmitsConfirmedVersion(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(usersDir, "tester", "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	connector := &uncertainSubmitConnector{}
+	connector := &cloneSubmissionEvidenceSpy{}
 	request := webSubmitRequest{TaskIDs: []string{"777777"}, Versions: []string{"ai1"}, Force: true}
 	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, request, nil, connector)
-	if err != nil || connector.submitCalls != 1 || result.Success != 1 {
-		t.Fatalf("force must resubmit confirmed version: result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	if err != nil || connector.submitCalls != 0 || connector.cloneSource != "initial-ai1-receipt" || result.Success != 1 {
+		t.Fatalf("force must resubmit confirmed version: result=%#v err=%v connector=%+v", result, err, connector)
 	}
 	request.Force = false
+	connector.cloneSource = ""
 	result, err = executeWebSubmit(context.Background(), "tester", usersDir, store, request, nil, connector)
-	if err != nil || connector.submitCalls != 1 || result.Success != 0 || len(result.Results) != 1 {
-		t.Fatalf("without force confirmed version must be skipped: result=%#v err=%v submits=%d", result, err, connector.submitCalls)
+	if err != nil || connector.submitCalls != 0 || connector.cloneSource != "" || result.Success != 0 || len(result.Results) != 1 {
+		t.Fatalf("without force confirmed version must be skipped: result=%#v err=%v connector=%+v", result, err, connector)
 	}
 	if row, _ := result.Results[0].(map[string]any); row["status"] != "skipped" {
 		t.Fatalf("result=%#v", result.Results[0])

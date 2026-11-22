@@ -12,9 +12,9 @@ import (
 // A deferred fetch is retried by automation under a new process job. That job
 // does not own the original schedule ID. Reconcile the original schedule from
 // its own books instead of redispatching it or leaving its card waiting forever.
-func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworkshop.Store, owner string, item, settings map[string]any, now time.Time) (bool, error) {
+func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworkshop.Store, owner string, item, settings map[string]any, now time.Time, readback ...novelFetchScheduleReadback) (bool, error) {
 	previous := firstText(item["status"])
-	if previous != "waiting_retry" && item["retry_tracking"] != true {
+	if previous != "waiting_retry" && previous != "upload_pending" && previous != "pending_verification" && previous != "pending_confirmation" && item["retry_tracking"] != true {
 		return false, nil
 	}
 	switch previous {
@@ -27,6 +27,7 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 	}
 	states := map[string]int{}
 	message := ""
+	versions := scheduleStringSlice(item["selected_versions"])
 	var nextRetry time.Time
 	for _, bookID := range ids {
 		document, err := store.GetDocument(ctx, owner, bookID)
@@ -47,15 +48,37 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		if novelFetchStopped(status) {
 			status = "stopped"
 		}
-		if status == "completed" && item["auto_submit"] != false && !novelFetchVersionsSubmitted(document, scheduleStringSlice(item["selected_versions"])) {
-			switch submitted {
-			case "waiting_login", "waiting_configuration", "pending_verification", "pending_confirmation":
-				status = submitted
-			default:
-				status = "upload_pending"
+		if status != "stopped" && item["auto_submit"] != false {
+			pending := novelFetchScheduleReadbackVersions(document, versions)
+			if len(pending) > 0 {
+				status = "pending_verification"
+				if len(readback) > 0 && readback[0] != nil && novelFetchScheduleReadbackDue(document, now) {
+					readback[0](ctx, owner, bookID, pending)
+					document, err = store.GetDocument(ctx, owner, bookID)
+					if err != nil {
+						return true, err
+					}
+					meta = document.Meta
+					if novelFetchStopped(firstText(meta["status"], meta["queueState"])) {
+						status = "stopped"
+					} else if len(novelFetchScheduleReadbackVersions(document, versions)) == 0 {
+						status = "upload_pending"
+					}
+				}
+			}
+			done := novelFetchVersionsSubmitted(document, versions)
+			if !done && status == "completed" {
+				switch submitted {
+				case "waiting_login", "waiting_configuration":
+					status = submitted
+				default:
+					status = "upload_pending"
+				}
+			} else if done && status == "upload_pending" {
+				status = "completed"
 			}
 		}
-		if status == "completed" && item["auto_submit"] == false && !novelFetchVersionsGenerated(ctx, store, owner, document, scheduleStringSlice(item["selected_versions"])) {
+		if status == "completed" && item["auto_submit"] == false && !novelFetchVersionsGenerated(ctx, store, owner, document, versions) {
 			status = "waiting_retry"
 		}
 		switch status {

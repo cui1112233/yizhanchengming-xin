@@ -2,10 +2,13 @@ package httpapi
 
 import (
 	"context"
-	"qiantie/backend/internal/novelfetchworkshop"
-	"qiantie/backend/internal/videomanagementconnector"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 func TestSubmitReadbackCannotConfirmAnOlderUpload(t *testing.T) {
@@ -79,4 +82,168 @@ func TestWorkshopSubmitDiagnosticExplainsNoAttemptAndLegacyHistory(t *testing.T)
 	if len(legacy["logs"].([]any)) != 1 {
 		t.Fatal("legacy history lost")
 	}
+}
+
+func TestWebSubmitConfirmedVersionWithUnchangedFingerprintIsNotUploaded(t *testing.T) {
+	store, usersDir, doc := newSubmissionEvidenceTask(t)
+	connector := &recordingSubmitConnector{}
+	result, err := executeWebSubmit(context.Background(), "tester", usersDir, store, webSubmitRequest{
+		TaskIDs: []string{doc.BookID}, Versions: []string{"ai1", "ai2"},
+	}, nil, connector)
+	if err != nil || result.Failed != 0 || len(result.Results) != 2 || connector.submitCalls != 1 || string(connector.lastInput.Content) != "第二版完整正文" {
+		t.Fatalf("only ai2 should upload: result=%+v calls=%d input=%+v error=%v", result, connector.submitCalls, connector.lastInput, err)
+	}
+	if row := mapOrEmpty(result.Results[0]); row["version"] != "ai1" || row["status"] != "skipped" || row["reason"] != "confirmed_result" {
+		t.Fatalf("confirmed ai1 was not skipped: %+v", row)
+	}
+}
+
+func TestWebSubmitUnknownSubmissionOnlyReadsBackEvenWhenForced(t *testing.T) {
+	for _, status := range []string{"pending_verification", "pending_confirmation"} {
+		t.Run(status, func(t *testing.T) {
+			ctx := context.Background()
+			store, usersDir, doc := newSubmissionEvidenceTask(t)
+			doc.Meta["siteSubmitStatus"] = status
+			doc.Meta["siteSubmitFailedVersions"] = []string{"ai1"}
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			connector := &configuredSubmitConnector{}
+			result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
+				TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, Force: true,
+			}, nil, connector)
+			if err != nil || result.Success != 1 || connector.submitCalls != 0 || connector.readbackCalls != 1 {
+				t.Fatalf("unknown submission must only be read back: result=%+v uploads=%d readbacks=%d error=%v", result, connector.submitCalls, connector.readbackCalls, err)
+			}
+		})
+	}
+}
+
+func TestWebSubmitForceAuditsOperationAndPriorReceipt(t *testing.T) {
+	ctx := context.Background()
+	store, usersDir, doc := newSubmissionEvidenceTask(t)
+	connector := &cloneSubmissionEvidenceSpy{}
+	result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
+		TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "force-operation", Force: true,
+	}, nil, connector)
+	if err != nil || result.Success != 1 || connector.submitCalls != 0 || connector.cloneSource != "first-ai1-receipt" || connector.content != "第一版完整正文" {
+		t.Fatalf("force did not create a second receipt: result=%+v connector=%+v error=%v", result, connector, err)
+	}
+	saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if priorWorkshopSubmitReceipt(saved, "ai1") != "cloned-ai1-receipt" {
+		t.Fatalf("second receipt not stored: %+v", saved.Logs)
+	}
+	diagnostic := workshopSubmitDiagnostic(saved)
+	for _, value := range arrayOrEmpty(diagnostic["logs"]) {
+		entry := mapOrEmpty(value)
+		if entry["operation_id"] == "force-operation" && entry["version"] == "ai1" && entry["force"] == true && entry["prior_receipt_id"] == "first-ai1-receipt" {
+			return
+		}
+	}
+	t.Fatalf("force audit lacks operation and prior receipt: %+v", diagnostic["logs"])
+}
+
+func TestWebSubmitDisabledSkipUsesExistingSubmitAndAuditsPriorReceipt(t *testing.T) {
+	ctx := context.Background()
+	store, usersDir, doc := newSubmissionEvidenceTask(t)
+	cfg, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mapOrEmpty(mapOrEmpty(cfg["appConfig"])["web_submit"])["skip_submitted"] = false
+	if err := store.PutConfig(ctx, "tester", cfg); err != nil {
+		t.Fatal(err)
+	}
+	connector := &cloneSubmissionEvidenceSpy{}
+	result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
+		TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "submit-again-operation",
+	}, nil, connector)
+	if err != nil || result.Success != 1 || connector.submitCalls != 1 || connector.cloneSource != "" {
+		t.Fatalf("skip setting was not respected: result=%+v connector=%+v error=%v", result, connector, err)
+	}
+	saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range saved.Logs {
+		entry := mapOrEmpty(raw)
+		if entry["operation_id"] == "submit-again-operation" && entry["prior_receipt_id"] == "first-ai1-receipt" && entry["skip_submitted"] == false {
+			return
+		}
+	}
+	t.Fatalf("disabled skip audit missing: %+v", saved.Logs)
+}
+
+func TestWebSubmitForceFailsWhenCloneIsUnavailable(t *testing.T) {
+	ctx := context.Background()
+	store, usersDir, doc := newSubmissionEvidenceTask(t)
+	connector := &recordingSubmitConnector{}
+	result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
+		TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, Force: true,
+	}, nil, connector)
+	if err != nil || result.Failed != 1 || result.Success != 0 || len(result.Results) != 1 || firstText(mapOrEmpty(result.Results[0])["error"]) == "" || connector.submitCalls != 0 {
+		t.Fatalf("unsupported forced resend was not blocked: result=%+v uploads=%d error=%v", result, connector.submitCalls, err)
+	}
+	saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+	if err != nil || priorWorkshopSubmitReceipt(saved, "ai1") != "first-ai1-receipt" || saved.Meta["siteSubmitStatus"] != "submitted" {
+		t.Fatalf("blocked forced resend lost old confirmation: %+v %v", saved, err)
+	}
+}
+
+type cloneSubmissionEvidenceSpy struct {
+	recordingSubmitConnector
+	cloneSource string
+	content     string
+}
+
+func (c *cloneSubmissionEvidenceSpy) CloneSubmission(_ context.Context, _ videomanagementconnector.Session, source string, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+	c.cloneSource, c.content = source, string(input.Content)
+	return videomanagementconnector.Submission{ID: "cloned-ai1-receipt", Status: "submitted"}, nil
+}
+
+func newSubmissionEvidenceTask(t *testing.T) (*novelfetchworkshop.MemoryStore, string, novelfetchworkshop.Document) {
+	t.Helper()
+	const owner = "tester"
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(ctx, owner, map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{
+		"enabled": true, "min_file_size": 0, "organization": "org-1",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Gender: "女频", Meta: map[string]any{
+		"status": "completed", "style": "现代悬疑", "platformId": "1", "siteSubmitStatus": "submitted",
+		"siteSubmitDoneVersions": []string{"ai1"}, "autoSubmitReady": true,
+	}, Logs: []any{
+		map[string]any{"event": "site_submit", "status": "submitted", "version": "ai1", "operation_id": "first-operation",
+			"remote_receipt": map[string]any{"verified": true, "submission_id": "first-ai1-receipt"}},
+	}}
+	if err := store.PutDocument(ctx, owner, doc); err != nil {
+		t.Fatal(err)
+	}
+	for version, content := range map[string]string{"ai1": "第一版完整正文", "ai2": "第二版完整正文"} {
+		if _, err := store.PutBody(ctx, owner, novelfetchworkshop.BodyRecord{BookID: doc.BookID, BodyRef: novelfetchworkshop.BodyRef{VersionID: version}, Content: content}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var err error
+	doc, err = store.GetDocument(ctx, owner, doc.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc.Meta["autoSubmitReadyFingerprint"] = novelFetchUploadReadyFingerprint(ctx, store, owner, doc, []string{"ai1", "ai2"})
+	if err := store.PutDocument(ctx, owner, doc); err != nil {
+		t.Fatal(err)
+	}
+	usersDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(usersDir, owner), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(usersDir, owner, "upload-target.json"), []byte(`{"cookie":"session=ok"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return store, usersDir, doc
 }
