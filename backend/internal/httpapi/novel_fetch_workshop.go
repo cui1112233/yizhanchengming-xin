@@ -383,7 +383,8 @@ func (worker workshopProcessWorker) process(parent context.Context, job novelfet
 		return context.Cause(ctx)
 	}
 	if leases != nil {
-		worker.store = workshopProcessLeaseStore{Store: worker.store, checkOwnership: checkOwnership}
+		ctx = context.WithValue(ctx, workshopProcessLeaseCheckKey{}, checkOwnership)
+		worker.store = workshopStoreForProcess(ctx, worker.store)
 	}
 	finish := func(job novelfetchworkshop.ProcessJob, action workshopQueueAction) error {
 		if err := context.Cause(ctx); err != nil {
@@ -2528,6 +2529,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	if queue != nil {
 		worker := &workshopProcessWorker{store: store, queue: queue, registry: registry, fetcher: fetcher, resolveGenderJudge: resolveGenderJudgeFor, resolveRewriteProvider: resolveRewriteProviderFor}
 		worker.autoSubmit = func(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
+			store := workshopStoreForProcess(ctx, store)
 			settings, err := store.GetConfig(ctx, job.Owner)
 			if err != nil {
 				return err

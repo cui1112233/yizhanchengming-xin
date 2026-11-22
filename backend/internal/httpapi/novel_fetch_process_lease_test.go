@@ -161,3 +161,36 @@ func TestWorkshopWorkerRechecksLeaseAfterPreparingUpload(t *testing.T) {
 		t.Fatalf("err=%v uploads=%d acks=%d fails=%d", err, uploads, q.acks, q.fails)
 	}
 }
+
+func TestWorkshopWorkerLeaseSwitchDuringClassificationPreservesNewBody(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	doc := readyIndependentUploadDocument("33333333")
+	delete(doc.Meta, "style")
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	q := &leaseProbeQueue{ProcessQueue: novelfetchworkshop.NewMemoryQueue(), owns: true}
+	const replacement = "新持有者保存的正文。"
+	calls := 0
+	worker := workshopProcessWorker{store: store, queue: q, registry: newWorkshopProcessRegistry(), leaseHeartbeat: time.Hour,
+		resolveRewriteProvider: func(context.Context, string) (novelfetchworkshop.RewriteProvider, error) {
+			return rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+				// Switch owners after the old worker read its input and before it gets the model response.
+				calls++
+				q.owns = false
+				newDoc := doc
+				newDoc.Original = replacement
+				newDoc.ProcessedText = replacement
+				if err := store.PutDocument(ctx, "tester", newDoc); err != nil {
+					return "", err
+				}
+				return `{"style":"历史","confidence":0.9,"reason":"参考情节"}`, nil
+			}), nil
+		}}
+	err := worker.process(ctx, novelfetchworkshop.ProcessJob{ID: "old", BatchID: "batch", Owner: "tester", LeaseToken: "old-token", BookIDs: []string{doc.BookID}})
+	saved, readErr := store.GetDocument(ctx, "tester", doc.BookID)
+	if readErr != nil || calls != 1 || saved.Original != replacement || saved.ProcessedText != replacement || !errors.Is(err, novelfetchworkshop.ErrProcessLeaseLost) || q.acks != 0 || q.fails != 0 {
+		t.Fatalf("classification handoff calls=%d saved=%q processed=%q err=%v ack=%d fail=%d", calls, saved.Original, saved.ProcessedText, err, q.acks, q.fails)
+	}
+}

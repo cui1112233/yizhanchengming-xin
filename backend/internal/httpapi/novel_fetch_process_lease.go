@@ -57,15 +57,39 @@ func startWorkshopProcessLease(parent context.Context, queue novelfetchworkshop.
 	return work, stop
 }
 
-// Some stores also save inline text in the document. Check cancellation at
-// both write entry points, even when the provider ignored its cancelled context.
+type workshopProcessLeaseCheckKey struct{}
+
+func checkWorkshopLease(ctx context.Context) error {
+	if err := context.Cause(ctx); err != nil {
+		return err
+	}
+	if check, ok := ctx.Value(workshopProcessLeaseCheckKey{}).(func() error); ok {
+		return check()
+	}
+	return nil
+}
+
+// Reuse the per-process ownership check inside the upload callback, which is
+// registered once and otherwise retains the original unguarded store.
+func workshopStoreForProcess(ctx context.Context, store novelfetchworkshop.Store) novelfetchworkshop.Store {
+	if _, guarded := store.(workshopProcessLeaseStore); guarded {
+		return store
+	}
+	if check, ok := ctx.Value(workshopProcessLeaseCheckKey{}).(func() error); ok {
+		return workshopProcessLeaseStore{Store: store, checkOwnership: check}
+	}
+	return store
+}
+
+// Documents can contain inline text as well as separate body references.
+// Both write paths verify ownership after any long-running provider call.
 type workshopProcessLeaseStore struct {
 	novelfetchworkshop.Store
 	checkOwnership func() error
 }
 
 func (s workshopProcessLeaseStore) PutBody(ctx context.Context, owner string, body novelfetchworkshop.BodyRecord) (novelfetchworkshop.BodyRef, error) {
-	if err := ctx.Err(); err != nil {
+	if err := context.Cause(ctx); err != nil {
 		return novelfetchworkshop.BodyRef{}, err
 	}
 	if err := s.checkOwnership(); err != nil {
@@ -76,6 +100,9 @@ func (s workshopProcessLeaseStore) PutBody(ctx context.Context, owner string, bo
 
 func (s workshopProcessLeaseStore) PutDocument(ctx context.Context, owner string, doc novelfetchworkshop.Document) error {
 	if err := context.Cause(ctx); err != nil {
+		return err
+	}
+	if err := s.checkOwnership(); err != nil {
 		return err
 	}
 	return s.Store.PutDocument(ctx, owner, doc)

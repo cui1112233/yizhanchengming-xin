@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -840,3 +841,46 @@ func TestWebSubmitUploadsBooksConcurrently(t *testing.T) {
 }
 
 func stringsReader(value string) *strings.Reader { return strings.NewReader(value) }
+
+type leaseSwitchSubmitConnector struct {
+	configuredSubmitConnector
+	queue *leaseProbeQueue
+}
+
+func (c *leaseSwitchSubmitConnector) Submit(context.Context, videomanagementconnector.Session, videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+	c.submitCalls++
+	c.queue.owns = false
+	return videomanagementconnector.Submission{}, errors.New("rejected submission")
+}
+
+func TestWebSubmitLeaseSwitchBlocksSecondUploadAttempt(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	dir := t.TempDir()
+	q := &leaseProbeQueue{ProcessQueue: novelfetchworkshop.NewMemoryQueue(), owns: true}
+	connector := &leaseSwitchSubmitConnector{queue: q}
+	doc := readyIndependentUploadDocument("12345678")
+	doc.Meta["platformId"] = "2"
+	doc.Versions["ai1"] = "她走进书店，与多年未见的朋友重逢。"
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PutBody(ctx, "tester", novelfetchworkshop.BodyRecord{BookID: doc.BookID, BodyRef: novelfetchworkshop.BodyRef{VersionID: "ai1", State: "ready"}, Content: doc.Versions["ai1"].(string)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutConfig(ctx, "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true, "min_file_size": 0, "organization": "org", "retry_times": 1}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveUploadTargetSession(dir, "tester", map[string]any{"cookie": "fixture", "targetUsername": "fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	worker := workshopProcessWorker{store: store, queue: q, registry: newWorkshopProcessRegistry(), leaseHeartbeat: time.Hour,
+		autoSubmit: func(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
+			_, err := executeWebSubmit(ctx, job.Owner, dir, store, webSubmitRequest{TaskIDs: job.BookIDs, Versions: job.SelectedVersions}, nil, connector)
+			return err
+		}}
+	err := worker.process(ctx, novelfetchworkshop.ProcessJob{ID: "job", Owner: "tester", BatchID: "batch", BookIDs: []string{doc.BookID}, LeaseToken: "old", SelectedVersions: []string{"ai1"}, AutoSubmit: true})
+	if connector.submitCalls != 1 || !errors.Is(err, novelfetchworkshop.ErrProcessLeaseLost) || q.acks != 0 || q.fails != 0 {
+		t.Fatalf("upload attempts=%d err=%v ack=%d fail=%d", connector.submitCalls, err, q.acks, q.fails)
+	}
+}

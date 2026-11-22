@@ -72,6 +72,7 @@ func submissionMatchesAttempt(receipt videomanagementconnector.Submission, expec
 func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfetchworkshop.Store, request webSubmitRequest, genderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), targets ...videomanagementconnector.Service) (webSubmitExecution, error) {
 	// 不再设置批次级总超时：单个外部请求由连接器的 120 秒超时兜底，
 	// 崩溃恢复由锁心跳与 manifest stale 判定负责。
+	store = workshopStoreForProcess(ctx, store)
 	if request.Queue == nil {
 		request.Queue, _ = ctx.Value(submitQueueKey{}).(novelfetchworkshop.ProcessQueue)
 	}
@@ -227,6 +228,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 				}
 				deferredStatus := ""
 				for _, version := range versions {
+					if err := checkWorkshopLease(ctx); err != nil {
+						finish(err)
+						return
+					}
 					if shouldStop() {
 						finish(nil)
 						return
@@ -455,6 +460,10 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 					var submission videomanagementconnector.Submission
 					var submitErr error
 					for attempt := 0; attempt <= retryTimes; attempt++ {
+						if err := checkWorkshopLease(ctx); err != nil {
+							finish(err)
+							return
+						}
 						submission, submitErr = targets[0].Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: uploadBookID, Filename: uploadBookID + ".txt", Content: []byte(content.Content), FormFields: fields})
 						if submitErr == nil {
 							break
@@ -462,6 +471,12 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						if !strings.Contains(strings.ToLower(submitErr.Error()), "rejected submission") {
 							break
 						}
+					}
+					// A completed HTTP call may already have reached the remote site.
+					// Leave its durable attempt available for readback by the next owner.
+					if err := checkWorkshopLease(ctx); err != nil {
+						finish(err)
+						return
 					}
 					if submitErr != nil {
 						if errors.Is(submitErr, videomanagementconnector.ErrSiteContractChanged) {
