@@ -9,13 +9,49 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-func novelFetchActiveGenerationQueueState(meta map[string]any) string {
-	status := strings.ToLower(firstText(meta["queueState"], meta["queue_state"]))
-	switch status {
-	case "queued", "running", "processing", "ai_processing", "waiting_retry":
-		return status
+type novelFetchGenerationDecision struct {
+	status    string
+	dispatch  bool
+	retryable bool
+}
+
+// Decide from current generation signals first. Only a completion candidate
+// needs a body lookup, and only an ordinary failure follows automatic retries.
+func novelFetchGenerationState(meta map[string]any) novelFetchGenerationDecision {
+	queue := strings.ToLower(firstText(meta["queueState"], meta["queue_state"]))
+	status := strings.ToLower(firstText(meta["status"], queue, meta["taskStatus"]))
+	if novelFetchStopped(status) || novelFetchStopped(queue) {
+		return novelFetchGenerationDecision{status: "stopped"}
 	}
-	return ""
+	if meta["manualOnly"] == true || meta["manual_only"] == true || meta["manualOriginalFetchRequired"] == true ||
+		meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) ||
+		strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "failed") {
+		return novelFetchGenerationDecision{status: "failed"}
+	}
+	if status == "failed" || queue == "failed" {
+		return novelFetchGenerationDecision{status: "failed", retryable: true}
+	}
+	for _, state := range []string{queue, status} {
+		switch state {
+		case "running", "processing", "ai_processing":
+			return novelFetchGenerationDecision{status: "running"}
+		case "queued", "waiting_retry", "waiting_classification", "waiting_sensitive_ai":
+			return novelFetchGenerationDecision{status: state}
+		}
+	}
+	switch status {
+	case "completed", "done", "success", "succeeded", "submitted", "upload_pending", "pending_upload", "pending_verification", "pending_confirmation":
+		return novelFetchGenerationDecision{status: "completed"}
+	}
+	return novelFetchGenerationDecision{status: status, dispatch: true}
+}
+
+func novelFetchScheduleGenerationDecision(ctx context.Context, store novelfetchworkshop.Store, owner string, doc novelfetchworkshop.Document, versions []string) novelFetchGenerationDecision {
+	decision := novelFetchGenerationState(doc.Meta)
+	if decision.status == "completed" && !novelFetchVersionsGenerated(ctx, store, owner, doc, versions) {
+		return novelFetchGenerationDecision{status: "waiting_retry", dispatch: true}
+	}
+	return decision
 }
 
 // A deferred fetch is retried by automation under a new process job. That job
@@ -94,22 +130,15 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 				pendingChanged = true
 			}
 		}
-		manualHold := meta["manualOnly"] == true || meta["manual_only"] == true || meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta)
+		retryableFailure := false
 		if item["auto_submit"] == false {
-			switch status {
-			case "completed", "submitted", "upload_pending", "pending_upload", "pending_verification", "pending_confirmation":
-				queueState := novelFetchActiveGenerationQueueState(meta)
-				switch {
-				case queueState != "":
-					status = queueState
-				case manualHold || strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "failed"):
-					status = "failed"
-				case novelFetchVersionsGenerated(ctx, store, owner, document, versions):
-					status = "completed"
-				default:
-					status = "waiting_retry"
-				}
+			decision := novelFetchScheduleGenerationDecision(ctx, store, owner, document, versions)
+			status, retryableFailure = decision.status, decision.retryable
+			if decision.dispatch && seenString(pendingBookIDs, bookID) {
+				status = "waiting_retry"
 			}
+		} else if status == "failed" {
+			retryableFailure = meta["manualOnly"] != true && meta["manual_only"] != true && meta["rewriteValidationHold"] != true && !novelFetchRetryScheduleHasManualHold(meta)
 		}
 		switch status {
 		case "processing", "ai_processing":
@@ -119,7 +148,7 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		case "input_ready", "":
 			status = "waiting_retry"
 		}
-		if status == "failed" && novelFetchAutomationEnabled(settings) && !manualHold {
+		if retryableFailure && novelFetchAutomationEnabled(settings) {
 			status = "waiting_retry"
 		}
 		states[status]++

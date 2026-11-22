@@ -1364,11 +1364,32 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			dispatchErr = errors.New("定时任务缺少唯一编号，无法安全派发")
 		}
 		if !recovering && dispatchErr == nil {
-			var allComplete bool
-			bookIDs, allComplete, dispatchErr = filterDueScheduleBooks(ctx, store, owner, item)
+			var books dueScheduleBooks
+			books, dispatchErr = filterDueScheduleBooks(ctx, store, owner, item)
+			bookIDs = books.eligible
+			if dispatchErr == nil && len(books.observed) > 0 {
+				item["book_ids"] = append(books.observed, bookIDs...)
+				item["retry_tracking"], item["partial_dispatch"] = true, true
+				if len(bookIDs) == 0 {
+					if _, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
+						return err
+					}
+				} else {
+					jobID, batchID = novelFetchScheduleDispatchIDs(owner, scheduleID, runAt)
+					item["job_id"], item["batch_id"] = jobID, firstText(item["batch_id"], batchID)
+					item["pending_book_ids"] = bookIDs
+					if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
+						return err
+					}
+					if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, settings, now, readback); err != nil {
+						return err
+					}
+				}
+				continue
+			}
 			if dispatchErr == nil && len(bookIDs) == 0 {
 				item["status"], item["error"] = "skipped_existing", "没有可派发任务，请查看每本书的跳过原因"
-				if allComplete {
+				if books.allComplete {
 					item["status"] = "completed"
 					delete(item, "error")
 				}

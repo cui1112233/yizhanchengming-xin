@@ -130,7 +130,7 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 			if len(versions) == 0 {
 				continue
 			}
-		} else if novelFetchVersionsGenerated(ctx, store, owner, doc, selected) {
+		} else if !novelFetchScheduleGenerationDecision(ctx, store, owner, doc, selected).dispatch {
 			continue
 		}
 		job := novelfetchworkshop.ProcessJob{
