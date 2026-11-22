@@ -554,15 +554,21 @@ func TestComicPageConfigStaleOnlyWhenSourceDigestChanges(t *testing.T) {
 
 func TestComicPageGenerateUsesPagePromptAndStoresCandidateOutsideAssets(t *testing.T) {
 	now := time.Unix(1700000000, 0)
-	var providerRequest struct {
+	type providerRequestPayload struct {
 		Model  string `json:"model"`
 		Prompt string `json:"prompt"`
 		Size   string `json:"size"`
 	}
+	providerRequests := make(chan providerRequestPayload, 1)
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&providerRequest); err != nil {
+		var request providerRequestPayload
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Errorf("decode provider request: %v", err)
 			return
+		}
+		select {
+		case providerRequests <- request:
+		default:
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"b64_json":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="}]}`))
@@ -617,13 +623,42 @@ func TestComicPageGenerateUsesPagePromptAndStoresCandidateOutsideAssets(t *testi
 		"provider": "doubao_local_executor",
 		"modelId":  "Seedream 4.5",
 	})
-	if generated.Code != http.StatusCreated {
+	if generated.Code != http.StatusCreated && generated.Code != http.StatusAccepted {
 		t.Fatalf("generate status=%d body=%s", generated.Code, generated.Body.String())
 	}
-	result := decodeBody[struct {
+	var result struct {
 		Page  batchfactoryv11.ComicPage      `json:"page"`
 		Image batchfactoryv11.ComicPageImage `json:"image"`
-	}](t, generated)
+	}
+	if generated.Code == http.StatusCreated {
+		result = decodeBody[struct {
+			Page  batchfactoryv11.ComicPage      `json:"page"`
+			Image batchfactoryv11.ComicPageImage `json:"image"`
+		}](t, generated)
+	} else {
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			pages, listErr := store.ListComicPages(context.Background(), "alice", batch.ID, book.ID)
+			if listErr != nil {
+				t.Fatal(listErr)
+			}
+			if len(pages) == 1 && len(pages[0].Images) == 1 {
+				result.Page = pages[0]
+				result.Image = pages[0].Images[0]
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		if result.Image.ID == "" {
+			t.Fatalf("asynchronous comic generation did not finish: %s", generated.Body.String())
+		}
+	}
+	var providerRequest providerRequestPayload
+	select {
+	case providerRequest = <-providerRequests:
+	case <-time.After(time.Second):
+		t.Fatal("provider request was not captured")
+	}
 	for _, part := range []string{"水墨漫画画风", "统一前缀", "阅读顺序", "三格竖版条漫，人物一致，第一页完整画面", "统一后缀"} {
 		if !strings.Contains(providerRequest.Prompt, part) {
 			t.Fatalf("provider prompt misses %q: %s", part, providerRequest.Prompt)

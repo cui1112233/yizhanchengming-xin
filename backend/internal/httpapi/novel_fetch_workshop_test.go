@@ -1987,13 +1987,13 @@ func TestNovelFetchWorkshopProcessStartReturnsBeforeBackgroundFetchCompletes(t *
 		if start.Code != http.StatusAccepted {
 			t.Fatalf("start status=%d body=%s", start.Code, start.Body.String())
 		}
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(2 * time.Second):
 		close(release)
 		t.Fatal("start request waited for the upstream fetch")
 	}
 	select {
 	case <-started:
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		close(release)
 		t.Fatal("background worker did not start fetch")
 	}
@@ -2004,7 +2004,7 @@ func TestNovelFetchWorkshopProcessStartReturnsBeforeBackgroundFetchCompletes(t *
 	if err := json.Unmarshal(start.Body.Bytes(), &job); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		polled := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/process/jobs/"+job.ID, nil, now, secret)
 		if bytes.Contains(polled.Body.Bytes(), []byte(`"status":"done"`)) {

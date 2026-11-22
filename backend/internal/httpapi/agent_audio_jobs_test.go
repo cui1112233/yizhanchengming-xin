@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -227,9 +228,9 @@ func TestAgentAudioCoordinatorRunsQueuedTTS(t *testing.T) {
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "audio-1", Type: "audio", Title: "旁白", Version: 1, Status: "draft"})
 	assets := agentworkspace.NewMemoryAssetStore()
 	objects := &memoryAudioObjects{contents: map[string][]byte{}}
-	called := 0
+	var called atomic.Int32
 	services := AgentAudioServices{Projects: store, Assets: assets, Objects: objects, QueueAudio: true, Now: func() time.Time { return now }, Generator: audioGeneratorFunc(func(_ context.Context, _ string, input agentworkspace.AudioGenerateInput) ([]agentworkspace.AudioOutput, error) {
-		called++
+		called.Add(1)
 		if input.Operation != agentworkspace.AudioSpeech || input.Prompt != "画布后台 TTS" {
 			t.Fatalf("input=%+v", input)
 		}
@@ -238,8 +239,8 @@ func TestAgentAudioCoordinatorRunsQueuedTTS(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterAgentAudioJobRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, services)
 	response := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/audio-generations", map[string]any{"nodeId": "audio-1", "nodeVersion": 1, "operation": "speech", "prompt": "画布后台 TTS", "modelId": "built-in-tts", "settings": map[string]any{}, "idempotencyKey": "queued-tts"})
-	if response.Code != http.StatusAccepted || called != 0 || !containsText(response.Body.String(), "queued") {
-		t.Fatalf("status=%d calls=%d body=%s", response.Code, called, response.Body.String())
+	if response.Code != http.StatusAccepted || called.Load() != 0 || !containsText(response.Body.String(), "queued") {
+		t.Fatalf("status=%d calls=%d body=%s", response.Code, called.Load(), response.Body.String())
 	}
 	coordinator := newAgentAudioCoordinator(services)
 	if err := coordinator.pollPendingOnce(context.Background()); err != nil {
@@ -248,12 +249,12 @@ func TestAgentAudioCoordinatorRunsQueuedTTS(t *testing.T) {
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
 		tasks, _ := store.ListGenerationTasks(context.Background(), "alice", "project-1")
-		if called == 1 && len(tasks) == 1 && tasks[0].State == agentworkspace.GenerationAwaitingConfirmation {
+		if called.Load() == 1 && len(tasks) == 1 && tasks[0].State == agentworkspace.GenerationAwaitingConfirmation {
 			return
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("audio task did not finish, calls=%d", called)
+	t.Fatalf("audio task did not finish, calls=%d", called.Load())
 }
 
 func TestAgentAudioTrimCreatesNewAssetWithoutChangingSource(t *testing.T) {
