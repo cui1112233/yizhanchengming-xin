@@ -10,48 +10,71 @@ import (
 )
 
 type novelFetchGenerationDecision struct {
-	status    string
-	dispatch  bool
-	retryable bool
+	status          string
+	dispatch        bool
+	retryable       bool
+	missingVersions []string
 }
 
-// Decide from current generation signals first. Only a completion candidate
-// needs a body lookup, and only an ordinary failure follows automatic retries.
-func novelFetchGenerationState(meta map[string]any) novelFetchGenerationDecision {
-	queue := strings.ToLower(firstText(meta["queueState"], meta["queue_state"]))
-	status := strings.ToLower(firstText(meta["status"], queue, meta["taskStatus"]))
-	if novelFetchStopped(status) || novelFetchStopped(queue) {
+// Normalize each current signal before applying the schedule's hold and retry
+// precedence. The general task status rule owns the persisted status aliases.
+func novelFetchGenerationSignal(raw string) string {
+	switch strings.ToLower(raw) {
+	case "ai_processing":
+		return novelfetchworkshop.TaskStatusProcessing
+	case "pending_upload", "pending_verification", "pending_confirmation", novelfetchworkshop.TaskStatusPendingSubmit:
+		return novelfetchworkshop.TaskStatusUploadPending
+	}
+	return novelfetchworkshop.DeriveTaskStatus(novelfetchworkshop.Document{Meta: map[string]any{"status": raw}})
+}
+
+func novelFetchScheduleGenerationDecision(ctx context.Context, store novelfetchworkshop.Store, owner string, doc novelfetchworkshop.Document, versions []string) novelFetchGenerationDecision {
+	meta := doc.Meta
+	queue := novelFetchGenerationSignal(firstText(meta["queueState"], meta["queue_state"]))
+	status := novelFetchGenerationSignal(firstText(meta["status"], meta["taskStatus"], meta["task_status"]))
+	if queue == novelfetchworkshop.TaskStatusStopped || status == novelfetchworkshop.TaskStatusStopped {
 		return novelFetchGenerationDecision{status: "stopped"}
 	}
 	if meta["manualOnly"] == true || meta["manual_only"] == true || meta["manualOriginalFetchRequired"] == true ||
 		meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) ||
-		strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "failed") {
+		novelFetchGenerationSignal(firstText(meta["aiStatus"], meta["ai_status"])) == novelfetchworkshop.TaskStatusFailed {
 		return novelFetchGenerationDecision{status: "failed"}
 	}
-	if status == "failed" || queue == "failed" {
+	if status == novelfetchworkshop.TaskStatusInputReady {
+		// Older documents can have just a queue marker or individual stage fields.
+		if queue != novelfetchworkshop.TaskStatusInputReady {
+			status = queue
+		} else {
+			status = novelfetchworkshop.DeriveTaskStatus(doc)
+		}
+	}
+	if status == novelfetchworkshop.TaskStatusFailed || queue == novelfetchworkshop.TaskStatusFailed {
 		return novelFetchGenerationDecision{status: "failed", retryable: true}
 	}
 	for _, state := range []string{queue, status} {
 		switch state {
-		case "running", "processing", "ai_processing":
+		case novelfetchworkshop.TaskStatusProcessing:
 			return novelFetchGenerationDecision{status: "running"}
-		case "queued", "waiting_retry", "waiting_classification", "waiting_sensitive_ai":
+		case novelfetchworkshop.TaskStatusQueued, novelfetchworkshop.TaskStatusWaitingRetry,
+			novelfetchworkshop.TaskStatusWaitingClassification, novelfetchworkshop.TaskStatusWaitingSensitiveAI,
+			novelfetchworkshop.TaskStatusWaitingConfig, novelfetchworkshop.TaskStatusWaitingLogin:
 			return novelFetchGenerationDecision{status: state}
 		}
 	}
 	switch status {
-	case "completed", "done", "success", "succeeded", "submitted", "upload_pending", "pending_upload", "pending_verification", "pending_confirmation":
+	case novelfetchworkshop.TaskStatusCompleted, novelfetchworkshop.TaskStatusPendingSubmit, novelfetchworkshop.TaskStatusUploadPending:
+		var missing []string
+		for _, version := range novelFetchRequiredVersions(versions) {
+			if !novelFetchVersionsGenerated(ctx, store, owner, doc, []string{version}) {
+				missing = append(missing, version)
+			}
+		}
+		if len(missing) > 0 {
+			return novelFetchGenerationDecision{status: "waiting_retry", dispatch: true, missingVersions: missing}
+		}
 		return novelFetchGenerationDecision{status: "completed"}
 	}
 	return novelFetchGenerationDecision{status: status, dispatch: true}
-}
-
-func novelFetchScheduleGenerationDecision(ctx context.Context, store novelfetchworkshop.Store, owner string, doc novelfetchworkshop.Document, versions []string) novelFetchGenerationDecision {
-	decision := novelFetchGenerationState(doc.Meta)
-	if decision.status == "completed" && !novelFetchVersionsGenerated(ctx, store, owner, doc, versions) {
-		return novelFetchGenerationDecision{status: "waiting_retry", dispatch: true}
-	}
-	return decision
 }
 
 // A deferred fetch is retried by automation under a new process job. That job
@@ -134,8 +157,12 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 		if item["auto_submit"] == false {
 			decision := novelFetchScheduleGenerationDecision(ctx, store, owner, document, versions)
 			status, retryableFailure = decision.status, decision.retryable
-			if decision.dispatch && seenString(pendingBookIDs, bookID) {
+			if decision.dispatch {
 				status = "waiting_retry"
+				if len(decision.missingVersions) > 0 && !seenString(pendingBookIDs, bookID) {
+					pendingBookIDs = append(pendingBookIDs, bookID)
+					pendingChanged = true
+				}
 			}
 		} else if status == "failed" {
 			retryableFailure = meta["manualOnly"] != true && meta["manual_only"] != true && meta["rewriteValidationHold"] != true && !novelFetchRetryScheduleHasManualHold(meta)
@@ -194,6 +221,9 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 	updated["updatedAt"] = now.UTC().Format(time.RFC3339Nano)
 	if pendingChanged {
 		updated["pending_book_ids"] = pendingBookIDs
+		if item["auto_submit"] == false && len(pendingBookIDs) > 0 {
+			updated["partial_dispatch"] = true
+		}
 	}
 	return true, saveNovelFetchScheduleItem(ctx, store, owner, updated)
 }

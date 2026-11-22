@@ -34,6 +34,13 @@ func novelFetchScheduleNeedsVersionDispatch(ctx context.Context, store novelfetc
 		if err != nil {
 			return false, err
 		}
+		if !job.AutoSubmit {
+			decision := novelFetchScheduleGenerationDecision(ctx, store, job.Owner, doc, job.SelectedVersions)
+			if !decision.dispatch || len(decision.missingVersions) > 0 {
+				return true, nil
+			}
+			continue
+		}
 		if len(novelFetchScheduleReadbackVersions(doc, job.SelectedVersions)) > 0 {
 			return true, nil
 		}
@@ -75,6 +82,23 @@ func novelFetchScheduleReadbackVersions(doc novelfetchworkshop.Document, version
 	return pending
 }
 
+// A missing-version job must carry the same processing options as a full dispatch.
+func applyNovelFetchScheduleProcessingOptions(job *novelfetchworkshop.ProcessJob, item, settings map[string]any) {
+	job.PlatformID = firstText(item["platform_id"], item["platformId"], "2")
+	job.TextModelID = firstText(item["text_model_id"], item["textModelId"])
+	job.MaxTxt = int(targetNumber(item["max_txt"]))
+	if job.MaxTxt <= 0 {
+		job.MaxTxt = int(targetNumber(item["maxTxt"]))
+	}
+	if job.MaxTxt <= 0 {
+		job.MaxTxt = 4000
+	}
+	job.SensitiveAIEnabled = novelFetchSensitiveAIEnabled(settings)
+	if explicit, ok := item["sensitive_ai_enabled"].(bool); ok {
+		job.SensitiveAIEnabled = explicit
+	}
+}
+
 // A per-book lock must not abandon unrelated books. Pending IDs remain on the
 // parent schedule until they are either independently queued or proven done.
 // Child jobs do not own the parent's status: reconciliation checks every book.
@@ -87,6 +111,22 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 	busy := 0
 	selected := scheduleStringSlice(item["selected_versions"])
 	autoSubmit := item["auto_submit"] != false
+	if !autoSubmit && (item["partial_dispatch"] != true || firstText(item["job_id"]) == "") {
+		// Older schedules could observe all their books without saving a parent
+		// job ID. Persist the normal identity before starting any child.
+		if firstText(item["job_id"]) == "" {
+			runAt, err := parseNovelFetchScheduleTime(firstText(item["run_at"], item["runAt"]))
+			if err != nil {
+				return err
+			}
+			jobID, batchID := novelFetchScheduleDispatchIDs(owner, firstText(item["id"]), runAt)
+			item["job_id"], item["batch_id"] = jobID, firstText(item["batch_id"], batchID)
+		}
+		item["partial_dispatch"] = true
+		if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
+			return err
+		}
+	}
 	runs, err := store.ListRuns(ctx, owner, "")
 	if err != nil {
 		return err
@@ -97,12 +137,27 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 			activeRuns[run.RunID] = true
 		}
 	}
+	template := novelfetchworkshop.ProcessJob{
+		Owner: owner, BatchID: firstText(item["batch_id"]), ScheduleID: firstText(item["id"]),
+		AutoSubmit: autoSubmit, RewriteMethods: scheduleStringMap(item["rewrite_methods"]),
+	}
+	if autoSubmit {
+		// Preserve the explicit options of the existing upload retry path.
+		template.PlatformID, template.TextModelID = firstText(item["platform_id"], "2"), firstText(item["text_model_id"])
+		template.SensitiveAIEnabled = item["sensitive_ai_enabled"] == true
+		template.MaxTxt = intValue(item["max_txt"])
+		if template.MaxTxt <= 0 {
+			template.MaxTxt = 4000
+		}
+	} else {
+		applyNovelFetchScheduleProcessingOptions(&template, item, settings)
+	}
 	for _, id := range scheduleStringSlice(item["pending_book_ids"]) {
 		doc, err := store.GetDocument(ctx, owner, id)
 		if err != nil {
 			return err
 		}
-		if novelFetchStopped(firstText(doc.Meta["status"], doc.Meta["queueState"])) || doc.Meta["manualOnly"] == true || doc.Meta["manual_only"] == true || doc.Meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(doc.Meta) {
+		if autoSubmit && (novelFetchStopped(firstText(doc.Meta["status"], doc.Meta["queueState"])) || doc.Meta["manualOnly"] == true || doc.Meta["manual_only"] == true || doc.Meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(doc.Meta)) {
 			continue
 		}
 		if cancellation, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
@@ -130,21 +185,21 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 			if len(versions) == 0 {
 				continue
 			}
-		} else if !novelFetchScheduleGenerationDecision(ctx, store, owner, doc, selected).dispatch {
-			continue
+		} else {
+			decision := novelFetchScheduleGenerationDecision(ctx, store, owner, doc, selected)
+			if !decision.dispatch {
+				if !workshopScheduleTerminal(decision.status) {
+					pending = append(pending, id)
+				}
+				continue
+			}
+			if len(decision.missingVersions) > 0 {
+				versions = decision.missingVersions
+			}
 		}
-		job := novelfetchworkshop.ProcessJob{
-			ID:         firstText(item["job_id"]) + "-book-" + id,
-			ScheduleID: firstText(item["id"]),
-			Owner:      owner, BatchID: firstText(item["batch_id"]), BookIDs: []string{id},
-			PlatformID: firstText(item["platform_id"], "2"), MaxTxt: intValue(item["max_txt"]),
-			SelectedVersions: versions, AutoSubmit: autoSubmit,
-			SensitiveAIEnabled: item["sensitive_ai_enabled"] == true,
-			RewriteMethods:     scheduleStringMap(item["rewrite_methods"]), TextModelID: firstText(item["text_model_id"]),
-		}
-		if job.MaxTxt <= 0 {
-			job.MaxTxt = 4000
-		}
+		job := template
+		job.ID = firstText(item["job_id"]) + "-book-" + id
+		job.BookIDs, job.SelectedVersions = []string{id}, versions
 		started := now.UTC().Format(time.RFC3339Nano)
 		if !activeRuns[job.ID] {
 			if err := store.PutRun(ctx, owner, novelfetchworkshop.RunRecord{RunID: job.ID, BookID: job.BatchID, Stage: "novel_fetch_process", Status: "queued", StartedAt: started, TextModelID: job.TextModelID, ModelID: "novel-fetch-workshop", ModelDisplayName: "定时任务逐书派发"}); err != nil {

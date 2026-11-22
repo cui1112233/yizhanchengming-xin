@@ -1284,6 +1284,11 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 				if err := dispatchNovelFetchSchedulePending(ctx, store, queue, owner, item, settings, now, readback); err != nil {
 					return err
 				}
+			} else if item["auto_submit"] == false {
+				// A paused queue can still observe work already running elsewhere.
+				if _, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
+					return err
+				}
 			}
 			continue
 		}
@@ -1347,14 +1352,6 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			continue
 		}
 
-		maxTxt := int(targetNumber(item["max_txt"]))
-		if maxTxt <= 0 {
-			maxTxt = int(targetNumber(item["maxTxt"]))
-		}
-		if maxTxt <= 0 {
-			maxTxt = 4000
-		}
-		platformID := firstText(item["platform_id"], item["platformId"], "2")
 		scheduleID := firstText(item["id"])
 		jobID := firstText(item["job_id"])
 		batchID := firstText(item["batch_id"])
@@ -1363,20 +1360,30 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 		if scheduleID == "" {
 			dispatchErr = errors.New("定时任务缺少唯一编号，无法安全派发")
 		}
-		if !recovering && dispatchErr == nil {
+		generateOnly := item["auto_submit"] == false
+		if recovering && dispatchErr == nil {
+			if jobID == "" || batchID == "" || firstText(item["dispatch_id"]) == "" || len(bookIDs) == 0 {
+				dispatchErr = errors.New("定时派发记录不完整，已停止自动恢复")
+			} else if generateOnly {
+				dispatchErr = ensureScheduleRecoveryDocuments(ctx, store, owner, item)
+			}
+		} else if !recovering {
+			newJobID, newBatchID := novelFetchScheduleDispatchIDs(owner, scheduleID, runAt)
+			jobID, batchID = newJobID, firstText(batchID, newBatchID)
+		}
+		if dispatchErr == nil && (!recovering || generateOnly) {
 			var books dueScheduleBooks
 			books, dispatchErr = filterDueScheduleBooks(ctx, store, owner, item)
 			bookIDs = books.eligible
 			if dispatchErr == nil && len(books.observed) > 0 {
 				item["book_ids"] = append(books.observed, bookIDs...)
 				item["retry_tracking"], item["partial_dispatch"] = true, true
+				item["job_id"], item["batch_id"] = jobID, batchID
 				if len(bookIDs) == 0 {
 					if _, err := reconcileNovelFetchScheduleRetry(ctx, store, owner, item, settings, now); err != nil {
 						return err
 					}
 				} else {
-					jobID, batchID = novelFetchScheduleDispatchIDs(owner, scheduleID, runAt)
-					item["job_id"], item["batch_id"] = jobID, firstText(item["batch_id"], batchID)
 					item["pending_book_ids"] = bookIDs
 					if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
 						return err
@@ -1399,13 +1406,13 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 				}
 				continue
 			}
-			newJobID, newBatchID := novelFetchScheduleDispatchIDs(owner, scheduleID, runAt)
-			jobID, batchID = newJobID, firstText(batchID, newBatchID)
+			item["book_ids"] = append([]string(nil), bookIDs...)
+		}
+		if !recovering && dispatchErr == nil {
 			item["status"] = "dispatching"
 			item["dispatch_id"] = "dispatch-" + strings.TrimPrefix(jobID, "go-schedule-")
 			item["job_id"] = jobID
 			item["batch_id"] = batchID
-			item["book_ids"] = append([]string(nil), bookIDs...)
 			item["dispatch_started_at"] = now.UTC().Format(time.RFC3339Nano)
 			item["updatedAt"] = now.UTC().Format(time.RFC3339Nano)
 			if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
@@ -1414,8 +1421,6 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 				}
 				return err
 			}
-		} else if dispatchErr == nil && (jobID == "" || batchID == "" || firstText(item["dispatch_id"]) == "" || len(bookIDs) == 0) {
-			dispatchErr = errors.New("定时派发记录不完整，已停止自动恢复")
 		}
 		reconciled := false
 		if dispatchErr == nil {
@@ -1432,6 +1437,10 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 						item["status"] = "queued"
 						reconciled = true
 					case "done", "completed", "succeeded":
+						if generateOnly {
+							// The current book check above still found generation work.
+							continue
+						}
 						item["status"] = "completed"
 						reconciled = true
 					case "upload_pending", "pending_verification", "pending_confirmation":
@@ -1456,27 +1465,20 @@ func dispatchDueNovelFetchSchedules(ctx context.Context, store novelfetchworksho
 			}
 			continue
 		}
-		sensitiveAIEnabled := novelFetchSensitiveAIEnabled(settings)
-		if raw, exists := item["sensitive_ai_enabled"]; exists {
-			if explicit, valid := raw.(bool); valid {
-				sensitiveAIEnabled = explicit
-			}
-		}
 		job := novelfetchworkshop.ProcessJob{
-			ID: jobID, Owner: owner, BatchID: batchID, ScheduleID: scheduleID, BookIDs: bookIDs, PlatformID: platformID, MaxTxt: maxTxt,
-			SensitiveAIEnabled: sensitiveAIEnabled,
-			AutoSubmit:         item["auto_submit"] != false,
-			SelectedVersions:   scheduleStringSlice(item["selected_versions"]),
-			RewriteMethods:     scheduleStringMap(item["rewrite_methods"]),
-			TextModelID:        firstText(item["text_model_id"], item["textModelId"]),
+			ID: jobID, Owner: owner, BatchID: batchID, ScheduleID: scheduleID, BookIDs: bookIDs,
+			AutoSubmit:       item["auto_submit"] != false,
+			SelectedVersions: scheduleStringSlice(item["selected_versions"]),
+			RewriteMethods:   scheduleStringMap(item["rewrite_methods"]),
 		}
+		applyNovelFetchScheduleProcessingOptions(&job, item, settings)
 		if dispatchErr == nil && len(bookIDs) == 0 {
 			dispatchErr = errors.New("定时任务没有有效书籍")
 		}
-		if dispatchErr == nil && recovering {
+		if dispatchErr == nil && recovering && !generateOnly {
 			dispatchErr = ensureScheduleRecoveryDocuments(ctx, store, owner, item)
 		}
-		if dispatchErr == nil && job.AutoSubmit {
+		if dispatchErr == nil {
 			var split bool
 			split, dispatchErr = novelFetchScheduleNeedsVersionDispatch(ctx, store, job)
 			if dispatchErr == nil && split {
@@ -1647,7 +1649,7 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 }
 
 // workshopProcessParsedResult 复用已解析的书单，避免 /process/start 先解析一次、
-// 再在保存阶段重复解析和查库。已有任务是否跳过与定时任务使用同一套判定：
+// 再在保存阶段重复解析和查库。手工导入沿用已有任务的跳过规则：
 // 只有正在执行、需要人工处理或所选版本已全部完成时才跳过，终态任务可以重新处理。
 func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.Store, owner string, documents []novelfetchworkshop.Document, parsed, emptyIDs, duplicates int, platformID, batchID string, metadata workshopInputMetadata, selectedVersions ...[]string) (map[string]any, []string, []string, error) {
 	settings, _ := store.GetConfig(ctx, owner)
@@ -1659,7 +1661,7 @@ func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.S
 	if len(selectedVersions) > 0 && len(selectedVersions[0]) > 0 {
 		versions = cleanStrings(selectedVersions[0])
 	}
-	skipItem := map[string]any{"id": "", "selected_versions": versions, "auto_submit": novelFetchAutomationEnabled(settings)}
+	autoSubmit := novelFetchAutomationEnabled(settings)
 	processBookIDs := make([]string, 0, len(documents))
 	skippedBookIDs := make([]string, 0)
 	alreadyExists := 0
@@ -1672,7 +1674,7 @@ func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.S
 			}
 			existing.Meta["lastImportedBatchId"] = batchID
 			existing.Meta["lastImportedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
-			if reason := scheduleBookSkipReason(ctx, store, owner, existing, skipItem); reason != "" {
+			if reason := workshopBookSkipReason(ctx, store, owner, existing, "", versions, autoSubmit); reason != "" {
 				skippedBookIDs = append(skippedBookIDs, document.BookID)
 				if err := store.PutDocument(ctx, owner, existing); err != nil {
 					return nil, nil, nil, err

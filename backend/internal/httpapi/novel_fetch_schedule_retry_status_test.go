@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -202,9 +205,18 @@ func TestGenerateOnlyScheduleFirstDispatchAndRetryAgree(t *testing.T) {
 		{"failed rewrite with old prose", "upload_pending", "", "failed", "", "failed"},
 		{"cancelled queue after old completion", "completed", "cancelled", "done", "", "stopped"},
 		{"failed queue with active status", "running", "failed", "done", "", "waiting_retry"},
+		{"legacy pending queue", "completed", "pending", "done", "", "queued"},
+		{"legacy retry queue", "upload_pending", "retrying", "done", "", "waiting_retry"},
+		{"legacy ai service wait", "waiting_ai_service", "", "", "", "waiting_sensitive_ai"},
+		{"login wait", "waiting_login", "", "", "", "waiting_login"},
+		{"configuration wait", "waiting_configuration", "", "", "", "waiting_configuration"},
+		{"legacy pending submit", "pending_submit", "", "", "", "completed"},
+		{"legacy uploaded", "uploaded", "", "", "", "completed"},
+		{"legacy restored", "restored", "", "", "", "completed"},
+		{"legacy complete", "complete", "", "", "", "completed"},
 		{"completed selected versions", "upload_pending", "", "done", "", "completed"},
 	} {
-		for _, entry := range []string{"first dispatch", "interrupted preparation", "retry", "pending retry"} {
+		for _, entry := range []string{"first dispatch", "interrupted preparation", "dispatch recovery", "recovery with completed run", "retry", "pending retry"} {
 			t.Run(scenario.name+"/"+entry, func(t *testing.T) {
 				ctx := context.Background()
 				now := time.Now()
@@ -216,7 +228,10 @@ func TestGenerateOnlyScheduleFirstDispatchAndRetryAgree(t *testing.T) {
 				if scenario.hold != "" {
 					doc.Meta[scenario.hold] = true
 				}
-				item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+				// Persist the dispatch checkpoint first. Recovery must see the later book change.
+				initial := doc
+				initial.Meta = map[string]any{"scheduleId": "evidence-schedule", "scheduledHold": true, "status": "scheduled_waiting"}
+				item := saveSubmissionEvidenceSchedule(t, store, initial, false)
 				if entry != "pending retry" {
 					item["pending_book_ids"] = nil
 				}
@@ -225,9 +240,22 @@ func TestGenerateOnlyScheduleFirstDispatchAndRetryAgree(t *testing.T) {
 					item["input_text"] = doc.BookID + " 测试"
 					item["run_at"] = now.Add(-time.Minute).Format(time.RFC3339Nano)
 				}
+				if entry == "dispatch recovery" || entry == "recovery with completed run" {
+					item["status"], item["tasks_prepared"], item["retry_tracking"] = "dispatching", true, false
+					item["updatedAt"], item["run_at"] = now.Add(-time.Hour).Format(time.RFC3339Nano), now.Add(-2*time.Hour).Format(time.RFC3339Nano)
+					item["dispatch_id"], item["input_text"] = "checkpoint", doc.BookID
+					if entry == "recovery with completed run" {
+						if err := store.PutRun(ctx, "tester", novelfetchworkshop.RunRecord{RunID: "evidence-job", BookID: "evidence-batch", Stage: "novel_fetch_process", ModelID: "novel-fetch-workshop", Status: "completed"}); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
 				if err := store.PutConfig(ctx, "tester", map[string]any{
 					"novel_fetch_schedules": []any{item}, novelFetchAutomationConfigKey: map[string]any{"enabled": true},
 				}); err != nil {
+					t.Fatal(err)
+				}
+				if err := store.PutDocument(ctx, "tester", doc); err != nil {
 					t.Fatal(err)
 				}
 				if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
@@ -359,5 +387,214 @@ func TestDeferredScheduleMergeDoesNotOverwriteConcurrentCompletion(t *testing.T)
 	settings, _ := store.GetConfig(ctx, "alice")
 	if row := mapOrEmpty(arrayOrEmpty(settings["novel_fetch_schedules"])[0]); row["status"] != "completed" {
 		t.Fatalf("completion was overwritten: %#v", row)
+	}
+}
+
+func TestGenerateOnlyScheduleQueuesOnlyMissingVersionAfterActiveBook(t *testing.T) {
+	for _, entry := range []string{"pending retry", "legacy retry without pending ids", "first dispatch observing active book"} {
+		t.Run(entry, func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now().UTC()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := novelfetchworkshop.NewMemoryQueue()
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"scheduleId": "evidence-schedule"}}
+			item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+			if entry != "pending retry" {
+				item["pending_book_ids"] = nil
+			}
+			if entry == "legacy retry without pending ids" {
+				// Older schedules observing an entire batch never saved the parent job ID.
+				delete(item, "job_id")
+				item["run_at"] = now.Add(-time.Hour).Format(time.RFC3339Nano)
+			}
+			if entry == "first dispatch observing active book" {
+				delete(item, "job_id")
+				item["status"], item["retry_tracking"], item["tasks_prepared"] = "scheduled", false, true
+				item["run_at"] = now.Add(-time.Hour).Format(time.RFC3339Nano)
+			}
+			if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}}); err != nil {
+				t.Fatal(err)
+			}
+			occupied := novelfetchworkshop.ProcessJob{ID: "other-job", BatchID: "other-batch", Owner: "tester", PlatformID: "2", BookIDs: []string{doc.BookID}, SelectedVersions: []string{"ai1"}}
+			if ok, _, err := queue.EnqueueUniqueBooks(ctx, occupied, time.Hour); err != nil || !ok {
+				t.Fatalf("occupy book: %v", err)
+			}
+			active, err := queue.Claim(ctx, time.Millisecond)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := updateWorkshopTaskRuntimeState(ctx, store, "tester", doc.BookID, "processing", ""); err != nil {
+				t.Fatal(err)
+			}
+			tick := func() map[string]any {
+				t.Helper()
+				now = now.Add(time.Second)
+				if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+					t.Fatal(err)
+				}
+				return storedSubmissionEvidenceSchedule(t, store)
+			}
+			row := tick()
+			if row["status"] != "running" || row["retry_tracking"] != true {
+				t.Fatalf("active job lost tracking: %+v", row)
+			}
+			if entry == "pending retry" && !slices.Contains(scheduleStringSlice(row["pending_book_ids"]), doc.BookID) {
+				t.Errorf("active book removed from pending list")
+			}
+			if _, err := queue.Claim(ctx, time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("unexpected job during active work: %v", err)
+			}
+			saveBody := func(version, body string) {
+				t.Helper()
+				doc, err := store.GetDocument(ctx, "tester", doc.BookID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if doc.Versions == nil {
+					doc.Versions = map[string]any{}
+				}
+				doc.Versions[version] = body
+				if err := store.PutDocument(ctx, "tester", doc); err != nil {
+					t.Fatal(err)
+				}
+				if err := updateWorkshopTaskRuntimeState(ctx, store, "tester", doc.BookID, "completed", ""); err != nil {
+					t.Fatal(err)
+				}
+			}
+			saveBody("ai1", "第一版")
+			if err := queue.Ack(ctx, active); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 3; i++ {
+				tick()
+			}
+			missing, err := queue.Claim(ctx, time.Millisecond)
+			if err != nil || !slices.Equal(missing.BookIDs, []string{doc.BookID}) || !slices.Equal(missing.SelectedVersions, []string{"ai2"}) || missing.AutoSubmit {
+				t.Fatalf("expected only ai2 after other job finished: job=%+v err=%v", missing, err)
+			}
+			row = storedSubmissionEvidenceSchedule(t, store)
+			if firstText(row["job_id"]) == "" || !slices.Equal(scheduleStringSlice(row["selected_versions"]), []string{"ai1", "ai2"}) {
+				t.Fatalf("lost schedule identity or original selection: %+v", row)
+			}
+			saveBody("ai2", "第二版")
+			if err := queue.Ack(ctx, missing); err != nil {
+				t.Fatal(err)
+			}
+			if row := tick(); row["status"] != "completed" || row["retry_tracking"] == true {
+				t.Fatalf("parent did not finish with both versions: %+v", row)
+			}
+			if _, err := queue.Claim(ctx, time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("unexpected duplicate after completion: %v", err)
+			}
+		})
+	}
+}
+
+func TestManualProcessStartImportsFailedBookWithMissingBodyAndAutomationOff(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	if err := store.PutConfig(ctx, "tester", map[string]any{novelFetchAutomationConfigKey: map[string]any{"enabled": false}}); err != nil {
+		t.Fatal(err)
+	}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"status": "failed"}, Versions: map[string]any{"ai1": "第一版"}}
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: "manual-import", Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+		"input_text": doc.BookID + " 测试", "selected_versions": []string{"ai1", "ai2"},
+	}, now, "manual-import")
+	if response.Code != http.StatusAccepted || len(queue.jobs) != 1 || !slices.Equal(queue.jobs[0].BookIDs, []string{doc.BookID}) {
+		t.Fatalf("manual import got HTTP %d and %d jobs, want 202 and the failed book queued", response.Code, len(queue.jobs))
+	}
+}
+func TestGenerateOnlyScheduleQueuesMissingBodyFromCompletedBook(t *testing.T) {
+	for _, entry := range []string{"first dispatch", "dispatch recovery", "recovery with completed run"} {
+		t.Run(entry, func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now().UTC()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &uniqueRecordingNovelFetchQueue{}
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"scheduleId": "evidence-schedule", "status": "completed"}, Versions: map[string]any{"ai1": "第一版"}}
+			item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+			item["maxTxt"], item["textModelId"], item["platformId"] = 2500, "saved-model", "7"
+			item["status"], item["tasks_prepared"], item["retry_tracking"], item["pending_book_ids"] = "scheduled", true, false, nil
+			item["run_at"] = now.Add(-2 * time.Hour).Format(time.RFC3339Nano)
+			if entry != "first dispatch" {
+				item["status"], item["dispatch_id"], item["updatedAt"] = "dispatching", "checkpoint", now.Add(-time.Hour).Format(time.RFC3339Nano)
+				if entry == "recovery with completed run" {
+					if err := store.PutRun(ctx, "tester", novelfetchworkshop.RunRecord{RunID: "evidence-job", BookID: "evidence-batch", Stage: "novel_fetch_process", ModelID: "novel-fetch-workshop", Status: "completed"}); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}}); err != nil {
+				t.Fatal(err)
+			}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+				t.Fatal(err)
+			}
+			if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "queued" || len(queue.jobs) != 1 || !slices.Equal(queue.jobs[0].SelectedVersions, []string{"ai2"}) {
+				t.Fatalf("completion with missing ai2: status=%v jobs=%+v", row["status"], queue.jobs)
+			}
+			if job := queue.jobs[0]; job.MaxTxt != 2500 || job.TextModelID != "saved-model" || job.PlatformID != "7" || !job.SensitiveAIEnabled {
+				t.Fatalf("narrowing to ai2 lost the saved processing options: %+v", job)
+			}
+		})
+	}
+}
+func TestGenerateOnlyScheduleRecoveryHonorsHoldInLegacyBatch(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"currentBatchId": "evidence-batch", "rewriteValidationHold": true}}
+	item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+	item["status"], item["tasks_prepared"], item["retry_tracking"], item["pending_book_ids"] = "dispatching", true, false, nil
+	item["run_at"], item["dispatch_id"], item["updatedAt"] = now.Add(-2*time.Hour).Format(time.RFC3339Nano), "checkpoint", now.Add(-time.Hour).Format(time.RFC3339Nano)
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "failed" || len(queue.jobs) != 0 || !slices.Contains(scheduleStringSlice(row["book_ids"]), doc.BookID) {
+		t.Fatalf("legacy batch lost its held book: row=%+v jobs=%+v", row, queue.jobs)
+	}
+}
+func TestGenerateOnlyScheduleSettlesActiveBookWhileQueuePaused(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"status": "processing"}}
+	item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+	item["status"] = "running"
+	if err := store.PutConfig(ctx, "tester", map[string]any{
+		"novel_fetch_schedules": []any{item}, novelFetchAutomationConfigKey: map[string]any{"enabled": false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	doc.Meta["status"] = "completed"
+	doc.Versions = map[string]any{"ai1": "第一版"}
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "waiting_retry" || len(queue.jobs) != 0 || !slices.Contains(scheduleStringSlice(row["pending_book_ids"]), doc.BookID) {
+		t.Fatalf("paused schedule must retain missing work without dispatch: row=%+v jobs=%+v", row, queue.jobs)
+	}
+	doc.Versions["ai2"] = "第二版"
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "completed" || len(queue.jobs) != 0 || len(scheduleStringSlice(row["pending_book_ids"])) != 0 {
+		t.Fatalf("paused queue masked completed work: row=%+v jobs=%+v", row, queue.jobs)
 	}
 }
