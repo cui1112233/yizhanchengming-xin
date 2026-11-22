@@ -202,6 +202,16 @@ func TestN8ComicPublishRouteUsesCollectionMainImagesAndServerNamingRule(t *testi
 		t.Fatalf("repeat publish called N8 %d times", client.calls)
 	}
 
+	forced := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, map[string]any{
+		"producerAdminName": "崔家铭", "audioCategoryId": 3, "audioId": 77, "workIds": []int64{2001, 2002}, "force": true,
+	})
+	if forced.Code != http.StatusOK {
+		t.Fatalf("forced publish status=%d body=%s", forced.Code, forced.Body.String())
+	}
+	if client.calls != 2 {
+		t.Fatalf("forced publish called N8 %d times, want 2 total", client.calls)
+	}
+
 	readback := signedJSONRequest(t, api, now, "alice", http.MethodGet, path, nil)
 	if readback.Code != http.StatusOK {
 		t.Fatalf("readback status=%d body=%s", readback.Code, readback.Body.String())

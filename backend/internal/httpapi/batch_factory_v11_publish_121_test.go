@@ -29,7 +29,11 @@ type recording121Connector struct {
 	loginInputs    []videomanagementconnector.LoginInput
 	loginSession   videomanagementconnector.Session
 	submissions    []videomanagementconnector.SubmissionInput
+	cloneInputs    []videomanagementconnector.SubmissionInput
+	cloneSources   []string
+	cloneID        string
 	readbacks      int
+	readbackIDs    []string
 	readbackErr    error
 	readbackRaw    map[string]any
 }
@@ -63,7 +67,18 @@ func (c *recording121Connector) Submit(_ context.Context, _ videomanagementconne
 	return videomanagementconnector.Submission{ID: "submission-1", Status: "uploaded", ReadbackRaw: map[string]any{"accepted": true}}, nil
 }
 
+func (c *recording121Connector) CloneSubmission(_ context.Context, _ videomanagementconnector.Session, sourceRecordID string, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+	c.cloneSources = append(c.cloneSources, sourceRecordID)
+	c.cloneInputs = append(c.cloneInputs, input)
+	id := c.cloneID
+	if id == "" {
+		id = "submission-2"
+	}
+	return videomanagementconnector.Submission{ID: id, Status: "submitted", ReadbackRaw: map[string]any{"success": true, "id": id}}, nil
+}
+
 func (c *recording121Connector) GetSubmission(_ context.Context, _ videomanagementconnector.Session, _ string) (videomanagementconnector.Submission, error) {
+	index := c.readbacks
 	c.readbacks++
 	if c.readbackErr != nil {
 		return videomanagementconnector.Submission{}, c.readbackErr
@@ -72,7 +87,11 @@ func (c *recording121Connector) GetSubmission(_ context.Context, _ videomanageme
 	if raw == nil {
 		raw = map[string]any{"confirmed": true}
 	}
-	return videomanagementconnector.Submission{ID: "submission-1", Status: "uploaded", ReadbackRaw: raw}, nil
+	id := "submission-1"
+	if index < len(c.readbackIDs) && strings.TrimSpace(c.readbackIDs[index]) != "" {
+		id = c.readbackIDs[index]
+	}
+	return videomanagementconnector.Submission{ID: id, Status: "uploaded", ReadbackRaw: raw}, nil
 }
 
 func TestPublishOrganizationUsesNestedBatchPublishSettings(t *testing.T) {
@@ -362,6 +381,68 @@ func TestPublish121IdempotentUploaded(t *testing.T) {
 	}
 	if len(connector.uploadNames) != 0 || len(connector.submissions) != 0 || connector.readbacks != 0 {
 		t.Fatalf("uploads/submissions/readbacks = %d/%d/%d, want no remote calls", len(connector.uploadNames), len(connector.submissions), connector.readbacks)
+	}
+}
+
+func TestPublish121ForceUsesCloneAndRequiresNewRemoteRecord(t *testing.T) {
+	publisher, connector, store, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	metadata := clonePublishMetadata(book.SourceMetadata)
+	metadata["websiteSubmitStatus"] = "uploaded"
+	if _, err := store.UpdateBookMetadata(context.Background(), "alice", batch.ID, book.ID, batchfactoryv11.UpdateBookMetadataInput{
+		Metadata:         metadata,
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	connector.cloneID = "296900"
+	connector.readbackIDs = []string{"296749", "296900"}
+	connector.readbackRaw = map[string]any{"bookid": book.BookID}
+
+	result, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1", "force": true})
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if len(connector.submissions) != 0 || len(connector.cloneInputs) != 1 {
+		t.Fatalf("normal/clone submissions = %d/%d, want 0/1", len(connector.submissions), len(connector.cloneInputs))
+	}
+	if len(connector.cloneSources) != 1 || connector.cloneSources[0] != "296749" {
+		t.Fatalf("clone sources = %#v, want [296749]", connector.cloneSources)
+	}
+	if connector.readbacks != 2 {
+		t.Fatalf("readbacks = %d, want baseline + confirmation", connector.readbacks)
+	}
+	if got := result["remoteRecordId"]; got != "296900" {
+		t.Fatalf("remoteRecordId = %#v, want 296900", got)
+	}
+}
+
+func TestPublish121ReuploadAliasDoesNotAcceptOldRemoteRecord(t *testing.T) {
+	publisher, connector, store, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	metadata := clonePublishMetadata(book.SourceMetadata)
+	metadata["websiteSubmitStatus"] = "uploaded"
+	if _, err := store.UpdateBookMetadata(context.Background(), "alice", batch.ID, book.ID, batchfactoryv11.UpdateBookMetadataInput{
+		Metadata:         metadata,
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	connector.cloneID = "296900"
+	connector.readbackIDs = []string{"296749", "296749"}
+	connector.readbackRaw = map[string]any{"bookid": book.BookID}
+
+	_, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1", "reupload": true})
+	if !errors.Is(err, errPublishUnconfirmed) {
+		t.Fatalf("Submit() error = %v, want errPublishUnconfirmed", err)
+	}
+	if len(connector.cloneInputs) != 1 {
+		t.Fatalf("clone submissions = %d, want 1", len(connector.cloneInputs))
+	}
+	updated, getErr := store.GetBatch(context.Background(), "alice", batch.ID)
+	if getErr != nil {
+		t.Fatal(getErr)
+	}
+	if got := updated.Books[0].SourceMetadata["websiteSubmitStatus"]; got == "uploaded" {
+		t.Fatalf("websiteSubmitStatus = %#v, must not confirm the old record", got)
 	}
 }
 

@@ -536,6 +536,7 @@ type n8ComicPublishInput struct {
 	AudioCategoryID   int64   `json:"audioCategoryId"`
 	AudioID           int64   `json:"audioId"`
 	WorkIDs           []int64 `json:"workIds"`
+	Force             bool    `json:"force"`
 }
 
 func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8ComicPublisher) {
@@ -978,7 +979,7 @@ func (p *BatchFactoryN8ComicPublisher) Publish(ctx context.Context, owner, batch
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if saved, ok := p.savedRecord(ctx, owner, batchID, collectionID); ok {
+	if saved, ok := p.savedRecord(ctx, owner, batchID, collectionID); ok && !input.Force {
 		return saved, nil
 	}
 	input.ProducerAdminName = strings.TrimSpace(input.ProducerAdminName)

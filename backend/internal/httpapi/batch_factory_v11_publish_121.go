@@ -34,6 +34,13 @@ type BatchFactory121Publisher struct {
 	CredentialSecret string
 }
 
+// cloneSubmissionService is intentionally separate from the normal connector
+// contract. Only an explicit manual "upload again" may create a second remote
+// record; automatic retries continue to use the idempotent normal submission.
+type cloneSubmissionService interface {
+	CloneSubmission(context.Context, videomanagementconnector.Session, string, videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error)
+}
+
 func (p *BatchFactory121Publisher) refreshTargetSession(ctx context.Context, owner string) (videomanagementconnector.Session, error) {
 	secret := strings.TrimSpace(p.CredentialSecret)
 	if secret == "" {
@@ -208,7 +215,8 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	metadata := book.SourceMetadata
 	// 发布幂等三态：uploaded 直接短路；upload_pending_confirm 先回读，确认成功
 	// 补写 uploaded，确认不存在才带已持久化的视频 heads 重新提交正文。
-	force := input["force"] == true || strings.EqualFold(toString(input["force"]), "true")
+	force := input["force"] == true || strings.EqualFold(toString(input["force"]), "true") ||
+		input["reupload"] == true || strings.EqualFold(toString(input["reupload"]), "true")
 	submitStatus := strings.TrimSpace(toString(metadata["websiteSubmitStatus"]))
 	if submitStatus == "uploaded" && !force {
 		return map[string]any{"status": "uploaded", "bookId": book.BookID, "internalBookId": book.ID, "skipped": true}, nil
@@ -245,6 +253,16 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 			for _, item := range raw {
 				pendingHeads = append(pendingHeads, fmt.Sprint(item))
 			}
+		}
+	}
+	var cloneSource videomanagementconnector.Submission
+	if force {
+		cloneSource, err = p.Connector.GetSubmission(ctx, targetSession, book.BookID)
+		if err != nil && !errors.Is(err, videomanagementconnector.ErrSubmissionNotFound) {
+			return nil, fmt.Errorf("再次上传前查询旧记录失败：%w", err)
+		}
+		if errors.Is(err, videomanagementconnector.ErrSubmissionNotFound) {
+			cloneSource = videomanagementconnector.Submission{}
 		}
 	}
 	fields, err := buildPublishFields(batch, book, input)
@@ -359,14 +377,32 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if _, ok := fields["jieya_ai_head_horizontal_flip"]; !ok {
 		fields["jieya_ai_head_horizontal_flip"] = "0"
 	}
-	submission, err := p.Connector.Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields})
+	submissionInput := videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields}
+	var submission videomanagementconnector.Submission
+	if force && strings.TrimSpace(cloneSource.ID) != "" {
+		cloner, ok := p.Connector.(cloneSubmissionService)
+		if !ok {
+			return nil, fmt.Errorf("视频管理系统 Go 连接器不支持再次上传")
+		}
+		submission, err = cloner.CloneSubmission(ctx, targetSession, cloneSource.ID, submissionInput)
+	} else {
+		submission, err = p.Connector.Submit(ctx, targetSession, submissionInput)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("视频管理系统上传失败：%w", err)
+	}
+	if force && strings.TrimSpace(cloneSource.ID) != "" && strings.TrimSpace(submission.ID) == strings.TrimSpace(cloneSource.ID) {
+		return nil, fmt.Errorf("%w：再次上传没有产生新记录", errPublishUnconfirmed)
 	}
 	remote := mapOrEmpty(submission.ReadbackRaw)
 	confirmed, err := p.Connector.GetSubmission(ctx, targetSession, book.BookID)
 	if err != nil {
 		return nil, fmt.Errorf("%w：%v", errPublishUnconfirmed, err)
+	}
+	if force && strings.TrimSpace(cloneSource.ID) != "" {
+		if strings.TrimSpace(confirmed.ID) == "" || strings.TrimSpace(confirmed.ID) != strings.TrimSpace(submission.ID) {
+			return nil, fmt.Errorf("%w：再次上传后仍只查到旧记录", errPublishUnconfirmed)
+		}
 	}
 	readback := mapOrEmpty(confirmed.ReadbackRaw)
 	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
@@ -411,6 +447,7 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 		"uploadedAt":            uploadedAt,
 		"response":              remote,
 		"readback":              readback,
+		"remoteRecordId":        confirmed.ID,
 	}, nil
 }
 

@@ -110,6 +110,57 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 	}
 }
 
+func TestTargetHTTPServiceCloneSubmissionUsesRemoteCloneContract(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tttadmin/api/zbooklist_clone.php" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatal(err)
+		}
+		if got := r.FormValue("id"); got != "296749" {
+			t.Errorf("source id = %q, want 296749", got)
+		}
+		if got := r.FormValue("action"); got != "clone" {
+			t.Errorf("action = %q, want clone", got)
+		}
+		if got := r.FormValue("text_content"); got != "再次上传正文" {
+			t.Errorf("text_content = %q", got)
+		}
+		config := r.FormValue("config")
+		for _, want := range []string{`"jieya_num":8`, `"gunping_num":0`, `"ai_head":"3"`, `"organization":"1"`} {
+			if !strings.Contains(config, want) {
+				t.Errorf("config missing %s: %s", want, config)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"id":296900}`))
+	}))
+	defer server.Close()
+
+	service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+	result, err := service.CloneSubmission(context.Background(), Session{Cookie: "sid=ok"}, "296749", SubmissionInput{
+		BookID:  "738579",
+		Content: []byte("再次上传正文"),
+		FormFields: map[string]string{
+			"organization":  "1",
+			"category":      "NEW_BOOK",
+			"gender":        "2",
+			"style":         "304",
+			"jieya_num":     "8",
+			"jieya_ai_head": "3",
+			"gunping_num":   "0",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ID != "296900" || result.Status != "submitted" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 // 目标站会话失效时 zidingyi.php 会 302 到 login.php，客户端跟随跳转后最终
 // 仍是 HTTP 200。CheckSession 必须识别正文里的登录页，否则会把过期会话
 // 判成“已登录并验证”，与同步风格目录的结果自相矛盾。

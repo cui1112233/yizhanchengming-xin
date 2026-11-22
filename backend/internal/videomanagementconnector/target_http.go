@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -313,6 +314,137 @@ func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input S
 		id = ""
 	}
 	return Submission{ID: id, Status: "submitted", ReadbackRaw: result}, nil
+}
+
+// CloneSubmission is the explicit "upload again" contract of the target
+// system. Its normal upload endpoint de-duplicates an existing bookid and may
+// still return success without creating or updating a row. The clone endpoint
+// is therefore required when the caller intentionally wants a second remote
+// record.
+func (s *TargetHTTPService) CloneSubmission(ctx context.Context, session Session, sourceRecordID string, input SubmissionInput) (Submission, error) {
+	base, err := s.base()
+	if err != nil {
+		return Submission{}, err
+	}
+	sourceRecordID = strings.TrimSpace(sourceRecordID)
+	if sourceRecordID == "" {
+		return Submission{}, fmt.Errorf("target site clone source id is required")
+	}
+	fields := input.FormFields
+	intField := func(key string, fallback int) int {
+		value, parseErr := strconv.Atoi(strings.TrimSpace(fields[key]))
+		if parseErr != nil {
+			return fallback
+		}
+		return value
+	}
+	jsonField := func(key string, fallback any) any {
+		raw := strings.TrimSpace(fields[key])
+		if raw == "" {
+			return fallback
+		}
+		var value any
+		if json.Unmarshal([]byte(raw), &value) != nil {
+			return fallback
+		}
+		return value
+	}
+	organization := strings.TrimSpace(fields["organization"])
+	category := strings.TrimSpace(fields["category"])
+	if category == "" {
+		category = "NEW_BOOK"
+	}
+	config := map[string]any{
+		"organization": organization,
+		"category":     category,
+		"gender":       strings.TrimSpace(fields["gender"]),
+		"style":        strings.TrimSpace(fields["style"]),
+		"tl5":          strings.TrimSpace(fields["tl5"]),
+		"jieya": map[string]any{
+			"jieya_num":             intField("jieya_num", 4),
+			"ai_head":               strings.TrimSpace(fields["jieya_ai_head"]),
+			"speed":                 firstNonEmpty(fields["jieya_speed"], "1.7"),
+			"pitch":                 firstNonEmpty(fields["jieya_pitch"], "0"),
+			"subtitle_version":      intField("subtitle_version", 1),
+			"subtitle_font_size":    intField("subtitle_font_size", 9),
+			"subtitle_line_chars":   intField("subtitle_line_chars", 0),
+			"subtitle_font_spacing": intField("subtitle_font_spacing", 0),
+			"horizontal_flip":       firstNonEmpty(fields["jieya_ai_head_horizontal_flip"], "0"),
+			"font_color_styles":     jsonField("font_color_styles", []any{1}),
+		},
+		"gunping": map[string]any{
+			"gunping_num":    intField("gunping_num", 4),
+			"ziti":           firstNonEmpty(fields["ziti"], "1"),
+			"zitidx":         firstNonEmpty(fields["zitidx"], "36"),
+			"speed":          firstNonEmpty(fields["gunping_speed"], "1"),
+			"biaohong":       fields["biaohong"],
+			"biaohong_reuse": firstNonEmpty(fields["biaohong_reuse"], "1"),
+			"keywords":       fields["keywords"],
+			"bg_image":       jsonField("bg_image", []any{}),
+			"bg_image_mode":  firstNonEmpty(fields["bg_image_mode"], "0"),
+		},
+	}
+	jieya := config["jieya"].(map[string]any)
+	if jieya["ai_head"] == "3" {
+		jieya["ai_head_video"] = jsonField("jieya_ai_head_video", []any{})
+		jieya["ai_head_video_mode"] = firstNonEmpty(fields["jieya_ai_head_video_mode"], "0")
+	}
+	encodedConfig, err := json.Marshal(config)
+	if err != nil {
+		return Submission{}, err
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	values := map[string]string{
+		"id":                    sourceRecordID,
+		"action":                "clone",
+		"start_time":            firstNonEmpty(fields["start_time"], time.Now().Format("2006-01-02T15:04:05")),
+		"text_content":          string(input.Content),
+		"config":                string(encodedConfig),
+		"organization":          organization,
+		"category":              category,
+		"background_music":      firstNonEmpty(fields["background_music"], "[]"),
+		"background_music_mode": firstNonEmpty(fields["background_music_mode"], "0"),
+	}
+	for key, value := range values {
+		if err := writer.WriteField(key, value); err != nil {
+			return Submission{}, err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return Submission{}, err
+	}
+	response, err := s.doWithContentType(ctx, s.client(), http.MethodPost, base+"/tttadmin/api/zbooklist_clone.php", session.Cookie, &body, writer.FormDataContentType())
+	if err != nil {
+		return Submission{}, fmt.Errorf("target site clone: %w", err)
+	}
+	defer response.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	var result map[string]any
+	decodeErr := json.Unmarshal(raw, &result)
+	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || targetResponseSessionExpired(raw, result) {
+		return Submission{}, ErrSessionExpired
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return Submission{}, fmt.Errorf("target site clone returned HTTP %d", response.StatusCode)
+	}
+	if decodeErr != nil || result["success"] != true {
+		return Submission{}, fmt.Errorf("target site rejected clone submission")
+	}
+	id := strings.TrimSpace(fmt.Sprint(result["id"]))
+	if id == "" || id == "<nil>" {
+		return Submission{}, ErrSiteContractChanged
+	}
+	return Submission{ID: id, Status: "submitted", ReadbackRaw: result}, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func (s *TargetHTTPService) UploadVideo(ctx context.Context, session Session, filename string, data []byte) (string, error) {
