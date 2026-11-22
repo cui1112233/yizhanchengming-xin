@@ -68,6 +68,31 @@ func TestDeferredScheduleDoesNotUseAnotherOwnersCompletedBook(t *testing.T) {
 	}
 }
 
+func TestDeferredGenerateOnlyScheduleCompletesAcrossStaleUploadStates(t *testing.T) {
+	for _, status := range []string{"upload_pending", "pending_verification", "pending_confirmation"} {
+		t.Run(status, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{
+				"status": status, "siteSubmitStatus": "pending_confirmation",
+				"processSnapshot": map[string]any{"auto_submit": false, "selected_versions": []string{"ai1", "ai2"}},
+			}, Versions: map[string]any{"ai1": "第一版已生成", "ai2": "第二版已生成"}}
+			item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+			item["status"], item["pending_book_ids"] = status, nil
+			if err := saveNovelFetchScheduleItem(ctx, store, "tester", item); err != nil {
+				t.Fatal(err)
+			}
+			queue := &uniqueRecordingNovelFetchQueue{}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "completed" || len(queue.jobs) != 0 {
+				t.Fatalf("old upload state kept a generate-only schedule open: row=%+v jobs=%+v", row, queue.jobs)
+			}
+		})
+	}
+}
+
 func TestDeferredScheduleTracksAutomaticFailureUntilManualBudgetExhaustion(t *testing.T) {
 	ctx := context.Background()
 	store := novelfetchworkshop.NewMemoryStore()

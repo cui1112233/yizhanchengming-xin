@@ -84,6 +84,7 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 		return fmt.Errorf("任务队列不支持防重复派发")
 	}
 	pending := []string{}
+	busy := 0
 	selected := scheduleStringSlice(item["selected_versions"])
 	autoSubmit := item["auto_submit"] != false
 	runs, err := store.ListRuns(ctx, owner, "")
@@ -116,7 +117,8 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 		versions := selected
 		if autoSubmit {
 			if len(novelFetchScheduleReadbackVersions(doc, selected)) > 0 {
-				continue // The parent reconciles these versions by readback below.
+				pending = append(pending, id)
+				continue // After readback, reassess the remaining versions.
 			}
 			done := scheduleStringSlice(firstConfiguredValue(doc.Meta["siteSubmitDoneVersions"], doc.Meta["site_submit_done_versions"]))
 			versions = nil
@@ -159,6 +161,7 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 				return fmt.Errorf("定时任务入队未确认，保留等待记录")
 			}
 			pending = append(pending, id)
+			busy++
 			_ = updateWorkshopRun(store, job, "duplicate_skipped", "该书正由其他任务处理，定时任务继续等待", started, true)
 			continue
 		}
@@ -174,8 +177,8 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 	item["pending_book_ids"], item["retry_tracking"] = pending, true
 	item["status"], item["updatedAt"] = "waiting_retry", now.UTC().Format(time.RFC3339Nano)
 	item["error"] = ""
-	if len(pending) > 0 {
-		item["error"] = fmt.Sprintf("%d 本书已有任务占用，将自动继续检查；其他书已独立派发", len(pending))
+	if busy > 0 {
+		item["error"] = fmt.Sprintf("%d 本书已有任务占用，将自动继续检查；其他书已独立派发", busy)
 	}
 	if err := saveNovelFetchScheduleItem(ctx, store, owner, item); err != nil {
 		return err

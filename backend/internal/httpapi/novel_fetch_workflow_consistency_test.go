@@ -359,6 +359,46 @@ type scheduleSubmissionReadbackSpy struct {
 	readbackCalls int
 }
 
+func TestScheduleReadbackThenQueuesRemainingUnsubmittedVersion(t *testing.T) {
+	for _, scenario := range []struct {
+		name                string
+		legacy, alreadyRead bool
+	}{{name: "keeps_pending_id"}, {name: "restores_legacy_id", legacy: true}, {name: "manual_readback", legacy: true, alreadyRead: true}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, usersDir, doc := newSubmissionEvidenceTask(t)
+			queue := &uniqueRecordingNovelFetchQueue{}
+			doc.Meta["status"] = "upload_pending"
+			wantReadbacks := 0
+			if !scenario.alreadyRead {
+				wantReadbacks = 1
+				doc.Logs = nil
+				delete(doc.Meta, "siteSubmitDoneVersions")
+				doc.Meta["siteSubmitStatus"] = "pending_confirmation"
+				doc.Meta["siteSubmitPendingConfirmation"] = map[string]any{"ai1": "pending-ai1-receipt"}
+			}
+			item := saveSubmissionEvidenceSchedule(t, store, doc, true)
+			if scenario.legacy {
+				item["status"], item["pending_book_ids"] = "pending_verification", nil
+				if err := saveNovelFetchScheduleItem(ctx, store, "tester", item); err != nil {
+					t.Fatal(err)
+				}
+			}
+			connector := &scheduleSubmissionReadbackSpy{receipt: videomanagementconnector.Submission{ID: "pending-ai1-receipt", Status: "readback"}}
+			readback := newNovelFetchScheduleReadback(store, queue, usersDir, connector)
+			now := time.Now()
+			for i := 0; i < 4; i++ {
+				if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(time.Duration(i)*time.Minute), readback); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if connector.readbackCalls != wantReadbacks || connector.submitCalls != 0 || len(queue.jobs) != 1 || !slices.Equal(queue.jobs[0].SelectedVersions, []string{"ai2"}) {
+				t.Fatalf("schedule stopped after ai1 readback: row=%+v jobs=%+v readbacks=%d uploads=%d", storedSubmissionEvidenceSchedule(t, store), queue.jobs, connector.readbackCalls, connector.submitCalls)
+			}
+		})
+	}
+}
+
 func (c *scheduleSubmissionReadbackSpy) GetSubmission(context.Context, videomanagementconnector.Session, string) (videomanagementconnector.Submission, error) {
 	c.readbackCalls++
 	return c.receipt, nil

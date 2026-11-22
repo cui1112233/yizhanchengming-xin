@@ -2,7 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,13 +14,25 @@ import (
 
 type contractChangedConnector struct {
 	configuredSubmitConnector
-	healthy bool
-	probes  int
+	healthy      bool
+	probes       int
+	receiptProof bool
 }
 
-func (c *contractChangedConnector) Submit(context.Context, videomanagementconnector.Session, videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+func (c *contractChangedConnector) Submit(_ context.Context, _ videomanagementconnector.Session, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
 	c.submitCalls++
+	c.lastInput = input
 	return videomanagementconnector.Submission{}, videomanagementconnector.ErrSiteContractChanged
+}
+
+func (c *contractChangedConnector) GetSubmission(ctx context.Context, session videomanagementconnector.Session, bookID string) (videomanagementconnector.Submission, error) {
+	receipt, err := c.configuredSubmitConnector.GetSubmission(ctx, session, bookID)
+	if c.receiptProof {
+		receipt.ReadbackRaw = map[string]any{
+			"bookid": c.lastInput.BookID, "content_sha256": fmt.Sprintf("%x", sha256.Sum256(c.lastInput.Content)),
+		}
+	}
+	return receipt, err
 }
 
 func (c *contractChangedConnector) ProbeSubmissionContract(context.Context, videomanagementconnector.Session) error {
@@ -94,7 +108,12 @@ func TestContractPauseProbesReadOnlyAndRecoversReceiptWithoutResubmission(t *tes
 	}
 	request.TaskIDs = []string{"12345678"}
 	result, err := executeWebSubmit(ctx, "tester", dir, store, request, nil, connector)
-	if err != nil || result.Success != 1 || connector.submitCalls != 1 || connector.readbackCalls != 1 {
+	if err != nil || result.Success != 0 || len(result.Results) != 1 || mapOrEmpty(result.Results[0])["status"] != "pending_confirmation" || connector.submitCalls != 1 || connector.readbackCalls != 1 {
+		t.Fatalf("an unattributed receipt was accepted after the probe: %v %#v calls=%d reads=%d", err, result, connector.submitCalls, connector.readbackCalls)
+	}
+	connector.receiptProof = true
+	result, err = executeWebSubmit(ctx, "tester", dir, store, request, nil, connector)
+	if err != nil || result.Success != 1 || connector.submitCalls != 1 || connector.readbackCalls != 2 {
 		t.Fatalf("receipt recovery resubmitted: %v %#v calls=%d reads=%d", err, result, connector.submitCalls, connector.readbackCalls)
 	}
 }

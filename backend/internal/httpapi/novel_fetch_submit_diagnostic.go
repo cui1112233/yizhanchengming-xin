@@ -42,21 +42,22 @@ func novelFetchSubmissionNeedsReadback(meta map[string]any, version string) bool
 }
 
 func priorWorkshopSubmitReceipt(document novelfetchworkshop.Document, version string) string {
-	bookID, _ := webSubmitSourceBookID(document.Meta, document.BookID)
 	for i := len(document.Logs) - 1; i >= 0; i-- {
 		entry := mapOrEmpty(document.Logs[i])
-		if id := workshopVerifiedSubmitReceipt(entry, bookID); entry["version"] == version && id != "" {
+		if id := workshopVerifiedSubmitReceipt(entry); entry["version"] == version && id != "" {
 			return id
 		}
 	}
 	return ""
 }
 
-func workshopVerifiedSubmitReceipt(entry map[string]any, bookID string) string {
+func workshopVerifiedSubmitReceipt(entry map[string]any) string {
 	if entry["event"] != "site_submit" || entry["status"] != "submitted" {
 		return ""
 	}
-	receipt := mapOrEmpty(repairHistoricalSubmitReceipt(entry, bookID)["remote_receipt"])
+	// Historical listings may help display old logs but do not identify the
+	// version that created a remote record.
+	receipt := mapOrEmpty(entry["remote_receipt"])
 	if receipt["verified"] != true {
 		return ""
 	}
@@ -66,25 +67,53 @@ func workshopVerifiedSubmitReceipt(entry map[string]any, bookID string) string {
 func workshopPendingReadbackMatches(receipt videomanagementconnector.Submission, doc novelfetchworkshop.Document, bookID, version string) bool {
 	record := mapOrEmpty(receipt.ReadbackRaw)
 	recordBook := firstText(record["bookid"])
-	if receipt.ID == "" || (recordBook != "" && recordBook != bookID) {
+	id := strings.TrimSpace(receipt.ID)
+	if id == "" || (recordBook != "" && recordBook != bookID) {
 		return false
 	}
 	for _, raw := range doc.Logs {
-		if workshopVerifiedSubmitReceipt(mapOrEmpty(raw), bookID) == receipt.ID {
+		if workshopVerifiedSubmitReceipt(mapOrEmpty(raw)) == id {
 			return false // A receipt already confirmed another attempt.
 		}
 	}
-	if expected := firstText(mapOrEmpty(doc.Meta["siteSubmitPendingConfirmation"])[version]); expected != "" && expected != bookID {
-		return receipt.ID == expected
+	pending := mapOrEmpty(doc.Meta["siteSubmitPendingConfirmation"])
+	if expected := firstText(pending[version]); expected != "" && expected != bookID {
+		for other, candidate := range pending {
+			if other != version && firstText(candidate) == id {
+				return false
+			}
+		}
+		return id == expected
 	}
-	if recordBook == "" {
-		// A connector can return an explicitly confirmed receipt, without a book listing.
-		return receipt.Status == "submitted"
+	recordVersion := firstText(record["version_id"], record["version"])
+	if recordVersion != "" && recordVersion != version {
+		return false
 	}
-	attempt := mapOrEmpty(mapOrEmpty(doc.Meta["siteSubmitAttempts"])[version])
-	fingerprint := firstText(attempt["content_sha256"])
-	return fingerprint != "" && strings.EqualFold(firstText(record["content_sha256"]), fingerprint) &&
-		submissionMatchesAttempt(receipt, bookID, firstText(attempt["started_at"]))
+	attempts := mapOrEmpty(doc.Meta["siteSubmitAttempts"])
+	matchesEvidence := func(key string, compare func(string, string) bool) bool {
+		value := firstText(record[key])
+		if value == "" || !compare(value, firstText(mapOrEmpty(attempts[version])[key])) {
+			return false
+		}
+		if recordVersion == "" {
+			for other, candidate := range attempts {
+				if other != version && compare(value, firstText(mapOrEmpty(candidate)[key])) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	if matchesEvidence("operation_id", func(received, saved string) bool { return received == saved }) {
+		return true
+	}
+	if !matchesEvidence("content_sha256", strings.EqualFold) {
+		return false
+	}
+	// If the connector supplies a creation time, stale content cannot prove
+	// that a new attempt using the same body was received.
+	attempt := mapOrEmpty(attempts[version])
+	return firstText(record["addtime"]) == "" || submissionMatchesAttempt(receipt, bookID, firstText(attempt["started_at"]))
 }
 
 // Read the same durable events that submission workers write. Metadata-only

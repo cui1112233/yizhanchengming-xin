@@ -124,7 +124,7 @@ func (c *configuredSubmitConnector) Submit(_ context.Context, _ videomanagementc
 	c.submitCalls++
 	c.lastInput = input
 	if c.submitCalls == 1 {
-		return videomanagementconnector.Submission{}, context.DeadlineExceeded
+		return videomanagementconnector.Submission{ID: "remote-1"}, context.DeadlineExceeded
 	}
 	return videomanagementconnector.Submission{ID: "remote-1", Status: "submitted"}, nil
 }
@@ -615,6 +615,7 @@ func TestWebSubmitExecutingVersionOnlyReadsBack(t *testing.T) {
 	}
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "654321", Gender: "女频", Meta: map[string]any{
 		"style": "现代悬疑", "platformId": "1", "siteSubmitExecutingVersions": []any{"ai1"},
+		"siteSubmitPendingConfirmation": map[string]any{"ai1": "remote-1"},
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -677,6 +678,38 @@ func TestWebSubmitForceResubmitsConfirmedVersion(t *testing.T) {
 	}
 	if row, _ := result.Results[0].(map[string]any); row["status"] != "skipped" {
 		t.Fatalf("result=%#v", result.Results[0])
+	}
+}
+
+func TestWebSubmitForceWithoutNewCloneReceiptStaysPending(t *testing.T) {
+	for _, scenario := range []struct{ name, id string }{{"empty", ""}, {"same", "first-ai1-receipt"}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, usersDir, doc := newSubmissionEvidenceTask(t)
+			connector := &cloneSubmissionEvidenceSpy{receipt: &videomanagementconnector.Submission{ID: scenario.id, Status: "submitted"}}
+			request := webSubmitRequest{TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "force-missing-proof", Force: true}
+			result, err := executeWebSubmit(ctx, "tester", usersDir, store, request, nil, connector)
+			if err != nil || len(result.Results) != 1 || result.Success != 0 || result.Failed != 1 || connector.cloneCalls != 1 || connector.submitCalls != 0 {
+				t.Fatalf("invalid clone response was accepted: result=%+v connector=%+v error=%v", result, connector, err)
+			}
+			if row := mapOrEmpty(result.Results[0]); row["status"] != "pending_confirmation" || row["code"] != "WEB_SUBMIT_RESUBMISSION_RECEIPT_UNCONFIRMED" || firstText(row["submissionId"]) != "" {
+				t.Fatalf("invalid clone receipt appeared confirmed: %+v", row)
+			}
+			saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+			if err != nil || saved.Meta["siteSubmitStatus"] != "pending_confirmation" || priorWorkshopSubmitReceipt(saved, "ai1") != "first-ai1-receipt" {
+				t.Fatalf("invalid clone overwrote existing proof: %+v %v", saved, err)
+			}
+			for _, raw := range saved.Logs {
+				log := mapOrEmpty(raw)
+				if log["operation_id"] == request.OperationID && (log["status"] == "submitted" || firstText(log["submissionId"]) != "" || mapOrEmpty(log["remote_receipt"])["verified"] == true) {
+					t.Fatalf("audit claimed a new receipt: %+v", log)
+				}
+			}
+			result, err = executeWebSubmit(ctx, "tester", usersDir, store, request, nil, connector)
+			if err != nil || result.Success != 0 || connector.cloneCalls != 1 || connector.submitCalls != 0 {
+				t.Fatalf("unconfirmed clone was repeated: result=%+v connector=%+v error=%v", result, connector, err)
+			}
+		})
 	}
 }
 

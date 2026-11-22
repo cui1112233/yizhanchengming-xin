@@ -104,16 +104,45 @@ func TestWebSubmitUnknownSubmissionOnlyReadsBackEvenWhenForced(t *testing.T) {
 			ctx := context.Background()
 			store, usersDir, doc := newSubmissionEvidenceTask(t)
 			doc.Meta["siteSubmitStatus"] = status
-			doc.Meta["siteSubmitFailedVersions"] = []string{"ai1"}
+			doc.Meta["siteSubmitFailedVersions"] = []string{"ai2"}
 			if err := store.PutDocument(ctx, "tester", doc); err != nil {
 				t.Fatal(err)
 			}
 			connector := &configuredSubmitConnector{}
 			result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
-				TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, Force: true,
+				TaskIDs: []string{doc.BookID}, Versions: []string{"ai2"}, Force: true,
 			}, nil, connector)
-			if err != nil || result.Success != 1 || connector.submitCalls != 0 || connector.readbackCalls != 1 {
-				t.Fatalf("unknown submission must only be read back: result=%+v uploads=%d readbacks=%d error=%v", result, connector.submitCalls, connector.readbackCalls, err)
+			if err != nil || result.Success != 0 || result.Failed != 1 || len(result.Results) != 1 || mapOrEmpty(result.Results[0])["status"] != "pending_confirmation" || connector.submitCalls != 0 || connector.readbackCalls != 1 {
+				t.Fatalf("unattributed receipt must stay pending: result=%+v uploads=%d readbacks=%d error=%v", result, connector.submitCalls, connector.readbackCalls, err)
+			}
+			saved, err := store.GetDocument(ctx, "tester", doc.BookID)
+			if err != nil || containsVersion(saved.Meta["siteSubmitDoneVersions"], "ai2") || saved.Meta["siteSubmitStatus"] != "pending_confirmation" {
+				t.Fatalf("unattributed ai2 receipt changed persisted evidence: %+v %v", saved, err)
+			}
+		})
+	}
+}
+
+func TestSubmitReadbackOperationMustIdentifyOneVersion(t *testing.T) {
+	doc := novelfetchworkshop.Document{Meta: map[string]any{"siteSubmitAttempts": map[string]any{
+		"ai1": map[string]any{"operation_id": "shared-attempt"},
+		"ai2": map[string]any{"operation_id": "shared-attempt"},
+	}}}
+	for _, scenario := range []struct {
+		name, operation, version string
+		want                     bool
+	}{
+		{name: "shared operation alone", operation: "shared-attempt"},
+		{name: "different version", operation: "shared-attempt", version: "ai1"},
+		{name: "different operation", operation: "another-attempt", version: "ai2"},
+		{name: "operation and version match", operation: "shared-attempt", version: "ai2", want: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			receipt := videomanagementconnector.Submission{ID: "candidate-receipt", ReadbackRaw: map[string]any{
+				"operation_id": scenario.operation, "version_id": scenario.version,
+			}}
+			if got := workshopPendingReadbackMatches(receipt, doc, "12345678901", "ai2"); got != scenario.want {
+				t.Fatalf("ai2 receipt attribution = %v, want %v", got, scenario.want)
 			}
 		})
 	}
@@ -193,14 +222,41 @@ func TestWebSubmitForceFailsWhenCloneIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestWebSubmitForceDoesNotGuessPriorVersionFromHistoricalListing(t *testing.T) {
+	ctx := context.Background()
+	store, usersDir, doc := newSubmissionEvidenceTask(t)
+	doc.Logs = []any{map[string]any{
+		"event": "site_submit", "status": "submitted", "version": "ai1", "time": "2026-11-13T11:24:43Z",
+		"remote_receipt": map[string]any{"verified": true, "remote_record": map[string]any{"data": []any{
+			map[string]any{"id": "ai2-receipt", "bookid": doc.BookID, "addtime": "2026-11-13 19:26:09"},
+		}}},
+	}}
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	connector := &cloneSubmissionEvidenceSpy{}
+	result, err := executeWebSubmit(ctx, "tester", usersDir, store, webSubmitRequest{
+		TaskIDs: []string{doc.BookID}, Versions: []string{"ai1"}, OperationID: "force-ai1", Force: true,
+	}, nil, connector)
+	if err != nil || result.Success != 0 || result.Failed != 1 || len(result.Results) != 1 || mapOrEmpty(result.Results[0])["code"] != "WEB_SUBMIT_RESUBMISSION_UNAVAILABLE" || connector.cloneCalls != 0 || connector.submitCalls != 0 {
+		t.Fatalf("force used an unattributed historical receipt: result=%+v connector=%+v error=%v", result, connector, err)
+	}
+}
+
 type cloneSubmissionEvidenceSpy struct {
 	recordingSubmitConnector
 	cloneSource string
 	content     string
+	cloneCalls  int
+	receipt     *videomanagementconnector.Submission
 }
 
 func (c *cloneSubmissionEvidenceSpy) CloneSubmission(_ context.Context, _ videomanagementconnector.Session, source string, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
 	c.cloneSource, c.content = source, string(input.Content)
+	c.cloneCalls++
+	if c.receipt != nil {
+		return *c.receipt, nil
+	}
 	return videomanagementconnector.Submission{ID: "cloned-ai1-receipt", Status: "submitted"}, nil
 }
 

@@ -287,7 +287,14 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						receipts := mapOrEmpty(meta["siteSubmitPendingConfirmation"])
 						receipts[version] = submissionID
 						meta["siteSubmitPendingConfirmation"] = receipts
-						doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "pending_confirmation", "error": message, "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": true, "submissionId": submissionID})
+						entry := map[string]any{"event": "site_submit", "operation_id": operationID, "version": version, "status": "pending_confirmation", "error": message, "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": true}
+						if submissionID != "" && submissionID != uploadBookID {
+							entry["submissionId"] = submissionID
+						}
+						if code := firstText(row["code"]); code != "" {
+							entry["code"] = code
+						}
+						doc.Logs = append(doc.Logs, entry)
 						result.Results = append(result.Results, row)
 						result.Failed++
 						manifestItem(bookID, version, "unknown", "remote_confirmation_required", message)
@@ -430,6 +437,7 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 						continue
 					}
 					submit := targets[0].Submit
+					cloneSource := ""
 					if containsVersion(done, version) {
 						priorReceipt := priorWorkshopSubmitReceipt(doc, version)
 						audit := map[string]any{
@@ -442,14 +450,15 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 							if !canClone || priorReceipt == "" {
 								message := "重新提交需要目标站支持复制提交并提供该版本的已确认回执"
 								audit["status"], audit["error"] = "waiting_configuration", message
-								row["error"] = message
+								row["error"], row["code"] = message, "WEB_SUBMIT_RESUBMISSION_UNAVAILABLE"
 								result.Results = append(result.Results, row)
 								result.Failed++
 								manifestItem(bookID, version, "failed", "resubmission_unavailable", message)
 								continue
 							}
+							cloneSource = priorReceipt
 							submit = func(ctx context.Context, session videomanagementconnector.Session, input videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
-								return cloner.CloneSubmission(ctx, session, priorReceipt, input)
+								return cloner.CloneSubmission(ctx, session, cloneSource, input)
 							}
 						}
 					}
@@ -521,6 +530,11 @@ func executeWebSubmit(ctx context.Context, owner, usersDir string, store novelfe
 							return
 						}
 						uncertainVersion("提交结果不确定，等待目标站回读确认", firstText(submission.ID, uploadBookID))
+						continue
+					}
+					if id := strings.TrimSpace(submission.ID); cloneSource != "" && (id == "" || id == cloneSource) {
+						row["code"] = "WEB_SUBMIT_RESUBMISSION_RECEIPT_UNCONFIRMED"
+						uncertainVersion("重新提交尚未返回新的回执编号，等待核对；不会重复上传", uploadBookID)
 						continue
 					}
 					// 与批量原文改文系统源码对齐：上传接口返回成功即视为已提交；
