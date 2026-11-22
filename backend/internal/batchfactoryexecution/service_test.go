@@ -2,6 +2,7 @@ package batchfactoryexecution
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -47,8 +48,13 @@ func (r *memoryExecutionRepository) Get(_ context.Context, owner, id string) (Ex
 	}
 	return execution, nil
 }
-func (r *memoryExecutionRepository) GetByClientRequest(context.Context, string, string, string) (Execution, bool, error) {
-	return Execution{}, false, nil
+func (r *memoryExecutionRepository) GetByClientRequest(_ context.Context, owner, batchID, requestID string) (Execution, bool, error) {
+	result, ok := r.byRequest[owner+"/"+batchID+"/"+requestID]
+	if !ok {
+		return Execution{}, false, nil
+	}
+	execution := r.executions[result.Execution.ID]
+	return execution, true, nil
 }
 func (r *memoryExecutionRepository) ListBookTimeline(context.Context, string, string, string) ([]TimelineEvent, error) {
 	return nil, nil
@@ -113,7 +119,7 @@ func TestServiceEnsureExecutionFirstClickQueuesBooks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Created || got.ExecutionID == "" || legacy.starts != 1 || len(got.QueuedBooks) != 2 {
+	if !got.Created || got.ExecutionID == "" || legacy.starts != 0 || len(got.QueuedBooks) != 2 {
 		t.Fatalf("response=%#v starts=%d", got, legacy.starts)
 	}
 }
@@ -130,7 +136,7 @@ func TestServiceEnsureExecutionSameRequestReusesExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.ExecutionID != second.ExecutionID || legacy.starts != 1 {
+	if first.ExecutionID != second.ExecutionID || legacy.starts != 0 {
 		t.Fatalf("first=%#v second=%#v starts=%d", first, second, legacy.starts)
 	}
 }
@@ -178,7 +184,7 @@ func TestServiceEnsureExecutionBlockedBookDoesNotStopRunnableBook(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.BlockedBooks) != 1 || got.BlockedBooks[0] != "blocked" || len(got.QueuedBooks) != 1 || got.QueuedBooks[0] != "ready" || legacy.starts != 1 {
+	if len(got.BlockedBooks) != 1 || got.BlockedBooks[0] != "blocked" || len(got.QueuedBooks) != 1 || got.QueuedBooks[0] != "ready" || legacy.starts != 0 {
 		t.Fatalf("response=%#v starts=%d", got, legacy.starts)
 	}
 }
@@ -191,11 +197,15 @@ func TestServiceEnsureExecutionAmbiguousStartReconcilesWithoutResubmit(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.ReconcilingBooks) != 1 || got.ReconcilingBooks[0] != "book-1" || repo.updates["alice/book-1"] != BookWaitingExternal {
-		t.Fatalf("response=%#v updates=%#v", got, repo.updates)
+	payload := json.RawMessage(`{"executionId":"` + got.ExecutionID + `","owner":"alice","batchId":"batch-1","bookIds":["book-1"],"mode":"video","target":"published_confirmed","clientRequestId":"request-1","config":{}}`)
+	if err := service.DispatchOutboxEvent(context.Background(), OutboxEvent{ID: "event-1", EventType: "execution.ensure", PayloadJSON: payload, Attempts: 1}); err == nil {
+		t.Fatal("ambiguous first dispatch should stay recoverable")
 	}
-	if _, err := service.EnsureExecution(context.Background(), executionCommand("request-1", "book-1")); err != nil {
-		t.Fatal(err)
+	if repo.updates["alice/book-1"] != BookWaitingExternal || repo.executions[got.ExecutionID].Status != ExecutionReconciling {
+		t.Fatalf("updates=%#v execution=%#v", repo.updates, repo.executions[got.ExecutionID])
+	}
+	if err := service.DispatchOutboxEvent(context.Background(), OutboxEvent{ID: "event-1", EventType: "execution.ensure", PayloadJSON: payload, Attempts: 2}); err == nil {
+		t.Fatal("unconfirmed retry should keep reconciling")
 	}
 	if legacy.starts != 1 {
 		t.Fatalf("ambiguous request was resubmitted: %d", legacy.starts)
@@ -211,6 +221,9 @@ func TestServiceReconcileDoesNotCompletePublishedBookWithoutReceipt(t *testing.T
 	service := NewService(repo, legacy)
 	ensured, err := service.EnsureExecution(context.Background(), executionCommand("request-1", "book-1"))
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.AttachLegacyJob(context.Background(), "alice", ensured.ExecutionID, "job-1"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.Reconcile(context.Background(), "alice", ensured.ExecutionID); err != nil {

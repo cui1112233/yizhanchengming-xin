@@ -141,6 +141,9 @@ func (s *Service) EnsureExecution(ctx context.Context, command EnsureCommand) (E
 		if err := s.Repository.AttachLegacyJob(ctx, command.Owner, result.Execution.ID, active.JobID); err != nil {
 			return response, err
 		}
+		if err := s.Repository.UpdateExecutionStatus(ctx, command.Owner, result.Execution.ID, ExecutionRunning); err != nil {
+			return response, err
+		}
 		response.Attached = true
 		for id, projected := range ProjectLegacyTask(active) {
 			if containsString(bookIDs, id) {
@@ -149,25 +152,17 @@ func (s *Service) EnsureExecution(ctx context.Context, command EnsureCommand) (E
 		}
 		return response, nil
 	}
-	if len(runnable) == 0 || s.Legacy == nil {
-		return response, nil
-	}
-	legacy, startErr := s.Legacy.Start(ctx, command.Owner, command.BatchID, LegacyStartInput{BookIDs: runnable, Mode: command.Mode, Target: command.Target, Config: command.Config, ClientRequestID: command.ClientRequestID})
-	if startErr != nil {
-		response.QueuedBooks = nil
-		response.ReconcilingBooks = append(response.ReconcilingBooks, runnable...)
-		for _, id := range runnable {
-			if updateErr := s.Repository.UpdateBookStatus(ctx, command.Owner, id, BookWaitingExternal, Failure{Code: "AMBIGUOUS_LEGACY_START", Message: startErr.Error()}); updateErr != nil {
-				return response, updateErr
+	if len(runnable) == 0 {
+		if len(blocked) > 0 {
+			if err := s.Repository.UpdateExecutionStatus(ctx, command.Owner, result.Execution.ID, ExecutionNeedsAttention); err != nil {
+				return response, err
 			}
 		}
 		return response, nil
 	}
-	if strings.TrimSpace(legacy.JobID) != "" {
-		if err := s.Repository.AttachLegacyJob(ctx, command.Owner, result.Execution.ID, legacy.JobID); err != nil {
-			return response, err
-		}
-	}
+	// The transaction already persisted an execution.ensure outbox event.
+	// Only the dispatcher may start new legacy work, keeping one durable owner
+	// for retries and preventing a synchronous start plus an outbox duplicate.
 	return response, nil
 }
 
@@ -281,19 +276,37 @@ func (s *Service) DispatchOutboxEvent(ctx context.Context, event OutboxEvent) er
 		return err
 	}
 	if hasActive {
-		return s.Repository.AttachLegacyJob(ctx, payload.Owner, execution.ID, active.JobID)
+		if err := s.Repository.AttachLegacyJob(ctx, payload.Owner, execution.ID, active.JobID); err != nil {
+			return err
+		}
+		return s.Repository.UpdateExecutionStatus(ctx, payload.Owner, execution.ID, ExecutionRunning)
 	}
 	if len(payload.BookIDs) == 0 {
 		return nil
 	}
+	if event.Attempts > 1 {
+		_ = s.Repository.UpdateExecutionStatus(ctx, payload.Owner, execution.ID, ExecutionReconciling)
+		return fmt.Errorf("legacy start outcome is still awaiting readback")
+	}
 	legacy, err := s.Legacy.Start(ctx, payload.Owner, payload.BatchID, LegacyStartInput{BookIDs: payload.BookIDs, Mode: payload.Mode, Target: payload.Target, Config: payload.Config, ClientRequestID: payload.ClientRequestID})
 	if err != nil {
+		for _, id := range payload.BookIDs {
+			if updateErr := s.Repository.UpdateBookStatus(ctx, payload.Owner, id, BookWaitingExternal, Failure{Code: "AMBIGUOUS_LEGACY_START", Message: err.Error()}); updateErr != nil {
+				return updateErr
+			}
+		}
+		if updateErr := s.Repository.UpdateExecutionStatus(ctx, payload.Owner, execution.ID, ExecutionReconciling); updateErr != nil {
+			return updateErr
+		}
 		return err
 	}
 	if strings.TrimSpace(legacy.JobID) == "" {
 		return fmt.Errorf("legacy start returned no job id")
 	}
-	return s.Repository.AttachLegacyJob(ctx, payload.Owner, execution.ID, legacy.JobID)
+	if err := s.Repository.AttachLegacyJob(ctx, payload.Owner, execution.ID, legacy.JobID); err != nil {
+		return err
+	}
+	return s.Repository.UpdateExecutionStatus(ctx, payload.Owner, execution.ID, ExecutionRunning)
 }
 
 func containsString(values []string, expected string) bool {

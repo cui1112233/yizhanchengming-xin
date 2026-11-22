@@ -15,6 +15,7 @@ type ExecutionStatus string
 const (
 	ExecutionPlanned        ExecutionStatus = "planned"
 	ExecutionRunning        ExecutionStatus = "running"
+	ExecutionReconciling    ExecutionStatus = "reconciling"
 	ExecutionNeedsAttention ExecutionStatus = "needs_attention"
 	ExecutionCompleted      ExecutionStatus = "completed"
 	ExecutionCancelled      ExecutionStatus = "cancelled"
@@ -115,9 +116,11 @@ var ErrInvalidTransition = errors.New("invalid state transition")
 func (s ExecutionStatus) CanTransition(to ExecutionStatus) bool {
 	switch s {
 	case ExecutionPlanned:
-		return to == ExecutionRunning
+		return to == ExecutionRunning || to == ExecutionReconciling
 	case ExecutionRunning:
-		return to == ExecutionCompleted || to == ExecutionNeedsAttention || to == ExecutionCancelled
+		return to == ExecutionReconciling || to == ExecutionCompleted || to == ExecutionNeedsAttention || to == ExecutionCancelled
+	case ExecutionReconciling:
+		return to == ExecutionRunning || to == ExecutionCompleted || to == ExecutionNeedsAttention || to == ExecutionCancelled
 	default:
 		return false
 	}

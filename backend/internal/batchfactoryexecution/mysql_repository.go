@@ -116,7 +116,7 @@ func (r *MySQLRepository) Ensure(ctx context.Context, record EnsureRecord) (resu
 		placeholders[index] = "?"
 		args = append(args, strings.TrimSpace(book.BookID))
 	}
-	activeRows, queryErr := tx.QueryContext(ctx, `SELECT eb.book_id FROM batch_execution_books eb JOIN batch_executions e ON e.id = eb.execution_id WHERE e.owner_username = ? AND e.batch_id = ? AND e.status IN ('planned','running','needs_attention') AND eb.status IN ('pending','running','waiting_external','retry_wait') AND eb.book_id IN (`+strings.Join(placeholders, ",")+`) FOR UPDATE`, args...)
+	activeRows, queryErr := tx.QueryContext(ctx, `SELECT eb.book_id FROM batch_execution_books eb JOIN batch_executions e ON e.id = eb.execution_id WHERE e.owner_username = ? AND e.batch_id = ? AND e.status IN ('planned','running','reconciling','needs_attention') AND eb.status IN ('pending','running','waiting_external','retry_wait') AND eb.book_id IN (`+strings.Join(placeholders, ",")+`) FOR UPDATE`, args...)
 	if queryErr != nil {
 		err = queryErr
 		return result, err
