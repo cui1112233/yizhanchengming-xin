@@ -313,6 +313,7 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 	failedBookIDs := make([]string, 0)
 	retryBookIDs := make([]string, 0)
 	classificationPendingCount := 0
+	originalFetchConfigurationCount := 0
 	failureMessages := make([]string, 0)
 	stopped := false
 	completed := 0
@@ -372,11 +373,16 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 				// 记录分类阶段的等待状态，确认分类后由重试队列统一清理。
 				_ = scheduleNovelFetchDocumentRetry(ctx, worker.store, job.Owner, bookID, novelFetchRetryStageClassify, result.err, time.Now().UTC())
 			} else if errors.Is(result.err, errNovelFetchOriginalFetch) {
-				retryBookIDs = append(retryBookIDs, bookID)
-				deferredOriginalFetchRetry = true
-				status = "waiting_retry"
-				if retryErr := markNovelFetchOriginalFetchRetry(ctx, worker.store, job.Owner, bookID, result.err, time.Now().UTC()); retryErr != nil {
-					_ = updateWorkshopTaskRuntimeState(ctx, worker.store, job.Owner, bookID, status, result.err.Error())
+				if markErr := markNovelFetchOriginalFetchRetry(ctx, worker.store, job.Owner, bookID, result.err, time.Now().UTC()); markErr != nil {
+					log.Printf("novel fetch: save original fetch failure for %s: %v", bookID, markErr)
+				} else if document, getErr := worker.store.GetDocument(ctx, job.Owner, bookID); getErr == nil {
+					status = firstText(document.Meta["status"], status)
+					switch status {
+					case "waiting_retry":
+						deferredOriginalFetchRetry = true
+					case "waiting_configuration":
+						originalFetchConfigurationCount++
+					}
 				}
 			} else if novelFetchAIManualRetryRequired(result.err) {
 				// 对照参考实现：模型确定性失败写 manual_ai_retry_required，
@@ -481,7 +487,10 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 		if len(uploadFailures) == len(failedBookIDs) {
 			status = "upload_pending"
 		}
-		if loginBlockedCount == len(failedBookIDs) {
+		originalFetchConfigurationBlocked := originalFetchConfigurationCount == len(failedBookIDs)
+		if originalFetchConfigurationBlocked {
+			status, queueState = "waiting_configuration", "waiting_configuration"
+		} else if loginBlockedCount == len(failedBookIDs) {
 			status = blockedUploadState
 			queueState = blockedUploadState
 		}
@@ -497,6 +506,8 @@ func (worker *workshopProcessWorker) process(ctx context.Context, job novelfetch
 			progressMessage = "改文已暂停，等待确认分类后重试"
 		} else if status == "waiting_login" {
 			progressMessage = workshopLoginRequiredMessage
+		} else if originalFetchConfigurationBlocked {
+			progressMessage = novelFetchOriginalConfigurationMessage
 		} else if status == "waiting_configuration" {
 			progressMessage = workshopContractChangedMessage
 		} else if status == "upload_pending" {
@@ -2102,6 +2113,10 @@ func fetchNovelWithSettings(ctx context.Context, store novelfetchworkshop.Store,
 		if err == nil || ctx.Err() != nil || attempt == retries {
 			break
 		}
+		class, _ := novelfetchworkshop.ClassifyUpstreamFailure(err)
+		if class == novelfetchworkshop.UpstreamFailurePermanent || class == novelfetchworkshop.UpstreamFailureConfiguration {
+			break
+		}
 	}
 	return result, err
 }
@@ -2142,7 +2157,7 @@ func executeWorkshopDocumentFetch(ctx context.Context, store novelfetchworkshop.
 		result, err = fetchNovelWithSettings(ctx, store, owner, fetcher, bookID, platformID, maxTxt)
 		if err != nil {
 			_ = appendWorkshopTaskLog(ctx, store, owner, bookID, "fetch_failed", err.Error())
-			return fmt.Errorf("%w: %v", errNovelFetchOriginalFetch, err)
+			return fmt.Errorf("%w: %w", errNovelFetchOriginalFetch, err)
 		}
 		if err := stageNovelFetchRaw(ctx, store, owner, &document, result); err != nil {
 			_ = appendWorkshopTaskLog(ctx, store, owner, bookID, "original_raw_save_failed", err.Error())

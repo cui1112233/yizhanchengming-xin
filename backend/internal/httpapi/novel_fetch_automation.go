@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 )
 
 const novelFetchAutomationConfigKey = "novel_fetch_automation"
-const defaultNovelFetchOriginalFetchRetryInterval = time.Hour
 
 func novelFetchAutomationEnabled(settings map[string]any) bool {
 	return mapOrEmpty(settings[novelFetchAutomationConfigKey])["enabled"] == true
@@ -64,23 +62,20 @@ func novelFetchAutomationVersions(settings map[string]any) []string {
 	return versions
 }
 
-func novelFetchOriginalFetchRetryInterval(settings map[string]any) time.Duration {
+func novelFetchOriginalRetryDelay(settings map[string]any, attempt int) time.Duration {
 	minutes := intValue(mapOrEmpty(settings["fetch"])["original_fetch_retry_interval_minutes"])
 	if minutes <= 0 {
 		minutes = intValue(mapOrEmpty(settings[novelFetchAutomationConfigKey])["original_fetch_retry_interval_minutes"])
 	}
-	if minutes <= 0 {
-		return defaultNovelFetchOriginalFetchRetryInterval
+	if minutes > 0 {
+		return time.Duration(min(minutes, 24*60)) * time.Minute
 	}
-	if minutes > 24*60 {
-		minutes = 24 * 60
-	}
-	return time.Duration(minutes) * time.Minute
+	delays := [...]time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}
+	return delays[min(max(attempt, 1), len(delays))-1]
 }
 
-// novelFetchOriginalFetchMaxAttempts 是原文获取自动重试上限。原文 400 通常是
-// 书籍已下架或源站拒绝，无限退避既不会成功也会掩盖真实问题。
 const novelFetchOriginalFetchMaxAttempts = 5
+const novelFetchOriginalConfigurationMessage = "原文获取配置不可用，请检查配置后手动重试"
 
 // novelFetchAIManualRetryRequired 判断错误是否属于模型确定性失败。参考实现
 // 对这类错误写 manual_ai_retry_required 并禁止自动重试：同一段超长文本反复
@@ -128,10 +123,6 @@ func markNovelFetchAIManualRetry(ctx context.Context, store novelfetchworkshop.S
 }
 
 func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, fetchErr error, now time.Time) error {
-	settings, err := store.GetConfig(ctx, owner)
-	if err != nil {
-		return err
-	}
 	document, err := store.GetDocument(ctx, owner, bookID)
 	if err != nil {
 		return err
@@ -139,38 +130,66 @@ func markNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworks
 	if document.Meta == nil {
 		document.Meta = map[string]any{}
 	}
-	attempts := intValue(document.Meta["originalFetchRetryAttempts"]) + 1
-	document.Meta["originalFetchRetryAttempts"] = attempts
-	// 原文获取 400（书籍信息不存在、源站拒绝）是确定性错误，无限退避重试
-	// 只会每小时重复一次失败。达到上限后转人工，保留瞬态错误自动恢复能力。
-	if attempts >= novelFetchOriginalFetchMaxAttempts {
-		reason := "原文连续获取失败已停止自动重试，请检查书籍来源是否有效后手动重试：" + firstText(fetchErr)
-		document.Meta["status"] = "failed"
-		document.Meta["queueState"] = "failed"
-		document.Meta["originalStatus"] = "waiting_manual_fetch"
-		document.Meta["manualOnly"] = true
-		document.Meta["manualOriginalFetchRequired"] = true
-		document.Meta["originalFetchLastError"] = firstText(fetchErr)
-		document.Meta["error"] = reason
-		delete(document.Meta, "originalFetchNextRetryAt")
-		clearNovelFetchTaskRetry(document.Meta, novelFetchRetryStageOriginalFetch)
-		appendNovelFetchDocumentLog(&document, "queue_failed", reason, now)
-		return store.PutDocument(ctx, owner, document)
+	meta := document.Meta
+	attempts := intValue(meta["originalFetchRetryAttempts"]) + 1
+	meta["originalFetchRetryAttempts"] = attempts
+	message := ""
+	if fetchErr != nil {
+		message = strings.TrimSpace(fetchErr.Error())
 	}
-	delay := novelFetchOriginalFetchRetryInterval(settings)
-	document.Meta["status"] = "waiting_retry"
-	document.Meta["queueState"] = "waiting_retry"
-	document.Meta["originalStatus"] = "waiting_fetch_retry"
-	document.Meta["originalFetchNextRetryAt"] = now.Add(delay).UTC().Format(time.RFC3339Nano)
-	document.Meta["originalFetchLastError"] = firstText(fetchErr)
-	document.Meta["error"] = firstText(fetchErr)
-	// 阶段重试表同时记录原文抓取退避，便于统一判断“是否已到重试时间”。
-	// 敏感词阶段失败已经单独记过 sensitive，不再重复记成原文抓取失败。
-	var sensitiveStage *novelFetchSensitiveStageError
-	if !errors.As(fetchErr, &sensitiveStage) {
-		scheduleNovelFetchTaskRetry(document.Meta, novelFetchRetryStageOriginalFetch, fetchErr, delay, now)
+	meta["originalFetchLastError"] = message
+
+	class, _ := novelfetchworkshop.ClassifyUpstreamFailure(fetchErr)
+	switch class {
+	case novelfetchworkshop.UpstreamFailurePermanent:
+		markNovelFetchOriginalManual(&document, "failed", "原文来源无效，请检查书籍来源后手动重试", now)
+	case novelfetchworkshop.UpstreamFailureConfiguration:
+		markNovelFetchOriginalManual(&document, "waiting_configuration", novelFetchOriginalConfigurationMessage, now)
+	default:
+		if attempts >= novelFetchOriginalFetchMaxAttempts {
+			markNovelFetchOriginalManual(&document, "failed", "原文连续获取失败已停止自动重试，请检查书籍来源是否有效后手动重试", now)
+			break
+		}
+		settings, err := store.GetConfig(ctx, owner)
+		if err != nil {
+			return err
+		}
+		next := now.Add(novelFetchOriginalRetryDelay(settings, attempts)).UTC().Format(time.RFC3339Nano)
+		meta["status"] = "waiting_retry"
+		meta["queueState"] = "waiting_retry"
+		meta["originalStatus"] = "waiting_fetch_retry"
+		meta["originalFetchNextRetryAt"] = next
+		meta["error"] = message
+
+		schedule := novelFetchRetrySchedule(meta)
+		schedule[novelFetchRetryStageOriginalFetch] = map[string]any{
+			"attempt":       attempts,
+			"next_retry_at": next,
+			"error":         message,
+			"updated_at":    now.UTC().Format(time.RFC3339Nano),
+		}
+		meta["retry_schedule"] = schedule
+		refreshNovelFetchTaskRetrySummary(meta)
 	}
 	return store.PutDocument(ctx, owner, document)
+}
+
+func markNovelFetchOriginalManual(document *novelfetchworkshop.Document, status, reason string, now time.Time) {
+	meta := document.Meta
+	if cause := firstText(meta["originalFetchLastError"]); cause != "" {
+		reason += "：" + cause
+	}
+	meta["status"] = status
+	meta["queueState"] = status
+	meta["originalStatus"] = "waiting_manual_fetch"
+	meta["manualOnly"] = true
+	meta["manualOriginalFetchRequired"] = true
+	meta["error"] = reason
+	for _, key := range []string{"originalFetchNextRetryAt", "original_fetch_next_retry_at", "automationNextRetryAt", "automation_next_retry_at"} {
+		delete(meta, key)
+	}
+	clearNovelFetchTaskRetry(meta, "")
+	appendNovelFetchDocumentLog(document, "queue_"+status, reason, now)
 }
 
 func clearNovelFetchOriginalFetchRetry(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string) error {
@@ -197,7 +216,7 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 	if meta["scheduledHold"] == true || status == "scheduled_waiting" {
 		return false
 	}
-	if status == "stopped" || status == "cancelled" || status == "canceled" {
+	if status == "stopped" || status == "cancelled" || status == "canceled" || status == "waiting_configuration" {
 		return false
 	}
 	// 自动重试预算耗尽后必须由人工介入，不能因为 status=failed 又被扫描器

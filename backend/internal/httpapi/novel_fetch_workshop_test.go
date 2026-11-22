@@ -810,11 +810,11 @@ func TestWorkshopWorkerClassifiesReadyOriginalWithoutRefetching(t *testing.T) {
 }
 
 func TestNovelFetchOriginalFetchRetryIntervalUsesFetchConfiguration(t *testing.T) {
-	delay := novelFetchOriginalFetchRetryInterval(map[string]any{
-		"fetch": map[string]any{"original_fetch_retry_interval_minutes": 15},
-	})
-	if delay != 15*time.Minute {
-		t.Fatalf("fetch retry interval = %s, want 15m", delay)
+	settings := map[string]any{"fetch": map[string]any{"original_fetch_retry_interval_minutes": 15}}
+	for attempt := 1; attempt <= 5; attempt++ {
+		if delay := novelFetchOriginalRetryDelay(settings, attempt); delay != 15*time.Minute {
+			t.Fatalf("attempt %d: fetch retry interval = %s, want 15m", attempt, delay)
+		}
 	}
 }
 
@@ -1408,6 +1408,81 @@ func TestWorkshopProcessWorkerHonorsConfiguredFetchConcurrency(t *testing.T) {
 	}
 }
 
+func TestNovelFetchOriginalFetchErrorPreservesUpstreamCause(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	const owner, bookID = "tester", "22345678901"
+	if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"platformId": "2"}}); err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":400,"message":"获取书籍信息失败"}`))
+	}))
+	defer upstream.Close()
+	fetcher := &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}
+	err := executeWorkshopDocumentFetch(ctx, store, owner, bookID, fetcher, 4000, false, nil, nil, nil)
+	if !errors.Is(err, errNovelFetchOriginalFetch) {
+		t.Fatalf("missing workflow error: %v", err)
+	}
+	var cause *novelfetchworkshop.UpstreamError
+	if !errors.As(err, &cause) || cause.Class != novelfetchworkshop.UpstreamFailurePermanent || cause.BusinessCode != 400 {
+		t.Fatalf("missing typed upstream cause: %v", err)
+	}
+}
+
+func TestNovelFetchWorkerHoldsNonRetryableOriginalFetchFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		responseStatus int
+		want           string
+	}{
+		{name: "permanent", responseStatus: http.StatusNotFound, want: "failed"},
+		{name: "configuration", responseStatus: http.StatusForbidden, want: "waiting_configuration"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := novelfetchworkshop.NewMemoryQueue()
+			const owner, bookID = "tester", "22345678901"
+			if err := store.PutConfig(ctx, owner, map[string]any{"fetch": map[string]any{"retries": 2}}); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"platformId": "2"}}); err != nil {
+				t.Fatal(err)
+			}
+			var calls atomic.Int32
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				http.Error(w, "fetch refused", tc.responseStatus)
+			}))
+			defer upstream.Close()
+			registry := newWorkshopProcessRegistry()
+			worker := &workshopProcessWorker{store: store, queue: queue, registry: registry, fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
+			const jobID = "job-original-hold"
+			worker.process(ctx, novelfetchworkshop.ProcessJob{ID: jobID, Owner: owner, BatchID: "batch-original-hold", BookIDs: []string{bookID}, MaxTxt: 4000})
+
+			document, err := store.GetDocument(ctx, owner, bookID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls.Load() != 1 {
+				t.Errorf("upstream calls=%d, want one", calls.Load())
+			}
+			if document.Meta["status"] != tc.want || document.Meta["queueState"] != tc.want {
+				t.Errorf("document status=%v queueState=%v, want %s", document.Meta["status"], document.Meta["queueState"], tc.want)
+			}
+			job, _ := registry.get(owner, jobID)
+			progress, _ := json.Marshal(job["progress"])
+			if job["status"] != tc.want || job["queue_state"] != tc.want || bytes.Contains(progress, []byte("等待下次自动抓取")) {
+				t.Errorf("unexpected job snapshot status=%v queue_state=%v progress=%s", job["status"], job["queue_state"], progress)
+			}
+			if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("held original fetch was requeued: %v", err)
+			}
+		})
+	}
+}
+
 func TestWorkshopProcessWorkerDefersOriginalFetchFailureBeforeAutoRetry(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	queue := novelfetchworkshop.NewMemoryQueue()
@@ -1427,7 +1502,9 @@ func TestWorkshopProcessWorkerDefersOriginalFetchFailureBeforeAutoRetry(t *testi
 	defer upstream.Close()
 	worker := &workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry(), fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
 
+	started := time.Now()
 	worker.process(context.Background(), novelfetchworkshop.ProcessJob{ID: "job-fetch-wait", Owner: owner, BatchID: "batch-fetch-wait", BookIDs: []string{bookID}, MaxTxt: 4000})
+	finished := time.Now()
 
 	document, err := store.GetDocument(context.Background(), owner, bookID)
 	if err != nil {
@@ -1440,9 +1517,8 @@ func TestWorkshopProcessWorkerDefersOriginalFetchFailureBeforeAutoRetry(t *testi
 	if err != nil {
 		t.Fatalf("missing retry time: %#v", document.Meta)
 	}
-	remaining := time.Until(nextRetry)
-	if remaining < 59*time.Minute || remaining > 61*time.Minute {
-		t.Fatalf("retry delay = %s, want about one hour", remaining)
+	if nextRetry.Before(started.Add(time.Minute)) || nextRetry.After(finished.Add(time.Minute)) {
+		t.Fatalf("retry time = %s, want one minute after fetch failed between %s and %s", nextRetry, started, finished)
 	}
 	if _, err := queue.Claim(context.Background(), 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
 		t.Fatalf("original fetch failure was immediately queued again: %v", err)
