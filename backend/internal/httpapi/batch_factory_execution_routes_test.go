@@ -14,6 +14,20 @@ type routeExecutionRepository struct {
 	created   bool
 }
 
+type routeExecutionLegacy struct {
+	task batchfactoryexecution.LegacyTask
+}
+
+func (l routeExecutionLegacy) PeekActive(context.Context, string, string) (batchfactoryexecution.LegacyTask, bool, error) {
+	return batchfactoryexecution.LegacyTask{}, false, nil
+}
+func (l routeExecutionLegacy) Start(context.Context, string, string, batchfactoryexecution.LegacyStartInput) (batchfactoryexecution.LegacyTask, error) {
+	return batchfactoryexecution.LegacyTask{}, nil
+}
+func (l routeExecutionLegacy) Read(context.Context, string, string) (batchfactoryexecution.LegacyTask, bool, error) {
+	return l.task, true, nil
+}
+
 func (r *routeExecutionRepository) Ensure(_ context.Context, record batchfactoryexecution.EnsureRecord) (batchfactoryexecution.EnsureResult, error) {
 	if r.execution.ID == "" {
 		r.execution = batchfactoryexecution.Execution{ID: "execution-1", OwnerUsername: record.Owner, BatchID: record.BatchID, Mode: record.Mode, Target: record.Target, ClientRequestID: record.ClientRequestID, Status: batchfactoryexecution.ExecutionPlanned}
@@ -95,5 +109,29 @@ func TestBatchExecutionRoutesIsolateOwners(t *testing.T) {
 	denied := signedJSONRequest(t, mux, now, "bob", http.MethodGet, "/api/batch-factory/v12/executions/execution-1", nil)
 	if allowed.Code != http.StatusOK || denied.Code != http.StatusNotFound {
 		t.Fatalf("allowed=%d denied=%d", allowed.Code, denied.Code)
+	}
+}
+
+func TestBatchExecutionGetReconcilesLegacyStateForPolling(t *testing.T) {
+	now := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
+	repo := &routeExecutionRepository{execution: batchfactoryexecution.Execution{
+		ID: "execution-1", OwnerUsername: "alice", BatchID: "batch-1",
+		Status: batchfactoryexecution.ExecutionPlanned, LegacyJobID: "legacy-1",
+	}}
+	legacy := routeExecutionLegacy{task: batchfactoryexecution.LegacyTask{
+		JobID: "legacy-1", State: "running",
+		Books: map[string]batchfactoryexecution.LegacyBook{"book-1": {State: "running"}},
+	}}
+	service := batchfactoryexecution.NewService(repo, legacy)
+	mux := http.NewServeMux()
+	registerBatchExecutionRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, service)
+
+	response := signedJSONRequest(t, mux, now, "alice", http.MethodGet, "/api/batch-factory/v12/executions/execution-1", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	execution := decodeBody[batchfactoryexecution.Execution](t, response)
+	if execution.Status != batchfactoryexecution.ExecutionRunning {
+		t.Fatalf("status=%q, want running after legacy reconciliation", execution.Status)
 	}
 }

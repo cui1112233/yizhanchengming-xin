@@ -218,6 +218,11 @@ func (s *Service) Reconcile(ctx context.Context, owner, executionID string) (Exe
 	projected := ProjectLegacyTask(legacy)
 	needsAttention := false
 	for id, book := range projected {
+		if book.Status == BookCompleted && !CanCompleteBook(execution.Target, nil) {
+			// The legacy coordinator can prove local generation/upload work, but
+			// not the remote publication receipt required by this target.
+			book.Status = BookWaitingExternal
+		}
 		if book.Status == BookNeedsAttention {
 			needsAttention = true
 		}

@@ -75,7 +75,10 @@ func registerBatchExecutionRoutes(mux *http.ServeMux, auth BridgeAuth, service *
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		execution, err := service.GetExecution(req.Context(), identity.Username, req.PathValue("executionId"))
+		// Polling this endpoint must advance the canonical read model from the
+		// legacy coordinator; a plain database read would leave the browser on
+		// "planned" even while the attached legacy job is already running.
+		execution, err := service.Reconcile(req.Context(), identity.Username, req.PathValue("executionId"))
 		if err != nil {
 			writeBatchExecutionError(w, err)
 			return

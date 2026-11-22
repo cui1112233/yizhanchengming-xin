@@ -7,15 +7,16 @@ import (
 )
 
 type memoryExecutionRepository struct {
-	byRequest map[string]EnsureResult
-	active    map[string]string
-	updates   map[string]BookStatus
-	legacy    map[string]string
-	next      int
+	byRequest  map[string]EnsureResult
+	executions map[string]Execution
+	active     map[string]string
+	updates    map[string]BookStatus
+	legacy     map[string]string
+	next       int
 }
 
 func newMemoryExecutionRepository() *memoryExecutionRepository {
-	return &memoryExecutionRepository{byRequest: map[string]EnsureResult{}, active: map[string]string{}, updates: map[string]BookStatus{}, legacy: map[string]string{}}
+	return &memoryExecutionRepository{byRequest: map[string]EnsureResult{}, executions: map[string]Execution{}, active: map[string]string{}, updates: map[string]BookStatus{}, legacy: map[string]string{}}
 }
 func (r *memoryExecutionRepository) Ensure(_ context.Context, record EnsureRecord) (EnsureResult, error) {
 	key := record.Owner + "/" + record.BatchID + "/" + record.ClientRequestID
@@ -36,10 +37,15 @@ func (r *memoryExecutionRepository) Ensure(_ context.Context, record EnsureRecor
 		}
 	}
 	r.byRequest[key] = result
+	r.executions[execution.ID] = execution
 	return result, nil
 }
-func (r *memoryExecutionRepository) Get(context.Context, string, string) (Execution, error) {
-	return Execution{}, ErrNotFound
+func (r *memoryExecutionRepository) Get(_ context.Context, owner, id string) (Execution, error) {
+	execution, ok := r.executions[id]
+	if !ok || execution.OwnerUsername != owner {
+		return Execution{}, ErrNotFound
+	}
+	return execution, nil
 }
 func (r *memoryExecutionRepository) GetByClientRequest(context.Context, string, string, string) (Execution, bool, error) {
 	return Execution{}, false, nil
@@ -49,13 +55,23 @@ func (r *memoryExecutionRepository) ListBookTimeline(context.Context, string, st
 }
 func (r *memoryExecutionRepository) AttachLegacyJob(_ context.Context, owner, executionID, jobID string) error {
 	r.legacy[owner+"/"+executionID] = jobID
+	execution := r.executions[executionID]
+	execution.LegacyJobID = jobID
+	r.executions[executionID] = execution
 	return nil
 }
 func (r *memoryExecutionRepository) UpdateBookStatus(_ context.Context, owner, bookID string, status BookStatus, _ Failure) error {
 	r.updates[owner+"/"+bookID] = status
 	return nil
 }
-func (r *memoryExecutionRepository) UpdateExecutionStatus(context.Context, string, string, ExecutionStatus) error {
+
+func (r *memoryExecutionRepository) UpdateExecutionStatus(_ context.Context, owner, id string, status ExecutionStatus) error {
+	execution, ok := r.executions[id]
+	if !ok || execution.OwnerUsername != owner {
+		return ErrNotFound
+	}
+	execution.Status = status
+	r.executions[id] = execution
 	return nil
 }
 func (r *memoryExecutionRepository) AppendOutbox(context.Context, OutboxEvent) error { return nil }
@@ -66,6 +82,8 @@ type fakeLegacyGateway struct {
 	starts    int
 	startErr  error
 	started   LegacyStartInput
+	readTask  LegacyTask
+	readFound bool
 }
 
 func (g *fakeLegacyGateway) PeekActive(context.Context, string, string) (LegacyTask, bool, error) {
@@ -80,7 +98,7 @@ func (g *fakeLegacyGateway) Start(_ context.Context, _ string, _ string, input L
 	return LegacyTask{JobID: "job-new", State: "running"}, nil
 }
 func (g *fakeLegacyGateway) Read(context.Context, string, string) (LegacyTask, bool, error) {
-	return LegacyTask{}, false, nil
+	return g.readTask, g.readFound, nil
 }
 
 func executionCommand(requestID string, books ...string) EnsureCommand {
@@ -181,5 +199,27 @@ func TestServiceEnsureExecutionAmbiguousStartReconcilesWithoutResubmit(t *testin
 	}
 	if legacy.starts != 1 {
 		t.Fatalf("ambiguous request was resubmitted: %d", legacy.starts)
+	}
+}
+
+func TestServiceReconcileDoesNotCompletePublishedBookWithoutReceipt(t *testing.T) {
+	repo := newMemoryExecutionRepository()
+	legacy := &fakeLegacyGateway{readFound: true, readTask: LegacyTask{
+		JobID: "job-1", State: "completed",
+		Books: map[string]LegacyBook{"book-1": {BookID: "book-1", State: "completed"}},
+	}}
+	service := NewService(repo, legacy)
+	ensured, err := service.EnsureExecution(context.Background(), executionCommand("request-1", "book-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Reconcile(context.Background(), "alice", ensured.ExecutionID); err != nil {
+		t.Fatal(err)
+	}
+	if got := repo.updates["alice/book-1"]; got != BookWaitingExternal {
+		t.Fatalf("published book status=%q, want waiting_external until publication readback", got)
+	}
+	if got := repo.executions[ensured.ExecutionID].Status; got != ExecutionRunning {
+		t.Fatalf("execution status=%q, want running until publication readback", got)
 	}
 }
