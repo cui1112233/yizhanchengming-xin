@@ -37,7 +37,7 @@
 
 ### Existing backend integration
 
-- `backend/internal/storage/automation_schema.go`：追加 `8800017` 迁移，不修改既有 `8800016`。
+- `backend/internal/storage/automation_schema.go`：追加 `8800035` 迁移，不修改任何既有迁移；`8800001`–`8800034` 已被当前仓库占用。
 - `backend/internal/storage/automation_schema_test.go`：约束、索引、迁移顺序测试。
 - `backend/internal/httpapi/batch_factory_execution_routes.go`：新接口的薄路由。
 - `backend/internal/httpapi/batch_factory_execution_adapter.go`：把旧 coordinator 包装成 `LegacyAutomationGateway`。
@@ -83,7 +83,7 @@ func AutomationMigrations() []Migration
 ```go
 func TestAutomationMigrationsAppendUnifiedExecutionKernel(t *testing.T) {
 	got := AutomationMigrations()
-	if got[len(got)-1].Version != 8800017 {
+	if got[len(got)-1].Version != 8800035 {
 		t.Fatalf("last migration version=%d", got[len(got)-1].Version)
 	}
 	sql := strings.Join(got[len(got)-1].SQL, "\n")
@@ -110,9 +110,9 @@ func TestAutomationMigrationsAppendUnifiedExecutionKernel(t *testing.T) {
 
 Run: `go test ./internal/storage -run 'TestAutomationMigrationsAppendUnifiedExecutionKernel' -count=1`
 
-Expected: FAIL because migration `8800017` and the new tables do not exist.
+Expected: FAIL because migration `8800035` and the new tables do not exist.
 
-- [ ] Step 3: Add seven InnoDB tables as migration `8800017`
+- [ ] Step 3: Add seven InnoDB tables as migration `8800035`
 
 Minimum columns:
 
@@ -888,7 +888,7 @@ Create a timestamped rollback copy, upload to a temporary filename, verify check
 
 - [ ] Step 3: Restart only the confirmed production service
 
-Read service logs immediately. If migration `8800017` fails, restore the previous binary; the append-only schema may remain because old binaries ignore the new tables.
+Read service logs immediately. If migration `8800035` fails, restore the previous binary; the append-only schema may remain because old binaries ignore the new tables.
 
 - [ ] Step 4: Verify public identity and behavior
 
@@ -910,7 +910,7 @@ Report local SHA, remote SHA, online SHA, migration result, local execution ID, 
 
 This foundation phase is complete only when all statements are true:
 
-- [ ] New execution tables exist through append-only migration `8800017`.
+- [ ] New execution tables exist through append-only migration `8800035`.
 - [ ] Repeated clicks cannot create duplicate active execution books or duplicate legacy jobs.
 - [ ] Configuration and stage inputs have persisted digests.
 - [ ] Old active jobs appear in the new read model without dual-write.
