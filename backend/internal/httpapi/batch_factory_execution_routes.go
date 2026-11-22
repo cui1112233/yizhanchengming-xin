@@ -2,7 +2,9 @@ package httpapi
 
 import (
 	"errors"
+	"log"
 	"net/http"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryexecution"
 )
@@ -31,6 +33,7 @@ func registerBatchExecutionRoutes(mux *http.ServeMux, auth BridgeAuth, service *
 		return
 	}
 	mux.Handle("POST /api/batch-factory/v12/batches/{batchId}/executions/ensure", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		startedAt := time.Now()
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -42,9 +45,24 @@ func registerBatchExecutionRoutes(mux *http.ServeMux, auth BridgeAuth, service *
 		}
 		result, err := service.EnsureExecution(req.Context(), batchfactoryexecution.EnsureCommand{Owner: identity.Username, BatchID: req.PathValue("batchId"), BookIDs: input.BookIDs, Mode: input.Mode, Target: input.Target, ClientRequestID: input.ClientRequestID, Config: input.Config})
 		if err != nil {
+			event := batchfactoryexecution.NewObservabilityEvent("execution_ensure_rejected", identity.Username)
+			event.BatchID = req.PathValue("batchId")
+			event.Status = "rejected"
+			event.DurationMS = time.Since(startedAt).Milliseconds()
+			log.Print(event.JSON())
 			writeBatchExecutionError(w, err)
 			return
 		}
+		event := batchfactoryexecution.NewObservabilityEvent("execution_ensured", identity.Username)
+		event.ExecutionID = result.ExecutionID
+		event.BatchID = req.PathValue("batchId")
+		if result.Created {
+			event.Status = "created"
+		} else {
+			event.Status = "reused"
+		}
+		event.DurationMS = time.Since(startedAt).Milliseconds()
+		log.Print(event.JSON())
 		status := http.StatusOK
 		if result.Created {
 			status = http.StatusCreated
@@ -80,6 +98,7 @@ func registerBatchExecutionRoutes(mux *http.ServeMux, auth BridgeAuth, service *
 	for _, action := range []string{"reconcile", "cancel"} {
 		action := action
 		mux.Handle("POST /api/batch-factory/v12/executions/{executionId}/"+action, auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			startedAt := time.Now()
 			identity, ok := BridgeIdentityFromContext(req.Context())
 			if !ok {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -93,9 +112,21 @@ func registerBatchExecutionRoutes(mux *http.ServeMux, auth BridgeAuth, service *
 				execution, err = service.Reconcile(req.Context(), identity.Username, req.PathValue("executionId"))
 			}
 			if err != nil {
+				event := batchfactoryexecution.NewObservabilityEvent("execution_"+action+"_rejected", identity.Username)
+				event.ExecutionID = req.PathValue("executionId")
+				event.Status = "rejected"
+				event.DurationMS = time.Since(startedAt).Milliseconds()
+				log.Print(event.JSON())
 				writeBatchExecutionError(w, err)
 				return
 			}
+			event := batchfactoryexecution.NewObservabilityEvent("execution_"+action, identity.Username)
+			event.ExecutionID = execution.ID
+			event.BatchID = execution.BatchID
+			event.LegacyJobID = execution.LegacyJobID
+			event.Status = string(execution.Status)
+			event.DurationMS = time.Since(startedAt).Milliseconds()
+			log.Print(event.JSON())
 			writeJSON(w, http.StatusOK, execution)
 		})))
 	}
