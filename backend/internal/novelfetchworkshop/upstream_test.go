@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 )
 
@@ -258,6 +261,45 @@ func TestUpstreamFetchReturnsTimeoutErrorWithoutBody(t *testing.T) {
 	}
 }
 
+func TestUpstreamFetchRedactsInvalidRedirect(t *testing.T) {
+	const secret = "example-redirect-token"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/%zz?token="+secret)
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer server.Close()
+
+	_, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "15", 0)
+	if class, ok := ClassifyUpstreamFailure(err); !ok || class != UpstreamFailureTransient {
+		t.Fatalf("got error %v, want a transient redirect failure", err)
+	}
+	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
+		if strings.Contains(cause.Error(), secret) {
+			t.Fatal("error chain exposed the redirect token")
+		}
+	}
+}
+
+func TestUpstreamFetchReadFailureRetainsSafeCancellation(t *testing.T) {
+	const secret = "example-response-token"
+	transport := roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(iotest.ErrReader(fmt.Errorf("token=%s: %w", secret, context.Canceled))),
+		}, nil
+	})
+	fetcher := UpstreamFetcher{Client: &http.Client{Transport: transport}, Endpoint: "http://upstream.invalid"}
+	_, err := fetcher.Fetch(context.Background(), "book-123", "15", 0)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("got error %v, want context cancellation", err)
+	}
+	for cause := err; cause != nil; cause = errors.Unwrap(cause) {
+		if strings.Contains(cause.Error(), secret) {
+			t.Fatal("error chain exposed the response token")
+		}
+	}
+}
+
 // Reproduces the production "参数不完整" failure: missing bookid/platform must
 // be rejected locally so we never call the upstream with incomplete params.
 func TestUpstreamFetchRejectsMissingParametersWithoutRequest(t *testing.T) {
@@ -308,7 +350,7 @@ func TestUpstreamFetchBusinessErrorIncludesRequestParameters(t *testing.T) {
 	if err == nil {
 		t.Fatal("want business error")
 	}
-	for _, want := range []string{"400", "参数不完整", "bookid=book-123", "platform=15"} {
+	for _, want := range []string{"business error 400", "参数不完整", "bookid=book-123", "platform=15"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %q, want to contain %q", err.Error(), want)
 		}
@@ -329,9 +371,12 @@ func TestUpstreamFetchClassifiesResponseFailures(t *testing.T) {
 		{name: "HTTP 401", httpStatus: http.StatusUnauthorized, class: UpstreamFailureConfiguration},
 		{name: "HTTP 403", httpStatus: http.StatusForbidden, class: UpstreamFailureConfiguration},
 		{name: "HTTP 408", httpStatus: http.StatusRequestTimeout, class: UpstreamFailureTransient},
+		{name: "HTTP 409", httpStatus: http.StatusConflict, class: UpstreamFailureTransient},
 		{name: "HTTP 429", httpStatus: http.StatusTooManyRequests, class: UpstreamFailureTransient},
 		{name: "HTTP 503", httpStatus: http.StatusServiceUnavailable, class: UpstreamFailureTransient},
 		{name: "business 400", body: `{"code":400,"msg":"token=` + secret + `","data":"错误内容"}`, class: UpstreamFailurePermanent, businessCode: 400},
+		{name: "business 403", body: `{"code":403,"msg":"无权访问"}`, class: UpstreamFailureTransient, businessCode: 403},
+		{name: "business 503", body: `{"code":503,"msg":"暂时不可用"}`, class: UpstreamFailureTransient, businessCode: 503},
 		{name: "invalid JSON", body: `{"token":"` + secret + `"`, class: UpstreamFailureTransient},
 		{name: "HTML response", body: `<!DOCTYPE html><html>` + secret + `</html>`, class: UpstreamFailureTransient},
 		{name: "HTML in data", body: `{"code":200,"data":"<html>` + secret + `</html>"}`, class: UpstreamFailureTransient},

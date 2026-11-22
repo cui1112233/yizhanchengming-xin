@@ -1,8 +1,10 @@
 package novelfetchworkshop
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -29,7 +31,7 @@ func (e *UpstreamError) Error() string {
 		parts = append(parts, fmt.Sprintf("HTTP status %d", e.HTTPStatus))
 	}
 	if e.BusinessCode > 0 {
-		parts = append(parts, fmt.Sprintf("business %d", e.BusinessCode))
+		parts = append(parts, fmt.Sprintf("business error %d", e.BusinessCode))
 	}
 	if message := strings.TrimSpace(e.Message); message != "" {
 		parts = append(parts, message)
@@ -38,6 +40,21 @@ func (e *UpstreamError) Error() string {
 }
 
 func (e *UpstreamError) Unwrap() error { return e.Cause }
+
+// safeUpstreamIOCause keeps errors.Is checks without retaining the transport's
+// error text, which can contain credentials from URLs or response headers.
+func safeUpstreamIOCause(ctx context.Context, err error) error {
+	switch contextErr := ctx.Err(); {
+	case errors.Is(err, context.DeadlineExceeded) || contextErr == context.DeadlineExceeded:
+		return context.DeadlineExceeded
+	case errors.Is(err, context.Canceled) || contextErr == context.Canceled:
+		return context.Canceled
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return io.ErrUnexpectedEOF
+	default:
+		return nil
+	}
+}
 
 func ClassifyUpstreamFailure(err error) (UpstreamFailureClass, bool) {
 	var target *UpstreamError

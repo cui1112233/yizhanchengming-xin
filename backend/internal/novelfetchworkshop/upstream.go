@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -126,25 +125,21 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return FetchResult{}, failure(UpstreamFailureTransient, "request timed out", context.DeadlineExceeded)
+		cause := safeUpstreamIOCause(ctx, err)
+		if cause == context.DeadlineExceeded {
+			return FetchResult{}, failure(UpstreamFailureTransient, "request timed out", cause)
 		}
-		// The client wrapper includes the full request URL and its query parameters.
-		if urlErr, ok := err.(*url.Error); ok {
-			err = urlErr.Err
-		}
-		return FetchResult{}, failure(UpstreamFailureTransient, "request failed", err)
+		return FetchResult{}, failure(UpstreamFailureTransient, "request failed", cause)
 	}
 	defer response.Body.Close()
 	status := response.StatusCode
 	if status < http.StatusOK || status >= http.StatusMultipleChoices {
-		class := UpstreamFailurePermanent
-		switch {
-		case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		class := UpstreamFailureTransient
+		switch status {
+		case http.StatusBadRequest, http.StatusNotFound:
+			class = UpstreamFailurePermanent
+		case http.StatusUnauthorized, http.StatusForbidden:
 			class = UpstreamFailureConfiguration
-		case status == http.StatusRequestTimeout || status == http.StatusTooManyRequests ||
-			(status >= http.StatusInternalServerError && status < 600):
-			class = UpstreamFailureTransient
 		}
 		fetchErr := failure(class, "request rejected", nil)
 		fetchErr.HTTPStatus = status
@@ -153,7 +148,7 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if err != nil {
-		return FetchResult{}, failure(UpstreamFailureTransient, "response read failed", err)
+		return FetchResult{}, failure(UpstreamFailureTransient, "response read failed", safeUpstreamIOCause(ctx, err))
 	}
 	payload, err := decodeUpstreamPayload(body)
 	if err != nil {
@@ -163,13 +158,17 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 		return FetchResult{}, failure(UpstreamFailureTransient, "上游响应缺少业务状态", nil)
 	}
 	if payload.Code != http.StatusOK {
+		class := UpstreamFailureTransient
+		if payload.Code == http.StatusBadRequest {
+			class = UpstreamFailurePermanent
+		}
 		message := "上游返回业务错误"
 		// Preserve known messages used by callers without echoing arbitrary upstream text.
 		switch text := strings.TrimSpace(payload.Message); text {
 		case "获取书籍信息失败", "参数不完整", "无权访问":
 			message = text
 		}
-		fetchErr := failure(UpstreamFailurePermanent, message, nil)
+		fetchErr := failure(class, message, nil)
 		fetchErr.BusinessCode = payload.Code
 		return FetchResult{}, fetchErr
 	}
