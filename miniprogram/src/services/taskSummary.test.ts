@@ -84,6 +84,13 @@ describe("真实任务汇总", () => {
     expect(source(summary, "fetch")).toMatchObject({ state: "ready" });
   });
 
+  it("保留服务端任务类型作为图标提示但不改变真实状态", async () => {
+    const summary = await loadTaskSummary(requestFrom({
+      "/api/batch-rewrite/tasks": { tasks: [{ id: "visual-1", title: "人物场景提取", kind: "image", status: "pending" }] },
+    }));
+    expect(summary.entries[0]).toMatchObject({ visualHint: "image", status: "running" });
+  });
+
   it("保留成功来源，并将单个请求失败限定在所属来源", async () => {
     const summary = await loadTaskSummary(requestFrom({
       "/api/history": { entries: [{ id: "script-1", preview: "第一集", status: "completed" }] },
@@ -113,6 +120,7 @@ describe("真实任务汇总", () => {
       rawStatus: undefined,
       status: "unknown",
       progress: undefined,
+      visualHint: undefined,
     }]);
     expect(filterTaskEntries(summary.entries, "已完成")).toEqual([]);
     expect(filterTaskEntries(summary.entries, "全部")).toHaveLength(1);

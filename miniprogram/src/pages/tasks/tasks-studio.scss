@@ -20,7 +20,7 @@
   .task-studio-title {display:block;color:#fff;font-size:29PX;line-height:35PX;font-weight:850;letter-spacing:-1PX;text-shadow:0 3PX 14PX rgba(8,15,43,.35)}
   .task-studio-subtitle {display:block;margin-top:4PX;color:#d7deec;font-size:12PX;line-height:18PX;letter-spacing:2PX}
   .task-studio-title-stroke {display:block;width:28PX;height:3PX;margin-top:11PX;border-radius:3PX;background:linear-gradient(90deg,var(--task-cyan),#46d9ff);box-shadow:0 0 10PX rgba(79,236,224,.6)}
-  .task-studio-hero-art {position:absolute;z-index:1;right:18PX;bottom:-1PX;width:118PX;height:104PX;filter:drop-shadow(0 10PX 17PX rgba(24,6,68,.38))}
+  .task-studio-hero-art {position:absolute;z-index:1;right:-8PX;bottom:-2PX;width:168PX;height:112PX;filter:drop-shadow(0 10PX 17PX rgba(24,6,68,.38))}
   .task-studio-refresh,.task-studio-retry {display:flex;align-items:center;justify-content:center;margin:0;padding:0;border:1PX solid rgba(127,241,232,.46);background:rgba(16,56,91,.58);color:#92f9ed;backdrop-filter:blur(12PX)}
   .task-studio-refresh {position:absolute;z-index:3;right:0;top:8PX;width:32PX;height:32PX;border-radius:16PX}
   .task-studio-refresh::after,.task-studio-retry::after {border:0}
@@ -29,7 +29,7 @@
   .task-studio-counts,.task-studio-segments,.task-studio-list,.task-studio-state,.task-studio-source-error {border:1PX solid rgba(111,203,232,.46);background:linear-gradient(145deg,rgba(25,55,91,.94),rgba(10,29,53,.97));box-shadow:inset 0 1PX 0 rgba(255,255,255,.16),0 10PX 25PX rgba(1,9,28,.26),0 0 20PX rgba(75,228,223,.06);backdrop-filter:blur(18PX)}
   .task-studio-counts {display:flex;align-items:center;min-height:72PX;padding:7PX 5PX;box-sizing:border-box;border-radius:20PX;background:linear-gradient(135deg,rgba(54,62,126,.91),rgba(18,53,83,.96));box-shadow:inset 0 1PX 0 rgba(255,255,255,.2),0 8PX 24PX rgba(2,8,30,.28),0 0 18PX rgba(70,225,222,.1)}
   .task-studio-count-item {display:flex;min-width:0;flex:1;align-items:center;justify-content:center;gap:5PX;color:#dce5f3;font-size:10PX;line-height:14PX}
-  .task-studio-count-art {display:block;width:36PX;height:36PX;flex:0 0 36PX;filter:drop-shadow(0 5PX 7PX rgba(0,11,34,.38))}
+  .task-studio-count-art {display:block;width:44PX;height:44PX;flex:0 0 44PX;filter:drop-shadow(0 5PX 7PX rgba(0,11,34,.38))}
   .task-studio-count-value {display:block;color:#fff;font-size:20PX;line-height:22PX;font-weight:850}
   .task-studio-count-divider {width:1PX;height:34PX;background:rgba(197,211,232,.2)}
 
@@ -43,8 +43,8 @@
   .task-studio-row.is-disabled {opacity:.58}
   .task-studio-row-art {position:absolute;left:0;top:50%;width:52PX;height:52PX;transform:translateY(-50%);filter:drop-shadow(0 5PX 7PX rgba(0,13,32,.34))}
   .task-studio-row-copy {display:flex;min-width:0;flex:1;flex-direction:column;padding-right:8PX}
-  .task-studio-row-title {display:block;overflow:hidden;color:#fff;font-size:14PX;line-height:19PX;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
-  .task-studio-row-source {display:block;margin-top:2PX;overflow:hidden;color:var(--task-muted);font-size:10PX;line-height:14PX;text-overflow:ellipsis;white-space:nowrap}
+  .task-studio-row-title {display:block;overflow:hidden;color:#fff;font-size:15PX;line-height:20PX;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+  .task-studio-row-source {display:block;margin-top:2PX;overflow:hidden;color:var(--task-muted);font-size:11PX;line-height:15PX;text-overflow:ellipsis;white-space:nowrap}
   .task-studio-row-state {display:flex;width:68PX;flex:0 0 68PX;align-items:flex-end;flex-direction:column}
   .task-studio-progress-value {font-size:12PX;line-height:16PX;color:#f4f7ff}
   .task-studio-progress-track {width:62PX;height:5PX;margin:3PX 0 5PX;overflow:hidden;border-radius:4PX;background:rgba(137,170,198,.28)}
@@ -68,9 +68,9 @@
     .task-studio-header-scene {margin-left:-11PX;margin-right:-11PX;padding-left:11PX;padding-right:11PX}
     .task-studio-title {font-size:26PX;line-height:32PX}
     .task-studio-subtitle {font-size:11PX;letter-spacing:1.4PX}
-    .task-studio-hero-art {right:10PX;width:106PX;height:96PX}
+    .task-studio-hero-art {right:-12PX;width:148PX;height:100PX}
     .task-studio-count-item {gap:2PX;font-size:9PX}
-    .task-studio-count-art {width:31PX;height:31PX;flex-basis:31PX}
+    .task-studio-count-art {width:38PX;height:38PX;flex-basis:38PX}
     .task-studio-row {padding-left:53PX}
     .task-studio-row-art {width:47PX;height:47PX}
     .task-studio-row-state {width:62PX;flex-basis:62PX}

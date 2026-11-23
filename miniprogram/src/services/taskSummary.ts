@@ -12,6 +12,7 @@ export type AggregatedTask = {
   rawStatus: string | undefined;
   status: TaskStatus;
   progress: { completed: number; total: number } | undefined;
+  visualHint: string | undefined;
 };
 
 export type TaskSourceResult = {
@@ -128,6 +129,7 @@ function entryFromRecord(definition: SourceDefinition, record: Record<string, un
     rawStatus,
     status,
     progress: video.progress,
+    visualHint: firstText(record, ["kind", "type", "stage", "taskType", "task_type"]),
     sourceOrder,
     entryOrder,
   };

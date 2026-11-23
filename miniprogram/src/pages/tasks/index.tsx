@@ -7,16 +7,15 @@ import { deriveTaskPageState } from "../../services/taskPageState";
 import { filterTaskEntries, loadTaskSummary, taskCounts, taskDestination, type AggregatedTask, type TaskFilter, type TaskSummary } from "../../services/taskSummary";
 import BrandHeader from "../../components/BrandHeader";
 import AppIcon from "../../components/AppIcon";
-import taskRunningArt from "../../assets/functions/shuihuo-production-3d.webp";
-import taskAttentionArt from "../../assets/functions/batch-review-3d.webp";
-import taskCompletedArt from "../../assets/functions/cm-canvas-3d.webp";
-import { FUNCTION_VISUALS } from "../functions/functionVisuals";
+import taskHeroArt from "../../assets/tasks/task-center-hero.webp";
+import taskRunningArt from "../../assets/functions/clapper-play-v2.webp";
+import taskAttentionArt from "../../assets/tasks/task-attention-clock.webp";
+import taskCompletedArt from "../../assets/tasks/task-completed-check.webp";
 import { ThemedPage } from "../../theme";
+import { taskVisualAsset } from "./taskVisuals";
 import "./tasks-studio.scss";
 
 const FILTERS: TaskFilter[] = ["全部", "进行中", "待确认", "已完成"];
-const SOURCE_VISUAL = { script: FUNCTION_VISUALS.script, agent: FUNCTION_VISUALS.agent, fetch: FUNCTION_VISUALS.fetch, batch: FUNCTION_VISUALS.batch, shuihuo: FUNCTION_VISUALS.shuihuo };
-
 function statusLabel(entry: AggregatedTask) {
   if (entry.status === "running") return "进行中";
   if (entry.status === "attention") return "待确认";
@@ -71,7 +70,7 @@ export default function TasksPage() {
       <BrandHeader title="任务" primary />
       <View className="task-studio-hero">
         <View className="task-studio-hero-copy"><Text className="task-studio-title">任务中心</Text><Text className="task-studio-subtitle">追踪全部创作与生产记录</Text><Text className="task-studio-title-stroke" /></View>
-        <Image className="task-studio-hero-art" src={taskRunningArt} mode="aspectFit" />
+        <Image className="task-studio-hero-art" src={taskHeroArt} mode="aspectFit" />
         <Button className="task-studio-refresh" aria-label="刷新任务" loading={refreshing} disabled={loading} onClick={load}><AppIcon name="refresh-ccw" size={16} /></Button>
       </View>
     </View>
@@ -90,9 +89,9 @@ export default function TasksPage() {
       {failedSources.map((source) => <View className="task-studio-source-error" key={source.source}><View><Text className="task-studio-state-title">{source.sourceLabel} 暂未同步</Text><Text>{source.error}</Text></View><Button className="task-studio-retry" onClick={load}>重试</Button></View>)}
       <View className="task-studio-list liquid-glass--list" data-glass-role="list">
         {filtered.map((entry, index) => {
-          const progress = validProgress(entry); const visual = SOURCE_VISUAL[entry.source]; const disabled = !entry.id;
+          const progress = validProgress(entry); const visual = taskVisualAsset(entry); const disabled = !entry.id;
           return <View className={`task-studio-row studio-task-record is-${entry.status}${disabled ? " is-disabled" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
-            <Image className="task-studio-row-art" src={visual.asset} mode="aspectFit" />
+            <Image className="task-studio-row-art" src={visual} mode="aspectFit" />
             <View className="task-studio-row-copy"><Text className="task-studio-row-title">{entry.title || "服务端未返回标题"}</Text><Text className="task-studio-row-source">{entry.sourceLabel} · {formatTimestamp(entry.createdAt)}</Text></View>
             <View className="task-studio-row-state studio-task-action">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text></View>
             {!disabled ? <AppIcon className="task-studio-row-arrow" name="chevron-right" size={17} /> : null}

@@ -13,6 +13,7 @@ vi.mock('../../components/BrandHeader',()=>({default:'BrandHeader'}));
 vi.mock('../../components/AmbientStarfield',()=>({default:'AmbientStarfield'}));
 vi.mock('../../components/AppIcon',()=>({default:'AppIcon'}));
 vi.mock('../functions/functionVisuals',()=>({FUNCTION_VISUALS:{script:{asset:'script.webp'},agent:{asset:'agent.webp'},fetch:{asset:'fetch.webp'},batch:{asset:'batch.webp'},shuihuo:{asset:'shuihuo.webp'}}}));
+vi.mock('./taskVisuals',()=>({taskVisualAsset:(entry:any)=>`visual-${entry.id}.webp`}));
 import TasksPage from './index';
 const nodes=(tree:any):any[]=>!tree||typeof tree!=='object'?[]:[tree,...[tree.props?.children].flat(Infinity).flatMap(nodes)];
 const render=()=>{h.cursor=0;return nodes(TasksPage());};
@@ -35,6 +36,13 @@ test('task center renders real counters, approved filters, and one shared list s
  expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-filter')).map(content)).toEqual(['全部','进行中','待确认','已完成']);
  expect(tree.filter(n=>n.props?.className?.includes('task-studio-list'))).toHaveLength(1);
  expect(tree.filter(n=>n.props?.className?.split(' ').includes('task-studio-row'))).toHaveLength(4);
+ expect(tree.filter(n=>n.props?.className==='task-studio-row-art').map(n=>n.props.src)).toEqual(['visual-run.webp','visual-review.webp','visual-done.webp','visual-a/b.webp']);
+});
+test('hero and three status counters use four purpose-specific illustrations',async()=>{
+ const tree=await ready();
+ const hero=tree.find(n=>n.props?.className==='task-studio-hero-art')?.props.src;
+ const counters=tree.filter(n=>n.props?.className?.includes('task-studio-count-art')).map(n=>n.props.src);
+ expect(new Set([hero,...counters]).size).toBe(4);
 });
 test('progress is rendered only when the server returns a valid total',async()=>{
  const tree=await ready();
@@ -61,7 +69,8 @@ test('task center disables the native dynamic canvas that can cover the page in 
 test('task center keeps the compact phone scale from the approved reference',()=>{
  const style=readFileSync(resolve(__dirname,'tasks-studio.scss'),'utf8');
  expect(style).toMatch(/\.task-studio-counts\s*\{[^}]*min-height:72PX/);
+ expect(style).toMatch(/\.task-studio-count-art\s*\{[^}]*width:44PX[^}]*height:44PX/);
  expect(style).toMatch(/\.task-studio-segments\s*\{[^}]*height:42PX/);
  expect(style).toMatch(/\.task-studio-row\s*\{[^}]*min-height:76PX/);
- expect(style).toMatch(/\.task-studio-row-title\s*\{[^}]*font-size:14PX/);
+ expect(style).toMatch(/\.task-studio-row-title\s*\{[^}]*font-size:15PX/);
 });
