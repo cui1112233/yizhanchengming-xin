@@ -150,22 +150,23 @@ func (r *MySQLRepository) CreateVersion(ctx context.Context, s Scope, in Version
 	default:
 		return Version{}, ErrInvalid
 	}
-	return transaction(ctx, r.db, func(tx *sql.Tx) (Version, error) {
-		h, err := lockHead(ctx, tx, s)
-		if err != nil {
-			return Version{}, err
-		}
-		if err = revision(in.ExpectedRevision, h.revision); err != nil {
-			return Version{}, err
-		}
-		v := Version{ID: rand.Text(), ProductionText: in.ProductionText, SensitiveMode: in.SensitiveMode, ChangeTrace: in.ChangeTrace, ContentDigest: digest(in.ProductionText)}
-		_, err = tx.ExecContext(ctx, "INSERT INTO "+versions+" (id,owner_username,book_id,document_id,production_text,sensitive_mode,change_trace_json,content_digest,created_at) VALUES(?,?,?,?,?,?,?,?,NOW(6))", v.ID, s.Owner, s.BookID, h.id, v.ProductionText, v.SensitiveMode, dbJSON(v.ChangeTrace), v.ContentDigest)
-		if err != nil {
-			return Version{}, err
-		}
-		_, err = tx.ExecContext(ctx, "UPDATE "+documents+" SET active_version_id=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", v.ID, h.id)
-		return v, err
-	})
+	return transaction(ctx, r.db, func(tx *sql.Tx) (Version, error) { return createVersionTx(ctx, tx, s, in) })
+}
+func createVersionTx(ctx context.Context, tx *sql.Tx, s Scope, in VersionInput) (Version, error) {
+	h, err := lockHead(ctx, tx, s)
+	if err != nil {
+		return Version{}, err
+	}
+	if err = revision(in.ExpectedRevision, h.revision); err != nil {
+		return Version{}, err
+	}
+	v := Version{ID: rand.Text(), ProductionText: in.ProductionText, SensitiveMode: in.SensitiveMode, ChangeTrace: in.ChangeTrace, ContentDigest: digest(in.ProductionText)}
+	_, err = tx.ExecContext(ctx, "INSERT INTO "+versions+" (id,owner_username,book_id,document_id,production_text,sensitive_mode,change_trace_json,content_digest,created_at) VALUES(?,?,?,?,?,?,?,?,NOW(6))", v.ID, s.Owner, s.BookID, h.id, v.ProductionText, v.SensitiveMode, dbJSON(v.ChangeTrace), v.ContentDigest)
+	if err != nil {
+		return Version{}, err
+	}
+	_, err = tx.ExecContext(ctx, "UPDATE "+documents+" SET active_version_id=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", v.ID, h.id)
+	return v, err
 }
 
 func (r *MySQLRepository) ListVersions(ctx context.Context, s Scope) ([]Version, error) {
@@ -280,56 +281,57 @@ func (r *MySQLRepository) ReplaceSystemPages(ctx context.Context, s Scope, in Pa
 	if !validJSON(in.ConfigSnapshot) {
 		return 0, ErrInvalid
 	}
-	return transaction(ctx, r.db, func(tx *sql.Tx) (int64, error) {
-		h, err := lockHead(ctx, tx, s)
+	return transaction(ctx, r.db, func(tx *sql.Tx) (int64, error) { return replacePagesTx(ctx, tx, s, in) })
+}
+func replacePagesTx(ctx context.Context, tx *sql.Tx, s Scope, in PaginationUpdate) (int64, error) {
+	h, err := lockHead(ctx, tx, s)
+	if err != nil {
+		return 0, err
+	}
+	if err = revision(in.ExpectedRevision, h.revision); err != nil {
+		return 0, err
+	}
+	if h.version == "" || in.VersionID != h.version {
+		return 0, ErrConflict
+	}
+	var text string
+	var priorSnapshot []byte
+	err = tx.QueryRowContext(ctx, "SELECT v.production_text,d.config_snapshot_json FROM "+versions+" v JOIN "+documents+" d ON d.id=v.document_id WHERE v.owner_username=? AND v.book_id=? AND v.id=?", s.Owner, s.BookID, h.version).Scan(&text, &priorSnapshot)
+	if err != nil {
+		return 0, lookupErr(err)
+	}
+	if err = validateDrafts(text, in.Pages); err != nil {
+		return 0, err
+	}
+	previous, err := previousPages(ctx, tx, s, in.Pages)
+	if err != nil {
+		return 0, err
+	}
+	oldBook, err := PageStyleFromSnapshot(priorSnapshot)
+	if err != nil {
+		return 0, err
+	}
+	if len(in.ConfigSnapshot) == 0 {
+		in.ConfigSnapshot = priorSnapshot
+	}
+	newBook, err := PageStyleFromSnapshot(in.ConfigSnapshot)
+	if err != nil {
+		return 0, err
+	}
+	next := h.pagination + 1
+	for i, d := range in.Pages {
+		ordinal := i + 1
+		err = writeNextPage(ctx, tx, s, h, ordinal, d, previous[d.StartOffset], oldBook, newBook)
 		if err != nil {
 			return 0, err
 		}
-		if err = revision(in.ExpectedRevision, h.revision); err != nil {
-			return 0, err
-		}
-		if h.version == "" || in.VersionID != h.version {
-			return 0, ErrConflict
-		}
-		var text string
-		var priorSnapshot []byte
-		err = tx.QueryRowContext(ctx, "SELECT v.production_text,d.config_snapshot_json FROM "+versions+" v JOIN "+documents+" d ON d.id=v.document_id WHERE v.owner_username=? AND v.book_id=? AND v.id=?", s.Owner, s.BookID, h.version).Scan(&text, &priorSnapshot)
-		if err != nil {
-			return 0, lookupErr(err)
-		}
-		if err = validateDrafts(text, in.Pages); err != nil {
-			return 0, err
-		}
-		previous, err := previousPages(ctx, tx, s, in.Pages)
-		if err != nil {
-			return 0, err
-		}
-		oldBook, err := PageStyleFromSnapshot(priorSnapshot)
-		if err != nil {
-			return 0, err
-		}
-		if len(in.ConfigSnapshot) == 0 {
-			in.ConfigSnapshot = priorSnapshot
-		}
-		newBook, err := PageStyleFromSnapshot(in.ConfigSnapshot)
-		if err != nil {
-			return 0, err
-		}
-		next := h.pagination + 1
-		for i, d := range in.Pages {
-			ordinal := i + 1
-			err = writeNextPage(ctx, tx, s, h, ordinal, d, previous[d.StartOffset], oldBook, newBook)
-			if err != nil {
-				return 0, err
-			}
-		}
-		_, err = tx.ExecContext(ctx, "DELETE FROM "+pagesTable+" WHERE owner_username=? AND book_id=? AND pagination_version=? AND locked=FALSE", s.Owner, s.BookID, h.pagination)
-		if err != nil {
-			return 0, err
-		}
-		_, err = tx.ExecContext(ctx, "UPDATE "+documents+" SET pagination_version=?,config_snapshot_json=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", next, dbJSON(in.ConfigSnapshot), h.id)
-		return next, err
-	})
+	}
+	_, err = tx.ExecContext(ctx, "DELETE FROM "+pagesTable+" WHERE owner_username=? AND book_id=? AND pagination_version=? AND locked=FALSE", s.Owner, s.BookID, h.pagination)
+	if err != nil {
+		return 0, err
+	}
+	_, err = tx.ExecContext(ctx, "UPDATE "+documents+" SET pagination_version=?,config_snapshot_json=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", next, dbJSON(in.ConfigSnapshot), h.id)
+	return next, err
 }
 
 const pageCols = "p.id,p.version_id,p.pagination_version,p.ordinal_no,p.start_offset,p.end_offset,p.page_text,p.content_digest,p.layout_json,p.background_json,p.source_kind,p.locked,p.render_version,COALESCE(p.active_artifact_id,''),p.status,COALESCE(p.failed_stage,''),COALESCE(p.error_type,''),COALESCE(p.last_error,''),p.revision"
@@ -560,7 +562,7 @@ func (r *MySQLRepository) CreateCollection(ctx context.Context, s Scope, in Coll
 		if err != nil {
 			return Collection{}, err
 		}
-		if in.VersionID != h.version || in.PaginationVersion != h.pagination {
+if in.VersionID != h.version || in.PaginationVersion != h.pagination || (in.ExpectedRevision > 0 && in.ExpectedRevision != h.revision) {
 			return Collection{}, ErrConflict
 		}
 		if h.version == "" || h.pagination == 0 {

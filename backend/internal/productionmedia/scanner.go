@@ -43,6 +43,8 @@ func (s Scanner) RunOnce(ctx context.Context) (ScanSummary, error) {
 		{`SELECT i.owner_username,COALESCE(i.storage_ref,''),COALESCE(i.media_type,'application/octet-stream') FROM batch_factory_v12_comic_page_images i WHERE COALESCE(i.storage_ref,'')<>''`, KindComicImage},
 		{`SELECT i.owner_username,COALESCE(i.storage_ref,''),COALESCE(i.media_type,'application/octet-stream') FROM batch_factory_v12_book_asset_images i WHERE COALESCE(i.storage_ref,'')<>''`, KindAssetImage},
 		{`SELECT owner_username,COALESCE(storage_ref,''),COALESCE(media_type,'application/octet-stream') FROM local_executor_artifacts WHERE COALESCE(storage_ref,'')<>''`, "local_executor"},
+		{`SELECT owner_username,storage_ref,media_type FROM batch_factory_v12_text_page_artifacts WHERE storage_ref<>''`, KindTextImage},
+		{`SELECT owner_username,storage_ref,media_type FROM batch_factory_v12_text_backgrounds WHERE storage_ref<>''`, KindTextBackground},
 	}
 	for _, source := range queries {
 		rows, err := s.DB.QueryContext(ctx, source.query)

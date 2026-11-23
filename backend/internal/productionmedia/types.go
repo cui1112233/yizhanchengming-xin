@@ -12,11 +12,13 @@ import (
 )
 
 const (
-	KindComicImage = "comic_image"
-	KindAssetImage = "asset_image"
-	KindAudio      = "audio"
-	KindVideo      = "video"
-	KindMergeVideo = "merge_video"
+	KindComicImage     = "comic_image"
+	KindTextImage      = "text_image"
+	KindTextBackground = "text_background"
+	KindAssetImage     = "asset_image"
+	KindAudio          = "audio"
+	KindVideo          = "video"
+	KindMergeVideo     = "merge_video"
 
 	StatePending        = "pending"
 	StateUploading      = "uploading"
@@ -86,6 +88,10 @@ func ObjectKey(prefix, kind, storageRef string) (string, error) {
 	}
 	var folder string
 	switch kind {
+	case KindTextImage:
+		folder = "text/pages"
+	case KindTextBackground:
+		folder = "text/backgrounds"
 	case KindComicImage:
 		folder = "comic/images"
 	case KindAssetImage:

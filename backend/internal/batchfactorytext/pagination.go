@@ -10,6 +10,23 @@ import (
 
 const DefaultTargetCharacters = 150
 
+// SentenceBreaks reports legal manual split points in the same coordinate space as Paginate.
+func SentenceBreaks(text string) []int {
+	runes := []rune(NormalizeLineEndings(text))
+	var qs straightQuotes
+	var breaks []int
+	for start := 0; start < len(runes); {
+		end := paragraphEnd(runes, start)
+		for start < end {
+			start = qs.sentenceEnd(runes, start, end)
+			if start < len(runes) {
+				breaks = append(breaks, start)
+			}
+		}
+	}
+	return breaks
+}
+
 type PaginationInput struct {
 	Text   string
 	Layout LayoutConfig

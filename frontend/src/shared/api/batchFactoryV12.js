@@ -896,7 +896,11 @@ export function getPublishAudits(provider, intentId) {
   return apiRequest(bf11Path(`publish/${id(provider)}/intents/${id(intentId)}/audits`));
 }
 
+export * from './batchFactoryText.js';
+import * as textProductionAPI from './batchFactoryText.js';
+
 export default {
+  ...textProductionAPI,
   getCapabilities,
   getBookAssetImageBlob,
   getComicPageImageBlob,

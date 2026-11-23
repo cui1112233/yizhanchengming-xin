@@ -258,6 +258,7 @@ type Collection struct {
 }
 
 type CollectionInput struct {
+	ExpectedRevision  int64
 	VersionID         string
 	PaginationVersion int64
 	PageIDs           []string // Empty selects every page, otherwise uses book order.

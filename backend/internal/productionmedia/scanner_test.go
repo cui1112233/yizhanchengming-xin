@@ -39,6 +39,8 @@ func TestScannerDiscoversExistingComicImageWithoutDuplicatingFile(t *testing.T) 
 	mock.ExpectQuery("SELECT i.owner_username").WillReturnRows(sqlmock.NewRows([]string{"owner_username", "storage_ref", "media_type"}).AddRow("alice", artifact.StorageRef, "image/png").AddRow("alice", "missing.png", "image/png"))
 	mock.ExpectQuery("SELECT i.owner_username").WillReturnRows(sqlmock.NewRows([]string{"owner_username", "storage_ref", "media_type"}))
 	mock.ExpectQuery("SELECT owner_username").WillReturnRows(sqlmock.NewRows([]string{"owner_username", "storage_ref", "media_type"}))
+	mock.ExpectQuery("FROM batch_factory_v12_text_page_artifacts").WillReturnRows(sqlmock.NewRows([]string{"owner_username", "storage_ref", "media_type"}).AddRow("alice", artifact.StorageRef, "image/png"))
+	mock.ExpectQuery("FROM batch_factory_v12_text_backgrounds").WillReturnRows(sqlmock.NewRows([]string{"owner_username", "storage_ref", "media_type"}).AddRow("alice", artifact.StorageRef, "image/png"))
 	mock.ExpectQuery("SELECT owner_username").WillReturnRows(sqlmock.NewRows([]string{"owner_username", "output_url"}))
 	recorder := &recordingEnqueuer{}
 	scanner := Scanner{DB: db, Repository: recorder, Local: files, Prefix: "production-media", RetentionDays: func(string) int { return 7 }}
@@ -46,7 +48,7 @@ func TestScannerDiscoversExistingComicImageWithoutDuplicatingFile(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.Enqueued != 1 || summary.Skipped != 1 || len(recorder.items) != 1 {
+	if summary.Enqueued != 3 || summary.Skipped != 1 || len(recorder.items) != 3 || recorder.items[1].ObjectKey != "production-media/text/pages/"+artifact.StorageRef || recorder.items[2].ObjectKey != "production-media/text/backgrounds/"+artifact.StorageRef {
 		t.Fatalf("summary=%+v items=%+v", summary, recorder.items)
 	}
 	if recorder.items[0].MediaKind != KindComicImage || recorder.items[0].ObjectKey != "production-media/comic/images/"+artifact.StorageRef {

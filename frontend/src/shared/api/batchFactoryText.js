@@ -1,0 +1,28 @@
+import { apiRequest } from './client.js';
+
+const id = encodeURIComponent;
+const base = (batch, book) => `/api/batch-factory/v12/batches/${id(batch)}/books/${id(book)}/text-`;
+const post = (path, payload = {}, options = {}) => apiRequest(path, { method: 'POST', body: JSON.stringify(payload), ...options });
+const page = (batch,book,pageId) => base(batch,book)+'pages/'+id(pageId);
+const upload = (path,file) => apiRequest(path,{method:'POST',body:file,headers:{'Content-Type': file.type || 'application/octet-stream'}});
+const revision = value => '?expectedRevision='+id(value);
+export const prepareTextBook = (b,k,p) => post(base(b,k)+'prepare',p);
+export const listTextPages = (b,k) => apiRequest(base(b,k)+'pages');
+export const patchTextPage = (b,k,i,p) => apiRequest(page(b,k,i),{method:'PATCH',body:JSON.stringify(p)});
+export const splitTextPage = (b,k,i,p) => post(page(b,k,i)+'/split',p);
+export const mergeTextPage = (b,k,i,p) => post(page(b,k,i)+'/merge',p);
+export const previewTextPage = (b,k,i,p) => post(page(b,k,i)+'/preview',p,{responseType:'blob'});
+export const renderTextPage = (b,k,i,p) => post(page(b,k,i)+'/render',p);
+export const uploadTextPageArtifact = (b,k,i,file,rev) => upload(page(b,k,i)+'/upload'+revision(rev),file);
+export const restoreTextPage = (b,k,i,p) => post(page(b,k,i)+'/restore',p);
+export const previewTextCover = (b,k,p) => post(base(b,k)+'cover/preview',p,{responseType:'blob'});
+export const renderTextCover = (b,k,p) => post(base(b,k)+'cover/render',p);
+export const uploadTextCover = (b,k,file,rev) => upload(base(b,k)+'cover/upload'+revision(rev),file);
+export const restoreTextCover = (b,k,p) => post(base(b,k)+'cover/restore',p);
+export const listTextBackgrounds = (b,k) => apiRequest(base(b,k)+'backgrounds');
+export const uploadTextBackground = (b,k,file,name) => upload(base(b,k)+'backgrounds?name='+id(name || file.name || '自定义背景'),file);
+export const createTextCollection = (b,k,p) => post(base(b,k)+'collections',p);
+export const listTextCollections = (b,k) => apiRequest(base(b,k)+'collections');
+export const getTextCollection = (b,k,i) => apiRequest(base(b,k)+'collections/'+id(i));
+export const getTextArtifactBlob = (b,k,i) => apiRequest(base(b,k)+'artifacts/'+id(i)+'/content',{responseType:'blob'});
+export const getTextBackgroundBlob = (b,k,i) => apiRequest(base(b,k)+'backgrounds/'+id(i)+'/content',{responseType:'blob'});

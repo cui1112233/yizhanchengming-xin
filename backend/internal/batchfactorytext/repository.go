@@ -22,8 +22,13 @@ func (e *ConflictError) Error() string {
 func (e *ConflictError) Unwrap() error { return ErrConflict }
 
 type Repository interface {
+	PreparePages(context.Context, Scope, VersionInput, PaginationUpdate) (int64, error)
+	SaveBackground(context.Context, string, string, ArtifactFile) (LibraryBackground, error)
+	ListBackgrounds(context.Context, string) ([]LibraryBackground, error)
+	GetBackground(context.Context, string, string) (LibraryBackground, error)
 	SaveOriginal(context.Context, Scope, string) (Document, error)
 	GetDocument(context.Context, Scope) (Document, error)
+	GetVersion(context.Context, Scope, string) (Version, error)
 	CreateVersion(context.Context, Scope, VersionInput) (Version, error)
 	ListVersions(context.Context, Scope) ([]Version, error)
 	ReplaceSystemPages(context.Context, Scope, PaginationUpdate) (int64, error)

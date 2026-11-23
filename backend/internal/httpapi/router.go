@@ -16,6 +16,7 @@ import (
 	"qiantie/backend/internal/aicut"
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryexecution"
+	"qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/ffmpegbin"
@@ -73,6 +74,7 @@ type RouterOptions struct {
 	Slice                           int
 	RegisterV11                     func(*http.ServeMux)
 	Store                           batchfactoryv11.Store
+	TextRepository                  batchfactorytext.Repository
 	Director                        *batchfactoryv11.DirectorService
 	H3AudioProbe                    batchfactoryv11.H3AudioDurationProbe
 	Compiler                        *batchfactoryv11.PromptCompilerService
@@ -299,6 +301,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		sources.register(v12)
 		registerSliceOneRoutes(v11, options.Store, options.PresetCatalog, sources)
 		registerV12IntakeRoutes(v12, options.Store, sources)
+		registerBatchTextRoutes(v12, options, manualProduction)
 		registerV12PublishClassificationRoute(v12, options.Store, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
