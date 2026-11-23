@@ -120,3 +120,71 @@ func TestCollectionPublishAcceptedWithoutCarouselIDStaysPending(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionPublishConfirmedReuseAfterMappingChangeBindsRun(t *testing.T) {
+	ctx := context.Background()
+	records := testRecords{}
+	rec := Record{Status: "published", Kind: CollectionKindText, BookID: "b", CollectionID: "c", IntentID: "intent", RequestKey: "manual", MappingRevision: "old", CarouselID: 9, PageCount: 2, ImageIDs: []int64{3, 4}}
+	r := PublishRequest{Kind: CollectionKindText, Owner: "owner", BatchID: "batch", BookID: "b", CollectionID: "c", MappingRevision: "changed", RunID: "run", Attempt: 2, RequestKey: "auto"}
+	records.Save(ctx, r, rec)
+	svc := Service{Records: records}
+	got, err := svc.Publish(ctx, r, func(context.Context, *PublishRequest) (Collection, error) {
+		t.Fatal("unexpected new upload")
+		return Collection{}, nil
+	})
+	if err != nil || !got.Confirmed() || got.IntentID != rec.IntentID || got.RunID != "run" || got.RequestKey != "auto" || got.Attempt != 2 || got.LastPublished == nil || got.LastPublished.RequestKey != "manual" {
+		t.Fatalf("derived=%+v err=%v", got, err)
+	}
+	stored, _, _ := records.Load(ctx, r)
+	if stored.RunID != got.RunID {
+		t.Fatalf("not persisted: %+v", stored)
+	}
+}
+
+func TestCollectionPublishPendingReadbackResumesWithoutSending(t *testing.T) {
+	ctx := context.Background()
+	records := testRecords{}
+	r := PublishRequest{Kind: CollectionKindText, Owner: "owner", BatchID: "batch", BookID: "b", CollectionID: "c", RunID: "new-run", Attempt: 2}
+	records.Save(ctx, r, Record{Status: "pending", Kind: r.Kind, BookID: "b", CollectionID: "c", IntentID: "pending-intent", ImageIDs: []int64{3, 4}, PageCount: 2, LastPublished: &Record{Status: "published", CarouselID: 9, ImageIDs: []int64{3, 4}}})
+	reads := 0
+	svc := Service{Records: records, Readback: func(ctx context.Context, in n8comic.ReceiptLookup) (n8comic.PublishResult, error) {
+		reads++
+		id := int64(9)
+		if reads > 1 {
+			id = 17
+		}
+		return n8comic.PublishResult{CarouselID: id, ImageIDs: []int64{3, 4}}, nil
+	}}
+	pending, ok, err := svc.Status(ctx, r)
+	if err != nil || !ok || pending.Status != "pending" || pending.LastPublished.CarouselID != 9 {
+		t.Fatal(pending, err)
+	}
+	got, _, err := svc.Status(ctx, r)
+	if err != nil || !got.Confirmed() || got.CarouselID != 17 || got.IntentID != "pending-intent" || reads != 2 {
+		t.Fatal(got, err)
+	}
+	got, _, err = svc.Status(ctx, r)
+	if err != nil || !got.Confirmed() || reads != 2 {
+		t.Fatal(got, err)
+	}
+}
+
+func TestCollectionPublishFailedRepublishNeedsForceWhenHistoryConfirmed(t *testing.T) {
+	ctx := context.Background()
+	r := PublishRequest{Kind: CollectionKindText, Owner: "owner", BatchID: "batch", BookID: "b", CollectionID: "c"}
+	prior := Record{Kind: r.Kind, BookID: r.BookID, CollectionID: r.CollectionID, IntentID: "accepted-first", Status: "published", CarouselID: 11, ImageIDs: []int64{1, 2}}
+	records := testRecords{}
+	records.Save(ctx, r, Record{Kind: r.Kind, BookID: r.BookID, CollectionID: r.CollectionID, Status: "upload_incomplete", IntentID: "failed-forced", LastPublished: &prior})
+	svc := Service{Records: records}
+	result, err := svc.Publish(ctx, r, func(context.Context, *PublishRequest) (Collection, error) {
+		t.Fatal("retried a republish without confirmation")
+		return Collection{}, nil
+	})
+	if err != nil || !result.Confirmed() || result.IntentID != "accepted-first" {
+		t.Fatal(result, err)
+	}
+	current, _, _ := svc.Status(ctx, r)
+	if current.IntentID != "failed-forced" {
+		t.Fatal("ordinary history lookup overwrote latest", current)
+	}
+}

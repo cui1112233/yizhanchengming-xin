@@ -38,8 +38,10 @@ func (f textPublishTestRepo) ListArtifacts(_ context.Context, s txt.Scope) ([]tx
 }
 
 type textPublishTestClient struct {
-	calls  int
-	images []n8comic.ImageInput
+	confirmedReadback bool
+	readbackCalls     int
+	calls             int
+	images            []n8comic.ImageInput
 }
 
 func (*textPublishTestClient) Configured() bool { return true }
@@ -47,9 +49,17 @@ func (f *textPublishTestClient) Publish(_ context.Context, r n8comic.PublishRequ
 	f.calls++
 	f.images = r.Images
 	if f.calls > 1 {
-		return n8comic.PublishResult{}, nil
+		return n8comic.PublishResult{ImageIDs: []int64{21, 22}, ImageSignatures: []string{"signature1", "signature2"}, ReceiptPath: "/receipt?private-proof=7"}, n8comic.ErrCarouselReceiptPending
 	}
 	return n8comic.PublishResult{CarouselID: 19, ImageIDs: []int64{11, 12}}, nil
+}
+
+func (f *textPublishTestClient) Readback(_ context.Context, in n8comic.ReceiptLookup) (n8comic.PublishResult, error) {
+	f.readbackCalls++
+	if f.confirmedReadback && in.ReceiptPath == "/receipt?private-proof=7" && len(in.ImageSignatures) == 2 && in.PreviousCarouselID == 19 {
+		return n8comic.PublishResult{CarouselID: 29, ImageIDs: []int64{21, 22}}, nil
+	}
+	return n8comic.PublishResult{}, nil
 }
 
 func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
@@ -147,6 +157,23 @@ func TestTextPublishSignedReadbackAndForcedPending(t *testing.T) {
 	}
 	if client.calls != 2 {
 		t.Fatalf("duplicate calls=%d", client.calls)
+	}
+	client.confirmedReadback = true
+	current := signedJSONRequest(t, api, now, "alice", "GET", path, nil)
+	if bytes.Contains(current.Body.Bytes(), []byte("private-proof")) || bytes.Contains(current.Body.Bytes(), []byte("signature1")) {
+		t.Fatal("private readback data leaked")
+	}
+	got := decodeBody[response](t, current)
+	if !got.Published || got.Publish.CarouselID != 29 || got.Publish.IntentID != second.Publish.IntentID || client.calls != 2 || client.readbackCalls == 0 {
+		t.Fatal(got)
+	}
+	bound, err := automatic.automation(ctx, txt.EnsureRequest{Scope: s, FrozenSettings: settings, PublishRunID: "next-run", PublishAttempt: 2, PublishRequestKey: "next-key"}, repo.collection)
+	if err != nil || !bound {
+		t.Fatal(bound, err)
+	}
+	reused := call("GET", nil).Publish
+	if reused.RunID != "next-run" || reused.Attempt != 2 || reused.RequestKey != "next-key" || reused.IntentID != second.Publish.IntentID || reused.LastPublished.RequestKey != "another-upload" || client.calls != 2 {
+		t.Fatal(reused)
 	}
 	foreign := signedJSONRequest(t, api, now, "bob", http.MethodGet, path, nil)
 	if foreign.Code != 404 {

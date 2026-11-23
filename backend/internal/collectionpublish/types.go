@@ -47,6 +47,10 @@ type Collection struct {
 	Pages    []Page
 }
 type Record struct {
+	PriorCarouselIDs  []int64        `json:"priorCarouselIds,omitempty"`
+	ReceiptPath       string         `json:"-"`
+	ImageSignatures   []string       `json:"-"`
+	Message           string         `json:"message,omitempty"`
 	RunID             string         `json:"runId,omitempty"`
 	Attempt           int            `json:"attempt,omitempty"`
 	MappingRevision   string         `json:"mappingRevision,omitempty"`
@@ -72,13 +76,18 @@ type Record struct {
 }
 
 func (r Record) Confirmed() bool {
-	if r.Status != "published" || r.CarouselID <= 0 || len(r.ImageIDs) == 0 || (r.PageCount > 0 && (len(r.ImageIDs) < r.PageCount || r.Kind == CollectionKindText && len(r.ImageIDs) != r.PageCount)) {
+	if r.Status != "published" || r.CarouselID <= 0 || len(r.ImageIDs) == 0 {
 		return false
 	}
+	if r.PageCount > 0 && (len(r.ImageIDs) < r.PageCount || r.Kind == CollectionKindText && len(r.ImageIDs) != r.PageCount) {
+		return false
+	}
+	seen := make(map[int64]bool, len(r.ImageIDs))
 	for _, id := range r.ImageIDs {
-		if id <= 0 {
+		if id <= 0 || seen[id] {
 			return false
 		}
+		seen[id] = true
 	}
 	return true
 }

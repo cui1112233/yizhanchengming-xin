@@ -14,6 +14,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -56,6 +57,7 @@ type ImageInput struct {
 }
 
 type PublishRequest struct {
+	BeforeCreate      func(PublishResult) error
 	ProducerAdminName string
 	Name              string
 	Images            []ImageInput
@@ -70,6 +72,7 @@ type PublishRequest struct {
 // UploadImagesRequest 是分片上传的入参。分片只负责把图片送入 N8 并拿回
 // image_id，不创建合集；合集由 CreateCarousel 用全部 image_id 一次创建。
 type UploadImagesRequest struct {
+	signatures        []string
 	ProducerAdminName string
 	Images            []ImageInput
 	// UploadedImageIDs 与 Images 等长，大于 0 的位置表示该页已有图片 ID，
@@ -92,8 +95,10 @@ type CreateCarouselRequest struct {
 var ErrCarouselReceiptPending = errors.New("N8 创建漫画合集成功但未返回合集 ID")
 
 type PublishResult struct {
-	CarouselID int64   `json:"carouselId"`
-	ImageIDs   []int64 `json:"imageIds"`
+	ImageSignatures []string `json:"imageSignatures,omitempty"`
+	ReceiptPath     string   `json:"receiptPath,omitempty"`
+	CarouselID      int64    `json:"carouselId"`
+	ImageIDs        []int64  `json:"imageIds"`
 }
 
 type APIError struct {
@@ -178,11 +183,18 @@ func (c *Client) Publish(ctx context.Context, input PublishRequest) (PublishResu
 	// N8 文档要求：多张图先全部申请并上传，再统一查询 image/read。
 	// 如果上传一张就立刻查询，TOS 回调还没完成时会把后续流程卡在
 	// IMAGE_NOT_READY，导致合集发布看起来一直失败。
-	imageIDs, uploadErr := c.UploadImages(ctx, UploadImagesRequest{ProducerAdminName: input.ProducerAdminName, Images: input.Images, UploadedImageIDs: input.UploadedImageIDs})
+	signatures := make([]string, len(input.Images))
+	imageIDs, uploadErr := c.UploadImages(ctx, UploadImagesRequest{signatures: signatures, ProducerAdminName: input.ProducerAdminName, Images: input.Images, UploadedImageIDs: input.UploadedImageIDs})
 	if uploadErr != nil {
 		// 返回部分成功的 imageIDs：调用方可以把已上传的页持久化，下一次只
 		// 重试缺图和建合集，避免整本书 35 张图全部重传。
 		return PublishResult{ImageIDs: imageIDs}, uploadErr
+	}
+	result := PublishResult{ImageIDs: imageIDs, ImageSignatures: signatures}
+	if input.BeforeCreate != nil {
+		if err := input.BeforeCreate(result); err != nil {
+			return result, err
+		}
 	}
 	carouselID, err := c.CreateCarousel(ctx, CreateCarouselRequest{
 		ProducerAdminName: input.ProducerAdminName,
@@ -193,9 +205,14 @@ func (c *Client) Publish(ctx context.Context, input PublishRequest) (PublishResu
 		AudioID:           input.AudioID,
 	})
 	if err != nil {
-		return PublishResult{ImageIDs: imageIDs}, err
+		var pending *pendingReceipt
+		if errors.As(err, &pending) {
+			result.ReceiptPath = pending.path
+		}
+		return result, err
 	}
-	return PublishResult{CarouselID: carouselID, ImageIDs: imageIDs}, nil
+	result.CarouselID = carouselID
+	return result, nil
 }
 
 // UploadImages 只执行图片上传与入库查询，返回与 Images 下标一致的 image_id。
@@ -214,7 +231,7 @@ func (c *Client) UploadImages(ctx context.Context, input UploadImagesRequest) ([
 	if len(input.UploadedImageIDs) > 0 && len(input.UploadedImageIDs) != len(input.Images) {
 		return nil, fmt.Errorf("已上传图片记录与当前漫画页数不一致，不能复用")
 	}
-	return c.uploadImages(ctx, producer, input.Images, input.UploadedImageIDs)
+	return c.uploadImages(ctx, producer, input.Images, input.UploadedImageIDs, input.signatures)
 }
 
 // CreateCarousel 用已经上传完成的 image_id 创建漫画合集，返回合集 ID。
@@ -259,11 +276,12 @@ func (c *Client) CreateCarousel(ctx context.Context, input CreateCarouselRequest
 	var created struct {
 		CarouselID int64 `json:"carousel_id"`
 	}
-	if err := c.post(ctx, createPath, payload, &created); err != nil {
+	var receiptPath string
+	if err := c.post(ctx, createPath, payload, &created, func(location string) { receiptPath = c.receiptPath(location) }); err != nil {
 		return 0, err
 	}
 	if created.CarouselID <= 0 {
-		return 0, ErrCarouselReceiptPending
+		return 0, &pendingReceipt{path: receiptPath, cause: ErrCarouselReceiptPending}
 	}
 	return created.CarouselID, nil
 }
@@ -277,18 +295,29 @@ type pendingImage struct {
 	target int
 }
 
-func (c *Client) uploadImages(ctx context.Context, producer string, inputs []ImageInput, uploaded []int64) ([]int64, error) {
+func (c *Client) uploadImages(ctx context.Context, producer string, inputs []ImageInput, uploaded []int64, signatures []string) ([]int64, error) {
 	imageIDs := make([]int64, len(inputs))
 	pending := make([]pendingImage, 0, len(inputs))
 	for index, input := range inputs {
 		if index < len(uploaded) && uploaded[index] > 0 {
 			imageIDs[index] = uploaded[index]
+			if signatures != nil {
+				content, _, err := compressImageForUpload(input.Content, strings.ToLower(strings.TrimSpace(input.MediaType)))
+				if err != nil {
+					return imageIDs, err
+				}
+				sig := md5.Sum(content)
+				signatures[index] = hex.EncodeToString(sig[:])
+			}
 			continue
 		}
 		item, err := c.prepareImageUpload(ctx, producer, input)
 		if err != nil {
 			// 已上传的页仍然保留在 imageIDs 里，便于调用方持久化后只补缺图。
 			return imageIDs, err
+		}
+		if signatures != nil {
+			signatures[index] = item.signature
 		}
 		item.target = index
 		pending = append(pending, item)
@@ -400,7 +429,7 @@ func (c *Client) prepareImageUpload(ctx context.Context, producer string, input 
 		return pendingImage{}, fmt.Errorf("申请上传 %s 失败：%w", fileName, err)
 	}
 	if upload.Info != nil && upload.Info.ID > 0 {
-		return pendingImage{fileName: fileName, imageID: upload.Info.ID}, nil
+		return pendingImage{fileName: fileName, imageID: upload.Info.ID, signature: signature}, nil
 	}
 	if strings.TrimSpace(upload.URL) == "" {
 		return pendingImage{}, fmt.Errorf("N8 未返回图片 %s 的上传地址", fileName)
@@ -446,7 +475,7 @@ func (c *Client) waitForImage(ctx context.Context, signature, fileName string) (
 	return 0, fmt.Errorf("等待 N8 图片 %s 入库超时", fileName)
 }
 
-func (c *Client) post(ctx context.Context, path string, payload map[string]any, target any) error {
+func (c *Client) post(ctx context.Context, path string, payload map[string]any, target any, location ...func(string)) error {
 	seconds := c.now().Unix()
 	payload["time"] = seconds
 	sum := md5.Sum([]byte(c.apiKey + strconv.FormatInt(seconds, 10)))
@@ -460,13 +489,36 @@ func (c *Client) post(ctx context.Context, path string, payload map[string]any, 
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	response, err := c.httpClient.Do(request)
-	if err != nil {
+	if err = ctx.Err(); err != nil {
 		return err
 	}
+	response, err := c.httpClient.Do(request)
+	isCreate := path == createPath
+	var receiptPath string
+	ambiguous := func(cause error) error {
+		if !isCreate {
+			return cause
+		}
+		return &pendingReceipt{path: receiptPath, cause: cause}
+	}
+	if err != nil {
+		var op *net.OpError
+		if errors.As(err, &op) && op.Op == "dial" {
+			return err
+		}
+		return ambiguous(err)
+	}
 	defer response.Body.Close()
+	receiptPath = c.receiptPath(response.Header.Get("Location"))
+	if len(location) > 0 {
+		location[0](receiptPath)
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("N8 HTTP 状态码 %d", response.StatusCode)
+		err := fmt.Errorf("N8 HTTP 状态码 %d", response.StatusCode)
+		if response.StatusCode >= 500 || response.StatusCode == http.StatusRequestTimeout {
+			return ambiguous(err)
+		}
+		return err
 	}
 	var envelope struct {
 		Code    string          `json:"code"`
@@ -474,17 +526,36 @@ func (c *Client) post(ctx context.Context, path string, payload map[string]any, 
 		Data    json.RawMessage `json:"data"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, 4<<20)).Decode(&envelope); err != nil {
-		return fmt.Errorf("解析 N8 响应失败：%w", err)
+		return ambiguous(fmt.Errorf("解析 N8 响应失败：%w", err))
+	}
+	if isCreate && receiptPath == "" && len(envelope.Data) > 0 {
+		var links struct {
+			Receipt string `json:"receipt_url"`
+			Status  string `json:"status_url"`
+		}
+		if json.Unmarshal(envelope.Data, &links) == nil {
+			receiptPath = c.receiptPath(links.Receipt)
+			if receiptPath == "" {
+				receiptPath = c.receiptPath(links.Status)
+			}
+			if len(location) > 0 {
+				location[0](receiptPath)
+			}
+		}
 	}
 	if envelope.Code != "SUCCESS" {
+		if response.StatusCode == http.StatusAccepted || envelope.Code == "" {
+			return ambiguous(errors.New("N8 尚未返回最终业务回执"))
+		}
 		return &APIError{Code: envelope.Code, Message: envelope.Message, Body: compactJSON(envelope)}
 	}
 	if target == nil || len(envelope.Data) == 0 || string(envelope.Data) == "null" {
 		return nil
 	}
 	if err := json.Unmarshal(envelope.Data, target); err != nil {
-		return fmt.Errorf("解析 N8 数据失败：%w", err)
+		return ambiguous(fmt.Errorf("解析 N8 数据失败：%w", err))
 	}
+
 	return nil
 }
 

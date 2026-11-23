@@ -662,17 +662,16 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "漫画发布记录存储尚未配置"})
 			return
 		}
-		record, found, err := (collectionDraftRecords{publisher.Store}).Load(r.Context(), collectionpublish.PublishRequest{Kind: collectionpublish.CollectionKindComic, Owner: owner, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId"), CollectionID: r.PathValue("collectionId")})
+		record, found, err := publisher.collectionService().Status(r.Context(), collectionpublish.PublishRequest{Kind: collectionpublish.CollectionKindComic, Owner: owner, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId"), CollectionID: r.PathValue("collectionId")})
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		found = found && record.Confirmed()
 		if !found {
 			writeJSON(w, http.StatusOK, map[string]any{"published": false, "publish": nil})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"published": true, "publish": record})
+		writeJSON(w, http.StatusOK, map[string]any{"published": record.Confirmed(), "publish": record})
 	})
 }
 
@@ -978,11 +977,14 @@ func (p *BatchFactoryN8ComicPublisher) Publish(ctx context.Context, owner, batch
 	if err := input.check(req.Kind, collectionID); err != nil {
 		return N8ComicPublishRecord{}, err
 	}
-	if p == nil || p.Store == nil || p.LocalFiles == nil || p.Client == nil || !p.Client.Configured() {
+	if p == nil || p.Store == nil {
 		return N8ComicPublishRecord{}, fmt.Errorf("N8 漫画发布接口尚未配置")
 	}
 	rec, err := p.collectionService().Publish(ctx, req, func(ctx context.Context, r *collectionpublish.PublishRequest) (collectionpublish.Collection, error) {
 		var out collectionpublish.Collection
+		if p.LocalFiles == nil || p.Client == nil || !p.Client.Configured() {
+			return out, fmt.Errorf("N8 漫画发布接口尚未配置")
+		}
 		if err := collectionpublish.ValidateMapping(*r); err != nil {
 			return out, err
 		}

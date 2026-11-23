@@ -61,6 +61,15 @@ func publishDraftKind(k cp.CollectionKind) string {
 	}
 	return n8ComicPublishDraftKind
 }
+
+// Readback locations can contain a signed resource identifier. Only the durable
+// store carries them; normal status responses and workflow summaries omit them.
+type storedPublishRecord struct {
+	cp.Record
+	PrivateReceiptPath string   `json:"_receiptPath,omitempty"`
+	PrivateSignatures  []string `json:"_imageSignatures,omitempty"`
+}
+
 func archivedPublishKey(id, key string) string {
 	sum := sha256.Sum256([]byte(id + "\x00" + key))
 	return hex.EncodeToString(sum[:])
@@ -89,9 +98,12 @@ func (d collectionDraftRecords) Load(ctx context.Context, r cp.PublishRequest) (
 	if err != nil {
 		return rec, false, err
 	}
-	if err = json.Unmarshal([]byte(v.Content), &rec); err != nil {
+	var stored storedPublishRecord
+	if err = json.Unmarshal([]byte(v.Content), &stored); err != nil {
 		return rec, false, err
 	}
+	rec = stored.Record
+	rec.ReceiptPath, rec.ImageSignatures = stored.PrivateReceiptPath, stored.PrivateSignatures
 	if rec.Kind != "" && rec.Kind != r.Kind || rec.BookID != "" && rec.BookID != r.BookID {
 		return rec, false, batchfactoryv11.ErrNotFound
 	}
@@ -112,7 +124,7 @@ func (d collectionDraftRecords) Load(ctx context.Context, r cp.PublishRequest) (
 	return rec, true, nil
 }
 func (d collectionDraftRecords) Save(ctx context.Context, r cp.PublishRequest, rec cp.Record) error {
-	if prev := rec.LastPublished; rec.Status == "pending" && prev != nil && prev.RequestKey != "" {
+	if prev := rec.LastPublished; prev != nil && prev.RequestKey != "" && (rec.Status == "pending" || rec.RunID != "" && rec.IntentID == prev.IntentID) {
 		raw, err := json.Marshal(prev)
 		if err != nil {
 			return err
@@ -122,7 +134,7 @@ func (d collectionDraftRecords) Save(ctx context.Context, r cp.PublishRequest, r
 			return err
 		}
 	}
-	raw, err := json.Marshal(rec)
+	raw, err := json.Marshal(storedPublishRecord{rec, rec.ReceiptPath, rec.ImageSignatures})
 	if err != nil {
 		return err
 	}
@@ -143,7 +155,16 @@ func (p *BatchFactoryN8ComicPublisher) configureCollectionClaim(redisURL string)
 	}
 }
 func (p *BatchFactoryN8ComicPublisher) collectionService() *cp.Service {
-	return &cp.Service{Acquire: p.claimCollection, Records: collectionDraftRecords{p.Store}, Submit: p.Client.Publish, Now: p.Now, Lock: &p.mu}
+	svc := &cp.Service{Acquire: p.claimCollection, Records: collectionDraftRecords{p.Store}, Now: p.Now, Lock: &p.mu}
+	if p.Client != nil {
+		svc.Submit = p.Client.Publish
+		if reader, ok := p.Client.(interface {
+			Readback(context.Context, n8comic.ReceiptLookup) (n8comic.PublishResult, error)
+		}); ok {
+			svc.Readback = reader.Readback
+		}
+	}
+	return svc
 }
 func (p *BatchFactoryN8ComicPublisher) collectionName(producer, title string) (string, error) {
 	now := time.Now
@@ -198,7 +219,11 @@ func (t textCollectionPublisher) route(m *http.ServeMux, options RouterOptions) 
 		if _, err := t.repo.GetCollection(x, x.scope, id); err != nil {
 			return err
 		}
-		rec, found, err := (collectionDraftRecords{a.store}).Load(x, textPublishRequest(x.scope, id))
+		svc := &cp.Service{Records: collectionDraftRecords{a.store}}
+		if t.n8 != nil && t.n8.Store != nil {
+			svc = t.n8.collectionService()
+		}
+		rec, found, err := svc.Status(x, textPublishRequest(x.scope, id))
 		if err != nil {
 			return err
 		}
@@ -301,22 +326,19 @@ func (t textCollectionPublisher) publish(ctx context.Context, s txt.Scope, book 
 		return cp.Record{}, err
 	}
 	p := t.n8
-	if t.repo == nil || p == nil || p.Store == nil || p.LocalFiles == nil || p.Client == nil || !p.Client.Configured() {
+	if p == nil || p.Store == nil {
 		return cp.Record{}, fmt.Errorf("文本发布服务尚未配置")
 	}
 	req := textPublishRequest(s, id)
 	req.RunID, req.Attempt = in.runID, in.attempt
-	mappingJSON, err := json.Marshal([]json.RawMessage{settings["publishSettings"], settings["comicPublishSettings"]})
-	if err != nil {
-		return cp.Record{}, err
-	}
-	hash := sha256.Sum256(mappingJSON)
-	req.MappingRevision = hex.EncodeToString(hash[:])
 	req.Force = in.Force
 	req.RequestKey = in.RequestKey
 	req.Collections = in.Collections
 	return p.collectionService().Publish(ctx, req, func(ctx context.Context, r *cp.PublishRequest) (cp.Collection, error) {
 		var out cp.Collection
+		if t.repo == nil || p.LocalFiles == nil || p.Client == nil || !p.Client.Configured() {
+			return out, fmt.Errorf("文本发布服务尚未配置")
+		}
 		c, err := t.repo.GetCollection(ctx, s, id)
 		if err != nil {
 			return out, err
@@ -327,6 +349,13 @@ func (t textCollectionPublisher) publish(ctx context.Context, s txt.Scope, book 
 		if err = t.resolveMapping(ctx, r, book, settings); err != nil {
 			return out, err
 		}
+		// Hash only the selected routing values after resolving the configuration.
+		data, err := json.Marshal([]any{r.Producer, r.OrganizationID, r.WebsiteProfileID, r.CategoryID, r.AudioCategoryID, r.AudioID, r.WorkIDs})
+		if err != nil {
+			return out, err
+		}
+		sum := sha256.Sum256(data)
+		r.MappingRevision = hex.EncodeToString(sum[:])
 		out.Kind = cp.CollectionKindText
 		out.ID = c.ID
 		out.Name, err = p.collectionName(r.Producer, book.Title)
