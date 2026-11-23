@@ -202,6 +202,12 @@ func scheduleOwnsBook(meta, item map[string]any) bool {
 		batchID == firstText(meta["currentBatchId"], meta["current_batch_id"])
 }
 
+const novelFetchShortOriginalSkipReason = "原文过短，已跳过改写"
+
+func scheduleSkipFinishesBook(reason string) bool {
+	return reason == "所选版本已经提交成功" || reason == "所选内容已经生成完成" || reason == novelFetchShortOriginalSkipReason
+}
+
 // A generate-only schedule continues to observe its own active or blocked books.
 func scheduleBookDisposition(ctx context.Context, store novelfetchworkshop.Store, owner string, doc novelfetchworkshop.Document, item map[string]any) (reason string, observe bool) {
 	scheduleID := firstText(item["id"])
@@ -216,6 +222,8 @@ func scheduleBookDisposition(ctx context.Context, store novelfetchworkshop.Store
 	switch {
 	case decision.dispatch:
 		return "", false
+	case decision.skipReason != "":
+		return decision.skipReason, false
 	case decision.status == "completed":
 		return "所选内容已经生成完成", false
 	case decision.status == "failed" || decision.status == "stopped":
@@ -279,7 +287,7 @@ func prepareNovelFetchScheduleTasks(ctx context.Context, store novelfetchworksho
 			if reason != "" {
 				skippedIDs = append(skippedIDs, doc.BookID)
 				skipped = append(skipped, map[string]any{"book_id": doc.BookID, "reason": reason})
-				if reason != "所选版本已经提交成功" && reason != "所选内容已经生成完成" {
+				if !scheduleSkipFinishesBook(reason) {
 					allComplete = false
 				}
 				continue
@@ -355,7 +363,7 @@ func filterDueScheduleBooks(ctx context.Context, store novelfetchworkshop.Store,
 			books.eligible = append(books.eligible, id)
 			continue
 		}
-		if reason != "所选版本已经提交成功" && reason != "所选内容已经生成完成" {
+		if !scheduleSkipFinishesBook(reason) {
 			books.allComplete = false
 		}
 		skipped = append(skipped, map[string]any{"book_id": id, "reason": reason})

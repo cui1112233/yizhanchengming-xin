@@ -19,6 +19,7 @@ import (
 	"unicode"
 
 	"qiantie/backend/internal/auth"
+	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/safehttp"
 	"qiantie/backend/internal/videomanagementconnector"
@@ -1632,7 +1633,7 @@ func (metadata workshopInputMetadata) responseFields() map[string]any {
 	return result
 }
 
-func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, owner, inputText, platformID, batchID string, maxTxt int, sourceMetadata ...workshopInputMetadata) (map[string]any, error) {
+func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner, inputText, platformID, batchID string, maxTxt int, sourceMetadata ...workshopInputMetadata) (map[string]any, error) {
 	if strings.TrimSpace(inputText) == "" {
 		return nil, errors.New("请输入要处理的书籍清单")
 	}
@@ -1644,14 +1645,14 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 		metadata = sourceMetadata[0]
 	}
 	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
-	result, _, _, err := workshopProcessParsedResult(ctx, store, owner, documents, parsed, emptyIDs, duplicates, platformID, batchID, metadata)
+	result, _, _, err := workshopProcessParsedResult(ctx, store, queue, owner, documents, parsed, emptyIDs, duplicates, platformID, batchID, metadata)
 	return result, err
 }
 
 // workshopProcessParsedResult 复用已解析的书单，避免 /process/start 先解析一次、
 // 再在保存阶段重复解析和查库。手工导入沿用已有任务的跳过规则：
-// 只有正在执行、需要人工处理或所选版本已全部完成时才跳过，终态任务可以重新处理。
-func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.Store, owner string, documents []novelfetchworkshop.Document, parsed, emptyIDs, duplicates int, platformID, batchID string, metadata workshopInputMetadata, selectedVersions ...[]string) (map[string]any, []string, []string, error) {
+// 已取消的书只能由明确的重试操作恢复。普通失败且缺正文的书仍可导入。
+func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, owner string, documents []novelfetchworkshop.Document, parsed, emptyIDs, duplicates int, platformID, batchID string, metadata workshopInputMetadata, selectedVersions ...[]string) (map[string]any, []string, []string, error) {
 	settings, _ := store.GetConfig(ctx, owner)
 	if settings == nil {
 		settings = map[string]any{}
@@ -1665,10 +1666,28 @@ func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.S
 	processBookIDs := make([]string, 0, len(documents))
 	skippedBookIDs := make([]string, 0)
 	alreadyExists := 0
+	cancellation, _ := queue.(novelfetchworkshop.ProcessCancellationQueue)
 	for _, document := range documents {
 		existing, err := store.GetDocument(ctx, owner, document.BookID)
 		if err == nil {
 			alreadyExists++
+		} else if !errors.Is(err, novelfetchworkshop.ErrNotFound) {
+			return nil, nil, nil, err
+		}
+		stopped := novelFetchStopped(firstText(existing.Meta["status"], existing.Meta["taskStatus"], existing.Meta["task_status"])) ||
+			novelFetchStopped(firstText(existing.Meta["queueState"], existing.Meta["queue_state"]))
+		if !stopped && cancellation != nil {
+			marked, err := cancellation.IsBookCancelled(ctx, owner, document.BookID)
+			if err != nil && !mergeworker.IsRedisNil(err) {
+				return nil, nil, nil, err
+			}
+			stopped = marked
+		}
+		if stopped {
+			skippedBookIDs = append(skippedBookIDs, document.BookID)
+			continue
+		}
+		if err == nil {
 			if existing.Meta == nil {
 				existing.Meta = map[string]any{}
 			}
@@ -1690,9 +1709,6 @@ func workshopProcessParsedResult(ctx context.Context, store novelfetchworkshop.S
 			}
 			processBookIDs = append(processBookIDs, document.BookID)
 			continue
-		}
-		if !errors.Is(err, novelfetchworkshop.ErrNotFound) {
-			return nil, nil, nil, err
 		}
 		if document.Meta == nil {
 			document.Meta = map[string]any{}
@@ -2711,7 +2727,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
-		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
+		result, err := workshopProcessResult(req.Context(), store, queue, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -2865,7 +2881,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		normalized := input.InputNormalized || strings.TrimSpace(firstText(input.InputFormat, input.InputFormatLegacy)) != ""
 		metadata := workshopInputMetadata{Format: firstText(input.ParseMode, input.InputFormat, input.InputFormatLegacy), ColumnPreset: firstText(input.ColumnPresetID, input.ColumnPreset, input.ColumnPresetLegacy), ColumnOrder: columnOrder, Normalized: normalized}
 		documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(input.InputText, input.MaxTxt, metadata)
-		result, bookIDs, skippedBookIDs, err := workshopProcessParsedResult(req.Context(), store, identity.Username, documents, parsed, emptyIDs, duplicates, input.PlatformID, batchID, metadata, input.SelectedVersions)
+		result, bookIDs, skippedBookIDs, err := workshopProcessParsedResult(req.Context(), store, queue, identity.Username, documents, parsed, emptyIDs, duplicates, input.PlatformID, batchID, metadata, input.SelectedVersions)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -2892,12 +2908,6 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if err := novelFetchSnapshotBeforeQueue(req.Context(), store, processJob); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存执行参数失败"})
 			return
-		}
-		if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
-			if err := cancellationQueue.ClearCancelledBooks(req.Context(), identity.Username, bookIDs); err != nil {
-				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 取消状态清理失败"})
-				return
-			}
 		}
 		jobView["result"] = result
 		uniqueQueue, supported := queue.(novelfetchworkshop.ProcessBookDedupQueue)

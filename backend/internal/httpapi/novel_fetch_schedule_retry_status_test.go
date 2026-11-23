@@ -2,12 +2,18 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"net"
 	"net/http"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -490,11 +496,199 @@ func TestGenerateOnlyScheduleQueuesOnlyMissingVersionAfterActiveBook(t *testing.
 	}
 }
 
+func TestGenerateOnlyScheduleSettlesAfterShortOriginal(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	if err := store.PutConfig(ctx, "tester", map[string]any{
+		"workflow":                    map[string]any{"skip_short_original": true, "min_original_chars": 10},
+		novelFetchAutomationConfigKey: map[string]any{"enabled": true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	doc := novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "短文"}
+	saveSubmissionEvidenceSchedule(t, store, doc, false)
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	first, err := queue.Claim(ctx, time.Second)
+	if err != nil || !slices.Equal(first.BookIDs, []string{doc.BookID}) {
+		t.Fatalf("first dispatch: job=%+v schedule=%+v err=%v", first, storedSubmissionEvidenceSchedule(t, store), err)
+	}
+	worker := workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry()}
+	if err := worker.process(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	skipped, err := store.GetDocument(ctx, "tester", doc.BookID)
+	if err != nil || skipped.Meta["originalStatus"] != "too_short" || skipped.Meta["aiStatus"] != "skipped_short_original" || len(skipped.Logs) == 0 {
+		t.Fatalf("worker did not record the short skip: doc=%+v err=%v", skipped, err)
+	}
+	for cycle := 1; cycle <= 3; cycle++ {
+		if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(time.Duration(cycle)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		row := storedSubmissionEvidenceSchedule(t, store)
+		if pending := scheduleStringSlice(row["pending_book_ids"]); row["status"] != "completed" || len(pending) != 0 {
+			t.Errorf("cycle %d after short skip: status=%v pending=%v", cycle, row["status"], pending)
+		}
+		if duplicate, err := queue.Claim(ctx, time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+			t.Fatalf("cycle %d dispatched short book again: job=%s books=%v err=%v", cycle, duplicate.ID, duplicate.BookIDs, err)
+		}
+	}
+	after, err := store.GetDocument(ctx, "tester", doc.BookID)
+	if err != nil || after.Meta["originalStatus"] != "too_short" || after.Meta["aiStatus"] != "skipped_short_original" || !reflect.DeepEqual(after.Logs, skipped.Logs) {
+		t.Fatalf("short skip reason or processing history changed: doc=%+v err=%v", after, err)
+	}
+}
+
+func TestGenerateOnlyScheduleRecognizesPersistedShortSkips(t *testing.T) {
+	ctx := context.Background()
+	for _, marker := range []struct{ key, value string }{{"original_status", "too_short"}, {"ai_status", "skipped_short_original"}} {
+		t.Run(marker.key, func(t *testing.T) {
+			store := novelfetchworkshop.NewMemoryStore()
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"status": "completed", marker.key: marker.value}}
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			item := createPreparedSchedule(t, store, map[string]any{
+				"input_text": doc.BookID, "auto_submit": false, "selected_versions": []string{"ai1"}, "run_at": time.Now().Add(time.Hour).Format(time.RFC3339Nano),
+			})
+			skipped := arrayOrEmpty(item["skipped_books"])
+			if item["status"] != "completed" || len(skipped) != 1 || !strings.Contains(firstText(mapOrEmpty(skipped[0])["reason"]), "原文过短") {
+				t.Fatalf("prepared schedule: status=%v skipped=%v", item["status"], skipped)
+			}
+			saveSubmissionEvidenceSchedule(t, store, doc, false)
+			queue := queueWithAbsentRedisCancellation(t)
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+				t.Fatalf("settle persisted pending book: %v", err)
+			}
+			row := storedSubmissionEvidenceSchedule(t, store)
+			if row["status"] != "completed" || len(scheduleStringSlice(row["pending_book_ids"])) != 0 || len(queue.jobs) != 0 {
+				t.Fatalf("short book remained pending: status=%v pending=%v jobs=%d", row["status"], row["pending_book_ids"], len(queue.jobs))
+			}
+		})
+	}
+}
+
+func TestGenerateOnlyScheduleSettlesMixedTerminalBooks(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"status": "completed", "aiStatus": "skipped_short_original"}}
+	item := saveSubmissionEvidenceSchedule(t, store, doc, false)
+	for _, other := range []novelfetchworkshop.Document{
+		{BookID: "12345678902", Meta: map[string]any{"status": "completed", "queueState": "cancelled"}},
+		{BookID: "12345678903", Meta: map[string]any{"status": "completed"}, Versions: map[string]any{"ai1": "第一版", "ai2": "第二版"}},
+	} {
+		if err := store.PutDocument(ctx, "tester", other); err != nil {
+			t.Fatal(err)
+		}
+	}
+	item["book_ids"] = []string{doc.BookID, "12345678902", "12345678903"}
+	item["pending_book_ids"] = nil
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{item}}); err != nil {
+		t.Fatal(err)
+	}
+	queue := &uniqueRecordingNovelFetchQueue{}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "completed" || len(scheduleStringSlice(row["pending_book_ids"])) != 0 || len(queue.jobs) != 0 {
+		t.Fatalf("mixed terminal books: status=%v pending=%v jobs=%d", row["status"], row["pending_book_ids"], len(queue.jobs))
+	}
+}
+
+func TestManualProcessStartPreservesCancelledBook(t *testing.T) {
+	for _, tc := range []struct {
+		name, queueState string
+		marker           bool
+	}{
+		{"stale completion and cancelled queue", "cancelled", true},
+		{"cancelled queue only", "cancelled", false},
+		{"cancellation marker only", "completed", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now()
+			store := novelfetchworkshop.NewMemoryStore()
+			queue := &recordingCancellationQueue{ProcessCancellationQueue: novelfetchworkshop.NewMemoryQueue()}
+			if err := store.PutConfig(ctx, "tester", map[string]any{novelFetchAutomationConfigKey: map[string]any{"enabled": false}}); err != nil {
+				t.Fatal(err)
+			}
+			doc := novelfetchworkshop.Document{BookID: "12345678901", Meta: map[string]any{"status": "completed", "queueState": tc.queueState}}
+			if err := store.PutDocument(ctx, "tester", doc); err != nil {
+				t.Fatal(err)
+			}
+			if tc.marker {
+				if err := queue.CancelBooks(ctx, "tester", []string{doc.BookID}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			handler := NewRouter(RouterOptions{BridgeSecret: "manual-import", Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+			response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+				"input_text": doc.BookID, "selected_versions": []string{"ai1", "ai2"},
+			}, now, "manual-import")
+			var body struct {
+				Result struct {
+					Skipped []string `json:"skipped_existing_book_ids"`
+				} `json:"result"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if response.Code != http.StatusOK || !slices.Equal(body.Result.Skipped, []string{doc.BookID}) || len(queue.jobs) != 0 {
+				t.Errorf("import: HTTP %d skipped=%v jobs=%d", response.Code, body.Result.Skipped, len(queue.jobs))
+			}
+			if cancelled, err := queue.IsBookCancelled(ctx, "tester", doc.BookID); err != nil || cancelled != tc.marker {
+				t.Errorf("cancellation marker: got %v want %v err=%v", cancelled, tc.marker, err)
+			}
+			if saved, err := store.GetDocument(ctx, "tester", doc.BookID); err != nil || saved.Meta["status"] != "completed" || saved.Meta["queueState"] != tc.queueState {
+				t.Errorf("import changed cancelled document: status=%v queueState=%v err=%v", saved.Meta["status"], saved.Meta["queueState"], err)
+			}
+		})
+	}
+}
+
+type recordingCancellationQueue struct {
+	uniqueRecordingNovelFetchQueue
+	novelfetchworkshop.ProcessCancellationQueue
+}
+
+// Production Redis represents an absent cancellation key with a RESP nil.
+func queueWithAbsentRedisCancellation(t *testing.T) *recordingCancellationQueue {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		const getAbsent = "*2\r\n$3\r\nGET\r\n$6\r\nabsent\r\n"
+		if _, err := io.ReadFull(conn, make([]byte, len(getAbsent))); err == nil {
+			_, _ = io.WriteString(conn, "$-1\r\n")
+		}
+	}()
+	transport, err := mergeworker.NewRedisStore("redis://"+listener.Addr().String(), "import-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, absent := transport.Do(context.Background(), "GET", "absent")
+	if !mergeworker.IsRedisNil(absent) {
+		t.Fatalf("fixture did not return a missing Redis key: %v", absent)
+	}
+	return &recordingCancellationQueue{ProcessCancellationQueue: novelfetchworkshop.NewRedisQueueWithDo("import-test", func(context.Context, ...string) (any, error) { return nil, absent })}
+}
+
 func TestManualProcessStartImportsFailedBookWithMissingBodyAndAutomationOff(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	store := novelfetchworkshop.NewMemoryStore()
-	queue := &uniqueRecordingNovelFetchQueue{}
+	queue := queueWithAbsentRedisCancellation(t)
 	if err := store.PutConfig(ctx, "tester", map[string]any{novelFetchAutomationConfigKey: map[string]any{"enabled": false}}); err != nil {
 		t.Fatal(err)
 	}

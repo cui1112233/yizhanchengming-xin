@@ -11,6 +11,7 @@ import (
 
 type novelFetchGenerationDecision struct {
 	status          string
+	skipReason      string
 	dispatch        bool
 	retryable       bool
 	missingVersions []string
@@ -34,6 +35,10 @@ func novelFetchScheduleGenerationDecision(ctx context.Context, store novelfetchw
 	status := novelFetchGenerationSignal(firstText(meta["status"], meta["taskStatus"], meta["task_status"]))
 	if queue == novelfetchworkshop.TaskStatusStopped || status == novelfetchworkshop.TaskStatusStopped {
 		return novelFetchGenerationDecision{status: "stopped"}
+	}
+	if strings.EqualFold(firstText(meta["originalStatus"], meta["original_status"]), "too_short") ||
+		strings.EqualFold(firstText(meta["aiStatus"], meta["ai_status"]), "skipped_short_original") {
+		return novelFetchGenerationDecision{status: "completed", skipReason: novelFetchShortOriginalSkipReason}
 	}
 	if meta["manualOnly"] == true || meta["manual_only"] == true || meta["manualOriginalFetchRequired"] == true ||
 		meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(meta) ||
@@ -196,7 +201,9 @@ func reconcileNovelFetchScheduleRetry(ctx context.Context, store novelfetchworks
 			break
 		}
 	}
-	if status == "completed" && states["completed"] != len(ids) {
+	if item["auto_submit"] == false && status == "stopped" && states["completed"] > 0 && states["completed"]+states["stopped"] == len(ids) {
+		status = "completed"
+	} else if status == "completed" && states["completed"] != len(ids) {
 		status = "waiting_retry"
 	}
 	if status == "completed" || status == "running" || status == "queued" {

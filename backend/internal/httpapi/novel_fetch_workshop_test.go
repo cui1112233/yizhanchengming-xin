@@ -2679,7 +2679,7 @@ func TestNovelFetchReimportDoesNotOverwriteExistingDocumentData(t *testing.T) {
 	if err := store.PutDocument(context.Background(), "tester", original); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := workshopProcessResult(context.Background(), store, "tester", "12345678901\t新导入标题", "15", "batch-new", 4000); err != nil {
+	if _, err := workshopProcessResult(context.Background(), store, nil, "tester", "12345678901\t新导入标题", "15", "batch-new", 4000); err != nil {
 		t.Fatal(err)
 	}
 	updated, err := store.GetDocument(context.Background(), "tester", "12345678901")

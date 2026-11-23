@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/videomanagementconnector"
 )
@@ -162,7 +163,7 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 		}
 		if cancellation, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
 			stopped, err := cancellation.IsBookCancelled(ctx, owner, id)
-			if err != nil {
+			if err != nil && (autoSubmit || !mergeworker.IsRedisNil(err)) {
 				return err
 			}
 			if stopped {
