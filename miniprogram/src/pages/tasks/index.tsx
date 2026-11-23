@@ -76,9 +76,9 @@ export default function TasksPage() {
 
     {summary && pageState.kind !== "configuration-error" && pageState.kind !== "all-error" ? <View className="task-studio-body">
       <View className="task-studio-counts liquid-glass--secondary" data-glass-role="secondary">
-        <View className="task-studio-count-item is-running"><AppIcon name="play" size={24} /><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
+        <View className="task-studio-count-item is-running"><AppIcon name="clapperboard" size={24} /><View><Text className="task-studio-count-value">{counts.running}</Text><Text>进行中</Text></View></View><View className="task-studio-count-divider" />
         <View className="task-studio-count-item is-attention"><AppIcon name="timer" size={24} /><View><Text className="task-studio-count-value">{counts.attention}</Text><Text>待确认</Text></View></View><View className="task-studio-count-divider" />
-        <View className="task-studio-count-item is-completed"><AppIcon name="circle-check" size={24} /><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
+        <View className="task-studio-count-item is-completed"><AppIcon name="shield-check" size={24} /><View><Text className="task-studio-count-value">{counts.completed}</Text><Text>已完成</Text></View></View>
       </View>
       <View className="task-studio-segments liquid-glass--list" data-glass-role="list">{FILTERS.map((item) => <Text key={item} className={filter === item ? "task-studio-filter is-active" : "task-studio-filter"} onClick={() => setFilter(item)}>{item}</Text>)}</View>
       {failedSources.map((source) => <View className="task-studio-source-error" key={source.source}><View><Text className="task-studio-state-title">{source.sourceLabel} 暂未同步</Text><Text>{source.error}</Text></View><Button className="task-studio-retry" onClick={load}>重试</Button></View>)}
