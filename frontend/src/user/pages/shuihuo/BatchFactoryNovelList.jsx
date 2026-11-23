@@ -4835,7 +4835,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (!items.length) { message.info('没有可以重试的文本步骤。'); return; }
     const result = await retryTextBooks({...textApi, getTextPublishStatus, publishTextCollection, retryBatchAutomation}, batch.id, items, {
       chooseCollection:chooseTextRetryCollection,
-      confirmRepublish:(book, id) => window.confirm(`《${book.title || book.id}》的文本合集 ${id} 已上传，确认再次上传？`)
+      confirmRepublish:(book, id, resume) => window.confirm(resume
+        ? `《${book.title || book.id}》的上次重传尚未收到回复，要继续同一次上传吗？`
+        : `《${book.title || book.id}》的文本合集 ${id} 已上传，确认再次上传？`)
     });
     if (result.submitted) message.success(`已提交 ${result.submitted} 本书重试`);
     if (result.errors.length) message.error(result.errors.join('；'));

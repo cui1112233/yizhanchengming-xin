@@ -535,15 +535,26 @@ export function textUploadControl(collection, status) {
   };
 }
 
-// 浏览器刷新后仍需重用已确认、但尚未收到调度器答复的请求编号。
+// 浏览器刷新后仍需重用已确认、但尚未收到服务端答复的请求编号。
 const transientTextRetryKeys = Object.create(null);
-function textRetryConfirmation(batchId, bookId, collectionId) {
+export function textRetryConfirmation(batchId, bookId, collectionId) {
   const storage = typeof window === 'undefined' ? transientTextRetryKeys : window.sessionStorage;
   const owner = typeof window === 'undefined' ? '' : window.localStorage.getItem('auth_username') || '';
   const slot = 'text-republish:' + JSON.stringify([owner, batchId, bookId, collectionId]);
   return {
     read:() => storage[slot],
-    save:key => { storage[slot] = key; },
+    async authorize(confirm, confirmResume) {
+      const previous = storage[slot];
+      if (previous) {
+        if (!confirmResume || await confirmResume()) return previous;
+        if (storage[slot] === previous) delete storage[slot];
+        return '';
+      }
+      if (!await confirm()) return '';
+      const key = globalThis.crypto?.randomUUID?.() || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      storage[slot] = key;
+      return key;
+    },
     finish:key => { if (storage[slot] === key) delete storage[slot]; }
   };
 }
@@ -559,25 +570,20 @@ async function planTextUpload(api, batchId, item, chooseCollection, confirmRepub
   if (!collectionId) return {skip:'已取消'};
   const status = await api.getTextPublishStatus(batchId, book.id, collectionId);
   if (!status) throw Error('无法读取合集上传状态');
-  const confirmation = manual ? null : textRetryConfirmation(batchId, book.id, collectionId);
-  if (status.publish?.requestKey) confirmation?.finish(status.publish.requestKey);
+  const confirmation = textRetryConfirmation(batchId, book.id, collectionId);
+  if (status.publish?.requestKey) confirmation.finish(status.publish.requestKey);
   const current = manual || (status.publish && run && textReceiptMatchesRun(status.publish, run, summary.runs));
-  if (status.published && current) return {skip:'已上传'};
+  if (status.published && current && !confirmation.read()) return {skip:'已上传'};
   const upload = textUploadControl({id:collectionId}, status);
   if (textPublishStatus(status.publish) === 'uploading') return {manual, collectionId, force:false, requestKey:upload.requestKey};
   if (upload.disabled) return {skip:'等待上传确认'};
   const force = Boolean(status.published || status.lastPublished || summary?.textLastPublishedRecord?.collectionId === collectionId);
-  if (force && !manual) {
-    let requestKey = confirmation.read();
-    if (!requestKey) {
-      if (!await confirmRepublish(book, collectionId)) return {skip:'已取消'};
-      requestKey = globalThis.crypto?.randomUUID?.() || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      confirmation.save(requestKey);
-    }
-    return {manual, collectionId, force, requestKey, acknowledged:() => confirmation.finish(requestKey)};
-  }
-  if (force && !await confirmRepublish(book, collectionId)) return {skip:'已取消'};
-  return {manual, collectionId, force};
+  if (!force) return {manual, collectionId, force};
+  const requestKey = await confirmation.authorize(
+    () => confirmRepublish(book, collectionId, false),
+    manual ? () => confirmRepublish(book, collectionId, true) : null
+  );
+  return requestKey ? {manual, collectionId, force, requestKey, acknowledged:() => confirmation.finish(requestKey)} : {skip:'已取消'};
 }
 
 export async function retryTextBooks(api, batchId, items, {chooseCollection, confirmRepublish}) {
@@ -595,7 +601,10 @@ export async function retryTextBooks(api, batchId, items, {chooseCollection, con
         if (plan.skip) { skipped.push(plan.skip); continue; }
         if (plan.manual) {
           const payload = {force:plan.force, ...(plan.requestKey && {requestKey:plan.requestKey})};
-          manual.push({book, run:() => api.publishTextCollection(batchId, book.id, plan.collectionId, payload)});
+          manual.push({book, run:async () => {
+            await api.publishTextCollection(batchId, book.id, plan.collectionId, payload);
+            plan.acknowledged?.();
+          }});
           continue;
         }
         overrides[book.id] = {collectionId:plan.collectionId, force:plan.force, ...(plan.requestKey && {requestKey:plan.requestKey})};

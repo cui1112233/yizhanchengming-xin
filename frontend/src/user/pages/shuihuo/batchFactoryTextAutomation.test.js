@@ -87,9 +87,10 @@ test('批量重试先确认和选合集，再一次提交所有同意的自动�
   assert.ok(events.slice(0,firstWrite).includes('confirm:cancel'));
   const requestKey=events.find(Array.isArray)[3].b.requestKey;
   assert.ok(requestKey);
+  assert.ok(events.filter(Array.isArray)[1][4].requestKey);
   assert.deepEqual(events.filter(Array.isArray),[
     ['retry','batch',['b','b2'],{b:{collectionId:'c-b',force:true,requestKey},b2:{collectionId:'chosen-b2',force:false}}],
-    ['manual','batch','manual','manual-current',{force:true}]
+    ['manual','batch','manual','manual-current',{force:true,requestKey:events.filter(Array.isArray)[1][4].requestKey}]
   ]);
 });
 
@@ -143,6 +144,28 @@ test('同次确认丢响应后重放原批量请求，下次确认才换上传�
   assert.equal((await retry()).submitted,1);
   assert.equal(prompts,2);
   assert.notEqual(calls[2][2].b.requestKey,calls[1][2].b.requestKey);
+});
+
+test('手动行重试保留确认编号，取消恢复会清除它，收到匹配回执后无需补交',async()=>{
+  const book={id:'manual'}, record={collectionId:'manual-replay',status:'failed'};
+  const item={book,stage:'text_publish',summary:{textPublishSource:'manual',textPublishRecord:record}};
+  const keys=[], dialogs=[];
+  let decision=true, lost=true, reply={published:false,publish:record,lastPublished:{status:'published'}};
+  const api={getTextPublishStatus:async()=>reply,publishTextCollection:async(_batch,_book,_collection,payload)=>{
+    keys.push(payload.requestKey);if(lost)throw Error('回复丢失');
+  }};
+  const retry=()=>helpers.retryTextBooks(api,'batch',[item],{
+    confirmRepublish:(_book,_id,resume)=>{dialogs.push(Boolean(resume));return decision}
+  });
+  await retry();await retry();
+  assert.ok(keys[0]);assert.equal(keys[0],keys[1]);
+  decision=false;await retry();assert.equal(keys.length,2);
+  decision=true;await retry();assert.notEqual(keys[2],keys[0]);
+  assert.deepEqual(dialogs,[false,true,true,false]);
+  reply={published:true,publish:{...record,status:'published',requestKey:keys[2]}};
+  assert.equal((await retry()).submitted,0);
+  reply={published:false,publish:record,lastPublished:{status:'published'}};lost=false;
+  await retry();assert.notEqual(keys[3],keys[2]);
 });
 
 test('已选文本进入自动生产接口，日志收录手动上传回执',()=>{
@@ -232,6 +255,52 @@ test('Chrome 点击上传、取消和确认再次上传，等待回读期间不�
       }
       run().catch(e=>document.body.dataset.error=e.message);
     `);
+});
+
+test('Chrome 媒体库再次上传响应丢失后刷新沿用原编号，收到答复后重新确认才换号', {skip:!browser},async()=>{
+  await runChrome(`
+    import React from 'react';
+    import {createRoot} from 'react-dom/client';
+    import TextMediaPanel from './TextMediaPanel.jsx';
+    const root=createRoot(document.querySelector('#root'));
+    const step=Number(sessionStorage.getItem('step')||0);
+    const keys=[],dialogs=[];
+    window.confirm=message=>{dialogs.push(message);return true};
+    const record={status:'published',requestKey:'previous',imageIds:[1],carouselId:8};
+    const current={published:true,publish:record,lastPublished:record};
+    window.fetch=async(url,opts={})=>{
+      const path=String(url).split('?')[0];
+      let data={};
+      if(path.endsWith('/text-pages')) data={pages:[],artifacts:[]};
+      else if(path.endsWith('/text-collections')) data={items:[{id:'c',status:'ready'}]};
+      else if(path.endsWith('/text-collections/c')) data={id:'c',status:'ready'};
+      else if(path.endsWith('/publish')){
+        if(opts.method==='POST'){
+          keys.push(JSON.parse(opts.body).requestKey);
+          if(!step)throw Error('回复丢失');
+        }
+        data=current;
+      }
+      return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}})
+    };
+    const button=()=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='再次上传');
+    const sleep=n=>new Promise(r=>setTimeout(r,n));
+    async function until(f){for(let i=0;i<400;i++){if(f())return;await sleep(20)}throw Error(document.body.innerText)}
+    async function run(){
+      root.render(<TextMediaPanel batchId="batch" book={{id:'b',title:'手动测试'}} initialTab="collections"/>);
+      await until(()=>button()?.disabled===false);
+      button().click();await until(()=>keys.length===1&&button()?.disabled===false);
+      if(!keys[0])throw Error('缺少确认编号');
+      if(!step){
+        sessionStorage.setItem('firstKey',keys[0]);sessionStorage.setItem('step','1');
+        location.reload();return;
+      }
+      if(keys[0]!==sessionStorage.getItem('firstKey')||!dialogs[0].includes('上次'))throw Error('刷新时未恢复上次确认');
+      button().click();await until(()=>keys.length===2);
+      if(keys[1]===keys[0]||!dialogs[1].includes('确认再次上传'))throw Error('新确认未换号');
+      document.body.dataset.result='passed';
+    }run().catch(e=>document.body.dataset.error=e.message)
+  `);
 });
 
 test('Chrome 重开媒体库后沿用原上传记录，轮询图片数量、回执和最终失败提示', {skip:!browser},async()=>{
@@ -340,7 +409,10 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       if(method==='POST')posts.push({path,payload});
       let data={};
       if(path.endsWith('runtime-summary'))data=runtime;
-      else if(path.endsWith('text-collections/c/publish'))data={published:false,publish:{status:'failed'},lastPublished:history};
+      else if(path.endsWith('text-collections/c/publish')){
+        if(method==='POST'&&posts.filter(x=>x.path.endsWith('/text-collections/c/publish')).length===1)throw Error('回复丢失');
+        data={published:false,publish:{status:'failed'},lastPublished:history};
+      }
       else if(path.endsWith('/books/b2/text-collections'))data={items:[{id:'do-not-guess'},{id:'choose-b2'}]};
       else if(path.endsWith('/text-collections/choose-b2/publish'))data={published:false,publish:null};
       else if(path.endsWith('/automation/retry'))data={automation:{state:'running'}};
@@ -356,6 +428,10 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       step='重试取消';await until(()=>button('重试失败步骤'));button('重试失败步骤').click();await until(()=>confirms===1);
       if(posts.some(x=>x.path.endsWith('/publish')))throw Error('取消后仍提交上传');
       step='确认重传';approved=true;await until(()=>!button('重试失败步骤').disabled);button('重试失败步骤').click();await until(()=>posts.some(x=>x.path.endsWith('/text-collections/c/publish')&&x.payload.force));
+      const manualWrites=()=>posts.filter(x=>x.path.endsWith('/text-collections/c/publish'));
+      await until(()=>button('重试失败步骤')?.disabled===false);
+      button('重试失败步骤').click();await until(()=>manualWrites().length===2);
+      if(!manualWrites()[0].payload.requestKey||manualWrites()[0].payload.requestKey!==manualWrites()[1].payload.requestKey)throw Error('书行重试更换了确认编号');
       step='手动日志';button('任务/日志').click();const logs=()=>Array.from(document.querySelectorAll('.ant-modal')).find(n=>n.textContent.includes('文本任务 / 日志'));
       await until(()=>logs()?.textContent.includes('手动上传 · 手动上传的书'));if(!logs().textContent.includes('上传失败'))throw Error('缺少手动上传失败状态');
       logs().querySelector('.ant-modal-close').click();await sleep(350);

@@ -7,7 +7,7 @@ import { canCreateTextCollection, textBookCompletion, textPagePresentation, text
 import { initialPageDraft,pageChanges,splitChoices,uploadLabel } from './textMediaActions.js';
 import { TextPageEditor,useDraftPreview } from './TextPageEditor.jsx';
 import { textPublishImageProgress, textPublishStatus } from './batchFactoryBookState.js';
-import { textUploadControl } from './batchFactoryNovelListHelpers.js';
+import { textRetryConfirmation, textUploadControl } from './batchFactoryNovelListHelpers.js';
 import { updateTextProductionSettings } from './textProductionConfig.js';
 import './text-media-panel.css';
 
@@ -113,6 +113,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
           signal:controller.signal, suppressGlobalError:true
         });
         if (controller.signal.aborted) return;
+        if (status?.publish?.requestKey) textRetryConfirmation(batchId, book.id, collection.id).finish(status.publish.requestKey);
         setReceipt({id:collection.id, status});
         const state = textPublishStatus(status?.publish);
         if (['uploading','pending'].includes(state) || (publishing && !state)) timer = setTimeout(read, 3000);
@@ -132,13 +133,31 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, initialT
   const upload = onUpload && textPublishStatus(collection) !== 'uploading'
     ? {label:uploadLabel(collection), force:uploadLabel(collection) === '再次上传', disabled:!collection}
     : textUploadControl(collection, onUpload ? {publish:collection} : selectedReceipt?.status);
-  function publish() {
-    if (upload.disabled || (upload.force && !window.confirm('这个文本合集已上传，确认再次上传？'))) return;
+  async function publish() {
+    if (upload.disabled || actionLock.current) return;
+    let requestKey = upload.requestKey;
+    let confirmation;
+    if (upload.force) {
+      try {
+        confirmation = textRetryConfirmation(batchId, book.id, collection.id);
+        requestKey = await confirmation.authorize(
+          () => window.confirm('这个文本合集已上传，确认再次上传？'),
+          () => window.confirm('上次重传尚未收到回复，要继续同一次上传吗？')
+        );
+        if (!requestKey) return;
+      } catch (error) {
+        setActionError(error.message || '无法保存上传确认编号');
+        return;
+      }
+    }
     void run('publish', async () => {
-      const payload = {force:upload.force, ...(upload.requestKey && {requestKey:upload.requestKey})};
-      if (onUpload) return onUpload(collection, payload);
-      const status = await publishTextCollection(batchId, book.id, collection.id, payload);
-      setReceipt({id:collection.id, status});
+      const payload = {force:upload.force, ...(requestKey && {requestKey})};
+      if (onUpload) await onUpload(collection, payload);
+      else {
+        const status = await publishTextCollection(batchId, book.id, collection.id, payload);
+        setReceipt({id:collection.id, status});
+      }
+      confirmation?.finish(requestKey);
     });
   }
   const currentCollection = collectionDetail?.id === collection?.id ? collectionDetail : collection;
