@@ -371,7 +371,7 @@ func (c *BatchAutomationCoordinator) preflightSettings(ctx context.Context, owne
 			current[key] = value
 		}
 	}
-	if mode := strings.TrimSpace(automationStringValue(input["productionMode"], "")); mode == "comic" || mode == "video" {
+	if mode := strings.TrimSpace(automationStringValue(input["productionMode"], "")); mode == "comic" || mode == "video" || mode == "text" {
 		current["productionMode"] = mode
 	}
 	current, hydrateIssue := c.preflightHydratePromptConfig(current)
@@ -523,6 +523,13 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 		return []automationPreflightIssue{{Code: "raw_source_missing", Message: missingSensitiveOriginal, FixTarget: automationFixBookSettings, FixLabel: "重新获取原文"}}
 	}
 	if productionMode == "text" {
+		effective = effectiveTextSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+		if !hasVerifiedBatchOriginal(book) && (strings.TrimSpace(book.BookID) == "" || book.BookID == book.ID) && firstMetadataString(book.SourceMetadata, "giantMaterialId", "qingyuMaterialId") == "" {
+			issues = append(issues, automationPreflightIssue{Code: "raw_source_missing", Message: missingSensitiveOriginal, FixTarget: automationFixBookSettings, FixLabel: "重新获取原文"})
+		}
+		if err := validateAutomationTextSettings(textRequest{Context: ctx, book: book, settings: effective}); err != nil {
+			issues = append(issues, automationPreflightIssue{Code: "text_render_settings_invalid", Message: "文本排版配置无效：" + err.Error(), FixTarget: automationFixBookSettings, FixLabel: "排版配置"})
+		}
 		if batchfactorysensitive.ResolveMode(effective) == batchfactorysensitive.ModeAI {
 			models := batchSensitiveModels(effective)
 			if len(models) == 0 {

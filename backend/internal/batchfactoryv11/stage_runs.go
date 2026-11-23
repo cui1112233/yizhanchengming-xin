@@ -36,6 +36,7 @@ type BookStageRun struct {
 	Status        ProductionState `json:"status"`
 	Attempt       int             `json:"attempt"`
 	RequestID     string          `json:"requestId,omitempty"`
+	CollectionID  string          `json:"collectionId,omitempty"`
 	InputRevision string          `json:"inputRevision,omitempty"`
 	ErrorMessage  string          `json:"errorMessage,omitempty"`
 	CreatedAt     time.Time       `json:"createdAt"`
@@ -50,7 +51,8 @@ type BookStageRunRepository interface {
 
 func validBookStage(value BookStage) bool {
 	switch value {
-	case BookStageAssets, BookStageDirector, BookStageOpening, BookStageVisual, BookStageComic, BookStageImage, BookStageVideo:
+	case BookStageAssets, BookStageDirector, BookStageOpening, BookStageVisual, BookStageComic, BookStageImage, BookStageVideo,
+		"text_process", "text_paginate", "text_render", "text_validate", "text_collection", "text_publish":
 		return true
 	default:
 		return false

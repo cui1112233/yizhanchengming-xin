@@ -235,6 +235,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		}
 		// Keep injected coordinators on the router's prompt catalog too.
 		options.AutomationCoordinator.promptCatalog = options.PresetCatalog
+		options.AutomationCoordinator.configureTextWorkflow(options.TextRepository, options.LocalArtifacts)
 		options.AutomationCoordinator.SetSourceClassification(batchFetchClassification{
 			AIGenderJudge:         options.NovelFetchAIGenderJudge,
 			AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,

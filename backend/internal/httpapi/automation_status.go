@@ -719,6 +719,7 @@ func publicAutomationJob(job map[string]any) map[string]any {
 				"message": messageValue, "error": errorValue, "publishError": publishError, "updatedAt": book["updatedAt"],
 				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": retryAt,
 				"retryRequested": retryRequested, "logs": publicAutomationBookLogs(book["logs"], 50),
+				"textCollectionId":  book["textCollectionId"],
 				"priorityRequested": book["priorityRequested"],
 				"batchRetryPending": batchRetryPending, "batchRetryCount": batchRetryCount,
 				"needsManualPages": automationNeedsManualPages(map[string]any{automationStringValue(book["bookId"], ""): book}),

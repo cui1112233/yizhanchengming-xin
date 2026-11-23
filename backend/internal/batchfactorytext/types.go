@@ -267,6 +267,7 @@ type Collection struct {
 }
 
 type CollectionInput struct {
+	Reuse             bool // Automation retries with the same ordered artifacts share one immutable collection.
 	ExpectedRevision  int64
 	VersionID         string
 	PaginationVersion int64

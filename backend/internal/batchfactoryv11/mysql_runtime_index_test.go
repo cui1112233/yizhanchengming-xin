@@ -20,9 +20,9 @@ func TestGetBatchRuntimeIndexReadsOnlyBatchAndBookIdentities(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.id,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b WHERE b.id=? AND b.owner_username=?`)).
 		WithArgs("batch-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "revision", "created_at", "updated_at"}).AddRow("batch-1", int64(7), now, now))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id,revision FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? AND hidden_at IS NULL ORDER BY ordinal,id`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT b.id,b.revision,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.textCollectionId')),'') FROM batch_factory_v12_books b LEFT JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? AND b.hidden_at IS NULL ORDER BY b.ordinal,b.id`)).
 		WithArgs("batch-1", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "revision"}).AddRow("book-1", int64(2)).AddRow("book-2", int64(3)))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "revision", "text_collection_id"}).AddRow("book-1", int64(2), "manual-collection").AddRow("book-2", int64(3), ""))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`)).
 		WithArgs("batch-1", "book-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal"}).AddRow("video-1", 0))
@@ -40,6 +40,9 @@ func TestGetBatchRuntimeIndexReadsOnlyBatchAndBookIdentities(t *testing.T) {
 	got, err := NewMySQLStore(db).GetBatchRuntimeIndex(context.Background(), "alice", "batch-1")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got.Books[0].SourceMetadata["textCollectionId"] != "manual-collection" {
+		t.Fatalf("manual collection missing: %+v", got.Books[0].SourceMetadata)
 	}
 	if got.ID != "batch-1" || got.Revision != 7 || len(got.Books) != 2 || got.Books[1].ID != "book-2" || len(got.Books[0].Videos) != 1 || got.Books[0].Videos[0].ID != "video-1" || len(got.Books[1].Videos) != 2 {
 		t.Fatalf("unexpected runtime index: %#v", got)

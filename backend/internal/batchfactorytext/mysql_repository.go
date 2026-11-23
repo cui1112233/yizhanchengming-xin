@@ -614,6 +614,16 @@ func (r *MySQLRepository) CreateCollection(ctx context.Context, s Scope, in Coll
 			return Collection{}, err
 		}
 		c := Collection{ID: rand.Text(), VersionID: h.version, PaginationVersion: h.pagination, CoverArtifactID: cover, ConfigSnapshot: in.ConfigSnapshot, Status: "ready", Items: frozen}
+		if in.Reuse {
+			// lockHead serializes creation for this book, including across workers.
+			// The immutable manifest supplies the same ID after a lost commit reply.
+			c.ID = fingerprint(s, h.version, h.pagination, cover, frozen)
+			var exists bool
+			err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM "+collections+" WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?)", c.ID, s.Owner, s.BatchID, s.BookID).Scan(&exists)
+			if err != nil || exists {
+				return c, err
+			}
+		}
 		_, err = tx.ExecContext(ctx, "INSERT INTO "+collections+" (id,owner_username,batch_id,book_id,version_id,pagination_version,cover_artifact_id,status,config_snapshot_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,NOW(6),NOW(6))", c.ID, s.Owner, s.BatchID, s.BookID, c.VersionID, c.PaginationVersion, c.CoverArtifactID, c.Status, dbJSON(c.ConfigSnapshot))
 		if err != nil {
 			return Collection{}, err

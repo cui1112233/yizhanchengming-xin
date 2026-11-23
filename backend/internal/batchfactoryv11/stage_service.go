@@ -2,11 +2,16 @@ package batchfactoryv11
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
+
+	txt "qiantie/backend/internal/batchfactorytext"
 )
 
 // StripReferenceImagesOnModerationEnv opts into dropping reference images when
@@ -179,6 +184,12 @@ func (s *BookStageService) SummaryWithAvailability(ctx context.Context, owner, b
 	if err != nil {
 		return BookStageSummary{}, err
 	}
+	for i := range runs {
+		if runs[i].Stage == "text_publish" && len(runs[i].InputRevision) > 64 {
+			runs[i].CollectionID = runs[i].InputRevision[64:]
+			runs[i].InputRevision = runs[i].InputRevision[:64]
+		}
+	}
 	return BookStageSummary{BookID: bookID, Runs: runs, Availability: availability, LastFailed: LatestFailedBookStageRun(runs)}, nil
 }
 
@@ -216,6 +227,65 @@ func (s *BookStageService) finish(ctx context.Context, owner string, run BookSta
 	}
 	_, err = repository.UpdateBookStageRun(ctx, owner, run.ID, BookStageRun{Status: status, ErrorMessage: text, InputRevision: run.InputRevision})
 	return err
+}
+
+// TrackTextStage journals the latest attempt for each fingerprint. Artifact
+// checks belong to the workflow, which can demand a fresh attempt if a page
+// or a cover was restored by the user since the previous success.
+func (s *BookStageService) TrackTextStage(ctx context.Context, owner, batchID, bookID, id, key, collectionID string, reuse bool, run func(BookStageRun) error) error {
+	stage := BookStage(id)
+	if !strings.HasPrefix(id, "text_") || !validBookStage(stage) {
+		return ErrInvalid
+	}
+	repo, err := s.repository()
+	if err != nil {
+		return err
+	}
+	runs, err := repo.ListBookStageRuns(ctx, owner, batchID, bookID)
+	if err != nil {
+		return err
+	}
+	if stage == "text_publish" {
+		// input_revision holds a fixed-width digest followed by the immutable
+		// input collection ID. The independent request_id identifies the upload attempt.
+		if collectionID == "" || len(collectionID) > 64 {
+			return ErrInvalid
+		}
+		if len(key) != 64 {
+			key = fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
+		}
+		key += collectionID
+	}
+	attempt := s.nextAttempt(runs, stage)
+	var started BookStageRun
+	for _, prev := range runs {
+		if prev.Stage != stage || prev.Attempt != attempt-1 || prev.InputRevision != key {
+			continue
+		}
+		if reuse && prev.Status == ProductionSucceeded {
+			return nil
+		}
+		if stage == "text_publish" && prev.Status == ProductionRunning {
+			started = prev
+		}
+	}
+	if started.ID == "" {
+		requestID := ""
+		if stage == "text_publish" {
+			requestID = rand.Text()
+		}
+		started, err = repo.CreateBookStageRun(ctx, BookStageRun{Owner: owner, BatchID: batchID, BookID: bookID, Stage: stage, Status: ProductionRunning, InputRevision: key, RequestID: requestID, Attempt: attempt})
+	}
+	if err != nil {
+		return err
+	}
+	err = run(started)
+	if errors.Is(err, txt.ErrPublishPending) {
+		return err
+	}
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return errors.Join(err, s.finish(finishCtx, owner, started, err))
 }
 
 func normalizeStageExecutionError(stage BookStage, err error) error {

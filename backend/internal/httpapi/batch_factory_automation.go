@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	txt "qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/localartifact"
@@ -48,6 +49,8 @@ type BatchAutomationCoordinator struct {
 	providerSync          func(context.Context, string) error
 	promptCatalog         *prompt.Catalog
 	publish121            *BatchFactory121Publisher
+	textEnsure            func(context.Context, txt.EnsureRequest) (txt.EnsureResult, error)
+	textPublish           func(context.Context, txt.EnsureRequest, txt.Collection) (bool, error)
 	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
 	comicPublish          func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
 	comicPublishRecord    func(context.Context, string, string, string) (N8ComicPublishRecord, bool)
@@ -978,7 +981,7 @@ var errProductionInFlight = errors.New("视频任务仍在生成")
 // 不能从 assets 从头强制重跑。
 func automationRetryResumeStage(stage string) string {
 	switch stage {
-	case "assets", "director", "opening", "video":
+	case "assets", "director", "opening", "video", "text_process", "text_paginate", "text_render", "text_validate", "text_collection", "text_publish":
 		return stage
 	case "merge", "submit", "publish", "upload_confirm":
 		// 合成 / 提交阶段失败说明视频已经完成，回补只需回到 video 重新回读。
@@ -1092,7 +1095,11 @@ func markAutomationBookStarted(entry map[string]any, now time.Time) bool {
 		return prepareAutomationBookRetry(entry, automationNumberValue(entry["batchRetryCount"], 0), now)
 	}
 	if automationStringValue(entry["status"], "") == "queued" {
-		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "assets", "已认领，等待出图槽位", now
+		stage, message := "assets", "已认领，等待出图槽位"
+		if _, ok := entry["frozenTextSettings"]; ok {
+			stage, message = "text_process", "等待处理"
+		}
+		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", stage, message, now
 		return true
 	}
 	return false
@@ -1647,7 +1654,18 @@ func (c *BatchAutomationCoordinator) applyResumePreflight(ctx context.Context, o
 			continue
 		}
 		reason := ""
-		if !frozenComicUpload(runMode, entry) {
+		if settings, ok, err := automationTextSettings(entry, batch, book); ok {
+			if err != nil {
+				reason = err.Error()
+			} else {
+				scoped := batch
+				scoped.SettingsState.Patch = settings
+				book.SettingsState.Patch = nil
+				if automationStringValue(entry["textPendingPublishCollectionId"], "") == "" {
+					reason = c.automationBookPreflightReason(ctx, owner, scoped, book, runMode)
+				}
+			}
+		} else if !frozenComicUpload(runMode, entry) {
 			reason = c.productionBookReadiness(ctx, owner, batch, book, runMode, independent)
 		}
 		if reason != "" {
@@ -1894,7 +1912,7 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 		return nil, fmt.Errorf("%w: 没有可自动生产的书籍", batchfactoryv11.ErrInvalid)
 	}
 	if automationBoolValue(input["queueIfActive"]) {
-		if queued, found, queueErr := c.queueBooksBehindActiveAutomation(owner, batchID, targetBooks, input); found || queueErr != nil {
+		if queued, found, queueErr := c.queueBooksBehindActiveAutomation(owner, batchID, batch.SettingsState.Patch, targetBooks, input); found || queueErr != nil {
 			return queued, queueErr
 		}
 	}
@@ -1952,7 +1970,7 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	// Automatic production enters the same provider-sync boundary as the
 	// explicit production endpoint. Without this, the UI can show a configured
 	// video model while the Go worker's in-memory registry is still empty.
-	if c.providerSync != nil {
+	if c.providerSync != nil && batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, nil) != "text" {
 		if err := c.providerSync(ctx, owner); err != nil {
 			return nil, err
 		}
@@ -1977,7 +1995,7 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	// 任务记录批次生产模式，前端用它判断“自动就绪”数字是否仍适用于当前批次。
 	// 旧前端/旧任务没有该字段时回退到批次设置，再不行就留空（视为通用）。
 	productionMode := automationStringValue(input["productionMode"], "")
-	if productionMode != "comic" && productionMode != "video" {
+	if productionMode != "comic" && productionMode != "video" && productionMode != "text" {
 		productionMode = batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, nil)
 	}
 	job := map[string]any{
@@ -2004,6 +2022,9 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 			status, stage, message = "scheduled", "scheduled", "等待北京时间到点后开始生产"
 		}
 		books[book.ID] = map[string]any{"bookId": book.ID, "title": book.Title, "status": status, "stage": stage, "message": message, "attempts": 0, "retryCount": 0, "updatedAt": c.now()}
+		if err := freezeAutomationTextSettings(books[book.ID].(map[string]any), batch.SettingsState.Patch, book); err != nil {
+			return nil, err
+		}
 	}
 	// 同一批次只允许一个执行任务：先把旧的 running/scheduled/queued 停掉，
 	// 否则两个任务会同时调度同一本书，重复出图、重复扣费。
@@ -2088,7 +2109,7 @@ const automationFollowUpStage = "waiting_active_run"
 // queueBooksBehindActiveAutomation 把用户明确选择的新书追加到同一任务的后续队列。
 // 它只写 queued 条目，不取消、不重启当前 run，因此当前正在调用模型的书不会被
 // 二次提交；本轮结束后 run() 再领取这些条目继续执行。
-func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, batchID string, targetBooks []batchfactoryv11.Book, input map[string]any) (map[string]any, bool, error) {
+func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, batchID string, batchSettings batchfactoryv11.SettingsPatch, targetBooks []batchfactoryv11.Book, input map[string]any) (map[string]any, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	state, err := c.loadLocked()
@@ -2132,6 +2153,9 @@ func (c *BatchAutomationCoordinator) queueBooksBehindActiveAutomation(owner, bat
 			"status": "queued", "stage": automationFollowUpStage,
 			"message": "当前任务完成后自动继续", "attempts": 0, "retryCount": 0,
 			"updatedAt": c.now(),
+		}
+		if err := freezeAutomationTextSettings(books[book.ID].(map[string]any), batchSettings, book); err != nil {
+			return nil, true, err
 		}
 		added++
 	}
@@ -2293,7 +2317,7 @@ func (c *BatchAutomationCoordinator) applyPreset(ctx context.Context, owner stri
 	merged := mergeAutomationPresetConfig(current, config)
 	if len(requestedProductionMode) > 0 {
 		mode := strings.TrimSpace(requestedProductionMode[0])
-		if mode == "comic" || mode == "video" {
+		if mode == "comic" || mode == "video" || mode == "text" {
 			merged["productionMode"] = mode
 		}
 	}
@@ -2503,7 +2527,7 @@ func hasFrozenComicUpload(job map[string]any) bool {
 	return false
 }
 func (c *BatchAutomationCoordinator) validateResumedAutomation(ctx context.Context, owner string, batch batchfactoryv11.Batch, job map[string]any) error {
-	if hasFrozenComicUpload(job) {
+	if hasFrozenComicUpload(job) || automationStringValue(job["productionMode"], "") == "text" {
 		return nil
 	}
 	return c.validateAutomationGlobalPreflight(ctx, owner, batch, automationStringValue(job["runMode"], "full_submit"))
@@ -3535,7 +3559,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 	// 服务重启后自动恢复的 job 不会经过 Start 的 providerSync 边界；内存里的
 	// 视频通道注册表为空时，新的视频任务会被误判成“通道未配置”。恢复执行前
 	// 补一次同步，失败只记录，不阻断已恢复的书。
-	if c.providerSync != nil {
+	if c.providerSync != nil && automationStringValue(job["productionMode"], batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, nil)) != "text" {
 		if syncErr := c.providerSync(ctx, owner); syncErr != nil {
 			log.Printf("automation: provider sync failed job=%s owner=%s: %v", jobID, owner, syncErr)
 		}
@@ -3902,6 +3926,109 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					persist()
 					continue
 				}
+				if settings, isText, settingsErr := automationTextSettings(entry, batch, book); isText {
+					if settingsErr != nil {
+						fail("text_process", settingsErr, settingsErr.Error())
+						continue
+					}
+					scoped := batch
+					scoped.SettingsState.Patch = settings
+					book.SettingsState.Patch = nil
+					pinned := automationStringValue(entry["textPendingPublishCollectionId"], "")
+					if reason := c.automationBookPreflightReason(ctx, owner, scoped, book, jobRunMode); pinned == "" && reason != "" {
+						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "blocked", "preflight", reason, c.now()
+						appendAutomationBookLog(entry, c.now(), "preflight", reason)
+						persist()
+						continue
+					}
+					if pinned == "" && !hasVerifiedBatchOriginal(book) {
+						fetched, fetchErr := c.fetchAutomationSource(ctx, owner, batchID, book, true)
+						if fetchErr != nil {
+							fail("fetch_original", fetchErr, "自动获取正文失败")
+							continue
+						}
+						book = fetched
+					}
+					if _, ok := entry["frozenTextSettings"]; !ok {
+						if err := freezeAutomationTextSettings(entry, settings, book); err != nil {
+							fail("text_process", err, err.Error())
+							continue
+						}
+						persist()
+					}
+					target := "collection"
+					upload := jobRunMode == "full_submit" || jobAutoPublish || string(settings["textAutoUpload"]) == "true"
+					if upload && !jobSubmitDeferred {
+						target = "published"
+					}
+					progress := func(stage, message string) {
+						stallLast.Store(c.now())
+						stallStage.Store(stage)
+						if entry["stage"] != stage || entry["message"] != message {
+							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", stage, message, c.now()
+							appendAutomationBookLog(entry, c.now(), stage, message)
+							persist()
+						}
+					}
+					req := txt.EnsureRequest{Scope: txt.Scope{Owner: owner, BatchID: batchID, BookID: book.ID}, FrozenSettings: settings, Target: target, ForceSensitive: automationBoolValue(entry["retrySensitiveManually"]), Progress: progress}
+					req.CollectionID = pinned
+					req.CollectionReady = func(collection txt.Collection) {
+						entry["textCollectionId"] = collection.ID
+						if upload {
+							entry["textPendingPublishCollectionId"] = collection.ID
+						}
+						persist()
+					}
+					delete(entry, "retrySensitiveManually")
+					if c.textEnsure == nil {
+						err := errors.New("文本生产存储尚未配置")
+						fail("text_process", err, err.Error())
+						continue
+					}
+					textCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+					result, err := c.textEnsure(textCtx, req)
+					cancel()
+					if result.Collection.ID != "" {
+						entry["textCollectionId"] = result.Collection.ID
+					}
+					if errors.Is(err, txt.ErrPublishPending) {
+						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "scheduled", "text_publish", err.Error(), c.now()
+						entry["retryRequested"] = true
+						entry["retryAt"] = c.now().Add(time.Minute)
+						appendAutomationBookLog(entry, c.now(), "text_publish", err.Error())
+						persist()
+						continue
+					}
+					if err != nil {
+						if ctx.Err() != nil {
+							fail(result.Stage, err, err.Error())
+							continue
+						}
+						entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", result.Stage, err.Error(), err.Error(), c.now()
+						entry["needsManual"] = true
+						delete(entry, "retryRequested")
+						delete(entry, "retryAt")
+						appendAutomationBookLog(entry, c.now(), result.Stage, err.Error())
+						failed.Add(1)
+						persist()
+						continue
+					}
+					stage, message := "text_collection", "合集就绪"
+					status := "completed"
+					if result.Published {
+						stage, message = "text_publish", "已上传"
+						delete(entry, "textPendingPublishCollectionId")
+					} else if upload && jobSubmitDeferred {
+						status, stage, message = "scheduled", "waiting_submit", "合集就绪，等待定时上传"
+					}
+					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = status, stage, message, c.now()
+					clearAutomationFailure(entry)
+					delete(entry, "retryRequested")
+					delete(entry, "retryAt")
+					appendAutomationBookLog(entry, c.now(), stage, message)
+					persist()
+					continue
+				}
 				// 幂等：已经发布成功的书，在重新执行/误点执行时直接跳过，
 				// 避免在 N8 重复创建合集。强制重生成时才允许重新发布。
 				if !jobForceRegenerate && !frozenComicUpload(jobRunMode, entry) &&
@@ -4045,11 +4172,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					}
 				}
 				effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-				if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "text" {
-					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "blocked", "text_layout", "文本排版服务待接入", c.now()
-					persist()
-					continue
-				}
 				if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
 					acknowledgeComicRetry(entry)
 					// 本轮补齐提示词后仍缺失的页数；storyboard_only 收尾必须保留它，
@@ -5714,7 +5836,7 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 		status := automationStringValue(entry["status"], "")
 		if status == "failed" || status == "blocked" || status == "paused" || status == "stopped" {
 			failedStage := automationStringValue(entry["stage"], "")
-			if failedStage == "sensitive" {
+			if failedStage == "sensitive" || failedStage == "text_process" {
 				entry["retrySensitiveManually"] = true
 			}
 			stage, message := automationRetryResumeStage(failedStage), "从失败阶段继续执行"

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,12 +16,277 @@ import (
 	"testing"
 	"time"
 
+	txt "qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/giantmaterialresolver"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
+	"qiantie/backend/internal/storage"
 )
+
+type workflowFailSecondPage struct {
+	txt.Repository
+}
+
+func (r workflowFailSecondPage) SaveSystemPageArtifact(ctx context.Context, s txt.Scope, id string, rev int64, file txt.ArtifactFile) (txt.PageArtifact, error) {
+	pages, err := r.ListPages(ctx, s)
+	if err != nil {
+		return txt.PageArtifact{}, err
+	}
+	for _, p := range pages {
+		if p.ID == id && p.Ordinal == 2 {
+			return txt.PageArtifact{}, fmt.Errorf("%w：第二页故障演练", txt.ErrInvalid)
+		}
+	}
+	return r.Repository.SaveSystemPageArtifact(ctx, s, id, rev, file)
+}
+
+// This full-schema fixture must use its own disposable database; the lighter
+// TEXT_REPO_TEST_DSN fixtures intentionally create only a minimal books table.
+func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
+	dsn := os.Getenv("TEXT_WORKFLOW_TEST_DSN")
+	if dsn == "" {
+		t.Skip("set TEXT_WORKFLOW_TEST_DSN to a disposable full-schema database")
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	if err = storage.RunMigrations(ctx, db, append(storage.V11Migrations(), storage.V12Migrations()...)); err != nil {
+		t.Fatal(err)
+	}
+	store := batchfactoryv11.NewMySQLStore(db)
+	settings := batchfactoryv11.SettingsPatch{"productionMode": mustJSON("text"), "sensitiveMode": mustJSON("off"), "textPageTarget": mustJSON(6)}
+	original := "第一段文字。\n第二段文字。\n第三段文字。"
+	b, err := store.CreateBatch(ctx, "workflow-test", batchfactoryv11.CreateBatchInput{Title: "文本自动任务", InitialBatchSettings: settings, Books: []batchfactoryv11.CreateBookInput{{Title: "测试书", SourceText: original, TxtText: original, SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := txt.Scope{Owner: "workflow-test", BatchID: b.ID, BookID: b.Books[0].ID}
+	req := txt.EnsureRequest{Scope: scope, FrozenSettings: settings, Target: "collection"}
+	files := localartifact.NewStore(t.TempDir(), 32<<20)
+	repo := txt.NewMySQLRepository(db)
+	coordinator := func(r txt.Repository) *BatchAutomationCoordinator {
+		c := NewBatchAutomationCoordinator(store, nil, &batchfactoryv11.BookStageService{Store: store}, nil, nil, nil, nil, nil, time.Now)
+		c.configureTextWorkflow(r, files)
+		return c
+	}
+	result, err := coordinator(workflowFailSecondPage{repo}).textEnsure(ctx, req)
+	if err == nil || result.Stage != "text_render" || !strings.Contains(err.Error(), "第 2 页") {
+		t.Fatalf("first run=%+v err=%v", result, err)
+	}
+	doc, err := repo.GetDocument(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pages, err := repo.ListPages(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pages) != 3 || doc.CoverArtifactID == "" || pages[0].ActiveArtifactID == "" || pages[1].ActiveArtifactID != "" || pages[2].ActiveArtifactID == "" {
+		t.Fatalf("partial render doc=%+v pages=%+v", doc, pages)
+	}
+	arts, err := repo.ListArtifacts(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]txt.ArtifactFile{}
+	for _, art := range arts {
+		byID[art.ID] = art.ArtifactFile
+	}
+	locked, err := repo.LockPageArtifact(ctx, scope, pages[0].ID, pages[0].Revision, byID[pages[0].ActiveArtifactID])
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err = repo.GetDocument(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cover, err := repo.SaveCover(ctx, scope, doc.Revision, byID[doc.CoverArtifactID], true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var collection string
+	for range 2 {
+		result, err = coordinator(repo).textEnsure(ctx, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if collection != "" && collection != result.Collection.ID {
+			t.Fatalf("duplicate collection %s %s", collection, result.Collection.ID)
+		}
+		collection = result.Collection.ID
+		items := result.Collection.Items
+		if len(items) != 3 || items[0].ArtifactID != locked.ID || items[1].ArtifactID == "" || items[2].ArtifactID != pages[2].ActiveArtifactID || result.Collection.CoverArtifactID != cover.ID {
+			t.Fatalf("unexpected collection %+v", result.Collection)
+		}
+	}
+	runs, err := store.ListBookStageRuns(ctx, scope.Owner, scope.BatchID, scope.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[batchfactoryv11.BookStage]int{}
+	for _, r := range runs {
+		counts[r.Stage]++
+	}
+	if counts["text_process"] != 1 || counts["text_paginate"] != 1 || counts["text_render"] != 2 || counts["text_validate"] != 1 || counts["text_collection"] != 1 {
+		t.Fatalf("persisted attempts %+v", counts)
+	}
+	t.Logf("book=%s pages=%d collection=%s stageAttempts=%v", scope.BookID, len(result.Collection.Items), collection, counts)
+}
+
+func TestAutomationTextPublishPendingResumesSameAttemptAndSeparatesHistory(t *testing.T) {
+	ctx := context.Background()
+	s := batchfactoryv11.NewMemoryStore()
+	b := preflightComicBatch(t, s, 1, 0)
+	book := b.Books[0]
+	run := func(result error) (started batchfactoryv11.BookStageRun) {
+		service := &batchfactoryv11.BookStageService{Store: s}
+		err := service.TrackTextStage(ctx, "alice", b.ID, book.ID, "text_publish", "key", "collection", false, func(r batchfactoryv11.BookStageRun) error { started = r; return result })
+		if !errors.Is(err, result) {
+			t.Fatal(err)
+		}
+		return started
+	}
+	first := run(txt.ErrPublishPending)
+	recovered := run(nil)
+	if first.ID != recovered.ID || first.Attempt != recovered.Attempt {
+		t.Fatalf("new intent on restart %+v %+v", first, recovered)
+	}
+	second := run(txt.ErrPublishPending)
+	if second.ID == first.ID || second.Attempt != 2 {
+		t.Fatalf("new attempt missing %+v", second)
+	}
+	prev := map[string]any{"kind": "text", "bookId": book.ID, "collectionId": "collection", "status": "published", "carouselId": 12, "imageIds": []int{9}, "runId": first.ID, "attempt": first.Attempt}
+	present := map[string]any{"kind": "text", "bookId": book.ID, "collectionId": "collection", "status": "pending", "runId": second.ID, "attempt": second.Attempt, "requestKey": second.RequestID, "lastPublished": prev}
+	save := func(record map[string]any) {
+		data, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = s.SaveDraft(ctx, "alice", batchfactoryv11.Draft{Kind: "n8-text-publish", Key: "collection", Scope: b.ID, Content: string(data)})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func() map[string]any {
+		service := &batchfactoryv11.BookStageService{Store: s}
+		summary, err := service.Summary(ctx, "alice", b.ID, book.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var current batchfactoryv11.BookStageRun
+		for _, r := range summary.Runs {
+			if r.Attempt > current.Attempt {
+				current = r
+			}
+		}
+		if current.Status != batchfactoryv11.ProductionRunning || current.RequestID == "collection" || current.CollectionID != "collection" {
+			t.Fatalf("wrong projection %+v", current)
+		}
+		out := map[string]any{}
+		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, book.ID, "", summary.Runs, out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	save(prev)
+	snapshot := read()
+	if snapshot["textPublishRecord"] != nil || mapOrEmpty(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
+		t.Fatalf("old receipt relabeled %+v", snapshot)
+	}
+	save(present)
+	snapshot = read()
+	if mapOrEmpty(snapshot["textPublishRecord"])["status"] != "upload_pending_confirm" || mapOrEmpty(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
+		t.Fatalf("pending receipt lost %+v", snapshot)
+	}
+}
+
+func TestAutomationTextManualPublishSummaryUsesBookCollection(t *testing.T) {
+	ctx := context.Background()
+	s := batchfactoryv11.NewMemoryStore()
+	b := preflightComicBatch(t, s, 1, 0)
+	id := b.Books[0].ID
+	for _, status := range []string{"pending", "published"} {
+		data, _ := json.Marshal(map[string]any{"kind": "text", "bookId": id, "collectionId": "manual-collection", "status": status, "carouselId": 12, "imageIds": []int{55}})
+		_, err := s.SaveDraft(ctx, "alice", batchfactoryv11.Draft{Kind: "n8-text-publish", Key: "manual-collection", Scope: b.ID, Content: string(data)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]any{}
+		if err := addWorkflowPublishSummary(ctx, s, "alice", b.ID, id, "manual-collection", nil, out); err != nil {
+			t.Fatal(err)
+		}
+		rec := mapOrEmpty(out["textPublishRecord"])
+		if rec["collectionId"] != "manual-collection" || out["runs"] != nil || rec["runId"] != nil {
+			t.Fatalf("manual receipt %+v", out)
+		}
+		if (out["textLastPublishedRecord"] != nil) != (status == "published") {
+			t.Fatal(out)
+		}
+	}
+}
+
+func TestAutomationTextFailureIsolatedAndFrozenSettings(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch := preflightComicBatch(t, store, 2, 0)
+	batch = savePreflightBatchSettings(t, store, batch, batchfactoryv11.SettingsPatch{"productionMode": json.RawMessage(`"text"`), "textFontSize": json.RawMessage("900")})
+	coord := preflightCoordinator(t, store, &batchfactoryv11.BookStageService{Store: store})
+	broken := batch.Books[0].ID
+	coord.textEnsure = func(_ context.Context, req txt.EnsureRequest) (txt.EnsureResult, error) {
+		if string(req.FrozenSettings["textFontSize"]) != "44" || req.Target != "collection" {
+			return txt.EnsureResult{}, errors.New("任务配置已变化")
+		}
+		if req.BookID == broken {
+			return txt.EnsureResult{Stage: "text_render"}, errors.New("第 2 页渲染失败")
+		}
+		return txt.EnsureResult{Stage: "text_collection", Collection: txt.Collection{ID: "ready-id"}}, nil
+	}
+	entries := map[string]any{}
+	for _, book := range batch.Books {
+		entries[book.ID] = map[string]any{"bookId": book.ID, "status": "queued", "stage": "queued", "frozenTextSettings": `{"productionMode":"text","textFontSize":44}`}
+	}
+	job := map[string]any{"id": "text-job", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": entries}
+	coord.run(ctx, 0, "alice", batch.ID, "text-job", job, batch)
+	bad := mapOrEmpty(entries[broken])
+	good := mapOrEmpty(entries[batch.Books[1].ID])
+	if bad["status"] != "failed" || bad["stage"] != "text_render" || good["status"] != "completed" || good["textCollectionId"] != "ready-id" {
+		t.Fatalf("bad=%v good=%v", bad, good)
+	}
+	if issues := coord.automationBookPreflightIssues(ctx, "alice", batch, batch.Books[0], "video_no_submit", true); len(issues) == 0 || issues[0].Code != "text_render_settings_invalid" {
+		t.Fatalf("invalid font passed preflight: %+v", issues)
+	}
+}
+
+func TestAutomationTextCheckpointSurvivesNewStageService(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch := preflightComicBatch(t, store, 1, 0)
+	calls := 0
+	for i := 0; i < 2; i++ {
+		service := &batchfactoryv11.BookStageService{Store: store}
+		if err := service.TrackTextStage(ctx, "alice", batch.ID, batch.Books[0].ID, "text_render", "key", "", true, func(batchfactoryv11.BookStageRun) error { calls++; return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := &batchfactoryv11.BookStageService{Store: store}
+	failure := errors.New("回读待确认")
+	err := service.TrackTextStage(ctx, "alice", batch.ID, batch.Books[0].ID, "text_publish", "mapping", "exact-collection", false, func(batchfactoryv11.BookStageRun) error { return failure })
+	if !errors.Is(err, failure) {
+		t.Fatal(err)
+	}
+	summary, err := service.Summary(ctx, "alice", batch.ID, batch.Books[0].ID)
+	if err != nil || summary.LastFailed == nil || summary.LastFailed.CollectionID != "exact-collection" {
+		t.Fatalf("publish retry scope: %+v %v", summary, err)
+	}
+	if calls != 1 {
+		t.Fatalf("render ran %d times across restart", calls)
+	}
+}
 
 func TestComicGenerationFailureStageSeparatesAssetImageFailures(t *testing.T) {
 	stage, detail := comicGenerationFailureStage(errors.New("漫画资产图生成失败: temporary upstream failure"))
