@@ -93,6 +93,8 @@ type RenderInput struct {
 	// The caller resolves authenticated storage references into bytes.
 	BackgroundImage       []byte
 	HighlightReuseEnabled bool
+	// Preview samples the actual cropped background behind the glyphs.
+	WarnLowContrast func()
 }
 type MeasureResult struct {
 	Fits                  bool
@@ -457,6 +459,13 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 			if !ok {
 				return fmt.Errorf("无法绘制第 %d 个字符", g.index+1)
 			}
+			if in.WarnLowContrast != nil && !rect.Empty() {
+				point := rect.Min.Add(rect.Size().Div(2))
+				if point.In(dst.Rect) && lowContrast(ink.C.(color.RGBA), dst.RGBAAt(point.X, point.Y)) {
+					in.WarnLowContrast()
+					in.WarnLowContrast = nil
+				}
+			}
 			if c.FontWeight < 400 {
 				mask = lightGlyphMask(mask, mp, rect.Size(), c.FontWeight)
 				mp = image.Point{}
@@ -478,4 +487,17 @@ func (r Renderer) Render(ctx context.Context, in RenderInput) ([]byte, string, e
 		return nil, "", err
 	}
 	return out.Bytes(), "image/png", nil
+}
+
+func lowContrast(fg, bg color.RGBA) bool {
+	linear := func(b uint8) float64 {
+		c := float64(b) / 255
+		if c <= 0.04045 {
+			return c / 12.92
+		}
+		return math.Pow((c+0.055)/1.055, 2.4)
+	}
+	lum := func(c color.RGBA) float64 { return .2126*linear(c.R) + .7152*linear(c.G) + .0722*linear(c.B) }
+	a, b := lum(fg), lum(bg)
+	return (max(a, b)+.05)/(min(a, b)+.05) < 3
 }

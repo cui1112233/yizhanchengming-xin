@@ -175,11 +175,18 @@ func (a textAPI) picture(w http.ResponseWriter, r *http.Request, x textRequest) 
 	if err != nil {
 		return err
 	}
+	lowContrast := false
+	if preview {
+		input.WarnLowContrast = func() { lowContrast = true }
+	}
 	data, mime, err := renderer.Render(x, input)
 	if err != nil {
 		return textLayoutError(err)
 	}
 	if preview {
+		if lowContrast {
+			w.Header().Set("X-Text-Contrast", "low")
+		}
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "private, no-store")
 		_, err = w.Write(data)

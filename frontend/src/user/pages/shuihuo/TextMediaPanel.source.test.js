@@ -31,21 +31,53 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       const root = createRoot(document.getElementById('root'));
       const sleep = t=>new Promise(r=>setTimeout(r,t));
       async function until(f){for(let i=0;i<300;i++){if(f())return;await sleep(20)}throw Error(document.body.innerText)}
-      let reads=0, rendering=true,requests=[];
+      let reads=0, rendering=true,requests=[],previewBodies=[],saved,aborted=false,restores=0,locked=false,coverLocked=false;
+      const mutations=[];
+      let confirmRestore=false;
+      let bookRevision=7, bookWrites=0, ready=false, collection, publishes=0;
+      window.confirm=()=>confirmRestore;
       window.fetch=async(path,opts)=>{
-        requests.push([path,opts.method]);
+        requests.push([path,opts.method]); if(opts.method==='POST')mutations.push([path,opts.body]);
         let items=[];
-        if(path.endsWith('text-pages')){
+        if(path.endsWith('/preview')){
+          const body=JSON.parse(opts.body);
+          previewBodies.push(body);
+          if(body.text==='较慢的草稿。') return new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>{aborted=true;reject(new DOMException('取消','AbortError'))},{once:true}));
+          if(body.text==='太长的草稿。')return new Response('{"error":"文字超出页面"}',{status:400});
+          return new Response(new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],{type:'image/png'}),{headers:{'X-Text-Contrast':'low'}});
+        }else if(opts.method==='PATCH'){saved=JSON.parse(opts.body);items={pages:[{id:'p1',revision:2},{id:'p2',revision:4,ordinal:2,status:'pending'}]};}
+        else if(opts.method==='PUT'){
+          const data=JSON.parse(opts.body);if(data.expectedRevision!==bookRevision || data.patch.textBackground?.kind!=='color')throw Error('整书背景版本错误');
+          bookWrites++;items={revision:++bookRevision,patch:data.patch};
+        }
+        else if(path.includes('/upload?')){if(path.includes('text-cover'))coverLocked=true;else locked=true;items={id:'new-art'};}
+        else if(path.endsWith('/restore')){restores++;if(path.includes('text-cover'))coverLocked=false;else locked=false;items={document:{revision:5},pages:[{id:'p2',revision:5}]};}
+        else if(path.endsWith('/split')||path.endsWith('/merge'))items={pages:[{id:'p1'},{id:'p2'}]};
+        else if(path.endsWith('text-pages')){
           reads++;
-          items={document:{id:'doc',revision:4,activeVersionId:'v',paginationVersion:1},artifacts:[],pages:[
-            {id:'p1',ordinal:1,status:rendering?'rendering':'pending',text:'第一段完整。'},
-            {id:'p2',ordinal:2,status:'pending',text:'第二段完整。'}]};
-        }else if(path.endsWith('text-collections'))items={items:[]};
+          items={document:{id:'doc',revision:4,activeVersionId:'v',paginationVersion:1,coverLocked},artifacts:[],sentenceBreaks:[6,9],pages:[
+            {id:'p1',ordinal:1,startOffset:0,endOffset:9,revision:2,status:rendering?'rendering':'pending',text:'第一段完整。后句。'},
+            {id:'p2',ordinal:2,status:'pending',text:saved?.text || '第二段完整。',revision:3,locked}]};
+          if(ready){
+            items.document.coverArtifactId='cover';
+            items.artifacts=[{id:'cover',kind:'cover',sourceKind:'system',renderVersion:1}];
+            for(const p of items.pages){
+              Object.assign(p,{status:'ready',versionId:'v',paginationVersion:1,renderVersion:1,activeArtifactId:p.id+'art'});
+              items.artifacts.push({id:p.activeArtifactId,pageId:p.id,kind:'page',sourceKind:'system',renderVersion:1});
+            }
+          }
+        }else if(path.endsWith('text-collections')){
+          if(opts.method==='POST'){
+            const data=JSON.parse(opts.body);
+            if(data.pageIds.join(',')!=='p1,p2'||data.versionId!=='v'||data.expectedRevision!==4)throw Error('合集版本/范围不对');
+            collection={id:'c',status:'ready'};items=collection;
+          }else items={items:collection?[collection]:[]};
+        }else if(path.endsWith('text-collections/c'))items=collection;
         return new Response(JSON.stringify(items),{headers:{'Content-Type':'application/json'}})
       };
       const button=(label)=>Array.from(document.querySelectorAll('button')).find(b=>b.getAttribute('aria-label')===label||b.textContent.trim()===label);
       async function run(){
-        root.render(<TextMediaPanel batchId="a" book={{id:'b',title:'测试书'}} onClose={()=>root.unmount()} />);
+        root.render(<TextMediaPanel batchId="a" book={{id:'b',title:'测试书',revision:7}} onUpload={()=>{publishes++;collection.status='uploaded'}} onClose={()=>root.unmount()} />);
         await until(()=>document.body.innerText.includes('第一段完整。'));
         for(const label of ['本页背景','页面内容','封面','文字页','文本合集','展开','合成当前书','上传网络'])if(!document.body.innerText.includes(label))throw Error('缺少 '+label);
         if(!button('合成当前书').disabled)throw Error('缺封面时未禁用合成');
@@ -54,12 +86,58 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         rendering=false;await until(()=>reads>=2);
         if(!document.body.innerText.includes('第二段完整。'))throw Error('刷新后丢失当前页');
         const n=reads;await sleep(4500);if(reads!==n)throw Error('无生成中页面仍在轮询');
+        const edit=button('排版调整');if(!edit)throw Error('缺少当前页排版调整');
+        edit.click();
+        const area=()=>document.querySelector('textarea[aria-label="页面正文"]');
+        await until(area);
+        const change=(s)=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(area(),s);area().dispatchEvent(new Event('input',{bubbles:true}))};
+        change('较慢的草稿。');await until(()=>previewBodies.some(p=>p.text==='较慢的草稿。'));
+        change('较新的草稿。');await until(()=>aborted && document.querySelector('img[alt="排版预览"]'));
+        if(!document.body.innerText.includes('对比度较低'))throw Error('未显示颜色提示');
+        const last=document.querySelector('img[alt="排版预览"]').src;
+        change('太长的草稿。'); await until(()=>document.body.innerText.includes('文字超出页面'));
+        if(document.querySelector('img[alt="排版预览"]').src!==last)throw Error('预览失败丢失上一张图');
+        change('最终手改。'); await until(()=>previewBodies.some(p=>p.text==='最终手改。'));
+        button('保存本页').click();await until(()=>saved && !area());
+        if(saved.text!=='最终手改。'||saved.expectedRevision!==3||saved.expectedDocumentRevision!==4||saved.reflow!==true)throw Error('保存未带草稿、局部分页和两个版本号');
+        await until(()=>mutations.some(([path,b])=>path.endsWith('/p2/render')&&JSON.parse(b).expectedRevision===4));
+        for(let i=0;i<2;i++){
+          button('排版调整').click();await until(area);
+          button('背景应用到整本书').click();await until(()=>!area());
+        }
+        const prep=mutations.filter(([path])=>path.endsWith('text-prepare'));
+        if(prep.length!==2||bookWrites!==2||prep.some(([,b])=>JSON.parse(b).reflow))throw Error('整书背景触发错误分页');
+        const upload=label=>{
+          const input=document.querySelector('input[type=file][aria-label="'+label+'"]');if(!input)throw Error('缺少'+label);
+          const transfer=new DataTransfer();transfer.items.add(new File(['test'],'用户成品.png',{type:'image/png'}));
+          input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+        };
+        upload('上传成品页');await until(()=>button('恢复系统生成'));
+        button('恢复系统生成').click();await sleep(80);if(restores!==0)throw Error('取消后仍然恢复');
+        confirmRestore=true;button('恢复系统生成').click();await until(()=>!button('恢复系统生成')&&restores===1);
+        if(!mutations.some(([url,body])=>url.endsWith('/p2/render')&&JSON.parse(body).expectedRevision===5))throw Error('未用解锁后的页版本重新出图');
+        button('上一页').click();await until(()=>button('在完整句子后拆页')&&!button('在完整句子后拆页').disabled);
+        button('在完整句子后拆页').click();await until(()=>mutations.some(([url,b])=>url.endsWith('/p1/split')&&JSON.parse(b).offset===6&&JSON.parse(b).expectedRevision===4));
+        await until(()=>!button('与下一页合并').disabled);button('与下一页合并').click();
+        await until(()=>mutations.some(([url,b])=>url.endsWith('/p1/merge')&&JSON.parse(b).expectedRevision===4));
+        await until(()=>!button('封面').disabled);
         button('封面').click();await until(()=>document.body.innerText.includes('测试书')&&!document.body.innerText.includes('第二段完整。'));
+        upload('上传成品封面');await until(()=>button('恢复系统生成'));
+        confirmRestore=false;button('恢复系统生成').click();await sleep(80);if(restores!==1)throw Error('取消恢复封面未生效');
+        confirmRestore=true;button('恢复系统生成').click();await until(()=>!button('恢复系统生成')&&restores===2);
+        if(!mutations.some(([url,b])=>url.endsWith('text-cover/render')&&JSON.parse(b).expectedRevision===5))throw Error('未重新生成封面');
         button('文本合集').click();await until(()=>document.body.innerText.includes('暂无文本合集'));
+        ready=true;button('文字页').click();await until(()=>button('更新文字页'));
+        button('更新文字页').click();await until(()=>!button('合成当前书').disabled);
+        button('合成当前书').click();await until(()=>button('重新合成')&&!button('上传网络').disabled);
+        button('上传网络').click();await until(()=>button('再次上传'));
+        confirmRestore=false;button('再次上传').click();await sleep(50);if(publishes!==1)throw Error('取消后重复上传');
+        confirmRestore=true;await until(()=>!button('再次上传').disabled);button('再次上传').click();await sleep(100);
+        await until(()=>publishes===2&&!button('关闭文本媒体库').disabled);
         button('关闭文本媒体库').click();await until(()=>!document.getElementById('root').children.length);
-        if(requests.some(([url])=>!url.includes('/text-')))throw Error('文本库请求了其他模式接口');
+        if(requests.some(([url,m])=>m!=='PUT'&&!url.includes('/text-')&&!url.includes('/client-errors')))throw Error('文本库请求了其他模式接口');
         document.body.dataset.result='passed'
-      }run().catch(e=>document.body.dataset.error=e.message);
+      }run().catch(e=>document.body.dataset.error=e.message+'（上传 '+publishes+' 次）');
     `},bundle:true,write:false,format:'iife',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"production"'},minify:true});
     writeFileSync(join(dir,'app.js'),result.outputFiles[0].contents);
     const html=join(dir,'index.html');

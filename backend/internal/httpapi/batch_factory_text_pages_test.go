@@ -317,6 +317,10 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	if r != 0xAAAA || g != 0 {
 		t.Fatal("preview background mismatch")
 	}
+	contrast := call("POST", "pages/"+pg.ID+"/preview", map[string]any{"layout": map[string]string{"textColor": "#FFFFFF"}, "background": map[string]string{"kind": "color", "color": "#FFFFFF"}}, 200)
+	if contrast.Header().Get("X-Text-Contrast") != "low" || contrast.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("preview headers %v", contrast.Header())
+	}
 	rev := func() map[string]any { return map[string]any{"expectedRevision": get().Document.Revision} }
 	input := func() map[string]any {
 		d := get().Document
@@ -610,6 +614,61 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	set("sensitiveMode", "off")
 	call("POST", "prepare", map[string]any{}, 200)
 	assertText("开犬尾。")
+	// A local reflow rolls back the author change and page version together when it would move a locked page.
+	{
+		const prefix, middle, suffix = "首段。", "中段。", "尾段。"
+		const initial = prefix + middle + suffix
+		if _, err := s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: initial}); err != nil {
+			t.Fatal(err)
+		}
+		call("POST", "prepare", map[string]any{}, 200)
+		for i, offset := range []int{3, 6} {
+			before := get()
+			call("POST", "pages/"+before.Pages[i].ID+"/split", map[string]any{"offset": offset, "expectedRevision": before.Document.Revision}, 200)
+		}
+		lock := func(p batchfactorytext.Page) {
+			upload("pages/"+p.ID+"/upload?expectedRevision="+fmtRev(p.Revision), img, 201)
+		}
+		lock(get().Pages[0])
+		lock(get().Pages[2])
+		before := get()
+		replacement := strings.Repeat("风来了。", 180)
+		apply := func(code int) {
+			st := get()
+			p := st.Pages[1]
+			call("PATCH", "pages/"+p.ID, map[string]any{"text": replacement, "layout": map[string]int{"fontSize": 60}, "reflow": true, "expectedRevision": p.Revision, "expectedDocumentRevision": st.Document.Revision}, code)
+		}
+		apply(409)
+		after := get()
+		draft, err := s.GetDraft(context.Background(), "alice", "working-front:"+book.ID, "working-front-content", b.ID)
+		if err != nil || draft.Content != initial || before.Document.Revision != after.Document.Revision || len(after.Pages) != 3 || after.Pages[2].ActiveArtifactID != before.Pages[2].ActiveArtifactID {
+			t.Fatal("locked edit did not roll back")
+		}
+		call("POST", "pages/"+after.Pages[2].ID+"/restore", map[string]any{"expectedRevision": after.Pages[2].Revision}, 200)
+		apply(200)
+		after = get()
+		if len(after.Pages) <= 3 || after.Pages[0].ActiveArtifactID != before.Pages[0].ActiveArtifactID || after.Pages[0].ID != before.Pages[0].ID || after.Pages[len(after.Pages)-1].Text != suffix {
+			t.Fatal("scoped reflow lost another page")
+		}
+		var body strings.Builder
+		for _, p := range after.Pages[1 : len(after.Pages)-1] {
+			if !strings.HasSuffix(p.Text, "。") || p.Layout == nil || p.Layout.FontSize != 60 {
+				t.Fatal("lost sentence or page layout")
+			}
+			body.WriteString(p.Text)
+		}
+		if body.String() != replacement {
+			t.Fatal("reflow lost text")
+		}
+		p := after.Pages[1]
+		paint := map[string]any{"background": map[string]string{"kind": "color", "color": "#ACACAC"}, "expectedRevision": p.Revision, "expectedDocumentRevision": after.Document.Revision - 1}
+		call("PATCH", "pages/"+p.ID, paint, 409)
+		paint["expectedDocumentRevision"] = after.Document.Revision
+		call("PATCH", "pages/"+p.ID, paint, 200)
+		if get().Document.PaginationVersion != after.Document.PaginationVersion {
+			t.Fatal("paint-only edit changed pagination")
+		}
+	}
 	// Frozen collections still resolve the original image after a replacement.
 	frozen := signedJSONRequest(t, api, now, "alice", "GET", mediaPath, nil)
 	if !bytes.Equal(media.Body.Bytes(), frozen.Body.Bytes()) {

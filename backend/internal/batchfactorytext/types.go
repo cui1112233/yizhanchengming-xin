@@ -150,10 +150,11 @@ type PaginationUpdate struct {
 
 // Text edits create a new Version and pagination. These edits only redraw a page.
 type PagePatch struct {
-	Layout          *LayoutConfig `json:"layout,omitempty"`
-	Background      *Background   `json:"background,omitempty"`
-	ClearLayout     bool          `json:"clearLayout,omitempty"`
-	ClearBackground bool          `json:"clearBackground,omitempty"`
+	DocumentRevision int64         `json:"-"` // Check an editor's pinned document while holding the same lock as the page write.
+	Layout           *LayoutConfig `json:"layout,omitempty"`
+	Background       *Background   `json:"background,omitempty"`
+	ClearLayout      bool          `json:"clearLayout,omitempty"`
+	ClearBackground  bool          `json:"clearBackground,omitempty"`
 }
 
 // PageStyle is the render-affecting projection of a book configuration.

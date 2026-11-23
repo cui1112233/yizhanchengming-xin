@@ -353,3 +353,18 @@ func TestRenderImageBackgroundCenterCrop(t *testing.T) {
 		}
 	}
 }
+func TestPreviewWarnsOnLowContrastWithoutChangingImage(t *testing.T) {
+	for _, tc := range []struct {
+		bg  string
+		low bool
+	}{{"#ffffff", true}, {"#111318", false}} {
+		called := false
+		in := RenderInput{Text: "正文", Background: Background{Kind: "color", Color: tc.bg}, WarnLowContrast: func() { called = true }}
+		if _, _, err := (Renderer{}).Render(context.Background(), in); err != nil {
+			t.Fatal(err)
+		}
+		if called != tc.low {
+			t.Fatalf("background %s low contrast = %v", tc.bg, called)
+		}
+	}
+}

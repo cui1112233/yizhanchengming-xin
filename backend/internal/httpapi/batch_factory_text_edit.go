@@ -67,7 +67,7 @@ func (a textAPI) prepareDrafts(x textRequest, d txt.Document, snap textSnapshot,
 	return pages, nil
 }
 
-func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequest, d txt.Document, edited txt.Page, patch txt.PagePatch) error {
+func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequest, d txt.Document, edited txt.Page, patch txt.PagePatch, reflow bool) error {
 	var snap textSnapshot
 	if err := json.Unmarshal(d.ConfigSnapshot, &snap); err != nil {
 		return err
@@ -96,30 +96,42 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 			return txt.ErrConflict
 		}
 		draft := p.PageDraft
+		replacement := []txt.PageDraft{draft}
 		if p.ID == edited.ID {
 			if p.Revision != edited.Revision || p.Locked {
 				return txt.ErrConflict
 			}
-			overrides, _, err := txt.ResolvePageStyle(snap.PageStyle, draft, patch)
+			overrides, style, err := txt.ResolvePageStyle(snap.PageStyle, draft, patch)
 			if err != nil {
 				return err
 			}
-			draft.Text = edited.Text
-			draft.Layout, draft.Background = overrides.Layout, overrides.Background
-			draft.ClearLayout, draft.ClearBackground = patch.ClearLayout, patch.ClearBackground
+			if reflow {
+				replacement, err = txt.Paginate(x, txt.PaginationInput{Text: edited.Text, Layout: style.Layout}, (txt.Renderer{}).MeasureFunc(x))
+				if err != nil {
+					return textLayoutError(err)
+				}
+			} else {
+				replacement[0].Text = edited.Text
+			}
+			for i := range replacement {
+				replacement[i].Layout, replacement[i].Background = overrides.Layout, overrides.Background
+				replacement[i].ClearLayout, replacement[i].ClearBackground = patch.ClearLayout, patch.ClearBackground
+			}
 		}
-		joined.WriteString(draft.Text)
-		draft.StartOffset = offset
-		offset += utf8.RuneCountInString(draft.Text)
-		draft.EndOffset = offset
-		drafts = append(drafts, draft)
+		for _, part := range replacement {
+			joined.WriteString(part.Text)
+			part.StartOffset = offset
+			offset += utf8.RuneCountInString(part.Text)
+			part.EndOffset = offset
+			drafts = append(drafts, part)
+		}
 	}
 	text := joined.String()
 	// A form may resend the displayed production text alongside a style change.
 	// Preserve the independent author draft when the wording is unchanged.
 	update := txt.PaginationUpdate{ExpectedRevision: d.Revision, Pages: drafts, ConfigSnapshot: d.ConfigSnapshot, VerifyProduction: a.productionGuard(x, snap.AuthorDraftKey)}
 	if text == txt.NormalizeLineEndings(v.ProductionText) {
-		if patch == (txt.PagePatch{}) {
+		if patch == (txt.PagePatch{}) && !reflow {
 			return a.list(w, r, x)
 		}
 	} else {

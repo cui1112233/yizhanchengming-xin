@@ -367,12 +367,15 @@ func (r *MySQLRepository) ListPages(ctx context.Context, s Scope) ([]Page, error
 func currentPage(ctx context.Context, tx *sql.Tx, s Scope, id string) (Page, error) {
 	return scanPage(tx.QueryRowContext(ctx, "SELECT "+pageCols+pageJoin+" AND p.id=? FOR UPDATE", s.Owner, s.BatchID, s.BookID, id))
 }
-func mutatePage[T any](ctx context.Context, db *sql.DB, s Scope, id string, expected int64, allowReleaseOfOldUpload bool, fn func(*sql.Tx, Page) (T, error)) (T, error) {
+func mutatePage[T any](ctx context.Context, db *sql.DB, s Scope, id string, expected, documentRevision int64, allowReleaseOfOldUpload bool, fn func(*sql.Tx, Page) (T, error)) (T, error) {
 	return transaction(ctx, db, func(tx *sql.Tx) (T, error) {
 		var zero T
 		h, err := lockHead(ctx, tx, s)
 		if err != nil {
 			return zero, err
+		}
+		if documentRevision != 0 && documentRevision != h.revision {
+			return zero, ErrConflict
 		}
 		p, err := currentPage(ctx, tx, s, id)
 		if err != nil {
@@ -398,7 +401,7 @@ func (r *MySQLRepository) PatchPage(ctx context.Context, s Scope, id string, exp
 	if in.Layout == nil && in.Background == nil && !in.ClearLayout && !in.ClearBackground {
 		return Page{}, ErrInvalid
 	}
-	return mutatePage(ctx, r.db, s, id, expected, false, func(tx *sql.Tx, p Page) (Page, error) {
+	return mutatePage(ctx, r.db, s, id, expected, in.DocumentRevision, false, func(tx *sql.Tx, p Page) (Page, error) {
 		if p.Locked {
 			return Page{}, ErrLocked
 		}
@@ -423,7 +426,7 @@ func (r *MySQLRepository) PatchPage(ctx context.Context, s Scope, id string, exp
 	})
 }
 func (r *MySQLRepository) RestoreSystemPage(ctx context.Context, s Scope, id string, expected int64) (Page, error) {
-	return mutatePage(ctx, r.db, s, id, expected, true, func(tx *sql.Tx, p Page) (Page, error) {
+	return mutatePage(ctx, r.db, s, id, expected, 0, true, func(tx *sql.Tx, p Page) (Page, error) {
 		if !p.Locked {
 			return Page{}, ErrConflict
 		}
@@ -452,7 +455,7 @@ func sourceKind(uploaded bool) string {
 	return "system"
 }
 func (r *MySQLRepository) savePageArtifact(ctx context.Context, s Scope, id string, expected int64, file ArtifactFile, uploaded bool) (PageArtifact, error) {
-	return mutatePage(ctx, r.db, s, id, expected, false, func(tx *sql.Tx, p Page) (PageArtifact, error) {
+	return mutatePage(ctx, r.db, s, id, expected, 0, false, func(tx *sql.Tx, p Page) (PageArtifact, error) {
 		if p.Locked && !uploaded {
 			return PageArtifact{}, ErrLocked
 		}

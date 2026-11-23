@@ -379,7 +379,7 @@ func (a textAPI) patch(w http.ResponseWriter, r *http.Request, x textRequest) er
 	if err != nil {
 		return err
 	}
-	if p.Revision != in.ExpectedRevision {
+	if p.Revision != in.ExpectedRevision || (in.ExpectedDocumentRevision != 0 && in.ExpectedDocumentRevision != doc.Revision) {
 		return txt.ErrConflict
 	}
 	if in.Text != nil {
@@ -398,6 +398,12 @@ func (a textAPI) patch(w http.ResponseWriter, r *http.Request, x textRequest) er
 	if err != nil {
 		return err
 	}
+	if in.Reflow {
+		if in.Text == nil {
+			return fmt.Errorf("%w：局部分页需要本页正文", txt.ErrInvalid)
+		}
+		return a.savePageText(w, r, x, doc, p, in.PagePatch, true)
+	}
 	fits, _, err := (txt.Renderer{}).MeasureFunc(x)(input.Text, input.Layout)
 	if err != nil {
 		return textLayoutError(err)
@@ -406,8 +412,9 @@ func (a textAPI) patch(w http.ResponseWriter, r *http.Request, x textRequest) er
 		return fmt.Errorf("%w：当前文字放不下，请调整字号或分页", txt.ErrInvalid)
 	}
 	if in.Text != nil {
-		return a.savePageText(w, r, x, doc, p, in.PagePatch)
+		return a.savePageText(w, r, x, doc, p, in.PagePatch, false)
 	}
+	in.PagePatch.DocumentRevision = in.ExpectedDocumentRevision
 	result, err := a.repo.PatchPage(x, x.scope, p.ID, in.ExpectedRevision, in.PagePatch)
 	if err != nil {
 		return err

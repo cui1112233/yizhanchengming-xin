@@ -142,6 +142,7 @@ export async function apiRequest(path, options = {}) {
   }
   const fetchOptions = { ...options, headers, signal: controller.signal };
   delete fetchOptions.timeoutMs;
+  delete fetchOptions.onResponseHeaders;
 
   try {
     let response;
@@ -192,7 +193,10 @@ export async function apiRequest(path, options = {}) {
       if (!options.silent && !options.suppressGlobalError) notifyApiFailure({ ...failure, path });
       throw attachApiError(error, { path, method, status: response.status });
     }
-    if (options.responseType === 'blob') return await response.blob();
+    if (options.responseType === 'blob') {
+      options.onResponseHeaders?.(response.headers);
+      return await response.blob();
+    }
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const payload = await response.json();

@@ -11,11 +11,18 @@ export const listTextPages = (b,k,options) => apiRequest(base(b,k)+'pages',optio
 export const patchTextPage = (b,k,i,p) => apiRequest(page(b,k,i),{method:'PATCH',body:JSON.stringify(p)});
 export const splitTextPage = (b,k,i,p) => post(page(b,k,i)+'/split',p);
 export const mergeTextPage = (b,k,i,p) => post(page(b,k,i)+'/merge',p);
-export const previewTextPage = (b,k,i,p) => post(page(b,k,i)+'/preview',p,{responseType:'blob'});
+async function preview(path, payload, {withMetadata, ...options} = {}) {
+  let warning = '';
+  const blob = await post(path,payload,{...options,responseType:'blob',suppressGlobalError:true,onResponseHeaders(headers){
+    if (headers.get('X-Text-Contrast') === 'low') warning = '文字与背景对比度较低，可调整文字颜色或背景。';
+  }});
+  return withMetadata ? {blob, warning} : blob;
+}
+export const previewTextPage = (b,k,i,p,options) => preview(page(b,k,i)+'/preview',p,options);
 export const renderTextPage = (b,k,i,p) => post(page(b,k,i)+'/render',p);
 export const uploadTextPageArtifact = (b,k,i,file,rev) => upload(page(b,k,i)+'/upload'+revision(rev),file);
 export const restoreTextPage = (b,k,i,p) => post(page(b,k,i)+'/restore',p);
-export const previewTextCover = (b,k,p) => post(base(b,k)+'cover/preview',p,{responseType:'blob'});
+export const previewTextCover = (b,k,p,options) => preview(base(b,k)+'cover/preview',p,options);
 export const renderTextCover = (b,k,p) => post(base(b,k)+'cover/render',p);
 export const uploadTextCover = (b,k,file,rev) => upload(base(b,k)+'cover/upload'+revision(rev),file);
 export const restoreTextCover = (b,k,p) => post(base(b,k)+'cover/restore',p);
