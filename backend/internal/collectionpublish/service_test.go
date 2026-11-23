@@ -2,10 +2,12 @@ package collectionpublish
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"qiantie/backend/internal/n8comic"
@@ -277,5 +279,77 @@ func TestCollectionPublishRejectedAsyncAttemptAllowsRetry(t *testing.T) {
 	next, err := svc.Publish(ctx, req, prepare)
 	if err != nil || !next.Confirmed() || next.IntentID == original.IntentID || calls != 2 {
 		t.Fatal(next, err, calls)
+	}
+}
+
+func TestCollectionPublishRedirectReceiptUnavailableDoesNotResubmit(t *testing.T) {
+	var creates, reads, mode atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/material/open/carousel/create":
+			creates.Add(1)
+			w.Header().Set("Location", "/receipts/create-op")
+			w.Header().Set("X-Operation-ID", "create-op")
+			w.WriteHeader(http.StatusSeeOther)
+		case "/receipts/create-op":
+			if r.Method != http.MethodGet {
+				t.Errorf("unexpected receipt method %s", r.Method)
+			}
+			reads.Add(1)
+			switch mode.Load() {
+			case 0:
+				w.WriteHeader(http.StatusNotFound)
+			case 1:
+				conn, _, err := w.(http.Hijacker).Hijack()
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				conn.Close()
+			default:
+				w.Header().Set("X-Request-ID", "query-trace")
+				io.WriteString(w, `{"code":"SUCCESS","data":{"operation_id":"create-op","carousel_id":99,"image_ids":[4,5]}}`)
+			}
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	defer server.Close()
+	client := n8comic.NewClient(n8comic.Config{BaseURL: server.URL, APIKey: "local", HTTPClient: server.Client()})
+	ctx := context.Background()
+	records := testRecords{}
+	svc := Service{Records: records, Submit: func(ctx context.Context, in n8comic.PublishRequest) (n8comic.PublishResult, error) {
+		in.UploadedImageIDs = []int64{4, 5}
+		return client.Publish(ctx, in)
+	}, Readback: client.Readback}
+	req := PublishRequest{Kind: CollectionKindText, Owner: "owner", BatchID: "batch", BookID: "book", CollectionID: "album", Producer: "p", OrganizationID: "org", CategoryID: "tag", WorkIDs: []int64{8}, AudioCategoryID: 1, AudioID: 2}
+	png, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepare := func(context.Context, *PublishRequest) (Collection, error) {
+		page := n8comic.ImageInput{FileName: "image.png", MediaType: "image/png", Content: png}
+		return Collection{Kind: req.Kind, ID: req.CollectionID, Name: "book", Pages: []Page{{Ordinal: 1, Image: page}, {Ordinal: 2, Image: page}}}, nil
+	}
+	first, err := svc.Publish(ctx, req, prepare)
+	if err != nil || first.Status != "pending" || first.Phase != "create_unknown" || first.ReceiptPath != "/receipts/create-op" || creates.Load() != 1 || reads.Load() != 0 {
+		t.Fatal(first, err, creates.Load(), reads.Load())
+	}
+	for _, state := range []int32{0, 1} {
+		mode.Store(state)
+		pending, err := svc.Publish(ctx, req, prepare)
+		if err != nil || pending.Status != "pending" || pending.IntentID != first.IntentID || creates.Load() != 1 {
+			t.Fatal(state, pending, err, creates.Load())
+		}
+		saved, _, err := records.Load(ctx, req)
+		if err != nil || saved.Phase != "create_unknown" {
+			t.Fatal(saved, err)
+		}
+	}
+	mode.Store(2)
+	done, _, err := svc.Status(ctx, req)
+	if err != nil || !done.Confirmed() || done.CarouselID != 99 || done.IntentID != first.IntentID || creates.Load() != 1 || reads.Load() < 3 {
+		t.Fatal(done, err, creates.Load(), reads.Load())
 	}
 }

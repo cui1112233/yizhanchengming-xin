@@ -537,8 +537,15 @@ func (c *Client) post(ctx context.Context, path string, payload map[string]any, 
 			}
 		}
 	}
-	response, err := c.httpClient.Do(request)
 	isCreate := path == createPath
+	var response *http.Response
+	if isCreate {
+		// A redirect describes the outcome of this POST. Following it would
+		// conflate a receipt lookup with the create or repeat the POST itself.
+		response, err = c.doWithoutRedirects(request)
+	} else {
+		response, err = c.httpClient.Do(request)
+	}
 	var receiptPath string
 	ambiguous := func(cause error) error {
 		if !isCreate {
@@ -565,7 +572,7 @@ func (c *Client) post(ctx context.Context, path string, payload map[string]any, 
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		err := fmt.Errorf("N8 HTTP 状态码 %d", response.StatusCode)
-		if response.StatusCode >= 500 || response.StatusCode == http.StatusRequestTimeout {
+		if isCreate && response.StatusCode >= 300 && response.StatusCode < 400 || response.StatusCode >= 500 || response.StatusCode == http.StatusRequestTimeout {
 			return ambiguous(err)
 		}
 		return err

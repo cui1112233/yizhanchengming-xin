@@ -61,6 +61,12 @@ type RejectedReceipt struct{ IntentID, Reason string }
 
 func (e *RejectedReceipt) Error() string { return e.Reason }
 
+func (c *Client) doWithoutRedirects(req *http.Request) (*http.Response, error) {
+	client := *c.httpClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return client.Do(req)
+}
+
 func (c *Client) Readback(ctx context.Context, in ReceiptLookup) (PublishResult, error) {
 	if !c.Configured() {
 		return PublishResult{}, errors.New("N8 发布回查服务未配置")
@@ -77,9 +83,7 @@ func (c *Client) Readback(ctx context.Context, in ReceiptLookup) (PublishResult,
 	if err != nil {
 		return PublishResult{}, err
 	}
-	client := *c.httpClient
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	res, err := client.Do(req)
+	res, err := c.doWithoutRedirects(req)
 	if err != nil {
 		return PublishResult{}, err
 	}
@@ -110,9 +114,8 @@ func (c *Client) Readback(ctx context.Context, in ReceiptLookup) (PublishResult,
 	if row.OperationID == "" {
 		row.OperationID = res.Header.Get("X-Operation-ID")
 	}
-	if row.RequestID == "" {
-		row.RequestID = res.Header.Get("X-Request-ID")
-	}
+	// The GET response X-Request-ID identifies this lookup. Only receipt data
+	// can echo the create intent, or explicitly identify the provider operation.
 	if row.RequestID != "" && row.RequestID != in.IntentID || row.OperationID != "" && in.OperationID != "" && row.OperationID != in.OperationID {
 		return PublishResult{}, nil
 	}

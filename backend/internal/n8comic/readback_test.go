@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"sync/atomic"
 	"testing"
 )
 
@@ -184,6 +185,85 @@ func TestCarouselReceiptRequiresMatchingOperationAndExactPageOrder(t *testing.T)
 			var rejected *RejectedReceipt
 			if errors.As(err, &rejected) != tc.wantRejection || result.CarouselID != tc.wantID || rejected != nil && (rejected.IntentID != "here" || rejected.Reason != "拒绝原因") {
 				t.Fatal(result, err)
+			}
+		})
+	}
+}
+
+func TestCreateCarouselRedirectIsNeverFollowed(t *testing.T) {
+	var foreignCalls atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { foreignCalls.Add(1); w.WriteHeader(404) }))
+	defer other.Close()
+	for _, code := range []int{301, 302, 303, 307, 308} {
+		for _, foreign := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%d/foreign=%v", code, foreign), func(t *testing.T) {
+				var creates, reads atomic.Int32
+				s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path != createPath {
+						reads.Add(1)
+						w.WriteHeader(404)
+						return
+					}
+					creates.Add(1)
+					location := "/receipts/op"
+					if foreign {
+						location = other.URL + location
+					}
+					w.Header().Set("Location", location)
+					w.Header().Set("X-Operation-ID", "op")
+					w.WriteHeader(code)
+				}))
+				defer s.Close()
+				c := NewClient(Config{BaseURL: s.URL, APIKey: "local", HTTPClient: s.Client()})
+				_, err := c.CreateCarousel(context.Background(), CreateCarouselRequest{ProducerAdminName: "p", Name: "book", ImageIDs: []int64{3, 4}, WorkIDs: []int64{5}, AudioCategoryID: 1, AudioID: 2})
+				var pending *pendingReceipt
+				if !errors.As(err, &pending) || !errors.Is(err, ErrCarouselReceiptPending) || creates.Load() != 1 || reads.Load() != 0 || foreignCalls.Load() != 0 {
+					t.Fatalf("err=%v creates=%d reads=%d foreign=%d", err, creates.Load(), reads.Load(), foreignCalls.Load())
+				}
+				want := "/receipts/op"
+				if foreign {
+					want = ""
+				}
+				if pending.path != want || pending.operation != "op" {
+					t.Fatalf("pending=%+v", pending)
+				}
+			})
+		}
+	}
+}
+
+func TestReadbackUsesOperationIdentityIndependentlyOfQueryTrace(t *testing.T) {
+	for _, state := range []string{"SUCCESS", "REJECTED", "trace-only"} {
+		t.Run(state, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" {
+					t.Errorf("unexpected method %s", r.Method)
+				}
+				w.Header().Set("X-Request-ID", "new-query-trace")
+				if state == "trace-only" {
+					w.Header().Set("X-Request-ID", "create-intent")
+					io.WriteString(w, `{"code":"SUCCESS","data":{"image_ids":[3,4],"carousel_id":9}}`)
+					return
+				}
+				fmt.Fprintf(w, `{"code":"SUCCESS","data":{"operation_id":"op","status":%q,"image_ids":[3,4],"carousel_id":9,"reason":"publisher rejected"}}`, state)
+			}))
+			defer s.Close()
+			c := NewClient(Config{BaseURL: s.URL, APIKey: "local", HTTPClient: s.Client()})
+			result, err := c.Readback(context.Background(), ReceiptLookup{ReceiptPath: "/receipt", IntentID: "create-intent", OperationID: "op", ImageIDs: []int64{3, 4}})
+			var rejected *RejectedReceipt
+			switch state {
+			case "SUCCESS":
+				if err != nil || result.CarouselID != 9 || result.ReceiptIntentID != "create-intent" {
+					t.Fatal(result, err)
+				}
+			case "REJECTED":
+				if !errors.As(err, &rejected) || rejected.IntentID != "create-intent" || rejected.Reason != "publisher rejected" {
+					t.Fatal(result, err)
+				}
+			default:
+				if err != nil || result.CarouselID != 0 {
+					t.Fatal(result, err)
+				}
 			}
 		})
 	}
