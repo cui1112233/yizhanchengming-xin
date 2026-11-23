@@ -1764,16 +1764,28 @@ func (s *MySQLStore) SaveDraft(ctx context.Context, owner string, d Draft) (Draf
 		return Draft{}, err
 	}
 	defer tx.Rollback()
+	saved, err := s.SaveDraftTx(ctx, tx, owner, d)
+	if err != nil {
+		return Draft{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return Draft{}, err
+	}
+	return saved, nil
+}
+
+// SaveDraftTx lets the text editor publish its author draft and page version atomically.
+func (s *MySQLStore) SaveDraftTx(ctx context.Context, tx *sql.Tx, owner string, d Draft) (Draft, error) {
+	if strings.TrimSpace(d.Key) == "" {
+		return Draft{}, ErrInvalid
+	}
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND kind=? AND scope=? FOR UPDATE`, owner, d.Key, d.Kind, d.Scope).Scan(&current)
+	err := tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND kind=? AND scope=? FOR UPDATE`, owner, d.Key, d.Kind, d.Scope).Scan(&current)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Draft{}, err
 	}
 	next := current + 1
 	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_drafts(owner_username,draft_key,kind,scope,content,revision,updated_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE content=VALUES(content),revision=VALUES(revision),updated_at=VALUES(updated_at)`, owner, d.Key, d.Kind, d.Scope, nullableString(d.Content), next); err != nil {
-		return Draft{}, err
-	}
-	if err := tx.Commit(); err != nil {
 		return Draft{}, err
 	}
 	d.Revision = next

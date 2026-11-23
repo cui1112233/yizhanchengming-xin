@@ -130,6 +130,7 @@ type textSnapshot struct {
 	Title            string        `json:"title"`
 	CoverFingerprint string        `json:"coverFingerprint"`
 	SourceVersion    string        `json:"sourceVersion,omitempty"`
+	AuthorDraftKey   string        `json:"authorDraftKey,omitempty"`
 	HighlightWords   []string      `json:"highlightWords,omitempty"`
 }
 
@@ -212,8 +213,22 @@ func (a textAPI) prepare(w http.ResponseWriter, r *http.Request, x textRequest) 
 	if err != nil && !absent {
 		return err
 	}
+	if !absent && doc.OriginalText != x.book.TxtText {
+		return txt.ErrConflict
+	}
 	if in.ExpectedRevision > 0 && in.ExpectedRevision != doc.Revision {
 		return txt.ErrConflict
+	}
+	previous := txt.Version{}
+	if doc.ActiveVersionID != "" {
+		previous, err = a.repo.GetVersion(x, x.scope, doc.ActiveVersionID)
+		if err != nil {
+			return err
+		}
+		doc, err = a.adoptLegacyPageEdit(x, doc, previous)
+		if err != nil {
+			return err
+		}
 	}
 	b, err := a.production.batchSensitiveStageFromBook(x, x.scope.Owner, x.batch, x.book, false, false)
 	if err != nil {
@@ -244,11 +259,11 @@ func (a textAPI) prepare(w http.ResponseWriter, r *http.Request, x textRequest) 
 		return err
 	}
 	version := txt.VersionInput{ProductionText: b.SourceText, SensitiveMode: stringValue(state["mode"]), ChangeTrace: trace}
-	drafts, err := a.prepareDrafts(x, doc, snap, &version, in.Reflow)
+	drafts, err := a.prepareDrafts(x, doc, snap, previous, version.ProductionText, in.Reflow)
 	if err != nil {
 		return err
 	}
-	_, err = a.repo.PreparePages(x, x.scope, version, txt.PaginationUpdate{OriginalText: b.TxtText, ExpectedRevision: doc.Revision, ConfigSnapshot: snapshot, Pages: drafts, VerifyProduction: a.productionGuard(x)})
+	_, err = a.repo.PreparePages(x, x.scope, version, txt.PaginationUpdate{OriginalText: b.TxtText, ExpectedRevision: doc.Revision, ConfigSnapshot: snapshot, Pages: drafts, VerifyProduction: a.productionGuard(x, "")})
 	if err != nil {
 		return err
 	}
@@ -404,6 +419,9 @@ func (a textAPI) reflow(w http.ResponseWriter, r *http.Request, x textRequest) e
 		left, right := p.PageDraft, p.PageDraft
 		left.Text, left.EndOffset = string(chars[:cut]), in.Offset
 		right.Text, right.StartOffset = string(chars[cut:]), in.Offset
+		if strings.TrimSpace(left.Text) == "" || strings.TrimSpace(right.Text) == "" {
+			return fmt.Errorf("%w：两页都需要保留正文", txt.ErrInvalid)
+		}
 		drafts = append(drafts, left, right)
 	} else {
 		if next >= len(pages) {

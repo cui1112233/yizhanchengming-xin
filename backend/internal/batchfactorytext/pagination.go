@@ -18,10 +18,18 @@ func SentenceBreaks(text string) []int {
 	for start := 0; start < len(runes); {
 		end := paragraphEnd(runes, start)
 		for start < end {
-			start = qs.sentenceEnd(runes, start, end)
-			if start < len(runes) {
-				breaks = append(breaks, start)
+			next := qs.sentenceEnd(runes, start, end)
+			if next < len(runes) {
+				// The paginator can carry part of a trailing separator to the next page.
+				first := separatorStart(runes, start, next)
+				if first == start {
+					first = next
+				}
+				for offset := first; offset <= next; offset++ {
+					breaks = append(breaks, offset)
+				}
 			}
+			start = next
 		}
 	}
 	return breaks
@@ -150,13 +158,17 @@ func (p *pagePacker) measureTo(end int) (bool, float64, error) {
 	return fits, height, p.ctx.Err()
 }
 
+func separatorStart(runes []rune, start, end int) int {
+	for end > start && unicode.IsSpace(runes[end-1]) {
+		end--
+	}
+	return end
+}
+
 // When the words fit exactly, a separator after a whole paragraph or sentence
 // may straddle the page break. Keep as much on this page as its geometry permits.
 func (p *pagePacker) carrySeparator(end int) (bool, error) {
-	contentEnd := end
-	for contentEnd > p.start && unicode.IsSpace(p.runes[contentEnd-1]) {
-		contentEnd--
-	}
+	contentEnd := separatorStart(p.runes, p.start, end)
 	if contentEnd == p.start {
 		return false, nil
 	}

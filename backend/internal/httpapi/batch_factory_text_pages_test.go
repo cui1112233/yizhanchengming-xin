@@ -13,6 +13,7 @@ import (
 	"qiantie/backend/internal/batchfactorytext"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/storage"
 	"strings"
 	"sync"
@@ -21,14 +22,29 @@ import (
 	"time"
 )
 
-type pausingTextBatchRead struct {
+type textDraftTestStore struct {
 	*batchfactoryv11.MemoryStore
+	drafts *batchfactoryv11.MySQLStore
+}
+
+func (s textDraftTestStore) GetDraft(ctx context.Context, owner, key, kind, scope string) (batchfactoryv11.Draft, error) {
+	return s.drafts.GetDraft(ctx, owner, key, kind, scope)
+}
+func (s textDraftTestStore) SaveDraft(ctx context.Context, owner string, d batchfactoryv11.Draft) (batchfactoryv11.Draft, error) {
+	return s.drafts.SaveDraft(ctx, owner, d)
+}
+func (s textDraftTestStore) SaveDraftTx(ctx context.Context, tx *sql.Tx, owner string, d batchfactoryv11.Draft) (batchfactoryv11.Draft, error) {
+	return s.drafts.SaveDraftTx(ctx, tx, owner, d)
+}
+
+type pausingTextBatchRead struct {
+	textDraftTestStore
 	reads           atomic.Int32
 	entered, resume chan struct{}
 }
 
 func (s *pausingTextBatchRead) GetDraft(ctx context.Context, owner, key, kind, scope string) (batchfactoryv11.Draft, error) {
-	b, err := s.MemoryStore.GetDraft(ctx, owner, key, kind, scope)
+	b, err := s.textDraftTestStore.GetDraft(ctx, owner, key, kind, scope)
 	// Pause after the request reads its production source, before pagination.
 	if s.reads.Add(1) == 1 {
 		close(s.entered)
@@ -48,7 +64,7 @@ type textSQLSourceReader interface {
 // Other batch calls use the signed fixture while the publication fence reads
 // the same MySQL record/draft tables and runs the same locking queries as production.
 type textSQLSourceStore struct {
-	*batchfactoryv11.MemoryStore
+	textDraftTestStore
 	textSQLSourceReader
 }
 type pausingTextPublication struct {
@@ -99,7 +115,10 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s := batchfactoryv11.NewMemoryStore()
+	if _, err = db.Exec("CREATE TABLE IF NOT EXISTS batch_factory_v12_drafts(owner_username VARCHAR(191),draft_key VARCHAR(100),kind VARCHAR(64),scope VARCHAR(64),content LONGTEXT,revision BIGINT NOT NULL,updated_at DATETIME(6),PRIMARY KEY(owner_username,draft_key,kind,scope)) ENGINE=InnoDB"); err != nil {
+		t.Fatal(err)
+	}
+	s := textDraftTestStore{batchfactoryv11.NewMemoryStore(), batchfactoryv11.NewMySQLStore(db)}
 	const original = "这是第一句。这是第二句。"
 	inputBook := batchfactoryv11.CreateBatchInput{Title: "批次", InitialBatchSettings: batchfactoryv11.SettingsPatch{"productionMode": mustJSON("text"), "sensitiveMode": mustJSON("off")}, Books: []batchfactoryv11.CreateBookInput{{Title: "书名", TxtText: original, SourceText: original, SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}}
 	var b batchfactoryv11.Batch
@@ -125,7 +144,8 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	}
 	now := time.Unix(1700000000, 0)
 	files := localartifact.NewStore(t.TempDir(), 32<<20)
-	api := NewRouter(RouterOptions{Slice: 1, Store: s, TextRepository: batchfactorytext.NewMySQLRepository(db), LocalArtifacts: files, BridgeSecret: "secret", Now: func() time.Time { return now }})
+	rules := novelfetchworkshop.NewMemoryStore()
+	api := NewRouter(RouterOptions{Slice: 1, Store: s, NovelFetchStore: rules, TextRepository: batchfactorytext.NewMySQLRepository(db), LocalArtifacts: files, BridgeSecret: "secret", Now: func() time.Time { return now }})
 	base := "/api/batch-factory/v12/batches/" + b.ID + "/books/" + book.ID + "/text-"
 	call := func(method, path string, body any, code int) *httptest.ResponseRecorder {
 		t.Helper()
@@ -147,7 +167,7 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	}
 	pg := st.Pages[0]
 	call("POST", "pages/"+pg.ID+"/split", map[string]any{"offset": 2, "expectedRevision": st.Document.Revision}, 400)
-	runSlow := func(opts RouterOptions, entered chan struct{}, resume chan struct{}, change func()) {
+	runPaused := func(opts RouterOptions, entered chan struct{}, resume chan struct{}, method, path string, body any, change func()) {
 		t.Helper()
 		opts.Slice = 1
 		opts.LocalArtifacts = files
@@ -157,7 +177,7 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 		defer release()
 		api := NewRouter(opts)
 		finished := make(chan *httptest.ResponseRecorder, 1)
-		go func() { finished <- signedJSONRequest(t, api, now, "alice", "POST", base+"prepare", map[string]any{}) }()
+		go func() { finished <- signedJSONRequest(t, api, now, "alice", method, base+path, body) }()
 		select {
 		case <-entered:
 		case <-time.After(15 * time.Second):
@@ -174,8 +194,11 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 			t.Fatal("stale prepare never finished")
 		}
 	}
+	runSlow := func(opts RouterOptions, entered, resume chan struct{}, change func()) {
+		runPaused(opts, entered, resume, "POST", "prepare", map[string]any{}, change)
+	}
 	entered, resume := make(chan struct{}), make(chan struct{})
-	raceStore := &pausingTextBatchRead{MemoryStore: s, entered: entered, resume: resume}
+	raceStore := &pausingTextBatchRead{textDraftTestStore: s, entered: entered, resume: resume}
 	runSlow(RouterOptions{Store: raceStore, TextRepository: batchfactorytext.NewMySQLRepository(db)}, entered, resume, func() {
 		call("POST", "pages/"+pg.ID+"/split", map[string]any{"offset": 6, "expectedRevision": st.Document.Revision}, 200)
 	})
@@ -195,6 +218,7 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	edit["expectedDocumentRevision"] = st.Document.Revision + 1
 	call("PATCH", pagePath, edit, 409)
 	edit["expectedDocumentRevision"] = st.Document.Revision
+	call("PATCH", pagePath, map[string]any{"text": "未说完", "expectedRevision": first.Revision, "expectedDocumentRevision": st.Document.Revision}, 400)
 	call("PATCH", pagePath, edit, 200)
 	st = get()
 	if len(st.Pages) != 2 || st.Pages[0].Text != edit["text"] || st.Pages[1].Text != second.Text || st.Document.OriginalText != original || st.Document.ActiveVersionID == baseVersion || st.Pages[0].EndOffset != st.Pages[1].StartOffset {
@@ -207,11 +231,7 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	if err != nil || prior.ProductionText != original {
 		t.Fatalf("original version mutated: %+v %v", prior, err)
 	}
-	call("PATCH", "pages/"+st.Pages[1].ID, map[string]any{"expectedRevision": st.Pages[1].Revision, "layout": map[string]string{"textColor": "#225599"}}, 200)
-	for _, page := range get().Pages {
-		call("POST", "pages/"+page.ID+"/render", map[string]any{"expectedRevision": page.Revision}, 201)
-	}
-	oldPages := get().Pages
+
 	set := func(key string, value any) {
 		t.Helper()
 		fresh, err := s.GetBatch(context.Background(), "alice", b.ID)
@@ -223,6 +243,44 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	assertText := func(want string) {
+		t.Helper()
+		curr := get()
+		var joined strings.Builder
+		for _, p := range curr.Pages {
+			joined.WriteString(p.Text)
+		}
+		if joined.String() != want || curr.Document.OriginalText != original {
+			t.Fatalf("production=%q, original=%q, want production=%q original=%q", joined.String(), curr.Document.OriginalText, want, original)
+		}
+	}
+	authored := st.Pages[0].Text + st.Pages[1].Text
+	set("sensitiveMode", "system")
+	call("POST", "prepare", map[string]any{}, 200)
+	assertText(authored)
+	if err = rules.PutConfig(context.Background(), "alice", map[string]any{"knowledgeLibraries": map[string]any{"layout_rules": map[string]any{"sensitive_rules": []any{map[string]any{"enabled": true, "find": "手动改写", "replace": "系统调整", "apply_to_original": true}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	call("POST", "prepare", map[string]any{}, 200)
+	assertText(strings.ReplaceAll(authored, "手动改写", "系统调整"))
+	processed := get()
+	shown := processed.Pages[0]
+	call("PATCH", "pages/"+shown.ID, map[string]any{"expectedRevision": shown.Revision, "expectedDocumentRevision": processed.Document.Revision, "text": shown.Text, "background": map[string]string{"kind": "color", "color": "#101010"}}, 200)
+	set("sensitiveMode", "off")
+	call("POST", "prepare", map[string]any{}, 200)
+	assertText(authored)
+	// A content-changing policy can repaginate. Recreate a manual split before
+	// checking that layout-only updates retain it.
+	st = get()
+	if len(st.Pages) == 1 {
+		call("POST", "pages/"+st.Pages[0].ID+"/split", map[string]any{"offset": len([]rune(edit["text"].(string))), "expectedRevision": st.Document.Revision}, 200)
+	}
+	st = get()
+	call("PATCH", "pages/"+st.Pages[1].ID, map[string]any{"expectedRevision": st.Pages[1].Revision, "layout": map[string]string{"textColor": "#225599"}}, 200)
+	for _, p := range get().Pages {
+		call("POST", "pages/"+p.ID+"/render", map[string]any{"expectedRevision": p.Revision}, 201)
+	}
+	oldPages := get().Pages
 	set("textColor", "#006688")
 	call("POST", "prepare", map[string]any{}, 200)
 	st = get()
@@ -390,7 +448,6 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	}
 	for _, ddl := range []string{
 		"CREATE TABLE IF NOT EXISTS batch_factory_v12_book_records(book_id VARCHAR(64) PRIMARY KEY, source_text LONGTEXT,txt_text LONGTEXT,source_metadata_json JSON) ENGINE=InnoDB",
-		"CREATE TABLE IF NOT EXISTS batch_factory_v12_drafts(owner_username VARCHAR(191),draft_key VARCHAR(100),kind VARCHAR(64),scope VARCHAR(64),content LONGTEXT, PRIMARY KEY(owner_username,draft_key,kind,scope)) ENGINE=InnoDB",
 	} {
 		if _, err = db.Exec(ddl); err != nil {
 			t.Fatal(err)
@@ -408,15 +465,28 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	if _, err = db.Exec("INSERT INTO batch_factory_v12_book_records(book_id,source_text,txt_text,source_metadata_json) VALUES(?,?,?,?)", book.ID, verified.SourceText, verified.TxtText, meta); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.Exec("INSERT INTO batch_factory_v12_drafts(owner_username,draft_key,kind,scope,content) VALUES(?,?,'working-front-content',?,?)", "alice", "working-front:"+book.ID, b.ID, verified.SourceText); err != nil {
-		t.Fatal(err)
-	}
+
 	sqlSource := textSQLSourceStore{s, batchfactoryv11.NewMySQLStore(db)}
 	opts := RouterOptions{Slice: 1, Store: sqlSource, TextRepository: batchfactorytext.NewMySQLRepository(db), LocalArtifacts: files, BridgeSecret: "secret", Now: func() time.Time { return now }}
 	if rr := signedJSONRequest(t, NewRouter(opts), now, "alice", "POST", base+"prepare", map[string]any{}); rr.Code != 200 {
 		t.Fatalf("SQL source fence rejected current source: %d %s", rr.Code, rr.Body.String())
 	}
 	head = get().Document
+	entered, resume = make(chan struct{}), make(chan struct{})
+	opts.TextRepository = &pausingTextPublication{Repository: batchfactorytext.NewMySQLRepository(db), entered: entered, resume: resume}
+	rawEdit := get().Pages[0]
+	runPaused(opts, entered, resume, "PATCH", "pages/"+rawEdit.ID, map[string]any{"text": "过期编辑。", "expectedRevision": rawEdit.Revision, "expectedDocumentRevision": head.Revision}, func() {
+		if _, err = db.Exec("UPDATE batch_factory_v12_book_records SET txt_text='并发更新的原文。' WHERE book_id=?", book.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+	unchanged, err := s.GetDraft(context.Background(), "alice", "working-front:"+book.ID, "working-front-content", b.ID)
+	if err != nil || unchanged.Content != verified.SourceText || get().Document.Revision != head.Revision {
+		t.Fatalf("stale raw edit changed author or document: %v", err)
+	}
+	if _, err = db.Exec("UPDATE batch_factory_v12_book_records SET txt_text=? WHERE book_id=?", verified.TxtText, book.ID); err != nil {
+		t.Fatal(err)
+	}
 	for _, q := range []string{"UPDATE batch_factory_v12_drafts SET content='并发改稿。' WHERE scope=?", "UPDATE batch_factory_v12_book_records SET source_text='并发改稿。' WHERE book_id=?"} {
 		entered, resume = make(chan struct{}), make(chan struct{})
 		opts.TextRepository = &pausingTextPublication{Repository: batchfactorytext.NewMySQLRepository(db), entered: entered, resume: resume}
@@ -459,6 +529,57 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	if len(resized.Pages) < 2 || rebuilt.String() != longDraft {
 		t.Fatal("explicit reflow lost text or did not repaginate")
 	}
+	set("textFontSize", 44)
+	const spaced = "你来了。\n好。\n尾页。"
+	if _, err = s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: spaced}); err != nil {
+		t.Fatal(err)
+	}
+	call("POST", "prepare", map[string]any{}, 200)
+	d := get().Document
+	drafts, err := batchfactorytext.Paginate(context.Background(), batchfactorytext.PaginationInput{Text: spaced}, func(line string, _ batchfactorytext.LayoutConfig) (bool, float64, error) {
+		n := len([]rune(line))
+		return n <= 4, float64(n), nil
+	})
+	if err != nil || len(drafts) < 2 || drafts[0].Text != "你来了。" {
+		t.Fatalf("separator fixture: %+v %v", drafts, err)
+	}
+	scope := batchfactorytext.Scope{Owner: "alice", BookID: book.ID, BatchID: b.ID}
+	if _, err = batchfactorytext.NewMySQLRepository(db).ReplaceSystemPages(context.Background(), scope, batchfactorytext.PaginationUpdate{VersionID: d.ActiveVersionID, ExpectedRevision: d.Revision, Pages: drafts}); err != nil {
+		t.Fatal(err)
+	}
+	withSeparators := get()
+	spill := withSeparators.Pages[1]
+	call("POST", "pages/"+spill.ID+"/split", map[string]any{"expectedRevision": withSeparators.Document.Revision, "offset": spill.StartOffset + 1}, 400)
+	last := withSeparators.Pages[len(withSeparators.Pages)-1]
+	updateLast := strings.Replace(last.Text, "尾页", "末页", 1)
+	call("PATCH", "pages/"+last.ID, map[string]any{"text": updateLast, "expectedRevision": last.Revision, "expectedDocumentRevision": withSeparators.Document.Revision}, 200)
+	assertText(strings.Replace(spaced, "尾页", "末页", 1))
+	// Simulate a manual version created by the older editor, which saved pages
+	// without persisting the new author baseline in the working draft.
+	manual := get()
+	legacyConfig := map[string]any{}
+	if err = json.Unmarshal(manual.Document.ConfigSnapshot, &legacyConfig); err != nil {
+		t.Fatal(err)
+	}
+	delete(legacyConfig, "authorDraftKey")
+	cfg, err := json.Marshal(legacyConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyPages := make([]batchfactorytext.PageDraft, 0, len(manual.Pages))
+	for _, p := range manual.Pages {
+		legacyPages = append(legacyPages, p.PageDraft)
+	}
+	repo := batchfactorytext.NewMySQLRepository(db)
+	if _, err = repo.ReplaceSystemPages(context.Background(), scope, batchfactorytext.PaginationUpdate{VersionID: manual.Document.ActiveVersionID, ExpectedRevision: manual.Document.Revision, Pages: legacyPages, ConfigSnapshot: cfg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: spaced}); err != nil {
+		t.Fatal(err)
+	}
+	set("sensitiveMode", "system")
+	call("POST", "prepare", map[string]any{}, 200)
+	assertText(strings.Replace(spaced, "尾页", "末页", 1))
 	// Frozen collections still resolve the original image after a replacement.
 	frozen := signedJSONRequest(t, api, now, "alice", "GET", mediaPath, nil)
 	if !bytes.Equal(media.Body.Bytes(), frozen.Body.Bytes()) {

@@ -59,6 +59,11 @@ func TestPaginateParagraphsAndSentences(t *testing.T) {
 			if !slices.Equal(got, c.want) {
 				t.Fatalf("pages = %q, want %q", got, c.want)
 			}
+			for _, page := range pages[:len(pages)-1] {
+				if !slices.Contains(SentenceBreaks(c.text), page.EndOffset) {
+					t.Fatalf("paginator emitted an uneditable break at %d, text %q", page.EndOffset, c.text)
+				}
+			}
 			if err := validateDrafts(c.text, pages); err != nil {
 				t.Fatal(err)
 			}

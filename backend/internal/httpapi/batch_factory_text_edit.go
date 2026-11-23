@@ -17,29 +17,21 @@ import (
 
 // Retain the editor's existing breaks whenever the upstream material still matches.
 // An explicit reflow request discards manual boundaries and runs the paginator.
-func (a textAPI) prepareDrafts(x textRequest, d txt.Document, snap textSnapshot, version *txt.VersionInput, reflow bool) ([]txt.PageDraft, error) {
+func (a textAPI) prepareDrafts(x textRequest, d txt.Document, snap textSnapshot, previous txt.Version, text string, reflow bool) ([]txt.PageDraft, error) {
 	measure := (txt.Renderer{}).MeasureFunc(x)
 	if d.ActiveVersionID != "" {
 		var old textSnapshot
 		if err := json.Unmarshal(d.ConfigSnapshot, &old); err != nil {
 			return nil, err
 		}
-		v, err := a.repo.GetVersion(x, x.scope, d.ActiveVersionID)
-		if err != nil {
-			return nil, err
-		}
-		if old.SourceVersion == snap.SourceVersion {
-			// Manual page edits form a derived version of this exact upstream text.
-			version.ProductionText = v.ProductionText
-		}
-		if !reflow && v.ProductionText == version.ProductionText {
+		if !reflow && previous.ProductionText == text {
 			ps, err := a.repo.ListPages(x, x.scope)
 			if err != nil {
 				return nil, err
 			}
 			drafts := make([]txt.PageDraft, 0, len(ps))
 			for _, p := range ps {
-				if p.VersionID != v.ID {
+				if p.VersionID != previous.ID {
 					return nil, txt.ErrConflict
 				}
 				_, style, err := txt.ResolvePageStyle(snap.PageStyle, p.PageDraft, txt.PagePatch{})
@@ -68,7 +60,7 @@ func (a textAPI) prepareDrafts(x textRequest, d txt.Document, snap textSnapshot,
 			return drafts, nil
 		}
 	}
-	pages, err := txt.Paginate(x, txt.PaginationInput{Text: version.ProductionText, Layout: snap.Layout}, measure)
+	pages, err := txt.Paginate(x, txt.PaginationInput{Text: text, Layout: snap.Layout}, measure)
 	if err != nil {
 		return nil, textLayoutError(err)
 	}
@@ -93,7 +85,7 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 	if err != nil {
 		return err
 	}
-	if len(ps) == 0 {
+	if len(ps) == 0 || x.book.TxtText != d.OriginalText {
 		return txt.ErrConflict
 	}
 	var joined strings.Builder
@@ -123,26 +115,103 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 		drafts = append(drafts, draft)
 	}
 	text := joined.String()
-	breaks := txt.SentenceBreaks(text)
-	for _, draft := range drafts[:len(drafts)-1] {
-		if !slices.Contains(breaks, draft.EndOffset) {
-			return fmt.Errorf("%w：请在页末保留完整的句子或段落", txt.ErrInvalid)
+	// A form may resend the displayed production text alongside a style change.
+	// Preserve the independent author draft when the wording is unchanged.
+	update := txt.PaginationUpdate{ExpectedRevision: d.Revision, Pages: drafts, ConfigSnapshot: d.ConfigSnapshot, VerifyProduction: a.productionGuard(x, snap.AuthorDraftKey)}
+	if text == txt.NormalizeLineEndings(v.ProductionText) {
+		if patch == (txt.PagePatch{}) {
+			return a.list(w, r, x)
 		}
+	} else {
+		breaks := txt.SentenceBreaks(text)
+		for _, draft := range drafts[:len(drafts)-1] {
+			if !slices.Contains(breaks, draft.EndOffset) {
+				return fmt.Errorf("%w：请在页末保留完整的句子或段落", txt.ErrInvalid)
+			}
+		}
+		update.VerifyProduction = a.authorDraftWriter(x, snap.AuthorDraftKey, text)
+		snap.AuthorDraftKey = batchfactoryv11.WorkingDraftVersion(text)
+		update.ConfigSnapshot, err = json.Marshal(snap)
+		if err != nil {
+			return err
+		}
+		v.ProductionText = text
 	}
-	raw, err := json.Marshal(snap)
-	if err != nil {
-		return err
-	}
-	_, err = a.repo.PreparePages(x, x.scope, txt.VersionInput{ProductionText: text, SensitiveMode: v.SensitiveMode, ChangeTrace: v.ChangeTrace}, txt.PaginationUpdate{ExpectedRevision: d.Revision, Pages: drafts, ConfigSnapshot: raw, VerifyProduction: a.productionGuard(x)})
+	_, err = a.repo.PreparePages(x, x.scope, txt.VersionInput{ProductionText: v.ProductionText, SensitiveMode: v.SensitiveMode, ChangeTrace: v.ChangeTrace}, update)
 	if err != nil {
 		return err
 	}
 	return a.list(w, r, x)
 }
 
+// Older page edits created a local version without saving the working draft. Adopt
+// it once, only when both its upstream version and its underlying input are still current.
+func (a textAPI) adoptLegacyPageEdit(x textRequest, doc txt.Document, v txt.Version) (txt.Document, error) {
+	if txt.NormalizeLineEndings(v.ProductionText) == txt.NormalizeLineEndings(x.book.SourceText) {
+		return doc, nil
+	}
+	var snap textSnapshot
+	if err := json.Unmarshal(doc.ConfigSnapshot, &snap); err != nil {
+		return doc, err
+	}
+	if snap.AuthorDraftKey != "" || snap.SourceVersion == "" || snap.SourceVersion != batchfactoryv11.ProductionVersion(x.book) {
+		return doc, nil
+	}
+	draft, err := a.store.GetDraft(x, x.scope.Owner, "working-front:"+x.scope.BookID, "working-front-content", x.scope.BatchID)
+	if err != nil && !errors.Is(err, batchfactoryv11.ErrNotFound) {
+		return doc, err
+	}
+	base := stringValue(mapOrEmpty(x.book.SourceMetadata["batchSensitiveStage"])["authoredBase"])
+	if strings.TrimSpace(draft.Content) != "" && base != batchfactoryv11.WorkingDraftVersion(draft.Content) || strings.TrimSpace(draft.Content) == "" && strings.HasPrefix(base, "working:") {
+		return doc, nil
+	}
+	ps, err := a.repo.ListPages(x, x.scope)
+	if err != nil {
+		return doc, err
+	}
+	pages := make([]txt.PageDraft, 0, len(ps))
+	for _, p := range ps {
+		if p.VersionID != v.ID {
+			return doc, txt.ErrConflict
+		}
+		pages = append(pages, p.PageDraft)
+	}
+	snap.AuthorDraftKey = batchfactoryv11.WorkingDraftVersion(v.ProductionText)
+	cfg, err := json.Marshal(snap)
+	if err != nil {
+		return doc, err
+	}
+	_, err = a.repo.PreparePages(x, x.scope, txt.VersionInput{ProductionText: v.ProductionText, SensitiveMode: v.SensitiveMode, ChangeTrace: v.ChangeTrace}, txt.PaginationUpdate{ExpectedRevision: doc.Revision, Pages: pages, ConfigSnapshot: cfg, VerifyProduction: a.authorDraftWriter(x, "", v.ProductionText)})
+	if err != nil {
+		return doc, err
+	}
+	// This transaction reused the immutable version, changed pagination once
+	// and compared the initially captured document revision.
+	doc.Revision++
+	doc.PaginationVersion++
+	doc.ConfigSnapshot = cfg
+	return doc, nil
+}
+
+func (a textAPI) authorDraftWriter(x textRequest, pending, content string) func(context.Context, *sql.Tx) error {
+	return func(ctx context.Context, tx *sql.Tx) error {
+		if err := a.productionGuard(x, pending)(ctx, tx); err != nil {
+			return err
+		}
+		writer, ok := a.store.(interface {
+			SaveDraftTx(context.Context, *sql.Tx, string, batchfactoryv11.Draft) (batchfactoryv11.Draft, error)
+		})
+		if !ok {
+			return batchfactoryv11.ErrUnavailable
+		}
+		_, err := writer.SaveDraftTx(ctx, tx, x.scope.Owner, batchfactoryv11.Draft{Key: "working-front:" + x.scope.BookID, Kind: "working-front-content", Scope: x.scope.BatchID, Content: content})
+		return err
+	}
+}
+
 // The MySQL check locks the authoritative book record and working draft in the
 // same transaction as activation. Neither can change between this read and commit.
-func (a textAPI) productionGuard(x textRequest) func(context.Context, *sql.Tx) error {
+func (a textAPI) productionGuard(x textRequest, pendingDraft string) func(context.Context, *sql.Tx) error {
 	pinned := x.book
 	return func(ctx context.Context, tx *sql.Tx) error {
 		current := pinned
@@ -177,8 +246,14 @@ func (a textAPI) productionGuard(x textRequest) func(context.Context, *sql.Tx) e
 		state := mapOrEmpty(current.SourceMetadata["batchSensitiveStage"])
 		base := stringValue(state["authoredBase"])
 		hasDraft := strings.TrimSpace(draft) != ""
+		currentWorking := batchfactoryv11.WorkingDraftVersion(draft)
+		expectedWorking := base
+		if pendingDraft != "" {
+			expectedWorking = pendingDraft
+		}
+		approvedWorking := expectedWorking == currentWorking
 		if !hasVerifiedBatchOriginal(current) || batchfactoryv11.ProductionVersion(current) != batchfactoryv11.ProductionVersion(pinned) || current.SourceText != pinned.SourceText || current.TxtText != pinned.TxtText ||
-			state["output"] != sensitiveDigest(current.SourceText) || state["raw"] != sensitiveDigest(current.TxtText) || (hasDraft && base != batchfactoryv11.WorkingDraftVersion(draft)) || (!hasDraft && strings.HasPrefix(base, "working:")) {
+			state["output"] != sensitiveDigest(current.SourceText) || state["raw"] != sensitiveDigest(current.TxtText) || (hasDraft && !approvedWorking) || (!hasDraft && (pendingDraft != "" || strings.HasPrefix(base, "working:"))) {
 			return fmt.Errorf("%w：生产正文已更新，请重新准备", txt.ErrConflict)
 		}
 		return nil
