@@ -170,7 +170,7 @@ import { checkWebSubmitEnvironment, getWebSubmitConfig, testWebSubmitVisible } f
 import { YIZHANSHENGMING_EXECUTOR_PROVIDER, localExecutorTaskToast } from './batchFactoryLocalExecutor.js';
 import { batchFactoryPlatformOptions } from './batchFactoryPlatformOptions';
 import { currentMergeJobsByOpening, publishMergeFiles } from './batchFactoryMergeGroups.js';
-import { BOOK_CONFIG_REGIONS, bookAssetSummary, bookConfigRegionStatus } from './batchFactoryBookConfigRegions';
+import { BOOK_CONFIG_REGIONS, bookAssetSummary, bookConfigRegionStatus, normalizeSensitiveMode, sensitiveModeLabel } from './batchFactoryBookConfigRegions';
 import { videoProviderForModel } from './videoProviderBinding';
 import { modelOptionsForProvider } from './providerModelBinding';
 import { stripBaseSetupSection } from '../scriptFinalSegment';
@@ -203,7 +203,7 @@ const GENERATED_CONTENT_SETTINGS_KEYS = [
 
 const UNIFIED_CONFIGURATION_KEYS = [
   'textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'imageConcurrency', 'assetImagesEnabled',
-	'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure',
+	'sensitiveMode', 'sensitiveAIModels', 'sensitiveAIOnFailure',
   'storyboardDurationLimit', 'maxVideoDuration', 'audioPlanningEnabled',
 	'audioSource', 'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'comicPublishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount',
 	'watermarkEnabled', 'watermarkText'
@@ -6535,6 +6535,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
               : [];
             const classifyBusy = actionBusy === `classify-${viewingBook.id}`;
             const sensitiveDetail = sensitiveProcessingDetail(viewingBook);
+            const hasSensitiveMode = Boolean(viewingBook.sourceMetadata?.sensitiveMode)
+              || (sensitiveDetail.status !== 'skipped' && typeof viewingBook.sourceMetadata?.sensitiveAIEnabled === 'boolean');
             const classifyFailed =
               ["failed", "pending_confirmation"].includes(
                 String(
@@ -6656,6 +6658,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                   <Descriptions.Item label="敏感处理">
                     {sensitiveDetail.status === 'failed' ? '处理失败' : sensitiveDetail.status === 'review_required' ? '待人工确认' : sensitiveDetail.status === 'partial' ? '部分处理' : sensitiveDetail.status ? '已完成' : '未处理'}
                   </Descriptions.Item>
+                  {hasSensitiveMode ? (
+                    <Descriptions.Item label="敏感模式">
+                      {sensitiveModeLabel(normalizeSensitiveMode(viewingBook.sourceMetadata))}
+                    </Descriptions.Item>
+                  ) : null}
                   <Descriptions.Item label="处理字数">
                     {sensitiveDetail.originalChars > 0 ? `${sensitiveDetail.processedChars}/${sensitiveDetail.originalChars} 字` : (sensitiveDetail.processedChars ? `${sensitiveDetail.processedChars} 字` : '—')}
                   </Descriptions.Item>

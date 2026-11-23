@@ -44,7 +44,7 @@ test('unified configuration covers engine, model, media, opening and publish fie
   for (const key of [
     'videoProvider', 'videoModelId', 'textModelId', 'imageModelId', 'imageProvider',
     'assetImagesEnabled',
-    'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure',
+    'sensitiveMode', 'sensitiveAIModels', 'sensitiveAIOnFailure',
     'publishSettings', 'publishRewriteEnabled', 'comicPublishSettings',
     'maxVideoDuration', 'videoAspectRatio', 'videoResolution', 'storyboardDurationLimit',
     'openingEnabled', 'openingCount'
@@ -69,17 +69,27 @@ test('the asset image switch defaults to off, is pushed batch-wide and only badg
   assert.match(bookModal, /<InheritedSwitchField label="生成资产图片"[\s\S]{0,220}inherited=\{inherited\.assetImagesEnabled === true\}[\s\S]{0,220}explicit=\{Object\.hasOwn\(bookPatch, 'assetImagesEnabled'\)\}/);
 });
 
-test('the batch AI repair switch defaults to off and only an explicit true turns it on', () => {
-  // 统一配置弹窗：未设置时不再默认开启，只有显式 true 才打开。
-  assert.match(unifiedModal, /<b>AI 修复<\/b>/);
-  assert.match(unifiedModal, /checked=\{value\.sensitiveAIEnabled === true\}/);
-  assert.match(unifiedModal, /默认关闭；只有显式开启后才会调用 AI 修复/);
-  // 单书继承值同样默认关闭，偏离批次时才出现“自定义”。
-  assert.match(bookModal, /<InheritedSwitchField label="AI 修复"[\s\S]{0,260}inherited=\{inherited\.sensitiveAIEnabled === true\}/);
-  assert.match(bookModal, /<InheritedSwitchField label="AI 修复"[\s\S]{0,260}explicit=\{Object\.hasOwn\(bookPatch, 'sensitiveAIEnabled'\)\}/);
-  // 仍纳入统一配置写透集合，保证批次级开关能按现有继承链下发。
-  const keys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
-  assert.match(keys, /'sensitiveAIEnabled'/, 'sensitiveAIEnabled must stay in UNIFIED_CONFIGURATION_KEYS');
+test('unified and single-book settings use the same three sensitive modes', () => {
+  for (const source of [unifiedModal, bookModal]) {
+    assert.match(source, /<Segmented[^>]*options=\{SENSITIVE_MODE_OPTIONS\}[^>]*onChange=\{sensitiveMode => patch\(\{ sensitiveMode \}\)\}/);
+    assert.match(source, /系统优化在本地执行，不消耗 AI 额度/);
+    assert.match(source, /(?:sensitiveMode|normalizeSensitiveMode\(value\)) === 'ai' \? <>[\s\S]*?修复模型[\s\S]*?失败时策略[\s\S]*?<\/> : null\}/);
+    assert.doesNotMatch(source, /patch\(\{ sensitiveAIEnabled \}\)/);
+  }
+  assert.match(unifiedModal, /value=\{normalizeSensitiveMode\(value\)\}/);
+  assert.match(bookModal, /继承：\{sensitiveModeLabel\(inheritedSensitiveMode\)\}/);
+  assert.match(bookModal, /bookSensitiveModeUpdate\(inherited, bookPatch, edited/);
+  assert.match(novelList, /sensitiveModeLabel\(normalizeSensitiveMode\(viewingBook\.sourceMetadata\)\)/);
+});
+
+test('settings saves do not write back the legacy sensitive AI flag', () => {
+  const unifiedKeys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
+  const bookKeys = bookModal.match(/const ENGINE_MODEL_OVERRIDE_FIELDS = \[[^\n]*\];/)?.[0] || '';
+  for (const keys of [unifiedKeys, bookKeys]) {
+    assert.match(keys, /'sensitiveMode'/);
+    assert.doesNotMatch(keys, /'sensitiveAIEnabled'/);
+  }
+  assert.match(unifiedModal, /const \{ sensitiveAIEnabled, \.\.\.settingsPatch \} = draftPatch;/);
 });
 
 test('unified configuration only writes configuration and never pushes generated content', () => {

@@ -6,6 +6,44 @@ export const BOOK_CONFIG_REGIONS = [
   { key: 'visual', label: '画面设置' }
 ];
 
+export const SENSITIVE_MODE_OPTIONS = [
+  { value: 'ai', label: 'AI优化' },
+  { value: 'system', label: '系统优化' },
+  { value: 'off', label: '关闭' }
+];
+
+export function normalizeSensitiveMode(settings) {
+  const mode = settings?.sensitiveMode;
+  if (SENSITIVE_MODE_OPTIONS.some(option => option.value === mode)) return mode;
+  return settings?.sensitiveAIEnabled === true ? 'ai' : 'system';
+}
+
+export function sensitiveModeLabel(mode) {
+  return SENSITIVE_MODE_OPTIONS.find(option => option.value === mode)?.label;
+}
+
+export function normalizePresetSensitiveMode(settings = {}) {
+  const { sensitiveAIEnabled, ...patch } = settings;
+  if (Object.hasOwn(settings, 'sensitiveAIEnabled')) patch.sensitiveMode = normalizeSensitiveMode(settings);
+  return patch;
+}
+
+export function bookSensitiveModeUpdate(inherited, bookPatch = {}, edited, restore = false) {
+  const patch = {};
+  const restoreKeys = [];
+  const mode = normalizeSensitiveMode(edited);
+  if (!restore && mode === normalizeSensitiveMode({ ...inherited, ...bookPatch })) return { patch, restoreKeys };
+  if (mode !== normalizeSensitiveMode(inherited)) {
+    patch.sensitiveMode = mode;
+    return { patch, restoreKeys };
+  }
+  const { sensitiveMode, ...legacyPatch } = bookPatch;
+  if (Object.hasOwn(bookPatch, 'sensitiveMode')) restoreKeys.push('sensitiveMode');
+  // 旧开关只有在恢复继承时仍会影响生效模式，才随这项设置一起撤销。
+  if (normalizeSensitiveMode({ ...inherited, ...legacyPatch }) !== mode) restoreKeys.push('sensitiveAIEnabled');
+  return { patch, restoreKeys };
+}
+
 const ENGINE_KEYS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'publishSettings', 'publishRewriteEnabled'];
 const AI_MODULE_BY_REGION = {
   assets: 'assets',
@@ -26,6 +64,8 @@ export function bookConfigRegionStatus(book, region, batchPatch = {}) {
     ? { label: '来自统一配置', tone: 'pushed' }
     : { label, tone: 'overridden' };
   if (region === 'engine') {
+    const inheritedMode = normalizeSensitiveMode(batchPatch);
+    if (normalizeSensitiveMode({ ...batchPatch, ...patch }) !== inheritedMode) return { label: '已单书覆盖', tone: 'overridden' };
     const keys = ENGINE_KEYS.filter(key => Object.hasOwn(patch, key));
     if (keys.length) return ownStatus(keys);
     const modules = ['video', 'comic'].filter(key => Object.hasOwn(patch?.aiPromptConfig || {}, key));
@@ -33,6 +73,7 @@ export function bookConfigRegionStatus(book, region, batchPatch = {}) {
       const pushed = modules.every(key => sameJSON(patch.aiPromptConfig?.[key], batchPatch?.aiPromptConfig?.[key]));
       return pushed ? { label: '来自统一配置', tone: 'pushed' } : { label: '已单书覆盖', tone: 'overridden' };
     }
+    if (Object.hasOwn(patch, 'sensitiveMode')) return { label: '来自统一配置', tone: 'pushed' };
     return { label: '继承作品配置', tone: 'inherited' };
   }
   const module = patch?.aiPromptConfig?.[AI_MODULE_BY_REGION[region]];

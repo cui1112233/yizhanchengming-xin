@@ -23,6 +23,7 @@ import { getConstraintPresetTexts } from '../../../shared/api/generation';
 import ImageCapacityControl from './ImageCapacityControl';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { batchFactoryProductionModeVisibility, batchFactoryShouldLoadPublishEnvironment } from './batchFactoryProductionMode';
+import { normalizePresetSensitiveMode, normalizeSensitiveMode, SENSITIVE_MODE_OPTIONS } from './batchFactoryBookConfigRegions';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts';
 import { loadBatchFactoryPresetCatalog } from './batchFactoryPresetCatalog';
 import { reconcileSyncedWebsiteProfiles, websiteProfileOrganization } from './batchFactoryWebsiteProfiles';
@@ -149,12 +150,16 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
     {modelsError ? <Alert type="warning" showIcon message="部分模型目录暂不可用" description={modelsError} /> : null}
     {!modelsLoading && !modelsError && !models.length ? <Alert type="warning" showIcon message="后台没有已启用模型" description="请先在模型配置中新增并启用模型。" /> : null}
     </> : null}
-    {sections.includes('sensitive') ? <section className="batch-factory-engine-card"><header><b>敏感词处理</b><HelpTip title="敏感词处理">批量工厂自己的开关：关闭后只走规则处理；无法替换的词会自动打码并继续自动化，不再要求人工确认。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
-      <label className="batch-factory-engine-field"><span><b>AI 修复</b><HelpTip title="AI 修复">默认关闭；只有显式开启后才会调用 AI 修复，关闭时只走规则脱敏/打码，不影响后续阶段。</HelpTip></span><Switch checked={value.sensitiveAIEnabled === true} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} /></label>
-      {/* 这里不能用 label 包住字段：同一 label 内的“？”帮助按钮是 label 的受控元素，
-          浏览器会把点击下拉当成激活帮助按钮，导致弹层打开后立即失焦收回（闪回）。 */}
-      <div className="batch-factory-engine-field"><span><b>修复模型</b><HelpTip title="修复模型">可多选，按顺序逐个尝试；留空表示继承批量测书页的全局修复模型。</HelpTip></span><Select mode="multiple" allowClear value={Array.isArray(value.sensitiveAIModels) ? value.sensitiveAIModels : []} options={modelOptions.text} placeholder="默认继承全局修复模型" onChange={sensitiveAIModels => patch({ sensitiveAIModels })} /></div>
-      <label className="batch-factory-engine-field"><span><b>失败时策略</b><HelpTip title="失败时策略">“自动打码并继续”不会中断生产；“判为失败”会停止当前书。</HelpTip></span><Segmented block value={value.sensitiveAIOnFailure === 'fail' ? 'fail' : 'review'} options={[{ value: 'review', label: '自动打码并继续' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
+    {sections.includes('sensitive') ? <section className="batch-factory-engine-card"><header><b>敏感词处理</b><HelpTip title="敏感词处理">系统优化在本地执行，不消耗 AI 额度。选“关闭”时跳过敏感词处理。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+      <div className="batch-factory-engine-field">
+        <span><b>敏感模式</b></span>
+        <Segmented block value={normalizeSensitiveMode(value)} options={SENSITIVE_MODE_OPTIONS} onChange={sensitiveMode => patch({ sensitiveMode })} />
+      </div>
+      {normalizeSensitiveMode(value) === 'ai' ? <>
+        {/* 带帮助按钮的 Select 用 div 包裹，避免点击下拉时触发 label 并导致选项闪回。 */}
+        <div className="batch-factory-engine-field"><span><b>修复模型</b><HelpTip title="修复模型">可多选，按顺序逐个尝试；留空表示继承批量测书页的全局修复模型。</HelpTip></span><Select mode="multiple" allowClear value={Array.isArray(value.sensitiveAIModels) ? value.sensitiveAIModels : []} options={modelOptions.text} placeholder="默认继承全局修复模型" onChange={sensitiveAIModels => patch({ sensitiveAIModels })} /></div>
+        <div className="batch-factory-engine-field"><span><b>失败时策略</b><HelpTip title="失败时策略">“自动打码并继续”不会中断生产；“判为失败”会停止当前书。</HelpTip></span><Segmented block value={value.sensitiveAIOnFailure === 'fail' ? 'fail' : 'review'} options={[{ value: 'review', label: '自动打码并继续' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></div>
+      </> : null}
     </div></section> : null}
     {visibility.video && sections.includes('audio') ? <section className="batch-factory-engine-card"><header><b>跟随配音</b><HelpTip title="跟随配音">开启后只测量没有有效缓存的视频原文非空行。</HelpTip></header><div className="batch-factory-engine-card-body"><Space direction="vertical" style={{ width: '100%' }}>
       <Space style={{ justifyContent: 'space-between', width: '100%' }}><span>分镜规划跟随配音</span><Switch checked={value.audioPlanningEnabled === true} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} /></Space>
@@ -639,7 +644,8 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
     try { await loadPresets(); setPresetOpen(true); }
     catch (error) { message.error(error?.message || '读取自动化预设失败'); }
   };
-  const clonePresetConfig = normalizeBatchAutoAudioConfig(selectedPreset?.config);
+  const clonePresetConfig = normalizePresetSensitiveMode(normalizeBatchAutoAudioConfig(selectedPreset?.config));
+  const presetDraftConfig = () => withAutomationPresetMode(normalizePresetSensitiveMode(normalizeBatchAutoAudioConfig(value)), productionMode);
   const loadPreset = () => {
     if (!selectedPreset) return message.warning('请先选择自动化预设');
     Modal.confirm({ title: '确认载入此预设', content: '它只替换当前统一配置草稿；确认当前批量配置后才会应用。', okText: '载入草稿', onOk: () => onLoad(clonePresetConfig) });
@@ -654,7 +660,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
       cancelText: '取消',
       onOk: async () => {
         try {
-          await updateAutomationPreset(selectedPreset.id, { name: selectedPreset.name, config: withAutomationPresetMode(normalizeBatchAutoAudioConfig(value), productionMode), expectedVersion: selectedPreset.version });
+          await updateAutomationPreset(selectedPreset.id, { name: selectedPreset.name, config: presetDraftConfig(), expectedVersion: selectedPreset.version });
           await loadPresets();
           message.success('自动化预设已更新。');
         } catch (error) {
@@ -667,7 +673,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
     const name = presetName.trim();
     if (!name) return message.warning('请填写预设名称');
     setPresetBusy(true);
-    try { const result = await createAutomationPreset({ name, config: withAutomationPresetMode(normalizeBatchAutoAudioConfig(value), productionMode) }); const saved = result?.preset || result; await loadPresets(); setSelectedPresetId(saved?.id || ''); setPresetName(''); message.success(productionMode ? `已保存为${automationPresetModeLabel(productionMode)}预设。` : '已保存自动化预设。'); }
+    try { const result = await createAutomationPreset({ name, config: presetDraftConfig() }); const saved = result?.preset || result; await loadPresets(); setSelectedPresetId(saved?.id || ''); setPresetName(''); message.success(productionMode ? `已保存为${automationPresetModeLabel(productionMode)}预设。` : '已保存自动化预设。'); }
     catch (error) { message.error(error?.message || '保存自动化预设失败'); }
     finally { setPresetBusy(false); }
   };
@@ -676,7 +682,7 @@ export function BatchFactoryAutomationPresetManager({ value, onLoad, productionM
     const name = presetName.trim();
     if (!name) return message.warning('请填写新的预设名称');
     setPresetBusy(true);
-    try { await updateAutomationPreset(selectedPreset.id, { name, config: normalizeBatchAutoAudioConfig(selectedPreset.config), expectedVersion: selectedPreset.version }); await loadPresets(); setPresetName(''); message.success('自动化预设已重命名。'); }
+    try { await updateAutomationPreset(selectedPreset.id, { name, expectedVersion: selectedPreset.version }); await loadPresets(); setPresetName(''); message.success('自动化预设已重命名。'); }
     catch (error) { message.error(error?.message || '重命名自动化预设失败'); }
     finally { setPresetBusy(false); }
   };
@@ -711,8 +717,9 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     setSaving(true);
     const aiPromptConfig = draftPatch.aiPromptConfig && typeof draftPatch.aiPromptConfig === 'object' ? draftPatch.aiPromptConfig : {};
     const video = requiredVideoPrompt(aiPromptConfig.video);
+    const { sensitiveAIEnabled, ...settingsPatch } = draftPatch;
     const preparedPatch = {
-      ...draftPatch,
+      ...settingsPatch,
       aiPromptConfig: { ...aiPromptConfig, video },
       ...(video.presetId === 'batch-video-sd' && !draftPatch.storyTimelineVersion
         ? { storyTimelineVersion: 'sd.original-story.v1' }

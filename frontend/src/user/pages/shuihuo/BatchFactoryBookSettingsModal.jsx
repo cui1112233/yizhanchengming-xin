@@ -12,9 +12,10 @@ import { batchFactoryPreviewText } from './batchFactoryContentRange';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { BatchFactoryComicPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal';
 import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
+import { bookSensitiveModeUpdate, normalizeSensitiveMode, SENSITIVE_MODE_OPTIONS, sensitiveModeLabel } from './batchFactoryBookConfigRegions';
 import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../../shared/imageAspectRatios';
 
-const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'assetImagesEnabled', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts', 'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure'];
+const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'assetImagesEnabled', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts', 'sensitiveMode', 'sensitiveAIModels', 'sensitiveAIOnFailure'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings', 'comicPublishSettings'];
 const ENGINE_OVERRIDE_FIELDS = [...ENGINE_MODEL_OVERRIDE_FIELDS, ...ENGINE_PUBLISH_OVERRIDE_FIELDS];
 const BOOK_OVERRIDE_FIELDS = [...ENGINE_OVERRIDE_FIELDS, 'starredCharacterNames', 'openingEnabled', 'openingCount', 'aiPromptConfig'];
@@ -185,7 +186,7 @@ function buildRestoreKeys(inherited, edited, currentPatch) {
   return BOOK_OVERRIDE_FIELDS.filter(key => Object.hasOwn(currentPatch || {}, key) && equal(inherited?.[key], edited?.[key]));
 }
 
-export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engineTab = 'models') {
+export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engineTab = 'models', restore = false) {
   if (region === 'engine' && engineTab === 'media') region = 'media';
   const patch = {};
   const restoreKeys = [];
@@ -211,9 +212,13 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
     }
 
     for (const key of ENGINE_MODEL_OVERRIDE_FIELDS) {
+      if (key === 'sensitiveMode') continue;
       if (!equal(inherited?.[key], edited?.[key])) patch[key] = edited?.[key];
       else if (Object.hasOwn(bookPatch || {}, key)) restoreKeys.push(key);
     }
+    const sensitiveUpdate = bookSensitiveModeUpdate(inherited, bookPatch, edited, restore);
+    Object.assign(patch, sensitiveUpdate.patch);
+    restoreKeys.push(...sensitiveUpdate.restoreKeys);
     // 换开头是统一配置根级的生产开关；单书只存差异，拨回相同值即恢复继承。
     for (const key of ['openingEnabled', 'openingCount']) {
       if (!equal(inherited?.[key], edited?.[key])) patch[key] = edited?.[key];
@@ -465,6 +470,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   ].filter(([name]) => name)).values()].map(asset => ({ value: String(asset.name || '').trim(), label: String(asset.name || '').trim() }));
   const publish = form.publishSettings || {};
   const inheritedPublish = inherited.publishSettings || {};
+  const sensitiveMode = normalizeSensitiveMode(form);
+  const inheritedSensitiveMode = normalizeSensitiveMode(inherited);
+  const savedSensitiveOverride = normalizeSensitiveMode({ ...inherited, ...bookPatch }) !== inheritedSensitiveMode;
   const tts = { ...DEFAULT_TTS, ...accountTts, ...(form.tts || {}) };
   const constraintRules = normalizeConstraintRules(ai.constraints);
   const moduleKey = AI_REGION_KEYS.get(region);
@@ -473,7 +481,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       ? Object.hasOwn(bookPatch, 'productionMode') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'video') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')
     : engineTab === 'publish'
       ? Object.hasOwn(bookPatch, 'publishRewriteEnabled') || Object.hasOwn(bookPatch, 'publishSettings')
-      : ENGINE_MODEL_OVERRIDE_FIELDS.some(key => Object.hasOwn(bookPatch, key)) || Object.hasOwn(bookPatch, 'openingEnabled') || Object.hasOwn(bookPatch, 'openingCount')
+      : savedSensitiveOverride || ENGINE_MODEL_OVERRIDE_FIELDS.some(key => Object.hasOwn(bookPatch, key)) || Object.hasOwn(bookPatch, 'openingEnabled') || Object.hasOwn(bookPatch, 'openingCount')
     : region === 'assets'
       ? Object.hasOwn(bookPatch, 'starredCharacterNames') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'assets')
     : region === 'media'
@@ -612,7 +620,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       };
       setForm(edited);
       setAudioBlob(blob);
-      await persist(edited, false);
+      await persist(edited, { closeWhenSaved: false });
       message.success(`已取得当前正文配音真实时长：${duration.toFixed(2)} 秒`);
     } catch (error) {
       message.error(error?.message || '当前正文配音生成失败');
@@ -633,9 +641,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       return saveBookOverride(batch.id, book.id, { ...input, expectedRevision: Number(latestBook.revision || 0) });
     }
   }
-  async function persist(edited, closeWhenSaved = true) {
+  async function persist(edited, { closeWhenSaved = true, restore = false } = {}) {
     if (!batch?.id || !book?.id) return;
-    const { patch: patchValue, restoreKeys } = buildBookRegionUpdate(inherited, bookPatch, region, edited, engineTab);
+    const { patch: patchValue, restoreKeys } = buildBookRegionUpdate(inherited, bookPatch, region, edited, engineTab, restore);
     if (!Object.keys(patchValue).length && !restoreKeys.length) { if (closeWhenSaved) onClose?.(); return; }
     setSaving(true);
     try {
@@ -645,7 +653,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
     } finally { setSaving(false); }
   }
   function save() { return persist(form); }
-  function restoreCurrentRegion() { return persist(inherited); }
+  function restoreCurrentRegion() { return persist(inherited, { restore: true }); }
 
   const currentAudioFingerprint = runtimeAudioDurationFingerprint(book, tts);
   const audioDurationStale = Number(form.audioDurationSeconds || 0) > 0
@@ -718,10 +726,20 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIO_OPTIONS} loading={false} explicit={Object.hasOwn(bookPatch, 'imageAspectRatio')} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
             <InheritedSwitchField label="生成资产图片" value={form.assetImagesEnabled} inherited={inherited.assetImagesEnabled === true} explicit={Object.hasOwn(bookPatch, 'assetImagesEnabled')} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} />
           </div></ConfigCard>
-          <ConfigCard title="敏感词处理" description="AI 修复默认关闭；关闭时只走规则处理，无法替换的词会自动打码，自动化继续执行。">
-            <InheritedSwitchField label="AI 修复" value={form.sensitiveAIEnabled} inherited={inherited.sensitiveAIEnabled === true} explicit={Object.hasOwn(bookPatch, 'sensitiveAIEnabled')} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} />
-            <InheritedMultiField label="修复模型" value={form.sensitiveAIModels} inherited={inherited.sensitiveAIModels} options={modelOptions.text} loading={modelsLoading} explicit={Object.hasOwn(bookPatch, 'sensitiveAIModels')} onChange={sensitiveAIModels => patch({ sensitiveAIModels })} />
-            <label className="batch-factory-engine-field"><span><b>失败时策略</b></span><Segmented block value={form.sensitiveAIOnFailure || inherited.sensitiveAIOnFailure || 'review'} options={[{ value: 'review', label: '自动打码并继续' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
+          <ConfigCard title="敏感词处理" description="系统优化在本地执行，不消耗 AI 额度。">
+            <div className="batch-factory-engine-field">
+              <span>
+                <b>敏感模式</b>
+                {sensitiveMode === inheritedSensitiveMode
+                  ? <small>继承：{sensitiveModeLabel(inheritedSensitiveMode)}</small>
+                  : <FieldSource value={sensitiveMode} inherited={inheritedSensitiveMode} explicit={savedSensitiveOverride} />}
+              </span>
+              <Segmented block value={sensitiveMode} options={SENSITIVE_MODE_OPTIONS} onChange={sensitiveMode => patch({ sensitiveMode })} />
+            </div>
+            {sensitiveMode === 'ai' ? <>
+              <InheritedMultiField label="修复模型" value={form.sensitiveAIModels} inherited={inherited.sensitiveAIModels} options={modelOptions.text} loading={modelsLoading} explicit={Object.hasOwn(bookPatch, 'sensitiveAIModels')} onChange={sensitiveAIModels => patch({ sensitiveAIModels })} />
+              <label className="batch-factory-engine-field"><span><b>失败时策略</b></span><Segmented block value={form.sensitiveAIOnFailure || inherited.sensitiveAIOnFailure || 'review'} options={[{ value: 'review', label: '自动打码并继续' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
+            </> : null}
           </ConfigCard>
         </div>
       },
