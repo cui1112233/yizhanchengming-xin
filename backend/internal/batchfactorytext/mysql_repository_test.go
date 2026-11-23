@@ -454,7 +454,7 @@ func TestRepositoryReusesSystemPageWithoutOverwritingItsRevisionOrArtifact(t *te
 	mock.ExpectQuery("SELECT id, .* FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(sqlmock.NewRows([]string{"id", "version_id", "pagination_version", "revision"}).AddRow("doc", "v2", 2, 4))
 	mock.ExpectQuery("SELECT v.production_text,d.config_snapshot_json FROM").WithArgs("alice", "book", "v2").WillReturnRows(sqlmock.NewRows([]string{"text", "snapshot"}).AddRow("甲。", nil))
 	mock.ExpectQuery("SELECT p.id,.* ORDER BY p.ordinal_no FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(previousPageRows().AddRow("p", "v1", 2, 1, 0, 2, "甲。", "digest", nil, nil, "system", false, 2, "artifact", "ready", "", "", "", 7))
-	mock.ExpectExec("UPDATE batch_factory_v12_text_pages SET version_id=.*,pagination_version=.*,ordinal_no=.*,updated_at=NOW.* WHERE id=").WithArgs("v2", 3, 1, "p").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE batch_factory_v12_text_pages SET version_id=.*,pagination_version=.*,ordinal_no=.*,start_offset=.*,end_offset=.*,revision=revision.*updated_at=NOW.* WHERE id=").WithArgs("v2", 3, 1, 0, 2, false, "p").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("DELETE FROM batch_factory_v12_text_pages").WithArgs("alice", "book", 2).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("UPDATE batch_factory_v12_text_documents SET pagination_version=").WithArgs(3, nil, "doc").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

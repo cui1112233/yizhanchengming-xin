@@ -88,6 +88,14 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 	if len(ps) == 0 || x.book.TxtText != d.OriginalText {
 		return txt.ErrConflict
 	}
+	artifacts, err := a.repo.ListArtifacts(x, x.scope)
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]txt.PageArtifact, len(artifacts))
+	for _, art := range artifacts {
+		byID[art.ID] = art
+	}
 	var joined strings.Builder
 	drafts := make([]txt.PageDraft, 0, len(ps))
 	var offset int
@@ -119,6 +127,16 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 			}
 		}
 		for _, part := range replacement {
+			if len(replacement) == 1 && p.Text == part.Text {
+				part.PreviousPageID = p.ID
+				if art, ok := byID[p.ActiveArtifactID]; ok && !p.Locked && p.Status == "ready" && art.PageID == p.ID && art.SourceKind == "system" && art.Kind == "page" && art.RenderVersion == p.RenderVersion {
+					if err := a.verifyArtifactFile(x, art, fmt.Sprintf("第 %d 页", p.Ordinal)); err == nil {
+						part.VerifiedArtifactID = art.ID
+					} else if x.Err() != nil {
+						return x.Err()
+					}
+				}
+			}
 			joined.WriteString(part.Text)
 			part.StartOffset = offset
 			offset += utf8.RuneCountInString(part.Text)
@@ -172,7 +190,7 @@ func (a textAPI) savePageText(w http.ResponseWriter, r *http.Request, x textRequ
 	if err != nil {
 		return err
 	}
-	return a.list(w, r, x)
+	return a.listAfterEdit(w, x, ps, edited.ID)
 }
 
 // Older page edits created a local version without saving the working draft. Adopt

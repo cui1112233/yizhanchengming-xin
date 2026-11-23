@@ -111,13 +111,16 @@ func NormalizeLineEndings(s string) string {
 
 // Offsets are half-open rune offsets into the newline-normalized version.
 type PageDraft struct {
-	Text            string        `json:"text"`
-	StartOffset     int           `json:"startOffset"`
-	EndOffset       int           `json:"endOffset"`
-	Layout          *LayoutConfig `json:"layout,omitempty"`
-	Background      *Background   `json:"background,omitempty"`
-	ClearLayout     bool          `json:"clearLayout,omitempty"`
-	ClearBackground bool          `json:"clearBackground,omitempty"`
+	// Only a page-local edit can identify a retained source page after its offsets shift.
+	PreviousPageID     string        `json:"-"`
+	VerifiedArtifactID string        `json:"-"`
+	Text               string        `json:"text"`
+	StartOffset        int           `json:"startOffset"`
+	EndOffset          int           `json:"endOffset"`
+	Layout             *LayoutConfig `json:"layout,omitempty"`
+	Background         *Background   `json:"background,omitempty"`
+	ClearLayout        bool          `json:"clearLayout,omitempty"`
+	ClearBackground    bool          `json:"clearBackground,omitempty"`
 }
 
 type Page struct {

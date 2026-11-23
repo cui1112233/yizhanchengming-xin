@@ -206,19 +206,39 @@ func sameRange(p, q PageDraft) bool {
 
 // Rune intervals form a unique key within a successful pagination. An
 // unchanged system page can therefore keep its ID even if its ordinal moves.
-func previousPages(ctx context.Context, tx *sql.Tx, s Scope, drafts []PageDraft) (map[int]Page, error) {
+func previousPages(ctx context.Context, tx *sql.Tx, s Scope, drafts []PageDraft) ([]Page, error) {
 	old, err := readRows(ctx, tx, scanPage, "SELECT "+pageCols+pageJoin+" ORDER BY p.ordinal_no FOR UPDATE", s.Owner, s.BatchID, s.BookID)
 	if err != nil {
 		return nil, err
 	}
 	byStart := make(map[int]Page, len(old))
+	byID := make(map[string]Page, len(old))
 	for _, p := range old {
 		if p.Locked && (p.Ordinal <= 0 || p.Ordinal > len(drafts) || !sameRange(p.PageDraft, drafts[p.Ordinal-1])) {
 			return nil, fmt.Errorf("%w（第 %d 页）", ErrLocked, p.Ordinal)
 		}
 		byStart[p.StartOffset] = p
+		byID[p.ID] = p
 	}
-	return byStart, nil
+	ordered := make([]Page, len(drafts))
+	claimed := make(map[string]bool)
+	for i, d := range drafts {
+		if d.PreviousPageID == "" {
+			continue
+		}
+		p, ok := byID[d.PreviousPageID]
+		if !ok || claimed[p.ID] || p.Text != d.Text {
+			return nil, ErrConflict
+		}
+		ordered[i] = p
+		claimed[p.ID] = true
+	}
+	for i, d := range drafts {
+		if p := byStart[d.StartOffset]; ordered[i].ID == "" && !claimed[p.ID] && sameRange(p.PageDraft, d) {
+			ordered[i] = p
+		}
+	}
+	return ordered, nil
 }
 
 func samePtrValue[T comparable](a, b *T) bool { return a == b || (a != nil && b != nil && *a == *b) }
@@ -229,7 +249,7 @@ func writeNextPage(ctx context.Context, tx *sql.Tx, s Scope, h head, ordinal int
 		_, err := tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", h.version, next, previous.ID)
 		return err
 	}
-	preserved := previous.ID != "" && previous.SourceKind == "system" && sameRange(previous.PageDraft, draft)
+	preserved := previous.ID != "" && previous.SourceKind == "system" && (sameRange(previous.PageDraft, draft) || previous.ID == draft.PreviousPageID && previous.Text == draft.Text)
 	var prior PageDraft
 	if preserved {
 		prior = previous.PageDraft
@@ -247,11 +267,14 @@ func writeNextPage(ctx context.Context, tx *sql.Tx, s Scope, h head, ordinal int
 		return err
 	}
 	sameStyle := oldStyle == style
+	if draft.PreviousPageID != "" && previous.Status == "ready" && (draft.VerifiedArtifactID == "" || previous.ActiveArtifactID != draft.VerifiedArtifactID) {
+		sameStyle = false
+	}
 	if style.HighlightReuseEnabled && style.HighlightRevision == "" && previous.VersionID != h.version {
 		sameStyle = false
 	}
 	if sameStyle && samePtrValue(prior.Layout, draft.Layout) && samePtrValue(prior.Background, draft.Background) {
-		_, err := tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,ordinal_no=?,updated_at=NOW(6) WHERE id=?", h.version, next, ordinal, previous.ID)
+		_, err := tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,ordinal_no=?,start_offset=?,end_offset=?,revision=revision+?,updated_at=NOW(6) WHERE id=?", h.version, next, ordinal, draft.StartOffset, draft.EndOffset, previous.StartOffset != draft.StartOffset, previous.ID)
 		return err
 	}
 	// A raw override can change without changing the pixels (for example
@@ -268,7 +291,7 @@ func writeNextPage(ctx context.Context, tx *sql.Tx, s Scope, h head, ordinal int
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,ordinal_no=?,layout_json=?,background_json=?,"+change+" WHERE id=?", h.version, next, ordinal, string(layout), string(background), previous.ID)
+	_, err = tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,ordinal_no=?,start_offset=?,end_offset=?,layout_json=?,background_json=?,"+change+" WHERE id=?", h.version, next, ordinal, draft.StartOffset, draft.EndOffset, string(layout), string(background), previous.ID)
 	return err
 }
 
@@ -328,7 +351,7 @@ func replacePagesTx(ctx context.Context, tx *sql.Tx, s Scope, in PaginationUpdat
 	next := h.pagination + 1
 	for i, d := range in.Pages {
 		ordinal := i + 1
-		err = writeNextPage(ctx, tx, s, h, ordinal, d, previous[d.StartOffset], oldBook, newBook)
+		err = writeNextPage(ctx, tx, s, h, ordinal, d, previous[i], oldBook, newBook)
 		if err != nil {
 			return 0, err
 		}

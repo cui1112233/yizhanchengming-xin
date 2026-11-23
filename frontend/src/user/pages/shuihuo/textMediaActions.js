@@ -29,7 +29,7 @@ export function pageChanges(base,draft,expectedRevision,expectedDocumentRevision
   return patch;
 }
 export function splitChoices(page,offsets=[]) {
-  if(!page)return [];
+  if(!page || !Array.isArray(offsets))return [];
   const chars=Array.from(page.text);
   return offsets.filter(i=>i>page.startOffset && i<page.endOffset)
     .map(offset=>({offset,label:Array.from(chars.slice(0,offset-page.startOffset).join('').trim()).slice(-35).join('')}))

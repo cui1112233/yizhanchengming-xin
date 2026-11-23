@@ -325,6 +325,20 @@ func (a textAPI) content(w http.ResponseWriter, r *http.Request, x textRequest) 
 
 // Check the immutable files before freezing their IDs. The document revision also
 // changes on page/cover replacement, so the final transaction cannot select other files.
+func (a textAPI) verifyArtifactFile(x textRequest, art txt.PageArtifact, label string) error {
+	f, err := a.files.OpenContext(x, art.StorageRef)
+	if err != nil {
+		return fmt.Errorf("%w（%s图片不可读取）", txt.ErrNotReady, label)
+	}
+	defer f.Close()
+	h := sha256.New()
+	n, err := io.Copy(h, io.LimitReader(f, art.ByteSize+1))
+	if err != nil || n != art.ByteSize || hex.EncodeToString(h.Sum(nil)) != art.SHA256 {
+		return fmt.Errorf("%w（%s图片已损坏）", txt.ErrNotReady, label)
+	}
+	return x.Err()
+}
+
 func (a textAPI) verifyCollectionFiles(x textRequest, in textInput) (txt.Document, error) {
 	d, err := a.repo.GetDocument(x, x.scope)
 	if err != nil {
@@ -349,17 +363,7 @@ func (a textAPI) verifyCollectionFiles(x textRequest, in textInput) (txt.Documen
 		if !ok {
 			return fmt.Errorf("%w（%s）", txt.ErrNotReady, label)
 		}
-		f, err := a.files.OpenContext(x, art.StorageRef)
-		if err != nil {
-			return fmt.Errorf("%w（%s图片不可读取）", txt.ErrNotReady, label)
-		}
-		defer f.Close()
-		h := sha256.New()
-		n, err := io.Copy(h, io.LimitReader(f, art.ByteSize+1))
-		if err != nil || n != art.ByteSize || hex.EncodeToString(h.Sum(nil)) != art.SHA256 {
-			return fmt.Errorf("%w（%s图片已损坏）", txt.ErrNotReady, label)
-		}
-		return x.Err()
+		return a.verifyArtifactFile(x, art, label)
 	}
 	if err := verify(d.CoverArtifactID, "封面"); err != nil {
 		return d, err

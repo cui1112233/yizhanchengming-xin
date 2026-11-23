@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createTextCollection, getTextCollection, listTextCollections, listTextPages, prepareTextBook } from '../../../shared/api/batchFactoryText.js';
 import * as api from '../../../shared/api/batchFactoryText.js';
 import { getBatch, saveBookOverride } from '../../../shared/api/batchFactoryV12.js';
@@ -62,7 +62,7 @@ function CandidateList({ items, selectedId, activeId, onSelect }) {
     </button>)}</div> : <p>暂无成品图</p>}</section>;
 }
 
-function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved, onClose, onUpload }) {
+function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved, onClose, onUpload, closeGuard }) {
   const [refresh, setRefresh] = useState(0);
   const [tab, setTab] = useState('pages');
   const [pageId, setPageId] = useState(initialPageId);
@@ -78,6 +78,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
   const [end,setEnd]=useState(null);
   const [split,setSplit]=useState('');
   const actionLock=useRef(false);
+  const backgroundUploading=useRef(false);
   const [savedSettings,setSavedSettings]=useState(null);
   const bookSettings=savedSettings?.revision>=book.revision?savedSettings:{revision:book.revision,patch:book.settingsState?.patch};
   const live=useDraftPreview(batchId,book.id,session);
@@ -117,6 +118,10 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
     setSession(null);return true;
   };
   const move = (newId) => { if(!discard())return false;setPageId(newId); selectCandidate('');setSplit('');return true; };
+  function requestClose() {
+    if(!actionLock.current && !backgroundUploading.current && discard())onClose?.();
+  }
+  useImperativeHandle(closeGuard,()=>requestClose);
   const cover=tab==='cover';
   const locked=cover?doc?.coverLocked:page?.locked;
   const targetRevision=cover?doc?.revision:page?.revision;
@@ -176,16 +181,19 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
       const result=await api.patchTextPage(batchId,book.id,session.id,payload);
       if(result.pages?.[pageIndex])setPageId(result.pages[pageIndex].id);
       setSession(null);selectCandidate('');
-      const updated=result.pages?.slice(pageIndex,pageIndex+1+result.pages.length-pages.length) || [result];
+      const updated=Array.isArray(result.affectedPageIds)?result.pages.filter(p=>result.affectedPageIds.includes(p.id)):
+        result.pages?.filter(p=>!p.locked && p.status!=='ready') || [result];
       await renderUpdated(updated);
     }
   }
   async function renderUpdated(updated) {
+    const failures=[];
     for (const item of updated) {
       if(!item.revision || !item.id || item.locked || item.status==='ready')continue;
       try {await api.renderTextPage(batchId,book.id,item.id,{expectedRevision:item.revision});}
-      catch(e){throw Error('排版已保存，第 '+item.ordinal+' 页生成失败：'+e.message);}
+      catch(e){failures.push('第 '+item.ordinal+' 页：'+e.message);}
     }
+    if(failures.length)throw Error('排版已保存，以下页面需重新生成：'+failures.join('；'));
   }
   async function applyBookBackground() {
     const result=await saveBookPatch({textBackground:session.draft.background});
@@ -233,7 +241,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
       {(live.error||live.warning) && <div className="text-preview-note" role="status">{live.error||live.warning}</div>}</section>
     <aside className="text-media-tools">
       <header><div><small>媒体库 · 文本</small><h3>{title}</h3></div>
-        <button type="button" aria-label="关闭文本媒体库" disabled={!!busy} onClick={()=>{if(discard())onClose?.();}}>×</button>
+        <button type="button" aria-label="关闭文本媒体库" disabled={!!busy} onClick={requestClose}>×</button>
         <div className="text-media-progress"><span>完成度 {completion.ready} / {completion.total} 页</span><progress max="100" value={completion.percent}/></div>
       </header>
       <nav role="tablist" aria-label="文本媒体视图">{tabs.map(([key,label]) =>
@@ -262,7 +270,7 @@ function TextBookLibrary({ batchId, book, settings = {}, initialPageId, onSaved,
               <button type="button" disabled={!!busy || !pages[pageIndex+1] || pages[pageIndex+1].locked} onClick={()=>changePages(true)}>与下一页合并</button>
             </>}
           </section>}
-          {session && <TextPageEditor key={session.id} session={session} fonts={snapshot.fonts} batchId={batchId} bookId={book.id} busy={!!busy} stale={stale} impact={impact}
+          {session && <TextPageEditor key={session.id} session={session} fonts={snapshot.fonts} batchId={batchId} bookId={book.id} busy={!!busy} stale={stale} impact={impact} onUploading={value=>{backgroundUploading.current=value;}}
             onDraft={fn=>setSession(s=>s?.id===session.id?{...s,draft:fn(s.draft)}:s)} onCancel={discard}
             onSave={()=>run('save',saveEdit)} onApplyBackground={()=>run('background',applyBookBackground)}/>}
           {!loading && !error && !session && <button type="button" disabled={!!busy} onClick={()=>run('prepare',()=>prepareTextBook(batchId,book.id,doc?{expectedRevision:doc.revision}:{}))}>{doc?'更新文字页':'准备文字页'}</button>}

@@ -614,6 +614,10 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	set("sensitiveMode", "off")
 	call("POST", "prepare", map[string]any{}, 200)
 	assertText("开犬尾。")
+	var single struct{ SentenceBreaks []int }
+	if err := json.Unmarshal(call("GET", "pages", nil, 200).Body.Bytes(), &single); err != nil || single.SentenceBreaks == nil || len(single.SentenceBreaks) != 0 {
+		t.Fatal("single sentence must return an empty JSON array")
+	}
 	// A local reflow rolls back the author change and page version together when it would move a locked page.
 	{
 		const prefix, middle, suffix = "首段。", "中段。", "尾段。"
@@ -645,8 +649,15 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 			t.Fatal("locked edit did not roll back")
 		}
 		call("POST", "pages/"+after.Pages[2].ID+"/restore", map[string]any{"expectedRevision": after.Pages[2].Revision}, 200)
+		tail := get().Pages[2]
+		call("POST", "pages/"+tail.ID+"/render", map[string]any{"expectedRevision": tail.Revision}, 201)
+		tail = get().Pages[2]
 		apply(200)
 		after = get()
+		retainedTail := after.Pages[len(after.Pages)-1]
+		if retainedTail.ID != tail.ID || retainedTail.ActiveArtifactID != tail.ActiveArtifactID || retainedTail.StartOffset <= tail.StartOffset || retainedTail.Status != "ready" {
+			t.Fatal("unchanged downstream system image lost on offset change")
+		}
 		if len(after.Pages) <= 3 || after.Pages[0].ActiveArtifactID != before.Pages[0].ActiveArtifactID || after.Pages[0].ID != before.Pages[0].ID || after.Pages[len(after.Pages)-1].Text != suffix {
 			t.Fatal("scoped reflow lost another page")
 		}
@@ -667,6 +678,57 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 		call("PATCH", "pages/"+p.ID, paint, 200)
 		if get().Document.PaginationVersion != after.Document.PaginationVersion {
 			t.Fatal("paint-only edit changed pagination")
+		}
+		// Changing the length of the first page shifts every later rune interval.
+		// Render two independent system images before moving them both.
+		first := get().Pages[0]
+		call("POST", "pages/"+first.ID+"/restore", map[string]any{"expectedRevision": first.Revision}, 200)
+		for _, p := range get().Pages[:2] {
+			call("POST", "pages/"+p.ID+"/render", map[string]any{"expectedRevision": p.Revision}, 201)
+		}
+		old := get()
+		saveFirst := func(text string, fontSize int) ([]batchfactorytext.Page, []string) {
+			cur := get()
+			p := cur.Pages[0]
+			mutation := map[string]any{"text": text, "reflow": true, "expectedRevision": p.Revision, "expectedDocumentRevision": cur.Document.Revision, "layout": map[string]int{"fontSize": fontSize}}
+			response := decodeBody[struct {
+				Pages           []batchfactorytext.Page
+				AffectedPageIds []string
+			}](t, call("PATCH", "pages/"+p.ID, mutation, 200))
+			return response.Pages, response.AffectedPageIds
+		}
+		const longer = "现在是一个更长的开头。"
+		shifted, affected := saveFirst(longer, 44)
+		if len(affected) != 1 || affected[0] != shifted[0].ID || shifted[0].ActiveArtifactID != "" {
+			t.Fatalf("invalidated pages %v", affected)
+		}
+		for _, i := range []int{1, len(shifted) - 1} {
+			if shifted[i].ID != old.Pages[i].ID || shifted[i].ActiveArtifactID != old.Pages[i].ActiveArtifactID || shifted[i].Status != "ready" || shifted[i].StartOffset <= old.Pages[i].StartOffset {
+				t.Fatal("unchanged ready page lost after first-page edit")
+			}
+		}
+		// An image whose persisted bytes changed cannot be silently reused.
+		arts, err := repo.ListArtifacts(context.Background(), scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tailID := shifted[len(shifted)-1].ActiveArtifactID
+		for _, art := range arts {
+			if art.ID != tailID {
+				continue
+			}
+			path, err := files.LocalPath(art.StorageRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(path, []byte("corrupt"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		call("POST", "pages/"+shifted[0].ID+"/render", map[string]any{"expectedRevision": shifted[0].Revision}, 201)
+		redraw, affected := saveFirst(longer, 68)
+		if len(affected) != 2 || affected[0] != redraw[0].ID || affected[1] != shifted[len(shifted)-1].ID || redraw[len(redraw)-1].ActiveArtifactID != "" || redraw[1].Status != "ready" {
+			t.Fatalf("incorrect invalidation after hash mismatch: %v", affected)
 		}
 	}
 	// Frozen collections still resolve the original image after a replacement.

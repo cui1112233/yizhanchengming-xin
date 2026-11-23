@@ -11,7 +11,7 @@ import { batchFactoryProjectsFrom } from './batchFactoryProjects.js';
 test('项目和书目将文本交给文字媒体库', () => {
   assert.equal(batchFactoryProjectsFrom([{id:'b',productionMode:'text'}])[0].factoryMode, 'text');
   const list = readFileSync(new URL('./BatchFactoryNovelList.jsx', import.meta.url), 'utf8');
-  assert.match(list, /mediaMode === 'text' \? <TextMediaPanel\b/);
+  assert.match(list, /mediaMode === 'text' \? <TextMediaDialog\b/);
   assert.match(list, /mediaMode === 'comic' \? <ComicMediaPanel/);
   const library = readFileSync(new URL('./ProjectsView.jsx', import.meta.url), 'utf8');
   assert.match(library, /project.factoryMode === 'text'.*<AuthenticatedTextPageImage/);
@@ -27,15 +27,15 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
     const result = await build({stdin:{resolveDir:fileURLToPath(new URL('.',import.meta.url)),loader:'jsx',contents:`
       import React from 'react';
       import { createRoot } from 'react-dom/client';
-      import TextMediaPanel from './TextMediaPanel.jsx';
+      import TextMediaDialog from './TextMediaDialog.jsx';
       const root = createRoot(document.getElementById('root'));
       const sleep = t=>new Promise(r=>setTimeout(r,t));
       async function until(f){for(let i=0;i<300;i++){if(f())return;await sleep(20)}throw Error(document.body.innerText)}
       let reads=0, rendering=true,requests=[],previewBodies=[],saved,aborted=false,restores=0,locked=false,coverLocked=false;
       const mutations=[];
-      let confirmRestore=false;
+      let confirmRestore=false, confirmCount=0, releaseSave, single=true;
       let bookRevision=7, bookWrites=0, ready=false, collection, publishes=0;
-      window.confirm=()=>confirmRestore;
+      window.confirm=()=>{confirmCount++;return confirmRestore};
       window.fetch=async(path,opts)=>{
         requests.push([path,opts.method]); if(opts.method==='POST')mutations.push([path,opts.body]);
         let items=[];
@@ -45,7 +45,8 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
           if(body.text==='较慢的草稿。') return new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>{aborted=true;reject(new DOMException('取消','AbortError'))},{once:true}));
           if(body.text==='太长的草稿。')return new Response('{"error":"文字超出页面"}',{status:400});
           return new Response(new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],{type:'image/png'}),{headers:{'X-Text-Contrast':'low'}});
-        }else if(opts.method==='PATCH'){saved=JSON.parse(opts.body);items={pages:[{id:'p1',revision:2},{id:'p2',revision:4,ordinal:2,status:'pending'}]};}
+        }else if(opts.method==='PATCH'){saved=JSON.parse(opts.body);await new Promise(resolve=>{releaseSave=resolve});
+          items={affectedPageIds:['p2','downstream'],pages:[{id:'p1',revision:2},{id:'p2',revision:4,ordinal:2,status:'pending'},{id:'downstream',revision:5,ordinal:3,status:'pending'}]};}
         else if(opts.method==='PUT'){
           const data=JSON.parse(opts.body);if(data.expectedRevision!==bookRevision || data.patch.textBackground?.kind!=='color')throw Error('整书背景版本错误');
           bookWrites++;items={revision:++bookRevision,patch:data.patch};
@@ -66,6 +67,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
               items.artifacts.push({id:p.activeArtifactId,pageId:p.id,kind:'page',sourceKind:'system',renderVersion:1});
             }
           }
+          if(single){items.sentenceBreaks=reads===1?null:[];items.pages=[{...items.pages[0],text:'只有一句。',status:'pending',endOffset:5}]}
         }else if(path.endsWith('text-collections')){
           if(opts.method==='POST'){
             const data=JSON.parse(opts.body);
@@ -77,13 +79,18 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
       };
       const button=(label)=>Array.from(document.querySelectorAll('button')).find(b=>b.getAttribute('aria-label')===label||b.textContent.trim()===label);
       async function run(){
-        root.render(<TextMediaPanel batchId="a" book={{id:'b',title:'测试书',revision:7}} onUpload={()=>{publishes++;collection.status='uploaded'}} onClose={()=>root.unmount()} />);
+        root.render(<TextMediaDialog batchId="a" book={{id:'b',title:'测试书',revision:7}} onUpload={()=>{publishes++;collection.status='uploaded'}} onClose={()=>root.unmount()} />);
+        await until(()=>document.body.innerText.includes('只有一句。'));
+        if(!button('在完整句子后拆页').disabled)throw Error('单句页仍能拆分');
+        button('更新文字页').click();await until(()=>reads>=2&&!button('更新文字页').disabled);
+        if(!button('在完整句子后拆页').disabled)throw Error('空句末列表仍可拆分');
+        single=false;button('更新文字页').click();
         await until(()=>document.body.innerText.includes('第一段完整。'));
         for(const label of ['本页背景','页面内容','封面','文字页','文本合集','展开','合成当前书','上传网络'])if(!document.body.innerText.includes(label))throw Error('缺少 '+label);
         if(!button('合成当前书').disabled)throw Error('缺封面时未禁用合成');
         button('下一页').click();
         await until(()=>document.body.innerText.includes('第二段完整。'));
-        rendering=false;await until(()=>reads>=2);
+        const beforePoll=reads;rendering=false;await until(()=>reads>beforePoll);
         if(!document.body.innerText.includes('第二段完整。'))throw Error('刷新后丢失当前页');
         const n=reads;await sleep(4500);if(reads!==n)throw Error('无生成中页面仍在轮询');
         const edit=button('排版调整');if(!edit)throw Error('缺少当前页排版调整');
@@ -98,15 +105,27 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         change('太长的草稿。'); await until(()=>document.body.innerText.includes('文字超出页面'));
         if(document.querySelector('img[alt="排版预览"]').src!==last)throw Error('预览失败丢失上一张图');
         change('最终手改。'); await until(()=>previewBodies.some(p=>p.text==='最终手改。'));
-        button('保存本页').click();await until(()=>saved && !area());
+        const esc=()=>document.querySelector('.ant-modal-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',keyCode:27,bubbles:true}));
+        const mask=()=>document.querySelector('.ant-modal-wrap').click();
+        const close=()=>button('关闭文本媒体库').click();
+        for(const request of [esc,mask,close]){
+          const n=confirmCount;request();await sleep(35);
+          if(confirmCount!==n+1 || area()?.value!=='最终手改。')throw Error('未保存关闭保护失效');
+        }
+        button('保存本页').click();await until(()=>releaseSave);
+        const nDuringSave=confirmCount;confirmRestore=true;
+        for(const request of [esc,mask,close]){request();await sleep(35);}
+        if(confirmCount!==nDuringSave || !area())throw Error('保存中仍可关闭');
+        confirmRestore=false;releaseSave();await until(()=>saved && !area());
         if(saved.text!=='最终手改。'||saved.expectedRevision!==3||saved.expectedDocumentRevision!==4||saved.reflow!==true)throw Error('保存未带草稿、局部分页和两个版本号');
         await until(()=>mutations.some(([path,b])=>path.endsWith('/p2/render')&&JSON.parse(b).expectedRevision===4));
+        await until(()=>mutations.some(([path,b])=>path.endsWith('/downstream/render')&&JSON.parse(b).expectedRevision===5));
         for(let i=0;i<2;i++){
           button('排版调整').click();await until(area);
           button('背景应用到整本书').click();await until(()=>!area());
         }
         const prep=mutations.filter(([path])=>path.endsWith('text-prepare'));
-        if(prep.length!==2||bookWrites!==2||prep.some(([,b])=>JSON.parse(b).reflow))throw Error('整书背景触发错误分页');
+        if(prep.length!==4||bookWrites!==2||prep.some(([,b])=>JSON.parse(b).reflow))throw Error('整书背景触发错误分页');
         const upload=label=>{
           const input=document.querySelector('input[type=file][aria-label="'+label+'"]');if(!input)throw Error('缺少'+label);
           const transfer=new DataTransfer();transfer.items.add(new File(['test'],'用户成品.png',{type:'image/png'}));
@@ -134,7 +153,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
         confirmRestore=false;button('再次上传').click();await sleep(50);if(publishes!==1)throw Error('取消后重复上传');
         confirmRestore=true;await until(()=>!button('再次上传').disabled);button('再次上传').click();await sleep(100);
         await until(()=>publishes===2&&!button('关闭文本媒体库').disabled);
-        button('关闭文本媒体库').click();await until(()=>!document.getElementById('root').children.length);
+        esc();await until(()=>!document.querySelector('.text-media-panel'));
         if(requests.some(([url,m])=>m!=='PUT'&&!url.includes('/text-')&&!url.includes('/client-errors')))throw Error('文本库请求了其他模式接口');
         document.body.dataset.result='passed'
       }run().catch(e=>document.body.dataset.error=e.message+'（上传 '+publishes+' 次）');
@@ -143,7 +162,7 @@ test('媒体库标签、翻页、刷新保留选中页，仅在生成中轮询',
     const html=join(dir,'index.html');
     writeFileSync(html,'<meta charset="utf-8"><div id="root"></div><script src="app.js"></script>');
     const dom=execFileSync(browser,['--headless=new','--disable-gpu','--no-first-run','--disable-background-networking',
-      '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=16000',
+      '--host-resolver-rules=MAP * ~NOTFOUND','--user-data-dir='+join(dir,'profile'),'--virtual-time-budget=24000',
       '--dump-dom',pathToFileURL(html).href],{timeout:45000,windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','pipe']});
     assert.ok(dom.includes('data-result="passed"'), dom.match(/data-error="([^"]*)"/)?.[1] || '浏览器未完成验证');
   } finally { rmSync(dir,{recursive:true,force:true,maxRetries:4,retryDelay:150}); }

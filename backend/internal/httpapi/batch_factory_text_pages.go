@@ -314,9 +314,13 @@ func textLayoutError(err error) error {
 	return fmt.Errorf("%w：%v", txt.ErrInvalid, err)
 }
 func (a textAPI) list(w http.ResponseWriter, _ *http.Request, x textRequest) error {
+	return a.listAfterEdit(w, x, nil, "")
+}
+
+func (a textAPI) listAfterEdit(w http.ResponseWriter, x textRequest, previous []txt.Page, editedID string) error {
 	d, err := a.repo.GetDocument(x, x.scope)
 	if errors.Is(err, txt.ErrNotFound) {
-		writeJSON(w, 200, map[string]any{"document": nil, "pages": []txt.Page{}, "artifacts": []textMediaView{}, "fonts": renderfont.Catalog()})
+		writeJSON(w, 200, map[string]any{"document": nil, "sentenceBreaks": []int{}, "pages": []txt.Page{}, "artifacts": []textMediaView{}, "fonts": renderfont.Catalog()})
 		return nil
 	}
 	if err != nil {
@@ -335,14 +339,14 @@ func (a textAPI) list(w http.ResponseWriter, _ *http.Request, x textRequest) err
 		views = append(views, artifactView(x, a))
 	}
 	var version *txt.Version
-	var breaks []int
+	breaks := []int{}
 	if d.ActiveVersionID != "" {
 		v, err := a.repo.GetVersion(x, x.scope, d.ActiveVersionID)
 		if err != nil {
 			return err
 		}
 		version = &v
-		breaks = txt.SentenceBreaks(v.ProductionText)
+		breaks = append(breaks, txt.SentenceBreaks(v.ProductionText)...)
 	}
 	latest, err := a.repo.GetDocument(x, x.scope)
 	if err != nil {
@@ -351,7 +355,22 @@ func (a textAPI) list(w http.ResponseWriter, _ *http.Request, x textRequest) err
 	if d.Revision != latest.Revision {
 		return txt.ErrConflict
 	}
-	writeJSON(w, 200, map[string]any{"document": d, "version": version, "sentenceBreaks": breaks, "pages": ps, "artifacts": views, "fonts": renderfont.Catalog()})
+	result := map[string]any{"document": d, "version": version, "sentenceBreaks": breaks, "pages": ps, "artifacts": views, "fonts": renderfont.Catalog()}
+	if previous != nil {
+		before := make(map[string]txt.Page, len(previous))
+		for _, p := range previous {
+			before[p.ID] = p
+		}
+		affected := []string{}
+		for _, p := range ps {
+			old, exists := before[p.ID]
+			if !p.Locked && p.Status != "ready" && (!exists || p.ID == editedID || old.Status == "ready" || old.ActiveArtifactID != "") {
+				affected = append(affected, p.ID)
+			}
+		}
+		result["affectedPageIds"] = affected
+	}
+	writeJSON(w, 200, result)
 	return nil
 }
 func (a textAPI) page(x textRequest, id string) (txt.Page, error) {

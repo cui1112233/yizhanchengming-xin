@@ -29,7 +29,7 @@ export function useDraftPreview(batchId,bookId,session) {
   return key && view.key===key ? view : {};
 }
 
-export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackground,busy,stale,impact,fonts,batchId,bookId}) {
+export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackground,onUploading,busy,stale,impact,fonts,batchId,bookId}) {
   const {draft,cover}=session;
   const [items,setItems]=useState([]);
   const [bgError,setBgError]=useState('');
@@ -46,12 +46,12 @@ export function TextPageEditor({session,onDraft,onSave,onCancel,onApplyBackgroun
   const setBackground=background=>onDraft(old=>({...old,background}));
   const upload=async(file)=>{
     if(!file)return;
-    setFileBusy(true);setBgError('');
+    onUploading(true);setFileBusy(true);setBgError('');
     try {
       const bg=await api.uploadTextBackground(batchId,bookId,file);
       setItems(list=>[bg,...list.filter(v=>v.id!==bg.id)]);
       setBackground({kind:'library',id:bg.id});
-    } catch(e){setBgError(e.message);} finally{setFileBusy(false);}
+    } catch(e){setBgError(e.message);} finally{onUploading(false);setFileBusy(false);}
   };
   return <fieldset className="text-page-editor" disabled={busy || fileBusy}>
     <legend>{cover?'封面排版':'排版调整'}</legend>

@@ -29,6 +29,7 @@ test('文字页编辑动作携带两级版本和绝对句末位置',async () => 
   assert.equal(base.layout.padding,0);
   assert.deepEqual(pageChanges(base,{...base,text:'甲😀。改了。'},2,4),{expectedRevision:2,expectedDocumentRevision:4,text:'甲😀。改了。'});
   assert.deepEqual(splitChoices(page,[3,8,11,14,20]),[{offset:11,label:'甲😀。'}]);
+  assert.deepEqual(splitChoices(page,null),[]);
   assert.equal(uploadLabel({id:'c',status:'uploaded'}),'再次上传');
   assert.equal(uploadLabel({id:'c',status:'ready'}),'上传网络');
 });
