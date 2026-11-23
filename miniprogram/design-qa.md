@@ -59,6 +59,48 @@ final result: passed
 
 ---
 
+# 任务中心 Design QA
+
+- source visual truth: `F:/脚本测试/一战晟铭-v88/docs/design-references/miniprogram-functions-first/03-tasks.png`
+- implementation screenshot: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-tasks-implementation.png`
+- normalized reference: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-tasks-reference.png`
+- side-by-side comparison: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-tasks-comparison.png`
+- viewport: WeChat Developer Tools, iPhone 15 simulator, `363 x 783` desktop-stage crop
+- state: 已登录、批量工厂返回 6 条真实记录、Agent 来源未同步、三类统计均为服务端真实的 0
+
+## Findings
+
+本轮没有剩余 P0、P1 或 P2 差异。
+
+- 顶部、统计栏、筛选栏和任务行均按 852px 参考稿折算到约 390px 手机宽度，不再直接照搬大画布固定尺寸。
+- 一屏可见 6 条真实任务，任务行 76px、筛选栏 42px、统计栏 72px，内容密度接近参考稿。
+- 双龙插画使用独立透明素材，文字、按钮和任务列表仍是可交互原生组件，不是整张截图。
+- 当前 6 条记录都来自批量工厂，因此使用同一批量测书图标；没有为了模仿参考图伪造成不同任务类型。
+- 服务端未返回可识别状态时显示“状态同步中”，没有伪造参考稿里的进度、完成或失败结果。
+
+## Runtime and regression history
+
+1. P0 黑屏：动态玻璃画布的层级覆盖了任务内容；任务头部和主体增加明确层级后，微信运行时恢复显示。
+2. P2 尺寸偏大：统计栏从 106px 缩到 72px，筛选栏从 52px 缩到 42px，任务行从 102px 缩到 76px。
+3. P2 统计图标像白色药丸：把渐变底座与图标图片拆成两个组件，恢复参考稿的独立发光图标结构。
+4. P2 顶部缺插画：接入双龙透明插画并用裁切容器控制手机端可视占比。
+5. 微信开发者工具最终页为 `pages/tasks/index`，页面显示真实任务与真实部分来源异常，没有业务代码错误。
+
+## Required fidelity surfaces
+
+- Typography: 主标题 27px、任务标题 14px、辅助信息 10px；没有再次放大成桌面比例。
+- Spacing: 页面左右 13px，主体间距 10px，列表采用单一连续玻璃面板。
+- Status: 三项计数、四项筛选、进度条和状态均由真实字段驱动；无效 total 不显示进度。
+- Navigation: 底部保持“功能、工作台、任务、我的”四项，任务为第三项高亮。
+
+## Follow-up polish
+
+- P3：真实运行态多了一张 Agent 未同步提示卡，参考稿没有该异常状态；这是有用的真实错误信息，不隐藏也不伪装成功。
+
+final result: passed
+
+---
+
 # 工作台执行中心 Design QA
 
 - source visual truth: `F:/脚本测试/一战晟铭-v88/docs/design-references/miniprogram-functions-first/02-workbench.png`
