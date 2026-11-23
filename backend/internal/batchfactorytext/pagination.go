@@ -194,20 +194,56 @@ func paragraphEnd(text []rune, start int) int {
 
 // Straight quotes use the same character on both sides. Follow their state
 // across sentences and paragraphs, ignoring apostrophes inside English words.
-type straightQuotes struct{ single, double bool }
+type straightQuotes struct {
+	single, double bool
+	nextSingle     int // cached lookahead shared by consecutive possessives
+}
+
+func insideEnglishWord(text []rune, i int) bool {
+	return i > 0 && i+1 < len(text) && unicode.In(text[i-1], unicode.Latin) && unicode.In(text[i+1], unicode.Latin)
+}
+
+// An s-apostrophe followed by a separated word can be a possessive, even
+// inside quoted speech: 'James' cat.' A quote around a word ending in s
+// is also possible: 'James' left. Inspect the next standalone quote.
+func beforePossessedWord(text []rune, i int) bool {
+	if i == 0 || (text[i-1] != 's' && text[i-1] != 'S') {
+		return false
+	}
+	j := i + 1
+	for j < len(text) && text[j] != '\n' && unicode.IsSpace(text[j]) {
+		j++
+	}
+	return j > i+1 && j < len(text) && (unicode.In(text[j], unicode.Latin) || unicode.IsDigit(text[j]))
+}
+
+func (q *straightQuotes) hasSingleCloserAhead(text []rune, i int) bool {
+	if q.nextSingle <= i {
+		q.nextSingle = len(text)
+		for j := i + 1; j < len(text); j++ {
+			if text[j] == '\'' && !insideEnglishWord(text, j) && !beforePossessedWord(text, j) {
+				q.nextSingle = j
+				break
+			}
+		}
+	}
+	j := q.nextSingle
+	return j < len(text) && !unicode.IsSpace(text[j-1]) && !strings.ContainsRune("“‘「『（([", text[j-1])
+}
 
 func (q *straightQuotes) state(text []rune, i int) *bool {
 	switch text[i] {
 	case '"':
 		return &q.double
 	case '\'':
-		if i > 0 && unicode.In(text[i-1], unicode.Latin) {
-			if i+1 < len(text) && unicode.In(text[i+1], unicode.Latin) {
-				return nil // don't, O'Neil
-			}
-			if !q.single && (text[i-1] == 's' || text[i-1] == 'S') {
-				return nil // James' cat outside quoted speech
-			}
+		if insideEnglishWord(text, i) {
+			return nil // don't, O'Neil
+		}
+		if !q.single && i > 0 && (text[i-1] == 's' || text[i-1] == 'S') {
+			return nil // predicative possessive, e.g. "it's the dogs'."
+		}
+		if beforePossessedWord(text, i) && q.hasSingleCloserAhead(text, i) {
+			return nil
 		}
 		return &q.single
 	default:
