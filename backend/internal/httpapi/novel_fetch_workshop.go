@@ -21,6 +21,7 @@ import (
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/safehttp"
 	"qiantie/backend/internal/videomanagementconnector"
 )
@@ -2055,9 +2056,7 @@ func escapeRawControlCharsInJSON(raw string) string {
 	return builder.String()
 }
 
-// 与批量原文改文系统源码保持一致的敏感词系统提示。
-const sensitiveRepairSystemPrompt = "你是内容合规改写助手。只改写用户给出的命中片段，保持原意，去掉违规、擦边、色情、低俗表达。"
-
+// 与批量原文改文系统源码保持一致的整组敏感词系统提示。
 const sensitiveGroupRepairSystemPrompt = "你是内容合规改写助手。请批量处理用户给出的敏感词命中片段。" +
 	"每条只改写对应 snippet，不要增加新剧情，不要改变人物关系和原意。" +
 	"必须只返回 JSON，不要解释。"
@@ -2323,7 +2322,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		} else {
 			for attempts < maxAttempts {
 				attempts++
-				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: sensitiveRepairSystemPrompt, UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: prompt.BatchFactorySensitiveSystemPrompt(), UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
 				output = strings.TrimSpace(output)
 				if lastErr != nil {
 					// 服务不可用时立即停止，避免同一故障连续烧掉全部重试次数。

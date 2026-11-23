@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 )
 
 func TestNovelFetchWorkshopGenerateAIRouteUsesGoProvider(t *testing.T) {
@@ -64,6 +65,9 @@ func TestApplySensitiveAIRepairRecordsExecutionAndReplacesHit(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
 		if request.UserPrompt == "" {
 			t.Fatal("sensitive repair prompt is empty")
+		}
+		if want := prompt.BatchFactorySensitiveSystemPrompt(); request.SystemPrompt != want {
+			t.Fatalf("sensitive repair system prompt = %q, want %q", request.SystemPrompt, want)
 		}
 		return "他说关系越界了", nil
 	})
