@@ -207,23 +207,26 @@ const textStageCopy = {
   text_publish: { pending: '等待上传', failed: '上传失败', completed: '已上传' }
 };
 
-function textReceiptMatchesRun(record, run, runs) {
-  if (!run) return true;
-  const runKey = run.requestKey || run.requestId;
-  const receiptKey = record.requestKey || record.requestId;
-  const identities = [
-    [runKey, receiptKey],
+function compareTextPublishIdentifiers(record, run) {
+  return [
+    [run.requestKey || run.requestId, record.requestKey || record.requestId],
     [run.id, record.runId],
     [run.attempt, record.attempt]
-  ].filter(([left, right]) => left && right);
-  if (identities.length) return identities.every(([left, right]) => String(left) === String(right));
+  ].filter(([left, right]) => left && right).map(([left, right]) => String(left) === String(right));
+}
+
+function textReceiptMatchesRun(record, run, runs) {
+  if (!run) return true;
+  const previous = runs.filter(other => other !== run && other.stage === 'text_publish');
+  if (previous.some(other => compareTextPublishIdentifiers(record, other).includes(true))) return false;
+  const identities = compareTextPublishIdentifiers(record, run);
+  if (identities.length) return identities.every(Boolean);
+  if (previous.length || run.requestKey || run.requestId || run.id || run.attempt) return false;
+  // 只有唯一一条无编号的旧上传记录可以按回执时间判断。
   const started = Date.parse(run.createdAt || run.startedAt || run.updatedAt);
   const received = Date.parse(record.publishedAt || record.createdAt);
   if (Number.isFinite(started) && Number.isFinite(received)) return received > started;
-  // 旧版无关联字段的摘要仅在首次上传阶段已成功时沿用成功回执。
-  return taskState(run) === 'succeeded' && !runKey && !run.id
-    && !(Number(run.attempt) > 1) && !Number.isFinite(started)
-    && !runs.some(other => other !== run && other.stage === 'text_publish' && taskState(other) === 'succeeded');
+  return taskState(run) === 'succeeded' && !Number.isFinite(started);
 }
 
 function textBookTimeline(book, summary) {

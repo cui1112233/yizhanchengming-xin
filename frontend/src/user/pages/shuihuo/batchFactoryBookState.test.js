@@ -29,8 +29,8 @@ test('text timeline follows each backend attempt and displays the stage outcome'
     assert.equal(current().status, 'failed');
     assert.equal(current().label, failed);
     assert.equal(current().detail, '本次任务失败');
-    runs.push({ stage, status: 'succeeded' });
-    if (stage === 'text_publish') summary.textPublishRecord = verifiedTextPublish;
+    runs.push({ stage, status: 'succeeded', attempt: 2 });
+    if (stage === 'text_publish') summary.textPublishRecord = { ...verifiedTextPublish, attempt: 2 };
     assert.equal(current().status, 'completed');
     assert.equal(current().label, completed);
   }
@@ -90,13 +90,13 @@ test('a previous text receipt preserves republish eligibility while the new atte
   assert.equal(progress().completionPercent, 100);
 });
 
-test('text receipt comparison uses attempt identity or publication time when a request key is missing', () => {
+test('an identified text upload attempt requires a matching receipt identity', () => {
   const run = { stage: 'text_publish', status: 'running', attempt: 2, createdAt: '2026-11-24T11:00:00Z' };
   const stageSummary = { runs: [run] };
   const state = () => batchFactoryBookState({ id: 'book' }, { productionMode: 'text', stageSummary });
   for (const [fields, terminal] of [
     [{ attempt: 1 }, false], [{ attempt: 2 }, true],
-    [{ publishedAt: '2026-11-24T10:59:00Z' }, false], [{ publishedAt: '2026-11-24T11:01:00Z' }, true],
+    [{ publishedAt: '2026-11-24T10:59:00Z' }, false], [{ publishedAt: '2026-11-24T11:01:00Z' }, false],
     [{}, false]
   ]) {
     stageSummary.textPublishRecord = { ...verifiedTextPublish, ...fields };
@@ -109,6 +109,46 @@ test('text receipt comparison uses attempt identity or publication time when a r
     { stage: 'text_publish', status: 'succeeded' }
   ];
   assert.equal(state().terminal, false);
+});
+
+test('late anonymous and historical receipts preserve the failed republish and its error', () => {
+  const book = { id: 'book' };
+  const previous = { stage: 'text_publish', status: 'failed', errorMessage: '首次请求超时', id: 'old-run', createdAt: '2026-11-24T10:00:00Z' };
+  const current = { stage: 'text_publish', status: 'failed', errorMessage: '本次上传失败', createdAt: '2026-11-24T11:00:00Z' };
+  const stageSummary = { runs: [previous, current] };
+  const runtime = { productionMode: 'text', stageSummary };
+  const checkFailed = () => {
+    assert.equal(batchFactoryBookTimeline(book, runtime).at(-1).status, 'failed');
+    const state = batchFactoryBookState(book, runtime);
+    assert.equal(state.published, true);
+    assert.equal(state.terminal, false);
+    assert.equal(state.detail, '本次上传失败');
+    assert.equal(batchFactoryBatchProgress([book], runtime).completionPercent, 0);
+  };
+  stageSummary.textPublishRecord = { ...verifiedTextPublish, publishedAt: '2026-11-24T12:00:00Z' };
+  checkFailed();
+  current.requestId = 'retry';
+  stageSummary.textPublishRecord.runId = 'old-run';
+  checkFailed();
+  stageSummary.textPublishRecord.requestKey = 'retry';
+  checkFailed();
+  delete stageSummary.textPublishRecord.runId;
+  assert.equal(batchFactoryBookState(book, runtime).label, '已上传');
+});
+
+test('a single legacy publish attempt can use a later book receipt timestamp', () => {
+  const stageSummary = {
+    runs: [
+      { stage: 'text_render', status: 'succeeded' },
+      { stage: 'text_publish', status: 'running', createdAt: '2026-11-24T11:00:00Z' }
+    ],
+    textPublishRecord: { ...verifiedTextPublish, publishedAt: '2026-11-24T10:00:00Z' }
+  };
+  const state = () => batchFactoryBookState({ id: 'book' }, { productionMode: 'text', stageSummary });
+  assert.equal(state().terminal, false);
+  stageSummary.textPublishRecord.publishedAt = '2026-11-24T12:00:00Z';
+  assert.equal(state().label, '已上传');
+  assert.equal(state().terminal, true);
 });
 
 test('a ready text collection is terminal only for a non-submit job and remains distinct from an upload', () => {
