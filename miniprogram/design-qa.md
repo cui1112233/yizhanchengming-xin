@@ -56,3 +56,45 @@
 - P3：实现图的主插画青色轮廓光略亮于参考图；不影响文字可读性、结构或操作，本轮保留。
 
 final result: passed
+
+---
+
+# 工作台执行中心 Design QA
+
+- source visual truth: `F:/脚本测试/一战晟铭-v88/docs/design-references/miniprogram-functions-first/02-workbench.png`
+- implementation screenshot: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-workbench-implementation.png`
+- normalized reference: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-workbench-reference.png`
+- side-by-side comparison: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-workbench-comparison.png`
+- viewport: WeChat Developer Tools, iPhone 12/13 simulator, `363 x 786` desktop-stage crop
+- state: 已登录、当前选择“漫剧创作”、没有可继续的真实任务、Agent 数据源暂未同步
+
+## Findings
+
+本轮没有剩余 P0、P1 或 P2 差异。
+
+- 页面已从功能入口集合改为单一执行中心，不再重复展示功能卡片。
+- 当前工作区、主操作、项目进度和本次执行沿用参考图的信息层级。
+- 真实账号当前没有可继续任务，因此实现图显示空状态；没有伪造参考图中的项目名、68%、13 页、模型或画幅。
+- 顶部品牌栏和微信安全区来自真实小程序运行环境，参考稿未完整表达这部分，属于可接受的平台差异。
+
+## Required fidelity surfaces
+
+- Typography: 标题、当前功能、状态、按钮和说明形成五级字号；小屏没有大字挤压或截断。
+- Spacing: 390px 基准左右 15px，卡片间距 16px，底部为四项固定导航并保留安全区。
+- Cards: 当前工作区 128px，真实项目卡 205px；空状态只在没有真实任务时出现。
+- Colors and material: 深海军蓝背景、青色描边、克制的玻璃内高光和单一青色主按钮与参考一致。
+- Data integrity: 进度只在服务端提供有效 total 时显示；当前功能只匹配自己的任务，不跨功能串记录。
+
+## Runtime and regression history
+
+1. P0 黑屏：确认是微信开发者工具仍引用旧页面分包，而磁盘已是新运行时代码；完整退出、重新构建并打开后恢复。
+2. P1 跨功能记录：建立功能与真实任务来源的明确映射，未映射的漫剧功能不会误显示剧本任务。
+3. P1 示例数据：移除固定 68%、示例项目名和示例模型；无真实数据时进入空状态。
+4. P2 重复入口：删除工作台里的功能目录和选择弹层，只保留一个主操作。
+5. 微信开发者工具最终页面为 `pages/workspace/index`，控制台 0 个业务错误；仅有基础库弃用和本地证书类警告。
+
+## Follow-up polish
+
+- P3：空状态比参考稿的真实运行态留白更多；这是数据状态差异，待用户产生任务后会自动替换为项目进度和本次执行卡，不用假数据补满。
+
+final result: passed
