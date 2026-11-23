@@ -95,16 +95,43 @@ func matchingWorkflowPublishAttempt(rec cp.Record, run batchfactoryv11.BookStage
 	if rec.CollectionID != run.CollectionID || run.ID == "" {
 		return false
 	}
-	if rec.Attempt > 0 && rec.Attempt != run.Attempt {
+	hasRun := rec.RunID != ""
+	hasAttempt := rec.Attempt > 0 && run.Attempt > 0
+	hasKey := rec.RequestKey != "" && run.RequestID != ""
+	if hasRun && rec.RunID != run.ID || hasAttempt && rec.Attempt != run.Attempt || hasKey && rec.RequestKey != run.RequestID {
 		return false
 	}
-	if rec.RunID != "" {
-		return rec.RunID == run.ID
+	return hasRun || hasAttempt || hasKey
+}
+
+// A directory sync can change many profiles. Only the selected profile and
+// the choices consumed by the text publisher identify this upload attempt.
+func workflowPublishSettingsKey(settings batchfactoryv11.SettingsPatch) (string, error) {
+	var config n8ComicPublishSettings
+	var err error
+	if len(settings["comicPublishSettings"]) > 0 {
+		config, err = parseN8ComicPublishSettings(settings)
+		if err != nil {
+			return "", err
+		}
 	}
-	if rec.Attempt > 0 {
-		return true
+	var website map[string]any
+	if raw := settings["publishSettings"]; len(raw) > 0 {
+		if err := json.Unmarshal(raw, &website); err != nil {
+			return "", err
+		}
 	}
-	return rec.RequestKey != "" && rec.RequestKey == run.RequestID
+	profile := selectedPublishProfile(website)
+	selected, err := json.Marshal([]any{
+		website["websiteProfileId"], website["bookCategory"], profile["id"], profile["config_id"],
+		config.ProducerAdminName, config.OrganizationID, config.AudioCategoryID, config.AudioCategoryName,
+		config.AudioCategorySelectionMode, config.AudioID, config.SpecifiedAudioID,
+		config.WorkIDs, config.WorkIDsText, config.WorkMatchMode,
+	})
+	if err != nil {
+		return "", err
+	}
+	return sensitiveDigest(string(selected)), nil
 }
 
 func freezeAutomationTextSettings(entry map[string]any, batch batchfactoryv11.SettingsPatch, book batchfactoryv11.Book) error {
@@ -176,6 +203,12 @@ func (c *BatchAutomationCoordinator) configureTextWorkflow(repo txt.Repository, 
 		x := textRequest{ctx, req.Scope, batch, b, req.FrozenSettings}
 		sourceID, _ := json.Marshal([]any{sensitiveDigest(b.TxtText), sensitiveDigest(b.WorkingFrontContent), sensitiveCaptureLimit(b, req.FrozenSettings), batchfactorysensitive.ResolveMode(req.FrozenSettings), batchSensitiveModels(req.FrozenSettings)})
 		req.SourceKey = sensitiveDigest(string(sourceID))
+		if req.Target == "published" {
+			req.PublishSettingsKey, err = workflowPublishSettingsKey(req.FrozenSettings)
+			if err != nil {
+				return txt.EnsureResult{Stage: "text_publish"}, err
+			}
+		}
 		w := txt.Workflow{Repo: repo}
 		var publishAttempt batchfactoryv11.BookStageRun
 		if c.textPublish != nil {
@@ -278,6 +311,9 @@ func (c *BatchAutomationCoordinator) configureTextWorkflow(repo txt.Repository, 
 			}
 			_, err = a.saveImage(x, p.ID, rev, false, "", data, mime)
 			return err
+		}
+		w.VerifyFile = func(_ context.Context, artifact txt.PageArtifact, label string) error {
+			return a.verifyArtifactFile(x, artifact, label)
 		}
 		w.Validate = func(_ context.Context, _ txt.EnsureRequest, d txt.Document) error {
 			_, err := a.verifyCollectionFiles(x, textInput{VersionID: d.ActiveVersionID, ExpectedRevision: d.Revision, PaginationVersion: d.PaginationVersion})

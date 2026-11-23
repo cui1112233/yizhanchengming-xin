@@ -259,13 +259,15 @@ func (s *BookStageService) TrackTextStage(ctx context.Context, owner, batchID, b
 	attempt := s.nextAttempt(runs, stage)
 	var started BookStageRun
 	for _, prev := range runs {
-		if prev.Stage != stage || prev.Attempt != attempt-1 || prev.InputRevision != key {
+		if prev.Stage != stage || prev.Attempt != attempt-1 {
 			continue
 		}
-		if reuse && prev.Status == ProductionSucceeded {
+		if reuse && prev.Status == ProductionSucceeded && prev.InputRevision == key {
 			return nil
 		}
-		if stage == "text_publish" && prev.Status == ProductionRunning {
+		// An upload can already be in flight. An upgraded settings fingerprint
+		// must not allocate another request for the same immutable collection.
+		if stage == "text_publish" && prev.Status == ProductionRunning && len(prev.InputRevision) > 64 && prev.InputRevision[64:] == collectionID {
 			started = prev
 		}
 	}

@@ -23,7 +23,22 @@ func (r *workflowRepo) GetDocument(context.Context, Scope) (Document, error) {
 	return r.doc, nil
 }
 func (r *workflowRepo) ListPages(context.Context, Scope) ([]Page, error) {
-	return append([]Page(nil), r.pages...), nil
+	pages := append([]Page(nil), r.pages...)
+	for i := range pages {
+		if pages[i].ActiveArtifactID != "" {
+			pages[i].Status = "ready"
+		}
+	}
+	return pages, nil
+}
+func (r *workflowRepo) ListArtifacts(context.Context, Scope) ([]PageArtifact, error) {
+	arts := []PageArtifact{{ID: r.doc.CoverArtifactID, Kind: "cover", SourceKind: sourceKind(r.doc.CoverLocked)}}
+	for _, p := range r.pages {
+		if p.ActiveArtifactID != "" {
+			arts = append(arts, PageArtifact{ID: p.ActiveArtifactID, PageID: p.ID, Kind: "page", SourceKind: sourceKind(p.Locked), RenderVersion: p.RenderVersion})
+		}
+	}
+	return arts, nil
 }
 func (r *workflowRepo) ListCollections(context.Context, Scope) ([]Collection, error) {
 	return r.collections, nil
@@ -39,7 +54,7 @@ func (r *workflowRepo) GetCollection(_ context.Context, _ Scope, id string) (Col
 func (r *workflowRepo) CreateCollection(_ context.Context, _ Scope, in CollectionInput) (Collection, error) {
 	c := Collection{ID: fmt.Sprintf("collection-%d", len(r.collections)+1), Status: "ready", VersionID: in.VersionID, PaginationVersion: in.PaginationVersion, CoverArtifactID: r.doc.CoverArtifactID}
 	for _, p := range r.pages {
-		c.Items = append(c.Items, CollectionItem{PageID: p.ID, ArtifactID: p.ActiveArtifactID})
+		c.Items = append(c.Items, CollectionItem{Ordinal: p.Ordinal, PageID: p.ID, ArtifactID: p.ActiveArtifactID})
 	}
 	r.collections = append(r.collections, c)
 	return c, nil
@@ -51,7 +66,7 @@ func TestTextWorkflowFingerprintsFollowChangedSettings(t *testing.T) {
 	src := WorkflowProduction{VersionInput: VersionInput{ProductionText: "正文"}, Snapshot: json.RawMessage(`{"layout":{"fontSize":24},"sourceVersion":"v"}`)}
 	var reflows, renders, publishes int
 	journal := map[string]string{}
-	w := Workflow{Repo: repo,
+	w := Workflow{Repo: repo, VerifyFile: func(context.Context, PageArtifact, string) error { return nil },
 		Track: func(_ context.Context, _ Scope, checkpoint StageCheckpoint, reuse bool, run func() error) error {
 			stage, key := checkpoint.Stage, checkpoint.Fingerprint
 			if reuse && journal[stage] == key {
@@ -84,7 +99,7 @@ func TestTextWorkflowFingerprintsFollowChangedSettings(t *testing.T) {
 		Validate: func(context.Context, EnsureRequest, Document) error { return nil },
 		Publish:  func(context.Context, EnsureRequest, Collection) (bool, error) { publishes++; return true, nil },
 	}
-	req := EnsureRequest{Scope: Scope{"owner", "batch", "book"}, Target: "published", FrozenSettings: map[string]json.RawMessage{}}
+	req := EnsureRequest{Scope: Scope{"owner", "batch", "book"}, Target: "published", PublishSettingsKey: "original-settings", FrozenSettings: map[string]json.RawMessage{}}
 	ensure := func() {
 		t.Helper()
 		res, err := w.Ensure(ctx, req)
@@ -95,6 +110,7 @@ func TestTextWorkflowFingerprintsFollowChangedSettings(t *testing.T) {
 	ensure()
 	initialPageKey := journal["text_paginate"]
 	initialRenderKey := journal["text_render"]
+	req.PublishSettingsKey = "organization-2"
 	req.FrozenSettings["comicPublishSettings"] = json.RawMessage(`{"organizationId":"2"}`)
 	ensure()
 	if reflows != 1 || renders != 2 || publishes != 2 || len(repo.collections) != 1 {
@@ -117,11 +133,18 @@ func TestTextWorkflowResumesFailedPageAndReusesCollection(t *testing.T) {
 	repo := &workflowRepo{}
 	var calls []string
 	failed := false
+	validationFailed := false
+	brokenID := ""
 	source := WorkflowProduction{VersionInput: VersionInput{ProductionText: "甲乙丙丁", SensitiveMode: "off"}, Snapshot: json.RawMessage(`{"layout":{},"sourceVersion":"v"}`)}
 	processed := false
 	stages := map[string]string{}
 	workflow := func() Workflow {
-		return Workflow{Repo: repo,
+		return Workflow{Repo: repo, VerifyFile: func(_ context.Context, art PageArtifact, _ string) error {
+			if art.ID == brokenID {
+				return ErrNotReady
+			}
+			return nil
+		},
 			Track: func(_ context.Context, _ Scope, checkpoint StageCheckpoint, reuse bool, run func() error) error {
 				stage, key := checkpoint.Stage, checkpoint.Fingerprint
 				if reuse && stages[stage] == key {
@@ -161,12 +184,23 @@ func TestTextWorkflowResumesFailedPageAndReusesCollection(t *testing.T) {
 				}
 				for i := range repo.pages {
 					if repo.pages[i].ID == p.ID {
+						if p.ActiveArtifactID == brokenID {
+							brokenID = ""
+						}
 						repo.pages[i].ActiveArtifactID = "img" + p.ID
 					}
 				}
 				return nil
 			},
-			Validate: func(context.Context, EnsureRequest, Document) error { calls = append(calls, "validate"); return nil },
+			Validate: func(context.Context, EnsureRequest, Document) error {
+				calls = append(calls, "validate")
+				if !validationFailed {
+					validationFailed = true
+					brokenID = "img4"
+					return ErrNotReady
+				}
+				return nil
+			},
 		}
 	}
 	req := EnsureRequest{Scope: Scope{"owner", "batch", "book"}, Target: "collection"}
@@ -174,20 +208,39 @@ func TestTextWorkflowResumesFailedPageAndReusesCollection(t *testing.T) {
 	if err == nil || result.Stage != "text_render" {
 		t.Fatalf("unexpected first result %+v %v", result, err)
 	}
+	result, err = workflow().Ensure(ctx, req)
+	if !errors.Is(err, ErrNotReady) || result.Stage != "text_validate" || len(repo.collections) != 0 {
+		t.Fatalf("first validation: %+v %v", result, err)
+	}
 	for i := 0; i < 2; i++ {
 		result, err = workflow().Ensure(ctx, req)
 		if err != nil || result.Collection.ID != "collection-1" {
 			t.Fatalf("retry %d: %+v %v", i, result, err)
 		}
 	}
-	if want := []string{"process", "paginate", "1", "2", "4", "2", "validate"}; !reflect.DeepEqual(calls, want) || len(repo.collections) != 1 {
+	if want := []string{"process", "paginate", "1", "2", "4", "2", "validate", "4", "validate"}; !reflect.DeepEqual(calls, want) || len(repo.collections) != 1 {
 		t.Fatalf("calls %v, collections %d", calls, len(repo.collections))
 	}
+	// The artifact rows are still valid, but this stored collection claims a different SHA.
+	repo.collections[0].Items[0].SHA256 = "wrong"
+	result, err = workflow().Ensure(ctx, req)
+	if !errors.Is(err, ErrNotReady) || result.Stage != "text_collection" || result.Collection.ID != "" {
+		t.Fatalf("invalid frozen manifest was reused: %+v %v", result, err)
+	}
+	repo.collections[0].Items[0].SHA256 = ""
 	req.Target = "published"
+	req.PublishSettingsKey = "frozen-mapping"
 	w := workflow()
 	w.Publish = func(context.Context, EnsureRequest, Collection) (bool, error) { return false, nil }
 	result, err = w.Ensure(ctx, req)
 	if err == nil || result.Published || result.Stage != "text_publish" {
 		t.Fatalf("unconfirmed publish %+v, %v", result, err)
+	}
+	// A deterministic collection also pins its pagination and all frozen references.
+	req.CollectionID = workflowCollectionID(req.Scope, repo.collections[0])
+	repo.collections[0].ID = req.CollectionID
+	repo.collections[0].PaginationVersion++
+	if _, err := w.Ensure(ctx, req); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("wrong pinned pagination: %v", err)
 	}
 }

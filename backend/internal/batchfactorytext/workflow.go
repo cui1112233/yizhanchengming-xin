@@ -14,6 +14,7 @@ type EnsureRequest struct {
 	FrozenSettings                  map[string]json.RawMessage
 	Target                          string
 	SourceKey                       string
+	PublishSettingsKey              string // Digest of only the selected publish mapping.
 	CollectionID                    string // A pending upload resumes with the same immutable collection.
 	PublishRunID, PublishRequestKey string
 	PublishAttempt                  int
@@ -44,13 +45,14 @@ type StageCheckpoint struct {
 }
 
 type Workflow struct {
-	Repo     Repository
-	Track    func(context.Context, Scope, StageCheckpoint, bool, func() error) error
-	Process  func(context.Context, EnsureRequest, bool) (WorkflowProduction, error)
-	Prepare  func(context.Context, EnsureRequest, WorkflowProduction, Document, bool) error
-	Render   func(context.Context, EnsureRequest, Document, Page) error // An empty page identifies the cover.
-	Validate func(context.Context, EnsureRequest, Document) error
-	Publish  func(context.Context, EnsureRequest, Collection) (bool, error)
+	Repo       Repository
+	Track      func(context.Context, Scope, StageCheckpoint, bool, func() error) error
+	Process    func(context.Context, EnsureRequest, bool) (WorkflowProduction, error)
+	Prepare    func(context.Context, EnsureRequest, WorkflowProduction, Document, bool) error
+	Render     func(context.Context, EnsureRequest, Document, Page) error // An empty page identifies the cover.
+	VerifyFile func(context.Context, PageArtifact, string) error
+	Validate   func(context.Context, EnsureRequest, Document) error
+	Publish    func(context.Context, EnsureRequest, Collection) (bool, error)
 }
 
 func fingerprint(parts ...any) string {
@@ -111,7 +113,7 @@ func geometry(layout LayoutConfig) LayoutConfig {
 }
 
 func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResult, err error) {
-	if req.Owner == "" || req.BatchID == "" || req.BookID == "" || (req.Target != "collection" && req.Target != "published") || w.Repo == nil || w.Track == nil || w.Process == nil || w.Prepare == nil || w.Render == nil || w.Validate == nil {
+	if req.Owner == "" || req.BatchID == "" || req.BookID == "" || (req.Target != "collection" && req.Target != "published") || w.Repo == nil || w.Track == nil || w.Process == nil || w.Prepare == nil || w.Render == nil || w.VerifyFile == nil || w.Validate == nil {
 		return res, ErrInvalid
 	}
 	for _, raw := range req.FrozenSettings {
@@ -133,9 +135,15 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 		}
 		return w.Track(ctx, req.Scope, checkpoint, reuse, run)
 	}
-	publish := func() error {
-		key := fingerprint(res.Collection.ID, req.FrozenSettings["textPublishSettings"], req.FrozenSettings["publishSettings"], req.FrozenSettings["comicPublishSettings"])
-		return stage("text_publish", "正在上传", key, !req.ForcePublish, func() error {
+	publish := func(verifyErr error) error {
+		key := fingerprint(res.Collection.ID, req.PublishSettingsKey)
+		return stage("text_publish", "正在上传", key, !req.ForcePublish && verifyErr == nil && req.PublishSettingsKey != "", func() error {
+			if verifyErr != nil {
+				return verifyErr
+			}
+			if req.PublishSettingsKey == "" {
+				return ErrInvalid
+			}
 			if w.Publish == nil {
 				return errors.New("文本上传服务未配置")
 			}
@@ -155,7 +163,7 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 		if res.Collection.ID != req.CollectionID || res.Collection.Status != "ready" {
 			return res, ErrNotReady
 		}
-		err = publish()
+		err = publish(w.verifyManifest(ctx, req.Scope, res.Collection, true))
 		res.Published = err == nil
 		return res, err
 	}
@@ -218,11 +226,14 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 		return res, err
 	}
 	renderKey := fingerprint(pageKey, desired)
-	rendered := !changeStyle && doc.CoverArtifactID != "" && len(pages) > 0
-	for _, p := range pages {
-		rendered = rendered && p.ActiveArtifactID != ""
+	var repairs map[string]error
+	if !changeStyle {
+		repairs, err = w.inspectFiles(ctx, req.Scope, doc, pages)
+		if err != nil {
+			return res, err
+		}
 	}
-	err = stage("text_render", "正在渲染", renderKey, rendered, func() error {
+	err = stage("text_render", "正在渲染", renderKey, !changeStyle && len(pages) > 0 && len(repairs) == 0, func() error {
 		if changeStyle {
 			if err := w.Prepare(ctx, req, production, doc, false); err != nil {
 				return err
@@ -235,6 +246,10 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 			if err != nil {
 				return err
 			}
+			repairs, err = w.inspectFiles(ctx, req.Scope, doc, pages)
+			if err != nil {
+				return err
+			}
 		}
 		if len(pages) == 0 {
 			return ErrNotReady
@@ -244,10 +259,11 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if p.VersionID != doc.ActiveVersionID || p.PaginationVersion != doc.PaginationVersion {
-				return ErrConflict
+			if repairs[p.ID] == nil {
+				continue
 			}
-			if p.Locked || p.ActiveArtifactID != "" {
+			if p.Locked {
+				failures = append(failures, fmt.Errorf("第 %d 页上传图已锁定，请重新上传：%w", p.Ordinal, repairs[p.ID]))
 				continue
 			}
 			if req.Progress != nil {
@@ -264,8 +280,13 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 		if head.ActiveVersionID != doc.ActiveVersionID || head.PaginationVersion != doc.PaginationVersion {
 			return ErrConflict
 		}
-		if !head.CoverLocked && head.CoverArtifactID == "" {
-			if err := w.Render(ctx, req, head, Page{}); err != nil {
+		if head.CoverArtifactID != doc.CoverArtifactID || head.CoverLocked != doc.CoverLocked {
+			return ErrConflict
+		}
+		if cause := repairs[""]; cause != nil {
+			if head.CoverLocked {
+				failures = append(failures, fmt.Errorf("封面上传图已锁定，请重新上传：%w", cause))
+			} else if err := w.Render(ctx, req, head, Page{}); err != nil {
 				failures = append(failures, fmt.Errorf("封面：%w", err))
 			}
 		}
@@ -301,14 +322,30 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 	if err != nil {
 		return res, err
 	}
-	err = stage("text_collection", "正在整理合集", fileKey, res.Collection.ID != "", func() error {
+	var manifestErr error
+	if res.Collection.ID != "" {
+		manifestErr = w.verifyManifest(ctx, req.Scope, res.Collection, false)
+	}
+	err = stage("text_collection", "正在整理合集", fileKey, res.Collection.ID != "" && manifestErr == nil, func() error {
 		if res.Collection.ID != "" {
-			return nil
+			return manifestErr
 		}
-		res.Collection, err = w.Repo.CreateCollection(ctx, req.Scope, CollectionInput{Reuse: true, ExpectedRevision: head.Revision, VersionID: head.ActiveVersionID, PaginationVersion: head.PaginationVersion, ConfigSnapshot: head.ConfigSnapshot})
-		return err
+		created, err := w.Repo.CreateCollection(ctx, req.Scope, CollectionInput{Reuse: true, ExpectedRevision: head.Revision, VersionID: head.ActiveVersionID, PaginationVersion: head.PaginationVersion, ConfigSnapshot: head.ConfigSnapshot})
+		if err != nil {
+			return err
+		}
+		// A retry can find the deterministic collection ID already present.
+		res.Collection, err = w.Repo.GetCollection(ctx, req.Scope, created.ID)
+		if err != nil {
+			return err
+		}
+		if !matchesPages(res.Collection, head, manifest) {
+			return ErrNotReady
+		}
+		return w.verifyManifest(ctx, req.Scope, res.Collection, false)
 	})
 	if err != nil {
+		res.Collection = Collection{}
 		return res, err
 	}
 	latest, err := w.Repo.GetDocument(ctx, req.Scope)
@@ -324,7 +361,7 @@ func (w Workflow) Ensure(ctx context.Context, req EnsureRequest) (res EnsureResu
 	if req.Target == "collection" {
 		return res, nil
 	}
-	err = publish()
+	err = publish(nil)
 	res.Published = err == nil
 	return res, err
 }
@@ -342,17 +379,7 @@ func (w Workflow) matchingCollection(ctx context.Context, s Scope, d Document, m
 		if err != nil {
 			return Collection{}, err
 		}
-		if len(full.Items) != len(manifest) {
-			continue
-		}
-		matched := true
-		for i, item := range full.Items {
-			if item.PageID != manifest[i][0] || item.ArtifactID != manifest[i][1] {
-				matched = false
-				break
-			}
-		}
-		if matched {
+		if matchesPages(full, d, manifest) {
 			return full, nil
 		}
 	}

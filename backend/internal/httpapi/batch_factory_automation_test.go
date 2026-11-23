@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -136,6 +137,105 @@ func TestAutomationTextWorkflowMySQLRestart(t *testing.T) {
 		t.Fatalf("persisted attempts %+v", counts)
 	}
 	t.Logf("book=%s pages=%d collection=%s stageAttempts=%v", scope.BookID, len(result.Collection.Items), collection, counts)
+	ready := result.Collection
+	// Delete one file and flip one byte in a second file without changing its size.
+	if err := files.Remove(ready.Items[1].StorageRef); err != nil {
+		t.Fatal(err)
+	}
+	corrupt := func(ref string) {
+		t.Helper()
+		f, err := files.OpenContext(ctx, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := f.Name()
+		f.Close()
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) == 0 {
+			t.Fatalf("open image: %v", err)
+		}
+		data[0] ^= 1
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	corrupt(ready.Items[2].StorageRef)
+	pinned := req
+	pinned.Target, pinned.CollectionID = "published", ready.ID
+	if _, err := coordinator(repo).textEnsure(ctx, pinned); !errors.Is(err, txt.ErrNotReady) {
+		t.Fatalf("broken pinned upload: %v", err)
+	}
+	ensure := func() txt.Collection {
+		t.Helper()
+		out, err := coordinator(repo).textEnsure(ctx, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out.Collection
+	}
+	fixed := ensure()
+	if fixed.ID == ready.ID || fixed.Items[0] != ready.Items[0] || fixed.CoverArtifactID != cover.ID || fixed.Items[1].ArtifactID == ready.Items[1].ArtifactID || fixed.Items[2].ArtifactID == ready.Items[2].ArtifactID {
+		t.Fatalf("damaged pages were not individually repaired: old=%+v new=%+v", ready, fixed)
+	}
+	if again := ensure(); again.ID != fixed.ID {
+		t.Fatalf("restart duplicated repaired collection: %s %s", fixed.ID, again.ID)
+	}
+	doc, err = repo.GetDocument(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = repo.RestoreCover(ctx, scope, doc.Revision); err != nil {
+		t.Fatal(err)
+	}
+	systemCover := ensure()
+	arts, err = repo.ListArtifacts(ctx, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, art := range arts {
+		if art.ID == systemCover.CoverArtifactID {
+			corrupt(art.StorageRef)
+		}
+	}
+	fixedCover := ensure()
+	if fixedCover.ID == systemCover.ID || fixedCover.CoverArtifactID == systemCover.CoverArtifactID || !reflect.DeepEqual(fixedCover.Items, fixed.Items) {
+		t.Fatalf("cover-only recovery: %+v", fixedCover)
+	}
+	uploads := 0
+	publish := func(otherProfileName, category string) {
+		t.Helper()
+		settings["publishSettings"] = mustJSON(map[string]any{"websiteProfileId": "selected", "bookCategory": category, "websiteProfiles": []any{map[string]any{"id": "selected"}, map[string]any{"id": "other", "name": otherProfileName}}})
+		settings["comicPublishSettings"] = mustJSON(map[string]any{"organizationId": "organization-1"})
+		publishReq := req
+		publishReq.Target = "published"
+		c := coordinator(repo)
+		c.textPublish = func(context.Context, txt.EnsureRequest, txt.Collection) (bool, error) { uploads++; return true, nil }
+		out, err := c.textEnsure(ctx, publishReq)
+		if err != nil || !out.Published || out.Collection.ID != fixedCover.ID {
+			t.Fatalf("publish: %+v %v", out, err)
+		}
+	}
+	publish("原名", "历史")
+	publish("目录同步后的新名称", "历史")
+	if uploads != 1 {
+		t.Fatalf("unselected profile triggered %d uploads", uploads)
+	}
+	publish("目录同步后的新名称", "科幻")
+	if uploads != 2 {
+		t.Fatalf("selected category did not trigger another attempt: %d", uploads)
+	}
+	if err := files.Remove(locked.StorageRef); err != nil {
+		t.Fatal(err)
+	}
+	out, err := coordinator(repo).textEnsure(ctx, req)
+	if !errors.Is(err, txt.ErrNotReady) || !strings.Contains(err.Error(), "锁定") || out.Collection.ID != "" {
+		t.Fatalf("locked missing upload: %+v %v", out, err)
+	}
+	pages, err = repo.ListPages(ctx, scope)
+	if err != nil || !pages[0].Locked || pages[0].ActiveArtifactID != locked.ID {
+		t.Fatalf("changed locked page: %+v %v", pages, err)
+	}
+	t.Logf("repaired pages collection=%s repaired cover collection=%s selected mapping uploads=%d", fixed.ID, fixedCover.ID, uploads)
 }
 
 func workflowReceiptJSON(v any) map[string]any {
@@ -149,15 +249,17 @@ func TestAutomationTextPublishPendingResumesSameAttemptAndSeparatesHistory(t *te
 	s := batchfactoryv11.NewMemoryStore()
 	b := preflightComicBatch(t, s, 1, 0)
 	book := b.Books[0]
+	settingsKey := "previous-fingerprint-format"
 	run := func(result error) (started batchfactoryv11.BookStageRun) {
 		service := &batchfactoryv11.BookStageService{Store: s}
-		err := service.TrackTextStage(ctx, "alice", b.ID, book.ID, "text_publish", "key", "collection", false, func(r batchfactoryv11.BookStageRun) error { started = r; return result })
+		err := service.TrackTextStage(ctx, "alice", b.ID, book.ID, "text_publish", settingsKey, "collection", false, func(r batchfactoryv11.BookStageRun) error { started = r; return result })
 		if !errors.Is(err, result) {
 			t.Fatal(err)
 		}
 		return started
 	}
 	first := run(txt.ErrPublishPending)
+	settingsKey = "fingerprint-of-selected-profile"
 	recovered := run(nil)
 	if first.ID != recovered.ID || first.Attempt != recovered.Attempt {
 		t.Fatalf("new intent on restart %+v %+v", first, recovered)
@@ -208,6 +310,19 @@ func TestAutomationTextPublishPendingResumesSameAttemptAndSeparatesHistory(t *te
 	snapshot = read()
 	if workflowReceiptJSON(snapshot["textPublishRecord"])["status"] != "upload_pending_confirm" || workflowReceiptJSON(snapshot["textLastPublishedRecord"])["runId"] != first.ID {
 		t.Fatalf("pending receipt lost %+v", snapshot)
+	}
+	for _, field := range []string{"requestKey", "attempt"} {
+		original := present[field]
+		if field == "requestKey" {
+			present[field] = first.RequestID
+		} else {
+			present[field] = first.Attempt
+		}
+		save(present)
+		if got := read(); got["textPublishRecord"] != nil || workflowReceiptJSON(got["textLastPublishedRecord"])["runId"] != first.ID {
+			t.Fatalf("conflicting %s matched current run: %+v", field, got)
+		}
+		present[field] = original
 	}
 }
 
