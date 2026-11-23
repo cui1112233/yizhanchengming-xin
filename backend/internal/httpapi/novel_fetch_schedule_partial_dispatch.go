@@ -2,16 +2,42 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
 type novelFetchScheduleReadback func(context.Context, string, string, []string)
+
+// Apply the snapshot and queue state only while this dispatch still owns the
+// book version read before admission. A worker can finish before Enqueue returns.
+type admittedScheduleBookStore struct {
+	novelfetchworkshop.Store
+	version string
+}
+
+func (s *admittedScheduleBookStore) PutDocument(ctx context.Context, owner string, doc novelfetchworkshop.Document) error {
+	if doc.UpdatedAt != s.version {
+		return novelfetchworkshop.ErrDocumentChanged
+	}
+	version, err := s.CompareAndSwapDocument(ctx, owner, doc)
+	if err == nil {
+		s.version = version
+	}
+	return err
+}
+
+func recordScheduleAdmissionStops(item map[string]any, ids []string) {
+	skipped := arrayOrEmpty(item["skipped_books"])
+	for _, id := range ids {
+		skipped = append(skipped, map[string]any{"book_id": id, "reason": "cancelled"})
+	}
+	item["skipped_books"] = skipped
+}
 
 const novelFetchScheduleReadbackOperationPrefix = "schedule-readback-"
 
@@ -161,14 +187,13 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 		if autoSubmit && (novelFetchStopped(firstText(doc.Meta["status"], doc.Meta["queueState"])) || doc.Meta["manualOnly"] == true || doc.Meta["manual_only"] == true || doc.Meta["rewriteValidationHold"] == true || novelFetchRetryScheduleHasManualHold(doc.Meta)) {
 			continue
 		}
-		if cancellation, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
-			stopped, err := cancellation.IsBookCancelled(ctx, owner, id)
-			if err != nil && (autoSubmit || !mergeworker.IsRedisNil(err)) {
-				return err
-			}
-			if stopped {
-				continue
-			}
+		stopped, err := reconcileAdmissionStop(ctx, store, queue, owner, doc)
+		if err != nil {
+			return err
+		}
+		if stopped {
+			recordScheduleAdmissionStops(item, []string{id})
+			continue
 		}
 		versions := selected
 		if autoSubmit {
@@ -207,13 +232,20 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 				return err
 			}
 		}
-		queued, existing, err := unique.EnqueueUniqueBooks(ctx, job, 7*24*time.Hour)
+		admission, err := tryNovelFetchBookAdmission(ctx, store, queue, unique, job, 7*24*time.Hour)
 		if err != nil {
 			_ = updateWorkshopRun(store, job, "failed", "定时任务入队失败", started, true)
 			return err
 		}
-		if !queued && existing != job.ID {
-			if existing == "" {
+		if len(admission.cancelled) > 0 {
+			recordScheduleAdmissionStops(item, admission.cancelled)
+			if err := updateWorkshopRun(store, job, "stopped", "书籍已取消，已跳过入队", started, true); err != nil {
+				return err
+			}
+			continue
+		}
+		if !admission.queued && admission.existing != job.ID {
+			if admission.existing == "" {
 				return fmt.Errorf("定时任务入队未确认，保留等待记录")
 			}
 			pending = append(pending, id)
@@ -223,10 +255,13 @@ func dispatchNovelFetchSchedulePending(ctx context.Context, store novelfetchwork
 		}
 		snapshot := job
 		snapshot.SelectedVersions = selected
-		if err := novelFetchSnapshotBeforeQueue(ctx, store, snapshot); err != nil {
+		admitted := &admittedScheduleBookStore{Store: store, version: doc.UpdatedAt}
+		if err := novelFetchSnapshotBeforeQueue(ctx, admitted, snapshot); errors.Is(err, novelfetchworkshop.ErrDocumentChanged) {
+			continue
+		} else if err != nil {
 			return err
 		}
-		if err := markNovelFetchTaskQueued(ctx, store, owner, id, job.ID, job.BatchID, now); err != nil {
+		if err := markNovelFetchTaskQueued(ctx, admitted, owner, id, job.ID, job.BatchID, now); err != nil && !errors.Is(err, novelfetchworkshop.ErrDocumentChanged) {
 			return err
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,13 @@ import (
 
 var ErrQueueEmpty = errors.New("novel fetch queue is empty")
 var ErrBookCancelled = errors.New("novel fetch book was cancelled")
+
+// CancelledBooksError identifies the markers seen by the atomic enqueue. An
+// explicit retry may clear those markers before the caller handles the error.
+type CancelledBooksError struct{ BookIDs []string }
+
+func (e *CancelledBooksError) Error() string { return ErrBookCancelled.Error() }
+func (e *CancelledBooksError) Unwrap() error { return ErrBookCancelled }
 
 type ProcessJob struct {
 	LeaseToken         string            `json:"-"`
@@ -110,10 +118,17 @@ func (q *MemoryQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, _ 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for {
+		var stopped []string
 		for _, id := range job.BookIDs {
 			if q.cancelled[cancellationKey(job.Owner, id)] {
-				return false, "", ErrBookCancelled
+				id = strings.TrimSpace(id)
+				if !slices.Contains(stopped, id) {
+					stopped = append(stopped, id)
+				}
 			}
+		}
+		if len(stopped) != 0 {
+			return false, "", &CancelledBooksError{BookIDs: stopped}
 		}
 		for _, key := range keys {
 			if existing := q.dedupe[key]; existing != "" {

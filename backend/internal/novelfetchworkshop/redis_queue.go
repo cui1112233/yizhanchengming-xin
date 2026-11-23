@@ -23,9 +23,11 @@ type RedisQueue struct {
 
 const enqueueUniqueBooksScript = `
 local count = tonumber(ARGV[4])
+local stopped = {}
 for i = 1, count do
-  if redis.call('EXISTS', KEYS[count + 2 + i]) == 1 then return {-1, ''} end
+  if redis.call('EXISTS', KEYS[count + 2 + i]) == 1 then stopped[#stopped + 1] = i end
 end
+if #stopped > 0 then return {-1, stopped} end
 for i = 1, count do
   local existing = redis.call('GET', KEYS[i])
   if existing then return {0, existing} end
@@ -223,12 +225,14 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 	seen := map[string]bool{}
 	keys := make([]string, 0, len(job.BookIDs)+2)
 	cancelKeys := make([]string, 0, len(job.BookIDs))
+	bookIDs := make([]string, 0, len(job.BookIDs))
 	for _, bookID := range job.BookIDs {
 		bookID = strings.TrimSpace(bookID)
 		if bookID == "" || seen[bookID] {
 			continue
 		}
 		seen[bookID] = true
+		bookIDs = append(bookIDs, bookID)
 		keys = append(keys, q.bookDedupeKey(job.Owner, job.PlatformID, bookID))
 		cancelKeys = append(cancelKeys, q.cancelKey(job.Owner, bookID))
 	}
@@ -257,7 +261,19 @@ func (q *RedisQueue) EnqueueUniqueBooks(ctx context.Context, job ProcessJob, ttl
 	}
 	outcome := strings.TrimSpace(fmt.Sprint(result[0]))
 	if outcome == "-1" {
-		return false, "", ErrBookCancelled
+		indices, ok := result[1].([]any)
+		if !ok || len(indices) == 0 {
+			return false, "", fmt.Errorf("missing Redis cancellation details")
+		}
+		stopped := make([]string, 0, len(indices))
+		for _, raw := range indices {
+			i, ok := raw.(int64)
+			if !ok || i < 1 || i > int64(len(bookIDs)) {
+				return false, "", fmt.Errorf("invalid Redis cancelled book index %v", raw)
+			}
+			stopped = append(stopped, bookIDs[i-1])
+		}
+		return false, "", &CancelledBooksError{BookIDs: stopped}
 	}
 	queued := outcome == "1"
 	existingID := strings.TrimSpace(fmt.Sprint(result[1]))

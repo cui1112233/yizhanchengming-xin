@@ -636,6 +636,7 @@ type manualImportStopQueue struct {
 	afterPreflight func()
 	beforeEnqueue  func()
 	afterEnqueue   func()
+	onAccepted     func(novelfetchworkshop.ProcessJob)
 	enqueueErr     error
 }
 
@@ -655,6 +656,9 @@ func (q *manualImportStopQueue) EnqueueUniqueBooks(ctx context.Context, job nove
 		return false, "", q.enqueueErr
 	}
 	ok, id, err := q.manualImportTestQueue.EnqueueUniqueBooks(ctx, job, ttl)
+	if ok && err == nil && q.onAccepted != nil {
+		q.onAccepted(job)
+	}
 	if q.afterEnqueue != nil {
 		q.afterEnqueue()
 	}
@@ -1002,5 +1006,375 @@ func TestGenerateOnlyScheduleSettlesActiveBookWhileQueuePaused(t *testing.T) {
 	}
 	if row := storedSubmissionEvidenceSchedule(t, store); row["status"] != "completed" || len(queue.jobs) != 0 || len(scheduleStringSlice(row["pending_book_ids"])) != 0 {
 		t.Fatalf("paused queue masked completed work: row=%+v jobs=%+v", row, queue.jobs)
+	}
+}
+
+const (
+	cancelRaceA = "12345678901"
+	cancelRaceB = "12345678902"
+)
+
+func cancelRaceQueue(t *testing.T) manualImportTestQueue {
+	t.Helper()
+	url := os.Getenv("V88_NOVEL_FETCH_TEST_REDIS_URL")
+	if url == "" {
+		return novelfetchworkshop.NewMemoryQueue()
+	}
+	prefix := fmt.Sprintf("dispatch-cancel-test:%d", time.Now().UnixNano())
+	transport, err := mergeworker.NewRedisStore(url, prefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := novelfetchworkshop.NewRedisQueueWithDo(prefix, novelfetchworkshop.RedisDoFunc(transport.Do))
+	t.Cleanup(func() { _ = q.ClearCancelledBooks(context.Background(), "tester", []string{cancelRaceA, cancelRaceB}) })
+	return q
+}
+
+// Keep scheduler polling out of tests that drive dispatch themselves.
+type cancelRaceStore struct {
+	novelfetchworkshop.LifecycleStore
+}
+
+type cancelRaceImportStore struct {
+	cancelRaceStore
+	beforeCAS func(novelfetchworkshop.Document)
+}
+
+func (s *cancelRaceImportStore) CompareAndSwapDocument(ctx context.Context, owner string, doc novelfetchworkshop.Document) (string, error) {
+	if s.beforeCAS != nil {
+		s.beforeCAS(doc)
+	}
+	return s.cancelRaceStore.CompareAndSwapDocument(ctx, owner, doc)
+}
+
+type gatedStopWorkerQueue struct {
+	*manualImportStopQueue
+	claim chan struct{}
+	acked chan struct{}
+}
+
+func (q *gatedStopWorkerQueue) Claim(ctx context.Context, wait time.Duration) (novelfetchworkshop.ProcessJob, error) {
+	select {
+	case <-ctx.Done():
+		return novelfetchworkshop.ProcessJob{}, ctx.Err()
+	case <-q.claim:
+		return q.manualImportTestQueue.Claim(ctx, wait)
+	}
+}
+
+func (q *gatedStopWorkerQueue) Ack(ctx context.Context, job novelfetchworkshop.ProcessJob) error {
+	err := q.manualImportTestQueue.Ack(ctx, job)
+	if err == nil {
+		close(q.acked)
+	}
+	return err
+}
+
+func TestManualProcessStartPublishesCurrentJobAfterStop(t *testing.T) {
+	for _, timing := range []string{"worker before response", "worker after response", "stop after response"} {
+		t.Run(timing, func(t *testing.T) {
+			ctx := context.Background()
+			store := cancelRaceStore{novelfetchworkshop.NewMemoryStore()}
+			queue := &gatedStopWorkerQueue{manualImportStopQueue: &manualImportStopQueue{manualImportTestQueue: cancelRaceQueue(t)}, claim: make(chan struct{}, 1), acked: make(chan struct{})}
+			now := time.Now()
+			const secret = "stop-registry-test"
+			h := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+			stop := func() {
+				r := doNovelFetchRequest(t, h, http.MethodPost, "/api/novel-fetch-workshop/process/stop", map[string]any{"ids": []string{cancelRaceA}}, now, secret)
+				if r.Code != http.StatusOK {
+					t.Fatalf("stop = %d", r.Code)
+				}
+			}
+			finish := func() {
+				queue.claim <- struct{}{}
+				select {
+				case <-queue.acked:
+				case <-time.After(5 * time.Second):
+					t.Fatal("worker did not acknowledge the stopped job")
+				}
+			}
+			if timing != "stop after response" {
+				queue.afterEnqueue = func() {
+					stop()
+					if timing == "worker before response" {
+						finish()
+					}
+				}
+			}
+			r := doNovelFetchRequest(t, h, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"input_text": cancelRaceA, "selected_versions": []string{"ai1"}}, now, secret)
+			var started map[string]any
+			if err := json.Unmarshal(r.Body.Bytes(), &started); err != nil || r.Code != http.StatusAccepted {
+				t.Fatalf("start = %d, %v", r.Code, err)
+			}
+			if timing == "stop after response" {
+				stop()
+			} else if started["status"] != "stopped" || started["queue_state"] != "stopped" {
+				t.Errorf("start status = %v/%v after stop", started["status"], started["queue_state"])
+			}
+			if timing == "worker before response" && intValue(started["attempts"]) != 1 {
+				t.Errorf("start lost the acknowledged worker attempt: %v", started["attempts"])
+			}
+			checkAPI := func(acknowledged bool) {
+				for _, path := range []string{firstText(started["id"]), "latest"} {
+					r := doNovelFetchRequest(t, h, http.MethodGet, "/api/novel-fetch-workshop/process/jobs/"+path, nil, now, secret)
+					var view map[string]any
+					if err := json.Unmarshal(r.Body.Bytes(), &view); err != nil || r.Code != http.StatusOK {
+						t.Fatalf("job %s: %d, %v", path, r.Code, err)
+					}
+					if path == "latest" {
+						view = mapOrEmpty(view["latest"])
+					}
+					if view["status"] != "stopped" || view["queue_state"] != "stopped" {
+						t.Errorf("job %s = %v/%v after stop", path, view["status"], view["queue_state"])
+					}
+					if acknowledged && intValue(view["attempts"]) != 1 {
+						t.Errorf("job %s lost the worker's registry entry: attempts=%v", path, view["attempts"])
+					}
+				}
+			}
+			checkAPI(timing == "worker before response")
+			if timing != "worker before response" {
+				finish()
+				checkAPI(true)
+			}
+			doc, err := store.GetDocument(ctx, "tester", cancelRaceA)
+			if err != nil || doc.Meta["status"] != "stopped" || doc.Meta["queueState"] != "stopped" {
+				t.Fatalf("document status = %v/%v err=%v", doc.Meta["status"], doc.Meta["queueState"], err)
+			}
+			if _, err := queue.manualImportTestQueue.Claim(ctx, time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Fatalf("queue after Ack: %v", err)
+			}
+		})
+	}
+}
+
+func TestScheduleDispatchKeepsSurvivorOfLateCancellation(t *testing.T) {
+	for _, entry := range []string{"initial batch", "pending child", "pending missing version", "default submit options"} {
+		t.Run(entry, func(t *testing.T) {
+			ctx := context.Background()
+			store := cancelRaceStore{novelfetchworkshop.NewMemoryStore()}
+			queue := &manualImportStopQueue{manualImportTestQueue: cancelRaceQueue(t)}
+			due := time.Now().UTC().Add(time.Hour)
+			withSubmit := entry == "default submit options"
+			item := createPreparedSchedule(t, store, map[string]any{"run_at": due.Format(time.RFC3339Nano), "input_text": cancelRaceA + " A\n" + cancelRaceB + " B", "selected_versions": []string{"ai1"}, "auto_submit": withSubmit})
+			if entry == "pending child" || entry == "pending missing version" {
+				item["pending_book_ids"], item["partial_dispatch"], item["job_id"] = []string{cancelRaceA, cancelRaceB}, true, "pending-parent"
+				if err := saveNovelFetchScheduleItem(ctx, store, "tester", item); err != nil {
+					t.Fatal(err)
+				}
+				if entry == "pending missing version" {
+					doc, err := store.GetDocument(ctx, "tester", cancelRaceA)
+					if err != nil {
+						t.Fatal(err)
+					}
+					doc.Meta["status"], doc.Meta["queueState"] = "completed", "completed"
+					if err := store.PutDocument(ctx, "tester", doc); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			queue.beforeEnqueue = func() {
+				queue.beforeEnqueue = nil
+				if err := queue.CancelBooks(ctx, "tester", []string{cancelRaceA}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 0; i < 2; i++ {
+				if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", due.Add(time.Duration(i+1)*time.Minute)); err != nil {
+					t.Fatalf("dispatch %d: %v", i, err)
+				}
+			}
+			row := storedSubmissionEvidenceSchedule(t, store)
+			if row["retry_tracking"] != true || row["status"] != "queued" || len(scheduleStringSlice(row["pending_book_ids"])) != 0 || !slices.Equal(scheduleStringSlice(row["book_ids"]), []string{cancelRaceA, cancelRaceB}) {
+				t.Errorf("parent=%v tracking=%v pending=%v books=%v", row["status"], row["retry_tracking"], row["pending_book_ids"], row["book_ids"])
+			}
+			var cancelled []string
+			for _, raw := range arrayOrEmpty(row["skipped_books"]) {
+				skipped := mapOrEmpty(raw)
+				if skipped["reason"] == "cancelled" {
+					cancelled = append(cancelled, firstText(skipped["book_id"]))
+				}
+			}
+			if !slices.Equal(cancelled, []string{cancelRaceA}) {
+				t.Errorf("cancelled book audit=%v", cancelled)
+			}
+			job, err := queue.manualImportTestQueue.Claim(ctx, time.Millisecond)
+			if err != nil || !slices.Equal(job.BookIDs, []string{cancelRaceB}) || !slices.Equal(job.SelectedVersions, []string{"ai1"}) {
+				t.Fatalf("admitted books=%v versions=%v err=%v", job.BookIDs, job.SelectedVersions, err)
+			}
+			stopped, err := store.GetDocument(ctx, "tester", cancelRaceA)
+			if err != nil || !novelFetchStopped(firstText(stopped.Meta["queueState"])) {
+				t.Errorf("cancelled book = %v/%v err=%v", stopped.Meta["status"], stopped.Meta["queueState"], err)
+			}
+			runs, err := store.ListRuns(ctx, "tester", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var queued []string
+			for _, run := range runs {
+				if run.Status == "queued" {
+					queued = append(queued, run.RunID)
+				}
+			}
+			if !slices.Equal(queued, []string{job.ID}) {
+				t.Errorf("queued audit jobs=%v, actual job=%v", queued, job.ID)
+			}
+			if err = queue.Ack(ctx, job); err != nil {
+				t.Fatal(err)
+			}
+			done, err := store.GetDocument(ctx, "tester", cancelRaceB)
+			if err != nil || done.Meta["currentProcessJobId"] != job.ID {
+				t.Fatalf("survivor job=%v err=%v", done.Meta["currentProcessJobId"], err)
+			}
+			done.Meta["status"], done.Meta["queueState"] = "completed", "completed"
+			done.Versions = map[string]any{"ai1": "B generated"}
+			if withSubmit {
+				done.Meta["siteSubmitStatus"], done.Meta["siteSubmitDoneVersions"] = "submitted", []string{"ai1"}
+			}
+			if err := store.PutDocument(ctx, "tester", done); err != nil {
+				t.Fatal(err)
+			}
+			if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", due.Add(3*time.Minute)); err != nil {
+				t.Fatal(err)
+			}
+			row = storedSubmissionEvidenceSchedule(t, store)
+			wantStatus := "completed"
+			if withSubmit {
+				wantStatus = "stopped"
+			} // The current submission aggregation keeps a stopped book visible.
+			if row["status"] != wantStatus || row["retry_tracking"] == true {
+				t.Errorf("final parent=%v tracking=%v", row["status"], row["retry_tracking"])
+			}
+			if _, err := queue.manualImportTestQueue.Claim(ctx, time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Errorf("extra admission: %v", err)
+			}
+		})
+	}
+}
+
+func TestScheduleKeepsSurvivorOfLateCancellationWhenWorkerFinishesBeforeDispatchReturns(t *testing.T) {
+	ctx := context.Background()
+	store := cancelRaceStore{novelfetchworkshop.NewMemoryStore()}
+	queue := &manualImportStopQueue{manualImportTestQueue: cancelRaceQueue(t)}
+	due := time.Now().UTC().Add(time.Hour)
+	createPreparedSchedule(t, store, map[string]any{"run_at": due.Format(time.RFC3339Nano), "input_text": cancelRaceA + " A\n" + cancelRaceB + " B", "selected_versions": []string{"ai1"}, "auto_submit": false})
+	cfg, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg["workflow"] = map[string]any{"skip_short_original": true, "min_original_chars": 10}
+	if err := store.PutConfig(ctx, "tester", cfg); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := store.GetDocument(ctx, "tester", cancelRaceB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc.OriginalRaw = "短文"
+	if err := store.PutDocument(ctx, "tester", doc); err != nil {
+		t.Fatal(err)
+	}
+	queue.beforeEnqueue = func() {
+		queue.beforeEnqueue = nil
+		if err := queue.CancelBooks(ctx, "tester", []string{cancelRaceA}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var admitted int
+	queue.onAccepted = func(enqueued novelfetchworkshop.ProcessJob) {
+		admitted++
+		job, err := queue.manualImportTestQueue.Claim(ctx, time.Millisecond)
+		if err != nil || job.ID != enqueued.ID || !slices.Equal(job.BookIDs, []string{cancelRaceB}) {
+			t.Fatalf("claim=%v err=%v", job, err)
+		}
+		worker := workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry()}
+		if err := worker.process(ctx, job); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", due.Add(time.Duration(i)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	row := storedSubmissionEvidenceSchedule(t, store)
+	doc, err = store.GetDocument(ctx, "tester", cancelRaceB)
+	if err != nil || admitted != 1 || row["status"] != "completed" || doc.Meta["queueState"] == "queued" || doc.Meta["aiStatus"] != "skipped_short_original" {
+		t.Fatalf("admitted=%d parent=%v book=%v/%v ai=%v err=%v", admitted, row["status"], doc.Meta["status"], doc.Meta["queueState"], doc.Meta["aiStatus"], err)
+	}
+}
+
+func TestManualProcessStartKeepsSurvivorOfLateCancellation(t *testing.T) {
+	for _, timing := range []string{"before import", "after import read", "after snapshot read", "after preflight", "at enqueue", "new retry after atomic rejection"} {
+		t.Run(timing, func(t *testing.T) {
+			ctx := context.Background()
+			store := &cancelRaceImportStore{cancelRaceStore: cancelRaceStore{novelfetchworkshop.NewMemoryStore()}}
+			if err := store.PutDocument(ctx, "tester", novelfetchworkshop.Document{BookID: cancelRaceA, Meta: map[string]any{"status": "failed"}}); err != nil {
+				t.Fatal(err)
+			}
+			queue := &manualImportStopQueue{manualImportTestQueue: cancelRaceQueue(t)}
+			now := time.Now()
+			const secret = "manual-partial"
+			h := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+			stop := func() {
+				queue.beforeEnqueue, queue.afterPreflight = nil, nil
+				store.beforeCAS = nil
+				r := doNovelFetchRequest(t, h, http.MethodPost, "/api/novel-fetch-workshop/process/stop", map[string]any{"ids": []string{cancelRaceA}}, now, secret)
+				if r.Code != http.StatusOK {
+					t.Fatalf("stop=%d", r.Code)
+				}
+			}
+			switch timing {
+			case "before import":
+				stop()
+			case "after import read", "after snapshot read":
+				store.beforeCAS = func(doc novelfetchworkshop.Document) {
+					if doc.BookID == cancelRaceA && (timing == "after import read" || doc.Meta["processSnapshot"] != nil) {
+						stop()
+					}
+				}
+			case "after preflight":
+				queue.afterPreflight = stop
+			case "new retry after atomic rejection":
+				queue.beforeEnqueue = stop
+				queue.afterEnqueue = func() {
+					queue.afterEnqueue = nil
+					if err := queue.ClearCancelledBooks(ctx, "tester", []string{cancelRaceA}); err != nil {
+						t.Fatal(err)
+					}
+					if err := updateWorkshopTaskRuntimeState(ctx, store, "tester", cancelRaceA, "waiting_retry", ""); err != nil {
+						t.Fatal(err)
+					}
+				}
+			default:
+				queue.beforeEnqueue = stop
+			}
+			r := doNovelFetchRequest(t, h, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"input_text": cancelRaceA + " A\n" + cancelRaceB + " B", "selected_versions": []string{"ai1"}}, now, secret)
+			var view map[string]any
+			if err := json.Unmarshal(r.Body.Bytes(), &view); err != nil {
+				t.Fatal(err)
+			}
+			if r.Code != http.StatusAccepted || !slices.Equal(scheduleStringSlice(view["book_ids"]), []string{cancelRaceB}) || mapOrEmpty(view["skipped_book_reasons"])[cancelRaceA] != "cancelled" {
+				t.Errorf("start=%d accepted=%v skipped=%v", r.Code, view["book_ids"], view["skipped_book_reasons"])
+			}
+			job, err := queue.manualImportTestQueue.Claim(ctx, time.Millisecond)
+			if err != nil || !slices.Equal(job.BookIDs, []string{cancelRaceB}) || job.ID != view["id"] {
+				t.Fatalf("admitted=%v job=%v err=%v", job.BookIDs, job.ID, err)
+			}
+			stopped, err := store.GetDocument(ctx, "tester", cancelRaceA)
+			want := "stopped"
+			if timing == "new retry after atomic rejection" {
+				want = "waiting_retry"
+			}
+			if err != nil || stopped.Meta["status"] != want || stopped.Meta["queueState"] != want {
+				t.Fatalf("cancelled book=%v/%v err=%v", stopped.Meta["status"], stopped.Meta["queueState"], err)
+			}
+			if err := queue.Ack(ctx, job); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := queue.manualImportTestQueue.Claim(ctx, time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+				t.Errorf("extra admission: %v", err)
+			}
+		})
 	}
 }

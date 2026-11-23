@@ -102,6 +102,7 @@ func TestMemoryQueueCancelledBookRejectsWholeEnqueue(t *testing.T) {
 	if queued || existing != "" || !errors.Is(err, ErrBookCancelled) {
 		t.Errorf("cancelled batch queued=%v existing=%q err=%v", queued, existing, err)
 	}
+	checkRejectedBooks(t, err, "stopped")
 	if len(q.pending) != 0 || len(q.dedupe) != 0 {
 		t.Fatalf("rejected batch left pending=%d dedupe=%d", len(q.pending), len(q.dedupe))
 	}
@@ -135,6 +136,7 @@ func TestRedisQueueCancelledBookRejectsWholeEnqueue(t *testing.T) {
 	if queued || existing != "" || !errors.Is(err, ErrBookCancelled) {
 		t.Fatalf("queued=%v existing=%q err=%v", queued, existing, err)
 	}
+	checkRejectedBooks(t, err, "stopped")
 	count, err := transport.Do(ctx, "EXISTS", q.jobKey(job.ID), q.pendingKey(), q.bookDedupeKey(job.Owner, "2", "free"), q.bookDedupeKey(job.Owner, "2", "stopped"))
 	if err != nil || count != int64(0) {
 		t.Fatalf("rejected batch left keys: %v %v", count, err)
@@ -156,6 +158,14 @@ func TestRedisQueueCancelledBookRejectsWholeEnqueue(t *testing.T) {
 	}
 	if err = q.Ack(ctx, got); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func checkRejectedBooks(t *testing.T, err error, want ...string) {
+	t.Helper()
+	var rejection *CancelledBooksError
+	if !errors.As(err, &rejection) || !slices.Equal(rejection.BookIDs, want) {
+		t.Fatalf("atomic rejection did not identify %v: %v", want, err)
 	}
 }
 
