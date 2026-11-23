@@ -142,21 +142,26 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		committed := false
 		defer func() { read.finish(context.WithoutCancel(r.Context()), committed) }()
 		if err = read.hydrate(r.Context(), owner, books, true); err != nil {
-			writeJSON(w, 422, map[string]string{"error": err.Error()})
+			writeIntakeSourceError(w, err)
 			return
 		}
-		intakeBooks := books
 		create := batchfactoryv11.CreateBatchInput{Title: input.Title, InitialBatchSettings: input.InitialBatchSettings}
 		if len(read.leases) > 0 {
-			create.Books = books
-			intakeBooks = append([]batchfactoryv11.CreateBookInput(nil), books...)
-			for i := range intakeBooks {
-				intakeBooks[i].SourceText = ""
-				intakeBooks[i].TxtText = ""
+			if strings.TrimSpace(create.Title) == "" {
+				create.Title = "Novel Fetch Batch"
 			}
+			create.Books = books
+			batch, err := store.CreateBatch(r.Context(), owner, create)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			committed = true
+			writeJSON(w, http.StatusCreated, map[string]any{"batch": batch})
+			return
 		}
 		intake, err := store.CreateIntake(r.Context(), owner, batchfactoryv11.NovelFetchIntakeInput{
-			Books: intakeBooks,
+			Books: books,
 			Metadata: map[string]any{
 				"sourceMode": "manual_original", "platformId": input.PlatformID, "platformName": strings.TrimSpace(input.PlatformName), "parseMode": input.ParseMode,
 				"columnPresetId": input.ColumnPresetID, "columnOrder": input.ColumnOrder, "inputText": input.InputText,
@@ -216,6 +221,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		if !decodeJSON(w, r, &input) {
 			return
 		}
+		batchfactoryv11.AcceptExternalOriginals(input.Books, "batch_request_original_raw")
 		batch, err := store.CreateBatchFromIntake(r.Context(), owner, r.PathValue("intakeId"), input)
 		if err != nil {
 			writeStoreError(w, err)
@@ -284,6 +290,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		if !decodeJSON(w, r, &input) {
 			return
 		}
+		batchfactoryv11.AcceptExternalOriginals(input.Books, "batch_request_original_raw")
 		batch, err := store.CreateBatch(r.Context(), owner, input)
 		if err != nil {
 			writeStoreError(w, err)
@@ -782,6 +789,8 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 
 func writeStoreError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, errIntakeFieldBytes):
+		writeIntakeSourceError(w, err)
 	case errors.Is(err, batchfactoryv11.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "目标数据不存在，请刷新列表后重试"})
 	case errors.Is(err, batchfactoryv11.ErrConfigRequired):

@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+// AcceptExternalOriginals recomputes provenance on a newly received handoff.
+// Internal intake-to-batch reads use the provenance frozen at this boundary.
+func AcceptExternalOriginals(books []CreateBookInput, origin string) {
+	for index := range books {
+		book := &books[index]
+		meta := sourceWriteMetadata(nil, book.SourceMetadata, "", "")
+		if _, ok := normalizeCapturedSourceText(book.OriginalRaw); ok {
+			book.TxtText = book.OriginalRaw
+			meta = sourceWriteMetadata(meta, nil, book.OriginalRaw, origin)
+		}
+		book.SourceMetadata = meta
+		book.OriginalRaw = ""
+	}
+}
+
 // normalizeNovelFetchIntake keeps the first occurrence of each explicit source
 // Book ID. Empty IDs are retained because they do not provide a stable
 // deduplication identity.
