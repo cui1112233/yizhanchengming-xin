@@ -1,0 +1,58 @@
+# 功能首页卡片区域 Design QA
+
+- source visual truth: `C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-b72f9e5f-5398-4d68-b31c-7f5917fdc764.png`
+- implementation screenshot: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-functions-card-cache-cleared.png`
+- normalized implementation region: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-functions-card-implementation-region.png`
+- side-by-side comparison: `F:/脚本测试/一战晟铭-v88/miniprogram/qa-functions-card-comparison.png`
+- viewport: WeChat Developer Tools, iPhone 12/13 simulator, about `390px` CSS width
+- source pixels: `425 x 466`
+- normalized implementation pixels: `425 x 466`, scaled from the simulator's `365 x 400` desktop-stage capture
+- state: 功能首页、深色主题、顶部以下的“内容创作/生产成片/AI 与工具”区域
+
+## Findings
+
+本轮最终对比没有剩余 P0、P1 或 P2 差异。
+
+- 两列宽度、主卡高度、小卡高度和组间节奏与参考图接近，归一化后的主要几何偏差在约 5% 内。
+- “私人定制”已换成参考方向的金色羽毛、魔法书、环形青光与 AI 晶体独立透明插画。
+- “漫剧创作”已换成参考方向的耳机人物、晚霞画面、播放键与环绕胶片独立透明插画。
+- 九个入口仍是独立按钮，未用整张截图替代交互页面。
+
+## Full-view comparison evidence
+
+`qa-functions-card-comparison.png` 左侧为用户参考图，右侧为微信模拟器实现区域。对比覆盖两个完整分组和第三组标题，能直接判断页面边距、两列比例、卡片高度、标题间距以及两张主插画的可视占比。
+
+## Focused region comparison evidence
+
+- `private-custom-reference-3d.webp` 与 `comic-production-reference-3d.webp` 均为 `384 x 384`、带 Alpha 的 WebP。
+- 微信模拟器最终截图能看到私人定制的 AI 晶体，也能看到漫剧创作画面中的耳机人物，证明运行时没有继续使用旧缓存素材。
+- 不再需要额外局部截图；两张主卡在归一化对比图中已足够清晰。
+
+## Required fidelity surfaces
+
+- Fonts and typography: 分区标题约 19px、主卡标题约 20px、小卡标题约 13px；层级、粗细和单行截断与参考一致。实现字体略粗属于可接受的系统字体差异。
+- Spacing and layout rhythm: 390px 基准左右边距 15px，列间距 10px，主卡 138px，高度由两张 62px 小卡和 14px 间距严格对齐；分区间距 24px。
+- Colors and visual tokens: 深海军蓝背景、蓝绿玻璃卡片、青色边框与参考方向一致；没有增加遮字的大面积炫光。
+- Image quality and asset fidelity: 两张新主图来自参考图定向生成，使用 384px 透明 WebP；微信中显示清晰，没有旧 160px 素材的明显模糊。
+- Copy and content: 私人定制、小说创作、批量测书、水货生产、漫剧创作、AI-CUT、CM 画布、配音、插件均保留；分区文案不变。
+
+## Comparison history
+
+1. P1 黑屏/高度塌陷：移除功能区 CSS Grid 与首图自动高度依赖，改为明确比例和 Flex；修复后页面可见。
+2. P2 卡片偏小：将主卡调整为 138px，小卡调整为 62px，列间距 10px，重新截图后几何接近参考。
+3. P2 主插画偏小：增大主卡插画可视区域；第二轮发现漫剧图压字后停止使用旧图定位方案。
+4. 用户更新素材要求：生成并接入两张新透明素材；首次微信截图仍命中旧编译缓存。
+5. P1 旧资源缓存：使用新文件名、清理微信编译缓存并重新打开项目；最终截图显示两张新素材，控制台 0 错误。
+
+## Primary interactions and runtime checks
+
+- 组件测试验证九张卡片均保存当前入口并通过 `moduleRoute` 打开真实页面。
+- 微信开发者工具最终页为 `pages/functions/index`，没有业务代码错误。
+- 完整 Vitest：`120 passed | 1 skipped`，`762 passed | 3 skipped`。
+- 生产构建：`Compiled successfully`；WXSS 兼容处理成功。
+
+## Follow-up polish
+
+- P3：实现图的主插画青色轮廓光略亮于参考图；不影响文字可读性、结构或操作，本轮保留。
+
+final result: passed

@@ -81,7 +81,9 @@
   .gallery-feature-name {display:block;font-size:20PX;line-height:25PX;font-weight:850}
   .gallery-feature-description {display:block;margin-top:2PX;max-width:72%;font-size:10PX;line-height:14PX;color:#cbe0e8}
   .gallery-feature-art {position:absolute;z-index:2;left:1%;right:1%;bottom:0;width:98%;height:112PX;filter:drop-shadow(0 7PX 10PX rgba(0,17,36,.3))}
-  .gallery-feature-arrow {position:absolute;z-index:4;top:13PX;right:12PX;display:flex;align-items:center;justify-content:center;width:24PX;height:24PX;border:1PX solid rgba(255,255,255,.5);border-radius:50%;background:rgba(7,30,47,.32)}
+  .tools-entry-script .gallery-feature-art {left:auto;right:-10PX;bottom:-15PX;width:160PX;height:160PX;transform:none}
+  .tools-entry-comic .gallery-feature-art {left:auto;right:-35PX;bottom:-42PX;width:210PX;height:210PX;transform:none}
+  .gallery-feature-arrow {position:absolute;z-index:4;top:13PX;right:auto;left:104PX;display:flex;align-items:center;justify-content:center;width:24PX;height:24PX;border:1PX solid rgba(255,255,255,.5);border-radius:50%;background:rgba(7,30,47,.32)}
 
   .gallery-compact.tools-entry {
     position:relative;
@@ -104,7 +106,7 @@
     line-height:1.35;
   }
   .gallery-compact>.mp-app-icon {position:absolute;right:7PX;top:50%;opacity:.9;transform:translateY(-50%)}
-  .gallery-compact-art {width:46PX;height:46PX;flex:0 0 46PX;filter:drop-shadow(0 4PX 7PX rgba(0,12,31,.3))}
+  .gallery-compact-art {width:46PX;height:46PX;flex:0 0 46PX;filter:drop-shadow(0 4PX 7PX rgba(0,12,31,.3));transform:scale(1.25);transform-origin:center}
   .gallery-compact-copy {display:flex;flex:1;min-width:0;flex-direction:column;padding-right:10PX}
   .gallery-compact-title {font-size:13PX;line-height:17PX;font-weight:800;color:#fff;white-space:nowrap}
   .gallery-compact-note {display:none}

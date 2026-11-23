@@ -106,4 +106,8 @@ test("uses WeChat-safe sizing instead of auto-height images or CSS grid", () => 
   expect(galleryStyles).toContain("height:62px");
   expect(galleryStyles).toContain("font-size:20px");
   expect(galleryStyles).toContain("font-size:13px");
+  expect(galleryStyles).toContain("left:104px");
+  expect(galleryStyles).toContain("transform:scale(1.25)");
+  expect(galleryStyles).toContain(".tools-entry-script.gallery-feature-art{left:auto;right:-10px;bottom:-15px;width:160px;height:160px;transform:none}");
+  expect(galleryStyles).toContain(".tools-entry-comic.gallery-feature-art{left:auto;right:-35px;bottom:-42px;width:210px;height:210px;transform:none}");
 });
