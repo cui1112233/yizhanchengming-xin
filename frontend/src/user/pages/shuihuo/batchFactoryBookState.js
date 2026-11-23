@@ -476,18 +476,25 @@ export function batchFactoryBatchProgress(books, runtime = {}) {
   result.total = values.length;
   if (runtime.productionMode === 'text') result.collectionReady = 0;
   for (const book of values) {
+    const textSummary = runtime.stageSummaries?.[book?.id] || runtime.stageSummary;
     const state = batchFactoryBookState(book, {
       ...runtime,
       textAutoUpload: book?.settingsState?.patch?.textAutoUpload ?? runtime.textAutoUpload,
-      stageSummary: runtime.stageSummaries?.[book?.id] || runtime.stageSummary
+      stageSummary: textSummary
     });
     if (runtime.productionMode === 'text') {
       if (state.uploadStatus === 'completed') result.uploaded += 1;
-      else if (state.terminal) result.collectionReady += 1;
-      else if (state.status === 'failed') result.failed += 1;
-      else if (state.status === 'running') result.running += 1;
-      else if (state.key === 'text_collection') result.awaitingUpload += 1;
-      else result.pending += 1;
+      else {
+        // 上传失败不会抹掉已经成功生成的文字页与合集。顶部同时显示
+        // “合集就绪”和“异常”，让用户能打开成品，也能继续处理上传配置。
+        const collectionGenerated = statusFromRun(latestStageRun(textSummary, 'text_collection')) === 'completed';
+        const collectionReady = state.terminal || (collectionGenerated && state.status === 'failed');
+        if (collectionReady) result.collectionReady += 1;
+        if (state.status === 'failed') result.failed += 1;
+        else if (state.status === 'running') result.running += 1;
+        else if (!collectionReady && state.key === 'text_collection') result.awaitingUpload += 1;
+        else if (!collectionReady) result.pending += 1;
+      }
     } else if (state.label === '完成') result.uploaded += 1;
     else if (state.label === '异常') result.failed += 1;
     else if (state.label === '执行中…' || state.label === '处理中') result.running += 1;

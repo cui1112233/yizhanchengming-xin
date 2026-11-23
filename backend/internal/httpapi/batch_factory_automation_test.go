@@ -3308,6 +3308,26 @@ func TestRetryReselectsFetchFailureAfterSourceBookIDChanged(t *testing.T) {
 	}
 }
 
+// 上游抓取失败后，用户在“编辑内容”里粘贴并保存了完整原文，就应直接从
+// 文本生产继续，不能因为书号没变而继续挡在 fetch_original。
+func TestRetryReselectsFetchFailureAfterVerifiedOriginalWasSaved(t *testing.T) {
+	entry := map[string]any{
+		"status": "failed", "stage": "fetch_original",
+		"error": "自动获取正文失败：书号 111111 在七猫付费无法读取：请检查ID是否正确",
+	}
+	book := batchfactoryv11.Book{
+		ID: "book-1", BookID: "111111", SourceText: "人工粘贴的完整原文。", TxtText: "人工粘贴的完整原文。",
+		SourceMetadata: map[string]any{"rawSourceStatus": "verified"},
+	}
+	if !automationFetchFailureRecoveredBySavedOriginal(entry, book) {
+		t.Fatal("已保存完整原文后必须允许继续文本生产")
+	}
+	book.SourceMetadata["rawSourceStatus"] = "unverified"
+	if automationFetchFailureRecoveredBySavedOriginal(entry, book) {
+		t.Fatal("未验证的临时正文不能绕过确定性抓取失败")
+	}
+}
+
 // 全部书都已成功时重试必须明确报错，不能静默启动一个空 run。
 func TestRetryWithoutUnfinishedBooksReturnsConflict(t *testing.T) {
 	now := time.Date(2026, 11, 5, 9, 30, 0, 0, time.UTC)

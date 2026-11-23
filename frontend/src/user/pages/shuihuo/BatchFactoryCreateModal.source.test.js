@@ -57,6 +57,12 @@ test('immediate execution defaults to the end-to-end upload automation mode', ()
 	assert.match(source, /if \(!scheduled\) setAutomationRunMode\('full_submit'\);/);
 });
 
+test('new text batches use text automation labels instead of the legacy video wording', () => {
+  assert.match(source, /batchMode === 'text'\s*\? \[\{ value: 'video_no_submit', label: '生成文本合集（按单书设置上传）' \}, \{ value: 'full_submit', label: '生成文本合集并上传' \}\]/);
+  assert.match(source, /batchMode === 'text' \? '创建完成后立即生成文本合集'/);
+  assert.match(source, /batchMode === 'text'\s*\? '创建后生成文本合集；只有开启上传模式，才会按发布统一配置上传。'/);
+});
+
 test('lets a first-time batch owner save unified settings before creating the batch', () => {
   assert.match(source, /BatchFactoryEngineSettingsForm/);
   assert.match(source, /BatchFactoryAiReasoningForm/);

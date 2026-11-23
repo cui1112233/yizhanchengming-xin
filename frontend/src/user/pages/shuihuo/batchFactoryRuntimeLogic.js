@@ -13,7 +13,7 @@ export function resolveBookProductionText(book) {
 export function resolveBookEditableContent(book, productionMode) {
   const working = batchFactorySourceText(book?.workingFrontContent);
   if (working) return working;
-  if (productionMode === 'comic') return batchFactoryCleanSourceText(book?.sourceText);
+  if (productionMode === 'comic' || productionMode === 'text') return batchFactoryCleanSourceText(book?.sourceText);
   return resolveBookProductionText(book);
 }
 

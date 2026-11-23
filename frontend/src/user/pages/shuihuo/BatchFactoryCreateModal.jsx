@@ -883,11 +883,15 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   >
     {automationDialogMode === 'scheduled' ? <><label className="shuihuo-form-label" htmlFor="batch-scheduled-at">自动启动时间（北京时间 UTC+8） <em>*</em></label>
     <Input id="batch-scheduled-at" type="datetime-local" value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} />
-    <small>{automationScheduleMode === 'submit' ? '提前完成生产和合成；到设定时间才上传或发布。' : '到设定时间才开始生产；生成、合成与上传按后续流程继续。'}</small></> : <Alert type="info" showIcon message="创建完成后立即启动自动生产" description="不会直接提交；只有选择全自动模式且成片完成后，才会上传视频管理系统。" />}
+    <small>{automationScheduleMode === 'submit' ? '提前完成生产和合成；到设定时间才上传或发布。' : '到设定时间才开始生产；生成、合成与上传按后续流程继续。'}</small></> : <Alert type="info" showIcon message={batchMode === 'text' ? '创建完成后立即生成文本合集' : '创建完成后立即启动自动生产'} description={batchMode === 'text' ? '创建后生成文本合集；只有开启上传模式，才会按发布统一配置上传。' : '不会直接提交；只有选择全自动模式且成片完成后，才会上传视频管理系统。'} />}
     <label className="shuihuo-form-label">自动化预设 <em>*</em></label>
     <Select value={automationPresetID || undefined} onChange={setAutomationPresetID} placeholder="选择已保存预设" options={automationPresetsForMode(automationPresets, batchMode).map(item => ({ value: item.id, label: `${item.name} · v${item.version} · ${automationPresetModeLabel(automationPresetMode(item))}` }))} />
     <label className="shuihuo-form-label">执行模式</label>
-    <Select value={automationRunMode} onChange={value => { setAutomationRunMode(value); if (value !== 'full_submit') setAutomationScheduleMode('execute'); }} options={[{ value: 'storyboard_only', label: '只生成分镜' }, { value: 'video_no_submit', label: '生成视频不提交' }, { value: 'full_submit', label: '全自动生成并提交（成片完成后上传）' }]} />
+    <Select value={automationRunMode} onChange={value => { setAutomationRunMode(value); if (value !== 'full_submit') setAutomationScheduleMode('execute'); }} options={batchMode === 'text'
+      ? [{ value: 'video_no_submit', label: '生成文本合集（按单书设置上传）' }, { value: 'full_submit', label: '生成文本合集并上传' }]
+      : batchMode === 'comic'
+        ? [{ value: 'storyboard_only', label: '只生成漫画分页与提示词' }, { value: 'video_no_submit', label: '生成漫画合集不上传' }, { value: 'full_submit', label: '全自动生成并提交' }]
+        : [{ value: 'storyboard_only', label: '只生成分镜' }, { value: 'video_no_submit', label: '生成视频不提交' }, { value: 'full_submit', label: '全自动生成并提交（成片完成后上传）' }]} />
     {automationDialogMode === 'scheduled' ? <><label className="shuihuo-form-label">定时方式</label><Select value={automationScheduleMode} onChange={setAutomationScheduleMode} options={[{ value: 'execute', label: '定时执行（到点才开始生产）' }, { value: 'submit', label: '定时提交（提前生产，到点上传/发布）', disabled: automationRunMode !== 'full_submit' }]} /></> : null}
     <label className="shuihuo-form-label">同时处理书籍</label>
     <Select value={automationConcurrency} onChange={value => setAutomationConcurrency(normalizeAutomationConcurrency(value))} options={[1, 2, 4].map(value => ({ value, label: `${value} 本并行` }))} />

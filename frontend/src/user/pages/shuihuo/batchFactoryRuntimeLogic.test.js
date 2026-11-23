@@ -50,13 +50,14 @@ test('clears only the deleted book from a completed background error', () => {
   assert.equal(clearDeletedBookBackgroundTask({ running: false, failed: 1, errors: task.errors.slice(0, 1) }, { title: '已删除' }), null);
 });
 
-test('comic editing uses the complete captured source instead of the video line range', () => {
+test('comic and text editing use the complete captured source instead of the video line range', () => {
   const book = {
     sourceText: '第一行\n第二行\n第三行',
     sourceMetadata: { contentRangeLines: 1 }
   };
   assert.equal(resolveBookEditableContent(book, 'video'), '第一行');
   assert.equal(resolveBookEditableContent(book, 'comic'), '第一行\n第二行\n第三行');
+  assert.equal(resolveBookEditableContent(book, 'text'), '第一行\n第二行\n第三行');
 });
 
 test('counts only playable VIDEO tasks and completed merge outputs', () => {

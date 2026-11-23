@@ -5079,6 +5079,15 @@ func automationBookRetryable(entry map[string]any, currentSourceBookID ...string
 	return true
 }
 
+// automationFetchFailureRecoveredBySavedOriginal 判断用户是否已经用“编辑内容”
+// 补齐了此前抓取失败的完整原文。此时不需要更换书号，也不能再次请求上游；
+// 重试应直接进入后续生产。
+func automationFetchFailureRecoveredBySavedOriginal(entry map[string]any, book batchfactoryv11.Book) bool {
+	return automationStringValue(entry["status"], "") == "failed" &&
+		automationStringValue(entry["stage"], "") == "fetch_original" &&
+		hasVerifiedBatchOriginal(book) && strings.TrimSpace(book.SourceText) != ""
+}
+
 // automationFetchFailureBookChanged 判断一次「获取原文」失败是否因为用户已经
 // 换过书号：错误文案里出现过书号（如“书号 794582 在七猫无法读取”），且没有
 // 任何一个与批次记录里的当前 source_book_id 相同。文案里没有书号时无法判断，
@@ -5760,6 +5769,19 @@ func (c *BatchAutomationCoordinator) retry(ctx context.Context, owner, batchID s
 	// 常规重试只调度未成功的书。明确指定文本合集时，先核对原任务和冻结配置，
 	// 再允许把该书加入本轮上传，包括用户已经确认再次上传的已完成书。
 	selected := selectRetryableAutomationBooks(books, set, currentSourceBookIDs)
+	// 同一书号的确定性抓取失败原本会被排除，避免无意义地反复请求上游。
+	// 但用户已经粘贴并保存完整原文时，正文来源已被人工修复，应直接继续生产。
+	if prefetchedBatchOK {
+		for _, book := range prefetchedBatch.Books {
+			if len(set) > 0 && !set[book.ID] {
+				continue
+			}
+			entry, _ := books[book.ID].(map[string]any)
+			if automationFetchFailureRecoveredBySavedOriginal(entry, book) {
+				selected[book.ID] = true
+			}
+		}
+	}
 	prepared := map[string]map[string]any{}
 	for bookID, override := range overrides {
 		entry, _ := books[bookID].(map[string]any)

@@ -259,6 +259,19 @@ test('a ready text collection is terminal only for a non-submit job and remains 
   assert.equal(batch.completionPercent, 100);
 });
 
+test('an upload failure still counts the already generated text collection as ready', () => {
+  const book = { id: 'book' };
+  const runtime = { productionMode: 'text', stageSummaries: { book: { runs: [
+    { stage: 'text_collection', status: 'succeeded' },
+    { stage: 'text_publish', status: 'failed', errorMessage: '缺少上传人和组织' }
+  ] } } };
+  const progress = batchFactoryBatchProgress([book], runtime);
+  assert.equal(progress.collectionReady, 1);
+  assert.equal(progress.failed, 1);
+  assert.equal(progress.uploaded, 0);
+  assert.equal(progress.completionPercent, 100);
+});
+
 test('a pending receipt keeps the book uploading while stage logs catch up', () => {
   const runtime = {
     productionMode: 'text',
