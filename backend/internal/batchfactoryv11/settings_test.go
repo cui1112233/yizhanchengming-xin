@@ -3,6 +3,7 @@ package batchfactoryv11
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -89,6 +90,71 @@ func TestResolveSettingsUsesPresenceNotTruthiness(t *testing.T) {
 	)
 	if string(effective["enabled"]) != "false" || string(effective["prefix"]) != "\"\"" || string(effective["duration"]) != "0" {
 		t.Fatalf("effective=%v", effective)
+	}
+}
+
+func TestResolveSettingsSensitiveModePrecedence(t *testing.T) {
+	batch := SettingsPatch{"sensitiveMode": raw("system"), "textModelId": raw("batch-text")}
+	bookAI := SettingsPatch{"sensitiveMode": raw("ai"), "textModelId": raw("book-text")}
+	restoredBook := ApplySparseUpdate(bookAI, SettingsUpdate{RestoreKeys: []string{"sensitiveMode"}})
+	legacyBatch := SettingsPatch{"sensitiveAIEnabled": raw(true)}
+
+	tests := []struct {
+		name  string
+		batch SettingsPatch
+		book  SettingsPatch
+		want  SettingsPatch
+	}{
+		{
+			name:  "book inherits batch system mode",
+			batch: batch,
+			want:  SettingsPatch{"sensitiveMode": raw("system"), "textModelId": raw("batch-text")},
+		},
+		{
+			name:  "book AI overrides batch system mode",
+			batch: batch,
+			book:  bookAI,
+			want:  SettingsPatch{"sensitiveMode": raw("ai"), "textModelId": raw("book-text")},
+		},
+		{
+			name:  "restored book inherits mode and keeps its text model",
+			batch: batch,
+			book:  restoredBook,
+			want:  SettingsPatch{"sensitiveMode": raw("system"), "textModelId": raw("book-text")},
+		},
+		{
+			name:  "legacy AI switch remains available to the policy",
+			batch: legacyBatch,
+			want:  SettingsPatch{"sensitiveAIEnabled": raw(true)},
+		},
+		{
+			name:  "explicit off is preserved alongside the legacy AI switch",
+			batch: legacyBatch,
+			book:  SettingsPatch{"sensitiveMode": raw("off")},
+			want:  SettingsPatch{"sensitiveMode": raw("off"), "sensitiveAIEnabled": raw(true)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			batchBefore, err := json.Marshal(tt.batch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := ResolveSettings(tt.batch, tt.book)
+			if !reflect.DeepEqual(got, tt.want) {
+				gotJSON, _ := json.Marshal(got)
+				wantJSON, _ := json.Marshal(tt.want)
+				t.Errorf("resolved settings = %s, want %s", gotJSON, wantJSON)
+			}
+			batchAfter, err := json.Marshal(tt.batch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(batchAfter) != string(batchBefore) {
+				t.Errorf("batch settings changed from %s to %s", batchBefore, batchAfter)
+			}
+		})
 	}
 }
 

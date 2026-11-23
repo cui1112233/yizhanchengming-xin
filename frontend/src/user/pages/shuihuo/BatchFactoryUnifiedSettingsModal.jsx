@@ -80,9 +80,15 @@ function HelpTip({ title, children }) {
   return <Tooltip title={children}><button type="button" className="batch-factory-help-button" aria-label={`查看${title}说明`}>?</button></Tooltip>;
 }
 
+const PRODUCTION_MODE_OPTIONS = [
+  { value: 'video', label: '视频生成' },
+  { value: 'comic', label: '漫画生成' },
+  { value: 'text', label: '文本生成' }
+];
+
 export function BatchFactoryProductionModeControl({ value, onChange, disabled = false }) {
   const productionMode = batchFactoryProductionModeVisibility(value).mode;
-  return <Segmented className={`batch-factory-production-mode-switch is-${productionMode}`} size="small" value={productionMode} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} disabled={disabled} onChange={onChange} />;
+  return <Segmented className={`batch-factory-production-mode-switch is-${productionMode}`} size="small" value={productionMode} options={PRODUCTION_MODE_OPTIONS} disabled={disabled} onChange={onChange} />;
 }
 
 export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['models', 'audio', 'publish'], active = true }) {
@@ -125,9 +131,10 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
   const publish = value.publishSettings || {};
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>当前批次统一生产参数 <HelpTip title="当前批次统一生产参数">保存后作为全部小说的默认值；单书已保存的显式覆盖不会被预设载入或本页保存清空。</HelpTip></span>} />
-    {modelSettingsEnabled ? <><section className="batch-factory-engine-card"><header><b>模型配置</b><HelpTip title="模型配置">文本、图片、视频和配音。</HelpTip></header>
+    {modelSettingsEnabled ? <><section className="batch-factory-engine-card"><header><b>模型配置</b>{!visibility.text ? <HelpTip title="模型配置">文本、图片、视频和配音。</HelpTip> : null}</header>
       <div className="batch-factory-engine-card-body batch-factory-engine-grid">
       <label className="batch-factory-engine-field"><span><b>文本模型</b></span><Select allowClear loading={modelsLoading} value={value.textModelId || undefined} options={modelOptions.text} placeholder="选择已启用文本模型" onChange={textModelId => patch({ textModelId: textModelId || '' })} /></label>
+      {!visibility.text ? <>
       <label className="batch-factory-engine-field"><span><b>图片生成通道</b></span><Select value={value.imageProvider || 'personal_api'} options={imageProviderOptions} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: value.imageModelId }))} /></label>
       <label className="batch-factory-engine-field"><span><b>图片模型</b></span><Select allowClear loading={modelsLoading} value={value.imageModelId || undefined} options={imageModelOptions} placeholder="选择当前通道的图片模型" onChange={imageModelId => patch({ imageModelId: imageModelId || '', ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), value.imageProvider) } : {}) })} /></label>
       <label className="batch-factory-engine-field is-aspect-row"><span><b>图片画幅</b><HelpTip title="图片画幅">用于漫画成图与视频参考图；资产图默认 9:16，可单独覆盖。</HelpTip></span><Segmented value={value.imageAspectRatio || value.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIOS} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></label>
@@ -135,6 +142,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
       <label className="batch-factory-engine-field"><span><b>生成资产图片</b><HelpTip title="生成资产图片">默认关闭。开启后自动化会提取人物、场景和道具资产并生成参考图；关闭时跳过资产生成阶段（不调用生图、不消耗额度），不影响分镜、视频与漫画流程；已有资产图片仍会照常使用，没有资产图片时沿用文字描述继续生成。</HelpTip></span><Switch checked={value.assetImagesEnabled === true} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} /></label>
       <label className="batch-factory-engine-field"><span><b>添加水印</b><HelpTip title="添加水印">开启后在每张漫画图片右下角叠加白底方框文字。</HelpTip></span><Switch checked={value.watermarkEnabled === true} onChange={watermarkEnabled => patch({ watermarkEnabled })} /></label>
       {value.watermarkEnabled === true ? <label className="batch-factory-engine-field"><span><b>水印文字</b><HelpTip title="水印文字">显示在图片右下角的文字，默认为“热门小说”。</HelpTip></span><Input value={value.watermarkText || '热门小说'} placeholder="热门小说" maxLength={20} onChange={event => patch({ watermarkText: event.target.value })} /></label> : null}
+      </> : null}
       {visibility.video ? <>
       <label className="batch-factory-engine-field"><span><b>视频引擎</b></span><Select value={normalizeModelProvider(value.videoProvider || 'personal_api', 'personal_api', value.videoModelId)} options={videoProviderOptions} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: value.videoModelId, expandFanKeModels: true }))} /></label>
       <div className="batch-factory-engine-field"><span><b>视频模型</b><HelpTip title="视频模型">模型列表只显示当前视频引擎的可用模型；选择模型时会同步对应的生成通道。</HelpTip></span><Select allowClear loading={modelsLoading} value={value.videoModelId || undefined} options={videoModelOptions} placeholder="选择当前通道的视频模型" onChange={videoModelId => patch({ videoModelId: videoModelId || '', ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), value.videoProvider) } : {}) })} /></div>
@@ -732,7 +740,8 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
   };
   const changeProductionMode = async productionMode => {
     const previousMode = batchFactoryProductionModeVisibility(draftPatch.productionMode).mode;
-    const nextLabel = productionMode === 'comic' ? '漫画生成' : '视频生成';
+    const nextLabel = PRODUCTION_MODE_OPTIONS.find(option => option.value === productionMode).label;
+    const previousLabel = PRODUCTION_MODE_OPTIONS.find(option => option.value === previousMode).label;
     if (!onProductionModeChange || productionMode === previousMode) {
       setDraftPatch(current => ({ ...current, productionMode }));
       return;
@@ -743,7 +752,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
       const confirmed = await new Promise(resolve => {
         Modal.confirm({
           title: `确认把整批切换为${nextLabel}？`,
-          content: `整批 ${batchBooks.length} 本将切换为${nextLabel}；漫画页、视频与资产数据全部保留，随时可切回。${overrideCount ? `${overrideCount} 本单书的模式覆盖将被清除；` : ''}在途${previousMode === 'video' ? '视频' : '漫画'}任务不会迁移。`,
+          content: `整批 ${batchBooks.length} 本将切换为${nextLabel}。已生成的内容和资产全部保留，随时可切回。${overrideCount ? `${overrideCount} 本单书的模式覆盖将被清除。` : ''}在途${previousLabel}任务不会迁移。`,
           okText: '确认切换',
           cancelText: '保持当前模式',
           okButtonProps: { danger: true },

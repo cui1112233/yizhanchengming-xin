@@ -460,7 +460,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const comicPageRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-page'), [catalog.batch]);
   const comicImageDerivationRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-image-derivation'), [catalog.batch]);
   const ai = form.aiPromptConfig || {};
-  const visibility = batchFactoryProductionModeVisibility(form.productionMode);
+  const visibility = batchFactoryProductionModeVisibility(batchPatch.productionMode === 'text' ? 'text' : form.productionMode);
   const productionMode = visibility.mode;
   const assetRules = ai.assets || {};
   const starredCharacterNames = Array.isArray(form.starredCharacterNames) ? form.starredCharacterNames : [];
@@ -719,12 +719,14 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             {audioEnabled ? <div className="batch-factory-book-audio-duration"><InheritedNumberField label="配音目标（秒）" value={form.audioDurationSeconds ?? 0} inherited={inherited.audioDurationSeconds ?? 0} explicit={Object.hasOwn(bookPatch, 'audioDurationSeconds')} min={0} max={86400} precision={2} onChange={audioDurationSeconds => patch({ audioDurationSeconds })} /></div> : null}
           </section></ConfigCard> : null}
 
-          <ConfigCard title="辅助生成" description="图片与文本模型用于资产、AI 推理和画面生成。"><div className="batch-factory-engine-grid">
+          <ConfigCard title="辅助生成" description={visibility.text ? '文本模型用于需要调用 AI 的文本处理。' : '图片与文本模型用于资产、AI 推理和画面生成。'}><div className="batch-factory-engine-grid">
+            <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={modelsLoading} explicit={Object.hasOwn(bookPatch, 'textModelId')} onChange={textModelId => patch({ textModelId })} />
+            {!visibility.text ? <>
             <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} explicit={Object.hasOwn(bookPatch, 'imageProvider')} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
             <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : modelsLoading} explicit={Object.hasOwn(bookPatch, 'imageModelId')} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
-            <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={modelsLoading} explicit={Object.hasOwn(bookPatch, 'textModelId')} onChange={textModelId => patch({ textModelId })} />
             <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIO_OPTIONS} loading={false} explicit={Object.hasOwn(bookPatch, 'imageAspectRatio')} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
             <InheritedSwitchField label="生成资产图片" value={form.assetImagesEnabled} inherited={inherited.assetImagesEnabled === true} explicit={Object.hasOwn(bookPatch, 'assetImagesEnabled')} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} />
+            </> : null}
           </div></ConfigCard>
           <ConfigCard title="敏感词处理" description="系统优化在本地执行，不消耗 AI 额度。">
             <div className="batch-factory-engine-field">

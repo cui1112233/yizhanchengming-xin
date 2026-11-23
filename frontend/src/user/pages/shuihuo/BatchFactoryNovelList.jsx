@@ -4238,7 +4238,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (failed.length) throw new Error(`统一配置已保存，但 ${failed.length} 本小说未完成覆盖：${failed.join('；')}`);
   }
   async function saveProductionMode(value) {
-    const productionMode = value === 'comic' ? 'comic' : 'video';
+    const productionMode = value === 'comic' || value === 'text' ? value : 'video';
     try {
       await saveBatchSettings(batch.id, {
         patch: { productionMode },

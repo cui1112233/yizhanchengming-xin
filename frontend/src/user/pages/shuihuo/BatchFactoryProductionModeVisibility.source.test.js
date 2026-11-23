@@ -12,7 +12,7 @@ const novelListSource = fs.readFileSync(path.join(directory, 'BatchFactoryNovelL
 const stylesheet = fs.readFileSync(path.join(directory, '..', 'shuihuo-production.css'), 'utf8');
 
 test('unified settings use the shared production-mode visibility model', () => {
-  assert.match(unifiedSource, /import \{ batchFactoryProductionModeVisibility \} from '\.\/batchFactoryProductionMode'/);
+  assert.match(unifiedSource, /import \{[^}]*\bbatchFactoryProductionModeVisibility\b[^}]*\} from '\.\/batchFactoryProductionMode'/);
   assert.match(unifiedSource, /const visibility = batchFactoryProductionModeVisibility\(value\.productionMode\)/);
   assert.match(unifiedSource, /visibility\.video && sections\.includes\('audio'\)/);
 });
@@ -30,11 +30,60 @@ test('unified reasoning no longer exposes the legacy visual prompt selector', ()
 
 test('unified settings switch production mode beside the title without a media tab', () => {
   assert.match(unifiedSource, /export function BatchFactoryProductionModeControl/);
-  assert.match(unifiedSource, /options=\{\[\{ value: 'video', label: '视频生成' \}, \{ value: 'comic', label: '漫画生成' \}\]\}/);
   assert.match(unifiedSource, /<span>统一配置<\/span><BatchFactoryProductionModeControl/);
   assert.doesNotMatch(unifiedSource, /key: 'media', label: '画面与视频'/);
   assert.match(createSource, /<span>新建批量 · 统一配置<\/span><BatchFactoryProductionModeControl/);
   assert.doesNotMatch(createSource, /key: 'media', label: '画面与视频'/);
+});
+
+test('the shared production switch offers video, comic and text generation', () => {
+  const optionList = unifiedSource.match(/const PRODUCTION_MODE_OPTIONS\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? '';
+  const options = Array.from(optionList.matchAll(/\{\s*value:\s*'([^']+)',\s*label:\s*'([^']+)'\s*,?\s*\}/g), ([, value, label]) => [value, label]);
+  assert.deepEqual(Object.fromEntries(options), {
+    video: '视频生成',
+    comic: '漫画生成',
+    text: '文本生成'
+  });
+  assert.match(unifiedSource, /function BatchFactoryProductionModeControl\b[\s\S]*?<Segmented[^>]*\boptions=\{PRODUCTION_MODE_OPTIONS\}/);
+});
+
+test('text mode in unified settings keeps the text model and hides the image and video models', () => {
+  const modelControls = unifiedSource.match(/<b>模型配置<\/b>[\s\S]*?<\/section>/)?.[0] ?? '';
+  const imageControls = modelControls.match(/\{!visibility\.text\s*\?\s*<>([\s\S]*?)<\/>\s*:\s*null\}/)?.[1] ?? '';
+  const videoControls = modelControls.match(/\{visibility\.video\s*\?\s*<>([\s\S]*?)<\/>\s*:\s*null\}/)?.[1] ?? '';
+  const sharedControls = modelControls.replace(imageControls, '').replace(videoControls, '');
+  assert.match(sharedControls, /<b>文本模型<\/b><\/span><Select\b/);
+  assert.ok(!/<b>(?:图片生成通道|图片模型|视频模型)<\/b>/.test(sharedControls), 'text mode should expose only the unified text model');
+  assert.match(imageControls, /<b>图片生成通道<\/b>/, 'text mode should hide the unified image provider');
+  assert.match(imageControls, /<b>图片模型<\/b>/, 'text mode should hide the unified image model');
+  assert.match(imageControls, /<ImageCapacityControl\b/, 'text mode should hide the unified image capacity controls');
+  assert.match(videoControls, /<b>视频模型<\/b>/, 'only video mode should show the unified video model');
+  for (const label of ['视频引擎', '视频画幅', '视频分辨率', '音频来源', '配音音色', '配音风格', '语速']) {
+    assert.ok(videoControls.includes(`<b>${label}</b>`), `only video mode should show ${label}`);
+  }
+  assert.match(unifiedSource, /sections\.includes\('sensitive'\) \? <section[^>]*><header><b>敏感词处理<\/b>/);
+});
+
+test('text mode in single-book settings keeps the text model and hides the image and video models', () => {
+  const auxiliaryControls = bookSource.match(/<ConfigCard title="辅助生成"[\s\S]*?<\/ConfigCard>/)?.[0] ?? '';
+  const imageControls = auxiliaryControls.match(/\{!visibility\.text\s*\?\s*<>([\s\S]*?)<\/>\s*:\s*null\}/)?.[1] ?? '';
+  const videoControls = bookSource.match(/\{visibility\.video\s*\?\s*<ConfigCard title="核心视频引擎"[\s\S]*?<\/ConfigCard>/)?.[0] ?? '';
+  const sharedControls = auxiliaryControls.replace(imageControls, '');
+  assert.match(sharedControls, /label="文本模型" field="textModelId"/);
+  assert.ok(!/field="(?:imageProvider|imageModelId|imageAspectRatio|videoModelId)"/.test(sharedControls), 'text mode should expose only the book text model');
+  assert.match(imageControls, /label="图片生成通道" field="imageProvider"/, 'text mode should hide the book image provider');
+  assert.match(imageControls, /label="图片模型" field="imageModelId"/, 'text mode should hide the book image model');
+  assert.match(imageControls, /label="图片画幅" field="imageAspectRatio"/, 'text mode should hide the book image aspect ratio');
+  assert.match(videoControls, /label="视频模型" field="videoModelId"/, 'only video mode should show the book video model');
+  for (const field of ['videoProvider', 'videoAspectRatio', 'videoResolution']) {
+    assert.ok(videoControls.includes(`field="${field}"`), `only video mode should show ${field}`);
+  }
+  assert.match(bookSource, /visibility\.video \? <ConfigCard title="配音与时长"/);
+  assert.match(bookSource, /<ConfigCard title="敏感词处理"/);
+});
+
+test('a text batch hides media controls even when a book still carries an old production mode', () => {
+  assert.match(bookSource, /batchFactoryProductionModeVisibility\(batchPatch\.productionMode === 'text' \? 'text' : form\.productionMode\)/);
 });
 
 test('production mode switch uses distinct visible colors for video and comic', () => {
@@ -53,7 +102,7 @@ test('comic mode owns comic generation prompts inside AI reasoning', () => {
 
 test('single-book settings use the shared production-mode visibility model', () => {
   assert.match(bookSource, /import \{ batchFactoryProductionModeVisibility \} from '\.\/batchFactoryProductionMode'/);
-  assert.match(bookSource, /const visibility = batchFactoryProductionModeVisibility\(form\.productionMode\)/);
+  assert.match(bookSource, /const visibility = batchFactoryProductionModeVisibility\(/);
   assert.match(bookSource, /visibility\.video \? <ConfigCard title="核心视频引擎"/);
   assert.match(bookSource, /visibility\.video \? <ConfigCard title="配音与时长"/);
   assert.match(bookSource, /visibility\.comic \? <section className="batch-factory-engine-card"><header><b>漫画图片约束<\/b>/);
