@@ -531,21 +531,61 @@ export function textUploadControl(collection, status) {
   };
 }
 
-export async function retryTextUpload(api, batchId, bookId, summary, confirmRepublish) {
+async function planTextUpload(api, batchId, item, chooseCollection, confirmRepublish) {
+  const {book, summary} = item;
   const record = summary?.textPublishRecord;
-  const run = summary?.runs?.findLast(item => item.stage === 'text_publish');
-  const manual = summary?.textPublishSource === 'manual' || (!run && record && !record.runId && !record.attempt);
-  const collectionId = record?.collectionId || (!manual && run?.collectionId);
-  if (!collectionId || (record?.bookId && record.bookId !== bookId) || (record?.kind && record.kind !== 'text')) return 'select';
-  const status = await api.getTextPublishStatus(batchId, bookId, collectionId);
-  const current = manual || (status?.publish && run && textReceiptMatchesRun(status.publish, run, summary.runs));
-  if (status?.published && current) return 'published';
-  if (status?.publish?.status === 'pending') return 'pending';
-  const force = Boolean(status?.published || status?.lastPublished || summary?.textLastPublishedRecord?.collectionId === collectionId);
-  if (force && !confirmRepublish()) return 'cancelled';
-  if (manual) await api.publishTextCollection(batchId, bookId, collectionId, {force});
-  else await api.retryBatchAutomation(batchId, [bookId]);
-  return 'retried';
+  const run = summary?.runs?.findLast(entry => entry.stage === 'text_publish');
+  const manual = summary?.textPublishSource === 'manual' || (!item.automatic && !run);
+  const scoped = (!record?.bookId || record.bookId === book.id) && (!record?.kind || record.kind === 'text');
+  let collectionId = scoped && (record?.collectionId || (!manual && run?.collectionId));
+  if (!collectionId) collectionId = await chooseCollection(book);
+  if (!collectionId) return {skip:'已取消'};
+  const status = await api.getTextPublishStatus(batchId, book.id, collectionId);
+  if (!status) throw Error('无法读取合集上传状态');
+  const current = manual || (status.publish && run && textReceiptMatchesRun(status.publish, run, summary.runs));
+  if (status.published && current) return {skip:'已上传'};
+  if (status.publish?.status === 'pending') return {skip:'等待上传确认'};
+  const force = Boolean(status.published || status.lastPublished || summary?.textLastPublishedRecord?.collectionId === collectionId);
+  if (force && !await confirmRepublish(book, collectionId)) return {skip:'已取消'};
+  return {manual, collectionId, force};
+}
+
+export async function retryTextBooks(api, batchId, items, {chooseCollection, confirmRepublish}) {
+  const automaticIds = [];
+  const overrides = {};
+  const manual = [];
+  const skipped = [];
+  const errors = [];
+  for (const item of items) {
+    const {book, stage} = item;
+    try {
+      if (stage === 'text_publish') {
+        const plan = await planTextUpload(api, batchId, item, chooseCollection, confirmRepublish);
+        if (plan.skip) { skipped.push(plan.skip); continue; }
+        if (plan.manual) {
+          manual.push({book, run:() => api.publishTextCollection(batchId, book.id, plan.collectionId, {force:plan.force})});
+          continue;
+        }
+        overrides[book.id] = {collectionId:plan.collectionId, force:plan.force};
+      } else if (!item.automatic && ['text_collection','text_render'].includes(stage)) {
+        manual.push({book, run:() => retryTextStage(api, batchId, book.id, {...item.failed, stage})});
+        continue;
+      }
+      automaticIds.push(book.id);
+    } catch (error) { errors.push(`${book.title || book.id}：${error.message}`); }
+  }
+  // 全部确认完成后才提交。调度器按照一个 bookIds 列表重开原任务。
+  const operations = [];
+  if (automaticIds.length) operations.push({
+    label:'自动生产', count:automaticIds.length, run:() => api.retryBatchAutomation(batchId, automaticIds, overrides)
+  });
+  for (const action of manual) operations.push({label:action.book.title || action.book.id, count:1, run:action.run});
+  let submitted = 0;
+  await Promise.all(operations.map(async operation => {
+    try { await operation.run(); submitted += operation.count; }
+    catch (error) { errors.push(`${operation.label}：${error.message}`); }
+  }));
+  return {submitted, skipped, errors};
 }
 
 export async function retryTextStage(api, batchId, bookId, failed) {

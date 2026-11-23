@@ -847,8 +847,10 @@ export function resumeBatchAutomation(batchId) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/automation/resume`), { method: 'POST', body: body({}) });
 }
 
-export function retryBatchAutomation(batchId, bookIds = []) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/automation/retry`), { method: 'POST', body: body({ bookIds }) });
+export function retryBatchAutomation(batchId, bookIds = [], textPublishOverrides = {}) {
+  const payload = { bookIds };
+  if (Object.keys(textPublishOverrides).length) payload.textPublishOverrides = textPublishOverrides;
+  return apiRequest(bf11Path(`batches/${id(batchId)}/automation/retry`), { method: 'POST', body: body(payload) });
 }
 
 export function cancelBatchAutomation(batchId) {

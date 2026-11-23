@@ -185,7 +185,7 @@ import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readCo
 import * as textApi from '../../../shared/api/batchFactoryText.js';
 import { getTextPublishStatus, publishTextCollection } from '../../../shared/api/batchFactoryV12.js';
 import automationStages from './automationStages.json';
-import { collectionUploadKind, retryTextStage, retryTextUpload, textModelPreflightReasons } from './batchFactoryNovelListHelpers.js';
+import { collectionUploadKind, retryTextBooks, textModelPreflightReasons } from './batchFactoryNovelListHelpers.js';
 import TextMediaDialog from './TextMediaDialog.jsx';
 import { ComicReferenceChips } from './ComicReferenceChips.jsx';
 import { removablePageReferences } from './comicReferenceMaterials.js';
@@ -4792,37 +4792,62 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     }
     return error?.message || `重试提交失败${status ? `（HTTP ${status}）` : ''}`;
   }
+  async function chooseTextRetryCollection(book) {
+    const response = await textApi.listTextCollections(batch.id, book.id);
+    const choices = (response?.items || []).filter(item => item.id);
+    if (!choices.length) throw Error('没有可以上传的文本合集');
+    return new Promise(resolve => {
+      let selected = '';
+      const dialog = Modal.confirm({
+        title:`为《${book.title || book.id}》选择重试合集`,
+        content:<select aria-label="重试文本合集" defaultValue="" onChange={event => {
+          selected = event.target.value;
+          dialog.update({okButtonProps:{disabled:!selected}});
+        }}>
+          <option value="" disabled>选择要上传的合集</option>
+          {choices.map((item, index) => <option key={item.id} value={item.id} title={item.id}>
+            文本合集 {String(choices.length - index).padStart(2, '0')} · {item.id}
+          </option>)}
+        </select>,
+        okText:'使用此合集', cancelText:'跳过本书', okButtonProps:{disabled:true},
+        onOk:() => resolve(selected), onCancel:() => resolve('')
+      });
+    });
+  }
+
+  async function retryFailedTextBooks(targetBooks) {
+    const runtime = await loadRuntimeStatus({quiet:true});
+    if (!runtime) throw Error('无法读取当前的重试状态，请刷新后重试。');
+    const items = [];
+    for (const book of targetBooks) {
+      const summary = runtime.stageSummaries?.[book.id];
+      const automation = runtime.automation;
+      const entry = automationBookForCard(automation, batch.id, book.id);
+      if (summary?.textPublishSource !== 'manual' && entry && automationBookIsActive(automation, book.id)) continue;
+      const state = batchFactoryBookState(book, {stageSummary:summary, productionMode:'text', automationBook:entry});
+      const retryable = automationBookNeedsRetry(automation, book.id);
+      if (state.status !== 'failed' && (!retryable || summary?.textPublishSource === 'manual')) continue;
+      const stage = state.failedStep?.key || state.failedStage?.stage || retryable?.stage;
+      const run = summary?.runs?.findLast(item => item.stage === stage);
+      items.push({book, summary, stage, automatic:Boolean(retryable || (run && stage === 'text_publish')),
+        failed:{...run, errorMessage:run?.errorMessage || state.detail}});
+    }
+    if (!items.length) { message.info('没有可以重试的文本步骤。'); return; }
+    const result = await retryTextBooks({...textApi, getTextPublishStatus, publishTextCollection, retryBatchAutomation}, batch.id, items, {
+      chooseCollection:chooseTextRetryCollection,
+      confirmRepublish:(book, id) => window.confirm(`《${book.title || book.id}》的文本合集 ${id} 已上传，确认再次上传？`)
+    });
+    if (result.submitted) message.success(`已提交 ${result.submitted} 本书重试`);
+    if (result.errors.length) message.error(result.errors.join('；'));
+    if (result.skipped.length) message.info(`跳过 ${result.skipped.length} 本（${[...new Set(result.skipped)].join('、')}）`);
+  }
+
   async function retryLastFailedStage(book, videoId = '', textModelId = '') {
-    if (!batch?.id || !book?.id || actionBusy) return;
+    if (!batch?.id || !book?.id || actionBusy || automationBusy) return;
     if (effectiveBookSettings(batch, book).productionMode === 'text') {
       setActionBusy(stageActionKey('retry', book.id));
-      try {
-        const runtime = await loadRuntimeStatus({quiet:true});
-        if (!runtime) throw Error('无法读取当前的重试状态，请刷新后重试。');
-        const summary = runtime.stageSummaries?.[book.id];
-        const automation = runtime.automation;
-        if (summary?.textPublishSource !== 'manual' && automationBookIsActive(automation, book.id)) { message.info('这本书正在自动生产中。'); return; }
-        const entry = automationBookForCard(automation, batch.id, book.id);
-        const failure = batchFactoryBookState(book, {stageSummary:summary, productionMode:'text', automationBook:entry});
-        const retryable = automationBookNeedsRetry(automation, book.id);
-        if (failure.status !== 'failed' && (!retryable || summary?.textPublishSource === 'manual')) { message.info('当前书没有失败的文本步骤。'); return; }
-        const stage = failure.failedStep?.key || failure.failedStage?.stage || retryable?.stage;
-        if (stage === 'text_publish') {
-          const result = await retryTextUpload({getTextPublishStatus, publishTextCollection, retryBatchAutomation}, batch.id, book.id, summary,
-            () => window.confirm('这个文本合集已上传，确认再次上传？'));
-          if (result === 'select') { openTextBook(book, 'collections'); message.info('请在文本媒体库选择要上传的合集。'); }
-          if (result === 'pending') message.info('已提交，等待上传确认');
-          if (result === 'published') message.info('当前文本合集已上传');
-          if (result === 'retried') message.success('已重试文本上传');
-          return;
-        }
-        const run = summary?.runs?.findLast(item => item.stage === stage);
-        await retryTextStage(textApi, batch.id, book.id, {...run, stage, errorMessage:run?.errorMessage || failure.detail});
-        if (retryable || !['text_collection','text_render'].includes(stage)) {
-          await retryBatchAutomation(batch.id, [book.id]);
-        }
-        message.success('已重试文本步骤');
-      } catch (error) { message.error(error?.message || '文本步骤重试失败'); }
+      try { await retryFailedTextBooks([book]); }
+      catch (error) { message.error(error?.message || '文本步骤重试失败'); }
       finally {
         setActionBusy('');
         void Promise.allSettled([refreshBatch(), loadRuntimeStatus({quiet:true})]);
@@ -5384,8 +5409,14 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (key === 'retry-stages' || (key === 'retry' && batchProductionMode === 'text')) {
       setAutomationBusy('retry-stages');
       try {
-        for (const book of stageRetryTargets) await retryLastFailedStage(book);
-      } finally { setAutomationBusy(''); }
+        if (batchProductionMode === 'text') {
+          await retryFailedTextBooks(books);
+          void Promise.allSettled([refreshBatch(), loadRuntimeStatus({quiet:true})]);
+        } else {
+          for (const book of stageRetryTargets) await retryLastFailedStage(book);
+        }
+      } catch (error) { message.error(error?.message || '重试失败'); }
+      finally { setAutomationBusy(''); }
       return;
     }
     if (key === 'cancel') {

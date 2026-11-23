@@ -66,39 +66,43 @@ test('渲染失败信息里的页码可定位尚未落图的页和封面', async
   assert.deepEqual(calls,[['batch','book','p2',{expectedRevision:5}],['batch','book',{expectedRevision:7}]]);
 });
 
-test('上传重试按当前回执选合集，自动任务仅交回调度器，重传之前必须确认', async () => {
-  const calls=[];
-  let approved=false;
+test('批量重试先确认和选合集，再一次提交所有同意的自动书，手动上传单独提交',async()=>{
+  const events=[];
   const api={
-    getTextPublishStatus:async(...args)=>{calls.push(['get',...args]);return {published:false,publish:{status:'failed'},lastPublished:{status:'published'}}},
-    retryBatchAutomation:async(...args)=>calls.push(['retry',...args]),
-    publishTextCollection:async(...args)=>calls.push(['publish',...args])
+    getTextPublishStatus:async(batch,id,c)=>{events.push('read:'+id+':'+c);return {published:false,publish:{status:'failed'},lastPublished:id==='b2'?null:{status:'published'}}},
+    retryBatchAutomation:async(...args)=>events.push(['retry',...args]),
+    publishTextCollection:async(...args)=>events.push(['manual',...args])
   };
-  const summary={runs:[{stage:'text_publish',id:'old',collectionId:'auto-c'}],textPublishRecord:{collectionId:'manual-c',status:'failed'},textPublishSource:'manual'};
-  const retry=()=>helpers.retryTextUpload(api,'batch','book',summary,()=>approved);
-  assert.equal(await retry(),'cancelled');
-  assert.deepEqual(calls,[['get','batch','book','manual-c']]);
-  approved=true;assert.equal(await retry(),'retried');
-  assert.deepEqual(calls.at(-1),['publish','batch','book','manual-c',{force:true}]);
-  delete summary.textPublishRecord;delete summary.textPublishSource;
-  approved=false;calls.length=0;assert.equal(await retry(),'cancelled');
-  assert.deepEqual(calls,[['get','batch','book','auto-c']]);
-  approved=true;assert.equal(await retry(),'retried');
-  assert.deepEqual(calls.at(-1),['retry','batch',['book']]);
-  summary.runs=[];assert.equal(await retry(),'select');
+  const items=['b','manual','cancel','b2'].map(id=>({book:{id,title:id},stage:'text_publish',
+    automatic:id!=='manual',summary:id==='manual'?{textPublishSource:'manual',textPublishRecord:{collectionId:'manual-current'},runs:[{stage:'text_publish',collectionId:'older-auto'}]}:
+      {runs:[{stage:'text_publish',id:'run-'+id,collectionId:id==='b2'?'':'c-'+id}]}}));
+  const result=await helpers.retryTextBooks(api,'batch',items,{
+    chooseCollection:async(book)=>{events.push('select:'+book.id);return 'chosen-'+book.id},
+    confirmRepublish:book=>{events.push('confirm:'+book.id);return book.id!=='cancel'}
+  });
+  assert.equal(result.submitted,3);
+  assert.deepEqual(result.errors,[]);
+  const firstWrite=events.findIndex(Array.isArray);
+  assert.ok(events.slice(0,firstWrite).includes('select:b2'));
+  assert.ok(events.slice(0,firstWrite).includes('confirm:cancel'));
+  assert.deepEqual(events.filter(Array.isArray),[
+    ['retry','batch',['b','b2'],{b:{collectionId:'c-b',force:true},b2:{collectionId:'chosen-b2',force:false}}],
+    ['manual','batch','manual','manual-current',{force:true}]
+  ]);
 });
 
-test('失败的自动重传仍带有旧成功回执时，确认后才继续原任务', async () => {
+test('失败的自动重传仍带有旧成功回执时，取消保留旧回执，确认绑定具体合集', async () => {
   const old={kind:'text',bookId:'book',collectionId:'c',status:'published',runId:'old',attempt:1,requestKey:'old-key'};
   const run={stage:'text_publish',id:'new',collectionId:'c',attempt:2,requestId:'new-key',status:'failed'};
   const calls=[];
   const api={getTextPublishStatus:async()=>({published:true,publish:old,lastPublished:old}),
     retryBatchAutomation:async(...args)=>calls.push(args)};
-  const summary={runs:[run],textLastPublishedRecord:old};
-  assert.equal(await helpers.retryTextUpload(api,'batch','book',summary,()=>false),'cancelled');
+  const item={book:{id:'book'},automatic:true,stage:'text_publish',summary:{runs:[run],textLastPublishedRecord:old}};
+  const retry=approved=>helpers.retryTextBooks(api,'batch',[item],{confirmRepublish:()=>approved});
+  assert.equal((await retry(false)).submitted,0);
   assert.equal(calls.length,0);
-  assert.equal(await helpers.retryTextUpload(api,'batch','book',summary,()=>true),'retried');
-  assert.deepEqual(calls,[['batch',['book']]]);
+  assert.equal((await retry(true)).submitted,1);
+  assert.deepEqual(calls,[['batch',['book'],{book:{collectionId:'c',force:true}}]]);
 });
 
 test('已选文本进入自动生产接口，日志收录手动上传回执',()=>{
@@ -219,6 +223,9 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       let data={};
       if(path.endsWith('runtime-summary'))data=runtime;
       else if(path.endsWith('text-collections/c/publish'))data={published:false,publish:{status:'failed'},lastPublished:history};
+      else if(path.endsWith('/books/b2/text-collections'))data={items:[{id:'do-not-guess'},{id:'choose-b2'}]};
+      else if(path.endsWith('/text-collections/choose-b2/publish'))data={published:false,publish:null};
+      else if(path.endsWith('/automation/retry'))data={automation:{state:'running'}};
       else if(path.endsWith('automation-presets'))data={presets:[{id:'preset',name:'文本预设',config:{productionMode:'text'}}]};
       else if(path.endsWith('automation/preflight'))data={readOnly:true,books:[{bookId:'b',passed:true}]};
       else if(path.endsWith('automation/start'))data={automation:{state:'running',books:[{bookId:'b',stage:'text_process',status:'running'}]}};
@@ -239,6 +246,31 @@ test('Chrome 在生产表重试手动上传、打开日志并立即执行所选�
       Array.from(document.querySelectorAll('[role=menuitem]')).find(n=>n.textContent.includes('立即执行已选')).click();
       step='已选启动';await until(()=>posts.some(x=>x.path.endsWith('/automation/start')));
       if(posts.some(x=>x.path.includes('/executions')) || posts.find(x=>x.path.endsWith('/automation/start')).payload.bookIds.join(',')!=='b')throw Error('提交到错误模式或书目');
+      step='两本书一次重试';
+      const book2={...book,id:'b2',bookId:'102',title:'第二本'};
+      batch.books=[book,book2];
+      const failed=id=>({bookId:id,stage:'text_publish',title:id,status:'failed',error:'上传失败'});
+      runtime.automation={batchId:'batch',state:'failed',books:[failed('b'),failed('b2')],counts:{total:2,failed:2}};
+      runtime.stageSummaries={
+        b:{runs:[{stage:'text_publish',status:'failed',id:'run-b',collectionId:'c'}],textLastPublishedRecord:history},
+        b2:{runs:[{stage:'text_publish',status:'failed',id:'run-b2'}]}
+      };
+      root.render(<Boundary key="batch-retry"><BatchFactoryNovelList batch={batch} onBatchChanged={async()=>batch}/></Boundary>);
+      await until(()=>buttons().filter(n=>n.textContent.trim()==='重试失败步骤').length===2);
+      const menu=buttons().find(n=>n.textContent.trim().startsWith('自动生产'));
+      menu.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));
+      const retryMenu=()=>Array.from(document.querySelectorAll('[role=menuitem]')).find(n=>n.textContent.includes('重试失败'));
+      await until(retryMenu); retryMenu().click();
+      const select=()=>document.querySelector('select[aria-label="重试文本合集"]');
+      await until(select);
+      if(posts.some(x=>x.path.endsWith('automation/retry')))throw Error('完成选集之前已提交');
+      select().value='choose-b2';select().dispatchEvent(new Event('change',{bubbles:true}));
+      await until(()=>button('使用此合集')&&!button('使用此合集').disabled);button('使用此合集').click();
+      await until(()=>posts.some(x=>x.path.endsWith('automation/retry')));
+      const requests=posts.filter(x=>x.path.endsWith('automation/retry'));
+      const sent=requests[0].payload, forced=sent.textPublishOverrides?.b, normal=sent.textPublishOverrides?.b2;
+      if(requests.length!==1||sent.bookIds.join(',')!=='b,b2'||forced?.collectionId!=='c'||forced.force!==true||
+        normal?.collectionId!=='choose-b2'||normal.force!==false)throw Error('两本书未按各自选集和确认状态一起提交');
       document.body.dataset.result='passed';root.unmount();
     }
     run().catch(e=>document.body.dataset.error=e.message);
