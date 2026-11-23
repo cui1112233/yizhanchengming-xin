@@ -29,14 +29,26 @@ export function textBookCompletion(pages = []) {
   return { ready, total, percent: total ? Math.round(ready * 100 / total) : 0 };
 }
 
-// Omitted selection means the whole book. Explicitly clearing the selection disables
-// composition. A caller with the document also checks the current title cover.
-export function canCreateTextCollection(pages = [], ids, document) {
-  if (document !== undefined && !document?.coverArtifactId) return false;
+// Use one listTextPages snapshot for document, pages and artifact history.
+// A newer page revision can coexist with a still-current, older cover render.
+export function canCreateTextCollection(pages = [], ids, document, artifacts) {
+  if (!document?.activeVersionId || !document.coverArtifactId || !Array.isArray(artifacts)) return false;
+  const byArtifactId = new Map(artifacts.map(artifact => [artifact.id, artifact]));
+  const cover = byArtifactId.get(document.coverArtifactId);
+  if (cover?.kind !== 'cover' || cover.sourceKind !== (document.coverLocked ? 'user_upload' : 'system')
+    || (cover.status && cover.status !== 'ready')
+    || !(cover.renderVersion > 0 && cover.renderVersion <= document.revision)) return false;
   const byId = new Map(pages.map(page => [page.id, page]));
   const selected = ids ?? [...byId.keys()];
-  return selected.length > 0 && new Set(selected).size === selected.length
-    && selected.every(id => id && textPagePresentation(byId.get(id)).ready);
+  if (!selected.length || new Set(selected).size !== selected.length) return false;
+  return selected.every(id => {
+    const page = byId.get(id);
+    if (page?.status !== 'ready' || page.versionId !== document.activeVersionId
+      || page.paginationVersion !== document.paginationVersion) return false;
+    const image = byArtifactId.get(page.activeArtifactId);
+    return image?.kind === 'page' && image.pageId === id && image.renderVersion === page.renderVersion
+      && image.sourceKind === (page.locked ? 'user_upload' : 'system');
+  });
 }
 
 // Compare editable properties, ignoring server-generated revisions and IDs.

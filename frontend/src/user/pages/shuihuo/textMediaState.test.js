@@ -23,16 +23,35 @@ test('文字页状态和图片只取当前活动版本', () => {
   assert.equal(textPagePresentation(locked, []).ready,false);
 });
 
-test('只允许合成已就绪选页，有文档时同时检查封面', () => {
-  const pages = [ready, locked, {id:'p3',status:'failed'}];
+const document = {id:'doc', activeVersionId:'v', paginationVersion:2, revision:6, coverArtifactId:'cover', coverLocked:false};
+const pages = [ready, locked, {id:'p3',status:'failed'}].map(p => ({...p, versionId:'v', paginationVersion:2}));
+const cover = {id:'cover', kind:'cover', renderVersion:4, sourceKind:'system'};
+const images = [
+  {id:'a',kind:'page',pageId:'p1',renderVersion:1,sourceKind:'system'},
+  {id:'b',kind:'page',pageId:'p2',renderVersion:1,sourceKind:'user_upload'},
+];
+test('加载完当前文档和活动封面后才允许合成，旧封面或失败封面不可用', () => {
+  assert.equal(canCreateTextCollection(pages,['p1']),false);
+  assert.equal(canCreateTextCollection(pages,['p1'],null,[cover,...images]),false);
+  assert.equal(canCreateTextCollection(pages,['p1'],document),false);
+  for (const changes of [{coverArtifactId:''},{activeVersionId:''},{coverLocked:true}])
+    assert.equal(canCreateTextCollection(pages,['p1'],{...document,...changes},[cover,...images]),false);
+  for (const changes of [{id:'old-cover'},{kind:'page'},{renderVersion:7},{renderVersion:0},{status:'failed'},{status:'rendering'},{status:'stale'}])
+    assert.equal(canCreateTextCollection(pages,['p1'],document,[{...cover,...changes},...images]),false);
+  assert.equal(canCreateTextCollection(pages,['p1'],{...document,coverLocked:true},
+    [{...cover,sourceKind:'user_upload'},...images]),true);
+});
+
+test('只计算当前生产版本和所选页对应的成品', () => {
   assert.deepEqual(textBookCompletion(pages), { ready:2,total:3,percent:67 });
   assert.equal(textBookCompletion([]).percent,0);
-  assert.equal(canCreateTextCollection(pages,['p2','p1'],{coverArtifactId:'cover'}),true);
+  assert.equal(canCreateTextCollection(pages,['p2','p1'],document,[cover,...images]),true);
   for (const ids of [[], ['missing'], ['p1','p1'], ['p1','p3']])
-    assert.equal(canCreateTextCollection(pages,ids),false);
-  assert.equal(canCreateTextCollection([ready],undefined,{coverArtifactId:''}),false);
-  assert.equal(canCreateTextCollection([ready]),true);
-  assert.equal(canCreateTextCollection([]),false);
+    assert.equal(canCreateTextCollection(pages,ids,document,[cover,...images]),false);
+  for (const changes of [{versionId:'old'},{paginationVersion:1},{renderVersion:2}])
+    assert.equal(canCreateTextCollection([{...pages[0],...changes}],undefined,document,[cover,...images]),false);
+  assert.equal(canCreateTextCollection(pages,['p1'],document,[cover]),false);
+  assert.equal(canCreateTextCollection([],undefined,document,[cover,...images]),false);
 });
 
 test('编辑正文和改变版心需要重算页界，仅更换颜色或背景只需重绘', () => {
