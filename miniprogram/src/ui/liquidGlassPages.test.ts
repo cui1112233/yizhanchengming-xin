@@ -13,7 +13,9 @@ test('functions uses a large feature card and two compact cards for every group'
 
 test('tasks uses one glass list container instead of a glass rim on every row', () => {
   const source = read('../pages/tasks/index.tsx');
-  expect(source).toContain('mp-task-list liquid-glass--list');
+  expect(source).toContain('task-studio-list liquid-glass--list');
+  expect(source).toContain('task-studio-counts liquid-glass--secondary');
+  expect(source).toContain('task-studio-segments liquid-glass--list');
   expect(source).not.toContain('mp-task-card mp-task-card-new liquid-glass');
 });
 

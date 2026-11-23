@@ -1,0 +1,51 @@
+.mp-theme.mp-liquid.task-studio-page {
+  --task-cyan:#65f6e4;--task-ink:#f7f8ff;--task-muted:#aebbd0;
+  width:100%;max-width:430PX;min-height:100vh;margin:0 auto;padding:0 15PX calc(96PX + env(safe-area-inset-bottom));box-sizing:border-box;overflow-x:hidden;color:var(--task-ink);background:#071427!important;
+  .task-studio-hero {position:relative;display:flex;align-items:flex-end;justify-content:space-between;padding:7PX 0 18PX}
+  .task-studio-kicker {display:block;font-size:10PX;line-height:16PX;letter-spacing:3PX;color:var(--task-muted)}
+  .task-studio-title {display:block;margin-top:4PX;font-size:31PX;line-height:39PX;font-weight:850;letter-spacing:-1PX;color:#fff;text-shadow:0 3PX 16PX rgba(75,246,225,.14)}
+  .task-studio-subtitle {display:block;margin-top:4PX;font-size:13PX;line-height:20PX;letter-spacing:2PX;color:#c6d0e1}
+  .task-studio-refresh,.task-studio-retry {display:flex;align-items:center;justify-content:center;margin:0;padding:0;border:1PX solid rgba(101,246,228,.4);background:rgba(35,126,132,.24);color:#8ff9eb}
+  .task-studio-refresh {width:42PX;height:42PX;border-radius:21PX}
+  .task-studio-refresh::after,.task-studio-retry::after {border:0}
+  .task-studio-body {display:flex;flex-direction:column;gap:15PX}
+  .task-studio-counts,.task-studio-segments,.task-studio-list,.task-studio-state,.task-studio-source-error {border:1PX solid rgba(105,214,224,.42);background:linear-gradient(145deg,rgba(28,58,89,.94),rgba(14,31,54,.96));box-shadow:inset 0 1PX 0 rgba(255,255,255,.13),0 10PX 26PX rgba(2,10,28,.22),0 0 20PX rgba(60,231,220,.07);backdrop-filter:blur(18PX)}
+  .task-studio-counts {display:flex;align-items:center;min-height:106PX;padding:13PX 10PX;box-sizing:border-box;border-radius:24PX;background:linear-gradient(135deg,rgba(56,65,127,.9),rgba(21,55,82,.94))}
+  .task-studio-count-item {display:flex;min-width:0;flex:1;align-items:center;justify-content:center;gap:9PX;color:#dce5f3;font-size:12PX;line-height:17PX}
+  .task-studio-count-item>.mp-app-icon {display:flex;width:38PX;height:38PX;flex:0 0 38PX;align-items:center;justify-content:center;border-radius:13PX;background:linear-gradient(145deg,#7ef4e1,#35ccd4);box-shadow:0 0 18PX rgba(69,238,222,.24);color:#fff}
+  .task-studio-count-item.is-attention>.mp-app-icon {background:linear-gradient(145deg,#ffd284,#b97cfd);box-shadow:0 0 18PX rgba(209,147,253,.24)}
+  .task-studio-count-item.is-completed>.mp-app-icon {background:linear-gradient(145deg,#9cf7d5,#37d6c6)}
+  .task-studio-count-value {display:block;font-size:24PX;line-height:27PX;font-weight:850;color:#fff}
+  .task-studio-count-divider {width:1PX;height:48PX;background:rgba(197,211,232,.2)}
+  .task-studio-segments {display:flex;height:52PX;padding:4PX;box-sizing:border-box;border-radius:28PX;background:rgba(21,48,77,.92)}
+  .task-studio-filter {display:flex;min-width:0;flex:1;align-items:center;justify-content:center;border-radius:23PX;color:#b8c3d5;font-size:13PX;line-height:44PX}
+  .task-studio-filter.is-active {background:linear-gradient(110deg,#47e4d2,#138f99);box-shadow:0 0 16PX rgba(57,238,219,.32),inset 0 1PX 0 rgba(255,255,255,.36);color:#fff;font-weight:750}
+  .task-studio-list {padding:0 16PX;overflow:hidden;border-radius:24PX;background:linear-gradient(145deg,rgba(22,63,88,.95),rgba(12,34,58,.97))}
+  .task-studio-row {position:relative;display:flex;min-height:102PX;padding:11PX 26PX 11PX 72PX;box-sizing:border-box;align-items:center;border-bottom:1PX solid rgba(150,183,211,.2)}
+  .task-studio-row:last-child {border-bottom:0}
+  .task-studio-row.is-disabled {opacity:.58}
+  .task-studio-row-art {position:absolute;left:-1PX;top:50%;width:68PX;height:68PX;transform:translateY(-50%);filter:drop-shadow(0 6PX 8PX rgba(0,13,32,.3))}
+  .task-studio-row-copy {display:flex;min-width:0;flex:1;flex-direction:column;padding-right:8PX}
+  .task-studio-row-title {display:block;overflow:hidden;color:#fff;font-size:16PX;line-height:23PX;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+  .task-studio-row-source {display:block;margin-top:4PX;overflow:hidden;color:var(--task-muted);font-size:11PX;line-height:17PX;text-overflow:ellipsis;white-space:nowrap}
+  .task-studio-row-state {display:flex;width:76PX;flex:0 0 76PX;align-items:flex-end;flex-direction:column}
+  .task-studio-progress-value {font-size:14PX;line-height:20PX;color:#f4f7ff}
+  .task-studio-progress-track {width:72PX;height:6PX;margin:5PX 0 7PX;overflow:hidden;border-radius:4PX;background:rgba(137,170,198,.28)}
+  .task-studio-progress-track>view {height:100%;border-radius:4PX;background:linear-gradient(90deg,#8ff5dd,#48dfe0)}
+  .task-studio-status {display:block;color:#c1ccda;font-size:12PX;line-height:20PX;white-space:nowrap}
+  .task-studio-status.is-running {padding:1PX 9PX;border:1PX solid #55eadc;border-radius:13PX;color:#78f5e7}
+  .task-studio-status.is-attention {padding:1PX 9PX;border:1PX solid #ffc85c;border-radius:13PX;color:#ffd477}
+  .task-studio-status.is-failed {color:#ff8292;font-weight:700}.task-studio-status.is-completed {color:#8af0c8;font-weight:700}
+  .task-studio-row-arrow {position:absolute;right:3PX;top:50%;color:#edf3ff;transform:translateY(-50%)}
+  .task-studio-state,.task-studio-source-error {display:flex;min-height:84PX;padding:16PX 18PX;box-sizing:border-box;align-items:center;justify-content:space-between;gap:12PX;border-radius:20PX;color:var(--task-muted);font-size:12PX;line-height:18PX}
+  .task-studio-state-title {display:block;margin-bottom:4PX;color:#fff;font-size:15PX;line-height:22PX;font-weight:750}
+  .task-studio-retry {min-width:72PX;height:38PX;border-radius:20PX;font-size:12PX;line-height:38PX}
+  .task-studio-empty {display:flex;min-height:160PX;align-items:center;justify-content:center;flex-direction:column;gap:5PX;color:var(--task-muted);font-size:12PX;text-align:center}
+  .task-studio-empty>.mp-app-icon {margin-bottom:5PX;color:#69ecdc}
+  &.mp-theme-light {color:var(--task-ink)}
+}
+@media (max-width:359PX) {
+  .mp-theme.mp-liquid.task-studio-page {padding-left:12PX;padding-right:12PX;
+    .task-studio-title {font-size:28PX;line-height:36PX}.task-studio-count-item {gap:5PX;font-size:11PX}.task-studio-count-item>.mp-app-icon {width:33PX;height:33PX;flex-basis:33PX}.task-studio-row {padding-left:64PX}.task-studio-row-art {width:60PX;height:60PX}.task-studio-row-state {width:68PX;flex-basis:68PX}
+  }
+}
