@@ -137,6 +137,7 @@ func TestV12FetchOriginalsAppliesNovelFetchRulesAndKeepsRawSource(t *testing.T) 
 }
 
 func TestV12FetchOriginalsClassifiesFetchedMetadata(t *testing.T) {
+	modelCalls := 0
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"code":200,"msg":"成功","data":"一段现代悬疑正文","bookinfo":{}}`))
@@ -147,9 +148,11 @@ func TestV12FetchOriginalsClassifiesFetchedMetadata(t *testing.T) {
 		BridgeSecret: "secret", Now: func() time.Time { return now },
 		NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL},
 		NovelFetchAIGenderJudge: func(context.Context, novelfetchworkshop.BookInfo) (string, error) {
+			modelCalls++
 			return `{"gender":"女频","confidence":0.9,"reason":"正文情感关系线突出"}`, nil
 		},
 		NovelFetchRewrite: singleFetchRewriteProvider(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+			modelCalls++
 			return `{"style":"现代悬疑","confidence":0.9,"reason":"正文围绕案件线索推进"}`, nil
 		}),
 	})
@@ -163,6 +166,11 @@ func TestV12FetchOriginalsClassifiesFetchedMetadata(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), want) {
 			t.Fatalf("response missing %q: %s", want, rec.Body.String())
 		}
+	}
+	before := modelCalls
+	rec = signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v12/fetch-originals", map[string]any{"platform": 15, "bookIds": []string{"book-1"}, "maxTxt": 100, "productionMode": "text"})
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"rawData":"一段现代悬疑正文"`) || before == 0 || modelCalls != before {
+		t.Fatalf("文本模式取稿产生了模型调用或丢失原文: calls=%d -> %d response=%s", before, modelCalls, rec.Body.String())
 	}
 }
 

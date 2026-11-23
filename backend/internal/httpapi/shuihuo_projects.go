@@ -2062,7 +2062,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 			book := batch.Books[0]
 			updated, err := store.CaptureBookSource(r.Context(), owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{
-				SourceText: strings.TrimSpace(input.SourceText), ReplaceSource: true, SourceTitle: input.SourceTitle, ExpectedRevision: book.Revision,
+				SourceText: strings.TrimSpace(input.SourceText), ReplaceSource: true, SourceTitle: input.SourceTitle, SourceMetadata: map[string]any{"productionTextEdited": true}, ExpectedRevision: book.Revision,
 			})
 			if err != nil {
 				writeStoreError(w, err)

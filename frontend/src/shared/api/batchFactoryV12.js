@@ -299,7 +299,8 @@ export function fetchDirectOriginals(payload) {
     bookIds: Array.isArray(payload?.bookIds)
       ? payload.bookIds.map(value => String(value ?? '').trim()).filter(Boolean)
       : [],
-    maxTxt: Number(payload?.maxTxt) || 4000
+    maxTxt: Number(payload?.maxTxt) || 4000,
+    ...(payload?.productionMode === 'text' ? { productionMode: 'text' } : {})
   };
   // Keep the JSON body as the primary contract. The query is a compatibility
   // fallback for the local embedded browser/runtime: older cached fetch
@@ -307,6 +308,7 @@ export function fetchDirectOriginals(payload) {
   const params = new URLSearchParams();
   params.set('platform', String(normalized.platform));
   params.set('maxTxt', String(normalized.maxTxt));
+  if (normalized.productionMode) params.set('productionMode', normalized.productionMode);
   normalized.bookIds.forEach(bookId => params.append('bookId', bookId));
   return apiRequest(`${bf11Path('fetch-originals')}?${params.toString()}`, {
     method: 'POST',

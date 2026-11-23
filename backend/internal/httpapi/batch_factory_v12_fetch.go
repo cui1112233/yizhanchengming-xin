@@ -22,11 +22,7 @@ func registerV12FetchOriginalsRoute(mux *http.ServeMux, store batchfactoryv11.St
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "原文抓取服务未配置"})
 			return
 		}
-		var input struct {
-			Platform int      `json:"platform"`
-			BookIDs  []string `json:"bookIds"`
-			MaxTxt   int      `json:"maxTxt"`
-		}
+		var input fetchOriginalsInput
 		if !decodeFetchOriginalsInput(w, r, &input) {
 			return
 		}
@@ -54,7 +50,13 @@ func registerV12FetchOriginalsRoute(mux *http.ServeMux, store batchfactoryv11.St
 				results = append(results, map[string]any{"bookId": bookID, "platform": input.Platform, "status": "error", "data": nil, "error": err.Error(), "length": 0, "attempts": attempts, "retryable": retryableBatchFetchError(err)})
 				continue
 			}
-			result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification, defaultBatchSensitiveConfig())
+			cfg := defaultBatchSensitiveConfig()
+			bookClassification := classification
+			if input.ProductionMode == "text" {
+				cfg.DeferToProduction = true
+				bookClassification = batchFetchClassification{}
+			}
+			result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, bookClassification, cfg)
 			if processErr != nil {
 				results = append(results, map[string]any{
 					"bookId": bookID, "platform": input.Platform, "status": "processing_error",
@@ -78,11 +80,14 @@ func registerV12FetchOriginalsRoute(mux *http.ServeMux, store batchfactoryv11.St
 // fallback. Some already-open embedded browser tabs can retain an older fetch
 // wrapper that loses a POST body after a hot update; the endpoint still has
 // enough request data in the query to complete this idempotent read operation.
-func decodeFetchOriginalsInput(w http.ResponseWriter, r *http.Request, target *struct {
-	Platform int      `json:"platform"`
-	BookIDs  []string `json:"bookIds"`
-	MaxTxt   int      `json:"maxTxt"`
-}) bool {
+type fetchOriginalsInput struct {
+	Platform       int      `json:"platform"`
+	BookIDs        []string `json:"bookIds"`
+	MaxTxt         int      `json:"maxTxt"`
+	ProductionMode string   `json:"productionMode,omitempty"`
+}
+
+func decodeFetchOriginalsInput(w http.ResponseWriter, r *http.Request, target *fetchOriginalsInput) bool {
 	if r.Body != nil {
 		raw, err := io.ReadAll(io.LimitReader(r.Body, 256<<10))
 		if err == nil && len(strings.TrimSpace(string(raw))) > 0 && json.Unmarshal(raw, target) == nil {
@@ -99,6 +104,7 @@ func decodeFetchOriginalsInput(w http.ResponseWriter, r *http.Request, target *s
 	if platformErr == nil && maxTxtErr == nil && platform > 0 && maxTxt > 0 && len(bookIDs) > 0 {
 		target.Platform = platform
 		target.MaxTxt = maxTxt
+		target.ProductionMode = query.Get("productionMode")
 		target.BookIDs = bookIDs
 		return true
 	}

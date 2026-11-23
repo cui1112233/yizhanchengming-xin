@@ -25,7 +25,7 @@ const directorHTTPJSON = `{"characters":[{"name":"林晚","prompt":"黑色长发
 func TestSliceTwoDirectorRoutePersistsRevision(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
-	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。"}}})
+	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。", TxtText: "林晚推门进入客厅。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
 	provider := &directorHTTPProvider{output: directorHTTPJSON}
 	service := &batchfactoryv11.DirectorService{Store: store, Provider: provider}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 2, Store: store, Director: service})
@@ -100,7 +100,7 @@ func TestSliceOneDoesNotRegisterDirectorMutation(t *testing.T) {
 func TestSliceTwoBookStageRouteRecordsDirectorAndImageAvailability(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
-	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。"}}})
+	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。", TxtText: "林晚推门进入客厅。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}}}})
 	provider := &directorHTTPProvider{output: directorHTTPJSON}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 2, Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: provider}})
 	base := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + batch.Books[0].ID + "/stages"
@@ -115,5 +115,24 @@ func TestSliceTwoBookStageRouteRecordsDirectorAndImageAvailability(t *testing.T)
 	rec = signedJSONRequest(t, api, now, "alice", http.MethodGet, base, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"lastFailed"`) || !strings.Contains(rec.Body.String(), `"stage":"image"`) {
 		t.Fatalf("summary status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBatchFactorySensitiveStageStopsManualDirectorBeforeProvider(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "历史书", Books: []batchfactoryv11.CreateBookInput{{Title: "片段", SourceText: "只保留了截取稿"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &directorHTTPProvider{output: directorHTTPJSON}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 2, Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: provider}})
+	base := "/api/batch-factory/v12/batches/" + batch.ID
+	bookPath := base + "/books/" + batch.Books[0].ID
+	for _, path := range []string{bookPath + "/stages/director", bookPath + "/director", base + "/director"} {
+		rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, map[string]any{"mode": "missing", "requestId": "old-book"})
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "缺少完整原文") || provider.calls != 0 {
+			t.Fatalf("%s 手动分镜未在收费前停止: calls=%d status=%d body=%s", path, provider.calls, rec.Code, rec.Body.String())
+		}
 	}
 }

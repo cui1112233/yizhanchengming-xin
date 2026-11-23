@@ -3050,6 +3050,10 @@ func isDirectFirstSourceBlocked(book batchfactoryv11.Book) bool {
 // original text. Immediate runs and retries must recover this required input
 // before starting audio planning rather than failing the whole production path.
 func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context, owner, batchID string, book batchfactoryv11.Book) (batchfactoryv11.Book, error) {
+	return c.fetchAutomationSource(ctx, owner, batchID, book, false)
+}
+
+func (c *BatchAutomationCoordinator) fetchAutomationSource(ctx context.Context, owner, batchID string, book batchfactoryv11.Book, deferClassification bool) (batchfactoryv11.Book, error) {
 	// 调度队列里保存的是入队那一刻的书快照。重试轮次之间 persistBatchFetchFailure
 	// 和其它阶段都会 revision+1，继续用快照的旧 revision 写会把自己制造的写入判成
 	// 冲突。每次进入本阶段先回读最新快照，后续写入再由 _withRetry 兜底。
@@ -3065,7 +3069,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if processingFailed && hasVerifiedBatchOriginal(book) {
 		maxTxt := bookCaptureCharacters(book)
 		fetched := batchFetchResultFromStoredRaw(book, maxTxt)
-		fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, book.BookID, fetched, c.classification, c.batchSensitiveConfigFor(ctx, owner, batchID, book))
+		fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, book.BookID, fetched, c.classification, batchSensitiveConfig{DeferToProduction: true, DeferClassification: deferClassification})
 		for key, value := range book.SourceMetadata {
 			if _, exists := metadata[key]; !exists {
 				metadata[key] = value
@@ -3151,7 +3155,7 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 	if len(strings.TrimSpace(fetched.ProcessedText)) == 0 {
 		return book, fmt.Errorf("自动获取正文失败：上游未返回可用正文")
 	}
-	fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, resolvedBookID, fetched, c.classification, c.batchSensitiveConfigFor(ctx, owner, batchID, book))
+	fetched, metadata, processErr := prepareBatchFetchedSource(ctx, c.ttsStore, owner, resolvedBookID, fetched, c.classification, batchSensitiveConfig{DeferToProduction: true, DeferClassification: deferClassification})
 	if fallbackFrom != "" {
 		metadata["platformBookId"] = resolvedBookID
 		metadata["resolvedPlatformBookId"] = resolvedBookID
@@ -3199,19 +3203,6 @@ func (c *BatchAutomationCoordinator) refreshAutomationBook(ctx context.Context, 
 		}
 	}
 	return book
-}
-
-// batchSensitiveConfigFor resolves the batch-level sensitive settings with the
-// book-level override on top, matching the existing settings inheritance order.
-func (c *BatchAutomationCoordinator) batchSensitiveConfigFor(ctx context.Context, owner, batchID string, book batchfactoryv11.Book) batchSensitiveConfig {
-	if c == nil || c.store == nil {
-		return defaultBatchSensitiveConfig()
-	}
-	batch, err := c.store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return defaultBatchSensitiveConfig()
-	}
-	return resolveBatchSensitiveConfig(batch.SettingsState.Patch, book.SettingsState.Patch)
 }
 
 // captureAutomationSource saves fetched text and rereads the revision on a
@@ -3456,7 +3447,12 @@ func (c *BatchAutomationCoordinator) GenerateBookAudioPlan(ctx context.Context, 
 		if candidate.ID != bookID {
 			continue
 		}
-		book, err := c.ensureAutomationSource(ctx, owner, batchID, candidate)
+		if len(productionLines(candidate)) == 0 && !hasVerifiedBatchOriginal(candidate) {
+			if _, err := c.fetchAutomationSource(ctx, owner, batchID, candidate, true); err != nil {
+				return nil, err
+			}
+		}
+		book, err := c.runBatchSensitiveStage(ctx, owner, batchID, candidate.ID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -3920,11 +3916,11 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					persist()
 					continue
 				}
-				if len(productionLines(book)) == 0 {
+				if len(productionLines(book)) == 0 && !hasVerifiedBatchOriginal(book) {
 					entry["stage"], entry["message"], entry["updatedAt"] = "fetch_original", "正在自动获取缺失正文", c.now()
 					persist()
 					fetchCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-					fetchedBook, fetchErr := c.ensureAutomationSource(fetchCtx, owner, batchID, book)
+					fetchedBook, fetchErr := c.fetchAutomationSource(fetchCtx, owner, batchID, book, true)
 					cancel()
 					if fetchErr != nil {
 						fail("fetch_original", fetchErr, "自动获取正文失败")
@@ -3932,7 +3928,33 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 					}
 					book = fetchedBook
 				}
+				manualSensitive, _ := entry["retrySensitiveManually"].(bool)
+				delete(entry, "retrySensitiveManually")
+				sensitiveCtx, cancelSensitive := context.WithTimeout(ctx, stageTimeout)
+				processed, sensitiveErr := c.runBatchSensitiveStage(sensitiveCtx, owner, batchID, book.ID, manualSensitive)
+				cancelSensitive()
+				if sensitiveErr != nil {
+					entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "failed", "sensitive", sensitiveErr.Error(), sensitiveErr.Error(), c.now()
+					entry["needsManual"] = true
+					appendAutomationBookLog(entry, c.now(), "sensitive", sensitiveErr.Error())
+					failed.Add(1)
+					persist()
+					continue
+				}
+				book = processed
+				if book.SourceMetadata["classificationAfterSensitive"] == true {
+					book, sensitiveErr = c.classifyProductionBook(ctx, owner, batchID, book, batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch))
+					if sensitiveErr != nil {
+						fail("classification", sensitiveErr, "保存书籍分类失败")
+						continue
+					}
+				}
 				effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+				if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "text" {
+					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "blocked", "text_layout", "文本排版服务待接入", c.now()
+					persist()
+					continue
+				}
 				if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "comic" {
 					if jobRunMode == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
 						entry["message"], entry["updatedAt"] = "正在继续发布已生成漫画合集", c.now()
@@ -5631,6 +5653,9 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 		status := automationStringValue(entry["status"], "")
 		if status == "failed" || status == "blocked" || status == "paused" || status == "stopped" {
 			failedStage := automationStringValue(entry["stage"], "")
+			if failedStage == "sensitive" {
+				entry["retrySensitiveManually"] = true
+			}
 			stage, message := automationRetryResumeStage(failedStage), "从失败阶段继续执行"
 			if failedStage == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
 				stage, message = "comic_publish", "重新发布已生成漫画合集"

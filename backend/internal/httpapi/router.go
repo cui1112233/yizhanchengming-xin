@@ -300,8 +300,12 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 	}
 	if options.Store != nil && options.Director != nil && options.Slice >= 2 {
-		registerDirectorRoutes(v11, options.Director, options.Store)
 		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, TextProviderResolver: runtimeTextProviderResolver}
+		manualProduction := &BatchAutomationCoordinator{store: options.Store, ttsStore: runtimeCatalogStore, stages: stageService}
+		stageService.PrepareProductionText = func(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.Book, error) {
+			return manualProduction.runBatchSensitiveStage(ctx, owner, batchID, bookID, true)
+		}
+		registerDirectorRoutes(v11, options.Director, options.Store, stageService)
 		if options.LocalArtifacts != nil {
 			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, runtimeCatalogStore, options.UserConfigStore, resolveRuntimeModelOwner)
 			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, runtimeCatalogStore, options.Production)

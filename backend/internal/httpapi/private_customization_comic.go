@@ -62,8 +62,8 @@ func registerPrivateCustomizationComicRoute(mux *http.ServeMux, store batchfacto
 		intake, err := store.CreateIntake(r.Context(), owner, batchfactoryv11.NovelFetchIntakeInput{
 			Books: []batchfactoryv11.CreateBookInput{{
 				ID: bookID, BookID: bookID, Title: title, Platform: "private_customization",
-				SourceText: sourceText, TxtText: sourceText,
-				SourceMetadata: map[string]any{"sourceMode": "private_customization", "queueStatus": "manual_pending"},
+				SourceText: sourceText, TxtText: input.SourceText,
+				SourceMetadata: map[string]any{"sourceMode": "private_customization", "queueStatus": "manual_pending", "rawSourceStatus": "verified", "rawSourceOrigin": "private_paste"},
 			}},
 			Metadata: map[string]any{"sourceMode": "private_customization", "title": title},
 		})

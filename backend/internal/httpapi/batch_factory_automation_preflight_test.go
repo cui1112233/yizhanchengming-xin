@@ -47,9 +47,11 @@ func preflightComicBatch(t *testing.T, store batchfactoryv11.Store, bookCount in
 			videos = append(videos, batchfactoryv11.CreateVideoInput{Label: "第" + string(rune('一'+page)) + "页"})
 		}
 		books = append(books, batchfactoryv11.CreateBookInput{
-			Title:      "漫画书" + string(rune('A'+index)),
-			SourceText: "林晚走进办公室，陆沉抬头看向她。",
-			Videos:     videos,
+			Title:          "漫画书" + string(rune('A'+index)),
+			SourceText:     "林晚走进办公室，陆沉抬头看向她。",
+			TxtText:        "林晚走进办公室，陆沉抬头看向她。",
+			SourceMetadata: map[string]any{"rawSourceStatus": "verified"},
+			Videos:         videos,
 		})
 	}
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: books})

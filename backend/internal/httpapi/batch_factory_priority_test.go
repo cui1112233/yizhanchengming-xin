@@ -260,7 +260,12 @@ func TestBatchPriorityActualRunnerDoesNotInterruptAndStartsChosenNext(t *testing
 func priorityFixture(t *testing.T) (*BatchAutomationCoordinator, batchfactoryv11.Batch, *memoryAutomationStateStore) {
 	t.Helper()
 	store := batchfactoryv11.NewMemoryStore()
-	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "插队验收", Books: []batchfactoryv11.CreateBookInput{{Title: "A", SourceText: "A正文"}, {Title: "B", SourceText: "B正文"}, {Title: "C", SourceText: "C正文"}, {Title: "D", SourceText: "D正文"}}})
+	var books []batchfactoryv11.CreateBookInput
+	for _, title := range []string{"A", "B", "C", "D"} {
+		original := title + "正文"
+		books = append(books, batchfactoryv11.CreateBookInput{Title: title, SourceText: original, TxtText: original, SourceMetadata: map[string]any{"rawSourceStatus": "verified"}})
+	}
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "插队验收", Books: books})
 	if err != nil {
 		t.Fatal(err)
 	}

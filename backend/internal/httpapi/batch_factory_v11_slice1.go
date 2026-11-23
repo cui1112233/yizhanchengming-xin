@@ -457,6 +457,12 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 		if !decodeJSON(w, r, &input) {
 			return
 		}
+		if input.ReplaceSource && input.RawSourceText == "" {
+			if input.SourceMetadata == nil {
+				input.SourceMetadata = map[string]any{}
+			}
+			input.SourceMetadata["productionTextEdited"] = true
+		}
 		book, err := store.CaptureBookSource(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input)
 		if err != nil {
 			writeStoreError(w, err)

@@ -715,7 +715,7 @@ func (s *MemoryStore) SaveBookProductionText(ctx context.Context, owner, batchID
 func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
 	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
 	_, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
-	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText && !input.KeepProductionText) {
 		return Book{}, ErrInvalid
 	}
 	s.mu.Lock()
@@ -733,7 +733,10 @@ func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookI
 		if book.Revision != input.ExpectedRevision || (strings.TrimSpace(book.SourceText) != "" && !input.ReplaceSource) {
 			return Book{}, ErrConflict
 		}
-		if validSourceText || input.ReplaceSource {
+		if !input.KeepProductionText && (validSourceText || input.ReplaceSource) {
+			if input.ProductionStage != nil {
+				sourceText = input.SourceText
+			}
 			book.SourceText = sourceText
 		}
 		raw := ""

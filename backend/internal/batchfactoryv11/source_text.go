@@ -18,7 +18,7 @@ func sourceWriteMetadata(current, patch map[string]any, original, origin string)
 		metadata[key] = value
 	}
 	for key, value := range patch {
-		if key != "rawSourceStatus" && key != "rawSourceOrigin" {
+		if key != "rawSourceStatus" && key != "rawSourceOrigin" && key != "batchSensitiveStage" {
 			metadata[key] = value
 		}
 	}
@@ -46,7 +46,7 @@ func sourceReadMetadata(metadata map[string]any) map[string]any {
 func replaceBookMetadata(current, replacement map[string]any, currentID, newID string) map[string]any {
 	facts := map[string]any{}
 	if newID == "" || newID == currentID {
-		for _, key := range []string{"rawSourceStatus", "rawSourceOrigin"} {
+		for _, key := range []string{"rawSourceStatus", "rawSourceOrigin", "batchSensitiveStage"} {
 			if value, ok := current[key]; ok {
 				facts[key] = value
 			}
@@ -57,6 +57,7 @@ func replaceBookMetadata(current, replacement map[string]any, currentID, newID s
 
 func (input SaveBookProductionTextInput) captureInput() CaptureBookSourceInput {
 	return CaptureBookSourceInput{
+		ProductionStage: input.Stage, KeepProductionText: input.KeepProductionText,
 		SourceText: input.SourceText, ReplaceSource: true, SourceMetadata: input.SourceMetadata,
 		ExpectedRevision: input.ExpectedRevision,
 	}
@@ -64,6 +65,12 @@ func (input SaveBookProductionTextInput) captureInput() CaptureBookSourceInput {
 
 func (input CaptureBookSourceInput) updatedMetadata(current map[string]any, currentID, raw string) map[string]any {
 	metadata := sourceWriteMetadata(current, input.SourceMetadata, raw, input.RawSourceOrigin)
+	if raw != "" {
+		delete(metadata, "productionTextEdited")
+	}
+	if input.ProductionStage != nil {
+		metadata["batchSensitiveStage"] = input.ProductionStage
+	}
 	if id := strings.TrimSpace(input.SourceBookID); raw == "" && id != "" && id != currentID {
 		delete(metadata, "rawSourceOrigin")
 		metadata["rawSourceStatus"] = "unverified"

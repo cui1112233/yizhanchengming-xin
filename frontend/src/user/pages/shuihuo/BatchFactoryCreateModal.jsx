@@ -442,7 +442,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
                   },
                   expectedRevision: Number(refreshedBook.revision || 0)
                 });
-                try { await classifyBookPublishMetadata(batchId, refreshedBook.id, { force: false }); } catch (_) { /* 分类可在工作区单独重试 */ }
+                if (initialBatchSettings.productionMode !== 'text') {
+                  try { await classifyBookPublishMetadata(batchId, refreshedBook.id, { force: false }); } catch (_) { /* 分类可在工作区单独重试 */ }
+                }
               }
             } catch (directFetchError) {
               hasDirectReadFailure = true;
@@ -631,6 +633,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           const result = await fetchDirectOriginals({
             platform: group.platformId,
             bookIds: pending,
+            productionMode: initialBatchSettings.productionMode,
             maxTxt: contentCaptureCharacters
           });
           const groupSources = {};

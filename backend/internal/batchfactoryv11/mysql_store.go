@@ -409,7 +409,7 @@ func (s *MySQLStore) SaveBookProductionText(ctx context.Context, owner, batchID,
 func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
 	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
 	_, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
-	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText && !input.KeepProductionText) {
 		return Book{}, ErrInvalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -458,8 +458,11 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 		nextSourceBookID = candidate
 	}
 	nextSourceText := source.String
-	if validSourceText || input.ReplaceSource {
+	if !input.KeepProductionText && (validSourceText || input.ReplaceSource) {
 		nextSourceText = sourceText
+		if input.ProductionStage != nil {
+			nextSourceText = input.SourceText
+		}
 	}
 	// See UpdateBookMetadata: this column is JSON, not a binary blob.
 	if !validRawSourceText && input.SourceTitle == "" && input.SourceBookID == "" {

@@ -43,6 +43,9 @@ func TestPrivateCustomizationComicCreatesSinglePastedBook(t *testing.T) {
 	if len(payload.Batch.Books) != 1 {
 		t.Fatalf("want one book, got %d", len(payload.Batch.Books))
 	}
+	if !hasVerifiedBatchOriginal(payload.Book) || payload.Book.SourceMetadata["rawSourceOrigin"] != "private_paste" {
+		t.Fatalf("新粘贴的全文缺少来源记录: %v", payload.Book.SourceMetadata)
+	}
 }
 
 func TestPrivateCustomizationComicRejectsEmptySource(t *testing.T) {

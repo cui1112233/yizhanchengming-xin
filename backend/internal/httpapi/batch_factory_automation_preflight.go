@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/batchfactorysensitive"
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
@@ -434,7 +435,8 @@ func automationSettingsPatchFromMap(values map[string]any) (batchfactoryv11.Sett
 // 版本：只覆盖“整批不可执行”的条件。
 func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context.Context, owner string, batch batchfactoryv11.Batch, runMode string) []automationPreflightIssue {
 	issues := make([]automationPreflightIssue, 0, 3)
-	if c.stages == nil || c.stages.Director == nil || c.stages.Director.Provider == nil {
+	productionMode := batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, nil)
+	if productionMode != "text" && (c.stages == nil || c.stages.Director == nil || c.stages.Director.Provider == nil) {
 		issues = append(issues, automationPreflightIssue{
 			Code:      "text_executor_missing",
 			Message:   "文本模型执行器未配置",
@@ -442,7 +444,6 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 			FixLabel:  "个人中心 → API 配置",
 		})
 	}
-	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
 	if productionMode == "comic" && runMode != "storyboard_only" {
 		if c.stages == nil || c.stages.ImageReady == nil {
 			issues = append(issues, automationPreflightIssue{
@@ -460,7 +461,7 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 			})
 		}
 	}
-	if productionMode != "comic" && runMode != "storyboard_only" {
+	if productionMode == "video" && runMode != "storyboard_only" {
 		if c.stages == nil || c.stages.VideoReady == nil {
 			issues = append(issues, automationPreflightIssue{
 				Code:      "video_executor_missing",
@@ -486,7 +487,7 @@ func (c *BatchAutomationCoordinator) automationGlobalPreflightIssues(ctx context
 				FixLabel:  "发布设置",
 			})
 		}
-		if productionMode != "comic" && c.publish121 == nil && c.external == nil {
+		if productionMode == "video" && c.publish121 == nil && c.external == nil {
 			issues = append(issues, automationPreflightIssue{
 				Code:      "video_publish_executor_missing",
 				Message:   "视频发布执行器未配置",
@@ -517,6 +518,30 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 		return issues
 	}
 	effective := c.automationEffectiveSettings(batch, book)
+	productionMode := batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch)
+	if !hasVerifiedBatchOriginal(book) && (strings.TrimSpace(book.SourceText) != "" || strings.TrimSpace(book.TxtText) != "") {
+		return []automationPreflightIssue{{Code: "raw_source_missing", Message: missingSensitiveOriginal, FixTarget: automationFixBookSettings, FixLabel: "重新获取原文"}}
+	}
+	if productionMode == "text" {
+		if batchfactorysensitive.ResolveMode(effective) == batchfactorysensitive.ModeAI {
+			models := batchSensitiveModels(effective)
+			if len(models) == 0 {
+				issues = append(issues, automationPreflightIssue{Code: "text_model_missing", Message: "AI 优化需要选择文本模型", FixTarget: automationFixAPIConfig, FixLabel: "模型配置"})
+			} else if extended {
+				available := false
+				for _, m := range models {
+					if c.stages != nil && c.stages.TextProviderResolver != nil && c.automationTextModelAvailable(ctx, owner, m) {
+						available = true
+						break
+					}
+				}
+				if !available {
+					issues = append(issues, automationPreflightIssue{Code: "text_model_unavailable", Message: "所选修复模型不可用", FixTarget: automationFixAPIConfig, FixLabel: "模型配置"})
+				}
+			}
+		}
+		return issues
+	}
 	textModelID := comicSettingString(effective, "textModelId", "")
 	if textModelID == "" {
 		issues = append(issues, automationPreflightIssue{
@@ -536,7 +561,6 @@ func (c *BatchAutomationCoordinator) automationBookPreflightIssues(ctx context.C
 	if runMode == "storyboard_only" {
 		return issues
 	}
-	productionMode := batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch)
 	if productionMode == "comic" {
 		if comicSettingString(effective, "imageModelId", "") == "" {
 			issues = append(issues, automationPreflightIssue{

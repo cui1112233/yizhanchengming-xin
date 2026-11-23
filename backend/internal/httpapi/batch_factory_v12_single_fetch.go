@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"qiantie/backend/internal/batchfactorysensitive"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
@@ -19,9 +20,11 @@ import (
 // 旧批次没有这三个字段时按默认值读取（关闭 AI 修复、继承全局模型、失败自动打码并继续）。
 // 显式写入 sensitiveAIEnabled=true 的老批次仍保持开启，默认值只作用于未设置的情况。
 type batchSensitiveConfig struct {
-	Enabled   bool
-	Models    []string
-	OnFailure string
+	DeferToProduction   bool
+	DeferClassification bool
+	Enabled             bool
+	Models              []string
+	OnFailure           string
 }
 
 const (
@@ -239,6 +242,18 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 	// 避免书城导入的书一直停留在「小说 <id>」这类占位名。
 	if title := strings.TrimSpace(result.BookInfo.WorkTitle); title != "" {
 		metadata["bookName"] = title
+	}
+	if sensitive.DeferToProduction {
+		metadata["originalStatus"], metadata["processingStatus"], metadata["sensitiveStatus"] = "done", "done", "pending"
+		metadata["queueStage"], metadata["sourceContentVersion"] = "classification", "original"
+		metadata["processedChars"] = result.ProcessedChars
+		if sensitive.DeferClassification {
+			metadata["themes"], metadata["labels"] = result.BookInfo.Themes, result.BookInfo.Labels
+			metadata["classificationAfterSensitive"] = true
+			return result, metadata, nil
+		}
+		metadata = finalizeFetchedBatchClassification(classifyFetchedBatchBook(ctx, owner, result.BookInfo, result.ProcessedText, metadata, classification))
+		return result, metadata, nil
 	}
 	if workshopStore == nil {
 		metadata["originalStatus"] = "done"
@@ -844,7 +859,17 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 			}
 			bookID = resolvedBookID
 		}
-		result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification, resolveBatchSensitiveConfig(batch.SettingsState.Patch, book.SettingsState.Patch))
+		fetchConfig := resolveBatchSensitiveConfig(batch.SettingsState.Patch, book.SettingsState.Patch)
+		// Manual fetch may preview local rules. Paid processing and off-mode
+		// passthrough belong to the production decision frozen for this book.
+		fetchConfig.DeferToProduction = batchfactorysensitive.ResolveMode(batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)) != batchfactorysensitive.ModeSystem
+		fetchConfig.Enabled = false
+		bookClassification := classification
+		if batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch) == "text" {
+			fetchConfig.DeferToProduction = true
+			bookClassification = batchFetchClassification{}
+		}
+		result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, bookClassification, fetchConfig)
 		if fallbackFrom != "" {
 			metadata["platformBookId"] = resolvedBookID
 			metadata["resolvedPlatformBookId"] = resolvedBookID

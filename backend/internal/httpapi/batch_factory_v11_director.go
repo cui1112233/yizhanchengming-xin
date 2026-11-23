@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -24,7 +25,13 @@ func directorForRequest(service *batchfactoryv11.DirectorService, input *textPro
 	return service, nil
 }
 
-func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.DirectorService, store batchfactoryv11.Store) {
+func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.DirectorService, store batchfactoryv11.Store, stages *batchfactoryv11.BookStageService) {
+	runDirector := func(ctx context.Context, runner *batchfactoryv11.DirectorService, owner, batchID, bookID, style string) (batchfactoryv11.DirectorRevision, error) {
+		if _, err := stages.PrepareProductionText(ctx, owner, batchID, bookID); err != nil {
+			return batchfactoryv11.DirectorRevision{}, err
+		}
+		return runner.RunDirectorWithSmartUnifiedStyle(ctx, owner, batchID, bookID, style)
+	}
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/books/{bookId}/director-prompt-candidate", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -207,7 +214,7 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 			writeStoreError(w, err)
 			return
 		}
-		value, err := runner.RunDirectorWithSmartUnifiedStyle(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.SmartUnifiedStyle)
+		value, err := runDirector(r.Context(), runner, owner, r.PathValue("batchId"), r.PathValue("bookId"), input.SmartUnifiedStyle)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -244,7 +251,7 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 		revisions := []batchfactoryv11.DirectorRevision{}
 		failures := []failure{}
 		for _, book := range batch.Books {
-			revision, runErr := runner.RunDirector(r.Context(), owner, batchID, book.ID)
+			revision, runErr := runDirector(r.Context(), runner, owner, batchID, book.ID, "")
 			if runErr != nil {
 				failures = append(failures, failure{BookID: book.ID, Error: safeDirectorError(runErr)})
 				continue
@@ -264,6 +271,8 @@ func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.Directo
 func safeDirectorError(err error) string {
 	// 这里的文案会直接进批量结果列表展示给用户，必须是中文可执行文案。
 	switch {
+	case errors.Is(err, batchfactoryv11.ErrConfigRequired):
+		return err.Error()
 	case errors.Is(err, batchfactoryv11.ErrNotFound):
 		return "书籍不存在或已被删除"
 	case errors.Is(err, batchfactoryv11.ErrConflict):

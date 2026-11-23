@@ -343,7 +343,7 @@ func comicAutomationResponse(request batchfactoryv11.TextCompletionRequest) stri
 func TestComicAutomationStopsAfterWholeBookCollectionWithoutAudioOrVideo(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
-	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室，陆沉抬头看向她。"}}})
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书", TxtText: "林晚走进办公室，陆沉抬头看向她。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室，陆沉抬头看向她。"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,8 +409,8 @@ func TestComicAutomationHonorsBookConcurrency(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{
-		{Title: "第一本", SourceText: "林晚走进办公室。"},
-		{Title: "第二本", SourceText: "林晚走进办公室。"},
+		{Title: "第一本", TxtText: "林晚走进办公室。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室。"},
+		{Title: "第二本", TxtText: "林晚走进办公室。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室。"},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -452,8 +452,8 @@ func TestAutomationRunSkipsBlockedBook(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{
-		{Title: "健康书", SourceText: "林晚走进办公室。"},
-		{Title: "缺模型书", SourceText: "林晚走进办公室。"},
+		{Title: "健康书", TxtText: "林晚走进办公室。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室。"},
+		{Title: "缺模型书", TxtText: "林晚走进办公室。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室。"},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -517,8 +517,8 @@ func TestAutomationRunContinuesAfterDeterministicBookFailure(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{
-		{Title: "余额不足书", SourceText: "林晚走进办公室。"},
-		{Title: "健康书", SourceText: "陆沉抬头看向她。"},
+		{Title: "余额不足书", TxtText: "林晚走进办公室。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室。"},
+		{Title: "健康书", TxtText: "陆沉抬头看向她。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "陆沉抬头看向她。"},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -976,7 +976,7 @@ func TestAutomationGlobalPreflightIgnoresBookConfig(t *testing.T) {
 func TestAutomationBookPreflightReason(t *testing.T) {
 	coordinator := &BatchAutomationCoordinator{}
 	batch := batchfactoryv11.Batch{}
-	book := batchfactoryv11.Book{ID: "book-1", Title: "书一", SourceText: "第一章 正文内容"}
+	book := batchfactoryv11.Book{ID: "book-1", Title: "书一", TxtText: "第一章 正文内容", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "第一章 正文内容"}
 	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "execute_only"); !strings.Contains(reason, "文本模型") {
 		t.Fatalf("reason=%q, want missing text model", reason)
 	}
@@ -1012,7 +1012,7 @@ func TestAutomationBookPreflightChecksComicPublishDirectory(t *testing.T) {
 		"productionMode":       json.RawMessage(`"comic"`),
 		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","organizationName":"博量","producerAdminName":"制作者","workIds":[9001]}`),
 	}}}
-	book := batchfactoryv11.Book{ID: "book-1", SourceText: "第一章 正文内容", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+	book := batchfactoryv11.Book{ID: "book-1", TxtText: "第一章 正文内容", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "第一章 正文内容", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
 		"textModelId":     json.RawMessage(`"text-1"`),
 		"imageModelId":    json.RawMessage(`"image-1"`),
 		"publishSettings": json.RawMessage(`{"websiteProfileId":"p1"}`),
@@ -1048,7 +1048,7 @@ func TestAutomationBookPreflightChecksComicPublishDirectory(t *testing.T) {
 		"productionMode":       json.RawMessage(`"video"`),
 		"comicPublishSettings": json.RawMessage(`{"organizationId":"1"}`),
 	}}}
-	videoBook := batchfactoryv11.Book{ID: "book-3", SourceText: "第一章 正文内容", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+	videoBook := batchfactoryv11.Book{ID: "book-3", TxtText: "第一章 正文内容", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "第一章 正文内容", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
 		"textModelId":  json.RawMessage(`"text-1"`),
 		"videoModelId": json.RawMessage(`"video-1"`),
 	}}}
@@ -1456,7 +1456,7 @@ func TestVideoAutomationAssetImagesSwitchDoesNotSkipPromptExtraction(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			store := batchfactoryv11.NewMemoryStore()
-			batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "视频批次", Books: []batchfactoryv11.CreateBookInput{{Title: "视频书", SourceText: "林晚推门进入客厅。"}}})
+			batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "视频批次", Books: []batchfactoryv11.CreateBookInput{{Title: "视频书", TxtText: "林晚推门进入客厅。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚推门进入客厅。"}}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1552,7 +1552,7 @@ func TestVideoAutomationAssetImagesSwitchDoesNotSkipPromptExtraction(t *testing.
 func TestComicAutomationWithAssetImagesDisabledStillRunsTheComicStages(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()
-	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室，陆沉抬头看向她。"}}})
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书", TxtText: "林晚走进办公室，陆沉抬头看向她。", SourceMetadata: map[string]any{"rawSourceStatus": "verified"}, SourceText: "林晚走进办公室，陆沉抬头看向她。"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2113,10 +2113,14 @@ func TestEnsureAutomationSourceUsesNovelFetchRulesAndKeepsRawText(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(updated.SourceText, "合规词") || strings.Contains(updated.SourceText, "坏词") {
-		t.Fatalf("production source was not processed: %q", updated.SourceText)
+	if updated.SourceText != "这是坏词正文" || updated.SourceMetadata["sensitiveStatus"] != "pending" {
+		t.Fatalf("抓取阶段应保留待处理稿件: %+v", updated)
 	}
-	if updated.TxtText != "这是坏词正文" || updated.SourceMetadata["sourceContentVersion"] != "sensitive" || updated.SourceMetadata["processingStatus"] != "done" {
+	updated, err = coordinator.runBatchSensitiveStage(context.Background(), "alice", batch.ID, updated.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SourceText != "这是合规词正文" || updated.TxtText != "这是坏词正文" || mapOrEmpty(updated.SourceMetadata["batchSensitiveStage"])["status"] != "done" {
 		t.Fatalf("raw source or processing metadata was lost: %+v", updated)
 	}
 }
@@ -2284,7 +2288,7 @@ func TestGenerateBookAudioPlanTargetsOnlyTheRequestedBookAndNeverCreatesAMerge(t
 	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
 		Title: "batch",
 		Books: []batchfactoryv11.CreateBookInput{
-			{Title: "selected", SourceText: "第一行", SourceMetadata: map[string]any{"gender": "男频", "style": "现代", "classifyStatus": "classified"}},
+			{Title: "selected", SourceText: "第一行", TxtText: "第一行", SourceMetadata: map[string]any{"rawSourceStatus": "verified", "gender": "男频", "style": "现代", "classifyStatus": "classified"}},
 			{Title: "other", SourceText: "第二行", SourceMetadata: map[string]any{"gender": "女频", "style": "现代", "classifyStatus": "classified"}},
 		},
 	})

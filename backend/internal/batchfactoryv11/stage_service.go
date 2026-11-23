@@ -47,9 +47,10 @@ type BookStageSummary struct {
 }
 
 type BookStageService struct {
-	Store      Store
-	Director   *DirectorService
-	Production *ProductionService
+	PrepareProductionText func(context.Context, string, string, string) (Book, error)
+	Store                 Store
+	Director              *DirectorService
+	Production            *ProductionService
 	// ImageReady and ImageGenerator are supplied by the host application so
 	// the stage service stays independent from a particular image provider.
 	ImageReady func(context.Context, string) (bool, string)
@@ -324,7 +325,10 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		return BookStageSummary{}, err
 	}
 	effectiveSettings := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-	effectiveMode := normalizeProductionMode(effectiveSettings)
+	effectiveMode := EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch)
+	if effectiveMode == "text" {
+		return BookStageSummary{}, fmt.Errorf("%w: 文本批次请使用文本排版", ErrConflict)
+	}
 	// 资产图片开关只决定是否生成资产参考图；人物/场景/道具的文字提示词
 	// 始终要提取，否则分镜和视频提示词会丢失“基础设定”信息。
 	if mode == StageModeMissing && effectiveMode == "comic" {
@@ -387,6 +391,13 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 			_ = s.finish(ctx, owner, run, err)
 			summary, _ := s.Summary(ctx, owner, batchID, bookID)
 			return summary, err
+		}
+	}
+	if s.PrepareProductionText != nil {
+		book, err = s.PrepareProductionText(ctx, owner, batchID, bookID)
+		if err != nil {
+			_ = s.finish(ctx, owner, run, err)
+			return BookStageSummary{}, err
 		}
 	}
 	switch stage {
