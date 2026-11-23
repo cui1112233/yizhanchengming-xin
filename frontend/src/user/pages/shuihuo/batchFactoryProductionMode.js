@@ -1,5 +1,5 @@
 export function batchFactoryProductionMode(value) {
-  return value === 'comic' ? 'comic' : 'video';
+  return value === 'comic' || value === 'text' ? value : 'video';
 }
 
 export function batchFactoryProductionModeVisibility(value) {
@@ -7,7 +7,8 @@ export function batchFactoryProductionModeVisibility(value) {
   return {
     mode,
     video: mode === 'video',
-    comic: mode === 'comic'
+    comic: mode === 'comic',
+    text: mode === 'text'
   };
 }
 

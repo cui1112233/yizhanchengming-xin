@@ -145,6 +145,15 @@ func TestResolveSettingsDeepMergesAIPromptConfigModules(t *testing.T) {
 	}
 }
 
+func TestEffectiveProductionModeSupportsText(t *testing.T) {
+	if got := normalizeProductionMode(SettingsPatch{"productionMode": raw("text")}); got != "text" {
+		t.Fatalf("mode = %q, want text", got)
+	}
+	if got := EffectiveProductionMode(SettingsPatch{"productionMode": raw("text")}, SettingsPatch{"productionMode": raw("comic")}); got != "text" {
+		t.Fatalf("batch mode = %q, want text", got)
+	}
+}
+
 func TestEffectiveProductionModeKeepsVideoBatchOutOfComicStages(t *testing.T) {
 	// 批次在页面上按视频渲染时，单书里遗留的 comic 模式不得把编排拉进
 	// comic_assets 阶段。

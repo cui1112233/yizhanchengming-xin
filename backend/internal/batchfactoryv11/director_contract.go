@@ -261,9 +261,9 @@ func hydrateConstraintSelectionBodies(config *AIReasoningPromptConfig) {
 }
 
 // normalizeProductionMode keeps historical books on the existing video path
-// until a user explicitly switches the book to comic production.
+// until a user explicitly switches the book to comic or text production.
 func normalizeProductionMode(patch SettingsPatch) string {
-	if mode := rawString(patch, "productionMode", ""); mode == "comic" || mode == "video" {
+	if mode := rawString(patch, "productionMode", ""); mode == "comic" || mode == "video" || mode == "text" {
 		return mode
 	}
 	// Earlier single-book screens persisted the selected comic module but could

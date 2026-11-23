@@ -122,7 +122,7 @@ func ResolveSettings(layers ...SettingsPatch) SettingsPatch {
 // must not drag a video batch into the comic stage sequence. Batches that only
 // stored the mode on the book keep working when the batch layer is silent.
 func EffectiveProductionMode(batchPatch, bookPatch SettingsPatch) string {
-	if mode := rawString(batchPatch, "productionMode", ""); mode == "comic" || mode == "video" {
+	if mode := rawString(batchPatch, "productionMode", ""); mode == "comic" || mode == "video" || mode == "text" {
 		return mode
 	}
 	return normalizeProductionMode(ResolveSettings(batchPatch, bookPatch))

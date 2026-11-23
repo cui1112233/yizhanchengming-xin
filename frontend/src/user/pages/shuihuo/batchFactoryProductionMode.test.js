@@ -13,7 +13,8 @@ test('defaults historical settings to video mode', () => {
   assert.deepEqual(batchFactoryProductionModeVisibility('unknown'), {
     mode: 'video',
     video: true,
-    comic: false
+    comic: false,
+    text: false
   });
 });
 
@@ -28,7 +29,17 @@ test('comic mode exposes comic settings and hides video settings', () => {
   assert.deepEqual(batchFactoryProductionModeVisibility('comic'), {
     mode: 'comic',
     video: false,
-    comic: true
+    comic: true,
+    text: false
+  });
+});
+
+test('text mode exposes text settings and hides video and comic settings', () => {
+  assert.deepEqual(batchFactoryProductionModeVisibility('text'), {
+    mode: 'text',
+    video: false,
+    comic: false,
+    text: true
   });
 });
 
