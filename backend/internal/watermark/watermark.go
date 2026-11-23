@@ -3,32 +3,16 @@ package watermark
 
 import (
 	"bytes"
-	_ "embed"
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/jpeg"
 	"image/png"
 
-	"github.com/golang/freetype"
-	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
+	"qiantie/backend/internal/renderfont"
 )
-
-//go:embed NotoSansSC.ttf
-var fontBytes []byte
-
-var parsedFont *truetype.Font
-
-func init() {
-	var err error
-	parsedFont, err = freetype.ParseFont(fontBytes)
-	if err != nil {
-		panic(fmt.Sprintf("watermark: parse embedded font: %v", err))
-	}
-}
 
 // Options 控制水印开关与文字内容。
 type Options struct {
@@ -82,7 +66,10 @@ func Apply(data []byte, mediaType string, opts Options) ([]byte, string) {
 		margin = 8
 	}
 
-	face := truetype.NewFace(parsedFont, &truetype.Options{Size: fontSize, DPI: 72})
+	face, err := renderfont.Open(renderfont.Noto, fontSize)
+	if err != nil {
+		return data, mediaType
+	}
 	defer face.Close()
 
 	// 测量文字宽度
@@ -93,7 +80,10 @@ func Apply(data []byte, mediaType string, opts Options) ([]byte, string) {
 	if boxWidth > width/2 {
 		// 文字太长，缩小字号重试一次
 		fontSize = fontSize * 0.8
-		face = truetype.NewFace(parsedFont, &truetype.Options{Size: fontSize, DPI: 72})
+		face, err = renderfont.Open(renderfont.Noto, fontSize)
+		if err != nil {
+			return data, mediaType
+		}
 		defer face.Close()
 		drawer = &font.Drawer{Face: face}
 		textWidth = drawer.MeasureString(text).Ceil()

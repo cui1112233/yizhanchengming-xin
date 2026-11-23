@@ -2,6 +2,8 @@ package watermark
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -26,6 +28,9 @@ func TestApplyAddsWatermark(t *testing.T) {
 	}
 	if len(out) == len(buf.Bytes()) {
 		t.Fatal("output should differ after watermark")
+	}
+	if got := fmt.Sprintf("%x", sha256.Sum256(out)); got != "36c234c083b1f4d3d69f0ba4d95180d78990d19da6c99ce42457c71c1f86c6bc" {
+		t.Fatalf("watermark output changed: %s", got)
 	}
 
 	decoded, err := png.Decode(bytes.NewReader(out))
