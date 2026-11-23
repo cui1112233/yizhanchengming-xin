@@ -1,4 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const h = vi.hoisted(() => ({
   slots: [] as any[], cursor: 0, show: undefined as any,
@@ -95,4 +97,13 @@ test("a failed summary keeps the selected module and offers a retry", async () =
   expect(find("workbench-error")).toBeDefined();
   find("workbench-retry").props.onClick();
   expect(h.loadSummary).toHaveBeenCalledTimes(2);
+});
+
+test("workbench stylesheet locks the mobile card hierarchy and safe area", () => {
+  const styles = readFileSync(resolve(__dirname, "studio.scss"), "utf8");
+  expect(styles).toContain(".workbench-current-card");
+  expect(styles).toContain(".workbench-project-card");
+  expect(styles).toContain(".workbench-detail-card");
+  expect(styles).toContain("padding-bottom:calc(96PX + env(safe-area-inset-bottom))");
+  expect(styles).toContain("min-height:128PX");
 });
