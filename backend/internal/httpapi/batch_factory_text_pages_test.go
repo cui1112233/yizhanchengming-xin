@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"image/png"
 	"net/http"
@@ -14,9 +15,56 @@ import (
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/storage"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+type pausingTextBatchRead struct {
+	*batchfactoryv11.MemoryStore
+	reads           atomic.Int32
+	entered, resume chan struct{}
+}
+
+func (s *pausingTextBatchRead) GetDraft(ctx context.Context, owner, key, kind, scope string) (batchfactoryv11.Draft, error) {
+	b, err := s.MemoryStore.GetDraft(ctx, owner, key, kind, scope)
+	// Pause after the request reads its production source, before pagination.
+	if s.reads.Add(1) == 1 {
+		close(s.entered)
+		select {
+		case <-s.resume:
+		case <-ctx.Done():
+			return b, ctx.Err()
+		}
+	}
+	return b, err
+}
+
+type textSQLSourceReader interface {
+	LockProductionSource(context.Context, *sql.Tx, string, string, string) (batchfactoryv11.Book, string, error)
+}
+
+// Other batch calls use the signed fixture while the publication fence reads
+// the same MySQL record/draft tables and runs the same locking queries as production.
+type textSQLSourceStore struct {
+	*batchfactoryv11.MemoryStore
+	textSQLSourceReader
+}
+type pausingTextPublication struct {
+	batchfactorytext.Repository
+	entered, resume chan struct{}
+}
+
+func (p *pausingTextPublication) PreparePages(ctx context.Context, s batchfactorytext.Scope, v batchfactorytext.VersionInput, u batchfactorytext.PaginationUpdate) (int64, error) {
+	close(p.entered)
+	select {
+	case <-p.resume:
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+	return p.Repository.PreparePages(ctx, s, v, u)
+}
 
 func TestBatchFactoryTextSignedModeGuard(t *testing.T) {
 	s := batchfactoryv11.NewMemoryStore()
@@ -99,10 +147,96 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 	}
 	pg := st.Pages[0]
 	call("POST", "pages/"+pg.ID+"/split", map[string]any{"offset": 2, "expectedRevision": st.Document.Revision}, 400)
-	call("POST", "pages/"+pg.ID+"/split", map[string]any{"offset": 6, "expectedRevision": st.Document.Revision}, 200)
+	runSlow := func(opts RouterOptions, entered chan struct{}, resume chan struct{}, change func()) {
+		t.Helper()
+		opts.Slice = 1
+		opts.LocalArtifacts = files
+		opts.BridgeSecret = "secret"
+		opts.Now = func() time.Time { return now }
+		release := sync.OnceFunc(func() { close(resume) })
+		defer release()
+		api := NewRouter(opts)
+		finished := make(chan *httptest.ResponseRecorder, 1)
+		go func() { finished <- signedJSONRequest(t, api, now, "alice", "POST", base+"prepare", map[string]any{}) }()
+		select {
+		case <-entered:
+		case <-time.After(15 * time.Second):
+			t.Fatal("slow prepare never reached the synchronization point")
+		}
+		change()
+		release()
+		select {
+		case got := <-finished:
+			if got.Code != 409 {
+				t.Fatalf("stale prepare got %d: %s", got.Code, got.Body.String())
+			}
+		case <-time.After(15 * time.Second):
+			t.Fatal("stale prepare never finished")
+		}
+	}
+	entered, resume := make(chan struct{}), make(chan struct{})
+	raceStore := &pausingTextBatchRead{MemoryStore: s, entered: entered, resume: resume}
+	runSlow(RouterOptions{Store: raceStore, TextRepository: batchfactorytext.NewMySQLRepository(db)}, entered, resume, func() {
+		call("POST", "pages/"+pg.ID+"/split", map[string]any{"offset": 6, "expectedRevision": st.Document.Revision}, 200)
+	})
 	st = get()
 	if len(st.Pages) != 2 {
 		t.Fatalf("split %+v", st)
+	}
+	first, second := st.Pages[0], st.Pages[1]
+	baseVersion := st.Document.ActiveVersionID
+	pagePath := "pages/" + first.ID
+	edit := map[string]any{"expectedRevision": first.Revision, "expectedDocumentRevision": st.Document.Revision, "text": "这是手动改写的第一句。"}
+	oldPixels := call("POST", pagePath+"/preview", map[string]any{}, 200).Body.Bytes()
+	newPixels := call("POST", pagePath+"/preview", edit, 200).Body.Bytes()
+	if bytes.Equal(oldPixels, newPixels) || get().Pages[0].Text != first.Text {
+		t.Fatal("draft preview must render new text without saving")
+	}
+	edit["expectedDocumentRevision"] = st.Document.Revision + 1
+	call("PATCH", pagePath, edit, 409)
+	edit["expectedDocumentRevision"] = st.Document.Revision
+	call("PATCH", pagePath, edit, 200)
+	st = get()
+	if len(st.Pages) != 2 || st.Pages[0].Text != edit["text"] || st.Pages[1].Text != second.Text || st.Document.OriginalText != original || st.Document.ActiveVersionID == baseVersion || st.Pages[0].EndOffset != st.Pages[1].StartOffset {
+		t.Fatalf("edit did not preserve version and boundaries: %+v", st)
+	}
+	if actual := call("POST", "pages/"+st.Pages[0].ID+"/preview", map[string]any{}, 200).Body.Bytes(); !bytes.Equal(actual, newPixels) {
+		t.Fatal("preview and saved pixels differ")
+	}
+	prior, err := batchfactorytext.NewMySQLRepository(db).GetVersion(context.Background(), batchfactorytext.Scope{Owner: "alice", BatchID: b.ID, BookID: book.ID}, baseVersion)
+	if err != nil || prior.ProductionText != original {
+		t.Fatalf("original version mutated: %+v %v", prior, err)
+	}
+	call("PATCH", "pages/"+st.Pages[1].ID, map[string]any{"expectedRevision": st.Pages[1].Revision, "layout": map[string]string{"textColor": "#225599"}}, 200)
+	for _, page := range get().Pages {
+		call("POST", "pages/"+page.ID+"/render", map[string]any{"expectedRevision": page.Revision}, 201)
+	}
+	oldPages := get().Pages
+	set := func(key string, value any) {
+		t.Helper()
+		fresh, err := s.GetBatch(context.Background(), "alice", b.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = s.SaveSettings(context.Background(), "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: b.ID}, batchfactoryv11.SettingsUpdate{ExpectedRevision: fresh.Revision, Patch: batchfactoryv11.SettingsPatch{key: mustJSON(value)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	set("textColor", "#006688")
+	call("POST", "prepare", map[string]any{}, 200)
+	st = get()
+	if len(st.Pages) != 2 || st.Pages[0].ID != oldPages[0].ID || st.Pages[1].ID != oldPages[1].ID || st.Pages[0].Text != edit["text"] {
+		t.Fatalf("color lost manual pages: %+v", st)
+	}
+	if st.Pages[0].ActiveArtifactID != "" || oldPages[1].ActiveArtifactID == "" || st.Pages[1].ActiveArtifactID != oldPages[1].ActiveArtifactID {
+		t.Fatal("color change invalidated incorrect pages")
+	}
+	set("textFontSize", 44)
+	call("POST", "prepare", map[string]any{}, 200)
+	st = get()
+	if len(st.Pages) != 2 || st.Pages[0].ID != oldPages[0].ID {
+		t.Fatal("geometry lost fitting manual boundaries")
 	}
 	call("POST", "pages/"+st.Pages[0].ID+"/merge", map[string]any{"expectedRevision": st.Document.Revision}, 200)
 	st = get()
@@ -198,6 +332,15 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 		t.Fatal("unlocked after upload")
 	}
 	call("POST", "pages/"+pg.ID+"/render", map[string]any{"expectedRevision": st.Pages[0].Revision}, 409)
+	call("POST", "pages/"+pg.ID+"/preview", map[string]any{"text": "编辑锁定页。"}, 409)
+	call("PATCH", "pages/"+pg.ID, map[string]any{"text": "编辑锁定页。", "expectedRevision": st.Pages[0].Revision, "expectedDocumentRevision": st.Document.Revision}, 409)
+	lockedArtifact := st.Pages[0].ActiveArtifactID
+	set("textBackground", map[string]string{"type": "color", "color": "#111111"})
+	call("POST", "prepare", map[string]any{}, 200)
+	st = get()
+	if !st.Pages[0].Locked || st.Pages[0].ActiveArtifactID != lockedArtifact {
+		t.Fatal("color changed a locked upload")
+	}
 	before := st.Document
 	_, err = s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: "修改后的整段文字。"})
 	if err != nil {
@@ -227,6 +370,95 @@ func TestBatchFactoryTextSignedMySQLLifecycle(t *testing.T) {
 		t.Fatal("changed background retained stale system cover")
 	}
 
+	// Pause after pinning the material and rendering layout. Updating only the
+	// upstream working draft must still prevent the old publication.
+	entered, resume = make(chan struct{}), make(chan struct{})
+	paused := &pausingTextPublication{Repository: batchfactorytext.NewMySQLRepository(db), entered: entered, resume: resume}
+	head := get().Document
+	runSlow(RouterOptions{Store: s, TextRepository: paused}, entered, resume, func() {
+		_, err = s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: "这是另一个新的工作稿。"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if get().Document.Revision != head.Revision {
+		t.Fatal("stale request changed the document")
+	}
+	call("POST", "prepare", map[string]any{}, 200)
+	if get().Pages[0].Text != "这是另一个新的工作稿。" {
+		t.Fatal("new working draft was not activated")
+	}
+	for _, ddl := range []string{
+		"CREATE TABLE IF NOT EXISTS batch_factory_v12_book_records(book_id VARCHAR(64) PRIMARY KEY, source_text LONGTEXT,txt_text LONGTEXT,source_metadata_json JSON) ENGINE=InnoDB",
+		"CREATE TABLE IF NOT EXISTS batch_factory_v12_drafts(owner_username VARCHAR(191),draft_key VARCHAR(100),kind VARCHAR(64),scope VARCHAR(64),content LONGTEXT, PRIMARY KEY(owner_username,draft_key,kind,scope)) ENGINE=InnoDB",
+	} {
+		if _, err = db.Exec(ddl); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fresh, err = s.GetBatch(context.Background(), "alice", b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified := fresh.Books[0]
+	meta, err := json.Marshal(verified.SourceMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec("INSERT INTO batch_factory_v12_book_records(book_id,source_text,txt_text,source_metadata_json) VALUES(?,?,?,?)", book.ID, verified.SourceText, verified.TxtText, meta); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec("INSERT INTO batch_factory_v12_drafts(owner_username,draft_key,kind,scope,content) VALUES(?,?,'working-front-content',?,?)", "alice", "working-front:"+book.ID, b.ID, verified.SourceText); err != nil {
+		t.Fatal(err)
+	}
+	sqlSource := textSQLSourceStore{s, batchfactoryv11.NewMySQLStore(db)}
+	opts := RouterOptions{Slice: 1, Store: sqlSource, TextRepository: batchfactorytext.NewMySQLRepository(db), LocalArtifacts: files, BridgeSecret: "secret", Now: func() time.Time { return now }}
+	if rr := signedJSONRequest(t, NewRouter(opts), now, "alice", "POST", base+"prepare", map[string]any{}); rr.Code != 200 {
+		t.Fatalf("SQL source fence rejected current source: %d %s", rr.Code, rr.Body.String())
+	}
+	head = get().Document
+	for _, q := range []string{"UPDATE batch_factory_v12_drafts SET content='并发改稿。' WHERE scope=?", "UPDATE batch_factory_v12_book_records SET source_text='并发改稿。' WHERE book_id=?"} {
+		entered, resume = make(chan struct{}), make(chan struct{})
+		opts.TextRepository = &pausingTextPublication{Repository: batchfactorytext.NewMySQLRepository(db), entered: entered, resume: resume}
+		runSlow(opts, entered, resume, func() {
+			key := book.ID
+			if strings.Contains(q, " WHERE scope=") {
+				key = b.ID
+			}
+			if _, err = db.Exec(q, key); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if get().Document.Revision != head.Revision {
+			t.Fatal("stale SQL source changed the document")
+		}
+		if _, err = db.Exec("UPDATE batch_factory_v12_drafts SET content=? WHERE scope=?", verified.SourceText, b.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	longDraft := strings.Repeat("他点头。", 20)
+	if _, err = s.SaveDraft(context.Background(), "alice", batchfactoryv11.Draft{Key: "working-front:" + book.ID, Kind: "working-front-content", Scope: b.ID, Content: longDraft}); err != nil {
+		t.Fatal(err)
+	}
+	call("POST", "prepare", map[string]any{}, 200)
+	beforeResize := get()
+	if len(beforeResize.Pages) != 1 {
+		t.Fatalf("geometry fixture needs one page, got %d", len(beforeResize.Pages))
+	}
+	set("textFontSize", 180)
+	call("POST", "prepare", map[string]any{}, 409)
+	if get().Document.Revision != beforeResize.Document.Revision {
+		t.Fatal("overflow modified page boundaries")
+	}
+	call("POST", "prepare", map[string]any{"reflow": true, "expectedRevision": beforeResize.Document.Revision}, 200)
+	resized := get()
+	var rebuilt strings.Builder
+	for _, page := range resized.Pages {
+		rebuilt.WriteString(page.Text)
+	}
+	if len(resized.Pages) < 2 || rebuilt.String() != longDraft {
+		t.Fatal("explicit reflow lost text or did not repaginate")
+	}
 	// Frozen collections still resolve the original image after a replacement.
 	frozen := signedJSONRequest(t, api, now, "alice", "GET", mediaPath, nil)
 	if !bytes.Equal(media.Body.Bytes(), frozen.Body.Bytes()) {

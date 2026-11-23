@@ -25,6 +25,7 @@ type textAPI struct {
 type textRequest struct {
 	context.Context
 	scope    txt.Scope
+	batch    batchfactoryv11.Batch
 	book     batchfactoryv11.Book
 	settings batchfactoryv11.SettingsPatch
 }
@@ -67,7 +68,7 @@ func (a textAPI) scoped(fn textHandler) http.HandlerFunc {
 				settings[k] = v
 			}
 		}
-		if err = fn(w, r, textRequest{r.Context(), s, book, settings}); err != nil {
+		if err = fn(w, r, textRequest{r.Context(), s, b, book, settings}); err != nil {
 			writeTextError(w, err)
 		}
 	}
@@ -112,8 +113,11 @@ func registerBatchTextRoutes(m *http.ServeMux, opt RouterOptions, c *BatchAutoma
 }
 
 type textInput struct {
-	ExpectedRevision int64 `json:"expectedRevision"`
-	Offset           int   `json:"offset"`
+	ExpectedRevision         int64   `json:"expectedRevision"`
+	ExpectedDocumentRevision int64   `json:"expectedDocumentRevision"`
+	Text                     *string `json:"text,omitempty"`
+	Reflow                   bool    `json:"reflow,omitempty"`
+	Offset                   int     `json:"offset"`
 	txt.PagePatch
 	VersionID         string   `json:"versionId"`
 	PaginationVersion int64    `json:"paginationVersion"`
@@ -125,6 +129,7 @@ type textSnapshot struct {
 	Cover            txt.PagePatch `json:"cover,omitempty"`
 	Title            string        `json:"title"`
 	CoverFingerprint string        `json:"coverFingerprint"`
+	SourceVersion    string        `json:"sourceVersion,omitempty"`
 	HighlightWords   []string      `json:"highlightWords,omitempty"`
 }
 
@@ -202,16 +207,15 @@ func (a textAPI) prepare(w http.ResponseWriter, r *http.Request, x textRequest) 
 	if in.ExpectedRevision < 0 {
 		return txt.ErrInvalid
 	}
-	if in.ExpectedRevision > 0 {
-		d, err := a.repo.GetDocument(x, x.scope)
-		if err != nil {
-			return err
-		}
-		if in.ExpectedRevision != d.Revision {
-			return txt.ErrConflict
-		}
+	doc, err := a.repo.GetDocument(x, x.scope)
+	absent := errors.Is(err, txt.ErrNotFound)
+	if err != nil && !absent {
+		return err
 	}
-	b, err := a.production.runBatchSensitiveStage(x, x.scope.Owner, x.scope.BatchID, x.scope.BookID, false)
+	if in.ExpectedRevision > 0 && in.ExpectedRevision != doc.Revision {
+		return txt.ErrConflict
+	}
+	b, err := a.production.batchSensitiveStageFromBook(x, x.scope.Owner, x.batch, x.book, false, false)
 	if err != nil {
 		return err
 	}
@@ -223,16 +227,11 @@ func (a textAPI) prepare(w http.ResponseWriter, r *http.Request, x textRequest) 
 	if _, err := a.bgData(x, snap.Background); err != nil {
 		return err
 	}
-	renderer := txt.Renderer{}
-	drafts, err := txt.Paginate(x, txt.PaginationInput{Text: b.SourceText, Layout: snap.Layout}, renderer.MeasureFunc(x))
-	if err != nil {
-		return textLayoutError(err)
+	if !absent && doc.OriginalText != b.TxtText {
+		return txt.ErrConflict
 	}
-	doc, err := a.repo.SaveOriginal(x, x.scope, b.TxtText)
-	if err != nil {
-		return err
-	}
-	if in.ExpectedRevision > 0 && in.ExpectedRevision != doc.Revision {
+	snap.SourceVersion = batchfactoryv11.ProductionVersion(b)
+	if snap.SourceVersion == "" {
 		return txt.ErrConflict
 	}
 	state := mapOrEmpty(b.SourceMetadata["batchSensitiveStage"])
@@ -244,7 +243,12 @@ func (a textAPI) prepare(w http.ResponseWriter, r *http.Request, x textRequest) 
 	if err != nil {
 		return err
 	}
-	_, err = a.repo.PreparePages(x, x.scope, txt.VersionInput{ProductionText: b.SourceText, SensitiveMode: stringValue(state["mode"]), ChangeTrace: trace}, txt.PaginationUpdate{ExpectedRevision: doc.Revision, ConfigSnapshot: snapshot, Pages: drafts})
+	version := txt.VersionInput{ProductionText: b.SourceText, SensitiveMode: stringValue(state["mode"]), ChangeTrace: trace}
+	drafts, err := a.prepareDrafts(x, doc, snap, &version, in.Reflow)
+	if err != nil {
+		return err
+	}
+	_, err = a.repo.PreparePages(x, x.scope, version, txt.PaginationUpdate{OriginalText: b.TxtText, ExpectedRevision: doc.Revision, ConfigSnapshot: snapshot, Pages: drafts, VerifyProduction: a.productionGuard(x)})
 	if err != nil {
 		return err
 	}
@@ -325,6 +329,18 @@ func (a textAPI) patch(w http.ResponseWriter, r *http.Request, x textRequest) er
 	if p.Revision != in.ExpectedRevision {
 		return txt.ErrConflict
 	}
+	if in.Text != nil {
+		if in.ExpectedDocumentRevision != doc.Revision || p.VersionID != doc.ActiveVersionID {
+			return txt.ErrConflict
+		}
+		if p.Locked {
+			return txt.ErrLocked
+		}
+		if strings.TrimSpace(*in.Text) == "" {
+			return txt.ErrInvalid
+		}
+		p.Text = txt.NormalizeLineEndings(*in.Text)
+	}
 	input, _, err := a.renderInput(x, doc, p, false, in.PagePatch)
 	if err != nil {
 		return err
@@ -335,6 +351,9 @@ func (a textAPI) patch(w http.ResponseWriter, r *http.Request, x textRequest) er
 	}
 	if !fits {
 		return fmt.Errorf("%w：当前文字放不下，请调整字号或分页", txt.ErrInvalid)
+	}
+	if in.Text != nil {
+		return a.savePageText(w, r, x, doc, p, in.PagePatch)
 	}
 	result, err := a.repo.PatchPage(x, x.scope, p.ID, in.ExpectedRevision, in.PagePatch)
 	if err != nil {

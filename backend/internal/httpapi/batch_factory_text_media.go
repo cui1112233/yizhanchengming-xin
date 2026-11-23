@@ -148,6 +148,18 @@ func (a textAPI) picture(w http.ResponseWriter, r *http.Request, x textRequest) 
 		revision = p.Revision
 		locked = p.Locked
 	}
+	if preview && ((in.ExpectedRevision != 0 && in.ExpectedRevision != revision) || (in.ExpectedDocumentRevision != 0 && in.ExpectedDocumentRevision != d.Revision)) {
+		return txt.ErrConflict
+	}
+	if in.Text != nil {
+		if locked {
+			return txt.ErrLocked
+		}
+		if !preview || cover || strings.TrimSpace(*in.Text) == "" {
+			return fmt.Errorf("%w：草稿正文只可用于单页预览", txt.ErrInvalid)
+		}
+		p.Text = txt.NormalizeLineEndings(*in.Text)
+	}
 	if !preview {
 		if revision != in.ExpectedRevision {
 			return txt.ErrConflict

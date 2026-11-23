@@ -13,7 +13,20 @@ func (r *MySQLRepository) PreparePages(ctx context.Context, s Scope, v VersionIn
 	if strings.TrimSpace(v.ProductionText) == "" || (v.SensitiveMode != "system" && v.SensitiveMode != "off" && v.SensitiveMode != "ai") || !validJSON(v.ChangeTrace) || !validJSON(p.ConfigSnapshot) {
 		return 0, ErrInvalid
 	}
-	return transaction(ctx, r.db, func(tx *sql.Tx) (int64, error) {
+	// Lock the working-draft key range even when no draft exists yet.
+	return transactionWithOptions(ctx, r.db, &sql.TxOptions{Isolation: sql.LevelRepeatableRead}, func(tx *sql.Tx) (int64, error) {
+		if p.VerifyProduction != nil {
+			if err := p.VerifyProduction(ctx, tx); err != nil {
+				return 0, err
+			}
+		}
+		if p.ExpectedRevision == 0 && strings.TrimSpace(p.OriginalText) != "" {
+			doc, err := saveOriginalTx(ctx, tx, s, p.OriginalText, true)
+			if err != nil {
+				return 0, err
+			}
+			p.ExpectedRevision = doc.Revision
+		}
 		h, err := lockHead(ctx, tx, s)
 		if err != nil {
 			return 0, err

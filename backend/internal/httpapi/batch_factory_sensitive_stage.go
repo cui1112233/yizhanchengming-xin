@@ -171,6 +171,13 @@ func (c *BatchAutomationCoordinator) batchSensitiveStage(ctx context.Context, ow
 	if !found {
 		return book, batchfactoryv11.ErrNotFound
 	}
+	return c.batchSensitiveStageFromBook(ctx, owner, batch, book, manualRetry, verifyOnly)
+}
+
+// A caller that already read the book can pin that exact source and settings
+// through preparation. Source writes in this stage check the book revision.
+func (c *BatchAutomationCoordinator) batchSensitiveStageFromBook(ctx context.Context, owner string, batch batchfactoryv11.Batch, book batchfactoryv11.Book, manualRetry, verifyOnly bool) (batchfactoryv11.Book, error) {
+	batchID, bookID := batch.ID, book.ID
 	if !hasVerifiedBatchOriginal(book) {
 		return book, batchfactoryv11.NewConfigRequiredError(missingSensitiveOriginal)
 	}

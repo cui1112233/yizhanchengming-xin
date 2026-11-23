@@ -1,6 +1,8 @@
 package batchfactorytext
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 )
@@ -137,10 +139,13 @@ type Page struct {
 }
 
 type PaginationUpdate struct {
+	OriginalText     string // A zero expected revision creates the document and activates its pages atomically.
 	ExpectedRevision int64
 	VersionID        string
 	ConfigSnapshot   json.RawMessage // Omit to keep the book settings; {} starts from defaults.
 	Pages            []PageDraft
+	// Lock and check the upstream production source in this publication transaction.
+	VerifyProduction func(context.Context, *sql.Tx) error
 }
 
 // Text edits create a new Version and pagination. These edits only redraw a page.

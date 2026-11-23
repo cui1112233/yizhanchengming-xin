@@ -52,8 +52,11 @@ func readRows[T any](ctx context.Context, db reader, scan func(scanner) (T, erro
 }
 
 func transaction[T any](ctx context.Context, db *sql.DB, fn func(*sql.Tx) (T, error)) (T, error) {
+	return transactionWithOptions(ctx, db, nil, fn)
+}
+func transactionWithOptions[T any](ctx context.Context, db *sql.DB, options *sql.TxOptions, fn func(*sql.Tx) (T, error)) (T, error) {
 	var zero T
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := db.BeginTx(ctx, options)
 	if err != nil {
 		return zero, err
 	}
@@ -119,26 +122,30 @@ func (r *MySQLRepository) SaveOriginal(ctx context.Context, s Scope, text string
 	if strings.TrimSpace(text) == "" {
 		return Document{}, ErrInvalid
 	}
-	return transaction(ctx, r.db, func(tx *sql.Tx) (Document, error) {
-		var book string
-		err := tx.QueryRowContext(ctx, "SELECT id FROM batch_factory_v12_books WHERE owner_username=? AND batch_id=? AND id=? FOR UPDATE", s.Owner, s.BatchID, s.BookID).Scan(&book)
-		if err != nil {
-			return Document{}, lookupErr(err)
+	return transaction(ctx, r.db, func(tx *sql.Tx) (Document, error) { return saveOriginalTx(ctx, tx, s, text, false) })
+}
+func saveOriginalTx(ctx context.Context, tx *sql.Tx, s Scope, text string, newOnly bool) (Document, error) {
+	var book string
+	err := tx.QueryRowContext(ctx, "SELECT id FROM batch_factory_v12_books WHERE owner_username=? AND batch_id=? AND id=? FOR UPDATE", s.Owner, s.BatchID, s.BookID).Scan(&book)
+	if err != nil {
+		return Document{}, lookupErr(err)
+	}
+	d, err := getDoc(ctx, tx, s)
+	if err == nil {
+		if newOnly {
+			return Document{}, ErrConflict
 		}
-		d, err := getDoc(ctx, tx, s)
-		if err == nil {
-			if d.OriginalText != text {
-				return Document{}, fmt.Errorf("%w：已保存的完整原文不同", ErrConflict)
-			}
-			return d, nil
+		if d.OriginalText != text {
+			return Document{}, fmt.Errorf("%w：已保存的完整原文不同", ErrConflict)
 		}
-		if !errors.Is(err, ErrNotFound) {
-			return Document{}, err
-		}
-		d = Document{ID: rand.Text(), OriginalText: text, Revision: 1}
-		_, err = tx.ExecContext(ctx, "INSERT INTO "+documents+" (id,owner_username,batch_id,book_id,original_text,created_at,updated_at) VALUES(?,?,?,?,?,NOW(6),NOW(6))", d.ID, s.Owner, s.BatchID, s.BookID, text)
-		return d, err
-	})
+		return d, nil
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return Document{}, err
+	}
+	d = Document{ID: rand.Text(), OriginalText: text, Revision: 1}
+	_, err = tx.ExecContext(ctx, "INSERT INTO "+documents+" (id,owner_username,batch_id,book_id,original_text,created_at,updated_at) VALUES(?,?,?,?,?,NOW(6),NOW(6))", d.ID, s.Owner, s.BatchID, s.BookID, text)
+	return d, err
 }
 
 func (r *MySQLRepository) CreateVersion(ctx context.Context, s Scope, in VersionInput) (Version, error) {
@@ -562,7 +569,7 @@ func (r *MySQLRepository) CreateCollection(ctx context.Context, s Scope, in Coll
 		if err != nil {
 			return Collection{}, err
 		}
-if in.VersionID != h.version || in.PaginationVersion != h.pagination || (in.ExpectedRevision > 0 && in.ExpectedRevision != h.revision) {
+		if in.VersionID != h.version || in.PaginationVersion != h.pagination || (in.ExpectedRevision > 0 && in.ExpectedRevision != h.revision) {
 			return Collection{}, ErrConflict
 		}
 		if h.version == "" || h.pagination == 0 {
