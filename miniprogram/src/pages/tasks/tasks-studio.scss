@@ -39,7 +39,7 @@
 
   .task-studio-list {padding:0 12PX;overflow:hidden;border-radius:20PX;background:linear-gradient(145deg,rgba(18,54,82,.96),rgba(9,29,53,.98))}
   .task-studio-row {position:relative;display:flex;min-height:76PX;padding:8PX 22PX 8PX 58PX;box-sizing:border-box;align-items:center;border-bottom:1PX solid rgba(150,183,211,.2)}
-  .task-studio-row:last-child {border-bottom:0}
+  .task-studio-row.is-last {border-bottom:0}
   .task-studio-row.is-disabled {opacity:.58}
   .task-studio-row-art {position:absolute;left:0;top:50%;width:52PX;height:52PX;transform:translateY(-50%);filter:drop-shadow(0 5PX 7PX rgba(0,13,32,.34))}
   .task-studio-row-copy {display:flex;min-width:0;flex:1;flex-direction:column;padding-right:8PX}

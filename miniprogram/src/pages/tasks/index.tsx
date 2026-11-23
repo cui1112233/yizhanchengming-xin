@@ -90,7 +90,7 @@ export default function TasksPage() {
       <View className="task-studio-list liquid-glass--list" data-glass-role="list">
         {filtered.map((entry, index) => {
           const progress = validProgress(entry); const visual = taskVisualAsset(entry); const disabled = !entry.id;
-          return <View className={`task-studio-row studio-task-record is-${entry.status}${disabled ? " is-disabled" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
+          return <View className={`task-studio-row studio-task-record is-${entry.status}${disabled ? " is-disabled" : ""}${index === filtered.length - 1 ? " is-last" : ""}`} key={`${entry.source}-${entry.id || index}`} onClick={() => openTask(entry)}>
             <Image className="task-studio-row-art" src={visual} mode="aspectFit" />
             <View className="task-studio-row-copy"><Text className="task-studio-row-title">{entry.title || "服务端未返回标题"}</Text><Text className="task-studio-row-source">{entry.sourceLabel} · {formatTimestamp(entry.createdAt)}</Text></View>
             <View className="task-studio-row-state studio-task-action">{progress ? <><Text className="task-studio-progress-value">{progress.percent}%</Text><View className="task-studio-progress-track"><View style={{ width: `${progress.percent}%` }} /></View></> : null}<Text className={`task-studio-status mp-status-pill is-${entry.status}`}>{disabled ? "记录 ID 未返回" : statusLabel(entry)}</Text></View>
