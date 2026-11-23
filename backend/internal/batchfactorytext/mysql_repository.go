@@ -178,12 +178,6 @@ func (r *MySQLRepository) ListVersions(ctx context.Context, s Scope) ([]Version,
 	}, "SELECT v.id,v.production_text,v.sensitive_mode,v.change_trace_json,v.content_digest FROM "+versions+" v JOIN "+documents+" d ON d.id=v.document_id WHERE d.owner_username=? AND d.batch_id=? AND d.book_id=? ORDER BY v.created_at,v.id", s.Owner, s.BatchID, s.BookID)
 }
 
-type lockedPage struct {
-	id                  string
-	ordinal, start, end int
-	text                string
-}
-
 func validateDrafts(text string, drafts []PageDraft) error {
 	runes := []rune(NormalizeLineEndings(text))
 	offset := 0
@@ -198,27 +192,76 @@ func validateDrafts(text string, drafts []PageDraft) error {
 	}
 	return nil
 }
-func lockedRows(ctx context.Context, tx *sql.Tx, s Scope, h head, drafts []PageDraft) (map[int]string, error) {
-	locked, err := readRows(ctx, tx, func(row scanner) (lockedPage, error) {
-		var p lockedPage
-		err := row.Scan(&p.id, &p.ordinal, &p.start, &p.end, &p.text)
-		return p, err
-	}, "SELECT id, ordinal_no, start_offset, end_offset, page_text FROM "+pagesTable+" WHERE owner_username=? AND book_id=? AND pagination_version=? AND locked=TRUE ORDER BY ordinal_no FOR UPDATE", s.Owner, s.BookID, h.pagination)
+func sameRange(p, q PageDraft) bool {
+	return p.StartOffset == q.StartOffset && p.EndOffset == q.EndOffset && p.Text == q.Text
+}
+
+// Rune intervals form a unique key within a successful pagination. An
+// unchanged system page can therefore keep its ID even if its ordinal moves.
+func previousPages(ctx context.Context, tx *sql.Tx, s Scope, drafts []PageDraft) (map[int]Page, error) {
+	old, err := readRows(ctx, tx, scanPage, "SELECT "+pageCols+pageJoin+" ORDER BY p.ordinal_no FOR UPDATE", s.Owner, s.BatchID, s.BookID)
 	if err != nil {
 		return nil, err
 	}
-	ids := make(map[int]string, len(locked))
-	for _, p := range locked {
-		if p.ordinal <= 0 || p.ordinal > len(drafts) {
-			return nil, fmt.Errorf("%w（第 %d 页）", ErrLocked, p.ordinal)
+	byStart := make(map[int]Page, len(old))
+	for _, p := range old {
+		if p.Locked && (p.Ordinal <= 0 || p.Ordinal > len(drafts) || !sameRange(p.PageDraft, drafts[p.Ordinal-1])) {
+			return nil, fmt.Errorf("%w（第 %d 页）", ErrLocked, p.Ordinal)
 		}
-		d := drafts[p.ordinal-1]
-		if p.text != d.Text || p.start != d.StartOffset || p.end != d.EndOffset {
-			return nil, fmt.Errorf("%w（第 %d 页）", ErrLocked, p.ordinal)
-		}
-		ids[p.ordinal] = p.id
+		byStart[p.StartOffset] = p
 	}
-	return ids, nil
+	return byStart, nil
+}
+
+func samePtrValue[T comparable](a, b *T) bool { return a == b || (a != nil && b != nil && *a == *b) }
+
+func writeNextPage(ctx context.Context, tx *sql.Tx, s Scope, h head, ordinal int, draft PageDraft, previous Page, oldBook, newBook PageStyle) error {
+	next := h.pagination + 1
+	if previous.Locked {
+		_, err := tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", h.version, next, previous.ID)
+		return err
+	}
+	preserved := previous.ID != "" && previous.SourceKind == "system" && sameRange(previous.PageDraft, draft)
+	var prior PageDraft
+	if preserved {
+		prior = previous.PageDraft
+	}
+	overrides, style, err := ResolvePageStyle(newBook, prior, PagePatch{Layout: draft.Layout, Background: draft.Background, ClearLayout: draft.ClearLayout, ClearBackground: draft.ClearBackground})
+	if err != nil {
+		return err
+	}
+	draft.Layout, draft.Background = overrides.Layout, overrides.Background
+	if !preserved {
+		return insertPage(ctx, tx, s, h.version, next, ordinal, draft)
+	}
+	_, oldStyle, err := ResolvePageStyle(oldBook, prior, PagePatch{})
+	if err != nil {
+		return err
+	}
+	sameStyle := oldStyle == style
+	if style.HighlightReuseEnabled && style.HighlightRevision == "" && previous.VersionID != h.version {
+		sameStyle = false
+	}
+	if sameStyle && samePtrValue(prior.Layout, draft.Layout) && samePtrValue(prior.Background, draft.Background) {
+		_, err := tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,ordinal_no=?,updated_at=NOW(6) WHERE id=?", h.version, next, ordinal, previous.ID)
+		return err
+	}
+	// A raw override can change without changing the pixels (for example
+	// clearing a background override equal to the book default).
+	change := resetPage
+	if sameStyle {
+		change = "revision=revision+1,updated_at=NOW(6)"
+	}
+	layout, err := json.Marshal(draft.Layout)
+	if err != nil {
+		return err
+	}
+	background, err := json.Marshal(draft.Background)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,ordinal_no=?,layout_json=?,background_json=?,"+change+" WHERE id=?", h.version, next, ordinal, string(layout), string(background), previous.ID)
+	return err
 }
 
 func insertPage(ctx context.Context, tx *sql.Tx, s Scope, version string, pagination int64, ordinal int, d PageDraft) error {
@@ -249,25 +292,33 @@ func (r *MySQLRepository) ReplaceSystemPages(ctx context.Context, s Scope, in Pa
 			return 0, ErrConflict
 		}
 		var text string
-		err = tx.QueryRowContext(ctx, "SELECT production_text FROM "+versions+" WHERE owner_username=? AND book_id=? AND id=?", s.Owner, s.BookID, h.version).Scan(&text)
+		var priorSnapshot []byte
+		err = tx.QueryRowContext(ctx, "SELECT v.production_text,d.config_snapshot_json FROM "+versions+" v JOIN "+documents+" d ON d.id=v.document_id WHERE v.owner_username=? AND v.book_id=? AND v.id=?", s.Owner, s.BookID, h.version).Scan(&text, &priorSnapshot)
 		if err != nil {
 			return 0, lookupErr(err)
 		}
 		if err = validateDrafts(text, in.Pages); err != nil {
 			return 0, err
 		}
-		locked, err := lockedRows(ctx, tx, s, h, in.Pages)
+		previous, err := previousPages(ctx, tx, s, in.Pages)
+		if err != nil {
+			return 0, err
+		}
+		oldBook, err := PageStyleFromSnapshot(priorSnapshot)
+		if err != nil {
+			return 0, err
+		}
+		if len(in.ConfigSnapshot) == 0 {
+			in.ConfigSnapshot = priorSnapshot
+		}
+		newBook, err := PageStyleFromSnapshot(in.ConfigSnapshot)
 		if err != nil {
 			return 0, err
 		}
 		next := h.pagination + 1
 		for i, d := range in.Pages {
 			ordinal := i + 1
-			if id, ok := locked[ordinal]; ok {
-				_, err = tx.ExecContext(ctx, "UPDATE "+pagesTable+" SET version_id=?,pagination_version=?,revision=revision+1,updated_at=NOW(6) WHERE id=?", h.version, next, id)
-			} else {
-				err = insertPage(ctx, tx, s, h.version, next, ordinal, d)
-			}
+			err = writeNextPage(ctx, tx, s, h, ordinal, d, previous[d.StartOffset], oldBook, newBook)
 			if err != nil {
 				return 0, err
 			}
@@ -335,19 +386,18 @@ func mutatePage[T any](ctx context.Context, db *sql.DB, s Scope, id string, expe
 const resetPage = "active_artifact_id=NULL,status='pending',failed_stage=NULL,error_type=NULL,last_error=NULL,revision=revision+1,updated_at=NOW(6)"
 
 func (r *MySQLRepository) PatchPage(ctx context.Context, s Scope, id string, expected int64, in PagePatch) (Page, error) {
-	if in.Layout == nil && in.Background == nil {
+	if in.Layout == nil && in.Background == nil && !in.ClearLayout && !in.ClearBackground {
 		return Page{}, ErrInvalid
 	}
 	return mutatePage(ctx, r.db, s, id, expected, false, func(tx *sql.Tx, p Page) (Page, error) {
 		if p.Locked {
 			return Page{}, ErrLocked
 		}
-		if in.Layout != nil {
-			p.Layout = in.Layout
+		overrides, _, err := ResolvePageStyle(PageStyle{}, p.PageDraft, in)
+		if err != nil {
+			return Page{}, err
 		}
-		if in.Background != nil {
-			p.Background = in.Background
-		}
+		p.Layout, p.Background = overrides.Layout, overrides.Background
 		layout, err := json.Marshal(p.Layout)
 		if err != nil {
 			return Page{}, err

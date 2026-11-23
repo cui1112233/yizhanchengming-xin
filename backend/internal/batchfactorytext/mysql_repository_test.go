@@ -14,6 +14,10 @@ import (
 	"qiantie/backend/internal/storage"
 )
 
+func previousPageRows() *sqlmock.Rows {
+	return sqlmock.NewRows(strings.Fields("id version pagination ordinal start end text digest layout background source locked render artifact status failedStage errorType lastError revision"))
+}
+
 // A failed insert must roll back before the document's pagination pointer advances.
 func TestRepositoryReplaceRollsBackOnPageInsert(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -25,8 +29,8 @@ func TestRepositoryReplaceRollsBackOnPageInsert(t *testing.T) {
 	s := Scope{"alice", "batch", "book"}
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT id, .* FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(sqlmock.NewRows([]string{"id", "active_version_id", "pagination_version", "revision"}).AddRow("doc", "version", 2, 5))
-	mock.ExpectQuery("SELECT production_text FROM").WithArgs("alice", "book", "version").WillReturnRows(sqlmock.NewRows([]string{"production_text"}).AddRow("一。"))
-	mock.ExpectQuery("SELECT id, ordinal_no, start_offset, end_offset, page_text FROM .* locked=TRUE").WithArgs("alice", "book", 2).WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal_no", "start_offset", "end_offset", "page_text"}))
+	mock.ExpectQuery("SELECT v.production_text,d.config_snapshot_json FROM").WithArgs("alice", "book", "version").WillReturnRows(sqlmock.NewRows([]string{"production_text", "snapshot"}).AddRow("一。", nil))
+	mock.ExpectQuery("SELECT p.id,.* ORDER BY p.ordinal_no FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(previousPageRows())
 	fail := errors.New("page insert failed")
 	mock.ExpectExec("INSERT INTO batch_factory_v12_text_pages").WillReturnError(fail)
 	mock.ExpectRollback()
@@ -40,7 +44,8 @@ func TestRepositoryReplaceRollsBackOnPageInsert(t *testing.T) {
 }
 
 // TEXT_REPO_TEST_DSN must point at a dedicated, disposable MySQL test schema.
-func TestRepositoryMySQLPageLifecycle(t *testing.T) {
+func mysqlBook(t *testing.T) (*MySQLRepository, Scope, *sql.DB) {
+	t.Helper()
 	dsn := os.Getenv("TEXT_REPO_TEST_DSN")
 	if dsn == "" {
 		t.Skip("set TEXT_REPO_TEST_DSN to run against an isolated MySQL test schema")
@@ -49,7 +54,7 @@ func TestRepositoryMySQLPageLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
 	exec := func(q string, args ...any) {
 		t.Helper()
@@ -67,7 +72,12 @@ func TestRepositoryMySQLPageLifecycle(t *testing.T) {
 	}
 	s := Scope{"alice", "batch", id}
 	exec("INSERT INTO batch_factory_v12_books VALUES(?,?,?)", id, s.Owner, s.BatchID)
-	repo := NewMySQLRepository(db)
+	return NewMySQLRepository(db), s, db
+}
+
+func TestRepositoryMySQLPageLifecycle(t *testing.T) {
+	ctx := context.Background()
+	repo, s, db := mysqlBook(t)
 	wrong := s
 	wrong.Owner = "bob"
 	wrongBatch := s
@@ -258,8 +268,8 @@ func TestRepositoryLockedPageCannotMoveEvenIfUploadIsNotCurrentlyActive(t *testi
 	defer db.Close()
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT id, .* FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(sqlmock.NewRows([]string{"id", "active_version_id", "pagination_version", "revision"}).AddRow("doc", "v2", 1, 7))
-	mock.ExpectQuery("SELECT production_text FROM").WithArgs("alice", "book", "v2").WillReturnRows(sqlmock.NewRows([]string{"production_text"}).AddRow("甲。"))
-	mock.ExpectQuery("SELECT id, ordinal_no, start_offset, end_offset, page_text FROM .* locked=TRUE").WithArgs("alice", "book", 1).WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal_no", "start_offset", "end_offset", "page_text"}).AddRow("upload", 2, 2, 4, "乙。"))
+	mock.ExpectQuery("SELECT v.production_text,d.config_snapshot_json FROM").WithArgs("alice", "book", "v2").WillReturnRows(sqlmock.NewRows([]string{"production_text", "snapshot"}).AddRow("甲。", nil))
+	mock.ExpectQuery("SELECT p.id,.* ORDER BY p.ordinal_no FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(previousPageRows().AddRow("upload", "v1", 1, 2, 2, 4, "乙。", "abc", nil, nil, "user_upload", true, 2, "file", "ready", "", "", "", 2))
 	mock.ExpectRollback()
 	_, err = NewMySQLRepository(db).ReplaceSystemPages(context.Background(), Scope{"alice", "batch", "book"}, PaginationUpdate{ExpectedRevision: 7, VersionID: "v2", Pages: []PageDraft{{Text: "甲。", EndOffset: 2}}})
 	if !errors.Is(err, ErrLocked) {
@@ -278,5 +288,181 @@ func TestRepositoryPaginationAcceptsNormalizedNewlinesAndExactRunes(t *testing.T
 	drafts[1].Text = "🙂。\n丙。"
 	if err := validateDrafts("甲。\r\n🙂。\r乙。", drafts); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("changed content accepted: %v", err)
+	}
+}
+
+func TestRepositoryMySQLReusesOnlyUnchangedPages(t *testing.T) {
+	ctx := context.Background()
+	repo, s, _ := mysqlBook(t)
+	doc, err := repo.SaveOriginal(ctx, s, "甲。乙。丙。")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refresh := func() {
+		t.Helper()
+		doc, err = repo.GetDocument(ctx, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	version := func(text string) Version {
+		t.Helper()
+		refresh()
+		v, e := repo.CreateVersion(ctx, s, VersionInput{ExpectedRevision: doc.Revision, ProductionText: text, SensitiveMode: "off"})
+		if e != nil {
+			t.Fatal(e)
+		}
+		return v
+	}
+	v := version("甲。乙。")
+	drafts := []PageDraft{{Text: "甲。", EndOffset: 2}, {Text: "乙。", StartOffset: 2, EndOffset: 4}}
+	config := []byte(`{"layout":{"fontSize":30},"background":{"kind":"color","color":"#101010"}}`)
+	replace := func(drafts []PageDraft) error {
+		t.Helper()
+		refresh()
+		_, e := repo.ReplaceSystemPages(ctx, s, PaginationUpdate{ExpectedRevision: doc.Revision, VersionID: v.ID, ConfigSnapshot: config, Pages: drafts})
+		return e
+	}
+	list := func() []Page {
+		t.Helper()
+		p, e := repo.ListPages(ctx, s)
+		if e != nil || len(p) != 2 {
+			t.Fatalf("pages %+v %v", p, e)
+		}
+		return p
+	}
+	saveFile := func(p Page) PageArtifact {
+		t.Helper()
+		a, e := repo.SaveSystemPageArtifact(ctx, s, p.ID, p.Revision, ArtifactFile{StorageRef: "test/" + p.ID, MediaType: "image/png", ByteSize: 8, SHA256: strings.Repeat("e", 64)})
+		if e != nil {
+			t.Fatal(e)
+		}
+		return a
+	}
+	if err = replace(drafts); err != nil {
+		t.Fatal(err)
+	}
+	p := list()
+	bg := Background{Kind: "color", Color: "#A12345"}
+	layout := LayoutConfig{FontSize: 40}
+	p[0], err = repo.PatchPage(ctx, s, p[0].ID, p[0].Revision, PagePatch{Layout: &layout, Background: &bg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstArtifact := saveFile(p[0])
+	saveFile(p[1])
+	refresh()
+	_, err = repo.SaveCover(ctx, s, doc.Revision, firstArtifact.ArtifactFile, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := list()
+	v = version("甲。丙。")
+	drafts[1].Text = "丙。"
+	broken := append([]PageDraft(nil), drafts...)
+	broken[1].Layout = &LayoutConfig{FontSize: math.NaN()}
+	if err = replace(broken); err == nil {
+		t.Fatal("bad layout unexpectedly succeeded")
+	}
+	rolledBack := list()
+	if rolledBack[0].Revision != before[0].Revision || rolledBack[0].PaginationVersion != before[0].PaginationVersion || rolledBack[0].ActiveArtifactID != firstArtifact.ID || rolledBack[1].ActiveArtifactID != before[1].ActiveArtifactID {
+		t.Fatalf("partial repagination: %+v", rolledBack)
+	}
+	if err = replace(drafts); err != nil {
+		t.Fatal(err)
+	}
+	after := list()
+	if after[0].ID != before[0].ID || after[0].Revision != before[0].Revision || after[0].Status != "ready" || after[0].ActiveArtifactID != firstArtifact.ID || after[0].Background == nil || *after[0].Background != bg || after[0].Layout == nil || *after[0].Layout != layout {
+		t.Fatalf("replaced unchanged first page: %+v", after[0])
+	}
+	if after[1].ActiveArtifactID != "" || after[1].Status != "pending" {
+		t.Fatalf("reused changed second page: %+v", after[1])
+	}
+	snapshot, err := repo.CreateCollection(ctx, s, CollectionInput{VersionID: v.ID, PaginationVersion: after[0].PaginationVersion, PageIDs: []string{after[0].ID}})
+	if err != nil || len(snapshot.Items) != 1 || snapshot.Items[0].ArtifactID != firstArtifact.ID {
+		t.Fatalf("unchanged page not usable: %+v %v", snapshot, err)
+	}
+	saveFile(after[1])
+	config = []byte(`{"layout":{"fontSize":53},"background":{"kind":"color","color":"#FFFFFF"}}`)
+	if err = replace(drafts); err != nil {
+		t.Fatal(err)
+	}
+	after = list()
+	if after[0].ActiveArtifactID != firstArtifact.ID || after[1].ActiveArtifactID != "" {
+		t.Fatalf("incorrect book style invalidation: %+v", after)
+	}
+	drafts[0].ClearBackground = true
+	if err = replace(drafts); err != nil {
+		t.Fatal(err)
+	}
+	after = list()
+	if after[0].Background != nil || after[0].ActiveArtifactID != "" || after[0].Layout == nil || *after[0].Layout != layout {
+		t.Fatalf("explicit clear lost or discarded other override: %+v", after[0])
+	}
+	rendered := saveFile(after[0])
+	// Omitting the book snapshot on a targeted repagination keeps the
+	// existing book defaults. An explicit {} resets them.
+	config = nil
+	if err = replace(drafts); err != nil {
+		t.Fatal(err)
+	}
+	after = list()
+	if after[0].ActiveArtifactID != rendered.ID {
+		t.Fatalf("omitting the book snapshot reset its background: %+v", after[0])
+	}
+	config = []byte(`{"layout":{"fontSize":53},"background":{"kind":"color","color":"#EFEFEF"}}`)
+	drafts[0].ClearBackground = false
+	if err = replace(drafts); err != nil {
+		t.Fatal(err)
+	}
+	after = list()
+	if after[0].ActiveArtifactID == rendered.ID || after[0].Status != "pending" {
+		t.Fatalf("inherited background still stale: %+v", after[0])
+	}
+}
+
+func TestRepositoryResolvePageStyleInheritanceAndExplicitClear(t *testing.T) {
+	book := PageStyle{Layout: LayoutConfig{FontID: "noto", FontSize: 32}, Background: Background{Kind: "color", Color: "#111111"}}
+	layout := LayoutConfig{FontID: "xiangHai", FontSize: 48}
+	bg := Background{Kind: "color", Color: "#658933"}
+	prior := PageDraft{Layout: &layout, Background: &bg}
+	p, style, err := ResolvePageStyle(book, prior, PagePatch{})
+	if err != nil || p.Layout == nil || p.Background == nil || style.Layout != layout || style.Background != bg {
+		t.Fatalf("retain: %+v %+v %v", p, style, err)
+	}
+	p, style, err = ResolvePageStyle(book, prior, PagePatch{ClearLayout: true})
+	if err != nil || p.Layout != nil || p.Background == nil || style.Layout != book.Layout || style.Background != bg {
+		t.Fatalf("clear layout: %+v %+v %v", p, style, err)
+	}
+	_, _, err = ResolvePageStyle(book, prior, PagePatch{Layout: &layout, ClearLayout: true})
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("ambiguous update %v", err)
+	}
+	_, _, err = ResolvePageStyle(book, prior, PagePatch{Layout: &LayoutConfig{}})
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("empty override %v", err)
+	}
+}
+
+func TestRepositoryReusesSystemPageWithoutOverwritingItsRevisionOrArtifact(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id, .* FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(sqlmock.NewRows([]string{"id", "version_id", "pagination_version", "revision"}).AddRow("doc", "v2", 2, 4))
+	mock.ExpectQuery("SELECT v.production_text,d.config_snapshot_json FROM").WithArgs("alice", "book", "v2").WillReturnRows(sqlmock.NewRows([]string{"text", "snapshot"}).AddRow("甲。", nil))
+	mock.ExpectQuery("SELECT p.id,.* ORDER BY p.ordinal_no FOR UPDATE").WithArgs("alice", "batch", "book").WillReturnRows(previousPageRows().AddRow("p", "v1", 2, 1, 0, 2, "甲。", "digest", nil, nil, "system", false, 2, "artifact", "ready", "", "", "", 7))
+	mock.ExpectExec("UPDATE batch_factory_v12_text_pages SET version_id=.*,pagination_version=.*,ordinal_no=.*,updated_at=NOW.* WHERE id=").WithArgs("v2", 3, 1, "p").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("DELETE FROM batch_factory_v12_text_pages").WithArgs("alice", "book", 2).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("UPDATE batch_factory_v12_text_documents SET pagination_version=").WithArgs(3, nil, "doc").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	pagination, err := NewMySQLRepository(db).ReplaceSystemPages(context.Background(), Scope{"alice", "batch", "book"}, PaginationUpdate{ExpectedRevision: 4, VersionID: "v2", Pages: []PageDraft{{Text: "甲。", EndOffset: 2}}})
+	if err != nil || pagination != 3 {
+		t.Fatalf("pagination=%d, err=%v", pagination, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }

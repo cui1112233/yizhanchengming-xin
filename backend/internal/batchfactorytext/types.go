@@ -63,11 +63,13 @@ func NormalizeLineEndings(s string) string {
 
 // Offsets are half-open rune offsets into the newline-normalized version.
 type PageDraft struct {
-	Text        string        `json:"text"`
-	StartOffset int           `json:"startOffset"`
-	EndOffset   int           `json:"endOffset"`
-	Layout      *LayoutConfig `json:"layout,omitempty"`
-	Background  *Background   `json:"background,omitempty"`
+	Text            string        `json:"text"`
+	StartOffset     int           `json:"startOffset"`
+	EndOffset       int           `json:"endOffset"`
+	Layout          *LayoutConfig `json:"layout,omitempty"`
+	Background      *Background   `json:"background,omitempty"`
+	ClearLayout     bool          `json:"clearLayout,omitempty"`
+	ClearBackground bool          `json:"clearBackground,omitempty"`
 }
 
 type Page struct {
@@ -91,14 +93,82 @@ type Page struct {
 type PaginationUpdate struct {
 	ExpectedRevision int64
 	VersionID        string
-	ConfigSnapshot   json.RawMessage
+	ConfigSnapshot   json.RawMessage // Omit to keep the book settings; {} starts from defaults.
 	Pages            []PageDraft
 }
 
 // Text edits create a new Version and pagination. These edits only redraw a page.
 type PagePatch struct {
-	Layout     *LayoutConfig
-	Background *Background
+	Layout          *LayoutConfig `json:"layout,omitempty"`
+	Background      *Background   `json:"background,omitempty"`
+	ClearLayout     bool          `json:"clearLayout,omitempty"`
+	ClearBackground bool          `json:"clearBackground,omitempty"`
+}
+
+// PageStyle is the render-affecting projection of a book configuration.
+// If highlight records are version-specific, leave HighlightRevision empty to
+// scope reuse to the production version; otherwise supply their stable digest.
+type PageStyle struct {
+	Layout                LayoutConfig `json:"layout"`
+	Background            Background   `json:"background"`
+	HighlightReuseEnabled bool         `json:"highlightReuseEnabled"`
+	HighlightRevision     string       `json:"highlightRevision,omitempty"`
+}
+
+func PageStyleFromSnapshot(snapshot json.RawMessage) (PageStyle, error) {
+	var s PageStyle
+	if len(snapshot) == 0 {
+		return s, nil
+	}
+	// Earlier layout snapshots can contain the layout fields at the top level.
+	// When both forms are present the nested layout takes precedence.
+	var raw struct {
+		PageStyle
+		Layout *LayoutConfig `json:"layout"`
+	}
+	if err := json.Unmarshal(snapshot, &raw); err != nil {
+		return s, err
+	}
+	s = raw.PageStyle
+	if raw.Layout != nil {
+		s.Layout = *raw.Layout
+	} else if err := json.Unmarshal(snapshot, &s.Layout); err != nil {
+		return s, err
+	}
+	if !s.HighlightReuseEnabled {
+		s.HighlightRevision = ""
+	}
+	return s, nil
+}
+
+// ResolvePageStyle applies the independent, complete layout and background
+// overrides. Omission keeps an existing override. Explicit clear restores its
+// book setting, even when other page settings continue to override the book.
+func ResolvePageStyle(book PageStyle, prior PageDraft, changes PagePatch) (PagePatch, PageStyle, error) {
+	o := PagePatch{Layout: prior.Layout, Background: prior.Background}
+	if changes.Layout != nil {
+		if changes.ClearLayout || *changes.Layout == (LayoutConfig{}) {
+			return PagePatch{}, PageStyle{}, ErrInvalid
+		}
+		o.Layout = changes.Layout
+	} else if changes.ClearLayout {
+		o.Layout = nil
+	}
+	if changes.Background != nil {
+		if changes.ClearBackground || *changes.Background == (Background{}) {
+			return PagePatch{}, PageStyle{}, ErrInvalid
+		}
+		o.Background = changes.Background
+	} else if changes.ClearBackground {
+		o.Background = nil
+	}
+	if o.Layout != nil {
+		book.Layout = *o.Layout
+	}
+	if o.Background != nil {
+		book.Background = *o.Background
+	}
+	return o, book, nil
 }
 
 type ArtifactFile struct {
